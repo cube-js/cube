@@ -20481,6 +20481,90 @@ limit
     }
 
     #[tokio::test]
+    async fn test_case_timestamp_nanosecond() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            select 
+                "_"."order_date" as "c10" 
+            from 
+                ( 
+                    select 
+                        "order_date", 
+                        "_"."t0_0" as "t0_0", 
+                        "_"."t1_0" as "t1_0" 
+                    from 
+                        ( 
+                            select 
+                                "_"."order_date", 
+                                "_"."o0", 
+                                "_"."t0_0", 
+                                "_"."t1_0" 
+                            from 
+                                ( 
+                                    select 
+                                        "_"."order_date" as "order_date", 
+                                        "_"."o0" as "o0", 
+                                        case 
+                                            when "_"."o0" is not null then "_"."o0" 
+                                            else timestamp '1899-12-28 00:00:00' 
+                                        end as "t0_0", 
+                                        case 
+                                            when "_"."o0" is null then 0 
+                                            else 1 
+                                        end as "t1_0" 
+                                    from 
+                                        ( 
+                                            select 
+                                                "rows"."order_date" as "order_date", 
+                                                "rows"."o0" as "o0" 
+                                            from 
+                                                ( 
+                                                    select 
+                                                        "order_date" as "order_date", 
+                                                        "order_date" as "o0" 
+                                                    from 
+                                                        "public"."KibanaSampleDataEcommerce" "$Table" 
+                                                ) "rows" 
+                                            group by 
+                                                "order_date", 
+                                                "o0" 
+                                        ) "_" 
+                                ) "_" 
+                        ) "_" 
+                ) "_" 
+            order by 
+                "_"."t0_0", 
+                "_"."t1_0" 
+            limit 
+                101
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_langchain_pgcatalog_schema() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "langchain_pgcatalog_schema",
