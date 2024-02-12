@@ -1,7 +1,7 @@
 use datafusion::{
     arrow::{
         array::{self, *},
-        datatypes::DataType,
+        datatypes::{DataType, TimeUnit},
     },
     error::{DataFusionError, Result},
 };
@@ -144,6 +144,13 @@ pub fn if_then_else(
         DataType::Boolean => if_then_else!(
             array::BooleanBuilder,
             array::BooleanArray,
+            bools,
+            true_values,
+            false_values
+        ),
+        DataType::Timestamp(TimeUnit::Nanosecond, None) => if_then_else!(
+            array::TimestampNanosecondBuilder,
+            array::TimestampNanosecondArray,
             bools,
             true_values,
             false_values
