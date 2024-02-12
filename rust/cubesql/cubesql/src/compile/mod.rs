@@ -19855,7 +19855,7 @@ limit
             "tableau_extract_epoch",
             execute_query(
                 "SELECT EXTRACT(EPOCH FROM (TIMESTAMP '2050-01-01T23:01:01.22')) as t".to_string(),
-                DatabaseProtocol::MySQL
+                DatabaseProtocol::PostgreSQL
             )
             .await?
         );
