@@ -4295,6 +4295,46 @@ limit
     }
 
     #[tokio::test]
+    async fn powerbi_date_range_min_max() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"select 
+  max("rows"."order_date") as "a0", 
+  min("rows"."order_date") as "a1" 
+from 
+  ( 
+    select 
+      "order_date" 
+    from 
+      "public"."KibanaSampleDataEcommerce" "$Table" 
+  ) "rows" "#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn powerbi_inner_decimal_cast() {
         init_logger();
 
