@@ -468,7 +468,7 @@ export class BaseQuery {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
-      if (this.options.disableExternalPreAggregations && preAggForQuery.preAggregation.external) {
+      if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
         preAggForQuery = undefined;
       }
     }
