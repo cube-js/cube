@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.53](https://github.com/cube-js/cube/compare/v0.34.52...v0.34.53) (2024-02-13)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down can be incorrectly routed to Cube Store pre-aggregations ([#7752](https://github.com/cube-js/cube/issues/7752)) ([1a6451c](https://github.com/cube-js/cube/commit/1a6451c2c0bef6f5efbba2870ec0a11238b1addb))
+
+
+
+
+
 ## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

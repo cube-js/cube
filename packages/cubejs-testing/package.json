@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.34.52",
+  "version": "0.34.53",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -89,11 +89,11 @@
   "dependencies": {
     "@cubejs-backend/cubestore-driver": "^0.34.52",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/postgres-driver": "^0.34.52",
+    "@cubejs-backend/postgres-driver": "^0.34.53",
     "@cubejs-backend/query-orchestrator": "^0.34.52",
-    "@cubejs-backend/schema-compiler": "^0.34.52",
+    "@cubejs-backend/schema-compiler": "^0.34.53",
     "@cubejs-backend/shared": "^0.34.47",
-    "@cubejs-backend/testing-shared": "^0.34.52",
+    "@cubejs-backend/testing-shared": "^0.34.53",
     "@cubejs-client/ws-transport": "^0.34.37",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
