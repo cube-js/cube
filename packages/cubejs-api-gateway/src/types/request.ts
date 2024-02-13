@@ -126,6 +126,7 @@ type QueryRequest = BaseRequest & {
   expressionParams?: string[];
   exportAnnotatedSql?: boolean;
   memberExpressions?: boolean;
+  disableExternalPreAggregations?: boolean;
 };
 
 type SqlApiRequest = BaseRequest & {

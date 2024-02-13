@@ -202,6 +202,7 @@ export class BaseQuery {
       className: this.constructor.name,
       externalClassName: this.options.externalQueryClass && this.options.externalQueryClass.name,
       preAggregationQuery: this.options.preAggregationQuery,
+      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
       historyQueries: this.options.historyQueries, // TODO too heavy for key
@@ -467,6 +468,9 @@ export class BaseQuery {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
+      if (this.options.disableExternalPreAggregations && preAggForQuery.preAggregation.external) {
+        preAggForQuery = undefined;
+      }
     }
     if (preAggForQuery) {
       const {
@@ -537,7 +541,7 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -556,7 +560,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
