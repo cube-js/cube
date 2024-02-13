@@ -1297,8 +1297,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                     c,
                     ScalarValue::Date32(_)
                         | ScalarValue::Date64(_)
-                        | ScalarValue::Int32(_)
                         | ScalarValue::Int64(_)
+                        | ScalarValue::Int32(_)
                         | ScalarValue::Float64(_)
                         | ScalarValue::IntervalYearMonth(_)
                         | ScalarValue::IntervalDayTime(_)
