@@ -14,7 +14,10 @@ use datafusion::{
 
 use crate::{
     compile::MetaContext,
-    sql::{session::DatabaseProtocol, ColumnType, SessionManager, SessionState},
+    sql::{
+        session::DatabaseProtocol, temp_tables::TempTableProvider, ColumnType, SessionManager,
+        SessionState,
+    },
     transport::V1CubeMetaExt,
     CubeError,
 };
@@ -272,7 +275,9 @@ impl DatabaseProtocol {
         table_provider: Arc<dyn datasource::TableProvider>,
     ) -> Result<String, CubeError> {
         let any = table_provider.as_any();
-        Ok(if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
+        Ok(if let Some(t) = any.downcast_ref::<TempTableProvider>() {
+            t.name().to_string()
+        } else if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
             t.table_name().to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaColumnsProvider>() {
             "information_schema.columns".to_string()
@@ -399,23 +404,28 @@ impl DatabaseProtocol {
                 table.to_ascii_lowercase(),
             ),
             datafusion::catalog::TableReference::Bare { table } => {
-                if table.starts_with("pg_") {
-                    (
-                        context.session_state.database().unwrap_or("db".to_string()),
-                        "pg_catalog".to_string(),
-                        table.to_ascii_lowercase(),
-                    )
+                let table_lower = table.to_ascii_lowercase();
+                let schema = if context.session_state.temp_tables().has(&table_lower) {
+                    "pg_temp_3"
+                } else if table.starts_with("pg_") {
+                    "pg_catalog"
                 } else {
-                    (
-                        context.session_state.database().unwrap_or("db".to_string()),
-                        "public".to_string(),
-                        table.to_ascii_lowercase(),
-                    )
-                }
+                    "public"
+                };
+                (
+                    context.session_state.database().unwrap_or("db".to_string()),
+                    schema.to_string(),
+                    table_lower,
+                )
             }
         };
 
         match schema.as_str() {
+            "pg_temp_3" => {
+                if let Some(temp_table) = context.session_state.temp_tables().get(&table) {
+                    return Some(Arc::new(TempTableProvider::new(table, temp_table)));
+                }
+            }
             "public" => {
                 if let Some(cube) = context
                     .meta

@@ -9,6 +9,7 @@ pub(crate) mod service;
 pub(crate) mod session;
 pub(crate) mod session_manager;
 pub(crate) mod statement;
+pub(crate) mod temp_tables;
 pub(crate) mod types;
 
 pub use auth_service::{

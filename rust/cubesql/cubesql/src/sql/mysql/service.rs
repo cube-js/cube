@@ -224,6 +224,7 @@ impl MySqlConnection {
 
                     return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
+                crate::compile::QueryPlan::CreateTempTable(_, _, _, _, _) => return Err(CubeError::internal("CREATE TABLE is not supported over MySQL".to_string())),
             }
         }
 
