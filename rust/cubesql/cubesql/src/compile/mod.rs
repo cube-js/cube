@@ -21514,8 +21514,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         .await
         .as_logical_plan();
 
-        println!("!!!! {:?}", logical_plan);
-
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
