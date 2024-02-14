@@ -71,15 +71,6 @@ jobs:
         node-version: [ 16 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
-        include:
-          - target: x86_64-unknown-linux-gnu
-            package_target_arch: x64
-            package_target_platform: linux
-            package_target_libc: glibc
-          - target: aarch64-unknown-linux-gnu
-            package_target_arch: arm64
-            package_target_platform: linux
-            package_target_libc: glibc
       fail-fast: false
     container:
       image: cubejs/rust-cross:${{ matrix.target }}-30052023
