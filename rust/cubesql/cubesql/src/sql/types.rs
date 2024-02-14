@@ -148,6 +148,7 @@ pub enum CommandCompletion {
     Deallocate,
     DeallocateAll,
     Discard(String),
+    DropTable,
 }
 
 impl CommandCompletion {
@@ -174,6 +175,7 @@ impl CommandCompletion {
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT
             CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+            CommandCompletion::DropTable => CommandComplete::Plain("DROP TABLE".to_string()),
         }
     }
 }

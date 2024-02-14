@@ -924,6 +924,92 @@ impl PostgresIntegrationTestSuite {
         Ok(())
     }
 
+    async fn test_temp_tables(&self) -> RunResult<()> {
+        // Create temporary table in current session
+        self.test_simple_query(
+            r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#
+            .to_string(),
+            |messages| {
+                let SimpleQueryMessage::CommandComplete(rows) = &messages[0] else {
+                    panic!("Must be CommandComplete");
+                };
+
+                assert_eq!(*rows, 2);
+            },
+        )
+        .await?;
+
+        // Check that we can query it and we get the correct data
+        self.test_simple_query(
+            "SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC".to_string(),
+            |messages| {
+                assert_eq!(messages.len(), 3);
+
+                let SimpleQueryMessage::Row(row) = &messages[0] else {
+                    panic!("Must be Row, 0");
+                };
+
+                assert_eq!(row.get(0), Some("5"));
+                assert_eq!(row.get(1), Some("c"));
+
+                let SimpleQueryMessage::Row(row) = &messages[1] else {
+                    panic!("Must be Row, 1");
+                };
+
+                assert_eq!(row.get(0), Some("10"));
+                assert_eq!(row.get(1), Some("d"));
+
+                let SimpleQueryMessage::CommandComplete(rows) = &messages[2] else {
+                    panic!("Must be CommandComplete, 2");
+                };
+
+                assert_eq!(*rows, 2);
+            },
+        )
+        .await?;
+
+        // Other sessions must have no access to temp tables
+        let new_client = Self::create_client(
+            format!(
+                "host=127.0.0.1 port={} dbname=meow user=test password=test",
+                self.port
+            )
+            .parse()
+            .unwrap(),
+        )
+        .await;
+
+        let result = new_client
+            .simple_query("SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC")
+            .await;
+        assert!(result.is_err());
+
+        // Drop table, make sure we can't query it anymore
+        self.test_simple_query("DROP TABLE temp_table".to_string(), |messages| {
+            let SimpleQueryMessage::CommandComplete(rows) = &messages[0] else {
+                panic!("Must be CommandComplete");
+            };
+
+            assert_eq!(*rows, 0);
+        })
+        .await?;
+
+        let result = self
+            .test_simple_query(
+                "SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
     fn assert_row(&self, message: &SimpleQueryMessage, expected_value: String) {
         if let SimpleQueryMessage::Row(row) = message {
             assert_eq!(row.get(0), Some(expected_value.as_str()));
@@ -973,6 +1059,7 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_df_panic_handle().await?;
         self.test_simple_query_discard_all().await?;
         self.test_database_change().await?;
+        self.test_temp_tables().await?;
 
         // PostgreSQL doesn't support unsigned integers in the protocol, it's a constraint only
         self.test_snapshot_execute_query(
