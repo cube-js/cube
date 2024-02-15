@@ -27,7 +27,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     let connectionId = 0;
 
-    async function createPostgresClient(user: string, password: string, pgPort: number) {
+    async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
       if (!pgPort) {
         return <any>undefined;
       }

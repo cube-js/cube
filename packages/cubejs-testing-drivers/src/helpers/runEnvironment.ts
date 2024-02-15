@@ -182,7 +182,7 @@ export async function runEnvironment(
     ),
     pgPort: fixtures.cube.ports[1] && environment.getContainer('cube').getMappedPort(
       parseInt(fixtures.cube.ports[1], 10),
-    ),
+    ) || undefined,
     logs: await environment.getContainer('cube').logs(),
   };
 

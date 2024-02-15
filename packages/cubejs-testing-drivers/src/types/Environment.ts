@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 export type Environment = {
   cube: {
       port: number;
-      pgPort: number;
+      pgPort?: number;
       logs: Readable;
   };
   store: {
