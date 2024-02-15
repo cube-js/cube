@@ -1,5 +1,6 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
+import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
@@ -22,6 +23,38 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
+    let connection: PgClient;
+
+    let connectionId = 0;
+
+    async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
+      if (!pgPort) {
+        return <any>undefined;
+      }
+      connectionId++;
+      const currentConnId = connectionId;
+
+      console.debug(`[pg] new connection ${currentConnId}`);
+
+      const conn = new PgClient({
+        database: 'db',
+        port: pgPort,
+        host: 'localhost',
+        user,
+        password,
+        ssl: false,
+      });
+      conn.on('error', (err) => {
+        console.log(err);
+      });
+      conn.on('end', () => {
+        console.debug(`[pg] end ${currentConnId}`);
+      });
+
+      await conn.connect();
+
+      return conn;
+    }
 
     function execute(name: string, test: () => Promise<void>) {
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
@@ -30,6 +63,15 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         it(name, test);
       }
     }
+
+    function executePg(name: string, test: () => Promise<void>) {
+      if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else {
+        it(name, test);
+      }
+    }
+
     const apiToken = sign({}, 'mysupersecret');
 
     const suffix = randomBytes(8).toString('hex');
@@ -64,6 +106,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         console.log('Error creating fixtures', e.stack);
         throw e;
       }
+      connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
     });
   
     afterAll(async () => {
@@ -1441,5 +1484,21 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     if (includeIncrementalSchemaSuite) {
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }
+
+    executePg('SQL API: powerbi min max push down', async () => {
+      const res = await connection.query(`
+      select
+  max("rows"."orderDate") as "a0",
+  min("rows"."orderDate") as "a1"
+from
+  (
+    select
+      "orderDate"
+    from
+      "public"."ECommerce" "$Table"
+  ) "rows"
+  `);
+      expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
+    });
   });
 }

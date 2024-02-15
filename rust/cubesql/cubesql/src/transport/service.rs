@@ -399,6 +399,7 @@ impl SqlTemplates {
             .chain(projection.iter())
             .map(|c| c.clone())
             .collect::<Vec<_>>();
+        let quoted_from_alias = self.quote_identifier(&alias)?;
         self.render_template(
             "statements/select",
             context! {
@@ -408,7 +409,7 @@ impl SqlTemplates {
                 aggregate => aggregate,
                 projection => projection,
                 order_by => order_by,
-                from_alias => alias,
+                from_alias => quoted_from_alias,
                 limit => limit,
                 offset => offset,
             },

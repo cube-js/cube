@@ -890,7 +890,15 @@ impl CubeScanWrapperNode {
                             match c.relation.as_ref() {
                                 Some(r) => format!(
                                     "{}.{}",
-                                    r,
+                                    sql_generator
+                                        .get_sql_templates()
+                                        .quote_identifier(&r)
+                                        .map_err(|e| {
+                                            DataFusionError::Internal(format!(
+                                                "Can't generate SQL for column: {}",
+                                                e
+                                            ))
+                                        })?,
                                     sql_generator
                                         .get_sql_templates()
                                         .quote_identifier(&c.name)

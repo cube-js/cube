@@ -174,11 +174,15 @@ export async function runEnvironment(
   }
   const cube = cliEnv ? {
     port: 4000,
+    pgPort: parseInt(fixtures.cube.ports[1], 10),
     logs: cliEnv.cli?.stdout || process.stdout
   } : {
     port: environment.getContainer('cube').getMappedPort(
       parseInt(fixtures.cube.ports[0], 10),
     ),
+    pgPort: fixtures.cube.ports[1] && environment.getContainer('cube').getMappedPort(
+      parseInt(fixtures.cube.ports[1], 10),
+    ) || undefined,
     logs: await environment.getContainer('cube').logs(),
   };
 
