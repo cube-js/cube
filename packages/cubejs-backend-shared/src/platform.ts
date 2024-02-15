@@ -27,7 +27,7 @@ export function detectLibc() {
       // Using pipe to protect unexpect STDERR output
       stdio: 'pipe',
     });
-    if (status === 0) {
+    if (status === 0 && stdout) {
       if (stdout.includes('musl')) {
         return 'musl';
       }
@@ -35,7 +35,7 @@ export function detectLibc() {
       if (stdout.includes('gnu')) {
         return 'gnu';
       }
-    } else {
+    } else if (stderr) {
       if (stderr.includes('musl')) {
         return 'musl';
       }
