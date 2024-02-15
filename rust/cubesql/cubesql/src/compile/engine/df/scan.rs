@@ -11,7 +11,7 @@ pub use datafusion::{
     arrow::{
         array::{
             ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int32Builder,
-            Int64Builder, StringBuilder,
+            Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -1187,6 +1187,11 @@ pub fn transform_response<V: ValueObject>(
                         },
                     }
                 )
+            }
+            DataType::Null => {
+                let len = response.len()?;
+                let array = NullArray::new(len);
+                Arc::new(array)
             }
             t => {
                 return Err(CubeError::user(format!(
