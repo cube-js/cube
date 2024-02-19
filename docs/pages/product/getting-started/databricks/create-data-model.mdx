@@ -85,9 +85,7 @@ three possible statuses: **processing**, **shipped**, or **completed**. We will
 create a new measure `completed_count` by using a filter on that dimension. To
 do this, we will use a
 [filter parameter](/reference/data-model/measures#filters) of the
-measure and
-[refer](/product/data-modeling/syntax#referring-to-objects) to the
-existing dimension.
+measure and [refer][ref-member-references] to the existing dimension.
 
 Add the following measure definition to your `model/cubes/orders.yml` file. It
 should be included within the `measures` block.
@@ -211,3 +209,5 @@ they should be joined for that particular view.
 After saving, you can experiment with your newly created view in the Playground.
 In the next section, we will learn how to query our `orders_view` using a BI
 tool.
+
+[ref-member-references]: /product/data-modeling/syntax#references

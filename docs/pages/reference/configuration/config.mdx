@@ -629,8 +629,6 @@ module.exports = {
 
 </CodeTabs>
 
-Learn more about [scheduled refreshes here][ref-caching-up-to-date].
-
 Best practice is to run `scheduled_refresh_timer` in a separate worker Cube
 instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
 should be used instead.
@@ -1149,7 +1147,7 @@ using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 ### `can_switch_sql_user`
 
 Used in the [SQL API][ref-sql-api],. Default
-implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
+implementation depends on `CUBEJS_SQL_SUPER_USER` and return `true` when it's
 equal to session's user.
 
 Called on each change request from Cube SQL API.
@@ -1313,7 +1311,6 @@ If not defined, Cube will lookup for environment variable
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-caching-up-to-date]: /product/caching#keeping-cache-up-to-date
 [ref-development-mode]: /product/configuration#development-mode
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-rest-api]: /reference/rest-api
@@ -1323,29 +1320,28 @@ If not defined, Cube will lookup for environment variable
   /reference/data-model/pre-aggregations#refresh_key
 [ref-schema-cube-ref-refresh-key]:
   /reference/data-model/cube#refresh_key
-[ref-schema-cube-ref-ctx-sec-ctx]:
-  /reference/data-model/cube#security-context
+[ref-schema-cube-ref-ctx-sec-ctx]: /reference/data-model/context-variables#security_context
 [ref-schema-ref-preaggs-rollup]:
   /reference/data-model/pre-aggregations#rollup
 [ref-sec]: /product/auth
 [ref-sec-ctx]: /product/auth/context
 [self-opts-req-ctx]: #requestcontext
 [self-opts-checkauth]: #checkauth
-[self-pre-aggregations-schema]: #preaggregationsschema
-[self-opts-ctx-to-appid]: #contexttoappid
-[self-driver-factory]: #driverfactory
+[self-pre-aggregations-schema]: #pre_aggregations_schema
+[self-opts-ctx-to-appid]: #context_to_app_id
+[self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-model/cube#data_source
-[self-opts-sched-refresh-ctxs]: #scheduledrefreshcontexts
-[self-opts-sched-refresh-tz]: #scheduledrefreshtimezones
-[self-repofactory]: #repositoryfactory
-[self-schemafilerepo]: #schemafilerepository
-[self-schemapath]: #schemaPath
+[self-opts-sched-refresh-ctxs]: #scheduled_refresh_contexts
+[self-opts-sched-refresh-tz]: #scheduled_refresh_time_zones
+[self-repofactory]: #repository_factory
+[self-schemafilerepo]: #schema_file_repository
+[self-schemapath]: #schema_path
 [ref-exec-environment-globals]:
-  /product/data-modeling/dynamic/schema-execution-environment#node-js-globals-process-env-console-log-and-others
+  /product/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
 [ref-environment-variables]: /reference/configuration/environment-variables
-[ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
+[ref-rest-scopes]: /product/apis-integrations/rest-api#api-scopes
 [ref-config-options]: /product/configuration#configuration-options
-[self-orchestrator-id]: #contexttoorchestratorid
+[self-orchestrator-id]: #context_to_orchestrator_id
 [ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
 [ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch
 
