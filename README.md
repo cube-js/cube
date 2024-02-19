@@ -69,7 +69,7 @@ For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting
 - [Documentation](https://cube.dev/docs?ref=github-readme)
 - [Getting Started](https://cube.dev/docs/getting-started?ref=github-readme)
 - [Examples & Tutorials](https://cube.dev/docs/examples?ref=github-readme)
-- [Architecture](https://cube.dev/docs/cubejs-introduction?ref=github-readme#architecture)
+- [Architecture](https://cube.dev/docs/product/introduction#four-layers-of-semantic-layer)
 
 ## Contributing
 
