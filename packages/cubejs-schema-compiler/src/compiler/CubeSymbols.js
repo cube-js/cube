@@ -11,6 +11,7 @@ const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
+  FILTER_GROUP: 'filterGroup',
   SQL_UTILS: 'sqlUtils'
 };
 
