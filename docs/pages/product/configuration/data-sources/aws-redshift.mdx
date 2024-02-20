@@ -110,6 +110,9 @@ pre-aggregations.
 
 ### Batching
 
+Cube requires the Redshift user to have ownership of a schema in Redshift to support pre-aggregations.  
+By default this schema is named `prod_pre_aggregations` but it can be customized using the `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable.
+
 No extra configuration is required to configure batching for AWS Redshift.
 
 ### Export bucket
