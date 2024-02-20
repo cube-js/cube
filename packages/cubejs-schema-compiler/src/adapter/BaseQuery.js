@@ -2959,22 +2959,22 @@ export class BaseQuery {
 
   static extractFilterMembers(filter) {
     if (filter.operator === 'and' || filter.operator === 'or') {
-      return filter.values.map(f => BaseQuery.extractFilterMembers(f)).reduce((a, b) => ({ ...a, ...b }), {});
+      return filter.values.map(f => BaseQuery.extractFilterMembers(f)).reduce((a, b) => ((a && b) ? { ...a, ...b } : null), {});
     } else if (filter.measure || filter.dimension) {
       return {
         [filter.measure || filter.dimension]: true
       };
     } else {
-      throw new Error(`Expected measure, dimension, and/or operator for a filter but found: ${filter} (${JSON.stringify(filter)})`);
+      return null;
     }
   }
 
   static findAndSubTreeForFilterGroup(filter, groupMembers, newGroupFilter) {
-    if ((filter.operator === 'and' || filter.operator === 'or') && !filter.values.length) {
+    if ((filter.operator === 'and' || filter.operator === 'or') && !filter.values?.length) {
       return null;
     }
     const filterMembers = BaseQuery.extractFilterMembers(filter);
-    if (Object.keys(filterMembers).every(m => groupMembers.indexOf(m) !== -1)) {
+    if (filterMembers && Object.keys(filterMembers).every(m => groupMembers.indexOf(m) !== -1)) {
       return filter;
     }
     if (filter.operator === 'and') {
