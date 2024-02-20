@@ -31,7 +31,7 @@ export class BaseGroupFilter {
         return null;
       }
       return `(${sql})`;
-    }).filter(R.identity).join(` ${this.operator} `);
+    }).filter(R.identity).join(` ${this.operator.toUpperCase()} `);
 
     if (!r.length) {
       return null;
