@@ -71,7 +71,6 @@ export class MaterializeDriver extends PostgresDriver {
       ssl?: boolean | { rejectUnauthorized: boolean },
     } = {},
   ) {
-
     // Enable SSL by default if not set explicitly to false
     const sslEnv = process.env.CUBEJS_DB_SSL;
     if (sslEnv !== undefined && sslEnv !== 'false') {
