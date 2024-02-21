@@ -38,7 +38,6 @@ const envVarsDbMap = [
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
       { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
-      { title: 'Materialize', driver: 'materialize', logo: logoMaterialize },
       { title: 'Crate', driver: 'crate', logo: logoCrate },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
@@ -117,6 +116,15 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       // { env: 'CUBEJS_DB_SSL_CERT', title: '' },
       // { env: 'CUBEJS_DB_SSL_CIPHERS' },
       // { env: 'CUBEJS_DB_SSL_PASSPHRASE' }
+    ],
+  },
+  {
+    databases: [{ title: 'Materialize', driver: 'materialize', logo: logoMaterialize },],
+    settings: [
+      ...BASE_SERVER,
+      ...BASE_CRED,
+      DB_NAME,
+      { env: 'CUBEJS_MZ_CLUSTER', title: 'Cluster' },
     ],
   },
   {

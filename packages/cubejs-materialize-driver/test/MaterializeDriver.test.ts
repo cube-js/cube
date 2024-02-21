@@ -31,6 +31,7 @@ describe('MaterializeDriver', () => {
       user: 'materialize',
       password: 'materialize',
       database: 'materialize',
+      ssl: false,
     });
     await driver.query('CREATE SCHEMA IF NOT EXISTS test;', []);
   });
@@ -149,4 +150,13 @@ describe('MaterializeDriver', () => {
       );
     }
   });
+
+  test('cluster', async () => {
+    const data = await driver.query(`SHOW CLUSTER;`, []);
+    expect(data).toEqual([
+      {
+        'cluster': 'default',
+      }]);
+  });
+
 });

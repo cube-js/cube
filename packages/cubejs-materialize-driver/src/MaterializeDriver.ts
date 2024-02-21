@@ -59,8 +59,29 @@ export class MaterializeDriver extends PostgresDriver {
        * request before determining it as not valid. Default - 10000 ms.
        */
       testConnectionTimeout?: number,
+
+      /**
+       * Optional cluster name to set for the connection.
+       */
+      cluster?: string,
+
+      /**
+       * SSL is enabled by default. Set to false to disable.
+       */
+      ssl?: boolean | { rejectUnauthorized: boolean },
     } = {},
   ) {
+
+    // Enable SSL by default if not set explicitly to false
+    const sslEnv = process.env.CUBEJS_DB_SSL;
+    if (sslEnv !== undefined && sslEnv !== 'false') {
+      options.ssl = {
+        rejectUnauthorized: sslEnv === 'true'
+      };
+    } else if (options.ssl === undefined) {
+      options.ssl = true;
+    }
+
     super(options);
   }
 
@@ -69,6 +90,11 @@ export class MaterializeDriver extends PostgresDriver {
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // Support for statement_timeout is still pending. https://github.com/MaterializeInc/materialize/issues/10390
+
+    // Set cluster to the CUBEJS_MZ_CLUSTER env variable if it exists
+    if (process.env.CUBEJS_MZ_CLUSTER) {
+      await conn.query(`SET CLUSTER TO ${process.env.CUBEJS_MZ_CLUSTER}`);
+    }
   }
 
   protected async loadUserDefinedTypes(): Promise<void> {
