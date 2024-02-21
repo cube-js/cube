@@ -69,6 +69,11 @@ export class MaterializeDriver extends PostgresDriver {
        * SSL is enabled by default. Set to false to disable.
        */
       ssl?: boolean | { rejectUnauthorized: boolean },
+
+      /**
+       * Application name to set for the connection.
+       */
+      application_name?: string,
     } = {},
   ) {
     // Enable SSL by default if not set explicitly to false
@@ -80,6 +85,8 @@ export class MaterializeDriver extends PostgresDriver {
     } else if (options.ssl === undefined) {
       options.ssl = true;
     }
+    // Set application name to 'cubejs-materialize-driver' by default
+    options.application_name = options.application_name || 'cubejs-materialize-driver';
 
     super(options);
   }
