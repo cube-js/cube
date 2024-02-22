@@ -213,9 +213,8 @@ export class JoinGraph {
   }
 
   checkIfCubeMultiplied(cube, join) {
-    const res = join.from === cube && join.join.relationship === 'hasMany' ||
+    return join.from === cube && join.join.relationship === 'hasMany' ||
       join.to === cube && join.join.relationship === 'belongsTo';
-    return res;
   }
 
   joinsByPath(path) {
