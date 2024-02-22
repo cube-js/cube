@@ -36,6 +36,8 @@ export interface DownloadTableBase {
    * Optional function to release stream/cursor/connection
    */
   release?: () => Promise<void>;
+
+  isUnloadSupported?: boolean;
 }
 
 export interface DownloadTableMemoryData extends DownloadTableBase {
