@@ -1244,7 +1244,7 @@ const variables: Record<string, (...args: any) => any> = {
     dataSource: string,
   }) => (
     process.env[
-      keyByDataSource('CUBEJS_MZ_CLUSTER', dataSource)
+      keyByDataSource('CUBEJS_DB_MATERIALIZE_CLUSTER', dataSource)
     ]
   ),
 

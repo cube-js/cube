@@ -124,7 +124,7 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       ...BASE_SERVER,
       ...BASE_CRED,
       DB_NAME,
-      { env: 'CUBEJS_MZ_CLUSTER', title: 'Cluster' },
+      { env: 'CUBEJS_DB_MATERIALIZE_CLUSTER', title: 'Cluster' },
     ],
   },
   {

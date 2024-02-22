@@ -11,7 +11,7 @@ Pure Javascript Materialize driver. Based on pg driver for PostgreSQL.
 
 ## Support
 
-This driver is maintained by [Bobby Iliev](https://github.com/bobbyiliev). This package is **community supported** and should be used at your own risk.
+This driver has been contributed by [Joaquin Colacci](https://github.com/joacoc) and is currently maintained by [Bobby Iliev](https://github.com/bobbyiliev). This package is **community supported** and should be used at your own risk.
 
 While the Cube Dev team is happy to review and accept future community contributions, we don't have active plans for further development. This includes bug fixes unless they affect different parts of Cube.js. **We're looking for maintainers for this package.** If you'd like to become a maintainer, please contact us in Cube.js Slack. 
 

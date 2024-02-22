@@ -97,9 +97,9 @@ export class MaterializeDriver extends PostgresDriver {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // Support for statement_timeout is still pending. https://github.com/MaterializeInc/materialize/issues/10390
 
-    // Set cluster to the CUBEJS_MZ_CLUSTER env variable if it exists
-    if (process.env.CUBEJS_MZ_CLUSTER) {
-      await conn.query(`SET CLUSTER TO ${process.env.CUBEJS_MZ_CLUSTER}`);
+    // Set cluster to the CUBEJS_DB_MATERIALIZE_CLUSTER env variable if it exists
+    if (process.env.CUBEJS_DB_MATERIALIZE_CLUSTER) {
+      await conn.query(`SET CLUSTER TO ${process.env.CUBEJS_DB_MATERIALIZE_CLUSTER}`);
     }
   }
 
