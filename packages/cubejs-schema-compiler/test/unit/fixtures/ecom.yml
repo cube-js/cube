@@ -1,0 +1,90 @@
+cubes:
+  - name: orders
+    sql_table: orders
+
+    joins:
+      - name: customers
+        sql: "{CUBE}.customer_id = {customers}.id"
+        relationship: many_to_one
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+      - name: total_revenue
+        sql: revenue
+        type: sum
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: customer_id
+        sql: customer_id
+        type: number
+
+##############################
+
+  - name: customers
+    sql_table: customers
+
+    joins:
+      
+      - name: countries
+        sql: "{CUBE}.country_id = {countries}.id"
+        relationship: many_to_one
+
+    dimensions:
+      - name: genger
+        sql: "'male'"
+        type: string
+
+##############################
+
+  - name: countries
+    sql_table: countries
+
+    joins: []
+
+    measures:
+      - name: count
+        sql: id
+        type: count
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+
+      - name: country
+        sql: country
+        type: string
+
+views:
+  - name: sp
+    cubes:
+      - join_path: orders
+        includes: "*"
+        prefix: true
+
+      - join_path: customers.countries
+        includes: "*"
+        split: true
+
+  - name: orders_view
+    cubes:
+      - join_path: customers
+        prefix: true
+        includes: "*"
+
+      - join_path: orders
+        split: true
+        includes: "*"
+
+      - join_path: customers.countries
+        split: true
+        includes: "*"

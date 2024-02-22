@@ -5,6 +5,12 @@ import R from 'ramda';
 import { BaseMeasure, BaseQuery } from '../adapter';
 import { UserError } from './UserError';
 
+const deprectedRelationships = {
+  hasOne: 'one_to_one',
+  hasMany: 'one_to_many',
+  belongsTo: 'many_to_one',
+};
+
 export class CubeToMetaTransformer {
   /**
    * @param {import('./CubeValidator').CubeValidator} cubeValidator
@@ -19,11 +25,12 @@ export class CubeToMetaTransformer {
     this.contextEvaluator = contextEvaluator;
     this.joinGraph = joinGraph;
     this.cubes = [];
+    this.splitJoins = {};
   }
 
   compile(cubes, errorReporter) {
     this.assignSplitJoins();
-    
+
     this.cubes = this.cubeSymbols.cubeList
       .filter(this.cubeValidator.isCubeValid.bind(this.cubeValidator))
       .map((v) => this.transform(v, errorReporter.inContext(`${v.name} cube`)))
@@ -36,74 +43,198 @@ export class CubeToMetaTransformer {
     this.queries = this.cubes;
   }
 
+  findSplitViewJoins(baseSplitView) {
+    const { undirectedNodes } = this.joinGraph;
+
+    const viewName = baseSplitView.name;
+    
+    // non-split nodes
+    const baseNodes = baseSplitView.cubes
+      .filter((c) => !c.split)
+      .map((c) => c.fullPath);
+    const splitNodes = baseSplitView.cubes
+      .filter((c) => c.split)
+      .map((c) => c.fullPath);
+
+    const cubeToSplitNodePath = Object.fromEntries(splitNodes
+      .map((c) => {
+        const paths = c.split('.');
+        return [paths[paths.length - 1], c];
+      }));
+
+    const isBaseNode = (node) => baseNodes.includes(node);
+    const isSplitNode = (node) => cubeToSplitNodePath[node] !== undefined;
+
+    // baseNodeJoin - join betwen all non-split nodes
+    const baseNodesJoin = this.joinGraph.buildJoin(baseNodes);
+    const isBaseNodeJoinMultiplied = baseNodesJoin.joins.some(({ join }) => {
+      const relationship = deprectedRelationships[join.relationship] || join.relationship;
+      return relationship === 'one_to_many' || relationship === 'many_to_one';
+    });
+
+    const builtJoin = this.joinGraph.buildJoin(baseNodes.concat(splitNodes));
+
+    const nodesToVisit = new Set(baseNodes);
+
+    builtJoin.joins.forEach((j) => {
+      nodesToVisit.add(j.from);
+      nodesToVisit.add(j.to);
+    });
+
+    function findJoin(node1, node2) {
+      const currentJoin = builtJoin.joins.find((j) => {
+        if (j.from === node1 && j.to === node2) {
+          return j;
+        }
+        if (j.from === node2 && j.to === node1) {
+          return j;
+        }
+
+        return undefined;
+      });
+
+      if (!currentJoin) {
+        throw Error(`No relationship between ${node1} and ${node2} found`);
+      }
+
+      return currentJoin;
+    }
+
+    const splitJoins = {};
+    const visited = new Set();
+    const queue = [{
+      node: baseNodes[0],
+      parent: null,
+      route: []
+    }];
+    while (queue.length > 0) {
+      const { node, parent, route } = queue.shift();
+      
+      if (!visited.has(node)) {
+        if (isSplitNode(node)) {
+          const currentJoin = findJoin(parent, node);
+          
+          const routeToCalculateMultiplication = [];
+          let closestNode = null;
+          // some other node defines this join, we need to find the node
+          let i = route.length - 1;
+          while (i >= 0 && !closestNode) {
+            if (isBaseNode(route[i])) {
+              closestNode = viewName;
+            } else if (isSplitNode(route[i])) {
+              closestNode = route[i];
+            }
+            routeToCalculateMultiplication.push(route[i]);
+            i--;
+          }
+          
+          const isRouteMultiplied = (() => {
+            if (routeToCalculateMultiplication.length === 1) {
+              return false;
+            }
+
+            const edges = [];
+            for (let j = 0; j < routeToCalculateMultiplication.length - 1; j++) {
+              const edge = [routeToCalculateMultiplication[j], routeToCalculateMultiplication[j + 1]];
+              edges.push(edge);
+            }
+
+            return edges.some(([from, to]) => {
+              const { join } = findJoin(from, to);
+
+              const relationship = deprectedRelationships[join.relationship] || join.relationship;
+              return relationship === 'one_to_many' || relationship === 'many_to_one';
+            });
+          })();
+
+          if (!closestNode) {
+            throw Error(`No closest node found for ${node}`);
+          }
+
+          const relationship = (isMultiplied) => {
+            const _relationship = deprectedRelationships[currentJoin.join.relationship] || currentJoin.join.relationship;
+
+            if (isMultiplied) {
+              if (currentJoin.from === node) {
+                if (_relationship === 'many_to_one') {
+                  return 'many_to_many';
+                }
+                
+                if (_relationship === 'one_to_one') {
+                  return 'one_to_many';
+                }
+              } else {
+                if (_relationship === 'one_to_many') {
+                  return 'many_to_many';
+                }
+                
+                if (_relationship === 'one_to_one') {
+                  return 'many_to_one';
+                }
+              }
+            }
+
+            return _relationship;
+          };
+
+          const splitJoin = (() => {
+            if (currentJoin.from === node) {
+              const multiplied = closestNode === viewName ? (isRouteMultiplied || isBaseNodeJoinMultiplied) : isRouteMultiplied;
+              return {
+                node,
+                relationship: relationship(multiplied),
+                to: closestNode,
+              };
+            } else if (closestNode === viewName) {
+              return {
+                node: viewName,
+                relationship: relationship(isBaseNodeJoinMultiplied),
+                to: node,
+              };
+            } else {
+              return {
+                node: closestNode,
+                relationship: relationship(isRouteMultiplied),
+                to: node,
+              };
+            }
+          })();
+          
+          splitJoins[splitJoin.node] = [
+            ...(splitJoins[splitJoin.node] || []),
+            {
+              to: splitJoin.to,
+              relationship: splitJoin.relationship,
+            }
+          ];
+        }
+        visited.add(node);
+        queue.push(
+          ...Object.keys(undirectedNodes[node] || {}).map(neighbor => ({ node: neighbor, parent: node, route: [...route, node] }))
+        );
+      }
+    }
+
+    return splitJoins;
+  }
+
   /**
    * @protected
    */
   assignSplitJoins() {
-    const joinPathsBySplitId = {};
-    for (const entity of this.cubeSymbols.cubeList) {
-      if (entity.splitId) {
-        joinPathsBySplitId[entity.splitId] = [...(joinPathsBySplitId[entity.splitId] || []), entity.fullPath];
-      }
-    }
+    const baseSplitViews = this.cubeSymbols.cubeList.filter(
+      (c) => c.isView && !c.isSplitView && c.splitId
+    );
     
-    const foundJoins = {};
-
-    for (const [splitId, joinPaths] of Object.entries(joinPathsBySplitId)) {
-      for (const [index, joinPath] of joinPaths.entries()) {
-        let j = index + 1;
-        while (j < joinPaths.length) {
-          const pair = ([joinPath, joinPaths[j]].map((p) => (p.split('.').length > 1 ? p.split('.') : p)));
-          
-          try {
-            const join = this.joinGraph.buildJoin(pair);
-            
-            const { relationship } = join.joins[0].join;
-            
-            if (!foundJoins[splitId]) {
-              foundJoins[splitId] = [];
-            }
-            
-            // We only need to know if 2 split views are joinable,
-            // actual joins are defined by cubes' `joins` field
-            let to = joinPath;
-            if (to === join.root) {
-              to = joinPaths[j];
-            }
-            
-            foundJoins[splitId].push({
-              pair,
-              // where to put this join
-              fullPath: join.root,
-              // joinpath on splitId
-              to,
-              relationship,
-              actualJoin: join
-            });
-          } catch (_) {
-          //
-          }
-
-          j++;
-        }
+    for (const splitView of baseSplitViews) {
+      let join = null;
+      try {
+        join = this.findSplitViewJoins(splitView);
+      } catch (e) {
+        console.log('Failed to find split view joins', e.message);
       }
-    }
-    
-    const { cubeList } = this.cubeSymbols;
-          
-    for (const [splitId, joins] of Object.entries(foundJoins)) {
-      for (const join of joins) {
-        const root = cubeList.find((cl) => cl.splitId === splitId && cl.fullPath === join.fullPath);
-        const to = cubeList.find((cl) => cl.splitId === splitId && cl.fullPath === join.to);
 
-        if (!root.splitJoins) {
-          root.splitJoins = [];
-        }
-        root.splitJoins.push({
-          relationship: join.relationship,
-          to: to.name
-        });
-      }
+      this.splitJoins[splitView.name] = join;
     }
   }
   

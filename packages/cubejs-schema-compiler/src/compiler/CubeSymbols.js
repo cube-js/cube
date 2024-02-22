@@ -253,16 +253,13 @@ export class CubeSymbols {
   membersFromCubes(parentCube, cubes, type, errorReporter, splitViews) {
     let hasSplitViews = false;
     
-    const members = R.unnest(cubes.map((cubeInclude, index) => {
+    const members = R.unnest(cubes.map((cubeInclude) => {
       const fullPath = this.evaluateReferences(null, cubeInclude.joinPath, { collectJoinHints: true });
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
       
-      // Base view cube join_path
-      if (index === 0) {
-        parentCube.fullPath = fullPath;
-      }
+      cubeInclude.fullPath = fullPath;
 
       let includes;
       const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);

@@ -1,149 +1,147 @@
+import fs from 'fs';
+import path from 'path';
+
 import { prepareYamlCompiler } from './PrepareCompiler';
 
-const model = [
-  {
-    fileName: 'all.yml',
-    content: `cubes:
-    - name: orders
-      sql_table: orders
-  
-      joins:
-        - name: customers
-          sql: "{CUBE}.customer_id = {customers}.id"
-          relationship: many_to_one
-   
-      measures:
-        - name: count
-          sql: id
-          type: count
-   
-        - name: total_revenue
-          sql: revenue
-          type: sum
-   
-      dimensions:
-        - name: id
-          sql: id
-          type: number
-          primary_key: true
-   
-        - name: customer_id
-          sql: customer_id
-          type: number
-  
-##############################
-
-    - name: customers
-      sql_table: customers
-  
-      joins:
-
-          
-        - name: countries
-          sql: "{CUBE}.country_id = {countries}.id"
-          relationship: many_to_one
-  
-      dimensions:
-        - name: genger
-          sql: "'male'"
-          type: string
-  
-  ##############################
-  
-    - name: countries
-      sql_table: countries
-  
-      joins: []
-  
-      measures:
-        - name: count
-          sql: id
-          type: count
-   
-      dimensions:
-        - name: id
-          sql: id
-          type: string
-          primary_key: true
-  
-        - name: country
-          sql: country
-          type: string`,
-  },
-  {
-    fileName: 'view.yml',
-    content: `
-views:   
-  - name: sp 
-    cubes:
-      - join_path: orders
-        includes: "*"
-        prefix: true
-
-      - join_path: customers.countries
-        includes: "*"
-        split: true
-
-  - name: orders_view
-    cubes:
-      - join_path: customers
-        prefix: true
-        includes: "*"
- 
-      - join_path: orders
-        split: true
-        includes: "*"
-
-      - join_path: customers.countries
-        split: true
-        includes: "*"  
-  `,
-  },
-];
-
 describe('Split views', () => {
-  const compilers = /** @type Compilers */ prepareYamlCompiler(model);
+  async function getSplitJoins(fileName) {
+    const content = fs.readFileSync(path.join(process.cwd(), 'test/unit/fixtures', fileName)).toString();
 
-  it('Finds split joins', async () => {
+    const model = [{
+      fileName,
+      content
+    }];
+  
+    const compilers = /** @type Compilers */ prepareYamlCompiler(model);
     await compilers.compiler.compile();
 
-    const { cubes } = compilers.metaTransformer;
-      
-    const spView = cubes.find((cube) => cube.config.name === 'sp');
-    expect(spView.config.splitJoins).toEqual(
-      [
+    return compilers.metaTransformer.splitJoins;
+  }
+
+  it('post -> post_topic -> topic', async () => {
+    const splitJoins = await getSplitJoins('m2m.yml');
+
+    expect(splitJoins.sp).toEqual({
+      author: [
         {
-          relationship: 'belongsTo',
-          to: 'sp_countries',
+          to: 'sp',
+          relationship: 'one_to_many'
         }
       ]
-    );
+    });
+  });
+
+  it('ab-s1 [s1 many_to_one a]', async () => {
+    const splitJoins = await getSplitJoins('ab-s1-Mx1.yml');
+
+    expect(splitJoins.sp).toEqual({
+      s1: [
+        {
+          to: 'sp',
+          relationship: 'many_to_many'
+        }
+      ]
       
-    const orders = cubes.find((cube) => cube.config.name === 'orders_view_orders');
+    });
+  });
+
+  it('ab-s1 [s1 one_to_many a]', async () => {
+    const splitJoins = await getSplitJoins('ab-s1-1xM.yml');
+
+    expect(splitJoins.sp).toEqual({
+      s1: [
+        {
+          to: 'sp',
+          relationship: 'one_to_many'
+        }
+      ]
       
-    expect(orders.config.splitJoins).toEqual([
+    });
+  });
+
+  it('ecom', async () => {
+    const splitJoins = await getSplitJoins('ecom.yml');
+
+    expect(splitJoins.orders_view).toEqual({
+      orders: [
+        {
+          to: 'orders_view',
+          relationship: 'many_to_one'
+        }
+      ],
+      orders_view: [
+        {
+          to: 'countries',
+          relationship: 'many_to_one'
+        }
+      ]
+    });
+  });
+
+  it('transitive1', async () => {
+    const splitJoins = await getSplitJoins('transitive1.yml');
+
+    expect(splitJoins.sp).toEqual(
       {
-        // many_to_one
-        relationship: 'belongsTo',
-        // directly to customers
-        to: 'orders_view',
-      },
-      {
-        // many_to_one
-        relationship: 'belongsTo',
-        // via customers
-        to: 'orders_view_countries',
+        s1: [
+          {
+            to: 'sp',
+            relationship: 'many_to_many'
+          }
+        ],
+        s2: [
+          {
+            to: 's1',
+            relationship: 'one_to_many'
+          }
+        ]
       }
-    ]);
-      
-    const customers = cubes.find((cube) => cube.config.name === 'orders_view');
-    expect(customers.config.splitJoins).toEqual(
-      [
-        {
-          relationship: 'belongsTo',
-          to: 'orders_view_countries',
-        }
-      ]
+    );
+  });
+
+  it('route', async () => {
+    const splitJoins = await getSplitJoins('route.yml');
+
+    expect(splitJoins.sp).toEqual(
+      {
+        s1: [
+          {
+            to: 'sp',
+            relationship: 'many_to_many'
+          }
+        ]
+      }
+    );
+  });
+
+  it('abcd', async () => {
+    const splitJoins = await getSplitJoins('abcd.yml');
+
+    expect(splitJoins.sp).toEqual(
+      {
+        sp: [
+          {
+            to: 's4',
+            relationship: 'many_to_one'
+          },
+          {
+            to: 's3',
+            relationship: 'many_to_one'
+          }
+        ],
+        s1: [
+          {
+            to: 'sp',
+            relationship: 'many_to_many'
+          }
+        ],
+        s2: [
+          {
+            to: 's1',
+            relationship: 'one_to_many'
+          }
+        ]
+      }
     );
   });
 });

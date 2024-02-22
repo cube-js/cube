@@ -1,0 +1,203 @@
+#  D
+#  |.\
+#  |  \. 
+#  |   *A -. B -. *C
+#  |    |      \ /(.?)
+#  S1  S2      /\
+#             /. \.
+#           S3   S4
+cubes:
+###
+  - name: a
+    sql_table: a
+    joins:
+      - name: b
+        sql: "{a}.id = {b}.a_id"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: c_id
+        sql: c_id
+        type: number
+      - name: d_id
+        sql: d_id
+        type: number
+      - name: s1_id
+        sql: s1_id
+        type: number
+      - name: shared_id_s1
+        sql: shared_id_s1
+        type: number
+    measures:
+      - name: count
+        type: count
+###        
+  - name: b
+    sql_table: b
+    joins: 
+      - name: c
+        sql: "{b}.id = {c}.b_id"
+        relationship: one_to_many
+      - name: s4
+        sql: "{s4}.id = {b.shared_id_s1}"
+        relationship: one_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: shared_id_s1
+        sql: shared_id_s1
+        type: number
+    measures:
+      - name: count
+        type: count
+###        
+  - name: c
+    sql_table: c
+    joins: 
+      - name: s3
+        sql: "{c}.s3_id = {s3.id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: b_id
+        sql: b_id
+        type: number
+      - name: s3_id
+        sql: s3_id
+        type: number
+    measures:
+      - name: count
+        type: count
+###        
+  - name: d
+    sql_table: d
+    joins: 
+      - name: a
+        sql: "{d}.id = {a}.d_id"
+        relationship: one_to_many
+      # - name: s1
+        # sql: "{d}.id = {s1}.d_id"
+        # relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: b_id
+        sql: b_id
+        type: number
+      - name: shared_id
+        sql: shared_id
+        type: number
+    measures:
+      - name: count
+        type: count
+###
+  - name: s1
+    sql_table: s1
+    joins:
+      # - name: a
+      #   sql: "{s1}.id = {a.shared_id_s1}"
+      #   relationship: many_to_one
+      - name: d
+        sql: "{s1}.id = {d.shared_id}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: d_id
+        sql: d_id
+        type: number
+      - name: s2_id
+        sql: s2_id
+        type: number
+    measures:
+      - name: count
+        type: count
+###
+  - name: s2
+    sql_table: s1
+    joins:
+      - name: s1
+        sql: "{s2}.id = {s1.s2_id}"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+###
+  - name: s3
+    sql_table: s3
+    joins:
+      # - name: c
+      #   sql: "{s3}.id = {c.s3_id}"
+      #   relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+###
+  - name: s4
+    sql_table: s4
+    joins:
+      # - name: b
+      #   sql: "{s4}.id = {b.shared_id_s1}"
+      #   relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: sp
+    cubes:
+      - join_path: a
+        includes: "*"
+        prefix: true
+      - join_path: c
+        includes: "*"
+        prefix: true
+
+      - join_path: s1
+        includes: "*"
+        split: true
+      - join_path: s2
+        includes: "*"
+        split: true
+      - join_path: s3
+        includes: "*"
+        split: true
+      - join_path: s4
+        includes: "*"
+        split: true

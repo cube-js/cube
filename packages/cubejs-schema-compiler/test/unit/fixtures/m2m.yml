@@ -1,0 +1,63 @@
+cubes:
+  - name: posts
+    sql_table: posts
+ 
+    joins:
+      - name: post_topics
+        relationship: many_to_one
+        sql: "{CUBE}.id = {post_topics.post_id}"
+
+    dimensions:
+      - name: author_id
+        sql: author_id
+        type: string
+ 
+  - name: topics
+    sql_table: topics
+ 
+    dimensions:
+      - name: post_id
+        sql: id
+        type: string
+        primary_key: true
+ 
+  - name: post_topics
+    sql_table: post_topics
+ 
+    joins:
+      - name: topics
+        relationship: one_to_many
+        sql: "{CUBE}.topic_id = {topics.id}"
+ 
+    dimensions:
+      - name: post_id
+        sql: post_id
+        type: string
+
+  - name: author
+    sql_table: author
+ 
+    joins:
+      - name: posts
+        relationship: one_to_many
+        sql: "{CUBE}.id = {posts.author_id}"
+ 
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+
+views:
+  - name: sp
+    cubes:
+      - join_path: posts
+        includes: "*"
+        prefix: true
+      - join_path: topics
+        includes: "*"
+        prefix: true
+
+      - join_path: author
+        includes: "*"
+        split: true
