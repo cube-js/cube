@@ -129,7 +129,6 @@ export class JoinGraph {
         multiplicationFactor: R.compose(
           R.fromPairs,
           R.map(v => [v, this.findMultiplicationFactorFor(v, join.joins)])
-        // )(cubesToJoin.concat(['b']))
         )(cubesToJoin)
       });
     }
