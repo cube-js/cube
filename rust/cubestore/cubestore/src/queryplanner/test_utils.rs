@@ -103,6 +103,7 @@ impl MetaStore for MetaStoreMock {
         _aggregates: Option<Vec<(String, String)>>,
         _partition_split_threshold: Option<u64>,
         _trace_obj: Option<String>,
+        _drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError> {
         panic!("MetaStore mock!")
     }

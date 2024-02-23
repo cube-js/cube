@@ -55,10 +55,10 @@ switching between the <Btn>API</Btn> and <Btn>Database</Btn> tabs.
   src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
-### All Queries and Top Queries
+### All queries and top queries
 
 Clicking <Btn>All Queries</Btn> will show all queries in order of recency,
-while <Btn>Top Queries</Btn> will show the most-frequently executed queries:
+while <Btn>Top Queries</Btn> will show the queries with the largest total duration (hits * avg duration) in the selected time frame. Both results are limited to 100 unique queries. 
 
 <Screenshot
   highlight="inset(30% 65% 64% 7% round 10px)"
@@ -79,7 +79,7 @@ You can use filters to find queries by various criteria:
   src="https://ucarecdn.com/951a2a64-bc9b-4277-b2fe-4cc88dbf4f49/"
 />
 
-## Inspecting API Queries
+## Inspecting API queries
 
 In the table, all queries are shown in their collapsed view by default.
 To see an expanded view of a query, click on the&nbsp;<Btn>❯</Btn> button
@@ -91,14 +91,15 @@ to the left of any query.
 />
 
 Check the columns to see the details:
-- **Query** shows a representation of a query, similar to the REST API
-[query format][ref-query-format]. In case of the SQL API, if the query is
-not coercible to a REST API query, raw SQL is shown "as is."
-- **API** shows the API type that was used to run the query: REST API via
-HTTP transport, REST API via WebSockets, GraphQL API, or SQL API.
-- **Duration** shows how long the query took, and the **bolt** indicates
-whether the query was accelerated with pre-aggregations, in-memory cache, etc.
-- **Time** shows the time the query was run at.
+- <Btn>Query</Btn> column shows a representation of a query, similar to the
+REST API [query format][ref-query-format]. In case of the SQL API, if the
+query is not coercible to a REST API query, raw SQL is shown "as is."
+- <Btn>API</Btn> column shows the API type that was used to run the query:
+REST API via HTTP transport, REST API via WebSockets, GraphQL API, or SQL API.
+- <Btn>Duration</Btn> column shows how long the query took.
+- Bolt icon indicates the [cache type][ref-cache-types] that was used to
+fulfill the query.
+- <Btn>Time</Btn> column shows the point in time the query was run at.
 
 To drill down on a specific query, click it to see more information.
 
@@ -132,7 +133,7 @@ Runner][ref-workspace-sqlrunner] by clicking <Btn>▶️</Btn>:
   src="https://ucarecdn.com/537f7269-654d-479c-a0cc-abc2941f9b5a/"
 />
 
-### Pre-Aggregations
+### Pre-aggregations
 
 The <Btn>Pre-Aggregations</Btn> tab shows the
 [pre-aggregation][ref-caching-gs-preaggs] used to accelerate this query, if one
@@ -148,7 +149,7 @@ screen:
 Clicking <Btn>Accelerate</Btn> takes you to the Rollup Designer, where you can
 add a pre-aggregation to accelerate similar queries in the future.
 
-### Queue Graph
+### Queue graph
 
 The <Btn>Queue Graph</Btn> tab details any activity in the query queue while
 processing the query. This may include other queries that were being processed
@@ -159,7 +160,7 @@ or were waiting in the queue by Cube Cloud at the same time as this query:
 A large number of queries in the queue may indicate that your deployment is
 under-provisioned, and you may want to consider scaling up your deployment.
 
-### Flame Graph
+### Flame graph
 
 The <Btn>Flame Graph</Btn> tab shows a [flame graph][datadog-kb-flamegraph] of a
 query's execution time across resources in the Cube Cloud deployment. This is
@@ -168,7 +169,7 @@ help identify bottlenecks in your Cube deployment or data source.
 
 <Screenshot src="https://ucarecdn.com/56188be4-0614-48e1-97c8-6d8d89639849/" />
 
-## Inspecting Database Queries
+## Inspecting database queries
 
 ### Query
 
@@ -206,3 +207,4 @@ while the query is in the query execution queue:
 [ref-deployment-refresh-worker]: /product/deployment#refresh-worker
 [ref-workspace-sqlrunner]: /product/workspace/sql-runner
 [ref-query-format]: /product/apis-integrations/rest-api/query-format
+[ref-cache-types]: /product/caching#cache-type

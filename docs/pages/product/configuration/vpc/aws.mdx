@@ -19,8 +19,6 @@ information is required:
 - **AWS Account ID:** The AWS account ID of the VPC owner. This can be found in
   the top-right corner of [the AWS Console][aws-console].
 - **AWS Region:** [The AWS region][aws-docs-regions] that the VPC resides in.
-  Ensure that the region is available in [Supported Regions](#supported-regions)
-  to see if Cube Cloud VPC connectivity is available in your region.
 - **AWS VPC ID:** The ID of the VPC that Cube Cloud will connect to, for
   example, `vpc-0099aazz`
 - **AWS VPC CIDR:** The [CIDR block][wiki-cidr-block] of the VPC that Cube Cloud
@@ -123,7 +121,6 @@ timeouts. If you are experiencing connection issues, please check the following:
   https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html
 [aws-docs-vpc-peering]:
   https://docs.aws.amazon.com/vpc/latest/peering/what-is-vpc-peering.html
-[aws-docs-vpc-security-group]:
-  https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html#SecurityGroupRules
+[aws-docs-vpc-security-group]: https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
 [wiki-cidr-block]:
   https://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_blocks

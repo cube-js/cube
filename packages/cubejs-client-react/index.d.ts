@@ -37,7 +37,7 @@ declare module '@cubejs-client/react' {
   type CubeProviderOptions = {
     castNumerics?: boolean;
   }
-  
+
   type CubeProviderProps = {
     cubejsApi: CubejsApi | null;
     options?: CubeProviderOptions;
@@ -450,6 +450,7 @@ declare module '@cubejs-client/react' {
     query: TQuery,
     options?: UseCubeQueryOptions,
   ): UseCubeQueryResult<
+    TQuery,
     unknown extends TData
       ? QueryRecordType<TQuery>
       : TData
@@ -461,7 +462,7 @@ declare module '@cubejs-client/react' {
      * A `CubejsApi` instance to use. Taken from the context if the param is not passed
      */
     cubejsApi?: CubejsApi;
-    
+
     /**
      * A `CubejsApi` instance to use. Taken from the context if the param is not passed
      */
@@ -484,11 +485,12 @@ declare module '@cubejs-client/react' {
     castNumerics?: boolean;
   };
 
-  type UseCubeQueryResult<TData> = {
+  type UseCubeQueryResult<TQuery, TData> = {
     error: Error | null;
     isLoading: boolean;
     resultSet: ResultSet<TData> | null;
     progress: ProgressResponse;
+    previousQuery: TQuery;
     refetch: () => Promise<void>;
   };
 

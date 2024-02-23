@@ -1,21 +1,163 @@
 ---
 redirect_from:
-  - /backend/sql/reference/functions-operators
+  - /backend/sql/reference/commands
 ---
 
-# SQL functions and operators
+# SQL API reference
+
+[SQL API][ref-sql-api] supports the following [commands](#sql-commands) as well
+as [functions and operators](#sql-functions-and-operators). 
 
 <InfoBox>
 
-This page describes the difference in behaviour of SQL functions and operators
-when using them within a Cube Query Rewrite. Outside a Cube Query Rewrite, the
-behaviour is the same as described in the [PostgreSQL documentation][pg-docs].
+This page describes the difference in behaviour of SQL commands when using them
+within a Cube Query Rewrite. Outside a Cube Query Rewrite, the behaviour is the
+same as described in the [PostgreSQL documentation][pg-docs].
 
 </InfoBox>
 
-## Comparison Functions and Operators
+## SQL commands
 
-### Less than
+### `SELECT`
+
+Synopsis:
+
+```sql
+SELECT select_expr [, ...]
+  FROM from_item
+    CROSS JOIN join_item
+    ON join_criteria]*
+  [ WHERE where_condition ]
+  [ GROUP BY grouping_expression ]
+  [ HAVING having_expression ]
+  [ LIMIT number ] [ OFFSET number ];
+```
+
+`SELECT` retrieves rows from a cube.
+
+The `FROM` clause specifies one or more source **cube tables** for the `SELECT`.
+Qualification conditions can be added (via `WHERE`) to restrict the returned
+rows to a small subset of the original dataset.
+
+Example:
+
+```sql
+SELECT COUNT(*), orders.status, users.city
+FROM orders
+  CROSS JOIN users
+WHERE city IN ('San Francisco', 'Los Angeles')
+GROUP BY orders.status, users.city
+HAVING status = 'shipped'
+LIMIT 1 OFFSET 1;
+```
+
+### `EXPLAIN`
+
+Synopsis:
+
+```sql
+EXPLAIN [ ANALYZE ] statement
+```
+
+The `EXPLAIN` command displays the query execution plan that the Cube planner
+will generate for the supplied `statement`.
+
+The `ANALYZE` will execute `statement` and display actual runtime statistics,
+including the total elapsed time expended within each plan node and the total
+number of rows it actually returned.
+
+Example:
+
+```sql
+EXPLAIN WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+   plan_type   |                                plan
+---------------+---------------------------------------------------------------------
+ logical_plan  | Projection: #COUNT(UInt8(1))                                       +
+               |   Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]                +
+               |     CubeScan: request={                                            +
+               |   "measures": [                                                    +
+               |     "orders.count"                                                 +
+               |   ],                                                               +
+               |   "dimensions": [                                                  +
+               |     "products.name",                                               +
+               |     "products.description"                                         +
+               |   ],                                                               +
+               |   "segments": []                                                   +
+               | }
+ physical_plan | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))]        +
+               |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))]    +
+               |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))]+
+               |       CubeScanExecutionPlan                                        +
+               |
+(2 rows)
+```
+
+With `ANALYZE`:
+
+```sql
+EXPLAIN ANALYZE WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+     plan_type     |                                                                                plan
+-------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Plan with Metrics | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=541ns, spill_count=0, spilled_bytes=0, mem_used=0]           +
+                   |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=6.583µs, spill_count=0, spilled_bytes=0, mem_used=0]     +
+                   |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=13.958µs, spill_count=0, spilled_bytes=0, mem_used=0]+
+                   |       CubeScanExecutionPlan, metrics=[]                                                                                                                           +
+                   |
+(1 row)
+```
+
+### `SHOW`
+
+Synopsis:
+
+```sql
+SHOW name
+SHOW ALL
+```
+
+Returns the value of a runtime parameter using `name`, or all runtime parameters
+if `ALL` is specified.
+
+Example:
+
+```sql
+SHOW timezone;
+ setting
+---------
+ GMT
+(1 row)
+
+SHOW ALL;
+            name             |    setting     | description
+-----------------------------+----------------+-------------
+ max_index_keys              | 32             |
+ max_allowed_packet          | 67108864       |
+ timezone                    | GMT            |
+ client_min_messages         | NOTICE         |
+ standard_conforming_strings | on             |
+ extra_float_digits          | 1              |
+ transaction_isolation       | read committed |
+ application_name            | NULL           |
+ lc_collate                  | en_US.utf8     |
+(9 rows)
+```
+
+
+## SQL functions and operators
+
+### Comparison functions and operators
+
+#### Less than
 
 ```sql
 datatype < datatype
@@ -88,7 +230,7 @@ WHERE o.number > 1000;
 (1 row)
 ```
 
-### Less than or equal to
+#### Less than or equal to
 
 ```sql
 datatype <= datatype
@@ -124,7 +266,7 @@ WHERE o.number <= 1000;
 (1 row)
 ```
 
-### Greater than or equal to
+#### Greater than or equal to
 
 ```sql
 datatype >= datatype
@@ -161,7 +303,7 @@ WHERE o.number >= 1000;
 (1 row)
 ```
 
-### Equal
+#### Equal
 
 ```sql
 datatype = datatype
@@ -198,7 +340,7 @@ WHERE o.status = 'completed';
 (1 row)
 ```
 
-### Not equal
+#### Not equal
 
 ```sql
 datatype != datatype
@@ -235,7 +377,7 @@ WHERE o.status <> 'completed';
 (1 row)
 ```
 
-### BETWEEN
+#### `BETWEEN`
 
 ```sql
 datatype BETWEEN datatype AND datatype
@@ -271,9 +413,9 @@ WHERE o.number BETWEEN 1 AND 100000;
 (1 row)
 ```
 
-## Mathematical Functions and Operators
+### Mathematical functions and operators
 
-### TRUNC
+#### `TRUNC`
 
 ```sql
 TRUNC(numeric)
@@ -307,9 +449,9 @@ LIMIT 1;
 (1 row)
 ```
 
-## String Functions and Operators
+### String functions and operators
 
-### Concatenation
+#### Concatenation
 
 ```sql
 string || string
@@ -345,7 +487,7 @@ LIMIT 1;
 (1 rows)
 ```
 
-### BIT_LENGTH
+#### `BIT_LENGTH`
 
 ```sql
 BIT_LENGTH(string)
@@ -369,7 +511,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### CHAR_LENGTH
+#### `CHAR_LENGTH`
 
 ```sql
 CHAR_LENGTH(string)
@@ -394,7 +536,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### LOWER
+#### `LOWER`
 
 ```sql
 LOWER(string)
@@ -428,7 +570,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### OCTET_LENGTH
+#### `OCTET_LENGTH`
 
 ```sql
 OCTET_LENGTH(string)
@@ -452,7 +594,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### SUBSTRING
+#### `SUBSTRING`
 
 ```sql
 SUBSTRING (string [ FROM start integer ] [ FOR count integer ])
@@ -488,7 +630,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### TRIM
+#### `TRIM`
 
 ```sql
 TRIM ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
@@ -515,7 +657,7 @@ LIMIT 1;
 cube=>
 ```
 
-### UPPER
+#### `UPPER`
 
 ```sql
 UPPER(string)
@@ -539,7 +681,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### STARTS_WITH
+#### `STARTS_WITH`
 
 ```sql
 starts_with (string, prefix)
@@ -573,9 +715,9 @@ LIMIT 1;
 (1 row)
 ```
 
-## Pattern Matching
+### Pattern matching
 
-### LIKE
+#### `LIKE`
 
 ```sql
 string LIKE pattern
@@ -599,7 +741,7 @@ WHERE orders.status LIKE 'completed';
 (1 row)
 ```
 
-### REGEXP_SUBSTR
+#### `REGEXP_SUBSTR`
 
 ```sql
 REGEXP_SUBSTR(string, pattern)
@@ -620,9 +762,9 @@ FROM (SELECT * FROM orders) o
 LIMIT 1;
 ```
 
-## Aggregation Functions
+### Aggregation functions
 
-### COUNT
+#### `COUNT`
 
 ```sql
 COUNT(*)
@@ -663,7 +805,7 @@ SELECT COUNT(orders.count) FROM orders;
 (1 row)
 ```
 
-### MEASURE
+#### `MEASURE`
 
 ```sql
 MEASURE(measure)
@@ -683,7 +825,7 @@ SELECT MEASURE(orders.count) FROM orders;
 (1 row)
 ```
 
-### SUM
+#### `SUM`
 
 ```sql
 SUM(col)
@@ -709,7 +851,7 @@ SELECT SUM(number) FROM orders;
 (1 row)
 ```
 
-### AVG
+#### `AVG`
 
 ```sql
 AVG(col)
@@ -735,7 +877,7 @@ SELECT AVG(avgNumber) FROM orders;
 (1 row)
 ```
 
-### MIN
+#### `MIN`
 
 ```sql
 MIN(col)
@@ -762,7 +904,7 @@ SELECT MIN(min_number) FROM orders;
 (1 row)
 ```
 
-### MAX
+#### `MAX`
 
 ```sql
 MAX(col)
@@ -789,9 +931,9 @@ SELECT MAX(max_number) FROM orders;
 (1 row)
 ```
 
-## Date/Time Functions
+### Date/time Functions
 
-### TO_TIMESTAMP
+#### `TO_TIMESTAMP`
 
 ```sql
 TO_TIMESTAMP(string, string)
@@ -817,7 +959,7 @@ WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < orders.crea
 (1 row)
 ```
 
-### LOCALTIMESTAMP
+#### `LOCALTIMESTAMP`
 
 ```sql
 LOCALTIMESTAMP()
@@ -841,7 +983,7 @@ WHERE LOCALTIMESTAMP() > orders.createdAt;
 (1 row)
 ```
 
-### NOW
+#### `NOW`
 
 ```sql
 NOW()
@@ -865,7 +1007,7 @@ WHERE NOW() > orders.createdAt;
 (1 row)
 ```
 
-### EXTRACT
+#### `EXTRACT`
 
 ```sql
 EXTRACT(field FROM source)
@@ -895,7 +1037,7 @@ LIMIT 1;
 (1 row)
 ```
 
-### DATE_TRUNC
+#### `DATE_TRUNC`
 
 ```sql
 DATE_TRUNC(field, source)
@@ -926,9 +1068,9 @@ LIMIT 1;
 (1 row)
 ```
 
-## Conditional Expressions
+### Conditional expressions
 
-### CASE
+#### `CASE`
 
 ```sql
 CASE WHEN condition THEN result
@@ -966,7 +1108,7 @@ GROUP BY 1;
 (1 row)
 ```
 
-### COALESCE
+#### `COALESCE`
 
 ```sql
 COALESCE(value [, ...])
@@ -997,7 +1139,7 @@ GROUP BY 2;
 (3 rows)
 ```
 
-### NULLIF
+#### `NULLIF`
 
 ```sql
 NULLIF(value1, value2)
@@ -1024,9 +1166,9 @@ GROUP BY 1;
 (3 rows)
 ```
 
-## Row and Array comparisons
+### Row and array comparisons
 
-### IN
+#### `IN`
 
 ```sql
 expression IN (value [, ...])
@@ -1050,7 +1192,7 @@ SELECT COUNT(*) FROM orders WHERE status IN ('shipped', 'completed');
 (1 row)
 ```
 
-### NOT IN
+#### `NOT IN`
 
 ```sql
 expression NOT IN (value [, ...])
@@ -1092,3 +1234,5 @@ SELECT COUNT(*) FROM orders WHERE status NOT IN ('shipped', 'completed');
 [ref-schema-ref-measure-types-sum]:
   /reference/data-model/types-and-formats#sum
 [self-ref-row-array-in]: #row-and-array-comparisons-in
+
+[ref-sql-api]: /product/apis-integrations/sql-api

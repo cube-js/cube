@@ -1,5 +1,6 @@
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::{union_seq_pointer_by_location, SeqPointerForLocation};
@@ -303,10 +304,8 @@ impl CompactionServiceImpl {
             self.meta_store
                 .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
                 .await?;
-
-            self.chunk_store
-                .add_memory_chunk(chunk.get_id(), batch)
-                .await?;
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+            self.chunk_store.add_memory_chunk(chunk_name, batch).await?;
 
             old_chunk_ids.append(&mut old_ids);
             new_chunk_ids.push((chunk.get_id(), None));
@@ -1432,6 +1431,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -1677,6 +1677,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -1717,11 +1718,17 @@ mod tests {
             .unwrap();
 
         chunk_store
-            .add_memory_chunk(chunk_first.get_id(), batch.clone())
+            .add_memory_chunk(
+                chunk_file_name(chunk_first.get_id(), chunk_first.get_row().suffix()),
+                batch.clone(),
+            )
             .await
             .unwrap();
         chunk_store
-            .add_memory_chunk(chunk_second.get_id(), batch2.clone())
+            .add_memory_chunk(
+                chunk_file_name(chunk_second.get_id(), chunk_second.get_row().suffix()),
+                batch2.clone(),
+            )
             .await
             .unwrap();
 
@@ -1855,6 +1862,7 @@ mod tests {
                 Some(vec![("sum".to_string(), "sum_int".to_string())]),
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();

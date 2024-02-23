@@ -1,7 +1,8 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        alias_expr,
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
@@ -11,19 +12,20 @@ use crate::{
         member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
-        time_dimension_date_range_replacer, time_dimension_expr, transforming_chain_rewrite,
-        transforming_rewrite, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
-        udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-        ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-        FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
-        FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated, LimitFetch,
-        LimitSkip, LiteralExprValue, LogicalPlanLanguage, SegmentMemberMember,
-        TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
+        time_dimension_date_range_replacer, time_dimension_expr, transform_original_expr_to_alias,
+        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
+        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated,
+        BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
+        CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+        FilterReplacerAliasToCube, FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar,
+        LikeExprNegated, LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage,
+        SegmentMemberMember, TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
         TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
     },
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
+use bigdecimal::{num_bigint::BigInt, BigDecimal};
 use chrono::{
     format::{
         Fixed, Item,
@@ -46,11 +48,12 @@ use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
     meta_context: Arc<MetaContext>,
+    eval_stable_functions: bool,
 }
 
 impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-        vec![
+        let mut rules = vec![
             transforming_rewrite(
                 "push-down-filter",
                 filter(
@@ -99,7 +102,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "push-down-limit-filter",
                 filter(
-                    literal_expr("?literal"),
+                    "?literal_false",
                     cube_scan(
                         "?source_table_name",
                         "?members",
@@ -130,7 +133,7 @@ impl RewriteRules for FilterRules {
                     ),
                 ),
                 self.push_down_limit_filter(
-                    "?literal",
+                    "?literal_false",
                     "?new_limit",
                     "?new_limit_skip",
                     "?new_limit_fetch",
@@ -139,18 +142,19 @@ impl RewriteRules for FilterRules {
             // Transform Filter: Boolean(true)
             // It's safe to push down filter under projection, next filter-truncate-true will truncate it
             // TODO: Find a better solution how to drop filter node at all once
-            rewrite(
+            transforming_rewrite(
                 "push-down-filter-projection",
                 filter(
-                    literal_bool(true),
+                    "?literal_true",
                     projection("?expr", "?input", "?alias", "?projection_split"),
                 ),
                 projection(
                     "?expr",
-                    filter(literal_bool(true), "?input"),
+                    filter("?literal_true", "?input"),
                     "?alias",
                     "?projection_split",
                 ),
+                self.transform_literal_true("?literal_true"),
             ),
             rewrite(
                 "swap-limit-filter",
@@ -255,26 +259,28 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             // Transform Filter: Boolean(True) same as TRUE = TRUE, which is useless
-            rewrite(
+            transforming_rewrite(
                 "filter-truncate-true",
                 filter_replacer(
-                    literal_bool(true),
+                    "?literal_true",
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 cube_scan_filters_empty_tail(),
+                self.transform_literal_true("?literal_true"),
             ),
             // We use this rule to transform: (?expr IN (?list..)) = TRUE and ((?expr IN (?list..)) = TRUE) = TRUE
-            rewrite(
+            transforming_rewrite(
                 "filter-truncate-in-list-true",
                 filter_replacer(
-                    binary_expr("?expr", "=", literal_bool(true)),
+                    binary_expr("?expr", "=", "?literal_true"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer("?expr", "?alias_to_cube", "?members", "?filter_aliases"),
+                self.transform_literal_true("?literal_true"),
             ),
             transforming_rewrite(
                 "filter-replacer",
@@ -1055,7 +1061,7 @@ impl RewriteRules for FilterRules {
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
                         "=",
-                        literal_expr("?literal"),
+                        "?literal",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1085,7 +1091,7 @@ impl RewriteRules for FilterRules {
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
                         "=",
-                        literal_expr("?literal"),
+                        "?literal",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1111,7 +1117,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1136,7 +1142,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     not_expr(fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     )),
                     "?alias_to_cube",
                     "?members",
@@ -1161,7 +1167,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     not_expr(udf_expr(
                         "ends_with",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     )),
                     "?alias_to_cube",
                     "?members",
@@ -1186,7 +1192,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     udf_expr(
                         "ends_with",
-                        vec![column_expr("?column"), literal_expr("?literal")],
+                        vec![column_expr("?column"), "?literal".to_string()],
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1227,15 +1233,18 @@ impl RewriteRules for FilterRules {
                                     ">",
                                     literal_int(0),
                                 ),
-                                fun_expr(
-                                    "Strpos",
-                                    vec![
-                                        fun_expr(
-                                            "Substr",
-                                            vec!["?expr".to_string(), literal_int(1)],
-                                        ),
-                                        literal_expr("?literal"),
-                                    ],
+                                alias_expr(
+                                    fun_expr(
+                                        "Strpos",
+                                        vec![
+                                            fun_expr(
+                                                "Substr",
+                                                vec!["?expr".to_string(), literal_int(1)],
+                                            ),
+                                            literal_expr("?literal"),
+                                        ],
+                                    ),
+                                    "?plus_minus_one_alias",
                                 ),
                             )],
                             Some(literal_int(0)),
@@ -1272,7 +1281,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1304,7 +1313,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1336,7 +1345,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1368,7 +1377,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                literal_expr("?literal"),
+                                "?literal".to_string(),
                                 fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
@@ -1400,7 +1409,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr("Reverse", vec!["?literal".to_string()]),
                                 fun_expr(
                                     "Reverse",
                                     vec![fun_expr("Lower", vec![column_expr("?column")])],
@@ -1435,7 +1444,7 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec![literal_expr("?literal")]),
+                                fun_expr("Reverse", vec!["?literal".to_string()]),
                                 fun_expr(
                                     "Reverse",
                                     vec![fun_expr("Lower", vec![column_expr("?column")])],
@@ -1633,9 +1642,13 @@ impl RewriteRules for FilterRules {
                 "filter-thoughtspot-date-add-column-comp-date",
                 filter_replacer(
                     binary_expr(
-                        udf_expr(
-                            "date_add",
-                            vec!["?expr".to_string(), literal_expr("?interval")],
+                        // TODO unwrap alias for filter_replacer?
+                        alias_expr(
+                            udf_expr(
+                                "date_add",
+                                vec!["?expr".to_string(), "?interval".to_string()],
+                            ),
+                            "?fun_alias",
                         ),
                         "?op",
                         "?date",
@@ -1652,7 +1665,7 @@ impl RewriteRules for FilterRules {
                             "date_add",
                             vec![
                                 udf_expr("date_to_timestamp", vec!["?date".to_string()]),
-                                negative_expr(literal_expr("?interval")),
+                                negative_expr("?interval"),
                             ],
                         ),
                     ),
@@ -1751,7 +1764,7 @@ impl RewriteRules for FilterRules {
                         "<=",
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
                     ),
                     "?alias_to_cube",
@@ -1764,7 +1777,7 @@ impl RewriteRules for FilterRules {
                         "<=",
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?expr")],
+                            vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
                     ),
                     "?alias_to_cube",
@@ -1782,24 +1795,20 @@ impl RewriteRules for FilterRules {
                                 "DateTrunc",
                                 vec![
                                     literal_expr("?granularity"),
-                                    binary_expr(
-                                        column_expr("?column"),
-                                        "+",
-                                        literal_expr("?same_interval"),
-                                    ),
+                                    binary_expr(column_expr("?column"), "+", "?same_interval"),
                                 ],
                             ),
                             "-",
-                            literal_expr("?same_interval"),
+                            "?same_interval",
                         ),
                         "<=",
                         binary_expr(
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                             ),
                             "-",
-                            literal_expr("?same_interval"),
+                            "?same_interval",
                         ),
                     ),
                     "?alias_to_cube",
@@ -1814,10 +1823,10 @@ impl RewriteRules for FilterRules {
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
-                                    vec![literal_expr("?granularity"), literal_expr("?expr")],
+                                    vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                                 ),
                                 "-",
-                                literal_expr("?same_interval"),
+                                "?same_interval",
                             ),
                             "+",
                             literal_expr("?interval"),
@@ -2002,14 +2011,15 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_negate_like_expr("?negated", "?new_negated"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "plus-value-minus-value",
                 binary_expr(
                     binary_expr("?expr", "+", literal_expr("?value")),
                     "-",
                     literal_expr("?value"),
                 ),
-                "?expr".to_string(),
+                alias_expr("?expr", "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             // Every expression should be handled by filter cast unwrap replacer otherwise other rules just won't work
             // Simplify rules
@@ -2026,17 +2036,11 @@ impl RewriteRules for FilterRules {
                 cast_expr(filter_simplify_replacer("?expr"), "?data_type"),
                 self.transform_filter_cast_unwrap("?expr", "?data_type", true),
             ),
+            // Alias
             rewrite(
-                "filter-simplify-now",
-                filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_now", Vec::<String>::new()),
-            ),
-            rewrite(
-                "filter-simplify-current-date",
-                filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
-                // TODO alias to make it equivalent transformation
-                udf_expr("eval_current_date", Vec::<String>::new()),
+                "filter-simplify-alias-push-down",
+                filter_simplify_replacer(alias_expr("?expr", "?alias")),
+                alias_expr(filter_simplify_replacer("?expr"), "?alias"),
             ),
             // Binary expr
             rewrite(
@@ -2606,13 +2610,39 @@ impl RewriteRules for FilterRules {
                     "?output_date_range",
                 ),
             ),
-        ]
+        ];
+        if self.eval_stable_functions {
+            rules.extend(vec![
+                rewrite(
+                    "filter-simplify-now",
+                    filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_now", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-utc-timestamp",
+                    filter_simplify_replacer(fun_expr("UtcTimestamp", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_utc_timestamp", Vec::<String>::new()),
+                ),
+                rewrite(
+                    "filter-simplify-current-date",
+                    filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                    // TODO alias to make it equivalent transformation
+                    udf_expr("eval_current_date", Vec::<String>::new()),
+                ),
+            ]);
+        }
+        rules
     }
 }
 
 impl FilterRules {
-    pub fn new(meta_context: Arc<MetaContext>) -> Self {
-        Self { meta_context }
+    pub fn new(meta_context: Arc<MetaContext>, eval_stable_functions: bool) -> Self {
+        Self {
+            meta_context,
+            eval_stable_functions,
+        }
     }
 
     fn push_down_filter(
@@ -2664,7 +2694,9 @@ impl FilterRules {
         let new_limit_skip_var = var!(new_limit_skip_var);
         let new_limit_fetch_var = var!(new_limit_fetch_var);
         move |egraph, subst| {
-            for literal_value in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+            if let Some(ConstantFolding::Scalar(literal_value)) =
+                &egraph[subst[literal_var]].data.constant
+            {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
                     subst.insert(
                         new_limit_var,
@@ -2678,6 +2710,23 @@ impl FilterRules {
                         new_limit_fetch_var,
                         egraph.add(LogicalPlanLanguage::LimitFetch(LimitFetch(Some(0)))),
                     );
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_literal_true(
+        &self,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            if let Some(ConstantFolding::Scalar(literal)) =
+                &egraph[subst[literal_var]].data.constant
+            {
+                if let ScalarValue::Boolean(Some(true)) = literal {
                     return true;
                 }
             }
@@ -2871,6 +2920,9 @@ impl FilterRules {
                                         ScalarValue::Int64(Some(value)) => value.to_string(),
                                         ScalarValue::Boolean(Some(value)) => value.to_string(),
                                         ScalarValue::Float64(Some(value)) => value.to_string(),
+                                        ScalarValue::Decimal128(Some(value), _, scale) => {
+                                            Decimal::new(*value).to_string(*scale)
+                                        }
                                         ScalarValue::TimestampNanosecond(_, _)
                                         | ScalarValue::Date32(_)
                                         | ScalarValue::Date64(_) => {
@@ -2955,7 +3007,9 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+            if let Some(ConstantFolding::Scalar(literal)) =
+                &egraph[subst[literal_var]].data.constant
+            {
                 for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
                     let literal_value = match literal {
                         ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
@@ -3546,6 +3600,9 @@ impl FilterRules {
             ScalarValue::Int64(Some(value)) => value.to_string(),
             ScalarValue::Boolean(Some(value)) => value.to_string(),
             ScalarValue::Float64(Some(value)) => value.to_string(),
+            ScalarValue::Decimal128(Some(value), _, scale) => {
+                Decimal::new(*value).to_string(*scale)
+            }
             ScalarValue::TimestampNanosecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
@@ -4414,7 +4471,9 @@ impl FilterRules {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
         move |egraph, subst| {
-            if let Some(expr) = egraph[subst[expr_var]].data.original_expr.clone() {
+            if let Some(OriginalExpr::Expr(expr)) =
+                egraph[subst[expr_var]].data.original_expr.clone()
+            {
                 for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType).cloned()
                 {
                     return match data_type {
@@ -4624,4 +4683,36 @@ fn format_iso_timestamp(dt: NaiveDateTime) -> String {
         .iter(),
     )
     .to_string()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct Decimal {
+    raw_value: i128,
+}
+
+impl Decimal {
+    pub fn new(raw_value: i128) -> Decimal {
+        Decimal { raw_value }
+    }
+
+    pub fn to_string(&self, scale: usize) -> String {
+        let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
+        let mut res = big_decimal.to_string();
+        if res.contains(".") {
+            let mut truncate_len = res.len();
+            for (i, c) in res.char_indices().rev() {
+                if c == '0' {
+                    truncate_len = i;
+                } else if c == '.' {
+                    truncate_len = i;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            res.truncate(truncate_len);
+        }
+        res
+    }
 }

@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::LogicalPlanAnalysis,
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
         column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
@@ -11,18 +11,19 @@ use crate::{
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
         rewriter::RewriteRules,
         rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
-        segment_expr, table_scan, time_dimension_expr, transforming_chain_rewrite,
-        transforming_rewrite, udaf_expr, udf_expr, virtual_field_expr,
-        AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias,
-        AllMembersCube, BinaryExprOp, CastExprDataType, ChangeUserCube, ColumnExprColumn,
-        CubeScanAliasToCube, CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset,
-        CubeScanUngrouped, DimensionName, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
-        LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
-        LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-        MemberErrorAliasToCube, MemberErrorError, MemberErrorPriority,
-        MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube, ProjectionAlias, SegmentName,
-        TableScanSourceTableName, TableScanTableName, TimeDimensionDateRange,
-        TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+        segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
+        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
+        udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
+        AggregateFunctionExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, BinaryExprOp,
+        CastExprDataType, ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube,
+        CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, DimensionName,
+        JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
+        LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
+        LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
+        MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
+        ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
+        TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
+        VirtualFieldName,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -251,21 +252,30 @@ impl RewriteRules for MemberRules {
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
             ),
             // Binary expression associative properties
-            rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-addition-assoc",
                 binary_expr(binary_expr("?a", "+", "?b"), "+", "?c"),
-                binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
+                alias_expr(
+                    binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
+                    "?alias",
+                ),
+                transform_original_expr_to_alias("?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-multi-assoc",
                 binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
-                binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+                alias_expr(
+                    binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
+                    "?alias",
+                ),
+                transform_original_expr_to_alias("?alias"),
             ),
             // MOD function to binary expr
-            rewrite(
+            transforming_rewrite_with_root(
                 "mod-fun-to-binary-expr",
                 udf_expr("mod", vec!["?a", "?b"]),
-                binary_expr("?a", "%", "?b"),
+                alias_expr(binary_expr("?a", "%", "?b"), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             // LIKE expr to binary expr
             transforming_rewrite(
@@ -570,6 +580,13 @@ impl MemberRules {
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
         ));
         rules.extend(find_matching_old_member(
+            "agg-fun-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                "?alias",
+            ),
+        ));
+        rules.extend(find_matching_old_member(
             "udaf-fun",
             udaf_expr("?fun_name", vec![column_expr("?column")]),
         ));
@@ -859,27 +876,8 @@ impl MemberRules {
         ));
         rules.push(transforming_rewrite(
             "pushdown-literal-member",
-            member_pushdown_replacer(literal_expr("?value"), "?old_members", "?alias_to_cube"),
-            literal_member("?literal_member_value", literal_expr("?value"), "?relation"),
-            self.pushdown_literal_member(
-                "?value",
-                "?literal_member_value",
-                "?alias_to_cube",
-                "?relation",
-            ),
-        ));
-        rules.push(transforming_rewrite(
-            "pushdown-literal-member-alias",
-            member_pushdown_replacer(
-                alias_expr(literal_expr("?value"), "?alias"),
-                "?old_members",
-                "?alias_to_cube",
-            ),
-            literal_member(
-                "?literal_member_value",
-                alias_expr(literal_expr("?value"), "?alias"),
-                "?relation",
-            ),
+            member_pushdown_replacer("?value", "?old_members", "?alias_to_cube"),
+            literal_member("?literal_member_value", "?value", "?relation"),
             self.pushdown_literal_member(
                 "?value",
                 "?literal_member_value",
@@ -1004,6 +1002,18 @@ impl MemberRules {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun",
             agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            measure_expr("?name", "?old_alias"),
+            Some("?fun_name"),
+            Some("?distinct"),
+            None,
+            Some("?column"),
+        ));
+        rules.push(pushdown_measure_rewrite(
+            "member-pushdown-replacer-agg-fun-alias",
+            alias_expr(
+                agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+                "?alias",
+            ),
             measure_expr("?name", "?old_alias"),
             Some("?fun_name"),
             Some("?distinct"),
@@ -1230,7 +1240,7 @@ impl MemberRules {
                         None => continue,
                     };
 
-                if let Ok(expr) = res {
+                if let Ok(OriginalExpr::Expr(expr)) = res {
                     // TODO unwrap
                     let name = expr.name(&DFSchema::empty()).unwrap();
                     let suffix_alias = format!("{}_{}", name, granularity);
@@ -1561,7 +1571,9 @@ impl MemberRules {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let relation_var = var!(relation_var);
         move |egraph, subst| {
-            for value in var_iter!(egraph[subst[literal_value_var]], LiteralExprValue).cloned() {
+            if let Some(ConstantFolding::Scalar(value)) =
+                egraph[subst[literal_value_var]].data.constant.clone()
+            {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
                     MemberPushdownReplacerAliasToCube
@@ -1680,7 +1692,7 @@ impl MemberRules {
         }
     }
 
-    fn add_alias_column(
+    pub fn add_alias_column(
         egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         alias: String,
         cube_alias: Option<String>,
@@ -2811,7 +2823,7 @@ lazy_static! {
     .collect();
 }
 
-fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
+pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
     let granularity_a = granularity_a.to_lowercase();
     let granularity_b = granularity_b.to_lowercase();
 

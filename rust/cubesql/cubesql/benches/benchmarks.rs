@@ -350,7 +350,7 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default().measurement_time(std::time::Duration::from_secs(30)).sample_size(10);
+    config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
     targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap
 }
 criterion_main!(benches);

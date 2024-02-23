@@ -3,9 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "dependencies": {
+    "elkjs": "^0.9.1",
     "react": "18.1.0",
     "react-dom": "18.1.0",
-    "@antv/g6": "4.8.3"
+    "reactflow": "^11.10.3"
   },
   "scripts": {
     "start": "GENERATE_SOURCEMAP=false && react-scripts start",

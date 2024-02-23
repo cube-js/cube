@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 8715
 expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspname, pg_catalog.pg_type_is_visible(t.oid) is_visible\n                FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n\n                WHERE t.typnamespace = n.oid\n                ORDER BY t.oid ASC;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+----------------------------+--------------------+------------+
@@ -91,10 +92,10 @@ expression: "execute_query(\"\n                SELECT t.oid, t.typname, n.nspnam
 | 13410 | sql_identifier             | information_schema | false      |
 | 18001 | KibanaSampleDataEcommerce  | public             | true       |
 | 18002 | _KibanaSampleDataEcommerce | public             | true       |
-| 18019 | Logs                       | public             | true       |
-| 18020 | _Logs                      | public             | true       |
-| 18029 | NumberCube                 | public             | true       |
-| 18030 | _NumberCube                | public             | true       |
-| 18035 | WideCube                   | public             | true       |
-| 18036 | _WideCube                  | public             | true       |
+| 18020 | Logs                       | public             | true       |
+| 18021 | _Logs                      | public             | true       |
+| 18030 | NumberCube                 | public             | true       |
+| 18031 | _NumberCube                | public             | true       |
+| 18036 | WideCube                   | public             | true       |
+| 18037 | _WideCube                  | public             | true       |
 +-------+----------------------------+--------------------+------------+
