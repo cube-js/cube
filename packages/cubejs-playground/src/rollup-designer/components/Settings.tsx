@@ -374,13 +374,6 @@ export function Settings({
                       </Space>
                     </>
                   )}
-
-                  {/* <Typography.Paragraph strong>Build Range</Typography.Paragraph> */}
-                  {/* <Flex direction="column" gap={4}>
-  <BuildRange time="since" />
-
-  <BuildRange time="until" />
-</Flex> */}
                 </>
               ) : null}
             </>

@@ -1478,6 +1478,36 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbS3UseSsl: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_SSL', dataSource)
+    ]
+  ),
+
+  duckdbS3UrlStyle: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_URL_STYLE', dataSource)
+    ]
+  ),
+
+  duckdbS3SessionToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
+    ]
+  ),
+  
   /**
    * Presto catalog.
    */
@@ -1524,7 +1554,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('5000')
     .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default('false')
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
     .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')

@@ -174,6 +174,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_extra_aggregate,
         ),
         t(
+            "rolling_window_extra_aggregate_addon",
+            rolling_window_extra_aggregate_addon,
+        ),
+        t(
             "rolling_window_extra_aggregate_timestamps",
             rolling_window_extra_aggregate_timestamps,
         ),
@@ -186,6 +190,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_one_quarter_interval,
         ),
         t("rolling_window_offsets", rolling_window_offsets),
+        t("rolling_window_filtered", rolling_window_filtered),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -5032,6 +5037,49 @@ async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
         .unwrap_err();
 }
 
+async fn rolling_window_extra_aggregate_addon(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (11, 'john', 10), \
+                                                     (11, 'sara', 7), \
+                                                     (13, 'sara', 3), \
+                                                     (13, 'john', 9), \
+                                                     (13, 'john', 11), \
+                                                     (15, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 9 TO 15 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (9, None, None),
+            (10, None, None),
+            (11, Some(17), Some(17)),
+            (12, Some(17), None),
+            (13, Some(23), Some(23)),
+            (14, Some(23), None),
+            (15, Some(5), Some(5))
+        ])
+    );
+}
+
 async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5215,6 +5263,89 @@ async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
             (6, None),
             (8, Some(9)),
             (10, None)
+        ])
+    );
+}
+
+async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.data(category text, day timestamp, count int, claimed_count int)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data(category, day, count, claimed_count)\
+                        VALUES \
+                         ('eth', '2023-12-12T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-08T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-06T00:00:00.000Z', 2, 2), \
+                         ('starkex', '2023-12-05T00:00:00.000Z', 0, 0), \
+                         ('starkex', '2023-12-07T00:00:00.000Z', 1, 1)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "
+                SELECT \
+                `day`, \
+                ROLLING( \
+                    sum( \
+                    `claimed_count` \
+                    ) RANGE UNBOUNDED PRECEDING OFFSET end \
+                ) `claimed_count`, \
+                sum( \
+                `count` \
+                ) `count` \
+                FROM \
+                ( \
+                    SELECT \
+                    `day` `day`, \
+                    sum( \
+                        `count` \
+                    ) `count`, \
+                    sum( \
+                        `claimed_count` \
+                    ) `claimed_count`
+                    FROM \
+                    ( \
+                        SELECT \
+                        * \
+                        FROM \
+                        s.data \
+                         \
+                    ) AS `starknet_test_provisions__eth_cumulative` \
+                    WHERE `starknet_test_provisions__eth_cumulative`.category = 'github'
+                    GROUP BY \
+                    1 \
+                ) `base` ROLLING_WINDOW DIMENSION `day` \
+                GROUP BY \
+                DIMENSION `day` \
+                FROM \
+                date_trunc('day', to_timestamp('2023-12-04T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-10T13:41:12.000')) EVERY INTERVAL '1 day'
+                ORDER BY 1
+            ",
+        )
+        .await
+        .unwrap();
+    let days = (4..=10)
+        .map(|d| timestamp_from_string(&format!("2023-12-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (days[0], None, None),
+            (days[1], None, None),
+            (days[2], Some(2), Some(2)),
+            (days[3], Some(2), None),
+            (days[4], Some(3), Some(1)),
+            (days[5], Some(3), None),
+            (days[6], Some(3), None),
         ])
     );
 }

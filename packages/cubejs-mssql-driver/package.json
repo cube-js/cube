@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/mssql-driver",
   "description": "Cube.js MS SQL database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.41",
+  "version": "0.34.55",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -13,7 +13,7 @@
   },
   "main": "driver/MSSqlDriver.js",
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.34.41",
+    "@cubejs-backend/base-driver": "^0.34.55",
     "mssql": "^6.1.0"
   },
   "jest": {

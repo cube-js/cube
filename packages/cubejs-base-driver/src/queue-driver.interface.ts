@@ -95,6 +95,7 @@ export interface QueueDriverConnectionInterface {
   release(): void;
   //
   getQueriesToCancel(): Promise<QueryKeysTuple[]>
+  // @deprecated
   getActiveAndToProcess(): Promise<GetActiveAndToProcessResponse>;
 }
 

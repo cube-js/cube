@@ -535,6 +535,8 @@ pub trait ConfigObj: DIService {
     fn remote_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_batch_size(&self) -> u64;
+
+    fn create_table_max_retries(&self) -> u64;
 }
 
 #[derive(Debug, Clone)]
@@ -631,6 +633,7 @@ pub struct ConfigObjImpl {
     pub local_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_delay_secs: u64,
     pub remote_files_cleanup_batch_size: u64,
+    pub create_table_max_retries: u64,
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
@@ -985,6 +988,10 @@ impl ConfigObj for ConfigObjImpl {
 
     fn remote_files_cleanup_batch_size(&self) -> u64 {
         self.remote_files_cleanup_batch_size
+    }
+
+    fn create_table_max_retries(&self) -> u64 {
+        self.create_table_max_retries
     }
 
     fn cachestore_cache_eviction_below_threshold(&self) -> u8 {
@@ -1496,6 +1503,7 @@ impl Config {
                     "CUBESTORE_REMOTE_FILES_CLEANUP_BATCH_SIZE",
                     50000,
                 ),
+                create_table_max_retries: env_parse("CUBESTORE_CREATE_TABLE_MAX_RETRIES", 3),
             }),
         }
     }
@@ -1604,6 +1612,7 @@ impl Config {
                 local_files_cleanup_delay_secs: 600,
                 remote_files_cleanup_delay_secs: 3600,
                 remote_files_cleanup_batch_size: 50000,
+                create_table_max_retries: 3,
             }),
         }
     }

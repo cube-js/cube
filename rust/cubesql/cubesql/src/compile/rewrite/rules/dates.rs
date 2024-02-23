@@ -1,13 +1,14 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        alias_expr,
+        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
-        literal_int, literal_string, negative_expr, rewrite,
+        literal_int, literal_string, negative_expr, original_expr_name, rewrite,
         rewriter::RewriteRules,
-        to_day_interval_expr, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
-        AliasExprAlias, CastExprDataType, LiteralExprValue, LogicalPlanLanguage,
+        to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
+        transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
+        LiteralExprValue, LogicalPlanLanguage,
     },
     var, var_iter,
 };
@@ -175,43 +176,6 @@ impl RewriteRules for DateRules {
                 ),
             ),
             rewrite(
-                "superset-second-to-date-trunc",
-                udf_expr(
-                    "date_add",
-                    vec![
-                        udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
-                            binary_expr(
-                                binary_expr(
-                                    binary_expr(
-                                        udf_expr("hour", vec![column_expr("?column")]),
-                                        "*",
-                                        literal_int(60),
-                                    ),
-                                    "*",
-                                    literal_int(60),
-                                ),
-                                "+",
-                                binary_expr(
-                                    binary_expr(
-                                        udf_expr("minute", vec![column_expr("?column")]),
-                                        "*",
-                                        literal_int(60),
-                                    ),
-                                    "+",
-                                    udf_expr("second", vec![column_expr("?column")]),
-                                ),
-                            ),
-                            literal_string("second"),
-                        ),
-                    ],
-                ),
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_string("second"), column_expr("?column")],
-                ),
-            ),
-            rewrite(
                 "date-to-date-trunc",
                 udf_expr("date", vec![column_expr("?column")]),
                 fun_expr(
@@ -271,15 +235,17 @@ impl RewriteRules for DateRules {
                 ),
                 self.unwrap_cast_to_timestamp("?data_type", "?granularity", "?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "current-timestamp-to-now",
                 udf_expr("current_timestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "localtimestamp-to-now",
                 udf_expr("localtimestamp", Vec::<String>::new()),
-                fun_expr("UtcTimestamp", Vec::<String>::new()),
+                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "tableau-week",
@@ -292,15 +258,15 @@ impl RewriteRules for DateRules {
                         "?date_trunc_alias",
                     ),
                     "+",
-                    negative_expr(binary_expr(
-                        fun_expr(
+                    binary_expr(
+                        negative_expr(fun_expr(
                             "DatePart",
                             vec![literal_string("DOW"), column_expr("?column")],
-                        ),
+                        )),
                         "*",
                         // TODO match
                         literal_expr("?interval_one_day"),
-                    )),
+                    ),
                 ),
                 alias_expr(
                     fun_expr(
@@ -326,37 +292,58 @@ impl RewriteRules for DateRules {
                     ],
                 ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-add-right",
                 binary_expr("?left", "+", "?interval"),
-                udf_expr("date_add", vec!["?left", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_add", vec!["?left", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-add-left",
                 binary_expr("?interval", "+", "?right"),
-                udf_expr("date_add", vec!["?right", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_add", vec!["?right", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-sub",
                 binary_expr("?left", "-", "?interval"),
-                udf_expr("date_sub", vec!["?left", "?interval"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(udf_expr("date_sub", vec!["?left", "?interval"]), "?alias"),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-mul-right",
                 binary_expr("?left", "*", "?interval"),
-                udf_expr("interval_mul", vec!["?interval", "?left"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(
+                    udf_expr("interval_mul", vec!["?interval", "?left"]),
+                    "?alias",
+                ),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-mul-left",
                 binary_expr("?interval", "*", "?right"),
-                udf_expr("interval_mul", vec!["?interval", "?right"]),
-                self.transform_interval_binary_expr("?interval"),
+                alias_expr(
+                    udf_expr("interval_mul", vec!["?interval", "?right"]),
+                    "?alias",
+                ),
+                self.transform_interval_binary_expr_with_chain_transform(
+                    "?interval",
+                    transform_original_expr_to_alias("?alias"),
+                ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "binary-expr-interval-neg",
                 negative_expr("?interval"),
                 udf_expr(
@@ -365,7 +352,7 @@ impl RewriteRules for DateRules {
                 ),
                 self.transform_interval_binary_expr("?interval"),
             ),
-            rewrite(
+            transforming_rewrite_with_root(
                 "redshift-dateadd-to-interval-cast-unwrap",
                 udf_expr(
                     "dateadd",
@@ -375,36 +362,44 @@ impl RewriteRules for DateRules {
                         "?expr".to_string(),
                     ],
                 ),
-                udf_expr(
-                    "dateadd",
-                    vec![
-                        literal_expr("?datepart"),
-                        literal_expr("?interval_int"),
-                        "?expr".to_string(),
-                    ],
+                alias_expr(
+                    udf_expr(
+                        "date_add",
+                        vec![
+                            literal_expr("?datepart"),
+                            literal_expr("?interval_int"),
+                            "?expr".to_string(),
+                        ],
+                    ),
+                    "?alias",
                 ),
+                transform_original_expr_to_alias("?alias"),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "redshift-dateadd-to-interval",
                 udf_expr(
                     "dateadd",
                     vec![
                         literal_expr("?datepart"),
-                        literal_expr("?interval_int"),
+                        "?interval_int".to_string(),
                         "?expr".to_string(),
                     ],
                 ),
-                udf_expr(
-                    "date_add",
-                    vec!["?expr".to_string(), literal_expr("?interval")],
+                alias_expr(
+                    udf_expr(
+                        "date_add",
+                        vec!["?expr".to_string(), literal_expr("?interval")],
+                    ),
+                    "?alias",
                 ),
                 self.transform_interval_parts_to_interval(
                     "?datepart",
                     "?interval_int",
                     "?interval",
+                    "?alias",
                 ),
             ),
-            transforming_rewrite(
+            transforming_rewrite_with_root(
                 "redshift-dateadd-literal-date32-to-interval",
                 udf_expr(
                     "dateadd",
@@ -414,17 +409,21 @@ impl RewriteRules for DateRules {
                         cast_expr_explicit(literal_expr("?date_string"), DataType::Date32),
                     ],
                 ),
-                udf_expr(
-                    "date_add",
-                    vec![
-                        udf_expr("date_to_timestamp", vec![literal_expr("?date_string")]),
-                        literal_expr("?interval"),
-                    ],
+                alias_expr(
+                    udf_expr(
+                        "date_add",
+                        vec![
+                            udf_expr("date_to_timestamp", vec![literal_expr("?date_string")]),
+                            literal_expr("?interval"),
+                        ],
+                    ),
+                    "?alias",
                 ),
                 self.transform_interval_parts_to_interval(
                     "?datepart",
                     "?interval_int",
                     "?interval",
+                    "?alias",
                 ),
             ),
             // TODO: TO_DATE should return Date32, but Timestamp works for all supported cases
@@ -454,16 +453,6 @@ impl RewriteRules for DateRules {
                     vec!["?granularity".to_string(), column_expr("?column")],
                 ),
             ),
-            transforming_rewrite(
-                "unwrap-cast-to-date",
-                agg_fun_expr(
-                    "?aggr_fun",
-                    vec![cast_expr(column_expr("?column"), "?data_type")],
-                    "?distinct",
-                ),
-                agg_fun_expr("?aggr_fun", vec![column_expr("?column")], "?distinct"),
-                self.unwrap_cast_to_date("?data_type"),
-            ),
         ]
     }
 }
@@ -476,16 +465,32 @@ impl DateRules {
     fn transform_interval_binary_expr(
         &self,
         interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+    {
+        self.transform_interval_binary_expr_with_chain_transform(interval_var, |_, _, _| true)
+    }
+
+    fn transform_interval_binary_expr_with_chain_transform<T>(
+        &self,
+        interval_var: &'static str,
+        chain_transform_fn: T,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+    where
+        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    {
         let interval_var = var!(interval_var);
-        move |egraph, subst| {
+        move |egraph, root, subst| {
             if let Some(ConstantFolding::Scalar(interval)) =
                 &egraph[subst[interval_var]].data.constant
             {
                 match interval {
                     ScalarValue::IntervalYearMonth(_)
                     | ScalarValue::IntervalDayTime(_)
-                    | ScalarValue::IntervalMonthDayNano(_) => return true,
+                    | ScalarValue::IntervalMonthDayNano(_) => {
+                        if chain_transform_fn(egraph, root, subst) {
+                            return true;
+                        }
+                    }
                     _ => (),
                 }
             }
@@ -499,23 +504,28 @@ impl DateRules {
         datepart_var: &'static str,
         interval_int_var: &'static str,
         interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        alias_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+    {
         let datepart_var = var!(datepart_var);
         let interval_int_var = var!(interval_int_var);
         let interval_var = var!(interval_var);
-        move |egraph, subst| {
-            for interval_int in var_iter!(egraph[subst[interval_int_var]], LiteralExprValue) {
+        let alias_var = var!(alias_var);
+        move |egraph, root, subst| {
+            if let Some(ConstantFolding::Scalar(interval_int)) =
+                egraph[subst[interval_int_var]].data.constant.clone()
+            {
                 let interval_int = match interval_int {
-                    ScalarValue::Int32(Some(interval_int)) => *interval_int,
-                    ScalarValue::Int64(Some(interval_int)) => match i32::try_from(*interval_int) {
+                    ScalarValue::Int32(Some(interval_int)) => interval_int,
+                    ScalarValue::Int64(Some(interval_int)) => match i32::try_from(interval_int) {
                         Ok(interval_int) => interval_int,
-                        _ => continue,
+                        _ => return false,
                     },
-                    _ => continue,
+                    _ => return false,
                 };
 
-                for datepart in var_iter!(egraph[subst[datepart_var]], LiteralExprValue) {
-                    let interval = match utils::parse_granularity(datepart, false).as_deref() {
+                for datepart in var_iter!(egraph[subst[datepart_var]], LiteralExprValue).cloned() {
+                    let interval = match utils::parse_granularity(&datepart, false).as_deref() {
                         Some("millisecond") => {
                             ScalarValue::IntervalDayTime(Some(i64::from(interval_int)))
                         }
@@ -540,14 +550,20 @@ impl DateRules {
                         _ => continue,
                     };
 
-                    subst.insert(
-                        interval_var,
-                        egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                            interval,
-                        ))),
-                    );
+                    if let Some(original_expr) = original_expr_name(egraph, root) {
+                        let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
+                            AliasExprAlias(original_expr),
+                        ));
+                        subst.insert(alias_var, alias);
 
-                    return true;
+                        subst.insert(
+                            interval_var,
+                            egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                                interval,
+                            ))),
+                        );
+                        return true;
+                    }
                 }
             }
 
@@ -574,28 +590,6 @@ impl DateRules {
         }
     }
 
-    fn unwrap_cast_to_date(
-        &self,
-        data_type_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let data_type_var = var!(data_type_var);
-        move |egraph, subst| {
-            for node in egraph[subst[data_type_var]].nodes.iter() {
-                match node {
-                    LogicalPlanLanguage::CastExprDataType(expr) => match expr {
-                        CastExprDataType(DataType::Date32) | CastExprDataType(DataType::Date64) => {
-                            return true
-                        }
-                        _ => (),
-                    },
-                    _ => (),
-                }
-            }
-
-            false
-        }
-    }
-
     fn unwrap_cast_to_timestamp(
         &self,
         data_type_var: &'static str,
@@ -608,7 +602,9 @@ impl DateRules {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
             for data_type in var_iter!(egraph[subst[data_type_var]], CastExprDataType) {
-                if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+                if let Some(OriginalExpr::Expr(original_expr)) =
+                    egraph[root].data.original_expr.as_ref()
+                {
                     let alias = original_expr.name(&DFSchema::empty()).unwrap();
                     match data_type {
                         DataType::Timestamp(TimeUnit::Nanosecond, None) => {
@@ -660,7 +656,9 @@ impl DateRules {
     {
         let alias_var = var!(alias_var);
         move |egraph, root, subst| {
-            if let Some(original_expr) = egraph[root].data.original_expr.as_ref() {
+            if let Some(OriginalExpr::Expr(original_expr)) =
+                egraph[root].data.original_expr.as_ref()
+            {
                 let alias = original_expr.name(&DFSchema::empty()).unwrap();
                 subst.insert(
                     alias_var,

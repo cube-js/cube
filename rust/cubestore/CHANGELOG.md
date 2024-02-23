@@ -3,6 +3,80 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.55](https://github.com/cube-js/cube.js/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube.js/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube.js/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+
+### Bug Fixes
+
+* **cubestore:** Error in queries with GROUP BY DIMENSION ([#7743](https://github.com/cube-js/cube.js/issues/7743)) ([b9fcc60](https://github.com/cube-js/cube.js/commit/b9fcc6007864303cbc662a76e7bed1f119b9fc7d))
+* **cubestore:** Use file_name instead of id for in memory chunks ([#7704](https://github.com/cube-js/cube.js/issues/7704)) ([9e2e925](https://github.com/cube-js/cube.js/commit/9e2e9258fb1d4824e71a423d6a10cfc9df053ca1))
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube.js/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Features
+
+* **cubestore:** CREATE TABLE IF NOT EXISTS support ([#7451](https://github.com/cube-js/cube.js/issues/7451)) ([79c5e92](https://github.com/cube-js/cube.js/commit/79c5e92e6aed04b59e88ed61bd4a6dcdbcfb0b92))
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* **cubestore:** Single job process don't stop after job done ([#7706](https://github.com/cube-js/cube/issues/7706)) ([b84a345](https://github.com/cube-js/cube/commit/b84a34592648f37bbdf77b9d8691e44a6e3d8f27))
+
+
+
+
+
+## [0.34.48](https://github.com/cube-js/cube.js/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube.js/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

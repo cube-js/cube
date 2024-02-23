@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Bug Fixes
+
+* **playground:** replace antd daterange picker ([#7735](https://github.com/cube-js/cube/issues/7735)) ([484f1ca](https://github.com/cube-js/cube/commit/484f1ca0d0fa67a148f2db01041837a95d35c1c5))
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* **playground:** replace antd popover for settings ([#7699](https://github.com/cube-js/cube/issues/7699)) ([56b44ee](https://github.com/cube-js/cube/commit/56b44eefe02fa21fe0ae89d2bc45ee83f20a5210))
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
 
 

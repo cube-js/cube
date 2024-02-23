@@ -3,7 +3,9 @@ redirect_from:
   - /rest-api
 ---
 
-# REST API
+# REST API reference
+
+[REST API][ref-rest-api] provides the following endpoints.
 
 ## `/v1/load`
 
@@ -152,6 +154,7 @@ Response
 - `cubes` - Array of cubes
   - `name` - Codename of the cube
   - `title` - Human-readable cube name
+  - `meta` - Custom metadata
   - `measures` - Array of measures defined within this cube
   - `dimensions` - Array of dimensions defined within this cube
   - `segments` - Array of segments defined within this cube
@@ -175,6 +178,12 @@ Example response:
     {
       "name": "Users",
       "title": "Users",
+      "meta": {
+          "someKey": "someValue",
+          "nested": {
+            "someKey": "someValue"
+          }
+      },
       "connectedComponent": 1,
       "measures": [
         {
@@ -492,3 +501,4 @@ Keep-Alive: timeout=5
 
 [ref-recipes-data-blending]:
   /product/data-modeling/concepts/data-blending#data-blending
+[ref-rest-api]: /product/apis-integrations/rest-api

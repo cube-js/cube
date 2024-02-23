@@ -779,7 +779,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*AND\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*\)/);
+      expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
   });
 });

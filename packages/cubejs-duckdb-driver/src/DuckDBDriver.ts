@@ -57,11 +57,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
-    const db_path = getEnv('duckdbDatabasePath', this.config);
+    const dbPath = getEnv('duckdbDatabasePath', this.config);
+    
+    // Determine the database URL based on the provided db_path or token
+    const dbUrl = dbPath ? dbPath : (token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:');
+    const dbOptions = token ? { custom_user_agent: `Cube/${version}` } : {};
 
-    const db_url = db_path ? db_path : (token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:');
+    // Create a new Database instance with the determined URL and custom user agent
+    const db = new Database(dbUrl, dbOptions);
 
-    const db = new Database(db_url);
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
@@ -117,6 +121,18 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         key: 'schema',
         value: getEnv('duckdbSchema', this.config),
       },
+      {
+        key: 's3_use_ssl',
+        value: getEnv('duckdbS3UseSsl', this.config),
+      },
+      {
+        key: 's3_url_style',
+        value: getEnv('duckdbS3UrlStyle', this.config),
+      },
+      {
+        key: 's3_session_token',
+        value: getEnv('duckdbS3SessionToken', this.config),
+      }
     ];
     
     for (const { key, value } of configuration) {

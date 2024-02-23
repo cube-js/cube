@@ -1172,7 +1172,16 @@ class ApiGateway {
     return [queryType, normalizedQueries];
   }
 
-  public async sql({ query, context, res, memberToAlias, exportAnnotatedSql, memberExpressions, expressionParams }: QueryRequest) {
+  public async sql({
+    query,
+    context,
+    res,
+    memberToAlias,
+    exportAnnotatedSql,
+    memberExpressions,
+    expressionParams,
+    disableExternalPreAggregations
+  }: QueryRequest) {
     const requestStarted = new Date();
 
     try {
@@ -1188,7 +1197,7 @@ class ApiGateway {
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
-          this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias, expressionParams }, context),
+          this.coerceForSqlQuery({ ...normalizedQuery, memberToAlias, expressionParams, disableExternalPreAggregations }, context),
           {
             includeDebugInfo: getEnv('devMode') || context.signedWithPlaygroundAuthSecret,
             exportAnnotatedSql,
@@ -1698,7 +1707,7 @@ class ApiGateway {
       }
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context);
+        await this.getNormalizedQueries(query, context, request.streaming);
 
       const compilerApi = await this.getCompilerApi(context);
       let metaConfigResult = await compilerApi.metaConfig({
@@ -1708,7 +1717,10 @@ class ApiGateway {
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
       const sqlQueries = await this
-        .getSqlQueriesInternal(context, normalizedQueries);
+        .getSqlQueriesInternal(
+          context,
+          normalizedQueries.map(q => ({ ...q, disableExternalPreAggregations: request.sqlQuery }))
+        );
 
       let results;
 

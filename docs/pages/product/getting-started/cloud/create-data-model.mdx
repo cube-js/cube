@@ -5,14 +5,6 @@ redirect_from:
 
 # Create your first data model
 
-<InfoBox heading="Getting Started with Cube Cloud">
-
-[Join our Cube Cloud Office Hours on August 23rd](https://event.on24.com/wcc/r/4314738/57FE0F7DCCEA887295E4BCD818061E2B?partnerref=docs)
-to jumpstart your Cube Cloud account and gain insights on connecting data
-sources, creating data models, and integrating your data apps.
-
-</InfoBox>
-
 Cube follows a dataset-oriented data modeling approach, which is inspired by and
 expands upon dimensional modeling. Cube incorporates this approach and provides
 a practical framework for implementing dataset-oriented data modeling.
@@ -98,9 +90,7 @@ three possible statuses: **processing**, **shipped**, or **completed**. We will
 create a new measure `completed_count` by using a filter on that dimension. To
 do this, we will use a
 [filter parameter](/reference/data-model/measures#filters) of the
-measure and
-[refer](/product/data-modeling/syntax#referring-to-objects) to the
-existing dimension.
+measure and [refer][ref-member-references] to the existing dimension.
 
 Add the following measure definition to your `model/cubes/orders.yml` file. It
 should be included within the `measures` block.
@@ -224,3 +214,5 @@ they should be joined for that particular view.
 After saving, you can experiment with your newly created view in the Playground.
 In the next section, we will learn how to query our `orders_view` using a BI
 tool.
+
+[ref-member-references]: /product/data-modeling/syntax#references

@@ -136,7 +136,7 @@ export class BaseQuery {
           return {
             values: this.extractFiltersAsTree(f[operator]),
             operator,
-            dimension: dimension[0],
+            dimensionGroup: true,
             measure: null,
           };
         }
@@ -145,15 +145,13 @@ export class BaseQuery {
             values: this.extractFiltersAsTree(f[operator]),
             operator,
             dimension: null,
-            measure: measure[0],
+            measureGroup: true,
           };
         }
         if (!dimension.length && !measure.length) {
           return {
             values: [],
             operator,
-            dimension: null,
-            measure: null,
           };
         }
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
@@ -202,6 +200,7 @@ export class BaseQuery {
       className: this.constructor.name,
       externalClassName: this.options.externalQueryClass && this.options.externalQueryClass.name,
       preAggregationQuery: this.options.preAggregationQuery,
+      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
       historyQueries: this.options.historyQueries, // TODO too heavy for key
@@ -223,8 +222,8 @@ export class BaseQuery {
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
     /** @type {(BaseFilter|BaseGroupFilter)[]} */
-    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
-    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
+    this.filters = filters.filter(f => f.dimensionGroup || f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
+    this.measureFilters = filters.filter(f => (f.measureGroup || f.measure) && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
@@ -467,6 +466,9 @@ export class BaseQuery {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
+      if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+        preAggForQuery = undefined;
+      }
     }
     if (preAggForQuery) {
       const {
@@ -537,7 +539,7 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -556,7 +558,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
@@ -2514,6 +2516,8 @@ export class BaseQuery {
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
+        true: 'TRUE',
+        false: 'FALSE',
       },
       quotes: {
         identifiers: '"',
@@ -2892,6 +2896,7 @@ export class BaseQuery {
     if (!this.parametrizedContextSymbolsValue) {
       this.parametrizedContextSymbolsValue = Object.assign({
         filterParams: this.filtersProxy(),
+        filterGroup: this.filterGroupFunction(),
         sqlUtils: {
           convertTz: this.convertTz.bind(this)
         }
@@ -2905,7 +2910,8 @@ export class BaseQuery {
 
   static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {
     return {
-      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam),
+      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam, (filter) => new BaseGroupFilter(filter)),
+      filterGroup: () => '1 = 1',
       sqlUtils: {
         convertTz: (field) => field,
       },
@@ -2951,16 +2957,106 @@ export class BaseQuery {
     });
   }
 
+  static extractFilterMembers(filter) {
+    if (filter.operator === 'and' || filter.operator === 'or') {
+      return filter.values.map(f => BaseQuery.extractFilterMembers(f)).reduce((a, b) => ((a && b) ? { ...a, ...b } : null), {});
+    } else if (filter.measure || filter.dimension) {
+      return {
+        [filter.measure || filter.dimension]: true
+      };
+    } else {
+      return null;
+    }
+  }
+
+  static findAndSubTreeForFilterGroup(filter, groupMembers, newGroupFilter) {
+    if ((filter.operator === 'and' || filter.operator === 'or') && !filter.values?.length) {
+      return null;
+    }
+    const filterMembers = BaseQuery.extractFilterMembers(filter);
+    if (filterMembers && Object.keys(filterMembers).every(m => groupMembers.indexOf(m) !== -1)) {
+      return filter;
+    }
+    if (filter.operator === 'and') {
+      const result = filter.values.map(f => BaseQuery.findAndSubTreeForFilterGroup(f, groupMembers, newGroupFilter)).filter(f => !!f);
+      if (!result.length) {
+        return null;
+      }
+      if (result.length === 1) {
+        return result[0];
+      }
+      return newGroupFilter({
+        operator: 'and',
+        values: result
+      });
+    }
+    return null;
+  }
+
   filtersProxy() {
     const { allFilters } = this;
     return BaseQuery.filterProxyFromAllFilters(
       allFilters,
       this.cubeEvaluator,
-      this.paramAllocator.allocateParam.bind(this.paramAllocator)
+      this.paramAllocator.allocateParam.bind(this.paramAllocator),
+      this.newGroupFilter.bind(this),
     );
   }
 
-  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam) {
+  static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter) {
+    if (!filter) {
+      return '1 = 1';
+    }
+
+    if (filter.operator === 'and' || filter.operator === 'or') {
+      const values = filter.values
+        .map(f => BaseQuery.renderFilterParams(f, filterParamArgs, allocateParam, newGroupFilter))
+        .map(v => ({ filterToWhere: () => v }));
+
+      return newGroupFilter({ operator: filter.operator, values }).filterToWhere();
+    }
+
+    const filterParams = filter && filter.filterParams();
+    const filterParamArg = filterParamArgs.filter(p => p.__member() === filter.measure || p.__member() === filter.dimension)[0];
+    if (!filterParamArg) {
+      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+    }
+    if (
+      filterParams && filterParams.length
+    ) {
+      if (typeof filterParamArg.__column() === 'function') {
+        // eslint-disable-next-line prefer-spread
+        return filterParamArg.__column().apply(
+          null,
+          filterParams.map(allocateParam),
+        );
+      } else {
+        return filter.conditionSql(filterParamArg.__column());
+      }
+    } else {
+      return '1 = 1';
+    }
+  }
+
+  filterGroupFunction() {
+    const { allFilters } = this;
+    const allocateParam = this.paramAllocator.allocateParam.bind(this.paramAllocator);
+    const newGroupFilter = this.newGroupFilter.bind(this);
+    return (...filterParamArgs) => {
+      const groupMembers = filterParamArgs.map(f => {
+        if (!f.__member) {
+          throw new UserError(`FILTER_GROUP expects FILTER_PARAMS args to be passed. For example FILTER_GROUP(FILTER_PARAMS.foo.bar.filter('bar'), FILTER_PARAMS.foo.jar.filter('jar')). But found: ${f}`);
+        }
+        return f.__member();
+      });
+
+      const filter = BaseQuery.findAndSubTreeForFilterGroup(newGroupFilter({ operator: 'and', values: allFilters }), groupMembers, newGroupFilter);
+
+      return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter)})`;
+    };
+  }
+
+  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
     return new Proxy({}, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
@@ -2970,36 +3066,24 @@ export class BaseQuery {
         // and do not check cube validity as it's part of compilation step.
         const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
-          get: (cubeNameObj, propertyName) => {
-            const filters =
-              allFilters?.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
-            return {
-              filter: (column) => {
-                if (!filters || !filters.length) {
-                  return '1 = 1';
-                }
-
-                return filters.map(filter => {
-                  const filterParams = filter && filter.filterParams();
-                  if (
-                    filterParams && filterParams.length
-                  ) {
-                    if (typeof column === 'function') {
-                      // eslint-disable-next-line prefer-spread
-                      return column.apply(
-                        null,
-                        filterParams.map(allocateParam),
-                      );
-                    } else {
-                      return filter.conditionSql(column);
-                    }
-                  } else {
-                    return '1 = 1';
-                  }
-                }).join(' AND ');
+          get: (cubeNameObj, propertyName) => ({
+            filter: (column) => ({
+              __column() {
+                return column;
+              },
+              __member() {
+                return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
+              },
+              toString() {
+                const filter = BaseQuery.findAndSubTreeForFilterGroup(
+                  newGroupFilter({ operator: 'and', values: allFilters }),
+                  [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
+                  newGroupFilter
+                );
+                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter)})`;
               }
-            };
-          }
+            })
+          })
         });
       }
     });

@@ -61,6 +61,7 @@ describe('SQL API', () => {
         CUBEJS_DB_PASS: 'test',
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
+        CUBESQL_SQL_PUSH_DOWN: 'true',
       },
       {
         schemaDir: 'postgresql/schema',
@@ -162,6 +163,22 @@ describe('SQL API', () => {
     test('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
       const res = await connection.query('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC');
       expect(res.rows).toMatchSnapshot('sql_orders');
+    });
+
+    test('powerbi min max push down', async () => {
+      const res = await connection.query(`
+      select
+  max("rows"."createdAt") as "a0",
+  min("rows"."createdAt") as "a1"
+from
+  (
+    select
+      "createdAt"
+    from
+      "public"."Orders" "$Table"
+  ) "rows"
+  `);
+      expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
   });
 });

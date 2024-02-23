@@ -3,6 +3,49 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* Merge streaming methods to one interface to allow SQL API use batching and Databricks batching implementation ([#7695](https://github.com/cube-js/cube/issues/7695)) ([73ad72d](https://github.com/cube-js/cube/commit/73ad72dd8a104651cf5ef23a60e8b4c116c97eed))
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
 ## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

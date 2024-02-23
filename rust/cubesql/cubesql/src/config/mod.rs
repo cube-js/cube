@@ -125,6 +125,14 @@ pub trait ConfigObj: DIService + Debug {
     fn auth_expire_secs(&self) -> u64;
 
     fn compiler_cache_size(&self) -> usize;
+
+    fn query_cache_size(&self) -> usize;
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool;
+
+    fn enable_rewrite_cache(&self) -> bool;
+
+    fn push_down_pull_up_split(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -137,6 +145,10 @@ pub struct ConfigObjImpl {
     pub timezone: Option<String>,
     pub disable_strict_agg_type_match: bool,
     pub compiler_cache_size: usize,
+    pub query_cache_size: usize,
+    pub enable_parameterized_rewrite_cache: bool,
+    pub enable_rewrite_cache: bool,
+    pub push_down_pull_up_split: bool,
 }
 
 impl ConfigObjImpl {
@@ -145,6 +157,7 @@ impl ConfigObjImpl {
             .ok()
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
+        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", false);
         Self {
             bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
                 env::var("CUBESQL_PORT")
@@ -163,6 +176,12 @@ impl ConfigObjImpl {
             ),
             auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
             compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
+            query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
+            enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
+                .unwrap_or(sql_push_down),
+            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
+            push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
+                .unwrap_or(sql_push_down),
         }
     }
 }
@@ -197,6 +216,22 @@ impl ConfigObj for ConfigObjImpl {
     fn compiler_cache_size(&self) -> usize {
         self.compiler_cache_size
     }
+
+    fn query_cache_size(&self) -> usize {
+        self.query_cache_size
+    }
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool {
+        self.enable_parameterized_rewrite_cache
+    }
+
+    fn enable_rewrite_cache(&self) -> bool {
+        self.enable_rewrite_cache
+    }
+
+    fn push_down_pull_up_split(&self) -> bool {
+        self.push_down_pull_up_split
+    }
 }
 
 lazy_static! {
@@ -226,6 +261,10 @@ impl Config {
                 timezone,
                 disable_strict_agg_type_match: false,
                 compiler_cache_size: 100,
+                query_cache_size: 500,
+                enable_parameterized_rewrite_cache: false,
+                enable_rewrite_cache: false,
+                push_down_pull_up_split: true,
             }),
         }
     }

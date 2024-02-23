@@ -4,6 +4,7 @@ import { Alert, Layout } from 'antd';
 import { Component, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
+import { Root, tasty } from '@cube-dev/ui-kit';
 
 import { CubeLoader } from './atoms';
 import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
@@ -102,23 +103,25 @@ class App extends Component<RouteComponentProps, AppState> {
       <LivePreviewContextProvider
         disabled={context!.livePreview == null || !context!.livePreview}
       >
-        <Layout>
-          <GlobalStyles />
+        <Root>
+          <Layout>
+            <GlobalStyles />
 
-          <Header selectedKeys={[location.pathname]} />
+            <Header selectedKeys={[location.pathname]} />
 
-          <StyledLayoutContent>
-            {fatalError ? (
-              <Alert
-                message="Error occured while rendering"
-                description={fatalError.stack || ''}
-                type="error"
-              />
-            ) : (
-              children
-            )}
-          </StyledLayoutContent>
-        </Layout>
+            <StyledLayoutContent>
+              {fatalError ? (
+                <Alert
+                  message="Error occured while rendering"
+                  description={fatalError.stack || ''}
+                  type="error"
+                />
+              ) : (
+                children
+              )}
+            </StyledLayoutContent>
+          </Layout>
+        </Root>
       </LivePreviewContextProvider>
     );
   }

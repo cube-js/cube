@@ -16,3 +16,12 @@ Array [
   },
 ]
 `;
+
+exports[`SQL API Postgres (Data) powerbi min max push down: powerbi_min_max_push_down 1`] = `
+Array [
+  Object {
+    "a0": 2024-01-05T00:00:00.000Z,
+    "a1": 2024-01-01T00:00:00.000Z,
+  },
+]
+`;

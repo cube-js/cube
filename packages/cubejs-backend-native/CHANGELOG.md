@@ -3,6 +3,105 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.56](https://github.com/cube-js/cube/compare/v0.34.55...v0.34.56) (2024-02-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow `NULL` values in `CASE` ([a97acdc](https://github.com/cube-js/cube/commit/a97acdc996dd68a0e2c00c155dfe30a863440ecc))
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+
+### Features
+
+* **cubesql:** Strings with Unicode Escapes ([#7756](https://github.com/cube-js/cube/issues/7756)) ([49acad5](https://github.com/cube-js/cube/commit/49acad51e6a2b7ffa9ec0b584aaaa6e54f4f1434))
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+
+### Features
+
+* **cubesql:** EXTRACT(EPOCH, ...) support ([#7734](https://github.com/cube-js/cube/issues/7734)) ([b4deacd](https://github.com/cube-js/cube/commit/b4deacddf0a2e06b0b1f4216ca735a41e52724e2))
+* **cubesql:** Support `TimestampNanosecond` in `CASE` ([69aed08](https://github.com/cube-js/cube/commit/69aed0875afb3b2d56176f4bdfdee7b1acd17ce9))
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix `CASE` type with `NULL` values ([2b7cc30](https://github.com/cube-js/cube/commit/2b7cc304b101330ca072fa0c4a3a6e9ae9efa2a5))
+* **cubesql:** Stabilize split operations for SQL push down ([#7725](https://github.com/cube-js/cube/issues/7725)) ([6241e5e](https://github.com/cube-js/cube/commit/6241e5e9335148947a687f7e3d6b56929ba46c36))
+* **native:** Don't crash after query cancellation ([40726ba](https://github.com/cube-js/cube/commit/40726ba3ae27a53a4e6531886513b545a27b1858))
+* **native:** Handle JsAsyncChannel error (without panic) ([#7729](https://github.com/cube-js/cube/issues/7729)) ([5480978](https://github.com/cube-js/cube/commit/5480978295232d5cd7b3baf2fe4c48b005338f06))
+
+
+
+
+
+## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix unary minus operator precedence ([d5a935a](https://github.com/cube-js/cube/commit/d5a935ac3bb16c1dda6c30982cdc9ef787a24967))
+
+
+### Features
+
+* **cubesql:** Support KPI chart in Thoughtspot ([dbab39e](https://github.com/cube-js/cube/commit/dbab39e63a1c752a56a2cb06169a479a3e9cb11e))
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.34.45](https://github.com/cube-js/cube/compare/v0.34.44...v0.34.45) (2024-01-16)
+
+
+### Features
+
+* **cubesql:** Query rewrite cache ([#7647](https://github.com/cube-js/cube/issues/7647)) ([79888af](https://github.com/cube-js/cube/commit/79888afc3823a3ef29ba76c440828c8c5d719ae4))
+
+
+
+
+
 ## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
 
 
