@@ -60,8 +60,19 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const dbPath = getEnv('duckdbDatabasePath', this.config);
     
     // Determine the database URL based on the provided db_path or token
-    const dbUrl = dbPath ? dbPath : (token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:');
-    const dbOptions = token ? { custom_user_agent: `Cube/${version}` } : undefined;
+    let dbUrl: string;
+    if (dbPath) {
+      dbUrl = dbPath;
+    } else if (token) {
+      dbUrl = `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}`;
+    } else {
+      dbUrl = ':memory:';
+    }
+
+    let dbOptions;
+    if (token) {
+      dbOptions = { custom_user_agent: `Cube/${version}` };
+    }
 
     // Create a new Database instance with the determined URL and custom user agent
     const db = new Database(dbUrl, dbOptions);
