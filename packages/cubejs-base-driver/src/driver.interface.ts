@@ -37,7 +37,7 @@ export interface DownloadTableBase {
    */
   release?: () => Promise<void>;
 
-  isUnloadSupported?: boolean;
+  isExportBucket?: boolean;
 }
 
 export interface DownloadTableMemoryData extends DownloadTableBase {

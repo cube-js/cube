@@ -1203,7 +1203,7 @@ export class PreAggregationLoader {
 
       this.logger('Downloading external pre-aggregation completed', {
         ...queryOptions,
-        isUnloadSupported: tableData.isUnloadSupported
+        isExportBucket: tableData.isExportBucket
       });
 
       return tableData;
@@ -1226,7 +1226,7 @@ export class PreAggregationLoader {
       tableData = await saveCancelFn(
         client.unload(table, this.getUnloadOptions()),
       );
-      tableData.isUnloadSupported = true;
+      tableData.isExportBucket = true;
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
@@ -1268,7 +1268,7 @@ export class PreAggregationLoader {
           { ...this.getUnloadOptions(), query: { sql, params } },
         )
       );
-      tableData.isUnloadSupported = true;
+      tableData.isExportBucket = true;
       return tableData;
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
