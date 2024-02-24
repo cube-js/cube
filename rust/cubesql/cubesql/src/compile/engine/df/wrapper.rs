@@ -485,7 +485,6 @@ impl CubeScanWrapperNode {
                             )
                             .await?;
 
-                            // TODO disable renaming and column generation for filters
                             let (filter, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
