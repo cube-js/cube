@@ -1846,14 +1846,35 @@ impl LanguageToLogicalPlanConverter {
                 let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
                 let ungrouped = match_data_node!(node_by_id, params[13], WrappedSelectUngrouped);
 
+                let filter_expr = normalize_cols(filter_expr, &from)?;
                 let group_expr = normalize_cols(group_expr, &from)?;
                 let aggr_expr = normalize_cols(aggr_expr, &from)?;
-                let projection_expr = normalize_cols(projection_expr, &from)?;
+                let projection_expr = if projection_expr.is_empty()
+                    && matches!(select_type, WrappedSelectType::Projection)
+                {
+                    from.schema()
+                        .fields()
+                        .iter()
+                        .map(|f| Expr::Column(f.qualified_column()))
+                        .collect::<Vec<_>>()
+                } else {
+                    normalize_cols(projection_expr, &from)?
+                };
                 let all_expr_without_window = match select_type {
                     WrappedSelectType::Projection => projection_expr.clone(),
                     WrappedSelectType::Aggregate => {
                         group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
                     }
+                };
+                // TODO support asterisk query?
+                let all_expr_without_window = if all_expr_without_window.is_empty() {
+                    from.schema()
+                        .fields()
+                        .iter()
+                        .map(|f| Expr::Column(f.qualified_column()))
+                        .collect::<Vec<_>>()
+                } else {
+                    all_expr_without_window
                 };
                 let without_window_fields =
                     exprlist_to_fields(all_expr_without_window.iter(), from.schema())?;

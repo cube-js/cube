@@ -70,7 +70,12 @@ impl WrapperRules {
                         "?cube_members",
                     ),
                     "?joins",
-                    "?filter_expr",
+                    wrapper_pullup_replacer(
+                        "?filter_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?cube_members",
+                    ),
                     "?having_expr",
                     "?limit",
                     "?offset",

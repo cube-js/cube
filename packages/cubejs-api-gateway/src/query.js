@@ -105,7 +105,7 @@ const querySchema = Joi.object().keys({
     Joi.object().pattern(id, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(id),
+  segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(1),
   offset: Joi.number().integer().min(0),

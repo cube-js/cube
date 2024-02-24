@@ -7,6 +7,7 @@ mod cast;
 mod column;
 mod cube_scan_wrapper;
 mod extract;
+mod filter;
 mod in_list_expr;
 mod is_null_expr;
 mod limit;
@@ -50,6 +51,7 @@ impl RewriteRules for WrapperRules {
         self.aggregate_rules(&mut rules);
         self.projection_rules(&mut rules);
         self.limit_rules(&mut rules);
+        self.filter_rules(&mut rules);
         self.order_rules(&mut rules);
         self.window_rules(&mut rules);
         self.aggregate_function_rules(&mut rules);

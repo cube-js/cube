@@ -845,7 +845,6 @@ fn wrapped_select_joins_empty_tail() -> String {
     "WrappedSelectJoins".to_string()
 }
 
-#[allow(dead_code)]
 fn wrapped_select_filter_expr(left: impl Display, right: impl Display) -> String {
     format!("(WrappedSelectFilterExpr {} {})", left, right)
 }
