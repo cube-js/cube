@@ -160,6 +160,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     return templates;
   }
 }

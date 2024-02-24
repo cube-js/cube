@@ -10,7 +10,7 @@ use crate::{
     },
     CubeError,
 };
-use chrono::{Days, NaiveDate};
+use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
 use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
@@ -165,6 +165,48 @@ lazy_static! {
     static ref DATE_PART_REGEX: Regex = Regex::new("^[A-Za-z_ ]+$").unwrap();
 }
 
+macro_rules! generate_sql_for_timestamp {
+    (@generic $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
+        if let Some($value) = $value {
+            let value = $value_block.to_rfc3339_opts(SecondsFormat::Millis, true);
+            (
+                $sql_generator
+                    .get_sql_templates()
+                    .timestamp_literal_expr(value)
+                    .map_err(|e| {
+                        DataFusionError::Internal(format!(
+                            "Can't generate SQL for timestamp: {}",
+                            e
+                        ))
+                    })?,
+                $sql_query,
+            )
+        } else {
+            ("NULL".to_string(), $sql_query)
+        }
+    };
+    ($value:ident, timestamp, $sql_generator:expr, $sql_query:expr) => {
+        generate_sql_for_timestamp!(
+            @generic $value, { Utc.timestamp_opt($value as i64, 0).unwrap() }, $sql_generator, $sql_query
+        )
+    };
+    ($value:ident, timestamp_millis_opt, $sql_generator:expr, $sql_query:expr) => {
+        generate_sql_for_timestamp!(
+            @generic $value, { Utc.timestamp_millis_opt($value as i64).unwrap() }, $sql_generator, $sql_query
+        )
+    };
+    ($value:ident, timestamp_micros, $sql_generator:expr, $sql_query:expr) => {
+        generate_sql_for_timestamp!(
+            @generic $value, { Utc.timestamp_micros($value as i64).unwrap() }, $sql_generator, $sql_query
+        )
+    };
+    ($value:ident, $method:ident, $sql_generator:expr, $sql_query:expr) => {
+        generate_sql_for_timestamp!(
+            @generic $value, { Utc.$method($value as i64) }, $sql_generator, $sql_query
+        )
+    };
+}
+
 impl CubeScanWrapperNode {
     pub async fn generate_sql(
         &self,
@@ -310,7 +352,7 @@ impl CubeScanWrapperNode {
                         window_expr,
                         from,
                         joins: _joins,
-                        filter_expr: _filter_expr,
+                        filter_expr,
                         having_expr: _having_expr,
                         limit,
                         offset,
@@ -443,6 +485,21 @@ impl CubeScanWrapperNode {
                             )
                             .await?;
 
+                            // TODO disable renaming and column generation for filters
+                            let (filter, sql) = Self::generate_column_expr(
+                                plan.clone(),
+                                schema.clone(),
+                                filter_expr.clone(),
+                                sql,
+                                generator.clone(),
+                                &column_remapping,
+                                &mut next_remapping,
+                                alias.clone(),
+                                can_rename_columns,
+                                ungrouped_scan_node.clone(),
+                            )
+                            .await?;
+
                             let (window, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
@@ -539,6 +596,17 @@ impl CubeScanWrapperNode {
                                 );
                                 load_request.dimensions = Some(
                                     group_by
+                                        .iter()
+                                        .map(|m| {
+                                            Self::ungrouped_member_def(
+                                                m,
+                                                &ungrouped_scan_node.used_cubes,
+                                            )
+                                        })
+                                        .collect::<Result<_>>()?,
+                                );
+                                load_request.segments = Some(
+                                    filter
                                         .iter()
                                         .map(|m| {
                                             Self::ungrouped_member_def(
@@ -651,7 +719,16 @@ impl CubeScanWrapperNode {
                                         aggregate,
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
-                                        None,
+                                        if !filter.is_empty() {
+                                            Some(
+                                                filter
+                                                    .iter()
+                                                    .map(|f| f.expr.to_string())
+                                                    .join(" AND "),
+                                            )
+                                        } else {
+                                            None
+                                        },
                                         None,
                                         order,
                                         limit,
@@ -1284,10 +1361,33 @@ impl CubeScanWrapperNode {
                             }
                         }
                         // ScalarValue::Date64(_) => {}
-                        // ScalarValue::TimestampSecond(_, _) => {}
-                        // ScalarValue::TimestampMillisecond(_, _) => {}
-                        // ScalarValue::TimestampMicrosecond(_, _) => {}
-                        // ScalarValue::TimestampNanosecond(_, _) => {}
+                        ScalarValue::TimestampSecond(s, _) => {
+                            generate_sql_for_timestamp!(s, timestamp, sql_generator, sql_query)
+                        }
+                        ScalarValue::TimestampMillisecond(ms, None) => {
+                            generate_sql_for_timestamp!(
+                                ms,
+                                timestamp_millis_opt,
+                                sql_generator,
+                                sql_query
+                            )
+                        }
+                        ScalarValue::TimestampMicrosecond(ms, None) => {
+                            generate_sql_for_timestamp!(
+                                ms,
+                                timestamp_micros,
+                                sql_generator,
+                                sql_query
+                            )
+                        }
+                        ScalarValue::TimestampNanosecond(nanoseconds, None) => {
+                            generate_sql_for_timestamp!(
+                                nanoseconds,
+                                timestamp_nanos,
+                                sql_generator,
+                                sql_query
+                            )
+                        }
                         ScalarValue::IntervalYearMonth(x) => {
                             if let Some(x) = x {
                                 let (num, date_part) = (x, "MONTH");

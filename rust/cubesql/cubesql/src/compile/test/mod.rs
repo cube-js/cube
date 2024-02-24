@@ -287,11 +287,14 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("functions/DATE_ADD".to_string(), "DATE_ADD({{ args_concat }})".to_string()),
                     ("functions/CONCAT".to_string(), "CONCAT({{ args_concat }})".to_string()),
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
+                    ("functions/LEFT".to_string(), "LEFT({{ args_concat }})".to_string()),
+                    ("functions/RIGHT".to_string(), "RIGHT({{ args_concat }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
                         r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
-  FROM ({{ from }}) AS {{ from_alias }} 
+  FROM ({{ from }}) AS {{ from_alias }}
+  {% if filter %} WHERE {{ filter }}{% endif %} 
   {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
   {% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
   LIMIT {{ limit }}{% endif %}{% if offset %}
@@ -313,6 +316,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("expressions/not".to_string(), "NOT ({{ expr }})".to_string()),
                     ("expressions/true".to_string(), "TRUE".to_string()),
                     ("expressions/false".to_string(), "FALSE".to_string()),
+                    ("expressions/timestamp_literal".to_string(), "timestamptz '{{ value }}'".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
