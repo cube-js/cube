@@ -16,13 +16,13 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "?ungrouped",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "?ungrouped",
                     "?cube_members",
                 ),
             ),

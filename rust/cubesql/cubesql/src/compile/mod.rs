@@ -4437,6 +4437,140 @@ limit
     }
 
     #[tokio::test]
+    async fn powerbi_year_month_split() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"select
+  "_"."order_date_year_month" as "c11",
+  "_"."a0" as "a0"
+from
+  (
+    select
+      "_"."order_date_year_month",
+      "_"."a0"
+    from
+      (
+        select
+          "_"."order_date_year_month",
+          "_"."a0"
+        from
+          (
+            select
+              "rows"."order_date_year_month" as "order_date_year_month",
+              sum(cast("rows"."sumPrice" as decimal)) as "a0"
+            from
+              (
+                select
+                  "_"."sumPrice" as "sumPrice",
+                  (
+                    case
+                      when left(
+                        cast(
+                          extract(
+                            year
+                            from
+                              "_"."order_date"
+                          ) as varchar
+                        ),
+                        4000
+                      ) is not null then left(
+                        cast(
+                          extract(
+                            year
+                            from
+                              "_"."order_date"
+                          ) as varchar
+                        ),
+                        4000
+                      )
+                      else ''
+                    end
+                  ) || (
+                    '-' || (
+                      case
+                        when left(
+                          cast(
+                            extract(
+                              month
+                              from
+                                "_"."order_date"
+                            ) as varchar
+                          ),
+                          4000
+                        ) is not null then left(
+                          cast(
+                            extract(
+                              month
+                              from
+                                "_"."order_date"
+                            ) as varchar
+                          ),
+                          4000
+                        )
+                        else ''
+                      end
+                    )
+                  ) as "order_date_year_month"
+                from
+                  (
+                    select
+                      "_"."sumPrice",
+                      "_"."order_date"
+                    from
+                      (
+                        select
+                          "sumPrice",
+                          "order_date"
+                        from
+                          "public"."KibanaSampleDataEcommerce" "$Table"
+                      ) "_"
+                    where
+                      "_"."order_date" < timestamp '2023-10-08 00:00:00'
+                      and "_"."order_date" >= timestamp '2023-07-08 00:00:00'
+                  ) "_"
+              ) "rows"
+            group by
+              "order_date_year_month"
+          ) "_"
+        where
+          not "_"."a0" is null
+      ) "_"
+  ) "_"
+order by
+  "_"."a0" desc,
+  "_"."order_date_year_month"
+limit
+  1001"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn powerbi_date_range_min_max() {
         if !Rewriter::sql_push_down_enabled() {
             return;
@@ -4458,6 +4592,59 @@ from
             DatabaseProtocol::PostgreSQL,
         )
         .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn powerbi_date_range_min_max_ungrouped() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"select 
+  count(distinct("rows"."sumPrice")) + max( 
+    case 
+      when "rows"."sumPrice" is null then 1 
+      else 0 
+    end 
+  ) as "a0", 
+  min("rows"."sumPrice") as "a1", 
+  max("rows"."sumPrice") as "a2" 
+from 
+  ( 
+    select 
+      "sumPrice" 
+    from 
+      "public"."KibanaSampleDataEcommerce" "$Table" 
+  ) "rows"
+  "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
