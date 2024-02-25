@@ -4609,6 +4609,84 @@ from
     }
 
     #[tokio::test]
+    async fn powerbi_cast_and_timestamp_equals_filter() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"select 
+  "_"."customer_gender", 
+  "_"."notes", 
+  "_"."a0" 
+from 
+  ( 
+    select 
+      "rows"."customer_gender" as "customer_gender", 
+      "rows"."notes" as "notes", 
+      sum(cast("rows"."sumPrice" as decimal)) as "a0" 
+    from 
+      ( 
+        select 
+          "_"."customer_gender", 
+          "_"."notes", 
+          "_"."count", 
+          "_"."order_date", 
+          "_"."maxPrice", 
+          "_"."minPrice", 
+          "_"."sumPrice", 
+          "_"."__user", 
+          "_"."__cubeJoinField" 
+        from 
+          "public"."KibanaSampleDataEcommerce" "_" 
+        where 
+          "_"."order_date" = timestamp '2024-01-01 00:00:00' 
+      ) "rows" 
+    group by 
+      "customer_gender", 
+      "notes"
+  ) "_" 
+where 
+  not "_"."a0" is null 
+limit 
+  1000001"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "KibanaSampleDataEcommerce.notes".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-01-01T00:00:00.000Z".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: Some(1000001),
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_aggregations() {
         let variants = vec![
             (
