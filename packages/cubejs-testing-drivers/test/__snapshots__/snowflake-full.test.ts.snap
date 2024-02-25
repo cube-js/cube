@@ -9,6 +9,16 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: powerbi min max ungrouped flag: powerbi_min_max_ungrouped_flag 1`] = `
+Array [
+  Object {
+    "a0": "39",
+    "a1": 3.76,
+    "a2": 2399.96,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver filtering Customers: contains + dimensions, first 1`] = `
 Array [
   Object {
