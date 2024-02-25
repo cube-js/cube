@@ -7,6 +7,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
@@ -22,6 +24,8 @@ on:
     paths:
       - '.github/workflows/drivers-tests.yml'
 
+      - 'packages/cubejs-testing-drivers/**'
+      - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
@@ -40,7 +44,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: git-log
@@ -58,24 +62,108 @@ jobs:
         env:
           OUT: ${{ steps.get-tag.outputs.sha }}
 
+  native_linux:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
+    strategy:
+      matrix:
+        node-version: [ 16 ]
+        python-version: [ "fallback" ]
+        target: [ "x86_64-unknown-linux-gnu" ]
+      fail-fast: false
+    container:
+      image: cubejs/rust-cross:${{ matrix.target }}-30052023
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly-2023-12-13
+          override: true
+          components: rustfmt
+          target: ${{ matrix.target }}
+      - name: Install Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install Yarn
+        run: npm install -g yarn
+      - name: Set Yarn version
+        run: yarn policies set-version v1.22.19
+      - name: Get yarn cache directory path
+        id: yarn-cache-dir-path
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
+        uses: actions/cache@v3
+        with:
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
+      - name: Yarn install
+        uses: nick-invision/retry@v2
+        env:
+          CUBESTORE_SKIP_POST_INSTALL: true
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: yarn install --frozen-lockfile
+      - name: Compile TypeScript
+        run: yarn tsc
+      - name: Build native (fallback)
+        if: (matrix.python-version == 'fallback')
+        env:
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && npm run native:build-release
+      - name: Setup cross compilation
+        if: (matrix.target == 'aarch64-unknown-linux-gnu')
+        uses: allenevans/set-env@v3.0.0
+        with:
+          PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
+      - name: Build native (with Python)
+        if: (matrix.python-version != 'fallback')
+        env:
+          PYO3_PYTHON: python${{ matrix.python-version }}
+          CARGO_BUILD_TARGET: ${{ matrix.target }}
+        run: cd packages/cubejs-backend-native && npm run native:build-release-python
+      - name: Upload native build
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-native
+          path: packages/cubejs-backend-native/index.node
+
   build:
-    needs: latest-tag-sha
+    needs: [latest-tag-sha, native_linux]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       # Building docker
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
+      - name: Download native build
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-native
+          path: packages/cubejs-backend-native/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -104,6 +192,7 @@ jobs:
           - bigquery
           - clickhouse
           - databricks-jdbc
+          - databricks-jdbc-export-bucket
           - mssql
           - mysql
           - postgres
@@ -112,7 +201,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install Rust
         uses: actions-rs/toolchain@v1
@@ -167,8 +256,8 @@ jobs:
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
 
           # Snowflake
-          DRIVERS_TESTS_CUBEJS_DB_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_USER }}
-          DRIVERS_TESTS_CUBEJS_DB_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_PASS }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
+          DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
         run: |
           cd ./packages/cubejs-testing-drivers
           export DEBUG=testcontainers

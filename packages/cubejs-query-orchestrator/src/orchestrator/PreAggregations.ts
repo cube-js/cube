@@ -26,6 +26,8 @@ import {
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import LRUCache from 'lru-cache';
+
 import { PreAggTableToTempTable, Query, QueryBody, QueryCache, QueryTuple, QueryWithParams } from './QueryCache';
 import { ContinueWaitError } from './ContinueWaitError';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
@@ -353,7 +355,7 @@ class PreAggregationLoadCache {
     return this.tables[redisKey];
   }
 
-  protected async getTableColumnTypes(preAggregation: PreAggregationDescription, tableName: string): Promise<TableStructure> {
+  public async getTableColumnTypes(preAggregation: PreAggregationDescription, tableName: string): Promise<TableStructure> {
     const prefixKey = this.tablesCachePrefixKey(preAggregation);
     if (!this.tableColumnTypes[prefixKey]?.[tableName]) {
       if (!this.preAggregations.options.skipExternalCacheAndQueue && preAggregation.external) {
@@ -423,7 +425,7 @@ class PreAggregationLoadCache {
     return this.versionEntries[redisKey];
   }
 
-  protected async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew, priority) {
+  public async keyQueryResult(sqlQuery: QueryWithParams, waitForRenew: boolean, priority: number) {
     const [query, values, queryOptions]: QueryTuple = Array.isArray(sqlQuery) ? sqlQuery : [sqlQuery, [], {}];
 
     if (!this.queryResults[this.queryCache.queryRedisKey([query, values])]) {
@@ -448,11 +450,11 @@ class PreAggregationLoadCache {
     return this.queryResults[this.queryCache.queryRedisKey([query, values])];
   }
 
-  protected hasKeyQueryResult(keyQuery) {
+  public hasKeyQueryResult(keyQuery) {
     return !!this.queryResults[this.queryCache.queryRedisKey(keyQuery)];
   }
 
-  protected async getQueryStage(stageQueryKey) {
+  public async getQueryStage(stageQueryKey) {
     const queue = await this.preAggregations.getQueue(this.dataSource);
     await this.fetchQueryStageState(queue);
     return queue.getQueryStage(stageQueryKey, undefined, this.queryStageState);
@@ -466,7 +468,7 @@ class PreAggregationLoadCache {
     return this.queryStageState;
   }
 
-  protected async reset(preAggregation) {
+  public async reset(preAggregation) {
     await this.tablesFromCache(preAggregation, true);
     this.tables = {};
     this.tableColumnTypes = {};
@@ -493,8 +495,6 @@ export class PreAggregationLoader {
   public preAggregation: any;
 
   private preAggregationsTablesToTempTables: any;
-
-  private loadCache: any;
 
   /**
    * Determines whether current instance instantiated for a jobed build query
@@ -528,13 +528,12 @@ export class PreAggregationLoader {
     preAggregations: PreAggregations,
     preAggregation,
     preAggregationsTablesToTempTables,
-    loadCache,
+    private readonly loadCache: PreAggregationLoadCache,
     options: any = {}
   ) {
     this.preAggregations = preAggregations;
     this.preAggregation = preAggregation;
     this.preAggregationsTablesToTempTables = preAggregationsTablesToTempTables;
-    this.loadCache = loadCache;
     this.isJob = !!options.isJob;
     this.waitForRenew = options.waitForRenew;
     this.forceBuild = options.forceBuild;
@@ -662,12 +661,7 @@ export class PreAggregationLoader {
       };
     }
 
-    // TODO this check can be redundant due to structure version is already checked in loadPreAggregation()
-    if (
-      !this.waitForRenew &&
-      // eslint-disable-next-line no-use-before-define
-      await this.loadCache.getQueryStage(PreAggregations.preAggregationQueryCacheKey(this.preAggregation))
-    ) {
+    if (!this.waitForRenew) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);
@@ -820,7 +814,7 @@ export class PreAggregationLoader {
     return version(versionArray);
   }
 
-  protected priority(defaultValue) {
+  protected priority(defaultValue: number): number {
     return this.preAggregation.priority != null ? this.preAggregation.priority : defaultValue;
   }
 
@@ -1495,7 +1489,7 @@ export class PreAggregationPartitionRangeLoader {
     private readonly preAggregations: PreAggregations,
     private readonly preAggregation: PreAggregationDescription,
     private readonly preAggregationsTablesToTempTables: [string, LoadPreAggregationResult][],
-    private readonly loadCache: any,
+    private readonly loadCache: PreAggregationLoadCache,
     private readonly options: PreAggsPartitionRangeLoaderOpts = {
       maxPartitions: 10000,
       maxSourceRowLimit: 10000,
@@ -1869,12 +1863,15 @@ export class PreAggregationPartitionRangeLoader {
     if (!range) {
       return;
     }
+
     if (range.length !== 2) {
       throw new Error(`Date range expected to be an array with 2 elements but ${range} found`);
     }
+
     if (typeof range[0] !== 'string' || typeof range[1] !== 'string') {
       throw new Error(`Date range expected to be a string array but ${range} found`);
     }
+
     if (range[0].length !== 23 || range[1].length !== 23) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }
@@ -1971,6 +1968,8 @@ export class PreAggregations {
 
   private readonly getQueueEventsBus: any;
 
+  private readonly touchCache: LRUCache<string, true>;
+
   public constructor(
     private readonly redisPrefix: string,
     private readonly driverFactory: DriverFactoryByDataSource,
@@ -1987,14 +1986,20 @@ export class PreAggregations {
     this.usedTablePersistTime = options.usedTablePersistTime || getEnv('dbQueryTimeout');
     this.externalRefresh = options.externalRefresh;
     this.getQueueEventsBus = options.getQueueEventsBus;
+    this.touchCache = new LRUCache({
+      max: getEnv('touchPreAggregationCacheMaxCount'),
+      maxAge: getEnv('touchPreAggregationCacheMaxAge') * 1000,
+      stale: false,
+      updateAgeOnGet: false
+    });
   }
 
-  protected tablesUsedRedisKey(tableName) {
+  protected tablesUsedRedisKey(tableName: string): string {
     // TODO add dataSource?
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_USED', tableName);
   }
 
-  protected tablesTouchRedisKey(tableName) {
+  protected tablesTouchRedisKey(tableName: string): string {
     // TODO add dataSource?
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_TABLES_TOUCH', tableName);
   }
@@ -2004,8 +2009,12 @@ export class PreAggregations {
     return this.queryCache.getKey('SQL_PRE_AGGREGATIONS_REFRESH_END_REACHED', '');
   }
 
-  public async addTableUsed(tableName) {
-    return this.queryCache.getCacheDriver().set(this.tablesUsedRedisKey(tableName), true, this.usedTablePersistTime);
+  public async addTableUsed(tableName: string): Promise<void> {
+    await this.queryCache.getCacheDriver().set(
+      this.tablesUsedRedisKey(tableName),
+      true,
+      this.usedTablePersistTime
+    );
   }
 
   public async tablesUsed() {
@@ -2013,8 +2022,24 @@ export class PreAggregations {
       .map(k => k.replace(this.tablesUsedRedisKey(''), ''));
   }
 
-  public async updateLastTouch(tableName) {
-    return this.queryCache.getCacheDriver().set(this.tablesTouchRedisKey(tableName), new Date().getTime(), this.touchTablePersistTime);
+  public async updateLastTouch(tableName: string): Promise<void> {
+    if (this.touchCache.has(tableName)) {
+      return;
+    }
+
+    try {
+      this.touchCache.set(tableName, true);
+
+      await this.queryCache.getCacheDriver().set(
+        this.tablesTouchRedisKey(tableName),
+        new Date().getTime(),
+        this.touchTablePersistTime
+      );
+    } catch (e: unknown) {
+      this.touchCache.del(tableName);
+
+      throw e;
+    }
   }
 
   public async tablesTouched() {
@@ -2456,6 +2481,6 @@ export class PreAggregations {
 
   public async cancelQueriesFromQueue(queryKeys: string[], dataSource: string) {
     const queue = await this.getQueue(dataSource);
-    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey)));
+    return Promise.all(queryKeys.map(queryKey => queue.cancelQuery(queryKey as any, null)));
   }
 }

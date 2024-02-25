@@ -12,14 +12,18 @@ import {
   BaseDriver,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
+  DriverCapabilities,
   DriverInterface,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
 } from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
-import { HydrationStream } from './HydrationStream';
+import * as moment from 'moment';
+
+import { HydrationStream, transformRow } from './HydrationStream';
 
 const ClickHouse = require('@apla/clickhouse');
 
@@ -223,30 +227,14 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   protected normaliseResponse(res: any) {
-    //
-    //
-    //  ClickHouse returns DateTime as strings in format "YYYY-DD-MM HH:MM:SS"
-    //  cube.js expects them in format "YYYY-DD-MMTHH:MM:SS.000", so translate them based on the metadata returned
-    //
-    //  ClickHouse returns some number types as js numbers, others as js string, normalise them all to strings
-    //
-    //
     if (res.data) {
+      const meta = res.meta.reduce(
+        (state: any, element: any) => ({ [element.name]: element, ...state }),
+        {}
+      );
+
       res.data.forEach((row: any) => {
-        Object.keys(row).forEach(field => {
-          const value = row[field];
-          if (value !== null) {
-            const meta = res.meta.find((m: any) => m.name === field);
-            if (meta.type.includes('DateTime')) {
-              row[field] = `${value.substring(0, 10)}T${value.substring(11, 22)}.000`;
-            } else if (meta.type.includes('Date')) {
-              row[field] = `${value}T00:00:00.000`;
-            } else if (meta.type.includes('Int') || meta.type.includes('Float') || meta.type.includes('Decimal')) {
-              // convert all numbers into strings
-              row[field] = `${value}`;
-            }
-          }
-        });
+        transformRow(row, meta);
       });
     }
     return res.data;
@@ -266,6 +254,40 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         FROM system.columns
        WHERE database = '${this.config.queryOptions.database}'
     `;
+  }
+
+  protected override getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT database as schema_name,
+            name as table_name
+      FROM system.tables
+      WHERE database IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected override getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT name as ${this.quoteIdentifier('column_name')},
+             table as ${this.quoteIdentifier('table_name')},
+             database as ${this.quoteIdentifier('schema_name')},
+             type as ${this.quoteIdentifier('data_type')}
+      FROM system.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  protected override getColumnNameForSchemaName() {
+    return 'database';
+  }
+
+  protected override getColumnNameForTableName() {
+    return 'table';
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    return [{ schema_name: this.config.queryOptions.database }];
   }
 
   public async stream(
@@ -376,5 +398,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
 
   public getTablesQuery(schemaName: string) {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

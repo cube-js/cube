@@ -34,7 +34,10 @@ import {
   TableColumnQueryResult,
   TableQueryResult,
   TableStructure,
-  DriverCapabilities
+  DriverCapabilities,
+  QuerySchemasResult,
+  QueryTablesResult,
+  QueryColumnsResult
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -149,6 +152,45 @@ export abstract class BaseDriver implements DriverInterface {
       FROM information_schema.columns
       WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
+  }
+
+  protected getSchemasQuery() {
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM information_schema.tables
+      WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      GROUP BY table_schema
+    `;
+  }
+
+  protected getTablesForSpecificSchemasQuery(schemasPlaceholders: string) {
+    const query = `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')},
+            table_name as ${this.quoteIdentifier('table_name')}
+      FROM information_schema.tables
+      WHERE table_schema IN (${schemasPlaceholders})
+    `;
+    return query;
+  }
+
+  protected getColumnsForSpecificTablesQuery(conditionString: string) {
+    const query = `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('schema_name')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE ${conditionString}
+    `;
+    return query;
+  }
+
+  protected getColumnNameForSchemaName() {
+    return 'table_schema';
+  }
+
+  protected getColumnNameForTableName() {
+    return 'table_name';
   }
 
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
@@ -299,6 +341,48 @@ export abstract class BaseDriver implements DriverInterface {
     }
   }
 
+  public getSchemas() {
+    const query = this.getSchemasQuery();
+    return this.query<QuerySchemasResult>(query);
+  }
+
+  public getTablesForSpecificSchemas(schemas: QuerySchemasResult[]) {
+    const schemasPlaceholders = schemas.map((_, idx) => this.param(idx)).join(', ');
+    const schemaNames = schemas.map(s => s.schema_name);
+
+    const query = this.getTablesForSpecificSchemasQuery(schemasPlaceholders);
+    return this.query<QueryTablesResult>(query, schemaNames);
+  }
+
+  public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+    const groupedBySchema: Record<string, string[]> = {};
+    tables.forEach((t) => {
+      if (!groupedBySchema[t.schema_name]) {
+        groupedBySchema[t.schema_name] = [];
+      }
+      groupedBySchema[t.schema_name].push(t.table_name);
+    });
+
+    const conditions: string[] = [];
+    const parameters: any[] = [];
+
+    for (const [schema, tableNames] of Object.entries(groupedBySchema)) {
+      const schemaPlaceholder = this.param(parameters.length);
+      parameters.push(schema);
+
+      const tablePlaceholders = tableNames.map((_, idx) => this.param(parameters.length + idx)).join(', ');
+      parameters.push(...tableNames);
+
+      conditions.push(`(${this.getColumnNameForSchemaName()} = ${schemaPlaceholder} AND ${this.getColumnNameForTableName()} IN (${tablePlaceholders}))`);
+    }
+
+    const conditionString = conditions.join(' OR ');
+
+    const query = this.getColumnsForSpecificTablesQuery(conditionString);
+
+    return this.query<QueryColumnsResult>(query, parameters);
+  }
+
   public getTablesQuery(schemaName: string) {
     return this.query<TableQueryResult>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = ${this.param(0)}`,
@@ -370,7 +454,8 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type  as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}`,
+      WHERE table_name = ${this.param(0)} AND table_schema = ${this.param(1)}
+      ${getEnv('fetchColumnsByOrdinalPosition') ? 'ORDER BY columns.ordinal_position' : ''}`,
       [name, schema]
     );
 

@@ -1,10 +1,10 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { ChildProcess, ChildProcessWithoutNullStreams, spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { config } from 'dotenv';
 import yargs from 'yargs/yargs';
 import { DockerComposeEnvironment, Wait } from 'testcontainers';
-import { pausePromise } from '@cubejs-backend/shared';
+import { isCI, pausePromise } from '@cubejs-backend/shared';
 import { getFixtures } from './getFixtures';
 import { getTempPath } from './getTempPath';
 import { getComposePath } from './getComposePath';
@@ -74,14 +74,23 @@ class CubeCliEnvironment implements CubeEnvironment {
 
   public async down() {
     if (this.cli) {
-      process.kill(-this.cli.pid, 'SIGINT');
+      const { cli } = this;
+      await new Promise((resolve) => {
+        cli.once('disconnect', () => resolve(null));
+        cli.once('exit', () => resolve(null));
+        cli.kill('SIGKILL');
+      });
       process.stdout.write('Cube Exited\n');
     }
   }
 }
 
-export async function runEnvironment(type: string, suf?: string): Promise<Environment> {
-  const fixtures = getFixtures(type);
+export async function runEnvironment(
+  type: string,
+  suf?: string,
+  { extendedEnv }: { extendedEnv?: string } = {}
+): Promise<Environment> {
+  const fixtures = getFixtures(type, extendedEnv);
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
@@ -105,8 +114,9 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
     composePath,
     composeFile,
   );
-  compose.withStartupTimeout(30 * 1000);
+  compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
   compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
+
   const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
   if (fs.existsSync(_path)) {
     config({
@@ -131,8 +141,13 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   });
   // TODO extract as a config
   if (type === 'mssql') {
-    compose.withWaitStrategy('data', Wait.forLogMessage('Service Broker manager has started'));
+    compose.withWaitStrategy('data', Wait.forLogMessage('SQL Server is now ready for client connections'));
   }
+  // TODO: Add health checks for all drivers
+  if (type === 'clickhouse') {
+    compose.withWaitStrategy('data', Wait.forHealthCheck());
+  }
+
   const environment = await compose.up();
 
   const store = {
@@ -159,11 +174,15 @@ export async function runEnvironment(type: string, suf?: string): Promise<Enviro
   }
   const cube = cliEnv ? {
     port: 4000,
+    pgPort: parseInt(fixtures.cube.ports[1], 10),
     logs: cliEnv.cli?.stdout || process.stdout
   } : {
     port: environment.getContainer('cube').getMappedPort(
       parseInt(fixtures.cube.ports[0], 10),
     ),
+    pgPort: fixtures.cube.ports[1] && environment.getContainer('cube').getMappedPort(
+      parseInt(fixtures.cube.ports[1], 10),
+    ) || undefined,
     logs: await environment.getContainer('cube').logs(),
   };
 

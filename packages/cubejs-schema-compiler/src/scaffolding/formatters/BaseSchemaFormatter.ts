@@ -24,6 +24,7 @@ export type SchemaFile = {
 
 export type SchemaFormatterOptions = {
   snakeCase: boolean;
+  catalog?: string | null;
 };
 
 export abstract class BaseSchemaFormatter {
@@ -99,21 +100,25 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected eligibleIdentifier(name: string) {
-    return !!name.match(/^[a-z0-9_]+$/);
+    return !!name.match(/^[a-z0-9_]+$/i);
   }
 
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
-    const table = `${
+    let table = `${
       tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
     
+    if (this.options.catalog) {
+      table = `${this.escapeName(this.options.catalog)}.${table}`;
+    }
+
     const { dataSource, ...contextProps } = schemaContext;
-      
+
     let dataSourceProp = {};
     if (dataSource) {
       dataSourceProp = this.options.snakeCase ? { data_source: dataSource } : { dataSource };
     }
-      
+
     const sqlOption = this.options.snakeCase
       ? {
         sql_table: table,
@@ -121,12 +126,12 @@ export abstract class BaseSchemaFormatter {
       : {
         sql: `SELECT * FROM ${table}`,
       };
-
+      
     return {
       cube: tableSchema.cube,
       ...sqlOption,
       ...dataSourceProp,
-      
+
       joins: tableSchema.joins
         .map((j) => ({
           [j.cubeToJoin]: {
@@ -139,7 +144,7 @@ export abstract class BaseSchemaFormatter {
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
-      dimensions: tableSchema.dimensions
+      dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
         .map((m) => ({
           [this.memberName(m)]: {
             sql: this.sqlForMember(m),
@@ -164,7 +169,7 @@ export abstract class BaseSchemaFormatter {
             type: 'count',
           },
         }),
-        
+
       ...(this.options.snakeCase
         ? Object.fromEntries(
           Object.entries(contextProps).map(([key, value]) => [toSnakeCase(key), value])

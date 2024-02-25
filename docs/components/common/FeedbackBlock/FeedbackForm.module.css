@@ -1,0 +1,40 @@
+@media (max-width: 950px) {
+  .FeedbackForm {
+    margin-top: 32px;
+  }
+
+  .FeedbackForm__buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.FeedbackForm {
+  margin-top: 0.125rem;
+  /*margin-top: 40px;*/
+}
+
+.FeedbackForm__buttons {
+  margin-top: 1.5rem 0 0;
+}
+
+.FeedbackForm > textarea {
+  border: 1px solid var(--dark_05);
+  border-radius: 8px;
+  outline: transparent;
+  padding: 10px 12px;
+  background: transparent;
+  /*border-radius: 4px;*/
+  /*border: none;*/
+  width: 100%;
+  color: rgba(20, 20, 70, 0.85);
+  min-height: 110px;
+  resize: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.FeedbackForm > textarea::placeholder {
+  color: rgba(20, 20, 70, 0.3);
+}

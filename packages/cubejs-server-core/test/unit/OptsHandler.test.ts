@@ -14,6 +14,7 @@ import type {
 import type { OptsHandler } from '../../src/core/OptsHandler';
 import { lookupDriverClass } from '../../src/core/DriverResolvers';
 import { CubejsServerCore } from '../../src/core/server';
+import { CreateOptions, SystemOptions } from '../../src/core/types';
 
 class CubejsServerCoreExposed extends CubejsServerCore {
   public options: ServerCoreInitializedOptions;
@@ -27,6 +28,19 @@ class CubejsServerCoreExposed extends CubejsServerCore {
   public apiGateway = super.apiGateway;
 
   public reloadEnvVariables = super.reloadEnvVariables;
+
+  public constructor(
+    opts: CreateOptions = {},
+    systemOptions?: SystemOptions,
+  ) {
+    // disable telemetry while testing
+    super({ ...opts, telemetry: false, }, systemOptions);
+  }
+
+  public startScheduledRefreshTimer() {
+    // disabling interval
+    return null;
+  }
 }
 
 let message: string;
@@ -56,7 +70,7 @@ describe('OptsHandler class', () => {
     'need to be restored after documentation will be added',
     async () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const core = new CubejsServerCore({
+      const core = new CubejsServerCoreExposed({
         ...conf,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         dbType: ((context: DriverContext) => 'postgres'),
@@ -398,7 +412,7 @@ describe('OptsHandler class', () => {
       JSON.stringify(new CustomDriver()),
     );
 
-    const oapi = (<any>core.getOrchestratorApi(<RequestContext>{}));
+    const oapi = (<any> await core.getOrchestratorApi(<RequestContext>{}));
     const opts = oapi.options;
     const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
     oapi.seenDataSources = ['default'];
@@ -465,7 +479,7 @@ describe('OptsHandler class', () => {
       },
     });
 
-    const oapi1 = (<any>core.getOrchestratorApi({
+    const oapi1 = (<any> await core.getOrchestratorApi({
       authInfo: {},
       securityContext: { tenantId: 1 },
       requestId: '1',
@@ -476,7 +490,7 @@ describe('OptsHandler class', () => {
     expect(driver11 instanceof Driver1).toBeTruthy();
     expect(driver12 instanceof Driver1).toBeTruthy();
 
-    const oapi2 = (<any>core.getOrchestratorApi({
+    const oapi2 = (<any> await core.getOrchestratorApi({
       authInfo: {},
       securityContext: { tenantId: 2 },
       requestId: '2',
@@ -502,7 +516,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: {},
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -532,7 +546,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: {},
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -562,7 +576,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: () => ({}),
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -592,7 +606,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: () => ({}),
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -622,7 +636,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: () => ({}),
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -655,7 +669,7 @@ describe('OptsHandler class', () => {
         orchestratorOptions: () => ({}),
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -699,7 +713,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+      const opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
 
       expect(opts.queryCacheOptions.queueOptions).toBeDefined();
       expect(typeof opts.queryCacheOptions.queueOptions).toEqual('function');
@@ -746,7 +760,7 @@ describe('OptsHandler class', () => {
         testConnectionTimeout,
       }),
     });
-    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}, opts));
 
     expect(driver.pool.options.max).toEqual(2 * (concurrency1 + concurrency2));
@@ -773,7 +787,7 @@ describe('OptsHandler class', () => {
         },
       }),
     });
-    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
     
     expect(driver.pool.options.max).toEqual(8);
@@ -797,7 +811,7 @@ describe('OptsHandler class', () => {
         },
       }),
     });
-    opts = (<any>core.getOrchestratorApi(<RequestContext>{})).options;
+    opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
 
     expect(driver.pool.options.max).toEqual(8);
@@ -821,7 +835,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -861,7 +875,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -898,7 +912,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -933,7 +947,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -970,7 +984,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -1015,7 +1029,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -1052,7 +1066,7 @@ describe('OptsHandler class', () => {
         }),
       });
 
-      const oapi = <any>(core.getOrchestratorApi(<RequestContext>{}));
+      const oapi = <any>(await core.getOrchestratorApi(<RequestContext>{}));
       const opts = oapi.options;
       const testDriverConnectionSpy = jest.spyOn(oapi, 'testDriverConnection');
       oapi.seenDataSources = ['default'];
@@ -1147,9 +1161,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns an inconsistent type.'
     );
   });
@@ -1180,9 +1192,7 @@ describe('OptsHandler class', () => {
     });
 
     const gateway = <any>core.apiGateway();
-    expect(async () => {
-      await gateway.contextToApiScopesFn();
-    }).rejects.toThrow(
+    await expect(async () => gateway.contextToApiScopesFn()).rejects.toThrow(
       'A user-defined contextToApiScopes function returns a wrong scope: job'
     );
   });

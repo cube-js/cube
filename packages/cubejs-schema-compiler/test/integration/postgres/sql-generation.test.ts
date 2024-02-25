@@ -175,7 +175,9 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')}
+      select * from visitor_checkins WHERE 
+      \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
+      \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
       \`,
       
       rewriteQueries: true,
@@ -456,6 +458,7 @@ describe('SQL Generation', () => {
   });
 
   async function runQueryTest(q, expectedResult) {
+    await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
     console.log(query.buildSqlAndParams());
@@ -1837,6 +1840,158 @@ describe('SQL Generation', () => {
     ])
   );
 
+  it(
+    'filter group',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          member: 'visitor_checkins.created_at',
+          operator: 'inDateRange',
+          values: ['2017-01-01', '2017-01-10']
+        }, {
+          member: 'visitor_checkins.source',
+          operator: 'equals',
+          values: ['google_123_123']
+        }]
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group sub filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        and: [{
+          or: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google_123_123']
+          }]
+        }, {
+          member: 'visitor_checkins.visitor_id',
+          operator: 'gte',
+          values: ['1']
+        }]
+      }, {
+        member: 'visitor_checkins.visitor_id',
+        operator: 'lte',
+        values: ['100']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group simple filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        member: 'visitor_checkins.created_at',
+        operator: 'inDateRange',
+        values: ['2017-01-01', '2017-01-10']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group double tree',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google']
+          }]
+        }, {
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-05', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: [null]
+          }]
+        }]
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '1' }
+    ])
+  );
+
+  it(
+    'filter group double tree and non matching filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google']
+          }]
+        }, {
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-05', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: [null]
+          }]
+        }]
+      }, {
+        member: 'visitor_checkins.visitor_id',
+        operator: 'equals',
+        values: ['1']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '1' }
+    ])
+  );
+
   const baseQuery = {
     measures: [
       'visitors.countDistinctApproxRolling'
@@ -1968,5 +2123,35 @@ describe('SQL Generation', () => {
           expect(cols[2]).toEqual('b__count');
         });
       });
+  });
+
+  it('expression cube name cache', async () => {
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitors', 'return `CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitors.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
+
+    await runQueryTest(
+      {
+        dimensions: [{
+          // eslint-disable-next-line no-new-func,no-template-curly-in-string
+          expression: new Function('visitor_checkins', 'return `CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END`'),
+          expressionName: 'visitors.id_case',
+          // eslint-disable-next-line no-template-curly-in-string
+          definition: 'CASE WHEN ${visitor_checkins.id} > 10 THEN 10 ELSE 0 END',
+          cubeName: 'visitors'
+        }],
+      },
+      [{ visitors__id_case: 0 }]
+    );
   });
 });

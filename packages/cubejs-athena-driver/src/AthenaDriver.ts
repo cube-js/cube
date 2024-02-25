@@ -126,16 +126,16 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       getEnv('athenaAwsSecret', { dataSource });
 
     const { schema, ...restConfig } = config;
-
+    
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
 
     this.config = {
-      ...restConfig,
       credentials: accessKeyId && secretAccessKey
         ? { accessKeyId, secretAccessKey }
         : undefined,
+      ...restConfig,
       region:
         config.region ||
         getEnv('athenaAwsRegion', { dataSource }),
@@ -188,7 +188,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Returns driver's capabilities object.
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true,
+    };
   }
 
   /**

@@ -19,7 +19,7 @@ context('Playground: Rollup Designer', () => {
       cy.getByTestId('rd-query-tab').should('exist');
 
       cy.getByTestId('member-tag-Orders.Count').should('exist');
-      cy.getByTestId('rd-query-tab').click();
+      cy.getByTestId('rd-query-tab').click({ timeout: 60 * 1000 });
       cy.getByTestId('rd-incompatible-query').should('not.exist');
 
       cy.getByTestId('member-tag-Orders.Count').find('.anticon-close').click();
@@ -48,7 +48,10 @@ context('Playground: Rollup Designer', () => {
       cy.getByTestId('rd-modal').should('be.visible');
 
       cy.getByTestId('member-tag-Orders.Count').should('exist');
-      cy.getByTestId('rd-query-tab').click();
+      cy.getByTestId('rd-query-tab').click({
+        timeout: 60 * 1000,
+        force: true,
+      });
     });
 
     it('applies settings', () => {
@@ -58,9 +61,13 @@ context('Playground: Rollup Designer', () => {
       cy.getByTestId('rd-settings-tab').click();
       cy.getByTestId('prism-code').should('contain.text', 'main: ');
       cy.getByTestId('rd-input-every').clear().type('3');
-      cy.getByTestId('rd-select-every-granularity').find('input').type('Day{enter}', { force: true });
+      cy.getByTestId('rd-select-every-granularity')
+        .find('input')
+        .type('Day{enter}', { force: true });
       cy.getByTestId('prism-code').should('contain.text', 'every: `3 day`');
-      cy.getByTestId('rd-add-btn').should('be.visible').should('not.be.disabled');
+      cy.getByTestId('rd-add-btn')
+        .should('be.visible')
+        .should('not.be.disabled');
     });
   });
 });

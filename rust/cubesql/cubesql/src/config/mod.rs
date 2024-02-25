@@ -16,12 +16,15 @@ use crate::{
 use futures::future::join_all;
 use log::error;
 
-use mockall::automock;
-
-use std::env;
+use std::{
+    env,
+    fmt::{Debug, Display},
+    str::FromStr,
+};
 
 use std::sync::Arc;
 
+use crate::sql::compiler_cache::{CompilerCache, CompilerCacheImpl};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -108,8 +111,7 @@ pub struct Config {
     injector: Arc<Injector>,
 }
 
-#[automock]
-pub trait ConfigObj: DIService {
+pub trait ConfigObj: DIService + Debug {
     fn bind_address(&self) -> &Option<String>;
 
     fn postgres_bind_address(&self) -> &Option<String>;
@@ -117,6 +119,20 @@ pub trait ConfigObj: DIService {
     fn query_timeout(&self) -> u64;
 
     fn nonce(&self) -> &Option<Vec<u8>>;
+
+    fn disable_strict_agg_type_match(&self) -> bool;
+
+    fn auth_expire_secs(&self) -> u64;
+
+    fn compiler_cache_size(&self) -> usize;
+
+    fn query_cache_size(&self) -> usize;
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool;
+
+    fn enable_rewrite_cache(&self) -> bool;
+
+    fn push_down_pull_up_split(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -125,11 +141,52 @@ pub struct ConfigObjImpl {
     pub postgres_bind_address: Option<String>,
     pub nonce: Option<Vec<u8>>,
     pub query_timeout: u64,
+    pub auth_expire_secs: u64,
     pub timezone: Option<String>,
+    pub disable_strict_agg_type_match: bool,
+    pub compiler_cache_size: usize,
+    pub query_cache_size: usize,
+    pub enable_parameterized_rewrite_cache: bool,
+    pub enable_rewrite_cache: bool,
+    pub push_down_pull_up_split: bool,
+}
+
+impl ConfigObjImpl {
+    pub fn default() -> Self {
+        let query_timeout = env::var("CUBESQL_QUERY_TIMEOUT")
+            .ok()
+            .map(|v| v.parse::<u64>().unwrap())
+            .unwrap_or(120);
+        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", false);
+        Self {
+            bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
+                env::var("CUBESQL_PORT")
+                    .ok()
+                    .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
+            }),
+            postgres_bind_address: env::var("CUBESQL_PG_PORT")
+                .ok()
+                .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
+            nonce: None,
+            query_timeout,
+            timezone: Some("UTC".to_string()),
+            disable_strict_agg_type_match: env_parse(
+                "CUBESQL_DISABLE_STRICT_AGG_TYPE_MATCH",
+                false,
+            ),
+            auth_expire_secs: env_parse("CUBESQL_AUTH_EXPIRE_SECS", 300),
+            compiler_cache_size: env_parse("CUBEJS_COMPILER_CACHE_SIZE", 100),
+            query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
+            enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
+                .unwrap_or(sql_push_down),
+            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
+            push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
+                .unwrap_or(sql_push_down),
+        }
+    }
 }
 
 crate::di_service!(ConfigObjImpl, [ConfigObj]);
-crate::di_service!(MockConfigObj, [ConfigObj]);
 
 impl ConfigObj for ConfigObjImpl {
     fn bind_address(&self) -> &Option<String> {
@@ -147,6 +204,34 @@ impl ConfigObj for ConfigObjImpl {
     fn query_timeout(&self) -> u64 {
         self.query_timeout
     }
+
+    fn disable_strict_agg_type_match(&self) -> bool {
+        self.disable_strict_agg_type_match
+    }
+
+    fn auth_expire_secs(&self) -> u64 {
+        self.auth_expire_secs
+    }
+
+    fn compiler_cache_size(&self) -> usize {
+        self.compiler_cache_size
+    }
+
+    fn query_cache_size(&self) -> usize {
+        self.query_cache_size
+    }
+
+    fn enable_parameterized_rewrite_cache(&self) -> bool {
+        self.enable_parameterized_rewrite_cache
+    }
+
+    fn enable_rewrite_cache(&self) -> bool {
+        self.enable_rewrite_cache
+    }
+
+    fn push_down_pull_up_split(&self) -> bool {
+        self.push_down_pull_up_split
+    }
 }
 
 lazy_static! {
@@ -156,25 +241,9 @@ lazy_static! {
 
 impl Config {
     pub fn default() -> Config {
-        let query_timeout = env::var("CUBESQL_QUERY_TIMEOUT")
-            .ok()
-            .map(|v| v.parse::<u64>().unwrap())
-            .unwrap_or(120);
         Config {
             injector: Injector::new(),
-            config_obj: Arc::new(ConfigObjImpl {
-                bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
-                    env::var("CUBESQL_PORT")
-                        .ok()
-                        .map(|v| format!("0.0.0.0:{}", v.parse::<u16>().unwrap()))
-                }),
-                postgres_bind_address: env::var("CUBESQL_PG_PORT")
-                    .ok()
-                    .map(|port| format!("0.0.0.0:{}", port.parse::<u16>().unwrap())),
-                nonce: None,
-                query_timeout,
-                timezone: Some("UTC".to_string()),
-            }),
+            config_obj: Arc::new(ConfigObjImpl::default()),
         }
     }
 
@@ -188,7 +257,14 @@ impl Config {
                 postgres_bind_address: None,
                 nonce: None,
                 query_timeout,
+                auth_expire_secs: 60,
                 timezone,
+                disable_strict_agg_type_match: false,
+                compiler_cache_size: 100,
+                query_cache_size: 500,
+                enable_parameterized_rewrite_cache: false,
+                enable_rewrite_cache: false,
+                push_down_pull_up_split: true,
             }),
         }
     }
@@ -225,12 +301,24 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn CompilerCache, _, _, _>(async move |i| {
+                let config = i.get_service_typed::<dyn ConfigObj>().await;
+                Arc::new(CompilerCacheImpl::new(
+                    config.clone(),
+                    i.get_service_typed().await,
+                ))
+            })
+            .await;
+
+        self.injector
             .register_typed::<ServerManager, _, _, _>(async move |i| {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
+                    i.get_service_typed().await,
                     config.nonce().clone(),
+                    config.clone(),
                 ))
             })
             .await;
@@ -285,6 +373,28 @@ impl Config {
 
         self.configure_injector().await;
     }
+}
+
+pub fn env_parse<T>(name: &str, default: T) -> T
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env_optparse(name).unwrap_or(default)
+}
+
+fn env_optparse<T>(name: &str) -> Option<T>
+where
+    T: FromStr,
+    T::Err: Display,
+{
+    env::var(name).ok().map(|x| match x.parse::<T>() {
+        Ok(v) => v,
+        Err(e) => panic!(
+            "Could not parse environment variable '{}' with '{}' value: {}",
+            name, x, e
+        ),
+    })
 }
 
 type LoopHandle = JoinHandle<Result<(), CubeError>>;

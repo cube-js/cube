@@ -1,7 +1,7 @@
 import R from 'ramda';
 import { EventEmitter } from 'events';
 import { getEnv, getProcessUid } from '@cubejs-backend/shared';
-import { QueueDriverInterface, QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import { QueueDriverInterface, QueryKey, QueryKeyHash, QueueId, QueryDef } from '@cubejs-backend/base-driver';
 import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
@@ -79,15 +79,17 @@ export class QueryQueue {
 
     /**
      * @protected
-     * @type {function(string): Promise<void>}
+     * @type {function(QueryKeyHash, QueueId | null): Promise<void>}
      */
-    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey) => { this.processQuery(queryKey); });
+    this.sendProcessMessageFn = options.sendProcessMessageFn || ((queryKey, queryId) => { this.processQuery(queryKey, queryId); });
 
     /**
      * @protected
+     * @param {QueryDef} query
+     * @param {QueueId | null} queueId
      * @type {function(*): Promise<void>}
      */
-    this.sendCancelMessageFn = options.sendCancelMessageFn || ((query) => { this.processCancel(query); });
+    this.sendCancelMessageFn = options.sendCancelMessageFn || ((query, queueId) => { this.processCancel(query, queueId); });
 
     /**
      * @protected
@@ -146,25 +148,33 @@ export class QueryQueue {
    * Returns stream object which will be used to pipe data from data source.
    *
    * @param {QueryKeyHash} queryKeyHash
+   * @return {QueryStream | undefined}
    */
   getQueryStream(queryKeyHash) {
     return this.streams.get(queryKeyHash);
   }
 
   /**
-   * @param {*} queryKey
+   * @param {QueryKeyHash} key
    * @param {{ [alias: string]: string }} aliasNameToMember
+   * @return {QueryStream}
    */
-  createQueryStream(queryKeyHash, aliasNameToMember) {
-    const key = queryKeyHash;
+  createQueryStream(key, aliasNameToMember) {
     const stream = new QueryStream({
       key,
       streams: this.streams,
       aliasNameToMember,
     });
     this.streams.set(key, stream);
-    this.streamEvents.emit('streamStarted', queryKeyHash);
+    this.streamEvents.emit('streamStarted', key);
+
     return stream;
+  }
+
+  counter = 0;
+
+  generateQueueId() {
+    return this.counter++;
   }
 
   /**
@@ -189,6 +199,7 @@ export class QueryQueue {
     options,
   ) {
     options = options || {};
+    options.queueId = this.generateQueueId();
     if (this.skipQueue) {
       const queryDef = {
         queryHandler,
@@ -200,6 +211,8 @@ export class QueryQueue {
         addedToQueueTime: new Date().getTime(),
       };
       this.logger('Waiting for query', {
+        queueId: options.queueId,
+        spanId: options.spanId,
         queueSize: 0,
         queryKey: queryDef.queryKey,
         queuePrefix: this.redisQueuePrefix,
@@ -209,11 +222,12 @@ export class QueryQueue {
       if (queryHandler === 'stream') {
         throw new Error('Streaming queries to Cube Store aren\'t supported');
       }
-      const result = await this.processQuerySkipQueue(queryDef);
+      const result = await this.processQuerySkipQueue(queryDef, options.queueId);
       return this.parseResult(result);
     }
 
     const queueConnection = await this.queueDriver.createConnection();
+    let waitingContext;
     try {
       if (priority == null) {
         priority = 0;
@@ -251,6 +265,8 @@ export class QueryQueue {
 
       if (added > 0) {
         this.logger('Added to queue', {
+          queueId,
+          spanId: options.spanId,
           priority,
           queueSize,
           queryKey,
@@ -272,40 +288,58 @@ export class QueryQueue {
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
       if (queryDef) {
-        this.logger('Waiting for query', {
-          queueSize,
+        waitingContext = {
+          queueId,
+          spanId: options.spanId,
           queryKey: queryDef.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: options.requestId,
+          waitingForRequestId: queryDef.requestId
+        };
+
+        this.logger('Waiting for query', {
+          ...waitingContext,
+          queueSize,
           activeQueryKeys: active,
           toProcessQueryKeys: toProcess,
           active: active.indexOf(queryKeyHash) !== -1,
           queueIndex: toProcess.indexOf(queryKeyHash),
-          waitingForRequestId: queryDef.requestId
         });
       }
 
       // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
       // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
+      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+      // while EventListener doesnt start to listen for started stream event
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
+          let timeoutTimerId = null;
+
           const onStreamStarted = (streamStartedHash) => {
             if (streamStartedHash === queryKeyHash) {
+              if (timeoutTimerId) {
+                clearTimeout(timeoutTimerId);
+              }
+
               resolve(self.getQueryStream(queryKeyHash));
             }
           };
 
-          setTimeout(() => {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(null);
-          }, this.continueWaitTimeout * 1000);
-
           self.streamEvents.addListener('streamStarted', onStreamStarted);
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+
+          const stream = this.getQueryStream(queryKeyHash);
           if (stream) {
             self.streamEvents.removeListener('streamStarted', onStreamStarted);
             resolve(stream);
+          } else {
+            timeoutTimerId = setTimeout(
+              () => {
+                self.streamEvents.removeListener('streamStarted', onStreamStarted);
+                resolve(null);
+              },
+              this.continueWaitTimeout * 10000
+            );
           }
         });
       } else {
@@ -320,6 +354,11 @@ export class QueryQueue {
       }
 
       return this.parseResult(result);
+    } catch (error) {
+      if (waitingContext) {
+        this.logger('Finished waiting for query', waitingContext);
+      }
+      throw error;
     } finally {
       this.queueDriver.release(queueConnection);
     }
@@ -407,8 +446,11 @@ export class QueryQueue {
         queueConnection.getToProcessQueries()
       ]);
 
-      const mapWithDefinition = (arr) => Promise.all(arr.map(async queryKey => ({
-        ...(await queueConnection.getQueryDef(queryKey)),
+      /**
+       * @param {QueryKeysTuple[]} arr
+       */
+      const mapWithDefinition = (arr) => Promise.all(arr.map(async ([queryKey, queueId]) => ({
+        ...(await queueConnection.getQueryDef(queryKey, queueId)),
         queryKey
       })));
 
@@ -444,16 +486,18 @@ export class QueryQueue {
   /**
    * Cancel query by its `queryKey`.
    *
-   * @param {*} queryKey
+   * @param {QueryKeyHash} queryKey
+   * @param {QueueId | null} queueId
    * @returns {void}
    */
-  async cancelQuery(queryKey) {
+  async cancelQuery(queryKey, queueId) {
     const queueConnection = await this.queueDriver.createConnection();
     try {
-      const query = await queueConnection.cancelQuery(queryKey);
+      const query = await queueConnection.cancelQuery(queryKey, queueId);
 
       if (query) {
         this.logger('Cancelling query manual', {
+          queueId,
           queryKey: query.queryKey,
           queuePrefix: this.redisQueuePrefix,
           requestId: query.requestId,
@@ -483,30 +527,40 @@ export class QueryQueue {
     const queueConnection = await this.queueDriver.createConnection();
     try {
       const toCancel = await queueConnection.getQueriesToCancel();
-      await Promise.all(toCancel.map(async queryKey => {
-        const [query] = await queueConnection.getQueryAndRemove(queryKey);
-        if (query) {
+
+      await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey, queueId);
+        if (queryDef) {
           this.logger('Removing orphaned query', {
-            queryKey: query.queryKey,
+            queueId: queueId || queryDef.queueId /** Special handling for Redis */,
+            queryKey: queryDef.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId,
-            metadata: query.query?.metadata,
-            preAggregationId: query.query?.preAggregation?.preAggregationId,
-            newVersionEntry: query.query?.newVersionEntry,
-            preAggregation: query.query?.preAggregation,
-            addedToQueueTime: query.addedToQueueTime,
+            requestId: queryDef.requestId,
+            metadata: queryDef.query?.metadata,
+            preAggregationId: queryDef.query?.preAggregation?.preAggregationId,
+            newVersionEntry: queryDef.query?.newVersionEntry,
+            preAggregation: queryDef.query?.preAggregation,
+            addedToQueueTime: queryDef.addedToQueueTime,
           });
-          await this.sendCancelMessageFn(query);
+
+          await this.sendCancelMessageFn(queryDef, queueId);
         }
       }));
 
+      /**
+       * There is a bug somewhere in Redis (maybe in memory too?),
+       * which doesn't remove queue item from pending, while it's in active state
+       *
+       * TODO(ovr): Check LocalQueueDriver for strict guarantees that item cannot be in active & pending in the same time
+       * TODO(ovr): Migrate to getToProcessQueries after removal of Redis
+       */
       const [active, toProcess] = await queueConnection.getActiveAndToProcess();
 
       await Promise.all(
         R.pipe(
-          R.filter(p => {
-            if (active.indexOf(p) === -1) {
-              const subKeys = p.split('@');
+          R.filter(([queryKey, _queueId]) => {
+            if (active.findIndex(([p, _a]) => p === queryKey) === -1) {
+              const subKeys = queryKey.split('@');
               if (subKeys.length === 1) {
                 // common queries
                 return true;
@@ -522,7 +576,7 @@ export class QueryQueue {
             }
           }),
           R.take(this.concurrency),
-          R.map(this.sendProcessMessageFn)
+          R.map((([queryKey, queueId]) => this.sendProcessMessageFn(queryKey, queueId)))
         )(toProcess)
       );
     } finally {
@@ -532,7 +586,7 @@ export class QueryQueue {
 
   /**
    * Apply query timeout to the query. Throw if query execution time takes more
-   * then specified timeout. Returns resolved `promise` value.
+   * than specified timeout. Returns resolved `promise` value.
    *
    * @param {Promise<*>} promise
    * @returns {Promise<*>}
@@ -612,11 +666,13 @@ export class QueryQueue {
    * Execute query without adding it to the queue.
    *
    * @param {*} query
+   * @param {QueueId} queueId
    * @returns {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuerySkipQueue(query) {
+  async processQuerySkipQueue(query, queueId) {
     const startQueryTime = (new Date()).getTime();
     this.logger('Performing query', {
+      queueId,
       queueSize: 0,
       queryKey: query.queryKey,
       queuePrefix: this.redisQueuePrefix,
@@ -639,6 +695,7 @@ export class QueryQueue {
         )
       };
       this.logger('Performing query completed', {
+        queueId,
         queueSize: 0,
         duration: ((new Date()).getTime() - startQueryTime),
         queryKey: query.queryKey,
@@ -651,6 +708,7 @@ export class QueryQueue {
         error: (e.message || e).toString() // TODO error handling
       };
       this.logger('Error while querying', {
+        queueId,
         queueSize: 0,
         duration: ((new Date()).getTime() - startQueryTime),
         queryKey: query.queryKey,
@@ -662,9 +720,10 @@ export class QueryQueue {
       if (e instanceof TimeoutError) {
         if (handler) {
           this.logger('Cancelling query due to timeout', {
+            queueId,
             queryKey: query.queryKey,
             queuePrefix: this.redisQueuePrefix,
-            requestId: query.requestId
+            requestId: query.requestId,
           });
           await handler(query);
         }
@@ -678,24 +737,31 @@ export class QueryQueue {
    * of the logic related with the queues updates, heartbeat, etc.
    *
    * @param {QueryKeyHash} queryKeyHashed
+   * @param {QueueId | null} queueId Supported by new Cube Store and Memory
    * @return {Promise<{ result: undefined | Object, error: string | undefined }>}
    */
-  async processQuery(queryKeyHashed) {
+  async processQuery(queryKeyHashed, queueId) {
     const queueConnection = await this.queueDriver.createConnection();
 
     let insertedCount;
-    let queueId;
     let activeKeys;
     let queueSize;
     let query;
     let processingLockAcquired;
 
     try {
-      const processingId = await queueConnection.getNextProcessingId();
+      const processingId = queueId || /** for Redis only */ await queueConnection.getNextProcessingId();
       const retrieveResult = await queueConnection.retrieveForProcessing(queryKeyHashed, processingId);
 
       if (retrieveResult) {
-        [insertedCount, queueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+        let retrieveQueueId;
+
+        [insertedCount, retrieveQueueId, activeKeys, queueSize, query, processingLockAcquired] = retrieveResult;
+
+        // Backward compatibility for old Cube Store, Redis and Memory
+        if (retrieveQueueId) {
+          queueId = retrieveQueueId;
+        }
       }
 
       const activated = activeKeys && activeKeys.indexOf(queryKeyHashed) !== -1;
@@ -708,6 +774,7 @@ export class QueryQueue {
         const startQueryTime = (new Date()).getTime();
         const timeInQueue = (new Date()).getTime() - query.addedToQueueTime;
         this.logger('Performing query', {
+          queueId,
           processingId,
           queueSize,
           queryKey: query.queryKey,
@@ -722,8 +789,20 @@ export class QueryQueue {
         });
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
+        let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed),
+          () => {
+            if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
+              this.logger('Query processing heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                requestId: query.requestId,
+              });
+              queryProcessHeartbeat = Date.now();
+            }
+
+            return queueConnection.updateHeartBeat(queryKeyHashed);
+          },
           this.heartBeatInterval * 1000
         );
         try {
@@ -755,6 +834,7 @@ export class QueryQueue {
                         return queueConnection.optimisticQueryUpdate(queryKeyHashed, { cancelHandler }, processingId, queueId);
                       } catch (e) {
                         this.logger('Error while query update', {
+                          queueId,
                           queryKey: query.queryKey,
                           error: e.stack || e,
                           queuePrefix: this.redisQueuePrefix,
@@ -775,6 +855,7 @@ export class QueryQueue {
           }
 
           this.logger('Performing query completed', {
+            queueId,
             processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
@@ -793,6 +874,7 @@ export class QueryQueue {
             error: (e.message || e).toString() // TODO error handling
           };
           this.logger('Error while querying', {
+            queueId,
             processingId,
             queueSize,
             duration: ((new Date()).getTime() - startQueryTime),
@@ -808,9 +890,10 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
+                queueId,
                 processingId,
                 queryKey: queryWithCancelHandle.queryKey,
                 queuePrefix: this.redisQueuePrefix,
@@ -821,15 +904,18 @@ export class QueryQueue {
                 preAggregation: queryWithCancelHandle.query?.preAggregation,
                 addedToQueueTime: queryWithCancelHandle.addedToQueueTime,
               });
-              await this.sendCancelMessageFn(queryWithCancelHandle);
+
+              await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
             }
           }
+        } finally {
+          // catch block can throw an exception, it's why it's important to clearInterval here
+          clearInterval(heartBeatTimer);
         }
-
-        clearInterval(heartBeatTimer);
 
         if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {
+            queueId,
             processingId,
             warn: 'Result for query was not set due to processing lock wasn\'t acquired',
             queryKey: query.queryKey,
@@ -855,6 +941,7 @@ export class QueryQueue {
         // }
 
         this.logger('Skip processing', {
+          queueId,
           processingId,
           queryKey: query && query.queryKey || queryKeyHashed,
           requestId: query && query.requestId,
@@ -869,6 +956,7 @@ export class QueryQueue {
         const currentProcessingId = await queueConnection.freeProcessingLock(queryKeyHashed, processingId, activated);
         if (currentProcessingId) {
           this.logger('Skipping free processing lock', {
+            queueId,
             processingId,
             currentProcessingId,
             queryKey: query && query.queryKey || queryKeyHashed,
@@ -885,6 +973,7 @@ export class QueryQueue {
       }
     } catch (e) {
       this.logger('Queue storage error', {
+        queueId,
         queryKey: query && query.queryKey || queryKeyHashed,
         requestId: query && query.requestId,
         error: (e.stack || e).toString(),
@@ -898,9 +987,10 @@ export class QueryQueue {
   /**
    * Processing cancel query flow.
    *
-   * @param {*} query
+   * @param {QueryDef} query
+   * @param {QueueId | null} queueId
    */
-  async processCancel(query) {
+  async processCancel(query, queueId) {
     const { queryHandler } = query;
     try {
       if (!this.cancelHandlers[queryHandler]) {
@@ -909,6 +999,7 @@ export class QueryQueue {
       await this.cancelHandlers[queryHandler](query);
     } catch (e) {
       this.logger('Error while cancel', {
+        queueId,
         queryKey: query.queryKey,
         error: e.stack || e,
         queuePrefix: this.redisQueuePrefix,

@@ -16,12 +16,12 @@ class DatabricksFilter extends BaseFilter {
   public likeIgnoreCase(column: any, not: any, param: any, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}')`;
   }
 }
 
 export class DatabricksQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new DatabricksFilter(this, filter);
   }
 
@@ -69,20 +69,12 @@ export class DatabricksQuery extends BaseQuery {
     return 'unix_timestamp()';
   }
 
-  public seriesSql(timeDimension: any) {
-    const values = timeDimension.timeSeries().map(
-      ([from, to]: [string, string]) => `select '${from}' f, '${to}' t`
-    ).join(' UNION ALL ');
-    return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
-  }
-
   public orderHashToString(hash: any) {
     if (!hash || !hash.id) {
       return null;
     }
 
     const fieldIndex = this.getFieldIndex(hash.id);
-
     if (fieldIndex === null) {
       return null;
     }
@@ -101,17 +93,18 @@ export class DatabricksQuery extends BaseQuery {
     return null;
   }
 
-  public groupByClause() {
-    const dimensionsForSelect = this.dimensionsForSelect();
-    const dimensionColumns = R.flatten(
-      dimensionsForSelect.map((s: any) => s.selectColumns() && s.aliasName())
-    )
-      .filter(s => !!s);
-
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.join(', ')}` : '';
-  }
-
   public defaultRefreshKeyRenewalThreshold() {
     return 120;
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
+    templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
+    templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
+    templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    return templates;
   }
 }

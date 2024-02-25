@@ -1,0 +1,25 @@
+.Grid {
+  width: 100%;
+  display: grid;
+  grid-row-gap: 1.25rem;
+  grid-column-gap: 1.25rem;
+  grid-template-columns: repeat(1, 1fr);
+  grid-template-rows: auto;
+  margin: 1.25rem 0;
+}
+
+.Grid--2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.Grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+@media screen and (max-width: 992px) {
+  .Grid--2,
+  .Grid--3 {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+

@@ -96,6 +96,30 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
     }
   ],
   [
+    { name: 'Rolling Mixed With Dimension No Granularity' },
+    {
+      measures: [
+        'visitors.checkinsRollingTotal',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      filters: [{
+        member: 'visitors.source',
+        operator: 'equals',
+        values: ['some']
+      }],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-02', '2017-01-05']
+      }],
+      order: {
+        'visitors.source': 'asc'
+      }
+    }
+  ],
+  [
     { name: 'Empty partitions' },
     {
       measures: [

@@ -8,7 +8,9 @@ use crate::{
     sql::ColumnType,
     transport::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
 };
-use chrono::{DateTime, Datelike, Duration, NaiveDate, SecondsFormat, TimeZone, Utc};
+use chrono::{
+    DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, SecondsFormat, TimeZone, Utc,
+};
 use cubeclient::models::{V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension};
 use log::{debug, trace};
 use serde_json::json;
@@ -122,8 +124,10 @@ impl CompiledExpression {
         match self {
             CompiledExpression::DateLiteral(date) => Some(*date),
             CompiledExpression::StringLiteral(s) => {
-                if let Ok(datetime) = Utc.datetime_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f") {
-                    return Some(datetime);
+                if let Ok(datetime) =
+                    NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+                {
+                    return Some(Utc.from_utc_datetime(&datetime));
                 };
 
                 if let Ok(datetime) = DateTime::parse_from_rfc3339(s.as_str()) {
@@ -132,8 +136,8 @@ impl CompiledExpression {
 
                 if let Ok(ref date) = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d") {
                     return Some(
-                        Utc.ymd(date.year(), date.month(), date.day())
-                            .and_hms_nano(0, 0, 0, 0),
+                        Utc.with_ymd_and_hms(date.year(), date.month(), date.day(), 0, 0, 0)
+                            .unwrap(),
                     );
                 }
 
@@ -227,13 +231,14 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
         )));
     }
 
-    let parsed_date = Utc
-        .datetime_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+    let parsed_date = NaiveDateTime::parse_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
         .map_err(|e| {
             CompilationError::user(format!("Unable to parse {}, err: {}", date, e.to_string(),))
         })?;
 
-    Ok(CompiledExpression::DateLiteral(parsed_date))
+    Ok(CompiledExpression::DateLiteral(
+        Utc.from_utc_datetime(&parsed_date),
+    ))
 }
 
 // DATE(expr)
@@ -253,8 +258,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
     match compiled {
         date @ CompiledExpression::DateLiteral(_) => Ok(date),
         CompiledExpression::StringLiteral(ref input) => {
-            let parsed_date = Utc
-                .datetime_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+            let parsed_date = NaiveDateTime::parse_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
                 .map_err(|e| {
                     CompilationError::user(format!(
                         "Unable to parse {}, err: {}",
@@ -263,7 +267,9 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
                     ))
                 })?;
 
-            Ok(CompiledExpression::DateLiteral(parsed_date))
+            Ok(CompiledExpression::DateLiteral(
+                Utc.from_utc_datetime(&parsed_date),
+            ))
         }
         _ => {
             return Err(CompilationError::user(format!(
@@ -557,7 +563,9 @@ fn compiled_binary_op_expr(
                 ast::BinaryOperator::Eq => (filter_expr, "equals".to_string()),
                 ast::BinaryOperator::NotEq => (filter_expr, "notEquals".to_string()),
                 ast::BinaryOperator::GtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "afterDate".to_string()),
+                    CompiledExpression::DateLiteral(_) => {
+                        (filter_expr, "afterOrOnDate".to_string())
+                    }
                     _ => (filter_expr, "gte".to_string()),
                 },
                 ast::BinaryOperator::Gt => match filter_expr {
@@ -575,7 +583,9 @@ fn compiled_binary_op_expr(
                     _ => (filter_expr, "lt".to_string()),
                 },
                 ast::BinaryOperator::LtEq => match filter_expr {
-                    CompiledExpression::DateLiteral(_) => (filter_expr, "beforeDate".to_string()),
+                    CompiledExpression::DateLiteral(_) => {
+                        (filter_expr, "beforeOrOnDate".to_string())
+                    }
                     _ => (filter_expr, "lte".to_string()),
                 },
                 _ => {
@@ -742,7 +752,11 @@ fn binary_op_create_node_and(
                         && ((l_op.eq(&"beforeDate".to_string())
                             && r_op.eq(&"afterDate".to_string()))
                             || (l_op.eq(&"afterDate".to_string())
-                                && r_op.eq(&"beforeDate".to_string())))
+                                && r_op.eq(&"beforeDate".to_string()))
+                            || (l_op.eq(&"afterOrOnDate".to_string())
+                                && r_op.eq(&"beforeOrOnDate".to_string()))
+                            || (l_op.eq(&"beforeOrOnDate".to_string())
+                                && r_op.eq(&"afterOrOnDate".to_string())))
                     {
                         return Ok(CompiledFilterTree::Filter(CompiledFilter::Filter {
                             member: l_member.clone(),

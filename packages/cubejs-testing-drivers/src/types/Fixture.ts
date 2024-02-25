@@ -2,6 +2,9 @@
 import { Cast } from 'src/dataset';
 
 export type Fixture = {
+  extendedEnvs: {
+    [key: string]: any
+  },
   cube: {
     environment: {
       [key: string]: string,

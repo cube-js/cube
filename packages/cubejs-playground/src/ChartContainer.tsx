@@ -1,27 +1,26 @@
-import { Component, FunctionComponent, Suspense } from 'react';
 import {
   CodeOutlined,
   CodeSandboxOutlined,
   CopyOutlined,
   DownOutlined,
-  PlusOutlined,
-  ThunderboltOutlined,
   QuestionCircleOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons';
-import { Dropdown, Menu, Modal } from 'antd';
-import { getParameters } from 'codesandbox-import-utils/lib/api/define';
-import styled from 'styled-components';
-import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
 import { ChartType, Meta, Query, ResultSet } from '@cubejs-client/core';
+import { Dropdown, Menu } from 'antd';
+import { getParameters } from 'codesandbox-import-utils/lib/api/define';
+import { Component, FunctionComponent, Suspense } from 'react';
+import { Redirect, RouteComponentProps, withRouter } from 'react-router-dom';
+import styled from 'styled-components';
 
-import { FatalError } from './components/Error/FatalError';
-import { SectionRow } from './components';
-import { Button, Card, CubeLoader } from './atoms';
 import PrismCode from './PrismCode';
+import { Button, Card, CubeLoader } from './atoms';
+import { SectionRow } from './components';
+import { FatalError } from './components/Error/FatalError';
 import { playgroundAction } from './events';
-import { codeSandboxDefinition, copyToClipboard } from './utils';
-import { GraphQLIcon } from './shared/icons/GraphQLIcon';
 import { loadable } from './loadable';
+import { GraphQLIcon } from './shared/icons/GraphQLIcon';
+import { codeSandboxDefinition, copyToClipboard } from './utils';
 
 const GraphiQLSandbox = loadable(
   () => import('./components/GraphQL/GraphiQLSandbox')

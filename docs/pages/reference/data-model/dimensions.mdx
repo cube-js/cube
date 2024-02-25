@@ -1,0 +1,533 @@
+---
+redirect_from:
+  - /dimensions
+  - /schema/reference/dimensions
+---
+
+# Dimensions
+
+The `dimensions` property contains a set of dimensions. You can think about a
+dimension as an attribute related to a measure, e.g. the measure `user_count`
+can have dimensions like `country`, `age`, `occupation`, etc.
+
+Any dimension should have the following properties: `name`, `sql` and `type`.
+
+## Parameters
+
+### name
+
+The `name` parameter serves as the identifier of a dimension. It must be unique
+among all dimensions, measures, and segments within a cube and follow the
+[naming conventions][ref-naming].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  dimensions: {
+    price: {
+      sql: `price`,
+      type: `number`,
+    },
+
+    brand_name: {
+      sql: `brand_name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+
+    dimensions:
+      - name: price
+        sql: price
+        type: number
+
+      - name: brand_name
+        sql: brand_name
+        type: string
+
+
+```
+
+</CodeTabs>
+
+### case
+
+The `case` statement is used to define dimensions based on SQL conditions.
+
+The `when` parameters declares a series of `sql` conditions and `labels`
+that are returned if the condition is truthy. The `else` parameter declares
+the default `label` that would be returned if there's no truthy `sql`
+condition.
+
+The following example will create a `size` dimension with values
+`xl`, `xxl`, and `Unknown`:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          { sql: `${CUBE}.size_value = 'xl-en'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xl'`, label: `xl` },
+          { sql: `${CUBE}.size_value = 'xxl-en'`, label: `xxl` },
+          { sql: `${CUBE}.size_value = 'xxl'`, label: `xxl` },
+        ],
+        else: { label: `Unknown` },
+      },
+    },
+  },
+});
+
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: size
+        type: string
+        case:
+          when:
+            - sql: "{CUBE}.size_value = 'xl-en'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xl'"
+              label: xl
+            - sql: "{CUBE}.size_value = 'xxl-en'"
+              label: xxl
+            - sql: "{CUBE}.size_value = 'xxl'"
+              label: xxl
+          else:
+            label: Unknown
+```
+
+</CodeTabs>
+
+The `label` property can be defined dynamically as an object with a `sql`
+property in JavaScript models:
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    size: {
+      type: `string`,
+      case: {
+        when: [
+          {
+            sql: `${CUBE}.meta_value = 'xl-en'`,
+            label: { sql: `${CUBE}.english_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xl'`,
+            label: { sql: `${CUBE}.euro_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl-en'`,
+            label: { sql: `${CUBE}.english_size` },
+          },
+          {
+            sql: `${CUBE}.meta_value = 'xxl'`,
+            label: { sql: `${CUBE}.euro_size` },
+          },
+        ],
+        else: { label: `Unknown` },
+      },
+    },
+  },
+});
+```
+
+### description
+
+You can add details to a dimension's definition via the `description` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      description: `Comments for orders`,
+      sql: `comments`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        description: Comments for orders
+        sql: comments
+        type: string
+```
+
+</CodeTabs>
+
+### format
+
+`format` is an optional parameter. It is used to format the output of dimensions
+in different ways, for example, a link for `external_url`. Please refer to the
+[Dimension Formats][ref-schema-ref-dims-formats] for the full list of supported
+formats.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    total: {
+      sql: `amount`,
+      type: `number`,
+      format: `currency`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: total
+        sql: amount
+        type: number
+        format: currency
+```
+
+</CodeTabs>
+
+### meta
+
+Custom metadata. Can be used to pass any information to the frontend.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      meta: {
+        any: "value",
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        meta:
+          any: value
+```
+
+</CodeTabs>
+
+### primary_key
+
+Specify which dimension is a primary key for a cube. The default value is
+`false`.
+
+A primary key is used to make [joins][ref-schema-ref-joins] work properly.
+
+<WarningBox>
+
+Setting `primary_key` to `true` will change the default value of `public`
+parameter to `false`. If you still want `public` to be `true`, set it manually.
+
+</WarningBox>
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+```
+
+</CodeTabs>
+
+### propagate_filters_to_sub_query
+
+When this statement is set to `true`, the filters applied to the query will be
+passed to the [subquery][self-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+      propagate_filters_to_sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_filters_to_sub_query: true
+```
+
+</CodeTabs>
+
+### public
+
+<InfoBox>
+
+Prior to v0.33, this property was called `shown`.
+
+</InfoBox>
+
+The `public` property is used to manage the visibility of a dimension. Valid
+values for `public` are `true` and `false`. When set to `false`, this dimension
+**cannot** be queried through the API. Defaults to `true`.
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    comment: {
+      sql: `comments`,
+      type: `string`,
+      public: false,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: comment
+        sql: comments
+        public: false
+        shown: false
+```
+
+</CodeTabs>
+
+### sql
+
+`sql` is a required parameter. It can take any valid SQL expression depending on
+the `type` of the dimension. Please refer to the [Dimension
+Types][ref-schema-ref-dims-types] to understand what the `sql` parameter should
+be for a given dimension type.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### sub_query
+
+The `sub_query` statement allows you to reference a measure in a dimension. It's
+an advanced concept and you can learn more about it [here][ref-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+```
+
+</CodeTabs>
+
+### title
+
+You can use the `title` parameter to change a dimension's displayed name. By
+default, Cube will humanize your dimension key to create a display name. In
+order to override default behavior, please use the `title` property:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    meta_value: {
+      title: `Size`,
+      sql: `meta_value`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: meta_value
+        title: Size
+        sql: meta_value
+        type: string
+```
+
+</CodeTabs>
+
+### type
+
+`type` is a required parameter. There are various types that can be assigned to
+a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
+for the full list of dimension types.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  dimensions: {
+    rating: {
+      sql: `rating`,
+      type: `number`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    dimensions:
+      - name: rating
+        sql: rating
+        type: number
+```
+
+</CodeTabs>
+
+[ref-schema-ref-joins]: /reference/data-model/joins
+[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[self-subquery]: #sub-query
+[ref-naming]: /product/data-modeling/syntax#naming
+[ref-schema-ref-dims-types]:
+  /reference/data-model/types-and-formats#dimension-types
+[ref-schema-ref-dims-formats]:
+  /reference/data-model/types-and-formats#dimension-formats

@@ -33,8 +33,17 @@ export class LocalQueueDriverConnection {
     return stalled.concat(orphaned);
   }
 
+  /**
+   * @returns {Promise<GetActiveAndToProcessResponse>}
+   */
   async getActiveAndToProcess() {
-    return [this.queueArray(this.active), this.queueArray(this.toProcess)];
+    const active = this.queueArrayAsTuple(this.active);
+    const toProcess = this.queueArrayAsTuple(this.toProcess);
+
+    return [
+      active,
+      toProcess
+    ];
   }
 
   getResultPromise(resultListKey) {
@@ -83,12 +92,30 @@ export class LocalQueueDriverConnection {
     return null;
   }
 
+  /**
+   * @protected
+   */
   queueArray(queueObj, orderFilterLessThan) {
     return R.pipe(
       R.values,
       R.filter(orderFilterLessThan ? q => q.order < orderFilterLessThan : R.identity),
       R.sortBy(q => q.order),
       R.map(q => q.key)
+    )(queueObj);
+  }
+
+  /**
+   * @protected
+   * @param queueObj
+   * @param orderFilterLessThan
+   * @returns {QueryKeysTuple[]}
+   */
+  queueArrayAsTuple(queueObj, orderFilterLessThan) {
+    return R.pipe(
+      R.values,
+      R.filter(orderFilterLessThan ? q => q.order < orderFilterLessThan : R.identity),
+      R.sortBy(q => q.order),
+      R.map(q => [q.key, q.queueId])
     )(queueObj);
   }
 
@@ -109,6 +136,7 @@ export class LocalQueueDriverConnection {
    */
   addToQueue(keyScore, queryKey, orphanedTime, queryHandler, query, priority, options) {
     const queryQueueObj = {
+      queueId: options.queueId,
       queryHandler,
       query,
       queryKey,
@@ -117,19 +145,27 @@ export class LocalQueueDriverConnection {
       requestId: options.requestId,
       addedToQueueTime: new Date().getTime()
     };
+
     const key = this.redisHash(queryKey);
     if (!this.queryDef[key]) {
       this.queryDef[key] = queryQueueObj;
     }
+
     let added = 0;
     if (!this.toProcess[key]) {
       this.toProcess[key] = {
         order: keyScore,
+        queueId: options.queueId,
         key
       };
       added = 1;
     }
-    this.recent[key] = { order: orphanedTime, key };
+
+    this.recent[key] = {
+      order: orphanedTime,
+      key,
+      queueId: options.queueId,
+    };
 
     if (this.getQueueEventsBus) {
       this.getQueueEventsBus().emit({
@@ -142,19 +178,18 @@ export class LocalQueueDriverConnection {
 
     return [
       added,
-      // this driver doesnt support queue id
-      null,
+      queryQueueObj.queueId,
       Object.keys(this.toProcess).length,
       queryQueueObj.addedToQueueTime
     ];
   }
 
   getToProcessQueries() {
-    return this.queueArray(this.toProcess);
+    return this.queueArrayAsTuple(this.toProcess);
   }
 
   getActiveQueries() {
-    return this.queueArray(this.active);
+    return this.queueArrayAsTuple(this.active);
   }
 
   async getQueryAndRemove(queryKey) {
@@ -217,11 +252,11 @@ export class LocalQueueDriverConnection {
   }
 
   getOrphanedQueries() {
-    return this.queueArray(this.recent, new Date().getTime());
+    return this.queueArrayAsTuple(this.recent, new Date().getTime());
   }
 
   getStalledQueries() {
-    return this.queueArray(this.heartBeat, new Date().getTime() - this.heartBeatTimeout * 1000);
+    return this.queueArrayAsTuple(this.heartBeat, new Date().getTime() - this.heartBeatTimeout * 1000);
   }
 
   async getQueryStageState(onlyKeys) {
@@ -247,12 +282,14 @@ export class LocalQueueDriverConnection {
   retrieveForProcessing(queryKey, processingId) {
     const key = this.redisHash(queryKey);
     let lockAcquired = false;
+
     if (!this.processingLocks[key]) {
       this.processingLocks[key] = processingId;
       lockAcquired = true;
     } else {
       return null;
     }
+
     let added = 0;
     if (Object.keys(this.active).length < this.concurrency && !this.active[key]) {
       this.active[key] = { key, order: processingId };
@@ -271,8 +308,7 @@ export class LocalQueueDriverConnection {
 
     return [
       added,
-      // this driver doesnt support queue id
-      null,
+      this.queryDef[key]?.queueId,
       this.queueArray(this.active),
       Object.keys(this.toProcess).length,
       this.queryDef[key],

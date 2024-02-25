@@ -8,6 +8,9 @@
       "path": "packages/cubejs-templates"
     },
     {
+      "path": "packages/cubejs-backend-native"
+    },
+    {
       "path": "packages/cubejs-backend-cloud"
     },
     {
@@ -30,9 +33,6 @@
     },
     {
       "path": "packages/cubejs-testing-shared"
-    },
-    {
-      "path": "packages/cubejs-backend-native"
     },
     {
       "path": "packages/cubejs-api-gateway"

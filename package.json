@@ -23,19 +23,14 @@
     "tsc": "tsc --build",
     "tsc:watch": "tsc --build --watch",
     "clean": "rimraf packages/*/{tsconfig.tsbuildinfo,lib,dist}",
-    "postinstall": "lerna link && patch-package",
+    "postinstall": "lerna link",
     "link:dev": "cd packages/cubejs-backend-shared && cd ../cubejs-backend-shared && yarn link && cd ../cubejs-backend-cloud && yarn link && cd ../cubejs-backend-native && yarn link && cd ../cubejs-server && yarn link && cd ../cubejs-server-core && yarn link && cd ../cubejs-api-gateway && yarn link && cd ../cubejs-schema-compiler && yarn link && cd ../cubejs-query-orchestrator && yarn link && cd ../cubejs-athena-driver && yarn link && cd ../cubejs-duckdb-driver && yarn link && cd ../cubejs-bigquery-driver && yarn link && cd ../cubejs-postgres-driver && yarn link && cd ../cubejs-databricks-jdbc-driver && yarn link && cd ../cubejs-mssql-driver && yarn link && cd ../cubejs-clickhouse-driver && yarn link && cd ../cubejs-snowflake-driver && yarn link && cd ../cubejs-cubestore-driver && yarn link && cd ../cubejs-templates && yarn link && cd ../cubejs-client-core && yarn link && cd ../cubejs-client-ws-transport && yarn link && cd ../cubejs-playground && yarn link"
   },
   "author": "Cube Dev, Inc.",
   "dependencies": {
-    "@babel/runtime-corejs2": "^7.0.0",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
-    "core-js": "^3.6.5",
-    "lerna": "^4.0.0",
-    "patch-package": "^6.4.7",
-    "ramda": "^0.27.0",
-    "rollup-plugin-dts": "^1.1.8",
-    "whatwg-fetch": "^3.0.0"
+    "core-js": "^3.34.0",
+    "lerna": "^4.0.0"
   },
   "files": [
     "src",
@@ -53,8 +48,7 @@
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-node-resolve": "^11.2.0",
     "@types/fs-extra": "^9.0.1",
-    "@types/jest": "^26.0.3",
-    "babel-runtime": "^6.26.0",
+    "@types/jest": "^27",
     "flush-promises": "^1.0.2",
     "husky": "^5.0.4",
     "is-ci": "^2.0.0",
@@ -65,7 +59,7 @@
     "rimraf": "^3.0.2",
     "rollup": "2.53.1",
     "rollup-plugin-peer-deps-external": "^2.2.4",
-    "typescript": "~4.9.5"
+    "typescript": "~5.2.2"
   },
   "repository": {
     "type": "git",

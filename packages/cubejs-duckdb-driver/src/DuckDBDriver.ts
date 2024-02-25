@@ -2,62 +2,154 @@ import {
   BaseDriver,
   DriverInterface,
   StreamOptions,
-  QueryOptions, StreamTableData,
+  QueryOptions,
+  StreamTableData,
+  GenericDataBaseType,
 } from '@cubejs-backend/base-driver';
-import { assertDataSource, getEnv } from '@cubejs-backend/shared';
+import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import * as stream from 'stream';
-// eslint-disable-next-line import/no-extraneous-dependencies
 import { Connection, Database } from 'duckdb';
 
 import { DuckDBQuery } from './DuckDBQuery';
 import { HydrationStream, transformRow } from './HydrationStream';
 
+const { version } = require('../../package.json');
+
 export type DuckDBDriverConfiguration = {
   dataSource?: string,
-  enableHttpFs?: boolean,
   initSql?: string,
+  schema?: string,
+};
+
+type InitPromise = {
+  defaultConnection: Connection,
+  db: Database;
+};
+
+const DuckDBToGenericType: Record<string, GenericDataBaseType> = {
+  // DATE_TRUNC returns DATE, but Cube Store still doesn't support DATE type
+  // DuckDB's driver transform date/timestamp to Date object, but HydrationStream converts any Date object to ISO timestamp
+  // That's why It's safe to use timestamp here
+  date: 'timestamp',
 };
 
 export class DuckDBDriver extends BaseDriver implements DriverInterface {
-  protected readonly config: DuckDBDriverConfiguration;
+  protected initPromise: Promise<InitPromise> | null = null;
 
-  protected initPromise: Promise<Database> | null = null;
+  private schema: string;
 
   public constructor(
-    config: DuckDBDriverConfiguration,
+    protected readonly config: DuckDBDriverConfiguration = {},
   ) {
     super();
 
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
-
-    this.config = {
-      enableHttpFs: getEnv('duckdbHttpFs', { dataSource }) || true,
-      ...config,
-    };
+    this.schema = this.config.schema || getEnv('duckdbSchema', this.config);
   }
 
-  protected async initDatabase(): Promise<Database> {
-    const db = new Database(':memory:');
-    const conn = db.connect();
+  public toGenericType(columnType: string): GenericDataBaseType {
+    if (columnType.toLowerCase() in DuckDBToGenericType) {
+      return DuckDBToGenericType[columnType.toLowerCase()];
+    }
 
-    if (this.config.enableHttpFs) {
-      try {
-        await this.handleQuery(conn, 'INSTALL httpfs', []);
-      } catch (e) {
-        if (this.logger) {
-          console.error('DuckDB - error on httpfs installation', {
-            e
-          });
+    return super.toGenericType(columnType.toLowerCase());
+  }
+
+  protected async init(): Promise<InitPromise> {
+    const token = getEnv('duckdbMotherDuckToken', this.config);
+
+    const db = new Database(
+      token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:',
+      {
+        custom_user_agent: `Cube/${version}`,
+      }
+    );
+    // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
+    const defaultConnection = db.connect();
+    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
+
+    try {
+      await execAsync('INSTALL httpfs');
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on httpfs installation', {
+          e
+        });
+      }
+
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+      throw e;
+    }
+
+    try {
+      await execAsync('LOAD httpfs');
+    } catch (e) {
+      if (this.logger) {
+        console.error('DuckDB - error on loading httpfs', {
+          e
+        });
+      }
+
+      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+      throw e;
+    }
+
+    const configuration = [
+      {
+        key: 's3_region',
+        value: getEnv('duckdbS3Region', this.config),
+      },
+      {
+        key: 's3_endpoint',
+        value: getEnv('duckdbS3Endpoint', this.config),
+      },
+      {
+        key: 's3_access_key_id',
+        value: getEnv('duckdbS3AccessKeyId', this.config),
+      },
+      {
+        key: 's3_secret_access_key',
+        value: getEnv('duckdbS3SecretAccessKeyId', this.config),
+      },
+      {
+        key: 'memory_limit',
+        value: getEnv('duckdbMemoryLimit', this.config),
+      },
+      {
+        key: 'schema',
+        value: getEnv('duckdbSchema', this.config),
+      },
+      {
+        key: 's3_use_ssl',
+        value: getEnv('duckdbS3UseSsl', this.config),
+      },
+      {
+        key: 's3_url_style',
+        value: getEnv('duckdbS3UrlStyle', this.config),
+      },
+      {
+        key: 's3_session_token',
+        value: getEnv('duckdbS3SessionToken', this.config),
+      }
+    ];
+    
+    for (const { key, value } of configuration) {
+      if (value) {
+        try {
+          await execAsync(`SET ${key}='${value}'`);
+        } catch (e) {
+          if (this.logger) {
+            console.error(`DuckDB - error on configuration, key: ${key}`, {
+              e
+            });
+          }
         }
       }
     }
 
     if (this.config.initSql) {
       try {
-        await this.handleQuery(conn, this.config.initSql, []);
+        await execAsync(this.config.initSql);
       } catch (e) {
         if (this.logger) {
           console.error('DuckDB - error on init sql (skipping)', {
@@ -66,18 +158,40 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-
-    return db;
+    
+    return {
+      defaultConnection,
+      db
+    };
   }
 
-  protected async getConnection() {
+  public override informationSchemaQuery(): string {
+    if (this.schema) {
+      return `${super.informationSchemaQuery()} AND table_catalog = '${this.schema}'`;
+    }
+
+    return super.informationSchemaQuery();
+  }
+
+  public override getSchemasQuery(): string {
+    if (this.schema) {
+      return `
+        SELECT table_schema as ${super.quoteIdentifier('schema_name')}
+        FROM information_schema.tables
+        WHERE table_catalog = '${this.schema}'
+        GROUP BY table_schema
+      `;
+    }
+    return super.getSchemasQuery();
+  }
+
+  protected async getInitiatedState(): Promise<InitPromise> {
     if (!this.initPromise) {
-      this.initPromise = this.initDatabase();
+      this.initPromise = this.init();
     }
 
     try {
-      const db = (await this.initPromise);
-      return db.connect();
+      return await this.initPromise;
     } catch (e) {
       this.initPromise = null;
 
@@ -89,15 +203,11 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return DuckDBQuery;
   }
 
-  protected handleQuery<R>(connection: Connection, query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
-    const executeQuery: (sql: string, ...args: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
-
-    return executeQuery(query, ...values);
-  }
-
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
-    const result = await this.handleQuery<R>(await this.getConnection(), query, values, _options);
+    const { defaultConnection } = await this.getInitiatedState();
+    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(defaultConnection.all).bind(defaultConnection) as any;
 
+    const result = await fetchAsync(query, ...values);
     return result.map((item) => {
       transformRow(item);
 
@@ -110,14 +220,29 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const connection = await this.getConnection();
+    const { db } = await this.getInitiatedState();
 
-    const asyncIterator = connection.stream(query, ...(values || []));
-    const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
+    // new connection, because stream can break with
+    // Attempting to execute an unsuccessful or closed pending query result
+    // PreAggregation queue has a concurrency limit, it's why pool is not needed here
+    const connection = db.connect();
+    const closeAsync = promisify(connection.close).bind(connection);
 
-    return {
-      rowStream,
-    };
+    try {
+      const asyncIterator = connection.stream(query, ...(values || []));
+      const rowStream = stream.Readable.from(asyncIterator, { highWaterMark }).pipe(new HydrationStream());
+
+      return {
+        rowStream,
+        release: async () => {
+          await closeAsync();
+        }
+      };
+    } catch (e) {
+      await closeAsync();
+
+      throw e;
+    }
   }
 
   public async testConnection(): Promise<void> {
@@ -130,7 +255,8 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   public async release(): Promise<void> {
     if (this.initPromise) {
-      const close = promisify((await this.initPromise).close).bind(this);
+      const { db } = await this.initPromise;
+      const close = promisify(db.close).bind(db);
       this.initPromise = null;
 
       await close();

@@ -11,20 +11,26 @@ import {
   assertDataSource,
   CancelablePromise,
 } from '@cubejs-backend/shared';
-import { BaseDriver } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  StreamOptions,
+} from '@cubejs-backend/base-driver';
 import * as SqlString from 'sqlstring';
 import { promisify } from 'util';
 import genericPool, { Factory, Pool } from 'generic-pool';
+import path from 'path';
 
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
 import { QueryStream, nextFn, Row } from './QueryStream';
 
-const DriverManager = require('jdbc/lib/drivermanager');
-const Connection = require('jdbc/lib/connection');
-const DatabaseMetaData = require('jdbc/lib/databasemetadata');
-const jinst = require('jdbc/lib/jinst');
+const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
+const Connection = require('@cubejs-backend/jdbc/lib/connection');
+const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
+const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
@@ -37,7 +43,10 @@ type JdbcStatement = {
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
-      mvn((err: any, mvnResults: any) => {
+      const options = {
+        packageJsonPath: `${path.join(__dirname, '../..')}/package.json`,
+      };
+      mvn(options, (err: any, mvnResults: any) => {
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
         } else {
@@ -257,7 +266,7 @@ export class JDBCDriver extends BaseDriver {
     }
   }
 
-  public async streamQuery(sql: string, values: string[]): Promise<Readable> {
+  public async stream(sql: string, values: unknown[], { highWaterMark }: StreamOptions): Promise<DownloadQueryResultsResult> {
     const conn = await this.pool.acquire();
     const query = applyParams(sql, values);
     const cancelObj: {cancel?: Function} = {};
@@ -271,7 +280,7 @@ export class JDBCDriver extends BaseDriver {
 
       const executeQuery = promisify(statement.execute.bind(statement));
       const resultSet = await executeQuery(query);
-      return new Promise((resolve, reject) => {
+      return (await new Promise((resolve, reject) => {
         resultSet.toObjectIter(
           (
             err: unknown,
@@ -281,25 +290,24 @@ export class JDBCDriver extends BaseDriver {
                 rows: { next: nextFn },
               },
           ) => {
-            if (err) reject(err);
-            const rowsStream = new QueryStream(res.rows.next);
-            let connectionReleased = false;
-            const cleanup = (e?: Error) => {
-              if (!connectionReleased) {
-                this.pool.release(conn);
-                connectionReleased = true;
-              }
-              if (!rowsStream.destroyed) {
-                rowsStream.destroy(e);
-              }
-            };
-            rowsStream.once('end', cleanup);
-            rowsStream.once('error', cleanup);
-            rowsStream.once('close', cleanup);
-            resolve(rowsStream);
+            if (err) {
+              reject(err);
+              return;
+            }
+            const rowStream = new QueryStream(res.rows.next, highWaterMark);
+            resolve({
+              rowStream,
+              release: () => this.pool.release(conn),
+              types: res.types.map(
+                (t, i) => ({
+                  name: res.labels[i],
+                  type: this.toGenericType(((t === -5 ? 'bigint' : resultSet._types[t]) || 'string').toLowerCase())
+                })
+              )
+            });
           }
         );
-      });
+      }));
     } catch (ex: any) {
       await this.pool.release(conn);
       if (ex.cause) {
@@ -308,6 +316,13 @@ export class JDBCDriver extends BaseDriver {
         throw ex;
       }
     }
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    if (options.streamImport) {
+      return this.stream(query, values, options);
+    }
+    return super.downloadQueryResults(query, values, options);
   }
 
   protected async executeStatement(conn: any, query: any, cancelObj?: any) {

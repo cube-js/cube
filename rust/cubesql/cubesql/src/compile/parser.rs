@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use regex::Regex;
 use sqlparser::{
     ast::Statement,
     dialect::{Dialect, PostgreSqlDialect},
@@ -39,7 +40,7 @@ impl Dialect for MySqlDialectWithBackTicks {
 }
 
 lazy_static! {
-    static ref SIGMA_WORKAROUND: regex::Regex = regex::Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s(?P<nspname>'[^']+'|\$\d+).*\),\s+tbl\sas\s\(.*relname\s=\s(?P<relname>'[^']+'|\$\d+).*\).*$"#).unwrap();
+    static ref SIGMA_WORKAROUND: Regex = Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap();
 }
 
 pub fn parse_sql_to_statements(
@@ -184,33 +185,17 @@ pub fn parse_sql_to_statements(
     );
 
     // Sigma Computing WITH query workaround
-    let query = match SIGMA_WORKAROUND.captures(&query) {
-        Some(c) => {
-            let nspname = c.name("nspname").unwrap().as_str();
-            let relname = c.name("relname").unwrap().as_str();
-            format!(
-                "
-                select
-                    attname,
-                    typname,
-                    description
-                from pg_attribute a
-                join pg_type on atttypid = pg_type.oid
-                left join pg_description on
-                    attrelid = objoid and
-                    attnum = objsubid
-                join pg_catalog.pg_namespace nsp ON nspname = {}
-                join pg_catalog.pg_class tbl ON relname = {} and relnamespace = nsp.oid
-                where
-                    attnum > 0 and
-                    attrelid = tbl.oid
-                order by attnum
-                ;
-                ",
-                nspname, relname
-            )
-        }
-        None => query,
+    let query = if SIGMA_WORKAROUND.is_match(&query) {
+        let relnamespace_re = Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap();
+        let relnamespace_replaced = relnamespace_re.replace(
+            &query,
+            "from pg_catalog.pg_class join nsp on relnamespace = nsp.oid where relname = $relname",
+        );
+        let attrelid_re = Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap();
+        let attrelid_replaced = attrelid_re.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
+        attrelid_replaced.to_string()
+    } else {
+        query
     };
 
     // Metabase
@@ -280,6 +265,40 @@ pub fn parse_sql_to_statements(
     let query = query.replace(
         "select NULL, NULL, NULL",
         "select NULL, NULL AS NULL2, NULL AS NULL3",
+    );
+
+    // Work around an issue with lowercase table name when queried as uppercase,
+    // an uncommon way of casting literals, and skip a few funcs along the way
+    let query = query.replace(
+        "(CASE\
+        \n  WHEN c.reltuples < 0 THEN NULL\
+        \n  WHEN c.relpages = 0 THEN float8 '0'\
+        \n  ELSE c.reltuples / c.relpages END\
+        \n  * (pg_relation_size(c.oid) / pg_catalog.current_setting('block_size')::int)\
+        \n)::bigint",
+        "NULL::bigint",
+    );
+
+    // Work around an aliasing issue (lowercase-uppercase). This is fine
+    // since it must be equivalent in PostgreSQL
+    let query = query.replace(
+        "c.relname AS PARTITION_NAME,",
+        "c.relname AS partition_name,",
+    );
+
+    // Work around lack of WHERE subqueries for INFORMATION_SCHEMA.SCHEMATA filter
+    let query = query.replace(
+        "WHERE N.nspname in (SELECT schema_name\
+        \n                    FROM INFORMATION_SCHEMA.SCHEMATA\
+        \n                    WHERE schema_name not like 'pg_%%'\
+        \n                    and schema_name != 'information_schema')",
+        "WHERE N.nspname = 'public'",
+    );
+
+    // Work around an issue with NULL, NULL, NULL in SELECT
+    let query = query.replace(
+        "p.proname AS PROCEDURE_NAME, NULL, NULL, NULL, ",
+        "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
     );
 
     if let Some(qtrace) = qtrace {

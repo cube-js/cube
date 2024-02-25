@@ -37,6 +37,7 @@ export type PrestoDriverConfiguration = {
   basic_auth?: { user: string, password: string };
   ssl?: string | TLSConnectionOptions;
   dataSource?: string;
+  queryTimeout?: number;
 };
 
 /**
@@ -126,6 +127,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
               rowStream,

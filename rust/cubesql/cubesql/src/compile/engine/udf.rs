@@ -1,6 +1,6 @@
 use std::{any::type_name, collections::HashMap, convert::TryFrom, sync::Arc, thread};
 
-use chrono::{Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime};
+use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
     arrow::{
         array::{
@@ -11,11 +11,11 @@ use datafusion::{
             StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
             TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
         },
-        compute::{cast, concat},
+        compute::{cast, cast_with_options, concat, CastOptions},
         datatypes::{
             DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
-            IntervalUnit, IntervalYearMonthType, TimeUnit, TimestampNanosecondType, UInt32Type,
-            UInt64Type,
+            IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
+            TimestampNanosecondType, UInt32Type, UInt64Type,
         },
     },
     error::{DataFusionError, Result},
@@ -395,17 +395,31 @@ pub fn create_isnull_udf() -> ScalarUDF {
                 Arc::new(builder.finish()) as ArrayRef
             }
             2 => {
-                if args[0].data_type() != &DataType::Utf8 || args[1].data_type() != &DataType::Utf8
-                {
-                    return Err(DataFusionError::Internal(format!(
-                        "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
-                        args[0].data_type(),
-                        args[1].data_type(),
-                    )));
-                }
+                let expr = match args[0].data_type() {
+                    DataType::Utf8 => Arc::clone(&args[0]),
+                    DataType::Null => cast(&args[0], &DataType::Utf8)?,
+                    _ => {
+                        return Err(DataFusionError::Internal(format!(
+                            "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                            args[0].data_type(),
+                            args[1].data_type(),
+                        )))
+                    }
+                };
+                let replacement = match args[1].data_type() {
+                    DataType::Utf8 => Arc::clone(&args[1]),
+                    DataType::Null => cast(&args[1], &DataType::Utf8)?,
+                    _ => {
+                        return Err(DataFusionError::Internal(format!(
+                            "isnull with 2 arguments supports only (Utf8, Utf8), actual: ({}, {})",
+                            args[0].data_type(),
+                            args[1].data_type(),
+                        )))
+                    }
+                };
 
-                let exprs = downcast_string_arg!(&args[0], "expr", i32);
-                let replacements = downcast_string_arg!(&args[1], "replacement", i32);
+                let exprs = downcast_string_arg!(expr, "expr", i32);
+                let replacements = downcast_string_arg!(replacement, "replacement", i32);
 
                 let result = exprs
                     .iter()
@@ -933,7 +947,8 @@ pub fn create_date_udf() -> ScalarUDF {
                         builder.append_value(
                             NaiveDateTime::parse_from_str(strings.value(i), "%Y-%m-%d %H:%M:%S%.f")
                                 .map_err(|e| DataFusionError::Execution(e.to_string()))?
-                                .timestamp_nanos(),
+                                .timestamp_nanos_opt()
+                                .unwrap(),
                         )?;
                     }
                     Ok(ColumnarValue::Array(Arc::new(builder.finish())))
@@ -1129,12 +1144,16 @@ macro_rules! date_math_udf {
         let intervals = downcast_primitive_arg!(&$ARGS[1], "interval", $SECOND_ARG_TYPE);
         let mut builder = TimestampNanosecondArray::builder(timestamps.len());
         for i in 0..timestamps.len() {
-            if timestamps.is_null(i) {
+            if timestamps.is_null(i) || intervals.is_null(i) {
                 builder.append_null()?;
             } else {
                 let timestamp = timestamps.value_as_datetime(i).unwrap();
                 let interval = intervals.value(i).into();
-                builder.append_value($FUN(timestamp, interval, $IS_ADD)?.timestamp_nanos())?;
+                builder.append_value(
+                    $FUN(timestamp, interval, $IS_ADD)?
+                        .timestamp_nanos_opt()
+                        .unwrap(),
+                )?;
             }
         }
         return Ok(Arc::new(builder.finish()));
@@ -1158,6 +1177,15 @@ pub fn create_date_add_udf() -> ScalarUDF {
                 TimestampNanosecondType,
                 IntervalYearMonthType,
                 date_addsub_year_month,
+                true
+            )
+        }
+        DataType::Interval(IntervalUnit::MonthDayNano) => {
+            date_math_udf!(
+                args,
+                TimestampNanosecondType,
+                IntervalMonthDayNanoType,
+                date_addsub_month_day_nano,
                 true
             )
         }
@@ -1188,6 +1216,14 @@ pub fn create_date_add_udf() -> ScalarUDF {
                 TypeSignature::Exact(vec![
                     DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
                     DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".to_string())),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
                 ]),
             ],
             Volatility::Immutable,
@@ -1314,6 +1350,36 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     };
 }
 
+fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result<NaiveDateTime> {
+    let month = (i >> (64 + 32)) & 0xFFFFFFFF;
+    let day = (i >> 64) & 0xFFFFFFFF;
+    let nano = i & 0xFFFFFFFFFFFFFFFF;
+
+    let result = if month > 0 && is_add || month < 0 && !is_add {
+        t.checked_add_months(Months::new(month as u32))
+    } else {
+        t.checked_sub_months(Months::new(month.abs() as u32))
+    };
+
+    let result = if day > 0 && is_add || day < 0 && !is_add {
+        result.and_then(|t| t.checked_add_days(Days::new(day as u64)))
+    } else {
+        result.and_then(|t| t.checked_sub_days(Days::new(day.abs() as u64)))
+    };
+
+    let result = result.and_then(|t| {
+        t.checked_add_signed(Duration::nanoseconds(
+            (nano as i64) * (if !is_add { -1 } else { 1 }),
+        ))
+    });
+    result.ok_or_else(|| {
+        DataFusionError::Execution(format!(
+            "Failed to add interval: {} month {} day {} nano",
+            month, day, nano
+        ))
+    })
+}
+
 fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
     let i = match is_add {
         true => interval,
@@ -1322,7 +1388,7 @@ fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result
 
     let days: i64 = i.signum() * (i.abs() >> 32);
     let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    return Ok(t + Duration::days(days) + Duration::milliseconds(millis));
+    return Ok(t + chrono::Duration::days(days) + chrono::Duration::milliseconds(millis));
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
@@ -1337,14 +1403,31 @@ fn last_day_of_month(y: i32, m: u32) -> u32 {
     if m == 12 {
         return 31;
     }
-    NaiveDate::from_ymd(y, m + 1, 1).pred().day()
+    NaiveDate::from_ymd_opt(y, m + 1, 1)
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .pred_opt()
+        .expect(&format!("Invalid year month: {}-{}", y, m))
+        .day()
 }
 
 pub fn create_interval_mul_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2);
 
-        let multiplicands = downcast_primitive_arg!(args[1], "multiplicand", Int64Type);
+        let multiplicands = match args[1].data_type() {
+            DataType::Utf8 => {
+                cast_with_options(&args[1], &DataType::Int64, &CastOptions { safe: false })?
+            }
+            DataType::Int64 => Arc::clone(&args[1]),
+            t => {
+                return Err(DataFusionError::Execution(format!(
+                    "unsupported multiplicand type {}",
+                    t
+                )))
+            }
+        };
+
+        let multiplicands = downcast_primitive_arg!(multiplicands, "multiplicand", Int64Type);
 
         match &args[0].data_type() {
             DataType::Interval(IntervalUnit::YearMonth) => {
@@ -1421,6 +1504,18 @@ pub fn create_interval_mul_udf() -> ScalarUDF {
                     DataType::Interval(IntervalUnit::MonthDayNano),
                     DataType::Int64,
                 ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    DataType::Utf8,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::DayTime),
+                    DataType::Utf8,
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    DataType::Utf8,
+                ]),
             ],
             Volatility::Immutable,
         ),
@@ -1431,6 +1526,11 @@ pub fn create_interval_mul_udf() -> ScalarUDF {
 
 fn postgres_datetime_format_to_iso(format: String) -> String {
     format
+        // Workaround for FM modifier
+        .replace("FMDay", "%A")
+        .replace("FMMonth", "%B")
+        .replace("Day", "%A")
+        .replace("Month", "%B")
         .replace("%i", "%M")
         .replace("%s", "%S")
         .replace(".%f", "%.f")
@@ -1438,6 +1538,7 @@ fn postgres_datetime_format_to_iso(format: String) -> String {
         .replace("yyyy", "%Y")
         // NOTE: "%q" is not a part of chrono
         .replace("Q", "%q")
+        .replace("Mon", "%b")
         .replace("DD", "%d")
         .replace("dd", "%d")
         .replace("HH24", "%H")
@@ -1488,7 +1589,7 @@ pub fn create_str_to_date_udf() -> ScalarUDF {
             })?;
 
             Ok(ColumnarValue::Scalar(ScalarValue::TimestampNanosecond(
-                Some(res.timestamp_nanos()),
+                Some(res.timestamp_nanos_opt().unwrap()),
                 None,
             )))
         });
@@ -1526,7 +1627,7 @@ macro_rules! parse_timestamp_arr {
             let mut result = Vec::new();
             let arr = arr.unwrap();
             for i in 0..arr.len() {
-                result.push(Duration::$FN_NAME(arr.value(i)));
+                result.push(chrono::Duration::$FN_NAME(arr.value(i)));
             }
 
             Some(result)
@@ -1577,21 +1678,26 @@ pub fn create_to_char_udf() -> ScalarUDF {
             let mut builder = StringBuilder::new(durations.len());
 
             for (i, duration) in durations.iter().enumerate() {
-                let format = formats.value(i);
-                let format =
-                    postgres_datetime_format_to_iso(format.to_string()).replace("TZ", &timezone);
+                if duration.is_zero() {
+                    builder.append_null().unwrap();
+                } else {
+                    let format = formats.value(i);
+                    let format = postgres_datetime_format_to_iso(format.to_string())
+                        .replace("TZ", &timezone);
 
-                let secs = duration.num_seconds();
-                let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
-                let timestamp = NaiveDateTime::from_timestamp(secs, nanosecs as u32);
+                    let secs = duration.num_seconds();
+                    let nanosecs = duration.num_nanoseconds().unwrap_or(0) - secs * 1_000_000_000;
+                    let timestamp = NaiveDateTime::from_timestamp_opt(secs, nanosecs as u32)
+                        .expect(format!("Invalid secs {} nanosecs {}", secs, nanosecs).as_str());
 
-                // chrono's strftime is missing quarter format, as such a workaround is required
-                let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
-                let format = format.replace("%q", quarter);
+                    // chrono's strftime is missing quarter format, as such a workaround is required
+                    let quarter = &format!("{}", timestamp.date().month0() / 3 + 1);
+                    let format = format.replace("%q", quarter);
 
-                builder
-                    .append_value(timestamp.format(&format).to_string())
-                    .unwrap();
+                    builder
+                        .append_value(timestamp.format(&format).to_string())
+                        .unwrap();
+                }
             }
 
             Ok(Arc::new(builder.finish()) as ArrayRef)
@@ -2718,6 +2824,77 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
     )
 }
 
+pub fn create_has_table_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        let (users, tables, privileges) = if args.len() == 3 {
+            (
+                Some(downcast_string_arg!(args[0], "user", i32)),
+                downcast_string_arg!(args[1], "table", i32),
+                downcast_string_arg!(args[2], "privilege", i32),
+            )
+        } else {
+            (
+                None,
+                downcast_string_arg!(args[0], "table", i32),
+                downcast_string_arg!(args[1], "privilege", i32),
+            )
+        };
+
+        let result = izip!(tables, privileges)
+            .enumerate()
+            .map(|(i, args)| {
+                Ok(match args {
+                    (Some(_table), Some(privilege)) => {
+                        match (users, state.user()) {
+                            (Some(users), Some(session_user)) => {
+                                let user = users.value(i);
+                                if user != session_user {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "role \"{}\" does not exist",
+                                        user
+                                    )));
+                                }
+                            }
+                            _ => (),
+                        }
+
+                        // TODO: check if table exists
+
+                        match privilege {
+                            "SELECT" => Some(true),
+                            "UPDATE" | "INSERT" | "DELETE" => Some(false),
+                            _ => {
+                                return Err(DataFusionError::Execution(format!(
+                                    "unrecognized privilege type: \"{}\"",
+                                    privilege
+                                )))
+                            }
+                        }
+                    }
+                    _ => None,
+                })
+            })
+            .collect::<Result<BooleanArray>>();
+
+        Ok(Arc::new(result?))
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Boolean)));
+
+    ScalarUDF::new(
+        "has_table_privilege",
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8, DataType::Utf8]),
+                TypeSignature::Exact(vec![DataType::Utf8, DataType::Utf8]),
+            ],
+            Volatility::Stable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn create_pg_total_relation_size_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
@@ -3008,7 +3185,11 @@ pub fn create_date_to_timestamp_udf() -> ScalarUDF {
                                     "Cannot initalize default zero NaiveTime".to_string(),
                                 ),
                             )?;
-                            Ok(Some(NaiveDateTime::new(date, time).timestamp_nanos()))
+                            Ok(Some(
+                                NaiveDateTime::new(date, time)
+                                    .timestamp_nanos_opt()
+                                    .unwrap(),
+                            ))
                         }
                         None => Ok(None),
                     })
@@ -3388,6 +3569,24 @@ pub fn create_udtf_stub(
     )
 }
 
+pub fn create_inet_server_addr_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |_: &[ArrayRef]| {
+        let mut builder = StringBuilder::new(1);
+        builder.append_value("127.0.0.1/32").unwrap();
+
+        Ok(Arc::new(builder.finish()) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |_| Ok(Arc::new(DataType::Utf8)));
+
+    ScalarUDF::new(
+        "inet_server_addr",
+        &Signature::exact(vec![], Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
 pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     macro_rules! register_fun_stub {
         ($FTYP:ident, $NAME:expr, argc=$ARGC:expr $(, rettyp=$RETTYP:ident)? $(, vol=$VOL:ident)?) => {
@@ -3611,6 +3810,7 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Int64,
         vol = Volatile
     );
+    register_fun_stub!(udf, "greatest", argc = 2);
     register_fun_stub!(
         udf,
         "has_any_column_privilege",
@@ -3738,20 +3938,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     );
     register_fun_stub!(
         udf,
-        "has_table_privilege",
-        tsigs = [
-            [Utf8, Utf8],
-            [Oid, Utf8],
-            [Utf8, Utf8, Utf8],
-            [Utf8, Oid, Utf8],
-            [Oid, Utf8, Utf8],
-            [Oid, Oid, Utf8],
-        ],
-        rettyp = Boolean,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
         "has_tablespace_privilege",
         tsigs = [
             [Utf8, Utf8],
@@ -3790,13 +3976,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "inet_client_port",
         argc = 0,
         rettyp = Int32,
-        vol = Stable
-    );
-    register_fun_stub!(
-        udf,
-        "inet_server_addr",
-        argc = 0,
-        rettyp = Utf8,
         vol = Stable
     );
     register_fun_stub!(
@@ -4743,6 +4922,29 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         "string_to_table",
         tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
         rettyp = Utf8
+    );
+
+    register_fun_stub!(
+        udf,
+        "eval_current_date",
+        argc = 0,
+        rettyp = Date32,
+        vol = Stable
+    );
+
+    register_fun_stub!(
+        udf,
+        "eval_now",
+        argc = 0,
+        rettyp = TimestampTz,
+        vol = Stable
+    );
+    register_fun_stub!(
+        udf,
+        "eval_utc_timestamp",
+        argc = 0,
+        rettyp = Timestamp,
+        vol = Stable
     );
 
     ctx

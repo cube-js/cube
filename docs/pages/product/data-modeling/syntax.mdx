@@ -1,0 +1,573 @@
+---
+redirect_from:
+  - /schema/fundamentals/working-with-yaml
+  - /schema/getting-started/yaml
+  - /data-modeling/syntax
+---
+
+# Syntax
+
+Entities within the data model (e.g., cubes, views, etc.) should be placed under
+the `model` [folder][self-folder-structure], follow [naming
+conventions][self-naming], and be defined using a supported
+[syntax][self-syntax].
+
+## Folder structure
+
+Data model files should be placed inside the `model` folder. You can use the
+[`schema_path` configuration option][ref-config-model-path] to override the
+folder name or the [`repository_factory` configuration
+option][ref-config-repository-factory] to dynamically define the folder name and
+data model file contents.
+
+It's recommended to place each cube or view in a separate file, in `model/cubes`
+and `model/views` folders, respectively. Example:
+
+```tree
+model
+├── cubes
+│   ├── orders.yml
+│   ├── products.yml
+│   └── users.yml
+└── views
+    └── revenue.yml
+```
+
+## Model syntax
+
+Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
+JavaScript syntax. YAML data model files should have the `.yml` extension,
+whereas JavaScript data model files should end with `.js`.
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT *
+    FROM orders, line_items
+    WHERE orders.id = line_items.order_id
+  `,
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT *
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
+
+```
+
+</CodeTabs>
+
+You define the data model statically or build [dynamic data
+models][ref-dynamic-data-models] programmatically. YAML data models use
+[Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
+models use [JavaScript][ref-dynamic-data-models-js].
+
+## Naming
+
+Common rules apply to names of entities within the data model. All names must:
+
+- start with a letter
+- consist of letters, numbers, and underscore (`_`) symbols only
+
+It is also recommended that names use [snake case][wiki-snake-case].
+
+Good examples of names:
+
+- `orders`, `stripe_invoices`, or `base_payments` (cubes)
+- `opportunities`, `cloud_accounts`, or `arr` (views)
+- `count`, `avg_price`, or `total_amount_shipped` (measures)
+- `name`, `is_shipped`, or `created_at` (dimensions)
+- `main`, `orders_by_status`, or `lambda_invoices` (pre-aggregations)
+
+## SQL expressions
+
+When defining cubes, you would often provide SQL snippets in `sql` and
+`sql_table` parameters.
+
+Provided SQL expressions should match your database SQL dialect, e.g.,
+to aggregate a list of strings, you would probably pick the [`LISTAGG`
+function][link-snowflake-listagg] in Snowflake and the [`STRING_AGG`
+function][link-bigquery-stringagg] in BigQuery.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: statuses
+        sql: "STRING_AGG(status)"
+        type: string
+
+    dimensions:
+      - name: status
+        sql: "UPPER(status)"
+        type: string
+
+
+
+
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    statuses: {
+      sql: `STRING_AGG(status)`,
+      type: `string`,
+    },
+  },
+
+  dimensions: {
+    status: {
+      sql: `UPPER(status)`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+If your database uses case-sensitive identifiers, make sure to properly
+quote table and column names. For example, here's how you can reference
+a Postgres table that contains uppercase letters in its name:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: 'public."Orders"'
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `public."Orders"`,
+});
+```
+
+</CodeTabs>
+
+## References
+
+To write reusable data models, it is important to be able to reference
+members of cubes and views, such as measures or dimensions, as well as
+table columns. Cube supports the following syntax for references.
+
+### `column`
+
+Most commonly, you would use bare column names in the `sql` parameter of
+measures or dimensions. In the following example, `name` references
+the respective column of the `users` table.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+
+
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+This syntax works great for simple use cases. However, if your cubes have
+joins and joined cubes have columns with the same name, the generated SQL
+query might become ambiguous. See below how to work around that.
+
+### `{member}`
+
+When defining measures and dimensions, you can also reference other members
+of the same cube by wrapping their names in curly braces. In the following
+example, the `full_name` dimension references `name` and `surname` dimensions
+of the same cube.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+
+      - name: surname
+        sql: "UPPER(surname)"
+        type: string
+
+      - name: full_name
+        sql: "CONCAT({name}, ' ', {surname})"
+        type: string
+
+
+
+
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`,
+    },
+
+    surname: {
+      sql: `UPPER(surname)`,
+      type: `string`,
+    },
+
+    full_name: {
+      sql: `CONCAT(${name}, ' ', ${surname})`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+This syntax works great for simple use cases. However, there are cases
+(like [subquery][ref-subquery]) when you'd like to reference members of
+other cubes. See below how to do that.
+
+### `{cube}.column`, `{cube.member}`
+
+You can qualify column and member names with the name of a cube to remove
+the ambiguity when cubes are joined and reference members of other cubes.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: contacts
+        sql: "{users}.contact_id = {contacts.id}"
+        relationship: one_to_one
+
+    dimensions:
+      - name: id
+        sql: "{users}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "COALESCE({users.name}, {contacts.name})"
+        type: string
+
+  - name: contacts
+    sql_table: contacts
+
+    dimensions:
+      - name: id
+        sql: "{contacts}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "{contacts}.name"
+        type: string
+
+
+
+
+
+
+
+
+
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  joins: {
+    contacts: {
+      sql: `${users}.contact_id = ${contacts.id}`,
+      relationship: `one_to_one`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `${users}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `COALESCE(${users}.name, ${contacts.name})`,
+      type: `string`,
+    },
+  },
+});
+
+cube(`contacts`, {
+  sql_table: `contacts`,
+
+  dimensions: {
+    id: {
+      sql: `${contacts}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `${contacts}.name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+In production, using fully-qualified names is generally encouraged since it
+removes the ambiguity and keeps data model code maintainable as it grows.
+However, always referring to the current cube by its name leads to code
+repetition and violates the DRY principle. See below how to solve that.
+
+### `{CUBE}` variable
+
+You can use a handy `{CUBE}` [context variable][ref-context-variables]
+(mind the uppercase) to reference the current cube so you don't have to
+repeat the its name over and over. It works both for column and member
+references.
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  joins: {
+    contacts: {
+      sql: `${CUBE}.contact_id = ${contacts.id}`,
+      relationship: `one_to_one`,
+    },
+  },
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `COALESCE(${CUBE}.name, ${contacts.name})`,
+      type: `string`,
+    },
+  },
+});
+
+cube(`contacts`, {
+  sql_table: `contacts`,
+
+  dimensions: {
+    id: {
+      sql: `${CUBE}.id`,
+      type: `number`,
+      primary_key: true,
+    },
+
+    name: {
+      sql: `${CUBE}.name`,
+      type: `string`,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    joins:
+      - name: contacts
+        sql: "{CUBE}.contact_id = {contacts.id}"
+        relationship: one_to_one
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "COALESCE({CUBE.name}, {contacts.name})"
+        type: string
+
+  - name: contacts
+    sql_table: contacts
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.id"
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: "{CUBE}.name"
+        type: string
+
+
+
+
+
+
+
+
+
+```
+
+</CodeTabs>
+
+Check the `{users.name}` dimension. Referencing another cube in the
+dimension definition instructs Cube to make an implicit join to that cube.
+For example, using the data model above, we can make the following query:
+
+```json
+{
+  "dimensions": ["users.name"]
+}
+```
+
+The resulting generated SQL query would look like this:
+
+```sql
+SELECT COALESCE("users".name, "contacts".name) "users__name"
+FROM users "users"
+LEFT JOIN contacts "contacts"
+  ON "users".contact_id = "contacts".id
+```
+
+### Non-SQL references
+
+Outside [SQL expressions][self-sql-expressions], `column` is not recognized
+as a column name; it is rather regonized as a member name. It means that,
+outside `sql` and `sql_table` parameters, you can skip the curly braces and
+reference members by their names directly: `member`, `cube_name.member`, or
+`CUBE.member`.
+
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+    pre_aggregations:
+      - name: orders_by_status
+        dimensions:
+          - CUBE.status
+        measures:
+          - CUBE.count
+
+
+
+
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  pre_aggregations: {
+    orders_by_status: {
+      dimensions: [CUBE.status],
+      measures: [CUBE.count]
+    }
+  }
+});
+```
+
+</CodeTabs>
+
+## Context variables
+
+In addition to the `CUBE` variable, you can also use a few more [context
+variables][ref-context-variables] within your data model. They are
+generally useful for two purposes: optimizing generated SQL queries and
+defining dynamic data models.
+
+[self-folder-structure]: #folder-structure
+[self-naming]: #naming
+[self-syntax]: #code-syntax
+[self-cube-variable]: #cube-variable
+[self-sql-expressions]: #sql-expressions
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-dynamic-data-models-jinja]: /product/data-modeling/dynamic/jinja
+[ref-dynamic-data-models-js]: /product/data-modeling/dynamic/javascript
+[ref-context-variables]: /reference/data-model/context-variables
+[ref-config-model-path]: /reference/configuration/config#schemapath
+[ref-config-repository-factory]:
+  /reference/configuration/config#repositoryfactory
+[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
+[wiki-yaml]: https://en.wikipedia.org/wiki/YAML
+[link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
+[link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg

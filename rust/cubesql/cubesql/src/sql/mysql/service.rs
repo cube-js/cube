@@ -1,4 +1,4 @@
-use std::{collections::HashMap, error::Error, io};
+use std::{collections::HashMap, io};
 
 use std::{sync::Arc, time::SystemTime};
 
@@ -202,8 +202,8 @@ impl MySqlConnection {
         } else if !ignore {
             trace!("query was not detected");
 
-            let meta = self.session.server.transport
-                .meta(self.auth_context()?)
+            let meta = self.session.server.compiler_cache
+                .meta(self.auth_context()?, self.session.state.protocol.clone())
                 .await?;
 
             let plan = convert_sql_to_cube_query(&query, meta, self.session.clone()).await?;
@@ -224,6 +224,7 @@ impl MySqlConnection {
 
                     return Ok(QueryResponse::ResultSet(status, Box::new(response)))
                 }
+                crate::compile::QueryPlan::CreateTempTable(_, _, _, _, _) => return Err(CubeError::internal("CREATE TABLE is not supported over MySQL".to_string())),
             }
         }
 
@@ -406,7 +407,7 @@ impl<W: io::Write + Send> AsyncMysqlShim<W> for MySqlConnection {
             .session
             .server
             .auth
-            .authenticate(user.clone())
+            .authenticate(user.clone(), None)
             .await
             .map_err(|e| {
                 if e.message != *"Incorrect user name or password" {
@@ -546,12 +547,6 @@ impl ProcessingLoop for MySqlServer {
                         format!("Error during processing MySQL connection: {}", e).as_str(),
                         None,
                     );
-
-                    if let Some(bt) = e.backtrace() {
-                        trace!("{}", bt.to_string());
-                    } else {
-                        trace!("Backtrace: not found");
-                    }
                 }
 
                 // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here

@@ -65,6 +65,8 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("column_escaping", column_escaping),
         t("information_schema", information_schema),
         t("system_query_cache", system_query_cache),
+        t("metastore_rocksdb_tables", metastore_rocksdb_tables),
+        t("cachestore_rocksdb_tables", cachestore_rocksdb_tables),
         t("case_column_escaping", case_column_escaping),
         t("inner_column_escaping", inner_column_escaping),
         t("convert_tz", convert_tz),
@@ -172,6 +174,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_extra_aggregate,
         ),
         t(
+            "rolling_window_extra_aggregate_addon",
+            rolling_window_extra_aggregate_addon,
+        ),
+        t(
             "rolling_window_extra_aggregate_timestamps",
             rolling_window_extra_aggregate_timestamps,
         ),
@@ -184,6 +190,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_one_quarter_interval,
         ),
         t("rolling_window_offsets", rolling_window_offsets),
+        t("rolling_window_filtered", rolling_window_filtered),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -266,6 +273,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         ),
         t("limit_pushdown_unique_key", limit_pushdown_unique_key),
         t("sys_drop_cache", sys_drop_cache),
+        t("sys_cachestore_info", sys_cachestore_info),
         t("sys_metastore_healthcheck", sys_metastore_healthcheck),
         t("sys_cachestore_healthcheck", sys_cachestore_healthcheck),
     ];
@@ -1395,9 +1403,18 @@ async fn system_query_cache(service: Box<dyn SqlClient>) {
         .exec_query("SELECT * FROM system.query_cache")
         .await
         .unwrap();
+}
 
+async fn metastore_rocksdb_tables(service: Box<dyn SqlClient>) {
     service
-        .exec_query("SELECT sql FROM system.query_cache;")
+        .exec_query("SELECT * FROM metastore.rocksdb_properties")
+        .await
+        .unwrap();
+}
+
+async fn cachestore_rocksdb_tables(service: Box<dyn SqlClient>) {
+    service
+        .exec_query("SELECT * FROM cachestore.rocksdb_properties")
         .await
         .unwrap();
 }
@@ -1567,7 +1584,14 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .exec_query(
             "INSERT INTO s.strings(t, pat) \
              VALUES ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'), ('ZZZ', 'zzz'), ('TTT', 'TTT'),\
-             ('some_underscore', '%some\\\\_underscore%')",
+             ('some_underscore', '%some\\\\_underscore%'),\
+             ('test [ special 1', '%test [%'),\
+             ('test ( special 2', '%test (%'),\
+             ('111 test {)?*|+aaa', '%test {)?*|+aaa'),\
+             ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%'),\
+             ('test2 -[]{}()*+?.,^$|# 2', '%-[]{}()*+?.,^$|#%')\
+             ",
+
         )
         .await
         .unwrap();
@@ -1603,6 +1627,28 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["some_underscore"]));
 
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '(', '%') ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&["test ( special 2", "test2 -[]{}()*+?.,^$|# 2"])
+    );
+
+    let r = service
+        .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '?*|+', '%') ORDER BY t")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["111 test {)?*|+aaa"]));
+
+    let r = service
+        .exec_query(
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '-[]{}()*+?.,^', '%') ORDER BY t",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["test2 -[]{}()*+?.,^$|# 2"]));
     // Compare constant string with a bunch of patterns.
     // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
     //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
@@ -1612,6 +1658,12 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["%ABA", "%a%b%a%", "%aba%", "aba%"]));
 
+    let r = service
+        .exec_query("SELECT pat FROM s.strings WHERE 'ggggtest (fjfj)' ILIKE pat ORDER BY pat")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["%test (%"]));
+
     // Compare array against array.
     let r = service
         .exec_query("SELECT t, pat FROM s.strings WHERE t ILIKE pat ORDER BY t")
@@ -1620,12 +1672,17 @@ async fn ilike(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&r),
         rows(&[
+            ("111 test {)?*|+aaa", "%test {)?*|+aaa"),
             ("ABa", "%aba%"),
             ("TTT", "TTT"),
             ("ZABA", "%a%b%a%"),
             ("ZZZ", "zzz"),
             ("aba", "%ABA"),
             ("some_underscore", "%some\\_underscore%"),
+            ("test ( special 2", "%test (%"),
+            ("test [ special 1", "%test [%"),
+            ("test2 -[]{}()*+?.,^$|# 2", "%-[]{}()*+?.,^$|#%"),
+            ("test2 }]\\222 ", "test2 }]\\\\%"),
         ])
     );
 
@@ -1969,7 +2026,7 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("6,New York,\"\",\"\\N\"\n".as_bytes())
+        file.write_all("6,New York,\\\\N,\"\\N\"\n".as_bytes())
             .await
             .unwrap();
 
@@ -2763,6 +2820,48 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
        \n        Merge\
        \n          Scan, index: default:1:[1], fields: [day, hits]\
        \n            Empty"
+    );
+
+    service
+        .exec_query("CREATE TABLE s.DataBool(url text, segment boolean, day int, hits int)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = true  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
+    );
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = false  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
     );
 }
 
@@ -4355,6 +4454,21 @@ async fn rolling_window_query(service: Box<dyn SqlClient>) {
         rows(&[(1, 17), (2, 17), (3, 23), (4, 23), (5, 5)])
     );
 
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 FOLLOWING) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             FROM 1 TO 5 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[(1, 17), (2, 23), (3, 23), (4, 5), (5, 5)])
+    );
+
     // Same, without preceding, i.e. with missing nodes.
     let r = service
         .exec_query(
@@ -4724,6 +4838,28 @@ async fn rolling_window_query_timestamps(service: Box<dyn SqlClient>) {
             (jan[5], 5)
         ])
     );
+    let r = service
+        .exec_query(
+            "select day, rolling(sum(n) range interval '1 day' following offset start) \
+             from (select day, sum(n) as n from s.data group by 1) \
+             rolling_window dimension day \
+               from to_timestamp('2021-01-01t00:00:00z') \
+               to to_timestamp('2021-01-05t00:00:00z') \
+               every interval '1 day' \
+             order by 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (jan[1], 17),
+            (jan[2], 23),
+            (jan[3], 23),
+            (jan[4], 5),
+            (jan[5], 5)
+        ])
+    );
 }
 
 async fn rolling_window_query_timestamps_exceeded(service: Box<dyn SqlClient>) {
@@ -4899,6 +5035,49 @@ async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap_err();
+}
+
+async fn rolling_window_extra_aggregate_addon(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (11, 'john', 10), \
+                                                     (11, 'sara', 7), \
+                                                     (13, 'sara', 3), \
+                                                     (13, 'john', 9), \
+                                                     (13, 'john', 11), \
+                                                     (15, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 9 TO 15 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (9, None, None),
+            (10, None, None),
+            (11, Some(17), Some(17)),
+            (12, Some(17), None),
+            (13, Some(23), Some(23)),
+            (14, Some(23), None),
+            (15, Some(5), Some(5))
+        ])
+    );
 }
 
 async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
@@ -5084,6 +5263,89 @@ async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
             (6, None),
             (8, Some(9)),
             (10, None)
+        ])
+    );
+}
+
+async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.data(category text, day timestamp, count int, claimed_count int)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data(category, day, count, claimed_count)\
+                        VALUES \
+                         ('eth', '2023-12-12T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-08T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-06T00:00:00.000Z', 2, 2), \
+                         ('starkex', '2023-12-05T00:00:00.000Z', 0, 0), \
+                         ('starkex', '2023-12-07T00:00:00.000Z', 1, 1)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "
+                SELECT \
+                `day`, \
+                ROLLING( \
+                    sum( \
+                    `claimed_count` \
+                    ) RANGE UNBOUNDED PRECEDING OFFSET end \
+                ) `claimed_count`, \
+                sum( \
+                `count` \
+                ) `count` \
+                FROM \
+                ( \
+                    SELECT \
+                    `day` `day`, \
+                    sum( \
+                        `count` \
+                    ) `count`, \
+                    sum( \
+                        `claimed_count` \
+                    ) `claimed_count`
+                    FROM \
+                    ( \
+                        SELECT \
+                        * \
+                        FROM \
+                        s.data \
+                         \
+                    ) AS `starknet_test_provisions__eth_cumulative` \
+                    WHERE `starknet_test_provisions__eth_cumulative`.category = 'github'
+                    GROUP BY \
+                    1 \
+                ) `base` ROLLING_WINDOW DIMENSION `day` \
+                GROUP BY \
+                DIMENSION `day` \
+                FROM \
+                date_trunc('day', to_timestamp('2023-12-04T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-10T13:41:12.000')) EVERY INTERVAL '1 day'
+                ORDER BY 1
+            ",
+        )
+        .await
+        .unwrap();
+    let days = (4..=10)
+        .map(|d| timestamp_from_string(&format!("2023-12-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (days[0], None, None),
+            (days[1], None, None),
+            (days[2], Some(2), Some(2)),
+            (days[3], Some(2), None),
+            (days[4], Some(3), Some(1)),
+            (days[5], Some(3), None),
+            (days[6], Some(3), None),
         ])
     );
 }
@@ -8175,7 +8437,7 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) {
 
 async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8189,7 +8451,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:queue_key_2" "payload2";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8203,7 +8465,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:queue_key_3" "payload3";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8217,7 +8479,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:queue_key_4" "payload4";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8231,7 +8493,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:queue_key_5" "payload5";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8247,7 +8509,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     // deduplication check
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
             .await
             .unwrap();
         assert_queue_add_columns(&add_response);
@@ -8270,34 +8532,40 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
             pending_response.get_columns(),
             &vec![
                 Column::new("id".to_string(), ColumnType::String, 0),
-                Column::new("status".to_string(), ColumnType::String, 1),
-                Column::new("extra".to_string(), ColumnType::String, 2),
+                Column::new("queue_id".to_string(), ColumnType::String, 1),
+                Column::new("status".to_string(), ColumnType::String, 2),
+                Column::new("extra".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(
             pending_response.get_rows(),
             &vec![
                 Row::new(vec![
+                    TableValue::String("queue_key_3".to_string()),
                     TableValue::String("3".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_4".to_string()),
                     TableValue::String("4".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_2".to_string()),
                     TableValue::String("2".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_1".to_string()),
                     TableValue::String("1".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_5".to_string()),
                     TableValue::String("5".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
@@ -8316,7 +8584,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
 
     {
         let retrieve_response = service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:queue_key_3""#)
             .await
             .unwrap();
         assert_queue_retrieve_columns(&retrieve_response);
@@ -8326,7 +8594,8 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
                 TableValue::Int(4),
-                TableValue::String("3".to_string()),
+                // list of active keys
+                TableValue::String("queue_key_3".to_string()),
                 TableValue::String("3".to_string()),
             ]),]
         );
@@ -8335,7 +8604,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     {
         // concurrency limit
         let retrieve_response = service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:queue_key_4""#)
             .await
             .unwrap();
         assert_queue_retrieve_columns(&retrieve_response);
@@ -8350,6 +8619,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
         assert_eq!(
             active_response.get_rows(),
             &vec![Row::new(vec![
+                TableValue::String("queue_key_3".to_string()),
                 TableValue::String("3".to_string()),
                 TableValue::String("active".to_string()),
                 TableValue::Null
@@ -8363,7 +8633,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
         let service_to_move = service.clone();
         let blocking = async move {
             service_to_move
-                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:3""#)
+                .exec_query(r#"QUEUE RESULT_BLOCKING 5000 "STANDALONE#queue:queue_key_3""#)
                 .await
                 .unwrap()
         };
@@ -8373,7 +8643,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
             tokio::time::sleep(Duration::from_millis(1000)).await;
 
             let ack_result = service_to_move
-                .exec_query(r#"QUEUE ACK "STANDALONE#queue:3" "result:3""#)
+                .exec_query(r#"QUEUE ACK "STANDALONE#queue:queue_key_3" "result:3""#)
                 .await
                 .unwrap();
             assert_eq!(
@@ -8404,7 +8674,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     // get
     {
         let get_response = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:queue_key_2""#)
             .await
             .unwrap();
         assert_eq!(
@@ -8419,7 +8689,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
     // cancel job
     {
         let cancel_response = service
-            .exec_query(r#"QUEUE CANCEL "STANDALONE#queue:2""#)
+            .exec_query(r#"QUEUE CANCEL "STANDALONE#queue:queue_key_2""#)
             .await
             .unwrap();
         assert_eq!(
@@ -8432,7 +8702,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
 
         // assertion that job was removed
         let get_response = service
-            .exec_query(r#"QUEUE GET "STANDALONE#queue:2""#)
+            .exec_query(r#"QUEUE GET "STANDALONE#queue:queue_key_2""#)
             .await
             .unwrap();
         assert_eq!(get_response.get_rows().len(), 0);
@@ -8441,7 +8711,7 @@ async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {
 
 async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8455,7 +8725,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:2" "payload2";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 10 "STANDALONE#queue:queue_key_2" "payload2";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8469,7 +8739,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:3" "payload3";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 100 "STANDALONE#queue:queue_key_3" "payload3";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8483,7 +8753,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:4" "payload4";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 50 "STANDALONE#queue:queue_key_4" "payload4";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8497,7 +8767,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     );
 
     let add_response = service
-        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:5" "payload5";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY -1 "STANDALONE#queue:queue_key_5" "payload5";"#)
         .await
         .unwrap();
     assert_queue_add_columns(&add_response);
@@ -8513,7 +8783,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     // deduplication check
     {
         let add_response = service
-            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+            .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
             .await
             .unwrap();
         assert_queue_add_columns(&add_response);
@@ -8536,34 +8806,40 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
             pending_response.get_columns(),
             &vec![
                 Column::new("id".to_string(), ColumnType::String, 0),
-                Column::new("status".to_string(), ColumnType::String, 1),
-                Column::new("extra".to_string(), ColumnType::String, 2),
+                Column::new("queue_id".to_string(), ColumnType::String, 1),
+                Column::new("status".to_string(), ColumnType::String, 2),
+                Column::new("extra".to_string(), ColumnType::String, 3),
             ]
         );
         assert_eq!(
             pending_response.get_rows(),
             &vec![
                 Row::new(vec![
+                    TableValue::String("queue_key_3".to_string()),
                     TableValue::String("3".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_4".to_string()),
                     TableValue::String("4".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_2".to_string()),
                     TableValue::String("2".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_1".to_string()),
                     TableValue::String("1".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
                 ]),
                 Row::new(vec![
+                    TableValue::String("queue_key_5".to_string()),
                     TableValue::String("5".to_string()),
                     TableValue::String("pending".to_string()),
                     TableValue::Null
@@ -8582,7 +8858,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
 
     {
         let retrieve_response = service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:3""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:queue_key_3""#)
             .await
             .unwrap();
         assert_queue_retrieve_columns(&retrieve_response);
@@ -8592,7 +8868,8 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
                 TableValue::String("payload3".to_string()),
                 TableValue::Null,
                 TableValue::Int(4),
-                TableValue::String("3".to_string()),
+                // array of active keys
+                TableValue::String("queue_key_3".to_string()),
                 TableValue::String("3".to_string()),
             ]),]
         );
@@ -8601,7 +8878,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
     {
         // concurrency limit
         let retrieve_response = service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:4""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:queue_key_4""#)
             .await
             .unwrap();
         assert_queue_retrieve_columns(&retrieve_response);
@@ -8616,6 +8893,7 @@ async fn queue_full_workflow_v2(service: Box<dyn SqlClient>) {
         assert_eq!(
             active_response.get_rows(),
             &vec![Row::new(vec![
+                TableValue::String("queue_key_3".to_string()),
                 TableValue::String("3".to_string()),
                 TableValue::String("active".to_string()),
                 TableValue::Null
@@ -8957,12 +9235,12 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
         .unwrap();
 
     service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
         .await
         .unwrap();
 
     service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:2" "payload2";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_2" "payload2";"#)
         .await
         .unwrap();
 
@@ -8976,12 +9254,12 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
     // RETRIEVE updates heartbeat
     {
         service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:1""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:queue_key_1""#)
             .await
             .unwrap();
 
         service
-            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:2""#)
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 2 "STANDALONE#queue:queue_key_2""#)
             .await
             .unwrap();
     }
@@ -8989,7 +9267,7 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
     tokio::time::sleep(Duration::from_millis(1000)).await;
 
     service
-        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:2";"#)
+        .exec_query(r#"QUEUE HEARTBEAT "STANDALONE#queue:queue_key_2";"#)
         .await
         .unwrap();
 
@@ -8999,11 +9277,17 @@ async fn queue_orphaned_timeout(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         res.get_columns(),
-        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("queue_id".to_string(), ColumnType::String, 1),
+        ]
     );
     assert_eq!(
         res.get_rows(),
-        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        &vec![Row::new(vec![
+            TableValue::String("queue_key_1".to_string()),
+            TableValue::String("1".to_string()),
+        ]),]
     );
 
     // awaiting for expiring heart beat for queue:2
@@ -9251,12 +9535,14 @@ async fn queue_multiple_result_blocking(service: Box<dyn SqlClient>) {
 
 async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
     service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:1" "payload1";"#)
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
         .await
         .unwrap();
 
     service
-        .exec_query(r#"QUEUE ADD PRIORITY 1 ORPHANED 60 "STANDALONE#queue:2" "payload1";"#)
+        .exec_query(
+            r#"QUEUE ADD PRIORITY 1 ORPHANED 60 "STANDALONE#queue:queue_key_2" "payload1";"#,
+        )
         .await
         .unwrap();
 
@@ -9268,13 +9554,23 @@ async fn queue_custom_orphaned(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(
         res.get_columns(),
-        &vec![Column::new("id".to_string(), ColumnType::String, 0),]
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("queue_id".to_string(), ColumnType::String, 1),
+        ]
     );
 
     assert_eq!(
         res.get_rows(),
-        &vec![Row::new(vec![TableValue::String("1".to_string()),]),]
+        &vec![Row::new(vec![
+            TableValue::String("queue_key_1".to_string()),
+            TableValue::String("1".to_string()),
+        ]),]
     );
+}
+
+async fn sys_cachestore_info(service: Box<dyn SqlClient>) {
+    service.exec_query("SYS CACHESTORE INFO").await.unwrap();
 }
 
 async fn sys_drop_cache(service: Box<dyn SqlClient>) {

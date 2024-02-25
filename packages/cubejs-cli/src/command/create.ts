@@ -91,7 +91,7 @@ const create = async (projectName, options) => {
     logStage('Installing JDBC dependencies');
 
     // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
-    const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
+    const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver'));
 
     const { jdbcDriver } = await inquirer.prompt([{
       type: 'list',

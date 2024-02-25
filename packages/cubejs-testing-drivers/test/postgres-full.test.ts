@@ -1,3 +1,3 @@
 import { testQueries } from '../src/tests/testQueries';
 
-testQueries('postgres');
+testQueries('postgres', { includeIncrementalSchemaSuite: true });

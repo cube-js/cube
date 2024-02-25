@@ -17,10 +17,10 @@ export class QueryStream extends Readable {
   /**
    * @constructor
    */
-  public constructor(nextFn: nextFn) {
+  public constructor(nextFn: nextFn, highWaterMark: number) {
     super({
       objectMode: true,
-      highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
+      highWaterMark,
     });
     this.next = nextFn;
   }

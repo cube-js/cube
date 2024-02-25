@@ -4,18 +4,32 @@ use cubeclient::{
     models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
 };
 
-use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
+use datafusion::{
+    arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
+    logical_plan::window_frames::WindowFrame,
+    physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
+};
+use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
-use std::{fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
 };
+use uuid::Uuid;
 
 use crate::{
-    compile::{engine::df::scan::MemberField, MetaContext},
+    compile::{
+        engine::df::{scan::MemberField, wrapper::SqlQuery},
+        MetaContext,
+    },
     sql::{AuthContextRef, HttpAuthContext},
-    CubeError,
+    CubeError, RWLockAsync,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -50,27 +64,114 @@ impl LoadRequestMeta {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct SqlResponse {
+    pub sql: SqlQuery,
+}
+
+#[derive(Debug)]
+pub struct SpanId {
+    pub span_id: String,
+    pub query_key: serde_json::Value,
+    span_start: SystemTime,
+    is_data_query: RWLockAsync<bool>,
+}
+
+impl SpanId {
+    pub fn new(span_id: String, query_key: serde_json::Value) -> Self {
+        Self {
+            span_id,
+            query_key,
+            span_start: SystemTime::now(),
+            is_data_query: tokio::sync::RwLock::new(false),
+        }
+    }
+
+    pub async fn set_is_data_query(&self, is_data_query: bool) {
+        let mut write = self.is_data_query.write().await;
+        *write = is_data_query;
+    }
+
+    pub async fn is_data_query(&self) -> bool {
+        let read = self.is_data_query.read().await;
+        *read
+    }
+
+    pub fn duration(&self) -> u64 {
+        self.span_start
+            .elapsed()
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_millis() as u64
+    }
+}
+
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
 
+    async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
+        let meta = self.meta(ctx).await?;
+        Ok(meta.compiler_id)
+    }
+
+    // Get sql for query to be used in wrapped SQL query
+    async fn sql(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        query: V1LoadRequestQuery,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        member_to_alias: Option<HashMap<String, String>>,
+        expression_params: Option<Vec<Option<String>>>,
+    ) -> Result<SqlResponse, CubeError>;
+
     // Execute load query
     async fn load(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError>;
 
     async fn load_stream(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
         schema: SchemaRef,
         member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError>;
+
+    async fn can_switch_user_for_session(
+        &self,
+        ctx: AuthContextRef,
+        to_user: String,
+    ) -> Result<bool, CubeError>;
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError>;
+}
+
+#[async_trait]
+pub trait SqlGenerator: Send + Sync + Debug {
+    fn get_sql_templates(&self) -> Arc<SqlTemplates>;
+
+    async fn call_template(
+        &self,
+        name: String,
+        params: HashMap<String, String>,
+    ) -> Result<String, CubeError>;
 }
 
 pub type CubeStreamReceiver = Receiver<Option<Result<RecordBatch, CubeError>>>;
@@ -136,7 +237,13 @@ impl TransportService for HttpTransport {
             }
         };
 
-        let value = Arc::new(MetaContext::new(response.cubes.unwrap_or_else(Vec::new)));
+        // Not used -- doesn't make sense to implement
+        let value = Arc::new(MetaContext::new(
+            response.cubes.unwrap_or_else(Vec::new),
+            HashMap::new(),
+            HashMap::new(),
+            Uuid::new_v4(),
+        ));
 
         *store = Some(MetaCacheBucket {
             lifetime: Instant::now(),
@@ -146,9 +253,23 @@ impl TransportService for HttpTransport {
         Ok(value)
     }
 
+    async fn sql(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        _query: V1LoadRequestQuery,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _member_to_alias: Option<HashMap<String, String>>,
+        _expression_params: Option<Vec<Option<String>>>,
+    ) -> Result<SqlResponse, CubeError> {
+        todo!()
+    }
+
     async fn load(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
@@ -172,12 +293,373 @@ impl TransportService for HttpTransport {
 
     async fn load_stream(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         _query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
         _schema: SchemaRef,
         _member_fields: Vec<MemberField>,
     ) -> Result<CubeStreamReceiver, CubeError> {
         panic!("Does not work for standalone mode yet");
+    }
+
+    async fn can_switch_user_for_session(
+        &self,
+        _ctx: AuthContextRef,
+        _to_user: String,
+    ) -> Result<bool, CubeError> {
+        panic!("Does not work for standalone mode yet");
+    }
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError> {
+        println!(
+            "Load state: {:?} {:?} {:?} {} {:?}",
+            span_id, ctx, meta_fields, event, properties
+        );
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub struct SqlTemplates {
+    pub templates: HashMap<String, String>,
+    jinja: Environment<'static>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AliasedColumn {
+    pub expr: String,
+    pub alias: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateColumn {
+    pub expr: String,
+    pub alias: String,
+    pub aliased: String,
+    pub index: usize,
+}
+
+impl SqlTemplates {
+    pub fn new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
+        let mut jinja = Environment::new();
+        for (name, template) in templates.iter() {
+            jinja
+                .add_template_owned(name.to_string(), template.to_string())
+                .map_err(|e| {
+                    CubeError::internal(format!(
+                        "Error parsing template {} '{}': {}",
+                        name, template, e
+                    ))
+                })?;
+        }
+
+        Ok(Self { templates, jinja })
+    }
+
+    pub fn aggregate_function_name(
+        &self,
+        aggregate_function: AggregateFunction,
+        distinct: bool,
+    ) -> String {
+        if aggregate_function == AggregateFunction::Count && distinct {
+            return "COUNT_DISTINCT".to_string();
+        }
+        aggregate_function.to_string()
+    }
+
+    pub fn select(
+        &self,
+        from: String,
+        projection: Vec<AliasedColumn>,
+        group_by: Vec<AliasedColumn>,
+        aggregate: Vec<AliasedColumn>,
+        alias: String,
+        filter: Option<String>,
+        _having: Option<String>,
+        order_by: Vec<AliasedColumn>,
+        limit: Option<usize>,
+        offset: Option<usize>,
+    ) -> Result<String, CubeError> {
+        let group_by = self.to_template_columns(group_by)?;
+        let aggregate = self.to_template_columns(aggregate)?;
+        let projection = self.to_template_columns(projection)?;
+        let order_by = self.to_template_columns(order_by)?;
+        let select_concat = group_by
+            .iter()
+            .chain(aggregate.iter())
+            .chain(projection.iter())
+            .map(|c| c.clone())
+            .collect::<Vec<_>>();
+        let quoted_from_alias = self.quote_identifier(&alias)?;
+        self.render_template(
+            "statements/select",
+            context! {
+                from => from,
+                select_concat => select_concat,
+                group_by => group_by,
+                aggregate => aggregate,
+                projection => projection,
+                order_by => order_by,
+                filter => filter,
+                from_alias => quoted_from_alias,
+                limit => limit,
+                offset => offset,
+            },
+        )
+    }
+
+    fn to_template_columns(
+        &self,
+        aliased_columns: Vec<AliasedColumn>,
+    ) -> Result<Vec<TemplateColumn>, CubeError> {
+        aliased_columns
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| -> Result<_, CubeError> {
+                Ok(TemplateColumn {
+                    expr: c.expr.to_string(),
+                    alias: c.alias.to_string(),
+                    aliased: self.alias_expr(&c.expr, &c.alias)?,
+                    index: i + 1,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
+
+    pub fn alias_expr(&self, expr: &str, alias: &str) -> Result<String, CubeError> {
+        let quoted_alias = self.quote_identifier(alias)?;
+        self.render_template(
+            "expressions/column_aliased",
+            context! { alias => alias, expr => expr, quoted_alias => quoted_alias },
+        )
+    }
+
+    pub fn quote_identifier(&self, column_name: &str) -> Result<String, CubeError> {
+        let quote = self
+            .templates
+            .get("quotes/identifiers")
+            .ok_or_else(|| CubeError::user("quotes/identifiers template not found".to_string()))?;
+        let escape = self
+            .templates
+            .get("quotes/escape")
+            .ok_or_else(|| CubeError::user("quotes/escape template not found".to_string()))?;
+        Ok(format!(
+            "{}{}{}",
+            quote,
+            column_name.replace(quote, escape),
+            quote
+        ))
+    }
+
+    fn render_template(&self, name: &str, ctx: Value) -> Result<String, CubeError> {
+        Ok(self
+            .jinja
+            .get_template(name)
+            .map_err(|e| CubeError::internal(format!("Error getting {} template: {}", name, e)))?
+            .render(ctx)
+            .map_err(|e| {
+                CubeError::internal(format!("Error rendering {} template: {}", name, e))
+            })?)
+    }
+
+    pub fn aggregate_function(
+        &self,
+        aggregate_function: AggregateFunction,
+        args: Vec<String>,
+        distinct: bool,
+    ) -> Result<String, CubeError> {
+        let function = self.aggregate_function_name(aggregate_function, distinct);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args, distinct => distinct },
+        )
+    }
+
+    pub fn scalar_function(
+        &self,
+        scalar_function: String,
+        args: Vec<String>,
+        date_part: Option<String>,
+        interval: Option<String>,
+    ) -> Result<String, CubeError> {
+        let function = scalar_function.to_string().to_uppercase();
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
+        )
+    }
+
+    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+        match window_function {
+            WindowFunction::AggregateFunction(aggregate_function) => {
+                self.aggregate_function_name(aggregate_function, false)
+            }
+            WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
+                built_in_window_function.to_string()
+            }
+        }
+    }
+
+    pub fn window_function(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let function = self.window_function_name(window_function);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args },
+        )
+    }
+
+    pub fn window_function_expr(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+        partition_by: Vec<String>,
+        order_by: Vec<String>,
+        _window_frame: Option<WindowFrame>,
+    ) -> Result<String, CubeError> {
+        let fun_call = self.window_function(window_function, args)?;
+        let partition_by_concat = partition_by.join(", ");
+        let order_by_concat = order_by.join(", ");
+        // TODO window_frame
+        self.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by => partition_by,
+                partition_by_concat => partition_by_concat,
+                order_by => order_by,
+                order_by_concat => order_by_concat
+            },
+        )
+    }
+
+    pub fn case(
+        &self,
+        expr: Option<String>,
+        when_then: Vec<(String, String)>,
+        else_expr: Option<String>,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/case",
+            context! { expr => expr, when_then => when_then, else_expr => else_expr },
+        )
+    }
+
+    pub fn binary_expr(
+        &self,
+        left: String,
+        op: String,
+        right: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/binary",
+            context! { left => left, op => op, right => right },
+        )
+    }
+
+    pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/is_null",
+            context! { expr => expr, negate => negate },
+        )
+    }
+
+    pub fn negative_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/negative", context! { expr => expr })
+    }
+
+    pub fn not_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/not", context! { expr => expr })
+    }
+
+    pub fn sort_expr(
+        &self,
+        expr: String,
+        asc: bool,
+        nulls_first: bool,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/sort",
+            context! { expr => expr, asc => asc, nulls_first => nulls_first },
+        )
+    }
+
+    pub fn extract_expr(&self, date_part: String, expr: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/extract",
+            context! { date_part => date_part, expr => expr },
+        )
+    }
+
+    pub fn interval_expr(
+        &self,
+        interval: String,
+        num: i64,
+        date_part: String,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/interval",
+            context! { interval => interval, num => num, date_part => date_part },
+        )
+    }
+
+    pub fn cast_expr(&self, expr: String, data_type: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/cast",
+            context! { expr => expr, data_type => data_type },
+        )
+    }
+
+    pub fn in_list_expr(
+        &self,
+        expr: String,
+        in_exprs: Vec<String>,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        let in_exprs_concat = in_exprs.join(", ");
+        self.render_template(
+            "expressions/in_list",
+            context! {
+                expr => expr,
+                in_exprs_concat => in_exprs_concat,
+                in_exprs => in_exprs,
+                negated => negated
+            },
+        )
+    }
+
+    pub fn literal_bool_expr(&self, value: bool) -> Result<String, CubeError> {
+        match value {
+            true => self.render_template("expressions/true", context! {}),
+            false => self.render_template("expressions/false", context! {}),
+        }
+    }
+
+    pub fn timestamp_literal_expr(&self, value: String) -> Result<String, CubeError> {
+        self.render_template("expressions/timestamp_literal", context! { value => value })
+    }
+
+    pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
+        self.render_template("params/param", context! { param_index => param_index })
     }
 }

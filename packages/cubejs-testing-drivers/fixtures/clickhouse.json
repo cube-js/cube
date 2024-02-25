@@ -15,14 +15,21 @@
     "ports" : ["4000"]
   },
   "data": {
-    "image": "clickhouse/clickhouse-server",
+    "image": "clickhouse/clickhouse-server:23.10",
     "environment": {
       "CLICKHOUSE_DB": "test",
       "CLICKHOUSE_USER": "test",
       "CLICKHOUSE_PASSWORD": "test",
       "CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT": 1
     },
-    "ports" : ["8123"]
+    "ports" : ["8123"],
+    "healthcheck": {
+      "test": "wget --spider -q --spider http://localhost:8123/ping || exit 1",
+      "start_period": "5s",
+      "interval": "10s",
+      "retries": 3,
+      "timeout": "5s"
+    }
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -46,14 +53,13 @@
       {
         "name": "RA",
         "measures": ["CUBE.count", "CUBE.runningTotal"],
-        "indexes": {
-          "category_index": {
-            "columns": [
-              "CUBE.count",
-              "CUBE.runningTotal"
-            ]
-          }
-        }
+        "indexes": [{
+          "name": "category_index",
+          "columns": [
+            "CUBE.count",
+            "CUBE.runningTotal"
+          ]
+        }]
       }
     ],
     "ECommerce": [
@@ -66,11 +72,10 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ],
-        "indexes": {
-          "category_index": {
-            "columns": ["CUBE.productName"]
-          }
-        }
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       },
       {
         "name": "TA",
@@ -84,11 +89,10 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ],
-        "indexes": {
-          "category_index": {
-            "columns": ["CUBE.productName"]
-          }
-        }
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ],
     "BigECommerce": [
@@ -104,11 +108,10 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ],
-        "indexes": {
-          "category_index": {
-            "columns": ["CUBE.productName"]
-          }
-        }
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ]
   },
@@ -121,6 +124,13 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying ECommerce: partitioned pre-agg",
     "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg"
+    "querying BigECommerce: partitioned pre-agg",
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: null boolean",
+    "Unsupported JOIN ON conditions. Unexpected 'big_e_commerce__order_date_month > subtractWeeks(date_to, 2)'",
+    "--------------------",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window by 2 month"
   ]
 }

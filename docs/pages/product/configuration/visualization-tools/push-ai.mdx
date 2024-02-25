@@ -1,0 +1,49 @@
+# Push.ai
+
+[Push.ai](https://push.ai) is a business observability tool that helps teams
+share metrics and other data insights in messaging tools, like Slack.
+
+<Screenshot src="https://ucarecdn.com/b7f2f073-fd77-4de3-a40f-ee7e3690b535/"/>
+
+<InfoBox>
+
+Watch how Cube and Push.ai work together in this webinar recording:
+[Unlock Proactive Intelligence Using Cube + Push.ai](https://cube.dev/events/unlock-proactive-intelligence-using-cube-push-ai).
+
+</InfoBox>
+
+## REST API
+
+You can use the [REST API][ref-rest-api] to connect Cube to Push.ai.
+
+### Cube Cloud
+
+When you have set up your Cube project in Cube Cloud, you need **REST API
+endpoint** and **API Secret** for your setup in order to connect Push.ai to
+Cube. Log in to your Cube console and follow the steps below.
+
+**REST API endpoint** can be found on the&nbsp;<Btn>Overview</Btn> page:
+
+<Screenshot src="https://ucarecdn.com/fddce1b2-fbdd-4711-82d9-3967af0e2641/"/>
+
+**API Secret** can be found on the&nbsp;<Btn>Settings → Configuration</Btn>
+page under&nbsp;<Btn>Environment variables</Btn> where it’s named
+`CUBEJS_API_SECRET`:
+
+<Screenshot src="https://ucarecdn.com/d978e95b-9e9c-443e-8b85-3106352a74cb/"/>
+
+### Connection in Push.ai
+
+Copy **REST API endpoint** and **API Secret** you got from Cube Cloud and
+paste them into Push.ai form for creating the Cube data source:
+
+<Screenshot src="https://ucarecdn.com/06a814c2-25df-42d4-8b24-406292b50ac3/"/>
+
+## Defining metrics
+
+After connecting to Cube, measures and dimensions need to be converted into
+metrics. See [Push.ai documention](https://docs.push.ai/semantic-layer-integrations/cube#usage-notes)
+for guidance.
+
+
+[ref-rest-api]: /product/apis-integrations/rest-api

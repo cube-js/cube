@@ -258,8 +258,12 @@ impl From<std::time::SystemTimeError> for CubeError {
 }
 
 impl From<Elapsed> for CubeError {
-    fn from(v: Elapsed) -> Self {
-        CubeError::from_error(v)
+    fn from(_: Elapsed) -> Self {
+        CubeError {
+            message: "Query execution timed out. Please consider evaluating EXPLAIN plan and optimizing the query.".to_string(),
+            backtrace: Backtrace::capture().to_string(),
+            cause: CubeErrorCauseType::Internal,
+        }
     }
 }
 

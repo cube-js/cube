@@ -27,7 +27,7 @@ interface JWTOptions {
   // JWK options
   jwkRetry?: number,
   jwkDefaultExpire?: number,
-  jwkUrl?: ((payload: any) => string) | string,
+  jwkUrl?: ((payload: any) => string | Promise<string>) | string,
   jwkRefetchWindow?: number,
 
   // JWT options
@@ -55,7 +55,8 @@ type CheckAuthFn =
 type CheckSQLAuthSuccessResponse = {
   password: string | null,
   superuser?: boolean,
-  securityContext?: any
+  securityContext?: any,
+  skipPasswordCheck?: boolean,
 };
 
 /**
@@ -64,7 +65,7 @@ type CheckSQLAuthSuccessResponse = {
  * auth logic.
  */
 type CheckSQLAuthFn =
-  (ctx: any, user: string | null) =>
+  (ctx: any, user: string | null, password: string | null) =>
     Promise<CheckSQLAuthSuccessResponse> |
     CheckSQLAuthSuccessResponse;
 

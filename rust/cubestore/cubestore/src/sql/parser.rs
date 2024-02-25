@@ -91,6 +91,19 @@ pub enum CacheCommand {
     },
 }
 
+impl CacheCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            CacheCommand::Set { .. } => "set",
+            CacheCommand::Get { .. } => "get",
+            CacheCommand::Keys { .. } => "keys",
+            CacheCommand::Remove { .. } => "remove",
+            CacheCommand::Truncate { .. } => "truncate",
+            CacheCommand::Incr { .. } => "incr",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
@@ -142,6 +155,29 @@ pub enum QueueCommand {
     Truncate {},
 }
 
+impl QueueCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            QueueCommand::Add { .. } => "add",
+            QueueCommand::Get { .. } => "get",
+            QueueCommand::ToCancel { .. } => "to_cancel",
+            QueueCommand::List { status_filter, .. } => match status_filter {
+                Some(QueueItemStatus::Active) => "active",
+                Some(QueueItemStatus::Pending) => "pending",
+                _ => "list",
+            },
+            QueueCommand::Cancel { .. } => "cancel",
+            QueueCommand::Heartbeat { .. } => "heartbeat",
+            QueueCommand::Ack { .. } => "ack",
+            QueueCommand::MergeExtra { .. } => "merge_extra",
+            QueueCommand::Retrieve { .. } => "retrieve",
+            QueueCommand::Result { .. } => "result",
+            QueueCommand::ResultBlocking { .. } => "result_blocking",
+            QueueCommand::Truncate { .. } => "truncate",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum SystemCommand {
     KillAllJobs,
@@ -169,6 +205,9 @@ pub enum MetaStoreCommand {
 pub enum CacheStoreCommand {
     Compaction,
     Healthcheck,
+    Eviction,
+    Info,
+    Persist,
 }
 
 pub struct CubeStoreParser<'a> {
@@ -385,6 +424,12 @@ impl<'a> CubeStoreParser<'a> {
     pub fn parse_cachestore(&mut self) -> Result<Statement, ParserError> {
         let command = if self.parse_custom_token("compaction") {
             CacheStoreCommand::Compaction
+        } else if self.parse_custom_token("persist") {
+            CacheStoreCommand::Persist
+        } else if self.parse_custom_token("eviction") {
+            CacheStoreCommand::Eviction
+        } else if self.parse_custom_token("info") {
+            CacheStoreCommand::Info
         } else if self.parse_custom_token("healthcheck") {
             CacheStoreCommand::Healthcheck
         } else {

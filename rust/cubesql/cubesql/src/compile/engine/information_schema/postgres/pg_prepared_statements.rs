@@ -44,7 +44,7 @@ impl PgPreparedStatementsBuilder {
     fn add_prepared_statement(&mut self, name: &str, statement: &PreparedStatement) {
         self.name.append_value(name).unwrap();
         self.prepare_time
-            .append_value(statement.get_created().timestamp_nanos())
+            .append_value(statement.get_created().timestamp_nanos_opt().unwrap())
             .unwrap();
 
         if let Some(parameters) = statement.get_parameters() {

@@ -28,7 +28,10 @@ use std::{convert::TryFrom, io, io::Error};
 
 // POSTGRES_EPOCH_JDATE
 fn pg_base_date_epoch() -> NaiveDateTime {
-    NaiveDate::from_ymd(2000, 1, 1).and_hms(0, 0, 0)
+    NaiveDate::from_ymd_opt(2000, 1, 1)
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
 }
 
 impl ToProtocolValue for TimestampValue {

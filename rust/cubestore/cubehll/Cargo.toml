@@ -9,6 +9,7 @@ description = "HyperLogLog implementation ported from AirLift"
 [dev-dependencies]
 twox-hash = "1.6.0"
 hex = "0.4.2"
+base64 = "0.13.0"
 
 [dependencies]
 byteorder = "1.4.2"

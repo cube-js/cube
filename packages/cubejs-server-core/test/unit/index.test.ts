@@ -134,12 +134,12 @@ describe('index.test', () => {
       .toBeInstanceOf(CubejsServerCore);
   });
 
-  const getCreateOrchestratorOptionsFromServer = (options: CreateOptions) => {
+  const getCreateOrchestratorOptionsFromServer = async (options: CreateOptions) => {
     const cubejsServerCore = new CubejsServerCoreOpen(<any>options);
     expect(cubejsServerCore).toBeInstanceOf(CubejsServerCore);
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -153,7 +153,7 @@ describe('index.test', () => {
     const options: CreateOptions = { dbType: () => <any>null };
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const [driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('mongo');
@@ -167,7 +167,7 @@ describe('index.test', () => {
   test('driverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', driverFactory: () => <any>null, };
 
-    const [driverFactory, _orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [driverFactory, _orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await driverFactory('default');
@@ -181,7 +181,7 @@ describe('index.test', () => {
   test('externalDriverFactory should return driver, failure', async () => {
     const options: CreateOptions = { dbType: () => <any>'mongo', externalDriverFactory: () => <any>null, };
 
-    const [_driverFactory, orchestratorOptions] = getCreateOrchestratorOptionsFromServer(options);
+    const [_driverFactory, orchestratorOptions] = await getCreateOrchestratorOptionsFromServer(options);
 
     try {
       await orchestratorOptions.externalDriverFactory();
@@ -284,6 +284,16 @@ describe('index.test', () => {
         subject: 'http://localhost:4000',
         claimsNamespace: 'http://localhost:4000',
       },
+      http: {
+        cors: {
+          origin: '*',
+          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+          preflightContinue: false,
+          optionsSuccessStatus: 204,
+          maxAge: 86400,
+          credentials: true,
+        }
+      },
       dashboardAppPath: 'string',
       dashboardAppPort: 4444,
       livePreview: true,
@@ -295,7 +305,7 @@ describe('index.test', () => {
 
     const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-    cubejsServerCore.getOrchestratorApi({
+    await cubejsServerCore.getOrchestratorApi({
       requestId: 'XXX',
       authInfo: null,
       securityContext: null,
@@ -320,7 +330,7 @@ describe('index.test', () => {
     ]);
     createOrchestratorApiSpy.mockRestore();
 
-    const compilerApi = cubejsServerCore.getCompilerApi({
+    const compilerApi = await cubejsServerCore.getCompilerApi({
       authInfo: null,
       securityContext: null,
       requestId: 'XXX'
@@ -342,7 +352,7 @@ describe('index.test', () => {
 
     test('CompilerApi metaConfig', async () => {
       const metaConfig = await compilerApi.metaConfig({ requestId: 'XXX' });
-      expect(metaConfig?.length).toBeGreaterThan(0);
+      expect((<any[]>metaConfig)?.length).toBeGreaterThan(0);
       expect(metaConfig[0]).toHaveProperty('config');
       expect(metaConfig[0].config.hasOwnProperty('sql')).toBe(false);
       expect(metaConfigSpy).toHaveBeenCalled();
@@ -471,7 +481,7 @@ describe('index.test', () => {
       [
         'Cube Store is not supported on your system',
         {
-          warning: 'You are using MockOS platform with x64 architecture, which is not supported by Cube Store.'
+          warning: `You are using MockOS platform with ${process.arch} architecture, which is not supported by Cube Store.`
         }
       ]
     ]);
@@ -633,7 +643,7 @@ describe('index.test', () => {
 
       const createOrchestratorApiSpy = jest.spyOn(cubejsServerCore, 'createOrchestratorApi');
 
-      cubejsServerCore.getOrchestratorApi({
+      await cubejsServerCore.getOrchestratorApi({
         requestId: 'XXX',
         authInfo: null,
         securityContext: null,

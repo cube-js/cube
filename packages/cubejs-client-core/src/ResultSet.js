@@ -169,7 +169,7 @@ class ResultSet {
             range.end
           ];
           
-          if (originalTimeDimension) {
+          if (originalTimeDimension?.dateRange) {
             const [originalStart, originalEnd] = originalTimeDimension.dateRange;
             
             dateRange = [
@@ -699,6 +699,10 @@ class ResultSet {
 
   pivotQuery() {
     return this.loadResponse.pivotQuery || null;
+  }
+
+  totalRows() {
+    return this.loadResponses[0].total;
   }
 
   rawData() {

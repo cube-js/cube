@@ -206,6 +206,26 @@ macro_rules! variant_field_struct {
         }
     };
 
+    ($variant:ident, $var_field:ident, Vec<JoinType>) => {
+        paste::item! {
+            #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+            pub struct [<$variant $var_field:camel>](Vec<Column>);
+
+            impl FromStr for [<$variant $var_field:camel>] {
+                type Err = CubeError;
+                fn from_str(_s: &str) -> Result<Self, Self::Err> {
+                    Err(CubeError::internal("Conversion from string is not supported".to_string()))
+                }
+            }
+
+            impl std::fmt::Display for [<$variant $var_field:camel>] {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                    write!(f, "{:?}", self.0)
+                }
+            }
+        }
+    };
+
     ($variant:ident, $var_field:ident, Arc<AggregateUDF>) => {
         paste::item! {
             #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
@@ -336,6 +356,7 @@ macro_rules! variant_field_struct {
                 BuiltinScalarFunction::MD5 => "MD5",
                 BuiltinScalarFunction::NullIf => "NullIf",
                 BuiltinScalarFunction::OctetLength => "OctetLength",
+                BuiltinScalarFunction::Pi => "Pi",
                 BuiltinScalarFunction::Random => "Random",
                 BuiltinScalarFunction::RegexpReplace => "RegexpReplace",
                 BuiltinScalarFunction::Repeat => "Repeat",
@@ -434,6 +455,15 @@ macro_rules! variant_field_struct {
                 LikeType::Like => "Like",
                 LikeType::ILike => "ILike",
                 LikeType::SimilarTo => "SimilarTo",
+            }
+        );
+    };
+
+    ($variant:ident, $var_field:ident, WrappedSelectType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { WrappedSelectType } -> {
+                WrappedSelectType::Projection => "Projection",
+                WrappedSelectType::Aggregate => "Aggregate",
             }
         );
     };
@@ -637,9 +667,7 @@ macro_rules! variant_field_struct {
 
             impl core::hash::Hash for [<$variant $var_field:camel>] {
                 fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-                    // @todo Care about enums
-                    #[allow(enum_intrinsics_non_enums)]
-                    std::mem::discriminant(&self.0).hash(state);
+                    self.0.hash(state);
                 }
             }
 
@@ -751,7 +779,7 @@ macro_rules! __plan_to_language {
 
     (@define_language $(#[$meta:meta])* $vis:vis enum $name:ident
      {
-         @data $variant:ident $var_field:ident ($data:ty),
+         @data $variant:ident $var_field:ident ($($data:tt)*),
          $($variants:tt)*
      } ->
      { $($decl:tt)* } { $($matches:tt)* } { $($children:tt)* } { $($children_mut:tt)* }
@@ -768,7 +796,7 @@ macro_rules! __plan_to_language {
             { $($from_op)*       (op, children) if op.parse::<[<$variant $var_field:camel>]>().is_ok() && children.is_empty() => Ok($name::[<$variant $var_field:camel>](op.parse().unwrap())), }
             {
                 $($type_decl)*
-                $crate::variant_field_struct!($variant, $var_field, $data);
+                $crate::variant_field_struct!($variant, $var_field, $($data)*);
             }
         );
     };
@@ -1031,7 +1059,7 @@ macro_rules! __plan_to_language {
      {
          $variant:ident {
             @variant_size $variant_size:expr,
-            $var_field:ident : $var_field_type:ty,
+            $var_field:ident : @collect_var_field_type ($($var_field_type:tt)*),
             $($var_fields:tt)*
          },
          $($variants:tt)*
@@ -1047,7 +1075,53 @@ macro_rules! __plan_to_language {
                 },
                 $($variants)*
             } ->
-            { $($decl)* @data $variant $var_field ($var_field_type), }
+            { $($decl)* @data $variant $var_field ($($var_field_type)*), }
+        );
+    };
+
+    ($(#[$meta:meta])* $vis:vis enum $name:ident
+     {
+         $variant:ident {
+            @variant_size $variant_size:expr,
+            $var_field:ident : @collect_var_field_type ($($var_field_type:tt)*) $token:tt $($var_fields:tt)*
+         },
+         $($variants:tt)*
+     } ->
+     { $($decl:tt)* }
+    ) => {
+        $crate::__plan_to_language!(
+            $(#[$meta])* $vis enum $name
+            {
+                $variant {
+                    @variant_size $variant_size,
+                    $var_field : @collect_var_field_type ($($var_field_type)* $token) $($var_fields)*
+                },
+                $($variants)*
+            } ->
+            { $($decl)* }
+        );
+    };
+
+    ($(#[$meta:meta])* $vis:vis enum $name:ident
+     {
+         $variant:ident {
+            @variant_size $variant_size:expr,
+            $var_field:ident : $($var_fields:tt)*
+         },
+         $($variants:tt)*
+     } ->
+     { $($decl:tt)* }
+    ) => {
+        $crate::__plan_to_language!(
+            $(#[$meta])* $vis enum $name
+            {
+                $variant {
+                    @variant_size $variant_size,
+                    $var_field : @collect_var_field_type () $($var_fields)*
+                },
+                $($variants)*
+            } ->
+            { $($decl)* }
         );
     };
 

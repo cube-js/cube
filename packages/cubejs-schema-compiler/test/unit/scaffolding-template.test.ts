@@ -110,7 +110,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Customers: {
-      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
+      sql: \`\${CUBE}.customerId = \${Customers}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -148,7 +148,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Accounts: {
-      sql: \`\${CUBE}."accountId" = \${Accounts}.id\`,
+      sql: \`\${CUBE}.accountId = \${Accounts}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -217,7 +217,7 @@ describe('ScaffoldingTemplate', () => {
     },
     
     failurecount: {
-      sql: \`\${CUBE}."failureCount"\`,
+      sql: \`failureCount\`,
       type: \`sum\`
     }
   },
@@ -251,7 +251,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     customers: {
-      sql: \`\${CUBE}."customerId" = \${customers}.id\`,
+      sql: \`\${CUBE}.customerId = \${customers}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -289,7 +289,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     accounts: {
-      sql: \`\${CUBE}."accountId" = \${accounts}.id\`,
+      sql: \`\${CUBE}.accountId = \${accounts}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -358,7 +358,7 @@ describe('ScaffoldingTemplate', () => {
     },
     
     failurecount: {
-      sql: \`\${CUBE}."failureCount"\`,
+      sql: \`failureCount\`,
       type: \`sum\`
     }
   },
@@ -407,7 +407,7 @@ describe('ScaffoldingTemplate', () => {
           {
             fileName: 'some_orders.js',
             content: `cube(\`some_orders\`, {
-  sql_table: \`public.\\\`someOrders\\\`\`,
+  sql_table: \`public.someOrders\`,
   
   joins: {
     
@@ -421,7 +421,7 @@ describe('ScaffoldingTemplate', () => {
     },
     
     somedimension: {
-      sql: \`\${CUBE}.\\\`someDimension\\\`\`,
+      sql: \`someDimension\`,
       type: \`string\`
     }
   },
@@ -592,7 +592,7 @@ describe('ScaffoldingTemplate', () => {
         format: SchemaFormat.Yaml,
         snakeCase: true
       });
-      
+
       expect(
         template.generateFilesByTableNames([
           'public.orders',
@@ -608,7 +608,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: customers
-        sql: "{CUBE}.\\"customerId\\" = {customers}.id"
+        sql: "{CUBE}.customerId = {customers}.id"
         relationship: many_to_one
 
     dimensions:
@@ -639,7 +639,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: accounts
-        sql: "{CUBE}.\\"accountId\\" = {accounts}.id"
+        sql: "{CUBE}.accountId = {accounts}.id"
         relationship: many_to_one
 
     dimensions:
@@ -693,7 +693,7 @@ describe('ScaffoldingTemplate', () => {
         type: count
 
       - name: failurecount
-        sql: "{CUBE}.\\"failureCount\\""
+        sql: failureCount
         type: sum
 
     pre_aggregations:
@@ -747,7 +747,62 @@ describe('ScaffoldingTemplate', () => {
         type: count
 
       - name: failurecount
-        sql: "{CUBE}.\`failureCount\`"
+        sql: failureCount
+        type: sum
+
+    pre_aggregations:
+      # Pre-aggregation definitions go here.
+      # Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started
+
+`,
+        },
+      ]);
+    });
+    
+    it('generates schema with a catalog', () => {
+      const template = new ScaffoldingTemplate(
+        {
+          public: {
+            accounts: dbSchema.public.accounts,
+          },
+        },
+        driver,
+        {
+          format: SchemaFormat.Yaml,
+          snakeCase: true,
+          catalog: 'hello_catalog'
+        }
+      );
+
+      expect(template.generateFilesByTableNames(['public.accounts'])).toEqual([
+        {
+          fileName: 'accounts.yml',
+          content: `cubes:
+  - name: accounts
+    sql_table: hello_catalog.public.accounts
+
+    joins: []
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: username
+        sql: username
+        type: string
+
+      - name: password
+        sql: password
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+      - name: failurecount
+        sql: failureCount
         type: sum
 
     pre_aggregations:

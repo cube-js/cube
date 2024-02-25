@@ -5,6 +5,7 @@ use std::{
         atomic::{AtomicU32, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use super::{
@@ -49,6 +50,7 @@ impl SessionManager {
                 client_port,
                 protocol,
                 None,
+                Duration::from_secs(self.server.config_obj.auth_expire_secs()),
             )),
         };
 

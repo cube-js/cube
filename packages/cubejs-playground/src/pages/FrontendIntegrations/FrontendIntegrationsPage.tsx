@@ -10,7 +10,7 @@ export function FrontendIntegrationsPage() {
   const apiUrl = 'http://localhost:4000/cubejs-api';
   const restUrl = `${apiUrl}/v1/load`;
   const wsUrl = "ws://localhost:4000/";
-  const graphqlUrl = `${apiUrl}/v1/graphql`;
+  const graphqlUrl = `${apiUrl}/graphql`;
 
   const dataSource = [
     {

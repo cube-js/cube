@@ -1,4 +1,4 @@
-FROM node:16.20.0-alpine3.17 as builder
+FROM node:16.20.2-alpine3.17 as builder
 
 WORKDIR /cube
 COPY . .
@@ -16,7 +16,7 @@ RUN apk update \
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
 
-FROM node:16.20.0-alpine3.17
+FROM node:16.20.2-alpine3.17
 
 ARG IMAGE_VERSION=unknown
 
@@ -34,6 +34,7 @@ COPY --from=builder /cube .
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV PYTHONUNBUFFERED=1
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
 

@@ -559,6 +559,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Int96 => Err(CubeError::user(
+            "int96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Bytes => match value {
             _ => Err(CubeError::internal(format!(
                 "ksql source bytes import isn't supported"
@@ -595,6 +598,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Decimal96 { .. } => Err(CubeError::user(
+            "decimal96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Float => match value {
             JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.clone().into()))),
             JsonValue::Null => Ok(TableValue::Null),
@@ -930,6 +936,7 @@ mod tests {
     use crate::metastore::{MetaStoreTable, RowKey};
 
     use super::*;
+    use crate::metastore::chunks::chunk_file_name;
     use crate::scheduler::SchedulerImpl;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::kafka::KafkaMessage;
@@ -1189,7 +1196,8 @@ mod tests {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
                         if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
-                            chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
+                            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+                            chunk_store.free_memory_chunk(chunk_name).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
                         }
@@ -1347,7 +1355,8 @@ mod tests {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
                         if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
-                            chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
+                            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+                            chunk_store.free_memory_chunk(chunk_name).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
                         }

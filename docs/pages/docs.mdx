@@ -1,0 +1,255 @@
+# MDX Components
+
+# Heading 1
+
+## Heading 2
+
+### Heading 3
+
+#### Heading 4
+
+##### Heading 5
+
+###### Heading 6
+
+---
+
+## Code block
+
+#### Default
+
+```javascript
+cube(`monthly_retention`, {
+  // ...
+
+  dimensions: {
+    months_since_signup: {
+      sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
+      type: `number`,
+    },
+
+    signup_date: {
+      sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
+      type: `time`,
+    },
+  },
+});
+```
+
+#### With tabs
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: monthly_retention
+    # ...
+    dimensions:
+      - name: months_since_signup
+        sql: "DATEDIFF('month', signup_month, activity_month)"
+        type: number
+
+      - name: signup_date
+        sql: "(signup_month AT TIME ZONE 'America/Los_Angeles')"
+        type: time
+```
+
+```javascript
+cube(`monthly_retention`, {
+  // ...
+
+  dimensions: {
+    months_since_signup: {
+      sql: `DATEDIFF('month', ${CUBE}.signup_month, ${CUBE}.activity_month)`,
+      type: `number`,
+    },
+
+    signup_date: {
+      sql: `(signup_month AT TIME ZONE 'America/Los_Angeles')`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+## Alert Box
+
+<DangerBox heading="DangerBox">
+  DangerBox
+</DangerBox>
+
+<DangerBox>DangerBox</DangerBox>
+
+<InfoBox heading="InfoBox">
+  InfoBox
+</InfoBox>
+
+<InfoBox>InfoBox</InfoBox>
+
+<SuccessBox heading="SuccessBox">
+  SuccessBox
+</SuccessBox>
+
+<SuccessBox>SuccessBox</SuccessBox>
+
+<WarningBox heading="WarningBox">
+  WarningBox
+</WarningBox>
+
+<WarningBox>WarningBox</WarningBox>
+
+## Buttons
+
+<ButtonGroup>
+
+  <Button>Send</Button>
+  <Button variant="secondary">Send</Button>
+  <LikeButton>Yes</LikeButton>
+  <DislikeButton>No</DislikeButton>
+
+</ButtonGroup>
+
+<ButtonGroup>
+
+  <Button disabled>Send</Button>
+  <Button disabled variant="secondary">Send</Button>
+  <LikeButton disabled>Yes</LikeButton>
+  <DislikeButton disabled>No</DislikeButton>
+
+</ButtonGroup>
+
+## Inline Button
+
+You can implement the element directly by using inline <Btn>Button</Btn> component.
+
+## Inline code
+
+SQL query `SELECT * FROM users`.
+
+## Selected text
+
+- TODO
+
+## Table
+
+| Field    | Value              | Description |
+|:---------|:-------------------|-------------|
+| Host     | `demo-db.cube.dev` | Foo         |
+| Port     | `5432`             | Bar         |
+| Database | `ecom`             | Baz         |
+| Username | `cube`             | More Foo    |
+| Password | `12345`            | More Bar    |
+
+## Video
+
+#### Loom
+
+<LoomVideo url="https://www.loom.com/embed/8898c6394cac46568c2be6ae526b1fd5" />
+
+#### Youtube
+
+<YouTubeVideo url="https://www.youtube.com/embed/FotEaaf20gY" />
+
+## Image
+
+<Screenshot
+  alt="Cube Cloud Environment Variables Screen"
+  src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+/>
+
+## Card links
+
+### Two-column
+
+<Grid cols={2} imageSize={[undefined, 50]}>
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/athena.svg"
+    title="Amazon Athena"
+  />
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/hive.svg"
+    title="Hive/SparkSQL"
+  />
+</Grid>
+
+### Three-column
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/athena.svg"
+    title="Amazon Athena"
+  />
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/hive.svg"
+    title="Hive/SparkSQL"
+  />
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/presto.svg"
+    title="Presto"
+  />
+  <GridItem
+    url="#"
+    imageUrl="https://raw.githubusercontent.com/cube-js/cube.js/master/packages/cubejs-playground/src/img/db/trino.svg"
+    title="Trino"
+  />
+</Grid>
+
+## Cube Cloud Promo block
+
+<CloudPromoBlock>
+
+Playground is available in Cube Cloud on [all tiers](#).
+
+</CloudPromoBlock>
+
+## Event promo block
+
+<EventPromoBlock
+  coverUrl="https://ucarecdn.com/46e9fed6-51af-4ba6-9956-028a205e639f/"
+  startsAt={(new Date()).setDate((new Date()).getDate() + 30)}
+  title="How Rittman Analytics delivers the semantic layer today with Cube"
+  linkText="Register Now"
+  linkUrl="#"
+/>
+
+<EventPromoBlock
+  coverUrl="https://ucarecdn.com/46e9fed6-51af-4ba6-9956-028a205e639f/"
+  startsAt={(new Date()).setDate((new Date()).getDate() + 3)}
+  title="How Rittman Analytics delivers the semantic layer today with Cube"
+  linkText="Register Now"
+  linkUrl="#"
+/>
+
+<EventPromoBlock
+  coverUrl="https://ucarecdn.com/46e9fed6-51af-4ba6-9956-028a205e639f/"
+  startsAt={(new Date()).setDate((new Date()).getDate() - 1)}
+  endsAt={(new Date()).setDate((new Date()).getDate() + 1)}
+  title="How Rittman Analytics delivers the semantic layer today with Cube"
+  linkText="Register Now"
+  linkUrl="#"
+/>
+
+<EventPromoBlock
+  coverUrl="https://ucarecdn.com/46e9fed6-51af-4ba6-9956-028a205e639f/"
+  startsAt={new Date('2023-03-29')}
+  title="How Rittman Analytics delivers the semantic layer today with Cube"
+  linkText="Register Now"
+  linkUrl="#"
+/>
+
+## Case Study promo block
+
+<CaseStudyPromoBlock
+  title={<img src="https://ucarecdn.com/8430f4c8-c123-4e36-8076-b1772475d154/" alt="Logo" />}
+>
+
+How RamSoft built its users native embedded analytics—in two weeks. [Read the case studies](#).
+
+</CaseStudyPromoBlock>

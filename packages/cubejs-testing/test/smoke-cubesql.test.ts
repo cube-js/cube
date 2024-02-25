@@ -5,7 +5,7 @@ import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import type { StartedTestContainer } from 'testcontainers';
 
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG } from './smoke-tests';
+import { DEFAULT_CONFIG, JEST_AFTER_ALL_DEFAULT_TIMEOUT, JEST_BEFORE_ALL_DEFAULT_TIMEOUT } from './smoke-tests';
 
 describe('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -61,6 +61,7 @@ describe('SQL API', () => {
         CUBEJS_DB_PASS: 'test',
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
+        CUBESQL_SQL_PUSH_DOWN: 'true',
       },
       {
         schemaDir: 'postgresql/schema',
@@ -68,14 +69,13 @@ describe('SQL API', () => {
       }
     );
     connection = await createPostgresClient('admin', 'admin_password');
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
+    await connection.end();
     await birdbox.stop();
     await db.stop();
-    // await not working properly
-    await connection.end();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe('Postgres (Auth)', () => {
     test('Success Admin', async () => {
@@ -163,6 +163,22 @@ describe('SQL API', () => {
     test('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
       const res = await connection.query('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC');
       expect(res.rows).toMatchSnapshot('sql_orders');
+    });
+
+    test('powerbi min max push down', async () => {
+      const res = await connection.query(`
+      select
+  max("rows"."createdAt") as "a0",
+  min("rows"."createdAt") as "a1"
+from
+  (
+    select
+      "createdAt"
+    from
+      "public"."Orders" "$Table"
+  ) "rows"
+  `);
+      expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
   });
 });

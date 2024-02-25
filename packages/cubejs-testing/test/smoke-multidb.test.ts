@@ -4,7 +4,12 @@ import cubejs, { CubejsApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG } from './smoke-tests';
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+} from './smoke-tests';
 
 describe('multidb', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -44,13 +49,13 @@ describe('multidb', () => {
     client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
     await db2.stop();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query', async () => {
     const response = await client.load({

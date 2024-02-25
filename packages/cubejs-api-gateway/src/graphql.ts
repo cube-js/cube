@@ -77,7 +77,9 @@ const DateTimeFilter = inputObjectType({
     t.list.string('inDateRange');
     t.list.string('notInDateRange');
     t.string('beforeDate');
+    t.string('beforeOrOnDate');
     t.string('afterDate');
+    t.string('afterOrOnDate');
     t.boolean('set');
   }
 });
@@ -263,12 +265,15 @@ function whereArgToQueryFilters(
   const queryFilters: any[] = [];
   
   Object.keys(whereArg).forEach((key) => {
+    const cubeExists = metaConfig.find((cube) => cube.config.name === key);
+    const normalizedKey = cubeExists ? key : capitalize(key);
+    
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
           (filters, whereBooleanArg) => [
             ...filters,
-            ...whereArgToQueryFilters(whereBooleanArg, prefix),
+            ...whereArgToQueryFilters(whereBooleanArg, prefix, metaConfig),
           ],
           []
         ),
@@ -282,8 +287,6 @@ function whereArgToQueryFilters(
       //   age: { equals: 28 } # <-- will require AND
       // }
       if (Object.keys(whereArg[key]).length > 1) {
-        const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-        
         queryFilters.push(
           ...whereArgToQueryFilters(
             {
@@ -292,11 +295,12 @@ function whereArgToQueryFilters(
                 []
               ),
             },
-            cubeExists ? key : capitalize(key)
+            normalizedKey,
+            metaConfig
           )
         );
       } else {
-        const res = whereArgToQueryFilters(whereArg[key], capitalize(key));
+        const res = whereArgToQueryFilters(whereArg[key], normalizedKey, metaConfig);
 
         queryFilters.push(...res);
       }
@@ -315,12 +319,10 @@ function whereArgToQueryFilters(
     } else {
       Object.entries<any>(whereArg[key]).forEach(([member, filters]) => {
         Object.entries(filters).forEach(([operator, value]) => {
-          const cubeExists = metaConfig.find((cube) => cube.config.name === key);
-          
           queryFilters.push({
             member: prefix
               ? `${prefix}.${key}`
-              : `${cubeExists ? key : capitalize(key)}.${member}`,
+              : `${normalizedKey}.${member}`,
             operator: mapWhereOperator(operator, value),
             ...(mapWhereValue(operator, value) && {
               values: mapWhereValue(operator, value),
@@ -501,11 +503,12 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          ungrouped: booleanArg(),
           orderBy: arg({
             type: 'RootOrderByInput'
           }),
         },
-        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
+        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery, ungrouped }, { req, apiGateway }, infos) => {
           const measures: string[] = [];
           const dimensions: string[] = [];
           const timeDimensions: any[] = [];
@@ -602,6 +605,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
             ...(timezone && { timezone }),
             ...(filters.length && { filters }),
             ...(renewQuery && { renewQuery }),
+            ...(ungrouped && { ungrouped }),
           };
 
           const results = await new Promise<any>((resolve, reject) => {

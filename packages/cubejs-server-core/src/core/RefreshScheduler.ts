@@ -144,7 +144,7 @@ export class RefreshScheduler {
     const baseQuerySql = await compilerApi.getSql(baseQuery);
     const preAggregationDescriptionList = baseQuerySql.preAggregations;
     const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
 
     // Return a empty array for cases with 2 same pre-aggregations but with different partitionGranularity
@@ -223,13 +223,13 @@ export class RefreshScheduler {
   /**
    * Evaluate and returns minimal QueryQueue concurrency value.
    */
-  protected getSchedulerConcurrency(
+  protected async getSchedulerConcurrency(
     core: CubejsServerCore,
     context: RequestContext,
-  ): null | number {
-    const preaggsQueues = core
-      .getOrchestratorApi(context)
-      .getQueryOrchestrator()
+  ): Promise<null | number> {
+    const orchestratorApi = await core
+      .getOrchestratorApi(context);
+    const preaggsQueues = orchestratorApi.getQueryOrchestrator()
       .getPreAggregations()
       .getQueues();
 
@@ -259,7 +259,7 @@ export class RefreshScheduler {
 
     const concurrency =
       options.concurrency ||
-      this.getSchedulerConcurrency(this.serverCore, context) ||
+      (await this.getSchedulerConcurrency(this.serverCore, context)) ||
       1;
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
@@ -278,7 +278,7 @@ export class RefreshScheduler {
     });
 
     try {
-      const compilerApi = this.serverCore.getCompilerApi(context);
+      const compilerApi = await this.serverCore.getCompilerApi(context);
       if (queryingOptions.preAggregationsWarmup) {
         await this.refreshPreAggregations(context, compilerApi, queryingOptions);
       } else {
@@ -314,14 +314,17 @@ export class RefreshScheduler {
     context: RequestContext,
     compilerApi: CompilerApi,
   ) {
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const compilers = await compilerApi.getCompilers();
+
     const { cubeEvaluator } = compilers;
     const processed = [];
+
     await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
       const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
       if (processed.indexOf(ds) === -1) {
         processed.push(ds);
-        await this.serverCore.getOrchestratorApi(context).forceReconcile(ds);
+        await orchestratorApi.forceReconcile(ds);
       }
     }));
   }
@@ -355,7 +358,7 @@ export class RefreshScheduler {
           timezone
         };
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+        const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           sql: null,
@@ -374,7 +377,7 @@ export class RefreshScheduler {
     context,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const compilerApi = this.serverCore.getCompilerApi(context);
+    const compilerApi = await this.serverCore.getCompilerApi(context);
     const preAggregationsQueryingOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
@@ -598,7 +601,7 @@ export class RefreshScheduler {
         for (;;) {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
-            const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+            const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
             await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
           }
           const hasNext = await queryIterator.advance();
@@ -607,14 +610,16 @@ export class RefreshScheduler {
           }
         }
       }));
-    await this.serverCore.getOrchestratorApi(context).updateRefreshEndReached();
+
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+    await orchestratorApi.updateRefreshEndReached();
   }
 
   public async buildPreAggregations(
     context: RequestContext,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
 
@@ -663,7 +668,7 @@ export class RefreshScheduler {
     context: RequestContext,
     queryingOptions: PreAggregationsQueryingOptions
   ): Promise<string[]> {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
     const jobsPromise = Promise.all(
@@ -697,7 +702,9 @@ export class RefreshScheduler {
         );
       })
     );
+
     const jobedPAs = await jobsPromise;
+
     return getPreAggsJobsList(
       context,
       <JobedPreAggregation[][][][]>jobedPAs,
@@ -719,7 +726,7 @@ export class RefreshScheduler {
     context: RequestContext,
     tokens: string[],
   ): Promise<PreAggJob[]> {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const jobsPromise = Promise.all(
       tokens.map(async (key) => {
         const job = <PreAggJob>(await orchestratorApi

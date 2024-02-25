@@ -3,6 +3,7 @@ use crate::{
     sql::{
         dataframe::{batch_to_dataframe, DataFrame, TableValue},
         statement::PostgresStatementParamsBinder,
+        temp_tables::TempTable,
         writer::BatchWriter,
     },
     CubeError,
@@ -11,7 +12,7 @@ use chrono::{DateTime, Utc};
 use datafusion::arrow::record_batch::RecordBatch;
 use pg_srv::{protocol, BindValue, PgTypeId, ProtocolError};
 use sqlparser::ast;
-use std::{fmt, pin::Pin};
+use std::{fmt, pin::Pin, sync::Arc};
 
 use crate::sql::shim::{ConnectionError, QueryPlanExt};
 use datafusion::{
@@ -19,8 +20,9 @@ use datafusion::{
     physical_plan::SendableRecordBatchStream,
 };
 use futures::*;
-use pg_srv::protocol::{PortalCompletion, PortalSuspended};
+use pg_srv::protocol::{CommandComplete, PortalCompletion, PortalSuspended};
 
+use crate::transport::SpanId;
 use async_stream::stream;
 use futures_core::stream::Stream;
 use futures_util::stream::StreamExt;
@@ -43,6 +45,7 @@ pub enum PreparedStatement {
         /// Prepared statement can be declared from SQL or protocol (Parser)
         from_sql: bool,
         created: DateTime<Utc>,
+        span_id: Option<Arc<SpanId>>,
     },
     Query {
         /// Prepared statement can be declared from SQL or protocol (Parser)
@@ -53,6 +56,7 @@ pub enum PreparedStatement {
         /// Fields which will be returned to the client, It can be None if server doesnt return any field
         /// for example BEGIN
         description: Option<protocol::RowDescription>,
+        span_id: Option<Arc<SpanId>>,
     },
 }
 
@@ -99,6 +103,13 @@ impl PreparedStatement {
 
                 Ok(statement)
             }
+        }
+    }
+
+    pub fn span_id(&self) -> Option<Arc<SpanId>> {
+        match self {
+            PreparedStatement::Empty { span_id, .. } => span_id.clone(),
+            PreparedStatement::Query { span_id, .. } => span_id.clone(),
         }
     }
 }
@@ -189,6 +200,7 @@ pub struct Portal {
     from: PortalFrom,
     // State which holds corresponding data for each step. Option is used for dereferencing
     state: Option<PortalState>,
+    span_id: Option<Arc<SpanId>>,
 }
 
 unsafe impl Send for Portal {}
@@ -215,18 +227,29 @@ fn split_record_batch(batch: RecordBatch, mid: usize) -> (RecordBatch, Option<Re
 }
 
 impl Portal {
-    pub fn new(plan: QueryPlan, format: protocol::Format, from: PortalFrom) -> Self {
+    pub fn new(
+        plan: QueryPlan,
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+    ) -> Self {
         Self {
             format,
             from,
+            span_id,
             state: Some(PortalState::Prepared(PreparedState { plan })),
         }
     }
 
-    pub fn new_empty(format: protocol::Format, from: PortalFrom) -> Self {
+    pub fn new_empty(
+        format: protocol::Format,
+        from: PortalFrom,
+        span_id: Option<Arc<SpanId>>,
+    ) -> Self {
         Self {
             format,
             from,
+            span_id,
             state: Some(PortalState::Empty),
         }
     }
@@ -237,12 +260,18 @@ impl Portal {
             Some(PortalState::InExecutionFrame(state)) => Ok(state.description.clone()),
             Some(PortalState::InExecutionStream(state)) => Ok(state.description.clone()),
             Some(PortalState::Finished(state)) => Ok(state.description.clone()),
-            Some(PortalState::Empty) => Err(ConnectionError::Cube(CubeError::internal(
-                "Unable to get description on empty Portal. It's a bug.".to_string(),
-            ))),
-            None => Err(ConnectionError::Cube(CubeError::internal(
-                "Unable to get description on Portal without state. It's a bug.".to_string(),
-            ))),
+            Some(PortalState::Empty) => Err(ConnectionError::Cube(
+                CubeError::internal(
+                    "Unable to get description on empty Portal. It's a bug.".to_string(),
+                ),
+                None,
+            )),
+            None => Err(ConnectionError::Cube(
+                CubeError::internal(
+                    "Unable to get description on Portal without state. It's a bug.".to_string(),
+                ),
+                None,
+            )),
         }
     }
 
@@ -316,7 +345,7 @@ impl Portal {
         for row in frame.to_rows().into_iter() {
             for value in row.to_values() {
                 match value {
-                    TableValue::Null => writer.write_value::<Option<bool>>(None)?,
+                    TableValue::Null => writer.write_value::<Option<String>>(None)?,
                     TableValue::String(v) => writer.write_value(v)?,
                     TableValue::Int16(v) => writer.write_value(v)?,
                     TableValue::Int32(v) => writer.write_value(v)?,
@@ -482,6 +511,30 @@ impl Portal {
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
                         }
+                        QueryPlan::CreateTempTable(_, plan, ctx, name, temp_tables) => {
+                            let df = DFDataFrame::new(ctx.state.clone(), &plan);
+                            let record_batch = df.collect();
+                            let row_count = match record_batch.await {
+                                Ok(record_batch) => {
+                                    let row_count: u32 = record_batch.iter().map(|batch| batch.num_rows() as u32).sum();
+                                    let temp_table = TempTable::new(Arc::clone(plan.schema()), vec![record_batch]);
+                                    let save_result = tokio::task::spawn_blocking(move || {
+                                        temp_tables.save(&name.to_ascii_lowercase(), temp_table)
+                                    }).await;
+                                    if let Err(err) = save_result {
+                                        return yield Err(err.into())
+                                    };
+                                    row_count
+                                }
+                                Err(err) => return yield Err(CubeError::panic(Box::new(err)).into()),
+                            };
+
+                            self.state = Some(PortalState::Finished(FinishedState { description }));
+
+                            return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                CommandComplete::Select(row_count),
+                            )));
+                        }
                     }
                 }
                 PortalState::InExecutionFrame(frame_state) => {
@@ -511,6 +564,10 @@ impl Portal {
                 }
             }
         }
+    }
+
+    pub fn span_id(&self) -> Option<Arc<SpanId>> {
+        self.span_id.clone()
     }
 }
 
@@ -631,6 +688,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 None,
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -663,6 +721,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 None,
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -674,7 +733,7 @@ mod tests {
             Ok(_) => panic!("must panic"),
             Err(e) => assert_eq!(
                 e.to_string(),
-                "Error: Cursor with limited max_rows: 1 for DataFrame is not supported"
+                "ProtocolError: Error: Cursor with limited max_rows: 1 for DataFrame is not supported"
             ),
         }
 
@@ -690,6 +749,7 @@ mod tests {
                 generate_testing_data_frame(3),
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         let mut portal = Pin::new(&mut p);
@@ -724,6 +784,7 @@ mod tests {
                 stream,
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         execute_portal_single_batch(&mut portal, 1, 1).await?;
@@ -746,6 +807,7 @@ mod tests {
                 stream,
                 Some(protocol::RowDescription::new(vec![])),
             ))),
+            span_id: None,
         };
 
         // use 1 batch

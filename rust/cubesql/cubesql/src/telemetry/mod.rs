@@ -1,13 +1,11 @@
 use crate::{sql::SessionState, CubeError};
-use log::{Level, LevelFilter, Log};
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    sync::{Arc, RwLock},
-};
+use arc_swap::ArcSwap;
+use log::{Level, LevelFilter};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 lazy_static! {
-    static ref REPORTER: RwLock<Box<dyn LogReporter>> = RwLock::new(Box::new(LocalReporter::new()));
+    static ref REPORTER: ArcSwap<Box<dyn LogReporter>> =
+        ArcSwap::from_pointee(Box::new(LocalReporter::new()));
 }
 
 pub trait LogReporter: Send + Sync + Debug {
@@ -37,21 +35,16 @@ impl LogReporter for LocalReporter {
 pub struct ReportingLogger {}
 
 impl ReportingLogger {
-    pub fn init(
-        logger: Box<dyn Log>,
-        reporter: Box<dyn LogReporter>,
-        max_level: LevelFilter,
-    ) -> Result<(), CubeError> {
-        let mut guard = REPORTER
-            .write()
-            .expect("failed to unlock REPORTER for writing");
-        *guard = reporter;
-
-        log::set_boxed_logger(logger)?;
+    pub fn init(reporter: Box<dyn LogReporter>, max_level: LevelFilter) -> Result<(), CubeError> {
+        REPORTER.swap(Arc::new(reporter));
         log::set_max_level(max_level);
 
         Ok(())
     }
+}
+
+pub fn set_reporter(reporter: Box<dyn LogReporter>) {
+    REPORTER.swap(Arc::new(reporter));
 }
 
 pub trait ContextLogger: Send + Sync + Debug {
@@ -93,9 +86,7 @@ impl ContextLogger for SessionLogger {
 }
 
 fn report(event: String, properties: HashMap<String, String>, level: Level) -> bool {
-    let guard = REPORTER
-        .read()
-        .expect("failed to unlock REPORTER for reading");
+    let guard = REPORTER.load();
     if !guard.is_active() {
         return false;
     }

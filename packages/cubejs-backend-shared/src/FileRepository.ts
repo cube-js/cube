@@ -47,7 +47,7 @@ export class FileRepository implements SchemaFileRepository {
 
     let result = await Promise.all(
       files
-        .filter(file => file.endsWith('.js') || file.endsWith('.yml') || file.endsWith('.yaml'))
+        .filter(file => file.endsWith('.js') || file.endsWith('.yml') || file.endsWith('.yaml') || file.endsWith('.jinja') || file.endsWith('.py'))
         .map(async file => {
           const content = await fs.readFile(path.join(this.localPath(), file), 'utf-8');
 

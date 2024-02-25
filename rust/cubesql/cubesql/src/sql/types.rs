@@ -1,5 +1,5 @@
 use bitflags::bitflags;
-use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit};
+use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use msql_srv::{
     ColumnFlags as MysqlColumnFlags, ColumnType as MysqlColumnType, StatusFlags as MysqlStatusFlags,
 };
@@ -81,6 +81,30 @@ impl ColumnType {
             ColumnType::Blob | ColumnType::List(_) => 128,
         }
     }
+
+    pub fn to_arrow(&self) -> DataType {
+        match self {
+            ColumnType::Date(large) => {
+                if *large {
+                    DataType::Date64
+                } else {
+                    DataType::Date32
+                }
+            }
+            ColumnType::Interval(unit) => DataType::Interval(unit.clone()),
+            ColumnType::String => DataType::Utf8,
+            ColumnType::VarStr => DataType::Utf8,
+            ColumnType::Boolean => DataType::Boolean,
+            ColumnType::Double => DataType::Float64,
+            ColumnType::Int8 => DataType::Int64,
+            ColumnType::Int32 => DataType::Int64,
+            ColumnType::Int64 => DataType::Int64,
+            ColumnType::Blob => DataType::Utf8,
+            ColumnType::Decimal(p, s) => DataType::Decimal(*p, *s),
+            ColumnType::List(field) => DataType::List(field.clone()),
+            ColumnType::Timestamp => DataType::Timestamp(TimeUnit::Millisecond, None),
+        }
+    }
 }
 
 bitflags! {
@@ -124,6 +148,7 @@ pub enum CommandCompletion {
     Deallocate,
     DeallocateAll,
     Discard(String),
+    DropTable,
 }
 
 impl CommandCompletion {
@@ -150,6 +175,7 @@ impl CommandCompletion {
             CommandCompletion::Discard(tp) => CommandComplete::Plain(format!("DISCARD {}", tp)),
             // ROWS COUNT
             CommandCompletion::Select(rows) => CommandComplete::Select(rows),
+            CommandCompletion::DropTable => CommandComplete::Plain("DROP TABLE".to_string()),
         }
     }
 }

@@ -59,7 +59,7 @@ cube(\`sales\`, {
     const queryAndParams = query.buildSqlAndParams();
 
     expect(queryAndParams[0]).toContain(
-      'DATE_TRUNC(\'DAY\', "sales".sales_datetime)'
+      'DATE_TRUNC(\'DAY\', "sales".sales_datetime AT TIME ZONE \'America/Los_Angeles\')'
     );
   }));
 
@@ -81,9 +81,39 @@ cube(\`sales\`, {
     const queryAndParams = query.buildSqlAndParams();
 
     expect(queryAndParams[0]).toContain(
-      '("sales".is_shiped = CAST(? AS BOOL))'
+      '("sales".is_shiped = CAST(? AS BOOLEAN))'
     );
 
     expect(queryAndParams[1]).toEqual(["true"]);
   }))
+    it("should cast timestamp", () =>
+    compiler.compile().then(() => {
+      const query = new FireboltQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          measures: ["sales.count"],
+          timeDimensions: [
+            {
+              dimension: "sales.salesDatetime",
+              granularity: "day",
+              dateRange: ["2017-01-01", "2017-01-02"],
+            },
+          ],
+          timezone: "America/Los_Angeles",
+          order: [
+            {
+              id: "sales.salesDatetime",
+            },
+          ],
+        }
+      );
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain(
+        '("sales".sales_datetime >= ?::timestamptz AND "sales".sales_datetime <= ?::timestamptz)'
+      );
+    }));
+
+
 })

@@ -3,13 +3,11 @@
  * @license Apache-2.0
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
-
+/* eslint-disable camelcase */
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import fs from 'fs';
-import path from 'path';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
@@ -19,13 +17,13 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, QueryOptions, UnloadOptions } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
 } from '@cubejs-backend/jdbc-driver';
 import { DatabricksQuery } from './DatabricksQuery';
-import { downloadJDBCDriver } from './installer';
+import { resolveJDBCDriver, extractUidFromJdbcUrl } from './helpers';
 
 export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
   {
@@ -91,16 +89,6 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
     token?: string,
   };
 
-async function fileExistsOr(
-  fsPath: string,
-  fn: () => Promise<string>,
-): Promise<string> {
-  if (fs.existsSync(fsPath)) {
-    return fsPath;
-  }
-  return fn();
-}
-
 type ShowTableRow = {
   database: string,
   tableName: string,
@@ -114,25 +102,6 @@ type ShowDatabasesRow = {
 const DatabricksToGenericType: Record<string, string> = {
   'decimal(10,0)': 'bigint',
 };
-
-async function resolveJDBCDriver(): Promise<string> {
-  return fileExistsOr(
-    path.join(process.cwd(), 'DatabricksJDBC42.jar'),
-    async () => fileExistsOr(
-      path.join(__dirname, '..', 'download', 'DatabricksJDBC42.jar'),
-      async () => {
-        const pathOrNull = await downloadJDBCDriver();
-        if (pathOrNull) {
-          return pathOrNull;
-        }
-        throw new Error(
-          'Please download and place DatabricksJDBC42.jar inside your ' +
-          'project directory'
-        );
-      }
-    )
-  );
-}
 
 /**
  * Databricks driver class.
@@ -202,13 +171,14 @@ export class DatabricksDriver extends JDBCDriver {
       drivername: 'com.databricks.client.jdbc.Driver',
       customClassPath: undefined,
       properties: {
+        UID: extractUidFromJdbcUrl(url),
         // PWD-parameter passed to the connection string has higher priority,
         // so we can set this one to an empty string to avoid a Java error.
         PWD:
           conf?.token ||
           getEnv('databrickToken', { dataSource }) ||
           '',
-        UserAgentEntry: `CubeDev_Cube`,
+        UserAgentEntry: 'CubeDev_Cube',
       },
       catalog:
         conf?.catalog ||
@@ -261,7 +231,10 @@ export class DatabricksDriver extends JDBCDriver {
    * @override
    */
   public capabilities(): DriverCapabilities {
-    return { unloadWithoutTempTable: true };
+    return {
+      unloadWithoutTempTable: true,
+      incrementalSchemaLoading: true
+    };
   }
 
   /**
@@ -455,6 +428,59 @@ export class DatabricksDriver extends JDBCDriver {
     );
 
     return tables.flat();
+  }
+
+  public override async getSchemas(): Promise<QuerySchemasResult[]> {
+    const databases = await this.query<ShowDatabasesRow>(
+      `SHOW DATABASES${
+        this.config?.catalog
+          ? ` IN ${this.quoteIdentifier(this.config.catalog)}`
+          : ''
+      }`,
+      [],
+    );
+
+    return databases.map(({ databaseName }) => ({
+      schema_name: databaseName,
+    }));
+  }
+
+  public override async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    const tables = await Promise.all(
+      // eslint-disable-next-line camelcase
+      schemas.map(async ({ schema_name }) => this.query<ShowTableRow>(
+        `SHOW TABLES IN ${this.getSchemaFullName(schema_name)}`,
+        []
+      ))
+    );
+
+    return tables.flat().map(({ database, tableName }) => ({
+      table_name: tableName,
+      schema_name: database,
+    }));
+  }
+
+  public override async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
+    const columns = await Promise.all(
+      // eslint-disable-next-line camelcase
+      tables.map(async ({ schema_name, table_name }) => {
+        const tableFullName = `${
+          this.config?.catalog
+            ? `${this.config.catalog}.`
+            : ''
+        // eslint-disable-next-line camelcase
+        }${schema_name}.${table_name}`;
+        const columnTypes = await this.tableColumnTypes(tableFullName);
+        return columnTypes.map(({ name, type }) => ({
+          column_name: name,
+          data_type: type,
+          table_name,
+          schema_name,
+        }));
+      })
+    );
+
+    return columns.flat();
   }
 
   /**

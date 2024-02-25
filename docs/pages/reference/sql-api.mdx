@@ -1,0 +1,1238 @@
+---
+redirect_from:
+  - /backend/sql/reference/commands
+---
+
+# SQL API reference
+
+[SQL API][ref-sql-api] supports the following [commands](#sql-commands) as well
+as [functions and operators](#sql-functions-and-operators). 
+
+<InfoBox>
+
+This page describes the difference in behaviour of SQL commands when using them
+within a Cube Query Rewrite. Outside a Cube Query Rewrite, the behaviour is the
+same as described in the [PostgreSQL documentation][pg-docs].
+
+</InfoBox>
+
+## SQL commands
+
+### `SELECT`
+
+Synopsis:
+
+```sql
+SELECT select_expr [, ...]
+  FROM from_item
+    CROSS JOIN join_item
+    ON join_criteria]*
+  [ WHERE where_condition ]
+  [ GROUP BY grouping_expression ]
+  [ HAVING having_expression ]
+  [ LIMIT number ] [ OFFSET number ];
+```
+
+`SELECT` retrieves rows from a cube.
+
+The `FROM` clause specifies one or more source **cube tables** for the `SELECT`.
+Qualification conditions can be added (via `WHERE`) to restrict the returned
+rows to a small subset of the original dataset.
+
+Example:
+
+```sql
+SELECT COUNT(*), orders.status, users.city
+FROM orders
+  CROSS JOIN users
+WHERE city IN ('San Francisco', 'Los Angeles')
+GROUP BY orders.status, users.city
+HAVING status = 'shipped'
+LIMIT 1 OFFSET 1;
+```
+
+### `EXPLAIN`
+
+Synopsis:
+
+```sql
+EXPLAIN [ ANALYZE ] statement
+```
+
+The `EXPLAIN` command displays the query execution plan that the Cube planner
+will generate for the supplied `statement`.
+
+The `ANALYZE` will execute `statement` and display actual runtime statistics,
+including the total elapsed time expended within each plan node and the total
+number of rows it actually returned.
+
+Example:
+
+```sql
+EXPLAIN WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+   plan_type   |                                plan
+---------------+---------------------------------------------------------------------
+ logical_plan  | Projection: #COUNT(UInt8(1))                                       +
+               |   Aggregate: groupBy=[[]], aggr=[[COUNT(UInt8(1))]]                +
+               |     CubeScan: request={                                            +
+               |   "measures": [                                                    +
+               |     "orders.count"                                                 +
+               |   ],                                                               +
+               |   "dimensions": [                                                  +
+               |     "products.name",                                               +
+               |     "products.description"                                         +
+               |   ],                                                               +
+               |   "segments": []                                                   +
+               | }
+ physical_plan | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))]        +
+               |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))]    +
+               |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))]+
+               |       CubeScanExecutionPlan                                        +
+               |
+(2 rows)
+```
+
+With `ANALYZE`:
+
+```sql
+EXPLAIN ANALYZE WITH cte AS (
+  SELECT o.count as count, p.name as product_name, p.description as product_description
+  FROM orders o
+    CROSS JOIN products p
+)
+SELECT COUNT(*) FROM cte;
+     plan_type     |                                                                                plan
+-------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Plan with Metrics | ProjectionExec: expr=[COUNT(UInt8(1))@0 as COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=541ns, spill_count=0, spilled_bytes=0, mem_used=0]           +
+                   |   HashAggregateExec: mode=Final, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=6.583µs, spill_count=0, spilled_bytes=0, mem_used=0]     +
+                   |     HashAggregateExec: mode=Partial, gby=[], aggr=[COUNT(UInt8(1))], metrics=[output_rows=1, elapsed_compute=13.958µs, spill_count=0, spilled_bytes=0, mem_used=0]+
+                   |       CubeScanExecutionPlan, metrics=[]                                                                                                                           +
+                   |
+(1 row)
+```
+
+### `SHOW`
+
+Synopsis:
+
+```sql
+SHOW name
+SHOW ALL
+```
+
+Returns the value of a runtime parameter using `name`, or all runtime parameters
+if `ALL` is specified.
+
+Example:
+
+```sql
+SHOW timezone;
+ setting
+---------
+ GMT
+(1 row)
+
+SHOW ALL;
+            name             |    setting     | description
+-----------------------------+----------------+-------------
+ max_index_keys              | 32             |
+ max_allowed_packet          | 67108864       |
+ timezone                    | GMT            |
+ client_min_messages         | NOTICE         |
+ standard_conforming_strings | on             |
+ extra_float_digits          | 1              |
+ transaction_isolation       | read committed |
+ application_name            | NULL           |
+ lc_collate                  | en_US.utf8     |
+(9 rows)
+```
+
+
+## SQL functions and operators
+
+### Comparison functions and operators
+
+#### Less than
+
+```sql
+datatype < datatype
+```
+
+Returns true if the first `datatype` is less than the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `<` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.number < 1000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `<` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.number < 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+### Greater than
+
+```sql
+datatype > datatype
+```
+
+Returns true if the first `datatype` is greater than the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                   | Selections | Projections | Outer Query                              |
+| ----------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `>` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.number > 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+The example below uses `>` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.number > 1000;
+ COUNT(UInt8(1))
+-----------------
+               0
+(1 row)
+```
+
+#### Less than or equal to
+
+```sql
+datatype <= datatype
+```
+
+Returns true if the first `datatype` is less than or equal to the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&lt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `<=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.number <= 1000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `<=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.number <= 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+#### Greater than or equal to
+
+```sql
+datatype >= datatype
+```
+
+Returns true if the first `datatype` is greater than or equal to the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                        | Selections | Projections | Outer Query                              |
+| ---------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&gt;&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `>=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.number >= 1000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+The example below uses `>=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.number >= 1000;
+ COUNT(UInt8(1))
+-----------------
+               0
+(1 row)
+```
+
+#### Equal
+
+```sql
+datatype = datatype
+```
+
+Returns true if the first `datatype` is equal to the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                    | Selections | Projections | Outer Query                              |
+| ------------------ | ---------- | ----------- | ---------------------------------------- |
+| <code>&#61;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.status = 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `=` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.status = 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+#### Not equal
+
+```sql
+datatype != datatype
+```
+
+Returns true if the first `datatype` is not equal to the second.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|                                              | Selections | Projections | Outer Query                              |
+| -------------------------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>!&#61;</code> or <code>&lt;&gt;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `!=` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.status != 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `<>` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.status <> 'completed';
+ COUNT(UInt8(1))
+-----------------
+            6654
+(1 row)
+```
+
+#### `BETWEEN`
+
+```sql
+datatype BETWEEN datatype AND datatype
+```
+
+Returns true if the first `datatype` is between the second and third.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|           | Selections | Projections | Outer Query                              |
+| --------- | ---------- | ----------- | ---------------------------------------- |
+| `BETWEEN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `BETWEEN` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE orders.number BETWEEN(orders.status) 1 AND 100000;
+ COUNT(UInt8(1))
+-----------------
+(0 rows)
+```
+
+The example below uses `BETWEEN` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE o.number BETWEEN 1 AND 100000;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+### Mathematical functions and operators
+
+#### `TRUNC`
+
+```sql
+TRUNC(numeric)
+```
+
+Truncates a number to an integer (towards zero).
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `TRUNC` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `TRUNC` in a projection within a Cube query rewrite:
+
+```sql
+SELECT TRUNC(orders.number) FROM orders LIMIT 1;
+ trunc(orders.number)
+----------------------
+               504690
+(1 row)
+```
+
+The example below uses `TRUNC` in post-processing with an outer query:
+
+```sql
+SELECT TRUNC(orders.number)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ trunc(o.number)
+----------------------
+               504690
+(1 row)
+```
+
+### String functions and operators
+
+#### Concatenation
+
+```sql
+string || string
+```
+
+Concatenates the first `string` with the `second`.
+
+|                           | Selections | Projections | Outer Query                              |
+| ------------------------- | ---------- | ----------- | ---------------------------------------- |
+| <code>&vert;&vert;</code> | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `||` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*)
+FROM orders
+WHERE status = 'comple' || 'ted';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `||` in post-processing with an outer query:
+
+```sql
+SELECT (status || status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ o.status || o.status
+--------------------------------
+ processingprocessing
+(1 rows)
+```
+
+#### `BIT_LENGTH`
+
+```sql
+BIT_LENGTH(string)
+```
+
+Returns number of bits in the string (8 times the `OCTET_LENGTH`).
+
+|              | Selections | Projections | Outer Query                              |
+| ------------ | ---------- | ----------- | ---------------------------------------- |
+| `BIT_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `BIT_LENGTH` in post-processing with an outer query:
+
+```sql
+SELECT BIT_LENGTH(status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ bitlength(orders.status)
+--------------------------
+                       80
+(1 row)
+```
+
+#### `CHAR_LENGTH`
+
+```sql
+CHAR_LENGTH(string)
+CHARACTER_LENGTH(string)
+```
+
+Returns the number of characters in the string.
+
+|               | Selections | Projections | Outer Query                              |
+| ------------- | ---------- | ----------- | ---------------------------------------- |
+| `CHAR_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `CHAR_LENGTH` in post-processing with an outer query:
+
+```sql
+SELECT CHAR_LENGTH(status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ characterlength(orders.status)
+--------------------------------
+                             10
+(1 row)
+```
+
+#### `LOWER`
+
+```sql
+LOWER(string)
+```
+
+Converts `string` to all lower case.
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `LOWER` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `LOWER` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE LOWER(orders.status) = 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `LOWER` in post-processing with an outer query:
+
+```sql
+SELECT LOWER(orders.status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ lower(o.status)
+----------------------
+ processing
+(1 row)
+```
+
+#### `OCTET_LENGTH`
+
+```sql
+OCTET_LENGTH(string)
+```
+
+Returns number of bytes in the string.
+
+|                | Selections | Projections | Outer Query                              |
+| -------------- | ---------- | ----------- | ---------------------------------------- |
+| `OCTET_LENGTH` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `OCTET_LENGTH` in post-processing with an outer query:
+
+```sql
+SELECT OCTET_LENGTH(status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ octetlength(orders.status)
+----------------------------
+                         10
+(1 row)
+```
+
+#### `SUBSTRING`
+
+```sql
+SUBSTRING (string [ FROM start integer ] [ FOR count integer ])
+```
+
+Extracts the substring of string starting at the `start` character (if
+specified), and stopping after `count` characters (if specified). Either `start`
+or `count` must be specified.
+
+|             | Selections | Projections | Outer Query                              |
+| ----------- | ---------- | ----------- | ---------------------------------------- |
+| `SUBSTRING` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `SUBSTRING` in a projection within a Cube query rewrite:
+
+```sql
+SELECT SUBSTRING(orders.status, 1, 3) FROM orders LIMIT 1;
+ substr(orders.status,Int64(1),Int64(3))
+-----------------------------------------
+ com
+(1 row)
+```
+
+The example below uses `SUBSTRING` in post-processing with an outer query:
+
+```sql
+SELECT SUBSTRING(orders.status, 1, 3)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ substr(o.status,Int64(1),Int64(3))
+-----------------------------------------
+ com
+(1 row)
+```
+
+#### `TRIM`
+
+```sql
+TRIM ([ LEADING | TRAILING | BOTH ] [ characters text ] FROM string)
+```
+
+Removes the longest string containing only characters in characters (a space by
+default) from the start, end, or both ends (`BOTH` is the default) of `string`.
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `TRIM` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `TRIM` in post-processing with an outer query:
+
+```sql
+SELECT TRIM(LEADING 'p' FROM orders.status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ ltrim(o.status,Utf8("p"))
+--------------------------------
+ rocessing
+(1 row)
+
+cube=>
+```
+
+#### `UPPER`
+
+```sql
+UPPER(string)
+```
+
+Converts `string` to all upper case.
+
+|         | Selections | Projections | Outer Query                              |
+| ------- | ---------- | ----------- | ---------------------------------------- |
+| `UPPER` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `UPPER` in post-processing with an outer query:
+
+```sql
+SELECT UPPER(orders.status)
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ upper(o.status)
+----------------------
+ PROCESSING
+(1 row)
+```
+
+#### `STARTS_WITH`
+
+```sql
+starts_with (string, prefix)
+```
+
+Returns true if `string` starts with `prefix`.
+
+|               | Selections | Projections | Outer Query                              |
+| ------------- | ---------- | ----------- | ---------------------------------------- |
+| `STARTS_WITH` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `STARTS_WITH` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE STARTS_WITH(orders.status, 'complete');
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+The example below uses `STARTS_WITH` in post-processing with an outer query:
+
+```sql
+SELECT STARTS_WITH(orders.status, 'complete')
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+ startswith(o.status,Utf8("complete"))
+--------------------------------------------
+ f
+(1 row)
+```
+
+### Pattern matching
+
+#### `LIKE`
+
+```sql
+string LIKE pattern
+```
+
+Returns true if `string` matches the supplied `pattern`.
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `LIKE` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `LIKE` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*)
+FROM orders
+WHERE orders.status LIKE 'completed';
+ COUNT(UInt8(1))
+-----------------
+            3346
+(1 row)
+```
+
+#### `REGEXP_SUBSTR`
+
+```sql
+REGEXP_SUBSTR(string, pattern)
+```
+
+Returns the substring of `string` that matches a POSIX regular expression
+`pattern`, or null if there is no match.
+
+|                 | Selections | Projections | Outer Query                              |
+| --------------- | ---------- | ----------- | ---------------------------------------- |
+| `REGEXP_SUBSTR` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `REGEXP_SUBSTR` in post-processing with an outer query:
+
+```sql
+SELECT REGEXP_SUBSTR(orders.status, '\w+')
+FROM (SELECT * FROM orders) o
+LIMIT 1;
+```
+
+### Aggregation functions
+
+#### `COUNT`
+
+```sql
+COUNT(*)
+COUNT(col)
+```
+
+Counts the number of rows. If `*` is specified, the count returned is the
+**total** number of rows.
+
+|         | Selections | Projections                  | Outer Query                              |
+| ------- | ---------- | ---------------------------- | ---------------------------------------- |
+| `COUNT` | ❌         | ✅ <sup>1</sup> <sup>2</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1.  `COUNT` can **only** be used to query measures of type
+    [`count`][ref-schema-ref-measure-types-count] inside Cube query rewrites.
+
+2.  If `*` is specified, Cube will query the **first** measure of type `count`
+    found in the cube
+
+The example below uses `COUNT` in a projection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders;
+ COUNT(UInt8(1))
+-----------------
+           10000
+(1 row)
+```
+
+The example below uses `COUNT` with a measure of type `count` in a projection
+within a Cube query rewrite:
+
+```sql
+SELECT COUNT(orders.count) FROM orders;
+ COUNT(orders.count)
+---------------------
+               10000
+(1 row)
+```
+
+#### `MEASURE`
+
+```sql
+MEASURE(measure)
+```
+
+`MEASURE` is **only supported** inside Cube query rewrites. It is a special
+function that can be only be used with [cube
+measures][ref-schema-ref-measure-types].
+
+The example below uses `MEASURE` in a projection within a Cube query rewrite:
+
+```sql
+SELECT MEASURE(orders.count) FROM orders;
+ measure(orders.count)
+-----------------------
+                 10000
+(1 row)
+```
+
+#### `SUM`
+
+```sql
+SUM(col)
+```
+
+Computes the sum of the non-null input values.
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `SUM` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1.  `SUM` can **only** be used to query measures of type
+    [`sum`][ref-schema-ref-measure-types-sum] inside Cube query rewrites.
+
+The example below uses `SUM` with a measure of type `sum` in a projection within
+a Cube query rewrite:
+
+```sql
+SELECT SUM(number) FROM orders;
+ SUM(orders.number)
+--------------------
+             504690
+(1 row)
+```
+
+#### `AVG`
+
+```sql
+AVG(col)
+```
+
+Computes the average (arithmetic mean) of all the non-null input values.
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `AVG` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1.  `AVG` can **only** be used to query measures of type
+    [`avg`][ref-schema-ref-measure-types-avg] inside Cube query rewrites.
+
+The example below uses `AVG` with a measure of type `avg` in a projection within
+a Cube query rewrite:
+
+```sql
+SELECT AVG(avgNumber) FROM orders;
+ AVG(orders.avgNumber)
+-----------------------
+                50.469
+(1 row)
+```
+
+#### `MIN`
+
+```sql
+MIN(col)
+```
+
+Computes the minimum of the non-null input values. Available for any numeric,
+string or date/time value.
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `MIN` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1.  `MIN` can **only** be used to query measures of type
+    [`min`][ref-schema-ref-measure-types-min] inside Cube query rewrites.
+
+The example below uses `MIN` with a measure of type `min` in a projection within
+a Cube query rewrite:
+
+```sql
+SELECT MIN(min_number) FROM orders;
+ MIN(orders.min_number)
+-----------------------
+                     1
+(1 row)
+```
+
+#### `MAX`
+
+```sql
+MAX(col)
+```
+
+Computes the maximum of the non-null input values. Available for any numeric,
+string or date/time value.
+
+|       | Selections | Projections     | Outer Query                              |
+| ----- | ---------- | --------------- | ---------------------------------------- |
+| `MAX` | ❌         | ✅ <sup>1</sup> | [✅][ref-backend-sql-query-fundamentals] |
+
+1.  `MAX` can **only** be used to query measures of type
+    [`max`][ref-schema-ref-measure-types-max] inside Cube query rewrites.
+
+The example below uses `MAX` with a measure of type `max` in a projection within
+a Cube query rewrite:
+
+```sql
+SELECT MAX(max_number) FROM orders;
+ MAX(orders.max_number)
+-----------------------
+                   100
+(1 row)
+```
+
+### Date/time Functions
+
+#### `TO_TIMESTAMP`
+
+```sql
+TO_TIMESTAMP(string, string)
+```
+
+Converts a `string` to a `timestamp` according to the given format.
+
+|                | Selections | Projections | Outer Query                              |
+| -------------- | ---------- | ----------- | ---------------------------------------- |
+| `TO_TIMESTAMP` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+Valid format patterns can be found [here][pg-docs-datetime-formats].
+
+The example below uses `TO_TIMESTAMP` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss') < orders.createdAt;
+ COUNT(UInt8(1))
+-----------------
+            7945
+(1 row)
+```
+
+#### `LOCALTIMESTAMP`
+
+```sql
+LOCALTIMESTAMP()
+```
+
+Returns the current date and time.
+
+|                  | Selections | Projections | Outer Query                              |
+| ---------------- | ---------- | ----------- | ---------------------------------------- |
+| `LOCALTIMESTAMP` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `LOCALTIMESTAMP` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE LOCALTIMESTAMP() > orders.createdAt;
+ COUNT(UInt8(1))
+-----------------
+            7693
+(1 row)
+```
+
+#### `NOW`
+
+```sql
+NOW()
+```
+
+Returns the current date and time with time zone.
+
+|       | Selections | Projections | Outer Query                              |
+| ----- | ---------- | ----------- | ---------------------------------------- |
+| `NOW` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `NOW` in post-processing with an outer query:
+
+```sql
+SELECT COUNT(*)
+FROM (SELECT * FROM orders) o
+WHERE NOW() > orders.createdAt;
+ COUNT(UInt8(1))
+-----------------
+            7693
+(1 row)
+```
+
+#### `EXTRACT`
+
+```sql
+EXTRACT(field FROM source)
+```
+
+The `EXTRACT` function retrieves subfields such as year or hour from date/time
+values.
+
+|           | Selections | Projections | Outer Query                              |
+| --------- | ---------- | ----------- | ---------------------------------------- |
+| `EXTRACT` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
+
+`source` must be a value expression of type `timestamp`, `time`, or `interval`.
+(Expressions of type `date` are cast to `timestamp` and can therefore be used as
+well). `field` is an identifier or string that selects what field to extract
+from `source`. The `EXTRACT` function returns values of type `numeric`.
+
+The example below uses `EXTRACT` in a projection within a Cube query rewrite:
+
+```sql
+SELECT EXTRACT(YEAR FROM orders.createdAt)
+FROM orders
+LIMIT 1;
+ datepart(Utf8("year"),orders.createdAt)
+-----------------------------------------
+                                    2019
+(1 row)
+```
+
+#### `DATE_TRUNC`
+
+```sql
+DATE_TRUNC(field, source)
+```
+
+The `DATE_TRUNC` function is conceptually similar to the `trunc` function for
+numbers.
+
+|              | Selections | Projections | Outer Query                              |
+| ------------ | ---------- | ----------- | ---------------------------------------- |
+| `DATE_TRUNC` | ❌         | ✅          | [✅][ref-backend-sql-query-fundamentals] |
+
+`source` is a value expression of type `timestamp`, `timestamp with time zone`,
+or `interval`. `field` selects to which precision to truncate the input value.
+The return value is likewise of type `timestamp`, `timestamp with time zone`, or
+`interval`, and it has all fields that are less significant than the selected
+one set to zero (or one, for day and month).
+
+The example below uses `DATE_TRUNC` in a projection within a Cube query rewrite:
+
+```sql
+SELECT DATE_TRUNC('month', orders.createdAt)
+FROM orders
+LIMIT 1;
+ datetrunc(Utf8("month"),orders.createdAt)
+-------------------------------------------
+ 2019-01-01 00:00:00.000000
+(1 row)
+```
+
+### Conditional expressions
+
+#### `CASE`
+
+```sql
+CASE WHEN condition THEN result
+     [WHEN ...]
+     [ELSE result]
+END
+```
+
+The `CASE` expression is a generic conditional expression, similar to if/else
+statements in other programming languages.
+
+Within a Cube Query Rewrite, this operator may behave differently. Use the table
+below for support:
+
+|        | Selections | Projections | Outer Query                              |
+| ------ | ---------- | ----------- | ---------------------------------------- |
+| `CASE` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `CASE` in post-processing with an outer query:
+
+```sql
+SELECT
+  CASE
+    WHEN char_length(status) > 5 THEN 'big'
+    ELSE 'small'
+  END status,
+  SUM(number) as total_value
+from (
+  SELECT status, number FROM orders
+) orders
+GROUP BY 1;
+ status | total_value
+--------+------------
+ big    |     504690
+(1 row)
+```
+
+#### `COALESCE`
+
+```sql
+COALESCE(value [, ...])
+```
+
+The `COALESCE` function returns the first of its arguments that is not null.
+
+|            | Selections | Projections | Outer Query                              |
+| ---------- | ---------- | ----------- | ---------------------------------------- |
+| `COALESCE` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+Null is returned only if all arguments are null. It is used to substitute a
+default value for null values when data is retrieved for display.
+
+The example below uses `COALESCE` in post-processing with an outer query:
+
+```sql
+SELECT
+  COUNT(*),
+  COALESCE(status, 'unknown') AS state
+FROM (SELECT * FROM orders) o
+GROUP BY 2;
+ COUNT(UInt8(1)) |   state
+-----------------+------------
+            3354 | processing
+            3346 | completed
+            3300 | shipped
+(3 rows)
+```
+
+#### `NULLIF`
+
+```sql
+NULLIF(value1, value2)
+```
+
+The `NULLIF` function returns a null value if `value1` equals `value2`,
+otherwise it returns `value1`.
+
+|          | Selections | Projections | Outer Query                              |
+| -------- | ---------- | ----------- | ---------------------------------------- |
+| `NULLIF` | ❌         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `NULLIF` in post-processing with an outer query:
+
+```sql
+SELECT NULLIF(orders.status, 'completed'), COUNT(*)
+FROM (SELECT * FROM orders) o
+GROUP BY 1;
+ nullif(orders.status,Utf8("completed")) | COUNT(UInt8(1))
+-----------------------------------------+-----------------
+ processing                              |            3354
+                                         |            3346
+ shipped                                 |            3300
+(3 rows)
+```
+
+### Row and array comparisons
+
+#### `IN`
+
+```sql
+expression IN (value [, ...])
+```
+
+The `IN` operator allows specifying multiple values for comparison in a `WHERE`
+clause, and returns `true` if the provided expression matches **any** of the
+values.
+
+|      | Selections | Projections | Outer Query                              |
+| ---- | ---------- | ----------- | ---------------------------------------- |
+| `IN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `IN` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE status IN ('shipped', 'completed');
+ COUNT(UInt8(1))
+-----------------
+            6646
+(1 row)
+```
+
+#### `NOT IN`
+
+```sql
+expression NOT IN (value [, ...])
+```
+
+The `NOT IN` operator is the reverse of the [`IN`
+operator][self-ref-row-array-in]; it returns `true` if the provided expression
+matches **none** of the values.
+
+|          | Selections | Projections | Outer Query                              |
+| -------- | ---------- | ----------- | ---------------------------------------- |
+| `NOT IN` | ✅         | ❌          | [✅][ref-backend-sql-query-fundamentals] |
+
+The example below uses `IN` in a selection within a Cube query rewrite:
+
+```sql
+SELECT COUNT(*) FROM orders WHERE status NOT IN ('shipped', 'completed');
+ COUNT(UInt8(1))
+-----------------
+            3354
+(1 row)
+```
+
+[pg-docs]: https://www.postgresql.org/docs/current/
+[pg-docs-datetime-formats]:
+  https://www.postgresql.org/docs/14/functions-formatting.html#FUNCTIONS-FORMATTING-DATETIME-TABLE
+[ref-backend-sql-query-fundamentals]:
+  /product/apis-integrations/sql-api#querying-fundamentals
+[ref-schema-ref-measure-types]:
+  /reference/data-model/types-and-formats#measure-types
+[ref-schema-ref-measure-types-avg]:
+  /reference/data-model/types-and-formats#avg
+[ref-schema-ref-measure-types-count]:
+  /reference/data-model/types-and-formats#count
+[ref-schema-ref-measure-types-max]:
+  /reference/data-model/types-and-formats#max
+[ref-schema-ref-measure-types-min]:
+  /reference/data-model/types-and-formats#min
+[ref-schema-ref-measure-types-sum]:
+  /reference/data-model/types-and-formats#sum
+[self-ref-row-array-in]: #row-and-array-comparisons-in
+
+[ref-sql-api]: /product/apis-integrations/sql-api

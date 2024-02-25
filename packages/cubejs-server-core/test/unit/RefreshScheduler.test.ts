@@ -1,10 +1,9 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import { pausePromise, SchemaFileRepository } from '@cubejs-backend/shared';
-import { CubejsServerCore, DatabaseType } from '../../src';
+import { CubejsServerCore } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
-import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
 const schemaContent = `
 cube('Foo', {
@@ -337,7 +336,14 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
   const mockDriver = new MockDriver();
   const externalDriver = new MockDriver();
 
-  const serverCore = new CubejsServerCore({
+  class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
+    public startScheduledRefreshTimer() {
+      // disabling interval
+      return null;
+    }
+  }
+
+  const serverCore = new CubejsServerCoreDisabledRefreshTimer({
     apiSecret: 'foo',
     logger: (msg, params) => console.log(msg, params),
     driverFactory: async ({ securityContext }) => {
@@ -386,7 +392,7 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertS
     }
   );
 
-  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
+  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(async () => compilerApi);
 
   const refreshScheduler = new RefreshScheduler(serverCore);
   return { refreshScheduler, compilerApi, mockDriver };
@@ -403,7 +409,7 @@ describe('Refresh Scheduler', () => {
 
   afterAll(async () => {
     // align logs from STDOUT
-    await pausePromise(100);
+    await pausePromise(250);
   });
 
   test('Round robin pre-aggregation refresh by history priority', async () => {

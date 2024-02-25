@@ -114,6 +114,14 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying ECommerce: partitioned pre-agg",
     "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg"
+    "querying BigECommerce: partitioned pre-agg",
+    "querying BigECommerce: null sum",
+    "querying BigECommerce: null boolean",
+    "--------------------",
+    "week granularity is not supported for intervals",
+    "--------------------",
+    "querying BigECommerce: rolling window by 2 day",
+    "querying BigECommerce: rolling window by 2 week",
+    "querying BigECommerce: rolling window by 2 month"
   ]
 }

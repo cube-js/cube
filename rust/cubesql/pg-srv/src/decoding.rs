@@ -5,6 +5,7 @@ use crate::{
     ProtocolError,
 };
 use byteorder::{BigEndian, ByteOrder};
+use std::backtrace::Backtrace;
 
 /// This trait explains how to decode values from the protocol
 /// It's used in the Bind message
@@ -33,31 +34,34 @@ pub trait FromProtocolValue {
 
 impl FromProtocolValue for String {
     fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+        String::from_utf8(raw.clone()).map_err(|err| ProtocolError::ErrorResponse {
+            source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+            backtrace: Backtrace::capture(),
         })
     }
 
     fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
+        String::from_utf8(raw.clone()).map_err(|err| ProtocolError::ErrorResponse {
+            source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+            backtrace: Backtrace::capture(),
         })
     }
 }
 
 impl FromProtocolValue for i64 {
     fn from_text(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
-        let as_str = String::from_utf8(raw.clone()).map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })?;
+        let as_str =
+            String::from_utf8(raw.clone()).map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })?;
 
-        as_str.parse::<i64>().map_err(|err| {
-            ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()).into():
-                ProtocolError
-        })
+        as_str
+            .parse::<i64>()
+            .map_err(|err| ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(ErrorCode::ProtocolViolation, err.to_string()),
+                backtrace: Backtrace::capture(),
+            })
     }
 
     fn from_binary(raw: &Vec<u8>) -> Result<Self, ProtocolError> {
@@ -70,11 +74,13 @@ impl FromProtocolValue for bool {
         match raw[0] {
             b't' => Ok(true),
             b'f' => Ok(false),
-            other => Err(ErrorResponse::error(
-                ErrorCode::ProtocolViolation,
-                format!("Unable to decode bool from text, actual: {}", other),
-            )
-            .into(): ProtocolError),
+            other => Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unable to decode bool from text, actual: {}", other),
+                ),
+                backtrace: Backtrace::capture(),
+            }),
         }
     }
 
@@ -82,11 +88,13 @@ impl FromProtocolValue for bool {
         match raw[0] {
             1 => Ok(true),
             0 => Ok(false),
-            other => Err(ErrorResponse::error(
-                ErrorCode::ProtocolViolation,
-                format!("Unable to decode bool from binary, actual: {}", other),
-            )
-            .into(): ProtocolError),
+            other => Err(ProtocolError::ErrorResponse {
+                source: ErrorResponse::error(
+                    ErrorCode::ProtocolViolation,
+                    format!("Unable to decode bool from binary, actual: {}", other),
+                ),
+                backtrace: Backtrace::capture(),
+            }),
         }
     }
 }

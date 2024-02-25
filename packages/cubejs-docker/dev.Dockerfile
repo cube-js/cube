@@ -1,4 +1,4 @@
-FROM node:16.20.0-bullseye-slim AS base
+FROM node:16.20.2-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -93,11 +93,14 @@ RUN yarn config set network-timeout 120000 -g
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
+
 FROM base as prod_base_dependencies
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
 FROM prod_base_dependencies as prod_dependencies
-COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
@@ -178,6 +181,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV PYTHONUNBUFFERED=1
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

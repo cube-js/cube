@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.33.24",
+  "version": "0.34.56",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -23,8 +23,8 @@
     "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
     "test:unit": "jest --forceExit",
     "test:cargo": "cargo test",
-    "lint": "eslint test/ --ext .ts",
-    "lint:fix": "eslint --fix test/ --ext .ts"
+    "lint": "eslint test/ js/ --ext .ts",
+    "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
   "engines": {
     "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
@@ -33,18 +33,18 @@
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.33.0",
-    "@cubejs-backend/testing-shared": "^0.33.24",
-    "@types/jest": "^26",
+    "@cubejs-backend/linter": "^0.34.25",
+    "@types/jest": "^27",
     "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
-    "jest": "^26",
+    "jest": "^27",
     "mysql2": "^2.3.3",
-    "typescript": "~4.9.5"
+    "typescript": "~5.2.2",
+    "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.33.24",
-    "@cubejs-backend/shared": "^0.33.24",
+    "@cubejs-backend/cubesql": "^0.34.56",
+    "@cubejs-backend/shared": "^0.34.55",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {
@@ -54,17 +54,16 @@
         "value": [
           "libpython",
           [
+            "3.12",
             "3.11",
             "3.10",
             "3.9"
           ]
         ],
         "constraints": {
-          "platform": [
-            "linux"
-          ],
-          "arch": [
-            "x64"
+          "platform-arch": [
+            "linux-x64",
+            "linux-arm64"
           ]
         }
       }
@@ -85,7 +84,8 @@
     ],
     "setupFilesAfterEnv": [
       "<rootDir>/dist/test/setup/index.js"
-    ]
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

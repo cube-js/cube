@@ -1,0 +1,22 @@
+.Th {
+  background: var(--dark_bg);
+  border-bottom: 1px solid var(--dark_05);
+  border-right: 1px solid var(--dark_05);
+  padding: 0.25rem 1rem;
+
+  font-size: 1rem;
+  line-height: 1.75rem;
+  font-weight: 700;
+
+  &:last-child {
+    border-right: none;
+  }
+
+  //&:first-of-type {
+  //  border-top-left-radius: 0.5rem;
+  //}
+  //
+  //&:last-of-type {
+  //  border-top-right-radius: 0.5rem;
+  //}
+}

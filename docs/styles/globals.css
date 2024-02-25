@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --hover_transition: 0.15s;
+
+  --topbar_height: 88px;
+
+  /* max-width */
+  --max-width-l: 1248px;
+  --max-width-m: 1120px;
+  --max-width-s: 800px;
+
+  /* spacing system */
+  --space-4xl: 96px;
+  --space-3xl: 80px;
+  --space-2xl: 64px;
+  --space-xl: 48px;
+  --space-l: 32px;
+  --space-m: 24px;
+  --space-s: 16px;
+  --space-xs: 8px;
+  --space-2xs: 4px;
+
+  /* common horizontal padding for page sections */
+  --padding-inline: 24px;
+
+  --border-radius-l: 32px;
+  --border-radius-m: 24px;
+  --border-radius-s: 16px;
+  --border-radius-xs: 8px;
+}
+
+@media (min-width: 980px) {
+  :root {
+    --space-4xl: 96px;
+    --space-3xl: 80px;
+    --space-2xl: 64px;
+    --space-xl: 48px;
+    --space-l: 32px;
+    --space-m: 24px;
+    --space-s: 16px;
+    --space-xs: 8px;
+
+    --padding-inline: 24px;
+
+    --border-radius-l: 32px;
+    --border-radius-m: 24px;
+    --border-radius-s: 16px;
+  }
+}
+
+/* Tablet And Mobile */
+@media (max-width: 979px) {
+  :root {
+    --topbar_height: 62px;
+
+    --space-4xl: 64px;
+    --space-3xl: 56px;
+    --space-2xl: 48px;
+    --space-xl: 40px;
+    --space-l: 24px;
+    --space-m: 24px;
+    --space-s: 16px;
+    --space-xs: 8px;
+
+    --padding-inline: 24px;
+
+    --border-radius-l: 24px;
+    --border-radius-m: 16px;
+    --border-radius-s: 16px;
+  }
+}
+
+/* Only when top menu is visible */
+@media (min-width: 768px) {
+  .nextra-nav-container > nav > :nth-child(1) {
+    margin-right: 98px !important;
+  }
+
+  .nextra-nav-container > nav > a + button {
+    margin-left: auto;
+  }
+}
+
+/* Only Tablet */
+@media (min-width: 640px) and (max-width: 979px) {
+}
+
+/* Only Mobile */
+@media (max-width: 639px) {
+}

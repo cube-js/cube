@@ -20,6 +20,7 @@ pub use rocks_store::*;
 pub use rocks_table::*;
 
 use crate::cluster::node_name_by_partition;
+use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
 use log::info;
 use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
@@ -151,7 +152,7 @@ macro_rules! base_rocks_secondary_index {
                 crate::metastore::RocksSecondaryIndex::get_id(self)
             }
 
-            fn value_version(&self) -> u32 {
+            fn value_version(&self) -> crate::metastore::RocksSecondaryIndexValueVersion {
                 crate::metastore::RocksSecondaryIndex::value_version(self)
             }
 
@@ -165,6 +166,10 @@ macro_rules! base_rocks_secondary_index {
 
             fn is_ttl(&self) -> bool {
                 RocksSecondaryIndex::is_ttl(self)
+            }
+
+            fn store_ttl_extended_info(&self) -> bool {
+                RocksSecondaryIndex::store_ttl_extended_info(self)
             }
 
             fn get_expire(&self, row: &$table) -> Option<chrono::DateTime<chrono::Utc>> {
@@ -310,10 +315,12 @@ impl DataFrameValue<String> for Option<Row> {
                             TableValue::Null => "NULL".to_string(),
                             TableValue::String(s) => format!("\"{}\"", s),
                             TableValue::Int(i) => i.to_string(),
+                            TableValue::Int96(i) => i.to_string(),
                             TableValue::Timestamp(t) => format!("{:?}", t),
                             TableValue::Bytes(b) => format!("{:?}", b),
                             TableValue::Boolean(b) => format!("{:?}", b),
                             TableValue::Decimal(v) => format!("{}", v.raw_value()),
+                            TableValue::Decimal96(v) => format!("{}", v.raw_value()),
                             TableValue::Float(v) => format!("{}", v),
                         })
                         .join(", ")
@@ -359,10 +366,12 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
 pub enum ColumnType {
     String,
     Int,
+    Int96,
     Bytes,
     HyperLogLog(HllFlavour), // HLL Sketches, compatible with presto.
     Timestamp,
     Decimal { scale: i32, precision: i32 },
+    Decimal96 { scale: i32, precision: i32 },
     Float,
     Boolean,
 }
@@ -371,8 +380,10 @@ impl Display for ColumnType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         let s = match self {
             ColumnType::Decimal { scale, .. } => return write!(f, "decimal({})", scale),
+            ColumnType::Decimal96 { scale, .. } => return write!(f, "decimal96({})", scale),
             ColumnType::String => "text",
             ColumnType::Int => "int",
+            ColumnType::Int96 => "int96",
             ColumnType::Bytes => "bytes",
             ColumnType::HyperLogLog(HllFlavour::Airlift) => "hyperloglog",
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "hyperloglogpp",
@@ -390,8 +401,19 @@ impl ColumnType {
     pub fn from_string(s: &str) -> Result<ColumnType, CubeError> {
         lazy_static! {
             static ref DECIMAL_RE: Regex = Regex::new(r"decimal\((?P<scale>\d+)\)").unwrap();
+            static ref DECIMAL_96_RE: Regex = Regex::new(r"decimal96\((?P<scale>\d+)\)").unwrap();
         }
-        if let Some(captures) = DECIMAL_RE.captures(s) {
+        if let Some(captures) = DECIMAL_96_RE.captures(s) {
+            let scale = captures
+                .name("scale")
+                .ok_or(CubeError::internal("missing scale capture".to_string()))?
+                .as_str()
+                .parse::<i32>()?;
+            Ok(ColumnType::Decimal96 {
+                scale,
+                precision: 0,
+            })
+        } else if let Some(captures) = DECIMAL_RE.captures(s) {
             let scale = captures
                 .name("scale")
                 .ok_or(CubeError::internal("missing scale capture".to_string()))?
@@ -405,6 +427,7 @@ impl ColumnType {
             match s {
                 "text" => Ok(ColumnType::String),
                 "int" => Ok(ColumnType::Int),
+                "int96" => Ok(ColumnType::Int),
                 "bigint" => Ok(ColumnType::Int),
                 "bytes" => Ok(ColumnType::Bytes),
                 "hyperloglog" => Ok(ColumnType::HyperLogLog(HllFlavour::Airlift)),
@@ -433,6 +456,13 @@ impl ColumnType {
                     *scale
                 }
             }
+            ColumnType::Decimal96 { scale, .. } => {
+                if *scale > 5 {
+                    10
+                } else {
+                    *scale
+                }
+            }
             x => panic!("target_scale called on {:?}", x),
         }
     }
@@ -453,8 +483,23 @@ impl From<&Column> for parquet::schema::types::Type {
                 .with_repetition(Repetition::OPTIONAL)
                 .build()
                 .unwrap(),
+            ColumnType::Int96 => {
+                types::Type::primitive_type_builder(&column.get_name(), Type::INT96)
+                    .with_repetition(Repetition::OPTIONAL)
+                    .build()
+                    .unwrap()
+            }
             ColumnType::Decimal { precision, .. } => {
                 types::Type::primitive_type_builder(&column.get_name(), Type::INT64)
+                    .with_converted_type(ConvertedType::DECIMAL)
+                    .with_precision(*precision)
+                    .with_scale(column.get_column_type().target_scale())
+                    .with_repetition(Repetition::OPTIONAL)
+                    .build()
+                    .unwrap()
+            }
+            ColumnType::Decimal96 { precision, .. } => {
+                types::Type::primitive_type_builder(&column.get_name(), Type::INT96)
                     .with_converted_type(ConvertedType::DECIMAL)
                     .with_precision(*precision)
                     .with_scale(column.get_column_type().target_scale())
@@ -513,10 +558,14 @@ impl<'a> Into<Field> for &'a Column {
             match self.column_type {
                 ColumnType::String => DataType::Utf8,
                 ColumnType::Int => DataType::Int64,
+                ColumnType::Int96 => DataType::Int96,
                 ColumnType::Timestamp => DataType::Timestamp(Microsecond, None),
                 ColumnType::Boolean => DataType::Boolean,
                 ColumnType::Decimal { .. } => {
                     DataType::Int64Decimal(self.column_type.target_scale() as usize)
+                }
+                ColumnType::Decimal96 { .. } => {
+                    DataType::Int96Decimal(self.column_type.target_scale() as usize)
                 }
                 ColumnType::Bytes => DataType::Binary,
                 ColumnType::HyperLogLog(_) => DataType::Binary,
@@ -532,10 +581,14 @@ impl fmt::Display for Column {
         let column_type = match &self.column_type {
             ColumnType::String => "STRING".to_string(),
             ColumnType::Int => "INT".to_string(),
+            ColumnType::Int96 => "INT96".to_string(),
             ColumnType::Timestamp => "TIMESTAMP".to_string(),
             ColumnType::Boolean => "BOOLEAN".to_string(),
             ColumnType::Decimal { scale, precision } => {
                 format!("DECIMAL({}, {})", precision, scale)
+            }
+            ColumnType::Decimal96 { scale, precision } => {
+                format!("DECIMAL96({}, {})", precision, scale)
             }
             ColumnType::Bytes => "BYTES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Airlift) => "HYPERLOGLOG".to_string(),
@@ -639,7 +692,10 @@ impl AggregateFunction {
                 _ => true,
             },
             Self::SUM => match col_type {
-                ColumnType::Int | ColumnType::Decimal { .. } | ColumnType::Float => true,
+                ColumnType::Int
+                | ColumnType::Decimal { .. }
+                | ColumnType::Decimal96 { .. }
+                | ColumnType::Float => true,
                 _ => false,
             },
             Self::MERGE => match col_type {
@@ -789,6 +845,7 @@ pub trait MetaStore: DIService + Send + Sync {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
@@ -969,6 +1026,8 @@ pub trait MetaStore: DIService + Send + Sync {
         &self,
     ) -> Result<Vec<(IdRow<Partition>, Vec<IdRow<Chunk>>)>, CubeError>;
 
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError>;
+
     fn chunks_table(&self) -> ChunkMetaStoreTable;
     async fn create_chunk(
         &self,
@@ -1119,6 +1178,7 @@ pub trait MetaStore: DIService + Send + Sync {
     // Force compaction for the whole RocksDB
     async fn compaction(&self) -> Result<(), CubeError>;
     async fn healthcheck(&self) -> Result<(), CubeError>;
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError>;
 
     async fn get_snapshots_list(&self) -> Result<Vec<SnapshotInfo>, CubeError>;
     async fn set_current_snapshot(&self, snapshot_id: u128) -> Result<(), CubeError>;
@@ -1217,10 +1277,44 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
             block_opts
         };
 
+        opts.set_max_background_jobs(rocksdb_config.max_background_jobs as i32);
+        opts.set_max_subcompactions(rocksdb_config.max_subcompactions);
         opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
+        opts.set_bottommost_compression_type(rocksdb_config.bottommost_compression_type);
+        opts.increase_parallelism(rocksdb_config.parallelism as i32);
 
         DB::open(&opts, path)
             .map_err(|err| CubeError::internal(format!("DB::open error for metastore: {}", err)))
+    }
+
+    fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
+        let rocksdb_config = config.metastore_rocksdb_config();
+        let mut opts = Options::default();
+        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+
+        let block_opts = {
+            let mut block_opts = BlockBasedOptions::default();
+            // https://github.com/facebook/rocksdb/blob/v7.9.2/include/rocksdb/table.h#L524
+            block_opts.set_format_version(5);
+            block_opts.set_checksum_type(rocksdb_config.checksum_type.as_rocksdb_enum());
+
+            let cache = Cache::new_lru_cache(rocksdb_config.cache_capacity)?;
+            block_opts.set_block_cache(&cache);
+
+            block_opts
+        };
+
+        opts.set_block_based_table_factory(&block_opts);
+        opts.set_compression_type(rocksdb_config.compression_type);
+        opts.set_bottommost_compression_type(rocksdb_config.bottommost_compression_type);
+
+        DB::open_for_read_only(&opts, path, false).map_err(|err| {
+            CubeError::internal(format!(
+                "DB::open_for_read_only error for metastore: {}",
+                err
+            ))
+        })
     }
 
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError> {
@@ -1396,6 +1490,37 @@ impl RocksMetaStore {
         R: Send + Sync + 'static,
     {
         self.store.write_operation(f).await
+    }
+
+    fn drop_table_impl(
+        table_id: u64,
+        db_ref: DbTableRef,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Table>, CubeError> {
+        let tables_table = TableRocksTable::new(db_ref.clone());
+        let indexes_table = IndexRocksTable::new(db_ref.clone());
+        let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
+        let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
+        let indexes = indexes_table
+            .get_row_ids_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?;
+        let trace_objects = trace_objects_table.get_rows_by_index(
+            &TraceObjectIndexKey::ByTableId(table_id),
+            &TraceObjectRocksIndex::ByTableId,
+        )?;
+        for trace_object in trace_objects {
+            trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
+        }
+        let replay_handles = replay_handles_table.get_rows_by_index(
+            &ReplayHandleIndexKey::ByTableId(table_id),
+            &ReplayHandleRocksIndex::ByTableId,
+        )?;
+        for replay_handle in replay_handles {
+            replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
+        }
+        for index in indexes {
+            RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
+        }
+        Ok(tables_table.delete(table_id, batch_pipe)?)
     }
 }
 
@@ -1940,9 +2065,15 @@ impl MetaStore for RocksMetaStore {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
+            if drop_if_exists {
+                if let Ok(exists_table) = get_table_impl(db_ref.clone(), schema_name.clone(), table_name.clone()) {
+                    RocksMetaStore::drop_table_impl(exists_table.get_id(), db_ref.clone(), batch_pipe)?;
+                }
+            }
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
@@ -2286,32 +2417,7 @@ impl MetaStore for RocksMetaStore {
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
-            let tables_table = TableRocksTable::new(db_ref.clone());
-            let indexes_table = IndexRocksTable::new(db_ref.clone());
-            let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
-            let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
-            let indexes = indexes_table.get_row_ids_by_index(
-                &IndexIndexKey::TableId(table_id),
-                &IndexRocksIndex::TableID,
-            )?;
-            let trace_objects = trace_objects_table.get_rows_by_index(
-                &TraceObjectIndexKey::ByTableId(table_id),
-                &TraceObjectRocksIndex::ByTableId,
-            )?;
-            for trace_object in trace_objects {
-                trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
-            }
-            let replay_handles = replay_handles_table.get_rows_by_index(
-                &ReplayHandleIndexKey::ByTableId(table_id),
-                &ReplayHandleRocksIndex::ByTableId,
-            )?;
-            for replay_handle in replay_handles {
-                replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
-            }
-            for index in indexes {
-                RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
-            }
-            Ok(tables_table.delete(table_id, batch_pipe)?)
+            RocksMetaStore::drop_table_impl(table_id, db_ref, batch_pipe)
         })
         .await
     }
@@ -3313,6 +3419,27 @@ impl MetaStore for RocksMetaStore {
         })
         .await
     }
+    async fn get_all_filenames(&self) -> Result<Vec<String>, CubeError> {
+        self.read_operation_out_of_queue(|db| {
+            let mut filenames = Vec::new();
+            for c in ChunkRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let c = c?;
+                if !c.row.in_memory {
+                    filenames.push(c.row.get_full_name(c.id));
+                }
+            }
+
+            for p in PartitionRocksTable::new(db.clone()).table_scan(db.snapshot)? {
+                let p = p?;
+                if p.row.active || p.row.main_table_row_count == 0 {
+                    //maint_table_row_count == 0 means that partition is just created
+                    filenames.push(partition_file_name(p.id, p.row.suffix()));
+                }
+            }
+            Ok(filenames)
+        })
+        .await
+    }
 
     #[tracing::instrument(level = "trace", skip(self))]
     async fn create_chunk(
@@ -4172,6 +4299,10 @@ impl MetaStore for RocksMetaStore {
         Ok(())
     }
 
+    async fn rocksdb_properties(&self) -> Result<Vec<RocksPropertyRow>, CubeError> {
+        self.store.rocksdb_properties()
+    }
+
     async fn healthcheck(&self) -> Result<(), CubeError> {
         self.store.healthcheck().await?;
 
@@ -4990,6 +5121,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5012,6 +5144,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5133,6 +5266,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5157,6 +5291,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5245,6 +5380,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5334,6 +5470,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5406,6 +5543,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5428,6 +5566,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5453,6 +5592,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5826,7 +5966,7 @@ mod tests {
             .await
             .unwrap();
         rocks_meta_store.run_upload().await.unwrap();
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
         assert!(uploaded.is_empty());
 
         rocks_meta_store.upload_check_point().await.unwrap();
@@ -5839,7 +5979,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -5850,7 +5990,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -5867,7 +6007,7 @@ mod tests {
 
         rocks_meta_store.run_upload().await.unwrap();
 
-        let uploaded = remote_fs.list("metastore-").await.unwrap();
+        let uploaded = remote_fs.list("metastore-".to_string()).await.unwrap();
 
         let logs_uploaded = uploaded
             .into_iter()
@@ -5929,6 +6069,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        false,
                     )
                     .await
                     .unwrap();
@@ -6151,6 +6292,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -6291,6 +6433,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();

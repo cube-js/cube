@@ -1,0 +1,114 @@
+---
+redirect_from:
+  - /cloud/deploys
+---
+
+# Continuous deployment
+
+This guide covers features and tools you can use to deploy your Cube project to
+Cube Cloud.
+
+## Deploy with Git
+
+Continuous deployment works by connecting a Git repository to a Cube Cloud
+deployment and keeping the two in sync.
+
+First, go to the <Btn>Build & Deploy</Btn> tab on the <Btn>Settings</Btn> screen
+to make sure your deployment is configured to deploy with Git. Then
+click <Btn>Generate Git credentials</Btn> to obtain Git credentials:
+
+<Screenshot src="https://ucarecdn.com/c79702ad-7a86-4a31-ac0c-9d64ccf91413/" />
+
+The instructions to set up Cube Cloud as a Git remote are also available on the
+same screen:
+
+```bash{promptUser: user}
+git config credential.helper store
+git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
+git push cubecloud master
+```
+
+## Deploy with GitHub
+
+First, ensure your deployment is configured to deploy with Git. Then connect
+your GitHub repository to your deployment by clicking the <Btn>Connect to
+GitHub</Btn> button, and selecting your repository.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/3dab6d90-6bd9-44a5-ae4d-d5579a08dd89/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Cube Cloud will automatically deploy from the specified production branch
+(`master` by default).
+
+## Deploy with CLI
+
+<WarningBox>
+
+Enabling this option will cause the <Btn>Data Model</Btn> page to display the
+last known state of a Git-based codebase (if available), instead of reflecting
+the latest modifications made. It is important to note that the logic will still
+be updated in both the API and the Playground.
+
+</WarningBox>
+
+You can use [the CLI][ref-workspace-cli] to set up continuous deployment for a
+Git repository. You can also use it to manually deploy changes without
+continuous deployment.
+
+### Manual Deploys
+
+You can deploy your Cube project manually. This method uploads data models and
+configuration files directly from your local project directory.
+
+You can obtain a Cube Cloud deploy token from your
+deployment's <Btn>Settings</Btn> screen.
+
+```bash{promptUser: user}
+npx cubejs-cli deploy --token TOKEN
+```
+
+### Continuous Deployment
+
+You can use Cube CLI with your continuous integration tool.
+
+<InfoBox>
+
+You can use the `CUBE_CLOUD_DEPLOY_AUTH` environment variable to pass the Cube
+Cloud deploy token to Cube CLI.
+
+</InfoBox>
+
+Below is an example configuration for GitHub Actions:
+
+```yaml
+name: My Cube App
+on:
+  push:
+    paths:
+      - "**"
+    branches:
+      - "master"
+jobs:
+  deploy:
+    name: Deploy My Cube App
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Use Node.js 14.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 14.x
+      - name: Deploy to Cube Cloud
+        run: npx cubejs-cli deploy
+        env:
+          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+```
+
+[ref-workspace-cli]: /product/workspace/cli

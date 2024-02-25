@@ -68,9 +68,9 @@ export class ClickHouseDbRunner {
 
   testQueries = async (queries, prepareDataSet) => {
     if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
-      const version = process.env.TEST_CLICKHOUSE_VERSION || '21.1.2';
+      const version = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
 
-      this.container = await new GenericContainer(`yandex/clickhouse-server:${version}`)
+      this.container = await new GenericContainer(`clickhouse/clickhouse-server:${version}`)
         .withExposedPorts(8123)
         .start();
     }

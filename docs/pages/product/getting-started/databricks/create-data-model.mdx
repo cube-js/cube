@@ -1,0 +1,213 @@
+# Create your first data model
+
+Cube follows a dataset-oriented data modeling approach, which is inspired by and
+expands upon dimensional modeling. Cube incorporates this approach and provides
+a practical framework for implementing dataset-oriented data modeling.
+
+When building a data model in Cube, you work with two dataset-centric objects:
+**cubes** and **views**. **Cubes** usually represent business entities such as
+customers, line items, and orders. In cubes, you define all the calculations
+within the measures and dimensions of these entities. Additionally, you define
+relationships between cubes, such as "an order has many line items" or "a user
+may place multiple orders."
+
+**Views** sit on top of a data graph of cubes and create a facade of your entire
+data model, with which data consumers can interact. You can think of views as
+the final data products for your data consumers - BI users, data apps, AI
+agents, etc. When building views, you select measures and dimensions from
+different connected cubes and present them as a single dataset to BI or data
+apps.
+
+<Diagram
+  alt="Architecture diagram of queries being sent to cubes and views"
+  src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/"
+/>
+
+## Working with cubes
+
+To begin building your data model, click on <Btn>Enter Development Mode</Btn> in
+Cube Cloud. This will take you to your personal developer space, where you can
+safely make changes to your data model without affecting the production
+environment.
+
+In the previous section, we generated four cubes. To see the data graph of these
+four cubes and how they are connected to each other, click the <Btn>Show
+Graph</Btn> button on the Data Model page.
+
+Let's review the `orders` cube first and update it with additional dimensions
+and measures.
+
+Once you are in developer mode, navigate to the <Btn>Data Model</Btn> and click
+on the `orders.yml` file in the left sidebar inside the `model/cubes` directory
+to open it.
+
+You should see the following content of `model/cubes/orders.yml` file.
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ECOM.ORDERS
+
+    joins:
+      - name: users
+        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        relationship: many_to_one
+
+    dimensions:
+      - name: status
+        sql: STATUS
+        type: string
+
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+      - name: completed_at
+        sql: COMPLETED_AT
+        type: time
+
+    measures:
+      - name: count
+        type: count
+```
+
+As you can see, we already have a `count` measure that we can use to calculate
+the total count of our orders.
+
+Let's add an additional measure to the `orders` cube to calculate only
+**completed orders**. The `status` dimension in the `orders` cube reflects the
+three possible statuses: **processing**, **shipped**, or **completed**. We will
+create a new measure `completed_count` by using a filter on that dimension. To
+do this, we will use a
+[filter parameter](/reference/data-model/measures#filters) of the
+measure and [refer][ref-member-references] to the existing dimension.
+
+Add the following measure definition to your `model/cubes/orders.yml` file. It
+should be included within the `measures` block.
+
+```yaml
+- name: completed_count
+  type: count
+  filters:
+    - sql: "{CUBE}.status = 'completed'"
+```
+
+With these two measures in place, `count` and `completed_count`, we can create a
+**derived measure**. Derived measures are measures that you can create based on
+existing measures. Let's create the `completed_percentage` derived measure.
+
+Add the following measure definition to your `model/cubes/orders.yml` file
+within the `measures` block.
+
+```yaml
+- name: completed_percentage
+  type: number
+  sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+  format: percent
+```
+
+Below you can see what your updated `orders` cube should look like with two new
+measures. Feel free to copy this code and paste it into your
+`model/cubes/order.yml` file.
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ECOM.ORDERS
+
+    joins:
+      - name: users
+        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        relationship: many_to_one
+
+    dimensions:
+      - name: status
+        sql: STATUS
+        type: string
+
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: created_at
+        sql: CREATED_AT
+        type: time
+
+      - name: completed_at
+        sql: COMPLETED_AT
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+      - name: completed_percentage
+        type: number
+        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        format: percent
+```
+
+Click <Btn>Save All</Btn> in the upper corner to save changes to the data model.
+Now, you can navigate to Cube’s Playground. The Playground is a web-based tool
+that allows you to query your data without connecting any tools or writing any
+code. It's the fastest way to explore and test your data model.
+
+You can select measures and dimensions from different cubes in playground,
+including your newly created `completed_percentage` measure.
+
+## Working with views
+
+When building views, we recommend following entity-oriented design and
+structuring your views around your business entities. Usually, cubes tend to be
+normalized entities without duplicated or redundant members, while views are
+denormalized entities where you pick as many measures and dimensions from
+multiple cubes as needed to describe a business entity.
+
+Let's create our first view, which will provide all necessary measures and
+dimensions to explore orders. Views are usually located in the `views` folder
+and have a `_view` postfix.
+
+Create `model/views/orders_view.yml` with the following content:
+
+```yaml
+views:
+  - name: orders_view
+
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+          - created_at
+          - count
+          - completed_count
+          - completed_percentage
+
+      - join_path: orders.users
+        prefix: true
+        includes:
+          - city
+          - age
+          - state
+```
+
+When building views, you can leverage the `cubes` parameter, which enables you
+to include measures and dimensions from other cubes in the view. You can build
+your view by combining multiple joined cubes and specifying the path by which
+they should be joined for that particular view.
+
+After saving, you can experiment with your newly created view in the Playground.
+In the next section, we will learn how to query our `orders_view` using a BI
+tool.
+
+[ref-member-references]: /product/data-modeling/syntax#references

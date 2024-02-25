@@ -575,17 +575,56 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Max number of elements
+   */
+  touchPreAggregationCacheMaxCount: (): number => get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Max cache
+   */
+  touchPreAggregationCacheMaxAge: (): number => {
+    // eslint-disable-next-line no-use-before-define
+    const touchPreAggregationTimeout = getEnv('touchPreAggregationTimeout');
+
+    const maxAge = get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE')
+      .default(Math.round(touchPreAggregationTimeout / 2))
+      .asIntPositive();
+
+    if (maxAge > touchPreAggregationTimeout) {
+      throw new InvalidConfiguration(
+        'CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE',
+        maxAge,
+        `Must be less or equal then CUBEJS_TOUCH_PRE_AGG_TIMEOUT (${touchPreAggregationTimeout}).`
+      );
+    }
+
+    return maxAge;
+  },
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
     .default(60 * 60 * 24)
-    .asInt(),
+    .asIntPositive(),
 
   /**
    * Expire time for touch records
    */
   dropPreAggregationsWithoutTouch: (): boolean => get('CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH')
     .default('true')
+    .asBoolStrict(),
+
+  /**
+   * Fetch Columns by Ordinal Position
+   *
+   * Currently defaults to 'false' as changing this in a live deployment could break existing pre-aggregations.
+   * This will eventually default to true.
+   */
+  fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
+    .default('false')
     .asBoolStrict(),
 
   /** ****************************************************************
@@ -1359,16 +1398,106 @@ const variables: Record<string, (...args: any) => any> = {
    * duckdb                                                         *
    ***************************************************************** */
 
-  duckdbHttpFs: ({
+  duckdbMotherDuckToken: ({
     dataSource
   }: {
     dataSource: string,
   }) => (
     process.env[
-      keyByDataSource('CUBEJS_DB_DUCKDB_HTTP_FS', dataSource)
+      keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
+    ]
+  ),
+  
+  duckdbS3Region: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_REGION', dataSource)
+    ]
+  ),
+  
+  duckdbS3AccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID', dataSource)
+    ]
+  ),
+  
+  duckdbS3SecretAccessKeyId: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY', dataSource)
+    ]
+  ),
+  
+  duckdbS3Endpoint: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_ENDPOINT', dataSource)
     ]
   ),
 
+  duckdbMemoryLimit: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_MEMORY_LIMIT', dataSource)
+    ]
+  ),
+
+  duckdbSchema: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_SCHEMA', dataSource)
+    ]
+  ),
+
+  duckdbS3UseSsl: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_SSL', dataSource)
+    ]
+  ),
+
+  duckdbS3UrlStyle: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_URL_STYLE', dataSource)
+    ]
+  ),
+
+  duckdbS3SessionToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
+    ]
+  ),
+  
   /**
    * Presto catalog.
    */
@@ -1415,7 +1544,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('5000')
     .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default('false')
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
     .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')
@@ -1590,7 +1719,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
   maxSourceRowLimit: () => get('CUBEJS_MAX_SOURCE_ROW_LIMIT')
     .default(200000)
-    .asInt()
+    .asInt(),
+  convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
 };
 
 type Vars = typeof variables;

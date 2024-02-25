@@ -1,5 +1,6 @@
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
+use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::multi_index::MultiPartition;
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::{union_seq_pointer_by_location, SeqPointerForLocation};
@@ -8,12 +9,14 @@ use crate::metastore::{
     deactivate_table_on_corrupt_data, table::Table, Chunk, IdRow, Index, IndexType, MetaStore,
     Partition, PartitionData,
 };
+use crate::queryplanner::trace_data_loaded::{DataLoadedSize, TraceDataLoadedExec};
 use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::store::{min_max_values_from_data, ChunkDataStore, ChunkStore, ROW_GROUP_SIZE};
 use crate::table::data::{cmp_min_rows, cmp_partition_key};
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
 use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
+use crate::util::batch_memory::record_batch_buffer_size;
 use crate::CubeError;
 use arrow::array::{ArrayRef, UInt64Array};
 use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
@@ -50,7 +53,11 @@ use tokio::task::JoinHandle;
 
 #[async_trait]
 pub trait CompactionService: DIService + Send + Sync {
-    async fn compact(&self, partition_id: u64) -> Result<(), CubeError>;
+    async fn compact(
+        &self,
+        partition_id: u64,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError>;
     async fn compact_in_memory_chunks(&self, partition_id: u64) -> Result<(), CubeError>;
     async fn compact_node_in_memory_chunks(&self, node: String) -> Result<(), CubeError>;
     /// Split multi-partition that has too many rows. Figures out the keys based on stored data.
@@ -297,10 +304,8 @@ impl CompactionServiceImpl {
             self.meta_store
                 .chunk_update_last_inserted(vec![chunk.get_id()], oldest_insert_at)
                 .await?;
-
-            self.chunk_store
-                .add_memory_chunk(chunk.get_id(), batch)
-                .await?;
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+            self.chunk_store.add_memory_chunk(chunk_name, batch).await?;
 
             old_chunk_ids.append(&mut old_ids);
             new_chunk_ids.push((chunk.get_id(), None));
@@ -415,7 +420,11 @@ impl CompactionServiceImpl {
 }
 #[async_trait]
 impl CompactionService for CompactionServiceImpl {
-    async fn compact(&self, partition_id: u64) -> Result<(), CubeError> {
+    async fn compact(
+        &self,
+        partition_id: u64,
+        data_loaded_size: Arc<DataLoadedSize>,
+    ) -> Result<(), CubeError> {
         let (partition, index, table, multi_part) = self
             .meta_store
             .get_partition_for_compaction(partition_id)
@@ -463,6 +472,43 @@ impl CompactionService for CompactionServiceImpl {
         }
 
         let partition_id = partition.get_id();
+
+        let mut data = Vec::new();
+        let mut chunks_to_use = Vec::new();
+        let mut chunks_total_size = 0;
+        let num_columns = index.get_row().columns().len();
+
+        for chunk in chunks.iter() {
+            for b in self
+                .chunk_store
+                .get_chunk_columns_with_preloaded_meta(
+                    chunk.clone(),
+                    partition.clone(),
+                    index.clone(),
+                )
+                .await?
+            {
+                assert_eq!(
+                    num_columns,
+                    b.num_columns(),
+                    "Column len mismatch for {:?} and {:?}",
+                    index,
+                    chunk
+                );
+                chunks_total_size += record_batch_buffer_size(&b);
+                data.push(b);
+            }
+            chunks_to_use.push(chunk.clone());
+            if chunks_total_size > self.config.compaction_chunks_in_memory_size_threshold() as usize
+            {
+                break;
+            }
+        }
+
+        data_loaded_size.add(chunks_total_size);
+
+        let chunks = chunks_to_use;
+
         let chunks_row_count = chunks
             .iter()
             .map(|c| c.get_row().get_row_count())
@@ -484,6 +530,7 @@ impl CompactionService for CompactionServiceImpl {
                 )
             }
         };
+
         let mut total_rows = chunks_row_count;
         if new_chunk.is_none() {
             total_rows += partition.get_row().main_table_row_count();
@@ -524,29 +571,6 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        let mut data = Vec::new();
-        let num_columns = index.get_row().columns().len();
-        for chunk in chunks.iter() {
-            for b in self
-                .chunk_store
-                .get_chunk_columns_with_preloaded_meta(
-                    chunk.clone(),
-                    partition.clone(),
-                    index.clone(),
-                )
-                .await?
-            {
-                assert_eq!(
-                    num_columns,
-                    b.num_columns(),
-                    "Column len mismatch for {:?} and {:?}",
-                    index,
-                    chunk
-                );
-                data.push(b)
-            }
-        }
-
         let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
         let old_partition_remote = match &new_chunk {
             Some(_) => None,
@@ -555,7 +579,7 @@ impl CompactionService for CompactionServiceImpl {
         let old_partition_local = if let Some(f) = old_partition_remote {
             let result = self
                 .remote_fs
-                .download_file(&f, partition.get_row().file_size())
+                .download_file(f, partition.get_row().file_size())
                 .await;
             deactivate_table_on_corrupt_data(self.meta_store.clone(), &result, &partition, None)
                 .await;
@@ -566,11 +590,11 @@ impl CompactionService for CompactionServiceImpl {
         let mut new_local_files = Vec::new();
         if let Some(c) = &new_chunk {
             let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
-            new_local_files.push(self.remote_fs.temp_upload_path(&remote).await?);
+            new_local_files.push(self.remote_fs.temp_upload_path(remote).await?);
         } else {
             for p in new_partitions.iter() {
                 let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
-                new_local_files.push(self.remote_fs.temp_upload_path(&new_remote_path).await?);
+                new_local_files.push(self.remote_fs.temp_upload_path(new_remote_path).await?);
             }
         }
 
@@ -615,14 +639,21 @@ impl CompactionService for CompactionServiceImpl {
         // Merge and write rows.
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
-            Some(file) => Arc::new(ParquetExec::try_from_path(
-                file.as_str(),
-                None,
-                None,
-                ROW_GROUP_SIZE,
-                1,
-                None,
-            )?),
+            Some(file) => {
+                let parquet_exec = Arc::new(ParquetExec::try_from_path(
+                    file.as_str(),
+                    None,
+                    None,
+                    ROW_GROUP_SIZE,
+                    1,
+                    None,
+                )?);
+
+                Arc::new(TraceDataLoadedExec::new(
+                    parquet_exec,
+                    data_loaded_size.clone(),
+                ))
+            }
             None => Arc::new(EmptyExec::new(false, schema.clone())),
         };
 
@@ -645,7 +676,7 @@ impl CompactionService for CompactionServiceImpl {
             let remote = ChunkStore::chunk_remote_path(c.get_id(), c.get_row().suffix());
             let file_size = self
                 .remote_fs
-                .upload_file(&new_local_files[0], &remote)
+                .upload_file(new_local_files[0].clone(), remote.clone())
                 .await?;
             let chunk_ids = chunks.iter().map(|c| c.get_id()).collect_vec();
             // In memory chunks shouldn't ever get here. Otherwise replay handle should be defined.
@@ -658,7 +689,7 @@ impl CompactionService for CompactionServiceImpl {
                     "Cancelled compaction of {}. It runs concurrently with multi-split",
                     partition_id
                 );
-                self.remote_fs.delete_file(&remote).await?;
+                self.remote_fs.delete_file(remote).await?;
             }
             return Ok(());
         }
@@ -674,7 +705,7 @@ impl CompactionService for CompactionServiceImpl {
                     let new_remote_path = partition_file_name(p.get_id(), p.get_row().suffix());
                     let file_size = self
                         .remote_fs
-                        .upload_file(&new_local_files[i], new_remote_path.as_str())
+                        .upload_file(new_local_files[i].clone(), new_remote_path.to_string())
                         .await?;
                     filtered_partitions.push((p, file_size));
                 }
@@ -1034,7 +1065,7 @@ async fn download_files(
             let (f, size) = take(f);
             let fs = fs.clone();
             tasks.push(cube_ext::spawn(
-                async move { fs.download_file(&f, size).await },
+                async move { fs.download_file(f, size).await },
             ))
         }
         remote_files.clear();
@@ -1400,6 +1431,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -1464,6 +1496,9 @@ mod tests {
             });
 
         config.expect_partition_split_threshold().returning(|| 20);
+        config
+            .expect_compaction_chunks_in_memory_size_threshold()
+            .returning(|| 3 * 1024 * 1024 * 1024);
 
         config
             .expect_partition_size_split_threshold_bytes()
@@ -1479,7 +1514,10 @@ mod tests {
             remote_fs,
             Arc::new(config),
         );
-        compaction_service.compact(1).await.unwrap();
+        compaction_service
+            .compact(1, DataLoadedSize::new())
+            .await
+            .unwrap();
 
         fn sort_fn(
             a: &(u64, Option<Row>, Option<Row>),
@@ -1549,7 +1587,10 @@ mod tests {
             .unwrap();
         metastore.chunk_uploaded(4).await.unwrap();
 
-        compaction_service.compact(next_partition_id).await.unwrap();
+        compaction_service
+            .compact(next_partition_id, DataLoadedSize::new())
+            .await
+            .unwrap();
 
         let active_partitions = metastore
             .get_active_partitions_by_index_id(1)
@@ -1636,6 +1677,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -1676,11 +1718,17 @@ mod tests {
             .unwrap();
 
         chunk_store
-            .add_memory_chunk(chunk_first.get_id(), batch.clone())
+            .add_memory_chunk(
+                chunk_file_name(chunk_first.get_id(), chunk_first.get_row().suffix()),
+                batch.clone(),
+            )
             .await
             .unwrap();
         chunk_store
-            .add_memory_chunk(chunk_second.get_id(), batch2.clone())
+            .add_memory_chunk(
+                chunk_file_name(chunk_second.get_id(), chunk_second.get_row().suffix()),
+                batch2.clone(),
+            )
             .await
             .unwrap();
 
@@ -1814,6 +1862,7 @@ mod tests {
                 Some(vec![("sum".to_string(), "sum_int".to_string())]),
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -1879,7 +1928,7 @@ mod tests {
             config.config_obj(),
         );
         compaction_service
-            .compact(partition.get_id())
+            .compact(partition.get_id(), DataLoadedSize::new())
             .await
             .unwrap();
 
@@ -1896,7 +1945,7 @@ mod tests {
             .get_full_name(partition.get_id())
             .unwrap();
         let local = remote_fs
-            .download_file(&remote, partition.get_row().file_size())
+            .download_file(remote.clone(), partition.get_row().file_size())
             .await
             .unwrap();
         let reader = Arc::new(
@@ -1926,6 +1975,117 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn partition_compaction_int96() {
+        Config::test("partition_compaction_int96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("create table test.a (a int, b int96)")
+                    .await
+                    .unwrap();
+                let values = (0..15)
+                    .map(|i| format!("({}, {})", i, i))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, b) values {}", values);
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                let values = (0..30)
+                    .map(|i| format!("({}, {})", i, i))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                let query = format!("insert into test.a (a, b) values {}", values);
+
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(partitions[0].get_id(), DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 3);
+            })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn partition_compaction_decimal96() {
+        Config::test("partition_compaction_decimal96")
+            .update_config(|mut c| {
+                c.partition_split_threshold = 20;
+                c
+            })
+            .start_test(async move |services| {
+                let service = services.sql_service;
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                let compaction_service = services
+                    .injector
+                    .get_service_typed::<dyn CompactionService>()
+                    .await;
+                service
+                    .exec_query("create table test.a (a int, d0 decimal(20,0), d1 decimal(20, 1), d2 decimal(20, 2), d3 decimal(20, 3), d4 decimal(20, 4), d5 decimal(20, 5), d10 decimal(20, 10))")
+                    .await
+                    .unwrap();
+                let values = (0..15)
+                    .map(|i| format!("({}, {}, {}, {}, {}, {}, {}, {})", i, i, i, i, i, i, i, i))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, d0, d1, d2, d3, d4, d5, d10) values {}", values);
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 1);
+                let values = (0..30)
+                    .map(|i| format!("({}, {}, {}, {}, {}, {}, {}, {})", i, i, i, i, i, i, i, i))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                let query = format!("insert into test.a (a, d0, d1, d2, d3, d4, d5, d10) values {}", values);
+
+                service.exec_query(&query).await.unwrap();
+                compaction_service
+                    .compact(partitions[0].get_id(), DataLoadedSize::new())
+                    .await
+                    .unwrap();
+                let partitions = services
+                    .meta_store
+                    .get_active_partitions_by_index_id(1)
+                    .await
+                    .unwrap();
+                assert_eq!(partitions.len(), 3);
+            })
+            .await;
+    }
+
+    #[tokio::test]
     async fn partition_split_by_file_size() {
         Config::test("partition_split_by_file_size")
             .update_config(|mut c| {
@@ -1950,7 +2110,10 @@ mod tests {
                     .join(", ");
                 let query = format!("insert into test.a (a, b) values {}", values);
                 service.exec_query(&query).await.unwrap();
-                compaction_service.compact(1).await.unwrap();
+                compaction_service
+                    .compact(1, DataLoadedSize::new())
+                    .await
+                    .unwrap();
                 let partitions = services
                     .meta_store
                     .get_active_partitions_by_index_id(1)
@@ -1965,7 +2128,7 @@ mod tests {
 
                 service.exec_query(&query).await.unwrap();
                 compaction_service
-                    .compact(partitions[0].get_id())
+                    .compact(partitions[0].get_id(), DataLoadedSize::new())
                     .await
                     .unwrap();
                 let partitions = services
@@ -2045,14 +2208,14 @@ impl MultiSplit {
         let mut in_files = Vec::new();
         collect_remote_files(&p, &mut in_files);
         for (f, _) in &mut in_files {
-            *f = self.fs.local_file(f).await?;
+            *f = self.fs.local_file(f.clone()).await?;
         }
 
         let mut out_files = Vec::with_capacity(children.len());
         let mut out_remote_paths = Vec::with_capacity(children.len());
         for c in &children {
             let remote_path = partition_file_name(c.get_id(), c.get_row().suffix());
-            out_files.push(self.fs.temp_upload_path(&remote_path).await?);
+            out_files.push(self.fs.temp_upload_path(remote_path.clone()).await?);
             out_remote_paths.push(remote_path);
         }
 
@@ -2095,7 +2258,7 @@ impl MultiSplit {
             let local_path = out_files[i].to_string();
             let remote_path = out_files[i].to_string();
             uploads.push(cube_ext::spawn(async move {
-                fs.upload_file(&local_path, &remote_path).await
+                fs.upload_file(local_path, remote_path).await
             }));
         }
         Ok(())

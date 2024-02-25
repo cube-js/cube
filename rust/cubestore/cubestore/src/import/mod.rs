@@ -31,13 +31,16 @@ use crate::import::limits::ConcurrencyLimits;
 use crate::metastore::table::Table;
 use crate::metastore::{is_valid_plain_binary_hll, HllFlavour, IdRow};
 use crate::metastore::{Column, ColumnType, ImportFormat, MetaStore};
+use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::remotefs::RemoteFs;
 use crate::sql::timestamp_from_string;
 use crate::store::ChunkDataStore;
 use crate::streaming::StreamingService;
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue};
-use crate::util::decimal::Decimal;
+use crate::util::batch_memory::columns_vec_buffer_size;
+use crate::util::decimal::{Decimal, Decimal96};
+use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
 use datafusion::cube_ext::ordfloat::OrdF64;
@@ -132,7 +135,7 @@ impl ImportFormat {
                         let value_buf = parser.next_value()?;
                         let value = value_buf.as_ref();
 
-                        if value == "" || value == "\\N" {
+                        if value == "" || value == "\\N" || value == "\\\\N" {
                             row[*insert_pos] = TableValue::Null;
                         } else {
                             let mut value_buf_opt = Some(value_buf);
@@ -180,7 +183,15 @@ impl ImportFormat {
                 .parse()
                 .map(|v| TableValue::Int(v))
                 .unwrap_or(TableValue::Null),
+            ColumnType::Int96 => value
+                .parse()
+                .map(|v| TableValue::Int96(Int96::new(v)))
+                .unwrap_or(TableValue::Null),
             t @ ColumnType::Decimal { .. } => TableValue::Decimal(parse_decimal(
+                value,
+                u8::try_from(t.target_scale()).unwrap(),
+            )?),
+            t @ ColumnType::Decimal96 { .. } => TableValue::Decimal96(parse_decimal_96(
                 value,
                 u8::try_from(t.target_scale()).unwrap(),
             )?),
@@ -226,6 +237,26 @@ pub(crate) fn parse_decimal(value: &str, scale: u8) -> Result<Decimal, CubeError
         }
     };
     Ok(Decimal::new(raw_value))
+}
+
+pub(crate) fn parse_decimal_96(value: &str, scale: u8) -> Result<Decimal96, CubeError> {
+    // TODO: parse into Decimal directly.
+    let bd = BigDecimal::from_str_radix(value, 10)?;
+    let raw_value = match bd
+        .with_scale(scale as i64)
+        .into_bigint_and_exponent()
+        .0
+        .to_i128()
+    {
+        Some(d) => d,
+        None => {
+            return Err(CubeError::user(format!(
+                "cannot represent '{}' with scale {} without loosing precision",
+                value, scale
+            )))
+        }
+    };
+    Ok(Decimal96::new(raw_value))
 }
 
 fn decode_byte(s: &str) -> Option<u8> {
@@ -438,14 +469,42 @@ impl<R: AsyncBufRead> Stream for CsvLineStream<R> {
     }
 }
 
+#[async_trait]
+pub trait LocationsValidator: DIService + Send + Sync {
+    async fn validate(&self, locations: &Vec<String>) -> Result<(), CubeError>;
+}
+
+pub struct LocationsValidatorImpl;
+
+#[async_trait]
+impl LocationsValidator for LocationsValidatorImpl {
+    async fn validate(&self, _locations: &Vec<String>) -> Result<(), CubeError> {
+        Ok(())
+    }
+}
+
+impl LocationsValidatorImpl {
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
+}
+
+crate::di_service!(LocationsValidatorImpl, [LocationsValidator]);
+
 #[automock]
 #[async_trait]
 pub trait ImportService: DIService + Send + Sync {
     async fn import_table(&self, table_id: u64) -> Result<(), CubeError>;
-    async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError>;
+    async fn import_table_part(
+        &self,
+        table_id: u64,
+        location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<(), CubeError>;
     async fn validate_table_location(&self, table_id: u64, location: &str)
         -> Result<(), CubeError>;
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError>;
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError>;
 }
 
 crate::di_service!(MockImportService, [ImportService]);
@@ -457,6 +516,7 @@ pub struct ImportServiceImpl {
     remote_fs: Arc<dyn RemoteFs>,
     config_obj: Arc<dyn ConfigObj>,
     limits: Arc<ConcurrencyLimits>,
+    validator: Arc<dyn LocationsValidator>,
 }
 
 crate::di_service!(ImportServiceImpl, [ImportService]);
@@ -469,6 +529,7 @@ impl ImportServiceImpl {
         remote_fs: Arc<dyn RemoteFs>,
         config_obj: Arc<dyn ConfigObj>,
         limits: Arc<ConcurrencyLimits>,
+        validator: Arc<dyn LocationsValidator>,
     ) -> Arc<ImportServiceImpl> {
         Arc::new(ImportServiceImpl {
             meta_store,
@@ -477,6 +538,7 @@ impl ImportServiceImpl {
             remote_fs,
             config_obj,
             limits,
+            validator,
         })
     }
 
@@ -582,23 +644,19 @@ impl ImportServiceImpl {
     }
 
     async fn download_temp_file(&self, location: &str) -> Result<File, CubeError> {
-        let to_download = ImportServiceImpl::temp_uploads_path(location);
+        let to_download = LocationHelper::temp_uploads_path(location);
         // TODO check file size
-        let local_file = self.remote_fs.download_file(&to_download, None).await?;
+        let local_file = self.remote_fs.download_file(to_download, None).await?;
         Ok(File::open(local_file.clone())
             .await
             .map_err(|e| CubeError::internal(format!("Open temp_file {}: {}", local_file, e)))?)
-    }
-
-    fn temp_uploads_path(location: &str) -> String {
-        location.replace("temp://", "temp-uploads/")
     }
 
     async fn drop_temp_uploads(&self, location: &str) -> Result<(), CubeError> {
         // TODO There also should be a process which collects orphaned uploads due to failed imports
         if location.starts_with("temp://") {
             self.remote_fs
-                .delete_file(&ImportServiceImpl::temp_uploads_path(location))
+                .delete_file(LocationHelper::temp_uploads_path(location))
                 .await?;
         }
         Ok(())
@@ -609,6 +667,7 @@ impl ImportServiceImpl {
         table: &IdRow<Table>,
         format: ImportFormat,
         location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(), CubeError> {
         let temp_dir = self.config_obj.data_dir().join("tmp");
         tokio::fs::create_dir_all(temp_dir.clone())
@@ -656,7 +715,13 @@ impl ImportServiceImpl {
                     mem::swap(&mut builders, &mut to_add);
                     num_rows = 0;
 
-                    ingestion.queue_data_frame(finish(to_add)).await?;
+                    let builded_rows = finish(to_add);
+
+                    if let Some(data_loaded_size) = &data_loaded_size {
+                        data_loaded_size.add(columns_vec_buffer_size(&builded_rows));
+                    }
+
+                    ingestion.queue_data_frame(builded_rows).await?;
                 }
             }
         }
@@ -702,7 +767,7 @@ impl ImportService for ImportServiceImpl {
                 table
             )))?;
         for location in locations.iter() {
-            self.do_import(&table, *format, location).await?;
+            self.do_import(&table, *format, location, None).await?;
         }
 
         for location in locations.iter() {
@@ -712,7 +777,12 @@ impl ImportService for ImportServiceImpl {
         Ok(())
     }
 
-    async fn import_table_part(&self, table_id: u64, location: &str) -> Result<(), CubeError> {
+    async fn import_table_part(
+        &self,
+        table_id: u64,
+        location: &str,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
+    ) -> Result<(), CubeError> {
         let table = self.meta_store.get_table_by_id(table_id).await?;
         let format = table
             .get_row()
@@ -739,7 +809,8 @@ impl ImportService for ImportServiceImpl {
         if Table::is_stream_location(location) {
             self.streaming_service.stream_table(table, location).await?;
         } else {
-            self.do_import(&table, *format, location).await?;
+            self.do_import(&table, *format, location, data_loaded_size.clone())
+                .await?;
             self.drop_temp_uploads(&location).await?;
         }
 
@@ -761,28 +832,57 @@ impl ImportService for ImportServiceImpl {
     }
 
     async fn estimate_location_row_count(&self, location: &str) -> Result<u64, CubeError> {
-        if location.starts_with("http") {
+        let file_size =
+            LocationHelper::location_file_size(location, self.remote_fs.clone()).await?;
+        Ok(ImportServiceImpl::estimate_rows(location, file_size))
+    }
+
+    async fn validate_locations_size(&self, locations: &Vec<String>) -> Result<(), CubeError> {
+        self.validator.validate(locations).await
+    }
+}
+
+pub struct LocationHelper;
+
+impl LocationHelper {
+    pub async fn location_file_size(
+        location: &str,
+        remote_fs: Arc<dyn RemoteFs>,
+    ) -> Result<Option<u64>, CubeError> {
+        let res = if location.starts_with("http") {
             let client = reqwest::Client::new();
             let res = client.head(location).send().await?;
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
-            let size = if let Some(length) = length {
+            if let Some(length) = length {
                 Some(length.to_str()?.parse::<u64>()?)
             } else {
                 None
-            };
-            Ok(ImportServiceImpl::estimate_rows(location, size))
+            }
         } else if location.starts_with("temp://") {
-            // TODO do the actual estimation
-            Ok(ImportServiceImpl::estimate_rows(location, None))
+            let remote_path = Self::temp_uploads_path(location);
+            match remote_fs.list_with_metadata(remote_path).await {
+                Ok(list) => {
+                    let list_res = list.iter().next().ok_or(CubeError::internal(format!(
+                        "Location {} can't be listed in remote_fs",
+                        location
+                    )));
+                    match list_res {
+                        Ok(file) => Ok(Some(file.file_size)),
+                        Err(e) => Err(e),
+                    }
+                }
+                Err(e) => Err(e),
+            }?
         } else if location.starts_with("stream://") {
-            Ok(ImportServiceImpl::estimate_rows(location, None))
+            None
         } else {
-            Ok(ImportServiceImpl::estimate_rows(
-                location,
-                Some(tokio::fs::metadata(location).await?.len()),
-            ))
-        }
+            Some(tokio::fs::metadata(location).await?.len())
+        };
+        Ok(res)
+    }
+    pub fn temp_uploads_path(location: &str) -> String {
+        location.replace("temp://", "temp-uploads/")
     }
 }
 

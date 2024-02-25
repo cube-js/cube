@@ -10,8 +10,9 @@ on:
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    # 22.04 has gcc 11, new binutils (ld)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -19,18 +20,35 @@ jobs:
     env:
       RUST: ${{ matrix.rust }}
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: ./rust/cubestore
-          key: ubuntu-20.04
+          workspaces: ./rust/cubestore -> target
+          shared-key: cubestore
+          key: ubuntu-22.04
       - name: Run cargo fmt cubestore
         uses: actions-rs/cargo@v1
         with:
@@ -81,7 +99,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
         uses: actions/github-script@v3
@@ -124,7 +142,7 @@ jobs:
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -211,7 +229,7 @@ jobs:
             compress: false
       fail-fast: false
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Disable rustup update (issue workaround for Windows)
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
@@ -223,11 +241,11 @@ jobs:
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: rust/cubestore
-          key: cross-${{ runner.OS }}-${{ matrix.target }}
-          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+          workspaces: ./rust/cubestore -> target
+          prefix-key: v0-rust-cubestore-cross
+          key: target-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
@@ -237,7 +255,7 @@ jobs:
       #  env:
       #    VCPKG_ROOT: 'C:\vcpkg'
       - name: Set Env Variables for Darwin
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
           OPENSSL_STATIC: "true"

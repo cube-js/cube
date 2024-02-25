@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT\n                    relname,\n                    has_table_privilege('ovr', relname, 'SELECT') \\\"select\\\",\n                    has_table_privilege('ovr', relname, 'INSERT') \\\"insert\\\"\n                FROM pg_class\n                ORDER BY relname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+--------+--------+
+| relname                   | select | insert |
++---------------------------+--------+--------+
+| KibanaSampleDataEcommerce | true   | false  |
+| Logs                      | true   | false  |
+| NumberCube                | true   | false  |
+| WideCube                  | true   | false  |
++---------------------------+--------+--------+

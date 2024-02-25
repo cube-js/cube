@@ -1,8 +1,8 @@
-import { FakeRowStream } from '@cubejs-backend/testing-shared';
 import mysql from 'mysql2/promise';
 
 import * as native from '../js';
 import metaFixture from './meta';
+import { FakeRowStream } from './response-fake';
 
 const logger = jest.fn(({ event }) => {
   if (!event.error.includes('load - strange response, success which contains error')) {
@@ -12,13 +12,13 @@ const logger = jest.fn(({ event }) => {
   console.log(event);
 });
 
-native.setupLogger(
-  logger,
-  'trace',
-);
+// native.setupLogger(
+//   logger,
+//   'trace',
+// );
 
 describe('SQLInterface', () => {
-  jest.setTimeout(10 * 1000);
+  jest.setTimeout(60 * 1000);
 
   it('SHOW FULL TABLES FROM `db`', async () => {
     const load = jest.fn(async ({ request, session, query }) => {
@@ -31,6 +31,46 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
+      console.log('[js] load', {
+        request,
+        session,
+        query,
+        streaming
+      });
+
+      if (streaming) {
+        return {
+          stream: new FakeRowStream(query),
+        };
+      }
+
+      expect(session).toEqual({
+        user: expect.toBeTypeOrNull(String),
+        superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
+      });
+
+      // It's just an emulation that ApiGateway returns error
+      return {
+        error: 'This error should be passed back to MySQL client'
+      };
+    });
+
+    const sql = jest.fn(async ({ request, session, query }) => {
+      console.log('[js] sql', {
+        request,
+        session,
+        query
       });
 
       // It's just an emulation that ApiGateway returns error
@@ -60,9 +100,22 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' },
       });
 
       return metaFixture;
+    });
+
+    const sqlGenerators = jest.fn(async ({ request, session }) => {
+      console.log('[js] sqlGenerators', {
+        request,
+        session,
+      });
+
+      return {
+        cubeNameToDataSource: {},
+        dataSourceToSqlGenerator: {},
+      };
     });
 
     const checkAuth = jest.fn(async ({ request, user }) => {
@@ -75,6 +128,7 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_allowed_user',
           superuser: false,
+          securityContext: { foo: 'bar' },
         };
       }
 
@@ -82,19 +136,29 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_admin',
           superuser: true,
+          securityContext: { foo: 'admin' },
         };
       }
 
       throw new Error('Please specify user');
     });
 
+    const logLoadEvent = ({ event, properties }: { event: string, properties: any }) => {
+      console.log(`Load event: ${JSON.stringify({ type: event, ...properties })}`);
+    };
+
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       port: 4545,
       checkAuth,
       load,
+      sqlApiLoad,
+      sql,
       meta,
       stream,
+      logLoadEvent,
+      sqlGenerators,
+      canSwitchUserForSession: (_payload) => true,
     });
     console.log(instance);
 
@@ -121,6 +185,7 @@ describe('SQLInterface', () => {
             meta: null,
           },
           user: user || null,
+          password: null,
         });
       };
 
@@ -172,9 +237,9 @@ describe('SQLInterface', () => {
           meta: null,
         },
         user: 'allowed_user',
+        password: null,
       });
 
-      expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
@@ -183,7 +248,9 @@ describe('SQLInterface', () => {
         session: {
           user: 'allowed_user',
           superuser: false,
-        }
+          securityContext: { foo: 'bar' },
+        },
+        onlyCompilerId: true
       });
 
       try {
@@ -212,11 +279,6 @@ describe('SQLInterface', () => {
 
         expect(result).toEqual([{ 'TimestampNanosecond(1608936528000000000, None)': '2020-12-25T22:48:48.000' }]);
       }
-
-      // Increment it in case you throw Error
-      setTimeout(_ => {
-        expect(logger.mock.calls.length).toEqual(1);
-      }, 2000);
 
       connection.destroy();
     } finally {

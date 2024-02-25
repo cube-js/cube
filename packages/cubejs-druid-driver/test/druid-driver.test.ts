@@ -6,7 +6,7 @@ import path from 'path';
 import { DruidDriver, DruidDriverConfiguration } from '../src/DruidDriver';
 
 describe('DruidDriver', () => {
-  let env: StartedDockerComposeEnvironment|null = null;
+  let env: StartedDockerComposeEnvironment | null = null;
   let config: DruidDriverConfiguration;
 
   const doWithDriver = async (callback: (driver: DruidDriver) => Promise<any>) => {
@@ -23,6 +23,8 @@ describe('DruidDriver', () => {
 
       config = {
         url: `http://${host}:${port}`,
+        user: 'admin',
+        password: 'password1',
       };
 
       return;
@@ -83,6 +85,30 @@ describe('DruidDriver', () => {
       expect(await driver.query('SELECT 1')).toEqual([{
         EXPR$0: 1,
       }]);
+    });
+  });
+
+  it('downloadQueryResults', async () => {
+    jest.setTimeout(10 * 1000);
+
+    return doWithDriver(async (driver) => {
+      const result = await driver.downloadQueryResults(
+        'SELECT 1 as id, true as finished, \'netherlands\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created UNION ALL SELECT 2 as id, false as finished, \'spain\' as country, CAST(\'2020-01-01T01:01:01.111Z\' as timestamp) as created',
+        [],
+        { highWaterMark: 1 }
+      );
+      expect(result).toEqual({
+        rows: [
+          { country: 'netherlands', created: '2020-01-01T01:01:01.111Z', finished: true, id: 1 },
+          { country: 'spain', created: '2020-01-01T01:01:01.111Z', finished: false, id: 2 }
+        ],
+        types: [
+          { name: 'id', type: 'int' },
+          { name: 'finished', type: 'boolean' },
+          { name: 'country', type: 'text' },
+          { name: 'created', type: 'timestamp' }
+        ]
+      });
     });
   });
 });

@@ -1,10 +1,8 @@
 use convert_case::{Case, Casing};
 use neon::prelude::*;
-use pyo3::exceptions::PyTypeError;
-use pyo3::types::PyFunction;
-use pyo3::{Py, PyAny, PyErr, PyResult};
+use pyo3::{PyAny, PyResult};
 
-use crate::python::cross::{CLRepr, CLReprObject};
+use crate::cross::{CLRepr, CLReprObject, CLReprPython};
 
 pub struct CubeConfigPy {
     properties: CLReprObject,
@@ -17,63 +15,57 @@ impl CubeConfigPy {
         }
     }
 
-    pub fn get_static_attrs(&self) -> Vec<&'static str> {
+    pub fn get_attrs(&self) -> Vec<&'static str> {
         vec![
+            "web_sockets",
+            "http",
+            "graceful_shutdown",
+            "process_subscriptions_interval",
+            "web_sockets_base_path",
             "schema_path",
             "base_path",
-            "web_sockets_base_path",
-            "compiler_cache_size",
-            "telemetry",
-            "pg_sql_port",
+            "dev_server",
+            "api_secret",
             "cache_and_queue_driver",
             "allow_js_duplicate_props_in_schema",
-            "process_subscriptions_interval",
+            "jwt",
+            "scheduled_refresh_timer",
+            "scheduled_refresh_timezones",
+            "scheduled_refresh_concurrency",
+            "scheduled_refresh_batch_size",
+            "compiler_cache_size",
+            "update_compiler_cache_keep_alive",
+            "max_compiler_cache_keep_alive",
+            "telemetry",
+            "sql_cache",
+            "live_preview",
+            "pg_sql_port",
+            "sql_super_user",
+            "sql_user",
+            "sql_password",
+            // functions
+            "logger",
+            "context_to_app_id",
+            "context_to_orchestrator_id",
+            "driver_factory",
+            "external_driver_factory",
+            "db_type",
+            "check_auth",
+            "check_sql_auth",
+            "can_switch_sql_user",
+            "query_rewrite",
+            "extend_context",
+            "scheduled_refresh_contexts",
+            "context_to_api_scopes",
+            "repository_factory",
+            "semantic_layer_sync",
+            "schema_version",
+            "pre_aggregations_schema",
+            "orchestrator_options",
         ]
     }
 
-    pub fn apply_dynamic_functions(&mut self, config_module: &PyAny) -> PyResult<()> {
-        self.function_attr(config_module, "logger")?;
-        self.function_attr(config_module, "context_to_app_id")?;
-        self.function_attr(config_module, "context_to_orchestrator_id")?;
-        self.function_attr(config_module, "driver_factory")?;
-        self.function_attr(config_module, "db_type")?;
-        self.function_attr(config_module, "check_auth")?;
-        self.function_attr(config_module, "check_sql_auth")?;
-        self.function_attr(config_module, "can_switch_sql_user")?;
-        self.function_attr(config_module, "query_rewrite")?;
-        self.function_attr(config_module, "extend_context")?;
-        self.function_attr(config_module, "scheduled_refresh_contexts")?;
-        self.function_attr(config_module, "context_to_api_scopes")?;
-
-        Ok(())
-    }
-
-    pub fn function_attr<'a>(
-        &mut self,
-        config_module: &'a PyAny,
-        key: &str,
-    ) -> PyResult<Option<Py<PyFunction>>> {
-        let v = config_module.getattr(&*key)?;
-        if !v.is_none() {
-            if v.get_type().is_subclass_of::<PyFunction>()? {
-                let cb = v.downcast::<PyFunction>()?;
-                let py: Py<PyFunction> = cb.into();
-
-                let value = CLRepr::PyFunction(py);
-                self.properties.insert(key.to_case(Case::Camel), value);
-            } else {
-                return Err(PyErr::new::<PyTypeError, _>(format!(
-                    "Unsupported configuration type: {} for key: {}, must be a lambda",
-                    v.get_type(),
-                    key
-                )));
-            }
-        }
-
-        Ok(None)
-    }
-
-    pub fn static_attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
+    pub fn attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
         let v = config_module.getattr(&*key)?;
         if !v.is_none() {
             let value = CLRepr::from_python_ref(v)?;
@@ -88,7 +80,7 @@ impl Finalize for CubeConfigPy {}
 
 impl CubeConfigPy {
     #[allow(clippy::wrong_self_convention)]
-    pub fn to_object<'a, C: Context<'a>>(mut self, mut cx: &mut C) -> JsResult<'a, JsValue> {
+    pub fn to_object<'a, C: Context<'a>>(self, cx: &mut C) -> JsResult<'a, JsValue> {
         let obj = CLRepr::Object(self.properties);
         obj.into_js(cx)
     }

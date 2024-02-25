@@ -1,4 +1,6 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
+import { randomBytes } from 'crypto';
+import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
 import cubejs, { CubejsApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
@@ -10,16 +12,49 @@ import {
   runEnvironment,
   buildPreaggs,
 } from '../helpers';
+import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string): void {
-  describe(`Queries with the @cubejs-backend/${type}-driver`, () => {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv }: { includeIncrementalSchemaSuite?: boolean, extendedEnv?: string } = {}): void {
+  describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
-    const fixtures = getFixtures(type);
+    const fixtures = getFixtures(type, extendedEnv);
     let client: CubejsApi;
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
+    let connection: PgClient;
+
+    let connectionId = 0;
+
+    async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
+      if (!pgPort) {
+        return <any>undefined;
+      }
+      connectionId++;
+      const currentConnId = connectionId;
+
+      console.debug(`[pg] new connection ${currentConnId}`);
+
+      const conn = new PgClient({
+        database: 'db',
+        port: pgPort,
+        host: 'localhost',
+        user,
+        password,
+        ssl: false,
+      });
+      conn.on('error', (err) => {
+        console.log(err);
+      });
+      conn.on('end', () => {
+        console.debug(`[pg] end ${currentConnId}`);
+      });
+
+      await conn.connect();
+
+      return conn;
+    }
 
     function execute(name: string, test: () => Promise<void>) {
       if (fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
@@ -28,11 +63,24 @@ export function testQueries(type: string): void {
         it(name, test);
       }
     }
+
+    function executePg(name: string, test: () => Promise<void>) {
+      if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
+        it.skip(name, test);
+      } else {
+        it(name, test);
+      }
+    }
+
     const apiToken = sign({}, 'mysupersecret');
 
-    const suffix = new Date().getTime().toString(32);
+    const suffix = randomBytes(8).toString('hex');
+    const tables = Object
+      .keys(fixtures.tables)
+      .map((key: string) => `${fixtures.tables[key]}_${suffix}`);
+
     beforeAll(async () => {
-      env = await runEnvironment(type, suffix);
+      env = await runEnvironment(type, suffix, { extendedEnv });
       process.env.CUBEJS_REFRESH_WORKER = 'true';
       process.env.CUBEJS_CUBESTORE_HOST = '127.0.0.1';
       process.env.CUBEJS_CUBESTORE_PORT = `${env.store.port}`;
@@ -49,17 +97,20 @@ export function testQueries(type: string): void {
       driver = (await getDriver(type)).source;
       queries = getCreateQueries(type, suffix);
       console.log(`Creating ${queries.length} fixture tables`);
-      for (const q of queries) {
-        await driver.query(q);
+      try {
+        for (const q of queries) {
+          await driver.query(q);
+        }
+        console.log(`Creating ${queries.length} fixture tables completed`);
+      } catch (e: any) {
+        console.log('Error creating fixtures', e.stack);
+        throw e;
       }
-      console.log(`Creating ${queries.length} fixture tables completed`);
+      connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
     });
   
     afterAll(async () => {
       try {
-        const tables = Object
-          .keys(fixtures.tables)
-          .map((key: string) => `${fixtures.tables[key]}${suffix}`);
         console.log(`Dropping ${tables.length} fixture tables`);
         for (const t of tables) {
           await driver.dropTable(t);
@@ -1358,6 +1409,96 @@ export function testQueries(type: string): void {
         }
       });
       expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: null sum', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalSales',
+        ],
+        filters: [{
+          member: 'BigECommerce.id',
+          operator: 'equals',
+          values: ['8958']
+        }]
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: null boolean', async () => {
+      const response = await client.load({
+        dimensions: [
+          'BigECommerce.returning',
+        ],
+        filters: [{
+          member: 'BigECommerce.id',
+          operator: 'equals',
+          values: ['8958']
+        }]
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window by 2 day', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Day',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window by 2 week', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Week',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: rolling window by 2 month', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.rollingCountBy2Month',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    if (includeIncrementalSchemaSuite) {
+      incrementalSchemaLoadingSuite(execute, () => driver, tables);
+    }
+
+    executePg('SQL API: powerbi min max push down', async () => {
+      const res = await connection.query(`
+      select
+  max("rows"."orderDate") as "a0",
+  min("rows"."orderDate") as "a1"
+from
+  (
+    select
+      "orderDate"
+    from
+      "public"."ECommerce" "$Table"
+  ) "rows"
+  `);
+      expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
   });
 }
