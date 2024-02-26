@@ -295,6 +295,7 @@ fn sort_push_down(
             subqueries,
             input,
             schema,
+            types,
         }) => {
             // TODO: Pushing Sort down Subquery?
             issue_sort(
@@ -306,6 +307,7 @@ fn sort_push_down(
                         .collect::<Result<_>>()?,
                     input: Arc::new(sort_push_down(optimizer, input, None, optimizer_config)?),
                     schema: schema.clone(),
+                    types: types.clone(),
                 }),
             )
         }

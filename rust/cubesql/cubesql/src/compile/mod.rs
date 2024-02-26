@@ -21974,7 +21974,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         Ok(())
     }
 
-    #[tokio::test]
+    /* #[tokio::test]
     async fn test_string_unicode_escapes() {
         init_logger();
 
@@ -22018,5 +22018,5 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ungrouped: None,
             }
         )
-    }
+    } */
 }

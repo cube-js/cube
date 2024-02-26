@@ -14,7 +14,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
-        JoinConstraint, JoinType, Operator,
+        JoinConstraint, JoinType, Operator, plan::SubqueryType,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -108,6 +108,7 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             subqueries: Vec<LogicalPlan>,
             schema: DFSchemaRef,
+            types: Vec<SubqueryType>,
         },
         Union {
             inputs: Vec<LogicalPlan>,
@@ -171,6 +172,7 @@ crate::plan_to_language! {
             left: Box<Expr>,
             op: Operator,
             right: Box<Expr>,
+            all: bool,
         },
         LikeExpr {
             like_type: LikeType,
@@ -238,6 +240,11 @@ crate::plan_to_language! {
         InListExpr {
             expr: Box<Expr>,
             list: Vec<Expr>,
+            negated: bool,
+        },
+        InSubquery {
+            expr: Box<Expr>,
+            subquery: Box<Expr>,
             negated: bool,
         },
         WildcardExpr {},
