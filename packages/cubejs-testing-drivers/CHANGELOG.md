@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.57](https://github.com/cube-js/cube.js/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+
+### Bug Fixes
+
+* **cubesql:** `ungrouped` query can be routed to Cube Store ([#7810](https://github.com/cube-js/cube.js/issues/7810)) ([b122837](https://github.com/cube-js/cube.js/commit/b122837de9cd4fcaca4ddc0e7f85ff695de09483))
+
+
+
+
+
 ## [0.34.56](https://github.com/cube-js/cube.js/compare/v0.34.55...v0.34.56) (2024-02-20)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/firebolt-driver
+
+
+
+
+
 ## [0.34.56](https://github.com/cube-js/cube/compare/v0.34.55...v0.34.56) (2024-02-20)
 
 **Note:** Version bump only for package @cubejs-backend/firebolt-driver

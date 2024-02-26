@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+
+### Bug Fixes
+
+* **cubesql:** More readable error message during SQL generation ([d9a7194](https://github.com/cube-js/cube/commit/d9a719479d6ca00ef5b2b511677cd777ceb131e7))
+* **cubesql:** writerOrChannel.resolve is not a function ([abc95e2](https://github.com/cube-js/cube/commit/abc95e259c82894aea63371e468c98d640b4d42e))
+
+
+### Features
+
+* **cubesql:** `WHERE` SQL push down ([#7808](https://github.com/cube-js/cube/issues/7808)) ([98b5709](https://github.com/cube-js/cube/commit/98b570946905586f16a502f83b0a1cf8e4aa92a6))
+* **cubesql:** Support placeholders in `OFFSET`, `FETCH ...` ([60aad90](https://github.com/cube-js/cube/commit/60aad90a237800f4471bb4efa10ec590b50e19fe))
+
+
+
+
+
 ## [0.34.56](https://github.com/cube-js/cube/compare/v0.34.55...v0.34.56) (2024-02-20)
 
 
