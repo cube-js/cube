@@ -1290,33 +1290,15 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             {
                 return;
             }
-            // TODO: ideally all constants should be aliased, but this requires
-            // rewrites to extract `.data.constant` instead of `literal_expr`.
-            let alias_name = if c.is_null()
-                || matches!(
-                    c,
-                    ScalarValue::Date32(_)
-                        | ScalarValue::Date64(_)
-                        | ScalarValue::Int64(_)
-                        | ScalarValue::Int32(_)
-                        | ScalarValue::Float64(_)
-                        | ScalarValue::IntervalYearMonth(_)
-                        | ScalarValue::IntervalDayTime(_)
-                        | ScalarValue::Utf8(_)
-                        | ScalarValue::Boolean(_)
-                ) {
-                egraph[id]
-                    .data
-                    .original_expr
-                    .as_ref()
-                    .and_then(|e| match e {
-                        OriginalExpr::Expr(expr) => Some(expr),
-                        OriginalExpr::List(_) => None,
-                    })
-                    .map(|expr| expr.name(&DFSchema::empty()).unwrap())
-            } else {
-                None
-            };
+            let alias_name = egraph[id]
+                .data
+                .original_expr
+                .as_ref()
+                .and_then(|e| match e {
+                    OriginalExpr::Expr(expr) => Some(expr),
+                    OriginalExpr::List(_) => None,
+                })
+                .map(|expr| expr.name(&DFSchema::empty()).unwrap());
             let c = c.clone();
             let value = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(c)));
             let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([value]));
@@ -1326,8 +1308,6 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                 )));
                 let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
                 egraph.union(id, alias_expr);
-            } else {
-                egraph.union(id, literal_expr);
             }
         }
     }

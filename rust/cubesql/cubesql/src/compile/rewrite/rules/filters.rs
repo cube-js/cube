@@ -1847,7 +1847,7 @@ impl RewriteRules for FilterRules {
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
                         "?op",
-                        literal_expr("?date"),
+                        "?date",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1867,7 +1867,7 @@ impl RewriteRules for FilterRules {
                                         udf_expr(
                                             "date_add",
                                             vec![
-                                                literal_expr("?date"),
+                                                "?date".to_string(),
                                                 literal_expr("?date_add_interval"),
                                             ],
                                         ),
@@ -1898,7 +1898,7 @@ impl RewriteRules for FilterRules {
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
                         "=",
-                        literal_expr("?date"),
+                        "?date".to_string(),
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1911,7 +1911,7 @@ impl RewriteRules for FilterRules {
                             ">=",
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?date")],
+                                vec![literal_expr("?granularity"), "?date".to_string()],
                             ),
                         ),
                         "AND",
@@ -1925,7 +1925,7 @@ impl RewriteRules for FilterRules {
                                     udf_expr(
                                         "date_add",
                                         vec![
-                                            literal_expr("?date"),
+                                            "?date".to_string(),
                                             literal_expr("?date_add_interval"),
                                         ],
                                     ),
@@ -4053,7 +4053,9 @@ impl FilterRules {
                     if let Some(date_add_interval) =
                         utils::granularity_str_to_interval(&granularity)
                     {
-                        for date in var_iter!(egraph[subst[date_var]], LiteralExprValue) {
+                        if let Some(ConstantFolding::Scalar(date)) =
+                            &egraph[subst[date_var]].data.constant
+                        {
                             if let ScalarValue::TimestampNanosecond(Some(date), None) = date {
                                 if let Some(true) =
                                     utils::is_literal_date_trunced(*date, &granularity)

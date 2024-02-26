@@ -4113,6 +4113,46 @@ ORDER BY \"COUNT(count)\" DESC"
     }
 
     #[tokio::test]
+    async fn tableau_gte_constant() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT 
+  ( 
+    "KibanaSampleDataEcommerce"."order_date" >= DATE_TRUNC( 
+      'MONTH', 
+      CAST(CAST('2024-01-01' AS DATE) AS TIMESTAMP) 
+    ) 
+  ) AS "Calculation_2760495522668597250" 
+FROM 
+  "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce" 
+GROUP BY 
+  1 
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn measure_used_on_dimension() {
         init_logger();
 
