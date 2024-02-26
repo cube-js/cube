@@ -47,6 +47,9 @@ const ClickhouseTypeToGeneric: Record<string, string> = {
   // floats
   float32: 'float',
   float64: 'double',
+  // We don't support enums
+  enum8: 'text',
+  enum16: 'text',
 };
 
 interface ClickHouseDriverOptions {
