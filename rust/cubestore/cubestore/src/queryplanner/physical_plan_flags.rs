@@ -1,3 +1,4 @@
+use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{
     AggregateMode, AggregateStrategy, HashAggregateExec,
 };
@@ -12,10 +13,6 @@ pub struct PhysicalPlanFlags {
 }
 
 impl PhysicalPlanFlags {
-    pub fn enough_to_fill(&self) -> bool {
-        self.merge_sort_plan
-    }
-
     pub fn is_suboptimal_query(&self) -> bool {
         !self.merge_sort_plan
     }
@@ -48,9 +45,20 @@ impl PhysicalPlanFlags {
             if is_final_hash_agg_without_groups || is_full_inplace_agg || is_final_inplace_agg {
                 flags.merge_sort_plan = true;
             }
-        }
-        if flags.enough_to_fill() {
-            return;
+        } else if let Some(f) = a.downcast_ref::<FilterExec>() {
+            if flags.merge_sort_plan == false {
+                return;
+            }
+            let output_hints = f.output_hints();
+            let is_sorted = match output_hints.sort_order {
+                Some(sort_order) => sort_order.len() >= output_hints.single_value_columns.len(),
+                _ => false,
+            };
+
+            if !is_sorted {
+                flags.merge_sort_plan = false;
+                return;
+            }
         }
         for child in p.children() {
             PhysicalPlanFlags::physical_plan_flags_fill(child.as_ref(), flags);
