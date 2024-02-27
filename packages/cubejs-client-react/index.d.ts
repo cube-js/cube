@@ -39,7 +39,8 @@ declare module '@cubejs-client/react' {
   }
 
   type CubeProviderProps = {
-    cubejsApi: CubejsApi | null;
+    cubejsApi?: CubejsApi | null;
+    cubeApi?: CubejsApi | null;
     options?: CubeProviderOptions;
     children: React.ReactNode;
   };
@@ -52,16 +53,16 @@ declare module '@cubejs-client/react' {
    * import { CubeProvider } from '@cubejs-client/react';
    *
    * const API_URL = 'https://harsh-eel.aws-us-east-2.cubecloudapp.dev';
-   * const CUBEJS_TOKEN =
+   * const CUBE_TOKEN =
    *   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.* eyJpYXQiOjE1OTE3MDcxNDgsImV4cCI6MTU5NDI5OTE0OH0.* n5jGLQJ14igg6_Hri_Autx9qOIzVqp4oYxmX27V-4T4';
    *
-   * const cubejsApi = cubejs(CUBEJS_TOKEN, {
+   * const cubeApi = cubejs(CUBE_TOKEN, {
    *   apiUrl: `${API_URL}/cubejs-api/v1`,
    * });
    *
    * export default function App() {
    *   return (
-   *     <CubeProvider cubejsApi={cubejsApi}>
+   *     <CubeProvider cubeApi={cubeApi}>
    *       //...
    *     </CubeProvider>
    *   )
@@ -73,26 +74,27 @@ declare module '@cubejs-client/react' {
   export const CubeProvider: React.FC<CubeProviderProps>;
 
   type CubeContextProps = {
-    cubejsApi: CubejsApi;
+    cubejsApi?: CubejsApi;
+    cubeApi?: CubejsApi;
     options?: CubeProviderOptions;
   };
 
   /**
-   * In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
+   * In case when you need direct access to `cubeApi` you can use `CubeContext` anywhere in your app
    *
    * ```js
    * import React from 'react';
    * import { CubeContext } from '@cubejs-client/react';
    *
    * export default function DisplayComponent() {
-   *   const { cubejsApi } = React.useContext(CubeContext);
+   *   const { cubeApi } = React.useContext(CubeContext);
    *   const [rawResults, setRawResults] = React.useState([]);
    *   const query = {
    *     ...
    *   };
    *
    *   React.useEffect(() => {
-   *     cubejsApi.load(query).then((resultSet) => {
+   *     cubeApi.load(query).then((resultSet) => {
    *       setRawResults(resultSet.rawData());
    *     });
    *   }, [query]);
@@ -359,7 +361,7 @@ declare module '@cubejs-client/react' {
    *
    * import ChartRenderer from './ChartRenderer';
    *
-   * const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+   * const cubeApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
    *   apiUrl: 'http://localhost:4000/cubejs-api/v1',
    * });
    *
@@ -373,7 +375,7 @@ declare module '@cubejs-client/react' {
    *         },
    *       ],
    *     }}
-   *     cubejsApi={cubejsApi}
+   *     cubejsApi={cubeApi}
    *     render={({ resultSet, measures, availableMeasures, updateMeasures }) => (
    *       <Layout.Content style={{ padding: '20px' }}>
    *         <Select
@@ -562,7 +564,7 @@ declare module '@cubejs-client/react' {
    * ```js
    * <QueryBuilder
    *   // ...
-   *   cubejsApi={cubejsApi}
+   *   cubejsApi={cubeApi}
    *   render={({
    *     // ...
    *     availableMeasures,
@@ -591,7 +593,7 @@ declare module '@cubejs-client/react' {
    * ```js
    * <QueryBuilder
    *   // ...
-   *   cubejsApi={cubejsApi}
+   *   cubejsApi={cubeApi}
    *   render={({
    *     // ...
    *     measures,
