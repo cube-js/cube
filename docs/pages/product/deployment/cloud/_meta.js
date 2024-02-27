@@ -1,4 +1,5 @@
 module.exports = {
+  "providers": "Cloud providers",
   "vpc": "VPC",
   "deployments": "Deployments",
   "deployment-types": "Deployment types",
