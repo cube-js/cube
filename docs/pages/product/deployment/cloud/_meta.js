@@ -1,4 +1,5 @@
 module.exports = {
+  "vpc": "VPC",
   "deployments": "Deployments",
   "deployment-types": "Deployment types",
   "continuous-deployment": "Continuous deployment",
