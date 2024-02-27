@@ -1203,7 +1203,7 @@ export class PreAggregationLoader {
 
       this.logger('Downloading external pre-aggregation completed', {
         ...queryOptions,
-        isExportBucket: tableData.isExportBucket
+        isUnloadSupported: await this.isUnloadSupported(capabilities, client)
       });
 
       return tableData;
@@ -1216,17 +1216,21 @@ export class PreAggregationLoader {
     }
   }
 
+  protected async isUnloadSupported(externalDriverCapabilities: DriverCapabilities, client: DriverInterface) {
+    const isUnloadSupported = externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions());
+    return isUnloadSupported;
+  }
+
   /**
    * prepares download data when temp table = true
    */
   protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
     let tableData: DownloadTableData;
 
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
       tableData = await saveCancelFn(
         client.unload(table, this.getUnloadOptions()),
       );
-      tableData.isExportBucket = true;
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(`SELECT * FROM ${table}`, [], this.getStreamingOptions())
@@ -1261,14 +1265,13 @@ export class PreAggregationLoader {
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
     let tableData: DownloadTableData;
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
       tableData = await saveCancelFn(
         client.unload(
           table,
           { ...this.getUnloadOptions(), query: { sql, params } },
         )
       );
-      tableData.isExportBucket = true;
       return tableData;
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
