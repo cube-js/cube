@@ -237,6 +237,36 @@ pub fn get_string_cube_meta() -> Vec<V1CubeMeta> {
     }]
 }
 
+pub fn get_sixteen_char_member_cube() -> Vec<V1CubeMeta> {
+    vec![V1CubeMeta {
+        name: "SixteenChar".to_string(),
+        title: None,
+        dimensions: vec![],
+        measures: vec![
+            V1CubeMetaMeasure {
+                name: "SixteenChar.sixteen_charchar".to_string(),
+                title: None,
+                _type: "number".to_string(),
+                agg_type: Some("sum".to_string()),
+            },
+            V1CubeMetaMeasure {
+                name: "SixteenChar.sixteen_charchar_foo".to_string(),
+                title: None,
+                _type: "number".to_string(),
+                agg_type: Some("avg".to_string()),
+            },
+            V1CubeMetaMeasure {
+                name: "SixteenChar.sixteen_charchar_bar".to_string(),
+                title: None,
+                _type: "number".to_string(),
+                agg_type: Some("count".to_string()),
+            },
+        ],
+        segments: vec![],
+        joins: None,
+    }]
+}
+
 #[derive(Debug)]
 pub struct SqlGeneratorMock {
     pub sql_templates: Arc<SqlTemplates>,
@@ -262,7 +292,27 @@ pub fn get_test_tenant_ctx() -> Arc<MetaContext> {
 }
 
 pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -> Arc<MetaContext> {
-    let sql_generator: Arc<dyn SqlGenerator + Send + Sync> = Arc::new(SqlGeneratorMock {
+    Arc::new(MetaContext::new(
+        get_test_meta(),
+        vec![
+            (
+                "KibanaSampleDataEcommerce".to_string(),
+                "default".to_string(),
+            ),
+            ("Logs".to_string(), "default".to_string()),
+            ("NumberCube".to_string(), "default".to_string()),
+        ]
+        .into_iter()
+        .collect(),
+        vec![("default".to_string(), sql_generator(custom_templates))]
+            .into_iter()
+            .collect(),
+        Uuid::new_v4(),
+    ))
+}
+
+fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerator + Send + Sync> {
+    Arc::new(SqlGeneratorMock {
         sql_templates: Arc::new(
             SqlTemplates::new(
                 vec![
@@ -321,37 +371,25 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
                 ]
-                .into_iter().chain(custom_templates.into_iter())
-                .collect(),
+                    .into_iter().chain(custom_templates.into_iter())
+                    .collect(),
             )
-            .unwrap(),
+                .unwrap(),
         ),
-    });
-    Arc::new(MetaContext::new(
-        get_test_meta(),
-        vec![
-            (
-                "KibanaSampleDataEcommerce".to_string(),
-                "default".to_string(),
-            ),
-            ("Logs".to_string(), "default".to_string()),
-            ("NumberCube".to_string(), "default".to_string()),
-        ]
-        .into_iter()
-        .collect(),
-        vec![("default".to_string(), sql_generator)]
-            .into_iter()
-            .collect(),
-        Uuid::new_v4(),
-    ))
+    })
 }
 
 pub fn get_test_tenant_ctx_with_meta(meta: Vec<V1CubeMeta>) -> Arc<MetaContext> {
-    // TODO
+    let cube_to_data_source = meta
+        .iter()
+        .map(|c| (c.name.clone(), "default".to_string()))
+        .collect();
     Arc::new(MetaContext::new(
         meta,
-        HashMap::new(),
-        HashMap::new(),
+        cube_to_data_source,
+        vec![("default".to_string(), sql_generator(vec![]))]
+            .into_iter()
+            .collect(),
         Uuid::new_v4(),
     ))
 }

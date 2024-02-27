@@ -854,25 +854,23 @@ impl CubeScanWrapperNode {
             } else {
                 original_alias.clone()
             };
-            if original_alias != alias {
-                if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    next_remapping.insert(original_alias_key, Column::from_name(&alias));
-                    next_remapping.insert(
-                        Column {
-                            name: original_alias.clone(),
-                            relation: from_alias.clone(),
-                        },
-                        Column {
-                            name: alias.clone(),
-                            relation: from_alias.clone(),
-                        },
-                    );
-                } else {
-                    return Err(CubeError::internal(format!(
-                        "Can't generate SQL for column expr: duplicate alias {}",
-                        alias
-                    )));
-                }
+            if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                next_remapping.insert(original_alias_key, Column::from_name(&alias));
+                next_remapping.insert(
+                    Column {
+                        name: original_alias.clone(),
+                        relation: from_alias.clone(),
+                    },
+                    Column {
+                        name: alias.clone(),
+                        relation: from_alias.clone(),
+                    },
+                );
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for column expr: duplicate alias {}",
+                    alias
+                )));
             }
 
             aliased_columns.push(AliasedColumn {

@@ -2020,8 +2020,8 @@ mod tests {
         compile::{
             rewrite::rewriter::Rewriter,
             test::{
-                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_customized,
-                get_test_tenant_ctx_with_meta,
+                get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
+                get_test_tenant_ctx_customized, get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -5054,6 +5054,57 @@ limit
                 ungrouped: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_sixteen_char_trunc() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan_with_meta(
+            r#"
+            SELECT MIN(a.sixteen_charchar), MAX(a.sixteen_charchar_foo), MAX(a.sixteen_charchar_bar) FROM (SELECT * FROM SixteenChar) a
+            "#
+            .to_string(),
+            get_sixteen_char_member_cube(),
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("sixteen_charchar_1"));
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("sixteen_charchar_2"));
     }
 
     #[tokio::test]
