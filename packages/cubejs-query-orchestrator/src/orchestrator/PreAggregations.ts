@@ -1266,13 +1266,12 @@ export class PreAggregationLoader {
 
     let tableData: DownloadTableData;
     if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
-      tableData = await saveCancelFn(
+      return saveCancelFn(
         client.unload(
           table,
           { ...this.getUnloadOptions(), query: { sql, params } },
         )
       );
-      return tableData;
     } else if (externalDriverCapabilities.streamImport && client.stream) {
       tableData = await saveCancelFn(
         client.stream(sql, params, this.getStreamingOptions())
