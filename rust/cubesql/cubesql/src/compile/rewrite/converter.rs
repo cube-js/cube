@@ -10,21 +10,22 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
             AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
-            AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType, ChangeUserMemberValue,
-            ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit, CubeScanOffset,
-            CubeScanUngrouped, CubeScanWrapped, DimensionName, EmptyRelationProduceOneRow,
-            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
-            JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn, LikeExprEscapeChar,
-            LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip, LiteralExprValue,
-            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
-            MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            TableScanFetch, TableScanProjection, TableScanSourceTableName, TableScanTableName,
-            TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
-            TryCastExprDataType, UnionAlias, WindowFunctionExprFun, WindowFunctionExprWindowFrame,
-            WrappedSelectAlias, WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
+            AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
+            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
+            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+            FilterOpOp, InListExprNegated, InSubqueryNegated, JoinJoinConstraint, JoinJoinType,
+            JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
+            LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
+            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
             WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
         },
     },
@@ -221,11 +222,18 @@ impl LogicalPlanToLanguageConverter {
                     graph.add(LogicalPlanLanguage::LiteralExpr([value]))
                 }
             }
-            Expr::AnyExpr { left, op, right } => {
+            Expr::AnyExpr {
+                left,
+                op,
+                right,
+                all,
+            } => {
                 let left = Self::add_expr_replace_params(graph, left, query_params)?;
                 let op = add_expr_data_node!(graph, op, AnyExprOp);
                 let right = Self::add_expr_replace_params(graph, right, query_params)?;
-                graph.add(LogicalPlanLanguage::AnyExpr([left, op, right]))
+                let all = add_expr_data_node!(graph, all, AnyExprAll);
+
+                graph.add(LogicalPlanLanguage::AnyExpr([left, op, right, all]))
             }
             Expr::BinaryExpr { left, op, right } => {
                 let left = Self::add_expr_replace_params(graph, left, query_params)?;
@@ -414,6 +422,17 @@ impl LogicalPlanToLanguageConverter {
                 let negated = add_expr_data_node!(graph, negated, InListExprNegated);
                 graph.add(LogicalPlanLanguage::InListExpr([expr, list, negated]))
             }
+            Expr::InSubquery {
+                expr,
+                subquery,
+                negated,
+            } => {
+                let expr = Self::add_expr_replace_params(graph, expr, query_params)?;
+                let subquery = Self::add_expr_replace_params(graph, subquery, query_params)?;
+                let negated = add_expr_data_node!(graph, negated, InSubqueryNegated);
+
+                graph.add(LogicalPlanLanguage::InSubquery([expr, subquery, negated]))
+            }
             Expr::Wildcard => graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
                 let expr = Self::add_expr_replace_params(graph, expr, query_params)?;
@@ -548,8 +567,9 @@ impl LogicalPlanToLanguageConverter {
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
                 let subqueries =
                     add_plan_list_node!(self, node.subqueries, query_params, SubquerySubqueries);
+                let types = add_data_node!(self, node.types, SubqueryTypes);
                 self.graph
-                    .add(LogicalPlanLanguage::Subquery([input, subqueries]))
+                    .add(LogicalPlanLanguage::Subquery([input, subqueries, types]))
             }
             LogicalPlan::TableUDFs(node) => {
                 let expr =
@@ -818,7 +838,13 @@ pub fn node_to_expr(
             let left = Box::new(to_expr(params[0].clone())?);
             let op = match_data_node!(node_by_id, params[1], AnyExprOp);
             let right = Box::new(to_expr(params[2].clone())?);
-            Expr::AnyExpr { left, op, right }
+            let all = match_data_node!(node_by_id, params[3], AnyExprAll);
+            Expr::AnyExpr {
+                left,
+                op,
+                right,
+                all,
+            }
         }
         LogicalPlanLanguage::BinaryExpr(params) => {
             let left = Box::new(to_expr(params[0].clone())?);
@@ -1006,6 +1032,16 @@ pub fn node_to_expr(
                 "QueryParam can't be evaluated as an Expr node".to_string(),
             ));
         }
+        LogicalPlanLanguage::InSubquery(params) => {
+            let expr = Box::new(to_expr(params[0].clone())?);
+            let subquery = Box::new(to_expr(params[1].clone())?);
+            let negated = match_data_node!(node_by_id, params[2], InSubqueryNegated);
+            Expr::InSubquery {
+                expr,
+                subquery,
+                negated,
+            }
+        }
         x => panic!("Unexpected expression node: {:?}", x),
     })
 }
@@ -1179,8 +1215,9 @@ impl LanguageToLogicalPlanConverter {
                     .into_iter()
                     .map(|n| self.to_logical_plan(n))
                     .collect::<Result<Vec<_>, _>>()?;
+                let types = match_data_node!(node_by_id, params[2], SubqueryTypes);
                 LogicalPlanBuilder::from(input)
-                    .subquery(subqueries)?
+                    .subquery(subqueries, types)?
                     .build()?
             }
             LogicalPlanLanguage::TableUDFs(params) => {

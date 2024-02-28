@@ -120,6 +120,9 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(expr)?;
                 self.visit_query(subquery)?;
             }
+            Expr::AnyAllSubquery(query) => {
+                self.visit_query(query)?;
+            }
             Expr::InUnnest {
                 expr, array_expr, ..
             } => {

@@ -339,6 +339,7 @@ fn limit_push_down(
             subqueries,
             input,
             schema,
+            types,
         }) => {
             // TODO: Pushing Limit down Subquery?
             issue_limit(
@@ -359,6 +360,7 @@ fn limit_push_down(
                         optimizer_config,
                     )?),
                     schema: schema.clone(),
+                    types: types.clone(),
                 }),
             )
         }
