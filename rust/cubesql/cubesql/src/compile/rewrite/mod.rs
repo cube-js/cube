@@ -13,8 +13,8 @@ use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
     logical_plan::{
-        window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
-        JoinConstraint, JoinType, Operator, plan::SubqueryType,
+        plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
+        ExprRewriter, JoinConstraint, JoinType, Operator,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
