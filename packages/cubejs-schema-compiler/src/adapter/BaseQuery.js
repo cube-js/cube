@@ -2005,7 +2005,7 @@ export class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        return '1';
+        return evaluateSql === '*' ? '1' : evaluateSql;
       } else {
         return evaluateSql;
       }
