@@ -2025,6 +2025,6 @@ describe('PreAggregations', () => {
 
     expect(partitionInvalidateKeyQueries).toStrictEqual([]);
     expect(loadSql[0]).not.toMatch(/GROUP BY/);
-    expect(loadSql[0]).toMatch(/1 `real_time_lambda_visitors__count`/);
+    expect(loadSql[0]).toMatch(/THEN 1 END `real_time_lambda_visitors__count`/);
   }));
 });

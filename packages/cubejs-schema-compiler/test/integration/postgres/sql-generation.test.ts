@@ -1456,7 +1456,7 @@ describe('SQL Generation', () => {
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__google_sourced_checkins: 6 },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__google_sourced_checkins: 1 },
   ]));
 
   it('builds geo dimension', () => runQueryTest({
