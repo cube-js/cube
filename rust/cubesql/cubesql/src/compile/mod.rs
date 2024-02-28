@@ -4703,6 +4703,59 @@ from
         );
     }
 
+    //     #[tokio::test]
+    //     async fn push_down_measure_filter() {
+    //         if !Rewriter::sql_push_down_enabled() {
+    //             return;
+    //         }
+    //         init_logger();
+    //
+    //         let query_plan = convert_select_to_query_plan(
+    //             r#"SELECT
+    //   SUM("KibanaSampleDataEcommerce"."sumPrice") AS "TEMP(Calculation_2760495522911424520)(2472686499)(0)",
+    //   SUM(
+    //     (
+    //       CASE
+    //         WHEN (
+    //           "KibanaSampleDataEcommerce"."order_date" < (TIMESTAMP '2024-01-01 00:00:00.000')
+    //         ) THEN "KibanaSampleDataEcommerce"."sumPrice"
+    //         ELSE NULL
+    //       END
+    //     )
+    //   ) AS "TEMP(Calculation_2760495522922868746)(243454951)(0)"
+    // FROM
+    //   "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    // HAVING
+    //   (COUNT(1) > 0)
+    //   "#
+    //             .to_string(),
+    //             DatabaseProtocol::PostgreSQL,
+    //         )
+    //         .await;
+    //
+    //         let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    //         println!(
+    //             "Physical plan: {}",
+    //             displayable(physical_plan.as_ref()).indent()
+    //         );
+    //
+    //         let logical_plan = query_plan.as_logical_plan();
+    //         assert_eq!(
+    //             logical_plan.find_cube_scan().request,
+    //             V1LoadRequestQuery {
+    //                 measures: Some(vec![]),
+    //                 dimensions: Some(vec![]),
+    //                 segments: Some(vec![]),
+    //                 time_dimensions: None,
+    //                 order: None,
+    //                 limit: None,
+    //                 offset: None,
+    //                 filters: None,
+    //                 ungrouped: Some(true),
+    //             }
+    //         );
+    //     }
+
     #[tokio::test]
     async fn powerbi_inner_decimal_cast() {
         init_logger();
@@ -15510,7 +15563,7 @@ limit
         }
         init_logger();
 
-        let logical_plan = convert_select_to_query_plan(
+        let query_plan = convert_select_to_query_plan(
             r#"
             select
                 "_"."t1.agentCountApprox" as "agentCountApprox",
@@ -15546,13 +15599,22 @@ limit
             .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await
-        .as_logical_plan();
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
 
         assert_eq!(
-            logical_plan.find_cube_scan().request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec!["Logs.agentCountApprox".to_string(),]),
+                measures: Some(vec![
+                    "Logs.agentCount".to_string(),
+                    "Logs.agentCountApprox".to_string(),
+                    "KibanaSampleDataEcommerce.count".to_string()
+                ]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),

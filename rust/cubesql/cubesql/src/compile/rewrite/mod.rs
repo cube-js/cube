@@ -434,12 +434,14 @@ crate::plan_to_language! {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
         // NOTE: converting this to a list might provide rewrite improvements
@@ -1263,11 +1265,12 @@ fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    in_projection: impl Display,
     cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {})",
-        members, alias_to_cube, ungrouped, cube_members
+        "(WrapperPushdownReplacer {} {} {} {} {})",
+        members, alias_to_cube, ungrouped, in_projection, cube_members
     )
 }
 
@@ -1275,11 +1278,12 @@ fn wrapper_pullup_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    in_projection: impl Display,
     cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {} {})",
-        members, alias_to_cube, ungrouped, cube_members
+        "(WrapperPullupReplacer {} {} {} {} {})",
+        members, alias_to_cube, ungrouped, in_projection, cube_members
     )
 }
 
