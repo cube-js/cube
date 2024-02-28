@@ -1435,6 +1435,30 @@ describe('SQL Generation', () => {
     }],
   }, [{ reference_visitors__google_sourced_count: '1' }]));
 
+  it('ungrouped filtered count', () => runQueryTest({
+    measures: [
+      'visitor_checkins.google_sourced_checkins',
+    ],
+    timezone: 'America/Los_Angeles',
+    order: [{
+      id: 'visitor_checkins.created_at',
+    }],
+    timeDimensions: [{
+      dimension: 'visitor_checkins.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-03-30'],
+    }],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [
+    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__google_sourced_checkins: 1 },
+  ]));
+
   it('builds geo dimension', () => runQueryTest({
     dimensions: [
       'visitors.location'
