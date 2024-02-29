@@ -334,6 +334,7 @@ impl AsyncPostgresShim {
                                     "Load Request".to_string(),
                                     serde_json::json!({
                                         "query": span_id.as_ref().unwrap().query_key.clone(),
+                                        "isDataQuery": span_id.as_ref().unwrap().is_data_query().await
                                     }),
                                 )
                                 .await?;
@@ -1702,7 +1703,8 @@ impl AsyncPostgresShim {
                     serde_json::json!({
                         "query": {
                             "sql": query.clone(),
-                        }
+                        },
+                        "isDataQuery": span_id.as_ref().unwrap().is_data_query().await
                     }),
                 )
                 .await?;
