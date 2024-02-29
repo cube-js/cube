@@ -973,6 +973,21 @@ impl PostgresIntegrationTestSuite {
         )
         .await?;
 
+        // Try to create temporary table with the same name
+        let result = self
+            .test_simple_query(
+                r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#
+                .to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_err());
+
         // Other sessions must have no access to temp tables
         let new_client = Self::create_client(
             format!(
@@ -988,6 +1003,19 @@ impl PostgresIntegrationTestSuite {
             .simple_query("SELECT i AS i, s AS s FROM temp_table GROUP BY 1, 2 ORDER BY i ASC")
             .await;
         assert!(result.is_err());
+
+        // But we can create a table with the same name as on another session
+        let result = new_client
+            .simple_query(
+                r#"
+            CREATE TEMPORARY TABLE temp_table AS
+            SELECT 5 AS i, 'c' AS s
+            UNION ALL
+            SELECT 10 AS i, 'd' AS s
+        "#,
+            )
+            .await;
+        assert!(result.is_ok());
 
         // Drop table, make sure we can't query it anymore
         self.test_simple_query("DROP TABLE temp_table".to_string(), |messages| {
