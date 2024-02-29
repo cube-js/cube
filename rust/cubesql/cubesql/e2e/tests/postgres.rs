@@ -1035,6 +1035,96 @@ impl PostgresIntegrationTestSuite {
             .await;
         assert!(result.is_err());
 
+        // Set memory limits for testing: 5 MiB for session, 7 MiB total
+        env::set_var("CUBESQL_TEMP_TABLE_SESSION_MEM", "5");
+        env::set_var("CUBESQL_TEMP_TABLE_TOTAL_MEM", "7");
+
+        // Test that we can hit the session memory limit
+        let large_table_query = "
+            CREATE TEMPORARY TABLE tmp1 AS
+            WITH t1 AS (
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            UNION ALL
+            SELECT '0123456789abcdefghijklnopqrstuvwxyz' AS c1
+            )
+            SELECT c1, c2, c3, c4, c5
+            FROM t1
+            CROSS JOIN (SELECT c1 AS c2 FROM t1) AS t2
+            CROSS JOIN (SELECT c1 AS c3 FROM t1) AS t3
+            CROSS JOIN (SELECT c1 AS c4 FROM t1) AS t4
+            CROSS JOIN (SELECT c1 AS c5 FROM t1) AS t5
+        "; // Estimation might change with arrow upgrades; currently almost 1.5 MiB
+
+        // We can create 3 tables estimating ~4.5 MiB
+        let result = self
+            .test_simple_query(large_table_query.to_string(), |_| {})
+            .await;
+        assert!(result.is_ok());
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_ok());
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp3 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result.is_ok());
+
+        // Attempting to allocate one more table should throw an error
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp4 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temporary table memory limit reached"));
+
+        // We are currently at 4.5 MiB total limit, hence we should be allowed
+        // to allocate one more similar table in a separate session
+        let result = new_client.simple_query(large_table_query).await;
+        assert!(result.is_ok());
+
+        // Next attempt must hit total memory limit
+        let result = new_client
+            .simple_query("CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1")
+            .await;
+        assert!(result.is_err());
+
+        // Dropping a table from first session makes quota allow allocation from the second session
+        let result = self
+            .test_simple_query("DROP TABLE tmp3".to_string(), |_| {})
+            .await;
+        assert!(result.is_ok());
+        let result = new_client
+            .simple_query("CREATE TEMPORARY TABLE tmp2 AS SELECT * FROM tmp1")
+            .await;
+        assert!(result.is_ok());
+
+        // Now that the total memory limit is almost hit, make sure the first session
+        // can't get over the limit
+        let result = self
+            .test_simple_query(
+                "CREATE TEMPORARY TABLE tmp3 AS SELECT * FROM tmp1".to_string(),
+                |_| {},
+            )
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("temporary table memory limit reached"));
+
         Ok(())
     }
 
