@@ -77,6 +77,28 @@ impl SplitRules {
             rules,
         );
         self.single_arg_split_point_rules(
+            "aggregate-function-sum-count-constant",
+            || agg_fun_expr("?fun_name", vec![literal_int(1)], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "Count",
+                    vec![literal_int(1)],
+                    "AggregateFunctionExprDistinct:false",
+                )
+            },
+            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            self.transform_aggregate_function(
+                Some("?fun_name"),
+                None,
+                Some("?distinct"),
+                "?output_fun_name",
+                "?alias_to_cube",
+                true,
+            ),
+            true,
+            rules,
+        );
+        self.single_arg_split_point_rules(
             "aggregate-function-invariant-constant",
             || agg_fun_expr("?fun_name", vec!["?constant"], "?distinct"),
             || "?constant".to_string(),
