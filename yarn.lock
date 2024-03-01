@@ -299,11 +299,6 @@
     lodash "^4.17.21"
     resize-observer-polyfill "^1.5.0"
 
-"@apla/clickhouse@^1.5.5":
-  version "1.6.4"
-  resolved "https://registry.yarnpkg.com/@apla/clickhouse/-/clickhouse-1.6.4.tgz#d0afcc2e9b88ad8a4d6053970247a5d26549d797"
-  integrity sha512-zOLL/lOaXrk+l8XS8eDGZfqOy1yKwYQirQtHtyrLxAHlJMNRKBosjK2gVUyCZ94fAIpE8lLUZRxFDid2Vmqxnw==
-
 "@assemblyscript/loader@^0.10.1":
   version "0.10.1"
   resolved "https://registry.yarnpkg.com/@assemblyscript/loader/-/loader-0.10.1.tgz#70e45678f06c72fa2e350e8553ec4a4d72b92e06"
@@ -4847,6 +4842,18 @@
   version "0.2.3"
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
+
+"@clickhouse/client-common@0.2.10":
+  version "0.2.10"
+  resolved "https://registry.yarnpkg.com/@clickhouse/client-common/-/client-common-0.2.10.tgz#62f454d2cc2ee27a325034a2cca47c6f5c90d22e"
+  integrity sha512-BvTY0IXS96y9RUeNCpKL4HUzHmY80L0lDcGN0lmUD6zjOqYMn78+xyHYJ/AIAX7JQsc+/KwFt2soZutQTKxoGQ==
+
+"@clickhouse/client@^0.2.10":
+  version "0.2.10"
+  resolved "https://registry.yarnpkg.com/@clickhouse/client/-/client-0.2.10.tgz#519561f3a4fff837bb606c52abfe74e5e7e9abb3"
+  integrity sha512-ZwBgzjEAFN/ogS0ym5KHVbR7Hx/oYCX01qGp2baEyfN2HM73kf/7Vp3GvMHWRy+zUXISONEtFv7UTViOXnmFrg==
+  dependencies:
+    "@clickhouse/client-common" "0.2.10"
 
 "@codemirror/highlight@^0.19.0":
   version "0.19.6"

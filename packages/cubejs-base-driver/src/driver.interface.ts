@@ -186,7 +186,7 @@ export interface DriverInterface {
   query<R = unknown>(query: string, params: unknown[], options?: QueryOptions): Promise<R[]>;
   //
   tableColumnTypes: (table: string) => Promise<TableStructure>;
-  queryColumnTypes: (sql: string, params?: unknown[]) => Promise<{ name: any; type: string; }[]>;
+  queryColumnTypes: (sql: string, params: unknown[]) => Promise<TableStructure>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
   getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;

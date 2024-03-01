@@ -1,5 +1,5 @@
 /* eslint-disable */
-import ClickHouse from '@apla/clickhouse';
+import { createClient } from '@clickhouse/client';
 import { GenericContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
@@ -21,20 +21,20 @@ export class ClickHouseDbRunner {
     // let engine = 'MergeTree PARTITION BY id ORDER BY (id) SETTINGS index_granularity = 8192'
     const engine = 'Memory';
 
-    await clickHouse.querying(`
+    await clickHouse.query(`
     CREATE TEMPORARY TABLE visitors (id UInt64, amount UInt64, created_at DateTime, updated_at DateTime, status UInt64, source Nullable(String), latitude Float64, longitude Float64)
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-      await clickHouse.querying(`
+      await clickHouse.query(`
     CREATE TEMPORARY TABLE visitor_checkins (id UInt64, visitor_id UInt64, created_at DateTime, source Nullable(String))
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-      await clickHouse.querying(`
+      await clickHouse.query(`
     CREATE TEMPORARY TABLE cards (id UInt64, visitor_id UInt64, visitor_checkin_id UInt64)
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
 
-      await clickHouse.querying(`
+      await clickHouse.query(`
       INSERT INTO
       visitors
       (id, amount, created_at, updated_at, status, source, latitude, longitude) VALUES
@@ -45,7 +45,7 @@ export class ClickHouseDbRunner {
       (5, 500, '2017-01-06 16:00:00', '2017-01-24 16:00:00', 2, null, 120.120, 58.10),
       (6, 500, '2016-09-06 16:00:00', '2016-09-06 16:00:00', 2, null, 120.120, 58.10)
     `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-      await clickHouse.querying(`
+      await clickHouse.query(`
     INSERT INTO
     visitor_checkins
     (id, visitor_id, created_at, source) VALUES
@@ -56,7 +56,7 @@ export class ClickHouseDbRunner {
     (5, 2, '2017-01-04 16:00:00', null),
     (6, 3, '2017-01-05 16:00:00', null)
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
-      await clickHouse.querying(`
+      await clickHouse.query(`
     INSERT INTO
     cards
     (id, visitor_id, visitor_checkin_id) VALUES
@@ -75,12 +75,12 @@ export class ClickHouseDbRunner {
         .start();
     }
 
-    const clickHouse = new ClickHouse({
+    const clickHouse = createClient({
       host: 'localhost',
       port: process.env.TEST_CLICKHOUSE_HOST ? 8123 : this.container.getMappedPort(8123),
+      // needed for tests to use temporary tables
+      session_id: uuidv4()
     });
-
-    clickHouse.sessionId = uuidv4(); // needed for tests to use temporary tables
 
     prepareDataSet = prepareDataSet || this.gutterDataSet;
     await prepareDataSet(clickHouse);

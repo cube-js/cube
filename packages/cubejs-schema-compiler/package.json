@@ -58,7 +58,7 @@
     "uuid": "^8.3.2"
   },
   "devDependencies": {
-    "@apla/clickhouse": "^1.5.5",
+    "@clickhouse/client": "^0.2.10",
     "@cubejs-backend/linter": "^0.34.25",
     "@cubejs-backend/query-orchestrator": "^0.34.57",
     "@types/babel__code-frame": "^7.0.2",

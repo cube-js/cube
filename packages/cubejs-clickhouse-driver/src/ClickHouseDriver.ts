@@ -16,16 +16,15 @@ import {
   DriverInterface,
   QuerySchemasResult,
   StreamOptions,
-  StreamTableDataWithTypes,
+  StreamTableDataWithTypes, TableStructure,
 } from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
-import * as moment from 'moment';
+import { createClient, ClickHouseClient, BaseResultSet } from '@clickhouse/client';
+import type Stream from 'stream';
 
 import { HydrationStream, transformRow } from './HydrationStream';
-
-const ClickHouse = require('@apla/clickhouse');
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
@@ -70,7 +69,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return 5;
   }
 
-  protected readonly pool: Pool<any>;
+  protected readonly pool: Pool<ClickHouseClient<any>>;
 
   protected readonly readOnlyMode: boolean;
 
@@ -109,43 +108,38 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     this.config = {
       host: getEnv('dbHost', { dataSource }),
       port: getEnv('dbPort', { dataSource }),
-      auth:
-        getEnv('dbUser', { dataSource }) ||
-        getEnv('dbPass', { dataSource })
-          ? `${
-            getEnv('dbUser', { dataSource })
-          }:${
-            getEnv('dbPass', { dataSource })
-          }`
-          : '',
-      protocol: getEnv('dbSsl', { dataSource }) ? 'https:' : 'http:',
-      queryOptions: {
-        database:
-          getEnv('dbName', { dataSource }) ||
-          config && config.database ||
-          'default'
-      },
+      username: getEnv('dbUser', { dataSource }),
+      password: getEnv('dbPass', { dataSource }),
+      protocol: getEnv('dbSsl', { dataSource }) ? 'https' : 'http',
+      database: getEnv('dbName', { dataSource }) || config && config.database || 'default',
       ...config
     };
     this.readOnlyMode =
       getEnv('clickhouseReadOnly', { dataSource }) === 'true';
     this.pool = genericPool.createPool({
-      create: async () => new ClickHouse({
-        ...this.config,
-        queryOptions: {
-          //
-          //
-          // If ClickHouse user's permissions are restricted with "readonly = 1",
-          // change settings queries are not allowed. Thus, "join_use_nulls" setting
-          // can not be changed
-          //
-          //
-          ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+      create: async () => {
+        const { host, port, protocol, ...restConfig } = this.config;
+
+        return createClient({
+          host: `${protocol}:${host}:${port}`,
+          ...restConfig,
           session_id: uuidv4(),
           ...this.config.queryOptions,
-        }
-      }),
-      destroy: () => Promise.resolve()
+          clickhouse_settings: {
+            //
+            //
+            // If ClickHouse user's permissions are restricted with "readonly = 1",
+            // change settings queries are not allowed. Thus, "join_use_nulls" setting
+            // can not be changed
+            //
+            //
+            ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+          }
+        });
+      },
+      destroy: async (connection) => {
+        await connection.close();
+      }
     }, {
       min: 0,
       max:
@@ -159,7 +153,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     });
   }
 
-  protected withConnection(fn: (con: any, queryId: string) => Promise<any>) {
+  protected withConnection(fn: (con: ClickHouseClient<Stream.Readable>, queryId: string) => Promise<any>) {
     const self = this;
     const connectionPromise = this.pool.acquire();
     const queryId = uuidv4();
@@ -171,7 +165,9 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
       cancelObj.cancel = async () => {
         cancelled = true;
         await self.withConnection(async conn => {
-          await conn.querying(`KILL QUERY WHERE query_id = '${queryId}'`);
+          await conn.query({
+            query: `KILL QUERY WHERE query_id = '${queryId}'`,
+          });
         });
       };
       return fn(connection, queryId)
@@ -194,7 +190,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.query('SELECT 1', []);
+    const connection = await this.pool.acquire();
+
+    try {
+      await connection.ping();
+    } finally {
+      await this.pool.release(connection);
+    }
   }
 
   public readOnly() {
@@ -204,29 +206,47 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query(query: string, values: unknown[]) {
-    return this.queryResponse(query, values).then((res: any) => this.normaliseResponse(res));
+    const res = await this.queryResponse(query, values);
+    return this.normaliseResponse(res);
   }
 
-  protected queryResponse(query: string, values: unknown[]) {
-    const formattedQuery = sqlstring.format(query, values);
+  protected queryResponse(sql: string, values: unknown[]): Promise<any> {
+    const query = sqlstring.format(sql, values);
+    console.log(query);
 
-    return this.withConnection((connection, queryId) => connection.querying(formattedQuery, {
-      dataObjects: true,
-      queryOptions: {
+    return this.withConnection(async (connection, queryId) => {
+      const response = await connection.query({
+        query,
+        format: 'JSON',
         query_id: queryId,
-        //
-        //
-        // If ClickHouse user's permissions are restricted with "readonly = 1",
-        // change settings queries are not allowed. Thus, "join_use_nulls" setting
-        // can not be changed
-        //
-        //
-        ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+        clickhouse_settings: {
+          //
+          //
+          // If ClickHouse user's permissions are restricted with "readonly = 1",
+          // change settings queries are not allowed. Thus, "join_use_nulls" setting
+          // can not be changed
+          //
+          //
+          ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+        }
+      });
+
+      const test = await response.text();
+      console.log({
+        test
+      });
+
+      try {
+        return JSON.parse(test);
+      } catch (e) {
+        return {};
       }
-    }));
+    });
   }
 
   protected normaliseResponse(res: any) {
+    console.log(res);
+
     if (res.data) {
       const meta = res.meta.reduce(
         (state: any, element: any) => ({ [element.name]: element, ...state }),
@@ -237,6 +257,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         transformRow(row, meta);
       });
     }
+
     return res.data;
   }
 
@@ -290,70 +311,100 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return [{ schema_name: this.config.queryOptions.database }];
   }
 
-  public async stream(
-    query: string,
-    values: unknown[],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    { highWaterMark }: StreamOptions
-  ): Promise<StreamTableDataWithTypes> {
-    // eslint-disable-next-line no-underscore-dangle
-    const conn = await (<any> this.pool)._factory.create();
-
-    try {
-      const formattedQuery = sqlstring.format(query, values);
-
-      return await new Promise((resolve, reject) => {
-        const options = {
-          queryOptions: {
-            query_id: uuidv4(),
-            //
-            //
-            // If ClickHouse user's permissions are restricted with "readonly = 1",
-            // change settings queries are not allowed. Thus, "join_use_nulls" setting
-            // can not be changed
-            //
-            //
-            ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
-          }
-        };
-
-        const originalStream = conn.query(formattedQuery, options, (err: Error | null, result: any) => {
-          if (err) {
-            reject(err);
-          } else {
-            const rowStream = new HydrationStream(result.meta);
-            originalStream.pipe(rowStream);
-
-            resolve({
-              rowStream,
-              types: result.meta.map((field: any) => ({
-                name: field.name,
-                type: this.toGenericType(field.type),
-              })),
-              release: async () => {
-                // eslint-disable-next-line no-underscore-dangle
-                await (<any> this.pool)._factory.destroy(conn);
-              }
-            });
-          }
-        });
-      });
-    } catch (e) {
-      // eslint-disable-next-line no-underscore-dangle
-      await (<any> this.pool)._factory.destroy(conn);
-
-      throw e;
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
+    const columns = await this.query(`DESCRIBE ${sql}`, params);
+    if (!columns) {
+      throw new Error('Unable to describe table');
     }
+
+    return columns.map((column: any) => ({
+      name: column.name,
+      type: this.toGenericType(column.type),
+    }));
   }
+
+  // public async stream(
+  //   sql: string,
+  //   values: unknown[],
+  //   // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  //   { highWaterMark }: StreamOptions
+  // ): Promise<StreamTableDataWithTypes> {
+  //   const conn: ClickHouseClient<Stream.Readable> = await this.pool.acquire();
+  //
+  //   try {
+  //     const query = sqlstring.format(sql, values);
+  //
+  //     const types = await this.queryColumnTypes(sql, values);
+  //     const result = await conn.query({
+  //       query,
+  //       query_id: uuidv4(),
+  //       clickhouse_settings: {
+  //         //
+  //         //
+  //         // If ClickHouse user's permissions are restricted with "readonly = 1",
+  //         // change settings queries are not allowed. Thus, "join_use_nulls" setting
+  //         // can not be changed
+  //         //
+  //         //
+  //         ...(this.readOnlyMode ? {} : { join_use_nulls: 1 }),
+  //       }
+  //     });
+  //
+  //     const rowStream = new HydrationStream(types);
+  //     result.stream().pipe(rowStream);
+  //
+  //     // result.stream()
+  //
+  //     // const formattedQuery = sqlstring.format(query, values);
+  //     //
+  //     // return await new Promise((resolve, reject) => {
+  //     //   const options = {
+  //     //     queryOptions: {
+  //     //       query_id: uuidv4(),
+  //
+  //     //     }
+  //     //   };
+  //     //
+  //     //   const originalStream = conn.query(formattedQuery, options, (err: Error | null, result: any) => {
+  //     //     if (err) {
+  //     //       reject(err);
+  //     //     } else {
+  //     //       const rowStream = new HydrationStream(result.meta);
+  //     //       originalStream.pipe(rowStream);
+  //     //
+  //     //       resolve({
+  //     //         rowStream,
+  //     //         types: result.meta.map((field: any) => ({
+  //     //           name: field.name,
+  //     //           type: this.toGenericType(field.type),
+  //     //         })),
+  //     //         release: async () => {
+  //     //           // eslint-disable-next-line no-underscore-dangle
+  //     //           await (<any> this.pool)._factory.destroy(conn);
+  //     //         }
+  //     //       });
+  //     //     }
+  //     //   });
+  //     // });
+  //   } catch (e) {
+  //     // eslint-disable-next-line no-underscore-dangle
+  //     await (<any> this.pool)._factory.destroy(conn);
+  //
+  //     throw e;
+  //   }
+  // }
 
   public async downloadQueryResults(
     query: string,
     values: unknown[],
     options: DownloadQueryResultsOptions
   ): Promise<DownloadQueryResultsResult> {
-    if ((options || {}).streamImport) {
-      return this.stream(query, values, options);
-    }
+    // if ((options || {}).streamImport) {
+    //   return this.stream(query, values, options);
+    // }
 
     const response = await this.queryResponse(query, values);
 
