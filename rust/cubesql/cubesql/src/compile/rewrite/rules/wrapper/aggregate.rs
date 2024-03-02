@@ -98,6 +98,7 @@ impl WrapperRules {
                     ),
                     "WrappedSelectAlias:None",
                     "?select_ungrouped",
+                    "WrappedSelectUngroupedScan:false",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),

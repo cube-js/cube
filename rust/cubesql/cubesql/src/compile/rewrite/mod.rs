@@ -268,6 +268,7 @@ crate::plan_to_language! {
             order_expr: Vec<Expr>,
             alias: Option<String>,
             ungrouped: bool,
+            ungrouped_scan: bool,
         },
         WrappedSelectJoin {
             input: Arc<LogicalPlan>,
@@ -788,9 +789,10 @@ fn wrapped_select(
     order_expr: impl Display,
     alias: impl Display,
     ungrouped: impl Display,
+    ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
@@ -805,6 +807,7 @@ fn wrapped_select(
         order_expr,
         alias,
         ungrouped,
+        ungrouped_scan
     )
 }
 
