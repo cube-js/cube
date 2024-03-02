@@ -28,7 +28,7 @@ const toRegularNode = (n) => ({
 const toEdge = (n) => ({
     ...n,
     id: `${n.source}->${n.target}`,
-    style: n.source.match(new RegExp(`^${n.target}-`)) ? { stroke:  '#f00', 'stroke-width': 10 } : undefined
+    style: n.source.indexOf(`${n.target}-`) === 0 ? { stroke:  '#f00', 'stroke-width': 10 } : undefined
 });
 const initialNodes = data.combos.map(toGroupNode).concat(data.nodes.map(toRegularNode));
 const initialEdges = data.edges.map(toEdge);

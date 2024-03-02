@@ -6,7 +6,8 @@ use crate::{
         wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
         wrapped_select_order_expr_empty_tail, wrapped_select_window_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage, ProjectionAlias,
-        WrappedSelectAlias, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        WrappedSelectAlias, WrappedSelectUngrouped, WrappedSelectUngroupedScan,
+        WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
@@ -92,6 +93,7 @@ impl WrapperRules {
                     ),
                     "?select_alias",
                     "?select_ungrouped",
+                    "?select_ungrouped_scan",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
@@ -100,6 +102,7 @@ impl WrapperRules {
                 "?ungrouped",
                 "?select_alias",
                 "?select_ungrouped",
+                "?select_ungrouped_scan",
             ),
         )]);
 
@@ -117,11 +120,13 @@ impl WrapperRules {
         ungrouped_var: &'static str,
         select_alias_var: &'static str,
         select_ungrouped_var: &'static str,
+        select_ungrouped_scan_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let projection_alias_var = var!(projection_alias_var);
         let ungrouped_var = var!(ungrouped_var);
         let select_alias_var = var!(select_alias_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
+        let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         move |egraph, subst| {
             for projection_alias in
                 var_iter!(egraph[subst[projection_alias_var]], ProjectionAlias).cloned()
@@ -133,6 +138,12 @@ impl WrapperRules {
                         select_ungrouped_var,
                         egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
                             WrappedSelectUngrouped(ungrouped),
+                        )),
+                    );
+                    subst.insert(
+                        select_ungrouped_scan_var,
+                        egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
+                            WrappedSelectUngroupedScan(ungrouped),
                         )),
                     );
                     subst.insert(

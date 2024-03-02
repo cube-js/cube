@@ -4705,12 +4705,18 @@ from
         )
         .await;
 
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
@@ -18849,7 +18855,13 @@ limit
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string(),),
+                    operator: Some("beforeDate".to_string(),),
+                    values: Some(vec!["2014-05-31T00:00:00.000Z".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
                 ungrouped: Some(true),
             }
         )
@@ -19941,6 +19953,44 @@ limit
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CASE WHEN COALESCE(customer_gender, 'N/A', 'NN') = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_distinct() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, COUNT(DISTINCT countDistinct) mp 
+            FROM KibanaSampleDataEcommerce a
+            WHERE
+              (
+                (
+                  ( a.order_date ) >= '2024-01-01'
+                  AND ( a.order_date ) < '2024-02-01'
+                )
+              ) 
+            GROUP BY 1"#
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
