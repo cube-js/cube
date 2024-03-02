@@ -1347,6 +1347,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
             self.state.get_load_request_meta(),
+            self.session_manager.server.config_obj.clone(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
