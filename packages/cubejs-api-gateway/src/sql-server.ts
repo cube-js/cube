@@ -159,6 +159,7 @@ export class SQLServer {
               memberExpressions: true,
               disableExternalPreAggregations: true,
               queryType: 'multi',
+              disableLimitEnforcing: true,
               context,
               res: (message) => {
                 resolve(message);

@@ -1754,9 +1754,13 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        let cube_scan_query_limit = env::var("CUBEJS_DB_QUERY_LIMIT")
-                            .map(|v| v.parse::<usize>().unwrap())
-                            .unwrap_or(50000);
+                        let cube_scan_query_limit = self
+                            .cube_context
+                            .sessions
+                            .server
+                            .config_obj
+                            .non_streaming_query_max_row_limit()
+                            as usize;
                         let fail_on_max_limit_hit = env::var("CUBESQL_FAIL_ON_MAX_LIMIT_HIT")
                             .map(|v| v.to_lowercase() == "true")
                             .unwrap_or(false);
@@ -1839,6 +1843,7 @@ impl LanguageToLogicalPlanConverter {
                         self.cube_context.meta.clone(),
                         self.auth_context.clone(),
                         self.span_id.clone(),
+                        self.cube_context.sessions.server.config_obj.clone(),
                     )),
                 })
             }

@@ -2500,10 +2500,12 @@ export class BaseQuery {
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-          'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
-          '{% if filter %} WHERE {{ filter }}{% endif %}' +
-          '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
-          '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+          'FROM (\n' +
+          '{{ from | indent(2, true) }}\n' +
+          ') AS {{ from_alias }}' +
+          '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
       },

@@ -343,12 +343,14 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                     (
                         "statements/select".to_string(),
                         r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
-  FROM ({{ from }}) AS {{ from_alias }}
-  {% if filter %} WHERE {{ filter }}{% endif %} 
-  {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
-  {% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
-  LIMIT {{ limit }}{% endif %}{% if offset %}
-  OFFSET {{ offset }}{% endif %}"#.to_string(),
+FROM (
+  {{ from | indent(2) }}
+) AS {{ from_alias }}{% if filter %}
+WHERE {{ filter }}{% endif %}{% if group_by %}
+GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}{% if order_by %}
+ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
+LIMIT {{ limit }}{% endif %}{% if offset %}
+OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),
                     (
                         "expressions/column_aliased".to_string(),
