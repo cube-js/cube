@@ -288,10 +288,17 @@ export function movePivotItem(
   if (id === 'measures') {
     destinationIndex = lastIndex + 1;
   } else if (
+    sourceAxis === destinationAxis &&
     destinationIndex >= lastIndex &&
     nextPivotConfig[destinationAxis][lastIndex] === 'measures'
   ) {
     destinationIndex = lastIndex - 1;
+  } else if (
+    sourceAxis !== destinationAxis &&
+    destinationIndex > lastIndex &&
+    nextPivotConfig[destinationAxis][lastIndex] === 'measures'
+  ) {
+    destinationIndex = lastIndex;
   }
 
   nextPivotConfig[sourceAxis].splice(sourceIndex, 1);
