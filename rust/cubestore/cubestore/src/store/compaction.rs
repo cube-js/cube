@@ -1776,7 +1776,7 @@ mod tests {
         assert_eq!(9, chunks_row_count);
 
         let rows = (0..9)
-            .map(|i| Row::new(TableValue::from_columns(&batch.columns().clone(), i)))
+            .map(|i| Row::new(TableValue::from_columns(&batch.columns(), i)))
             .collect::<Vec<_>>();
 
         let expected = vec![

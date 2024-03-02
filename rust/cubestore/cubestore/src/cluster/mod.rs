@@ -1108,7 +1108,7 @@ impl ClusterImpl {
         on_socket_bound: oneshot::Sender<()>,
         process_fn: impl Fn(Arc<ClusterImpl>, TcpStream) -> F + Send + Sync + Clone + 'static,
     ) -> Result<(), CubeError> {
-        let listener = TcpListener::bind(address.clone()).await?;
+        let listener = TcpListener::bind(address).await?;
         let _ = on_socket_bound.send(());
 
         info!("{} port open on {}", name, address);

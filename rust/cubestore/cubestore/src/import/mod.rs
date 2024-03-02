@@ -1,5 +1,5 @@
 use core::mem;
-use core::slice::memchr;
+use memchr;
 use std::convert::TryFrom;
 use std::path::Path;
 use std::pin::Pin;
@@ -567,7 +567,7 @@ impl ImportServiceImpl {
             Ok((temp_file, None))
         } else {
             Ok((
-                File::open(location.clone()).await.map_err(|e| {
+                File::open(location).await.map_err(|e| {
                     CubeError::internal(format!("Open location {}: {}", location, e))
                 })?,
                 None,
@@ -681,7 +681,7 @@ impl ImportServiceImpl {
             })?;
 
         let (file, tmp_path) = self
-            .resolve_location(location.clone(), table.get_id(), &temp_dir)
+            .resolve_location(location, table.get_id(), &temp_dir)
             .await?;
         let mut row_stream = format
             .row_stream(

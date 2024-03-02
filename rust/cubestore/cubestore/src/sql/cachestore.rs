@@ -575,9 +575,8 @@ impl CacheStoreSqlService {
 
         if track_time {
             app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
+            log::debug!("Queue command processing time: {:?}", execution_time);
         }
-
-        log::debug!("Queue command processing time: {:?}", execution_time,);
 
         Ok(result)
     }

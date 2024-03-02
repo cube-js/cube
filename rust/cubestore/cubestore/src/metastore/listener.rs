@@ -93,11 +93,13 @@ impl MetastoreListenerImpl {
     async fn process_event(&self, event: MetaStoreEvent) -> Result<(), CubeError> {
         let mut wait_fns = self.wait_fns.lock().await;
         let to_notify = wait_fns
-            .drain_filter(|(_, wait_fn)| wait_fn(event.clone()))
+            .extract_if(|(_, wait_fn)| wait_fn(event.clone()))
             .collect::<Vec<_>>();
+
         for (notify, _) in to_notify {
             notify.notify_waiters();
         }
+
         Ok(())
     }
 }

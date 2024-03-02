@@ -1,14 +1,11 @@
 #![feature(test)]
-#![feature(backtrace)]
 #![feature(async_closure)]
-#![feature(drain_filter)]
 #![feature(box_patterns)]
-#![feature(slice_internals)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
-#![feature(map_first_last)]
 #![feature(is_sorted)]
 #![feature(result_flattening)]
+#![feature(extract_if)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);

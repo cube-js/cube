@@ -1196,7 +1196,7 @@ fn alpha(index_bit_len: u8) -> f64 {
         4 => 0.673,
         5 => 0.697,
         6 => 0.709,
-        _ => (0.7213 / (1. + 1.079 / number_of_buckets(index_bit_len) as f64)),
+        _ => 0.7213 / (1. + 1.079 / number_of_buckets(index_bit_len) as f64),
     };
 }
 
