@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.60](https://github.com/cube-js/cube.js/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* Bump max connect retries for Cube Store ([00a6ec0](https://github.com/cube-js/cube.js/commit/00a6ec034c2d5dff8c66647b7ec6cae39c0237ba))
+
+
+
+
+
 ## [0.34.58](https://github.com/cube-js/cube.js/compare/v0.34.57...v0.34.58) (2024-02-27)
 
 

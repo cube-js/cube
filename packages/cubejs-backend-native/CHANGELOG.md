@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Features
+
+* **cubesql:** In subquery support ([#7851](https://github.com/cube-js/cube/issues/7851)) ([8e2a3ec](https://github.com/cube-js/cube/commit/8e2a3ecc348c4ab9e6a5ab038c46fcf7f4c3dfcc))
+
+
+
+
+
 ## [0.34.59](https://github.com/cube-js/cube/compare/v0.34.58...v0.34.59) (2024-02-28)
 
 **Note:** Version bump only for package @cubejs-backend/native
