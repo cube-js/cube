@@ -125,6 +125,11 @@ export function createECommerceSchema() {
           type: 'time',
         },
         {
+          name: 'updated_at',
+          sql: '{created_at}',
+          type: 'time',
+        },
+        {
           name: 'status',
           sql: 'status',
           type: 'string',
@@ -166,6 +171,7 @@ export function createECommerceSchema() {
         join_path: 'orders',
         includes: [
           'created_at',
+          'updated_at',
           'count',
           'status',
         ]

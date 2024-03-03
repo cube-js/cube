@@ -157,6 +157,8 @@ export class PreAggregations {
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries && queryForSqlEvaluation.partitionInvalidateKeyQueries(cube, preAggregation);
 
+    const allBackAliasMembers = PreAggregations.allBackAliasMembers(this.query);
+
     const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
       this.query.timeDimensions.find(td => {
         if (!td.dateRange) {
@@ -168,8 +170,7 @@ export class PreAggregations {
         }
 
         // Handling for views
-        const dimension = this.query.cubeEvaluator.byPath('dimensions', td.expressionPath());
-        return dimension?.aliasMember === foundPreAggregation.references.timeDimensions[0].dimension;
+        return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
       });
 
     const filters = preAggregation.partitionGranularity && this.query.filters.filter(td => {
@@ -180,8 +181,7 @@ export class PreAggregations {
         }
 
         // Handling for views
-        const dimension = this.query.cubeEvaluator.byPath('dimensions', td.expressionPath());
-        return dimension?.aliasMember === foundPreAggregation.references.timeDimensions[0].dimension && td.dateRange;
+        return td.dimension === allBackAliasMembers[foundPreAggregation.references.timeDimensions[0].dimension];
       }
 
       return false;
