@@ -22254,4 +22254,18 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_cast_float_to_text() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "cast_float_to_text",
+            execute_query(
+                "SELECT (11.0::double precision)::text AS eleven;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
