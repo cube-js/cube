@@ -6,17 +6,17 @@
 
 import {
   getEnv,
-  assertDataSource,
+  assertDataSource, pausePromise,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
-  DownloadQueryResultsResult,
+  DownloadQueryResultsResult, DownloadTableCSVData,
   DriverCapabilities,
   DriverInterface,
   QuerySchemasResult,
   StreamOptions,
-  StreamTableDataWithTypes,
+  StreamTableDataWithTypes, TableStructure, UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
@@ -24,6 +24,7 @@ import sqlstring from 'sqlstring';
 import * as moment from 'moment';
 
 import { HydrationStream, transformRow } from './HydrationStream';
+import * as process from 'process';
 
 const ClickHouse = require('@apla/clickhouse');
 
@@ -60,6 +61,20 @@ interface ClickHouseDriverOptions {
   database?: string,
   readOnly?: boolean,
   queryOptions?: object,
+}
+
+interface ClickhouseDriverExportRequiredAWS {
+  bucketType: 's3',
+  bucketName: string,
+  region: string,
+}
+
+interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequiredAWS {
+  keyId?: string,
+  secretKey?: string,
+}
+
+interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
 }
 
 /**
@@ -128,10 +143,13 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
           config && config.database ||
           'default'
       },
+      exportBucket: this.getExportBucket(dataSource),
       ...config
     };
+
     this.readOnlyMode =
       getEnv('clickhouseReadOnly', { dataSource }) === 'true';
+
     this.pool = genericPool.createPool({
       create: async () => new ClickHouse({
         ...this.config,
@@ -403,8 +421,118 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     return this.query('SELECT name as table_name FROM system.tables WHERE database = ?', [schemaName]);
   }
 
+  protected getExportBucket(
+    dataSource: string,
+  ): ClickhouseDriverExportAWS | undefined {
+    const supportedBucketTypes = ['s3'];
+
+    const requiredExportBucket: ClickhouseDriverExportRequiredAWS = {
+      bucketType: getEnv('dbExportBucketType', {
+        supported: supportedBucketTypes,
+        dataSource,
+      }),
+      bucketName: getEnv('dbExportBucket', { dataSource }),
+      region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+    };
+
+    const exportBucket: Partial<ClickhouseDriverExportAWS> = {
+      ...requiredExportBucket,
+      keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
+      secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
+    };
+
+    if (exportBucket.bucketType) {
+      if (!supportedBucketTypes.includes(exportBucket.bucketType)) {
+        throw new Error(
+          `Unsupported EXPORT_BUCKET_TYPE, supported: ${supportedBucketTypes.join(',')}`
+        );
+      }
+
+      // Make sure the required keys are set
+      const emptyRequiredKeys = Object.keys(requiredExportBucket)
+        .filter((key: string) => requiredExportBucket[<keyof ClickhouseDriverExportRequiredAWS>key] === undefined);
+      if (emptyRequiredKeys.length) {
+        throw new Error(
+          `Unsupported configuration exportBucket, some configuration keys are empty: ${emptyRequiredKeys.join(',')}`
+        );
+      }
+
+      return exportBucket as ClickhouseDriverExportAWS;
+    }
+
+    return undefined;
+  }
+
+  public async isUnloadSupported() {
+    if (this.config.exportBucket) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Returns an array of queried fields meta info.
+   */
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
+    const columns = await this.query(`DESCRIBE ${sql}`, params);
+    if (!columns) {
+      throw new Error('Unable to describe table');
+    }
+
+    return columns.map((column: any) => ({
+      name: column.name,
+      type: this.toGenericType(column.type),
+    }));
+  }
+
+  /**
+   * We use unloadWithoutTempTable strategy
+   */
+  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.config.exportBucket) {
+      throw new Error('Unload is not configured');
+    }
+
+    if (!options.query?.sql) {
+      throw new Error('Query must be defined in options');
+    }
+
+    const types = await this.queryColumnTypes(`(${options.query.sql})`, options.query.params);
+    await this.queryResponse(`
+      INSERT INTO FUNCTION
+         s3(
+             'https://${this.config.exportBucket.bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${tableName}/export.csv.gz',
+             '${this.config.exportBucket.keyId}',
+             '${this.config.exportBucket.secretKey}',
+             'CSV'
+          )
+      ${options.query.sql}
+    `, options.query.params);
+
+    const csvFile = await this.extractUnloadedFilesFromS3(
+      {
+        credentials: {
+          accessKeyId: this.config.exportBucket.keyId,
+          secretAccessKey: this.config.exportBucket.secretKey,
+        },
+        region: this.config.exportBucket.region,
+      },
+      this.config.exportBucket.bucketName,
+      tableName,
+    );
+
+    return {
+      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+      csvFile,
+      types,
+      csvNoHeader: true,
+    };
+  }
+
   public capabilities(): DriverCapabilities {
     return {
+      unloadWithoutTempTable: true,
       incrementalSchemaLoading: true,
     };
   }
