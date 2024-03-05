@@ -31,8 +31,8 @@
   "dependencies": {
     "@cubejs-backend/shared": "^0.34.60",
     "ramda": "^0.27.0",
-    "@aws-sdk/client-s3": "^3.521",
-    "@aws-sdk/s3-request-presigner": "^3.521"
+    "@aws-sdk/client-s3": "^3.49.0",
+    "@aws-sdk/s3-request-presigner": "^3.49.0"
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.34.25",

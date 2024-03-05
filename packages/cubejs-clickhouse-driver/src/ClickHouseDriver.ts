@@ -21,12 +21,10 @@ import {
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
 import sqlstring from 'sqlstring';
-import * as moment from 'moment';
 
 import { HydrationStream, transformRow } from './HydrationStream';
-import * as process from 'process';
 
-const ClickHouse = require('@apla/clickhouse');
+const ClickHouse = require('@cubejs-backend/apla-clickhouse');
 
 const ClickhouseTypeToGeneric: Record<string, string> = {
   enum: 'text',
@@ -523,10 +521,11 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
     );
 
     return {
-      exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
       types,
       csvNoHeader: true,
+      // Can be controlled via SET format_csv_delimiter
+      csvDelimiter: ','
     };
   }
 
