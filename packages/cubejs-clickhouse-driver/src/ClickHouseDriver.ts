@@ -6,17 +6,20 @@
 
 import {
   getEnv,
-  assertDataSource, pausePromise,
+  assertDataSource,
 } from '@cubejs-backend/shared';
 import {
   BaseDriver,
   DownloadQueryResultsOptions,
-  DownloadQueryResultsResult, DownloadTableCSVData,
+  DownloadQueryResultsResult,
+  DownloadTableCSVData,
   DriverCapabilities,
   DriverInterface,
   QuerySchemasResult,
   StreamOptions,
-  StreamTableDataWithTypes, TableStructure, UnloadOptions,
+  StreamTableDataWithTypes,
+  TableStructure,
+  UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import genericPool, { Pool } from 'generic-pool';
 import { v4 as uuidv4 } from 'uuid';
@@ -75,9 +78,6 @@ interface ClickhouseDriverExportKeySecretAWS extends ClickhouseDriverExportRequi
 interface ClickhouseDriverExportAWS extends ClickhouseDriverExportKeySecretAWS {
 }
 
-/**
- * ClickHouse driver class.
- */
 export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns default concurrency value.
