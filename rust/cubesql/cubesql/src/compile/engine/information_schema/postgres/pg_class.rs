@@ -1,6 +1,7 @@
 use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
+use bigdecimal::ToPrimitive;
 
 use datafusion::{
     arrow::{
@@ -13,7 +14,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-use mysql_common::bigdecimal::ToPrimitive;
 
 use crate::compile::CubeMetaTable;
 
