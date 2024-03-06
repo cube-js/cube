@@ -1,5 +1,5 @@
 /* eslint-disable */
-import ClickHouse from '@apla/clickhouse';
+import ClickHouse from '@cubejs-backend/apla-clickhouse';
 import { GenericContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
