@@ -68,11 +68,11 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Install tarpaulin@0.20.1
-        uses: baptiste0928/cargo-install@v2
+      - name: Install tarpaulin@0.25.2
+        uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-tarpaulin
-          version: "0.20.1"
+          version: "0.25.2"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
