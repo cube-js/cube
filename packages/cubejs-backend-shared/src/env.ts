@@ -152,7 +152,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
-    .default('schema')
+    .default('model')
     .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
