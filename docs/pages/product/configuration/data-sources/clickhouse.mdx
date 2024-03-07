@@ -58,7 +58,7 @@ here][ref-caching-using-preaggs-build-strats].
 | Feature       | Works with read-only mode? | Is default? |
 | ------------- | :------------------------: | :---------: |
 | Batching      |             ✅             |     ✅      |
-| Export Bucket |             -              |      -      |
+| Export Bucket |             ✅             |      -      |
 
 By default, ClickHouse uses [batching][self-preaggs-batching] to build
 pre-aggregations.
@@ -69,7 +69,32 @@ No extra configuration is required to configure batching for ClickHouse.
 
 ### Export Bucket
 
-ClickHouse does not support export buckets.
+<WarningBox>
+
+  Clickhouse driver **only** supports using AWS S3 for export buckets.
+
+</WarningBox>
+
+#### AWS S3
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube with the following environment variables:
+
+<InfoBox>
+
+  Ensure the AWS credentials are correctly configured in IAM to allow reads and
+  writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
 
 ## SSL
 
@@ -92,5 +117,7 @@ You can connect to a ClickHouse database when your user's permissions are
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-recipe-enable-ssl]:
   /guides/recipes/data-sources/using-ssl-connections-to-data-source
+[ref-caching-large-preaggs]:
+  /product/caching/using-pre-aggregations#export-bucket
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
