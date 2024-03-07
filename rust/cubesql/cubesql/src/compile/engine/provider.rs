@@ -40,6 +40,7 @@ use super::information_schema::postgres::{
     constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
+    schemata::InfoSchemaSchemataProvider as PostgresSchemaSchemataProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
     views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
@@ -295,6 +296,8 @@ impl DatabaseProtocol {
             "information_schema.role_table_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleColumnGrantsProvider>() {
             "information_schema.role_column_grants".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaSchemataProvider>() {
+            "information_schema.schemata".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -509,6 +512,11 @@ impl DatabaseProtocol {
                     return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
                 }
                 "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
+                "schemata" => {
+                    return Some(Arc::new(PostgresSchemaSchemataProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
