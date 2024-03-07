@@ -17,12 +17,15 @@ import {
 import {
   BaseDriver,
   cancelCombinator,
+  DownloadQueryResultsResult,
   DownloadTableData,
   DriverCapabilities,
   DriverInterface,
   InlineTable,
+  isDownloadTableCSVData,
   SaveCancelFn,
-  StreamOptions, TableStructure,
+  StreamOptions,
+  TableStructure,
   UnloadOptions,
 } from '@cubejs-backend/base-driver';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
@@ -1127,30 +1130,44 @@ export class PreAggregationLoader {
     const [sql, params] =
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
-    // @todo Deprecated, BaseDriver already implements it, before remove we need to add check for factoryDriver
-    if (!client.downloadQueryResults) {
-      throw new Error('Can\'t load external pre-aggregation: source driver doesn\'t support downloadQueryResults()');
-    }
-
     const queryOptions = this.queryOptions(invalidationKeys, sql, params, this.targetTableName(newVersionEntry), newVersionEntry);
     this.logExecutingSql(queryOptions);
     this.logger('Downloading external pre-aggregation via query', queryOptions);
     const externalDriver = await this.externalDriverFactory();
     const capabilities = externalDriver.capabilities && externalDriver.capabilities();
 
-    const tableData = await saveCancelFn(client.downloadQueryResults(
-      sql,
-      params, {
-        streamOffset: this.preAggregation.streamOffset,
-        ...queryOptions,
-        ...capabilities,
-        ...this.getStreamingOptions(),
-      }
-    )).catch((error: any) => {
-      this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
-      throw error;
+    let tableData: DownloadQueryResultsResult;
+
+    if (capabilities.csvImport && client.unloadFromQuery && await client.isUnloadSupported(this.getUnloadOptions())) {
+      tableData = await saveCancelFn(
+        client.unloadFromQuery(
+          sql,
+          params,
+          this.getUnloadOptions(),
+        )
+      ).catch((error: any) => {
+        this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
+        throw error;
+      });
+    } else {
+      tableData = await saveCancelFn(client.downloadQueryResults(
+        sql,
+        params, {
+          streamOffset: this.preAggregation.streamOffset,
+          ...queryOptions,
+          ...capabilities,
+          ...this.getStreamingOptions(),
+        }
+      )).catch((error: any) => {
+        this.logger('Downloading external pre-aggregation via query error', { ...queryOptions, error: error.stack || error.message });
+        throw error;
+      });
+    }
+
+    this.logger('Downloading external pre-aggregation via query completed', {
+      ...queryOptions,
+      isUnloadSupported: isDownloadTableCSVData(tableData)
     });
-    this.logger('Downloading external pre-aggregation via query completed', queryOptions);
 
     try {
       await this.uploadExternalPreAggregation(tableData, newVersionEntry, saveCancelFn, queryOptions);
@@ -1203,7 +1220,7 @@ export class PreAggregationLoader {
 
       this.logger('Downloading external pre-aggregation completed', {
         ...queryOptions,
-        isUnloadSupported: await this.isUnloadSupported(capabilities, client)
+        isUnloadSupported: isDownloadTableCSVData(tableData)
       });
 
       return tableData;
@@ -1216,18 +1233,13 @@ export class PreAggregationLoader {
     }
   }
 
-  protected async isUnloadSupported(externalDriverCapabilities: DriverCapabilities, client: DriverInterface) {
-    const isUnloadSupported = externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions());
-    return isUnloadSupported;
-  }
-
   /**
    * prepares download data when temp table = true
    */
   protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
     let tableData: DownloadTableData;
 
-    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
+    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
       tableData = await saveCancelFn(
         client.unload(table, this.getUnloadOptions()),
       );
@@ -1265,7 +1277,8 @@ export class PreAggregationLoader {
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
     let tableData: DownloadTableData;
-    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
+
+    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
       return saveCancelFn(
         client.unload(
           table,
