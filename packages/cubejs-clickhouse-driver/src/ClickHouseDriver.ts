@@ -487,26 +487,36 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
   /**
    * We use unloadWithoutTempTable strategy
    */
-  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
-    if (!this.config.exportBucket) {
-      throw new Error('Unload is not configured');
-    }
-
+  public async unload(_tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (!options.query?.sql) {
       throw new Error('Query must be defined in options');
     }
 
-    const types = await this.queryColumnTypes(`(${options.query.sql})`, options.query.params);
+    return this.unloadFromQuery(
+      options.query?.sql,
+      options.query?.params,
+      options
+    );
+  }
+
+  public async unloadFromQuery(sql: string, params: unknown[], options: UnloadOptions): Promise<DownloadTableCSVData> {
+    if (!this.config.exportBucket) {
+      throw new Error('Unload is not configured');
+    }
+
+    const types = await this.queryColumnTypes(`(${sql})`, params);
+    const exportPrefix = uuidv4();
+
     await this.queryResponse(`
       INSERT INTO FUNCTION
          s3(
-             'https://${this.config.exportBucket.bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${tableName}/export.csv.gz',
+             'https://${this.config.exportBucket.bucketName}.s3.${this.config.exportBucket.region}.amazonaws.com/${exportPrefix}/export.csv.gz',
              '${this.config.exportBucket.keyId}',
              '${this.config.exportBucket.secretKey}',
              'CSV'
           )
-      ${options.query.sql}
-    `, options.query.params);
+      ${sql}
+    `, params);
 
     const csvFile = await this.extractUnloadedFilesFromS3(
       {
@@ -517,7 +527,7 @@ export class ClickHouseDriver extends BaseDriver implements DriverInterface {
         region: this.config.exportBucket.region,
       },
       this.config.exportBucket.bucketName,
-      tableName,
+      exportPrefix,
     );
 
     return {
