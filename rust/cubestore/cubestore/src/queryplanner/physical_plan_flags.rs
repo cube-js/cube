@@ -165,7 +165,7 @@ fn extract_columns_with_operators_impl<'a>(
     let predicate = predicate.as_any();
     if let Some(binary) = predicate.downcast_ref::<BinaryExpr>() {
         match binary.op() {
-            Operator::Or | Operator::And => {
+            Operator::Or => {
                 let conditions = [binary.left().as_ref(), binary.right().as_ref()]
                     .iter()
                     .flat_map(|&expr| {
@@ -177,6 +177,10 @@ fn extract_columns_with_operators_impl<'a>(
                 if !conditions.is_empty() {
                     out.extend(conditions);
                 }
+            }
+            Operator::And => {
+                extract_columns_with_operators_impl(binary.left().as_ref(), out, false);
+                extract_columns_with_operators_impl(binary.right().as_ref(), out, false);
             }
             _ => {
                 let mut left = binary.left();
