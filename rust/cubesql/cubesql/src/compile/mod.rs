@@ -1347,6 +1347,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let query_planner = Arc::new(CubeQueryPlanner::new(
             self.session_manager.server.transport.clone(),
             self.state.get_load_request_meta(),
+            self.session_manager.server.config_obj.clone(),
         ));
         let mut ctx = DFSessionContext::with_state(
             default_session_builder(
@@ -2020,8 +2021,8 @@ mod tests {
         compile::{
             rewrite::rewriter::Rewriter,
             test::{
-                get_string_cube_meta, get_test_session_with_config, get_test_tenant_ctx_customized,
-                get_test_tenant_ctx_with_meta,
+                get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
+                get_test_tenant_ctx_customized, get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -3306,28 +3307,99 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn tableau_having_count_on_cube_without_count() {
+    async fn sum_to_count_push_down() {
         init_logger();
 
-        // let query_plan = convert_select_to_query_plan(
-        //     "SELECT COUNT(DISTINCT \"Logs\".\"agentCount\") AS \"sum:count:ok\" FROM \"public\".\"Logs\" \"Logs\" HAVING (COUNT(1) > 0)".to_string(),
-        //     DatabaseProtocol::PostgreSQL,
-        // ).await;
+        let query_plan = convert_select_to_query_plan(
+            "SELECT SUM(1) AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\" \"KibanaSampleDataEcommerce\"".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
 
-        // let logical_plan = query_plan.as_logical_plan();
-        // assert_eq!(
-        //     logical_plan.find_cube_scan().request,
-        //     V1LoadRequestQuery {
-        //         measures: Some(vec!["Logs.agentCount".to_string()]),
-        //         segments: Some(vec![]),
-        //         dimensions: Some(vec![]),
-        //         time_dimensions: None,
-        //         order: None,
-        //         limit: None,
-        //         offset: None,
-        //         filters: None,
-        //     }
-        // );
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn tableau_having_count_on_cube_without_count() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(DISTINCT \"Logs\".\"agentCount\") AS \"sum:count:ok\" FROM \"public\".\"Logs\" \"Logs\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn tableau_having_count_with_sum_on_cube_without_count() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT COUNT(DISTINCT \"Logs\".\"agentCount\") AS \"sum:count:ok\", SUM(1) AS \"count:ok\" FROM \"public\".\"Logs\" \"Logs\" HAVING (COUNT(1) > 0)".to_string(),
+            DatabaseProtocol::PostgreSQL,
+        ).await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
     }
 
     #[tokio::test]
@@ -4633,12 +4705,18 @@ from
         )
         .await;
 
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
@@ -4702,6 +4780,59 @@ from
             }
         );
     }
+
+    //     #[tokio::test]
+    //     async fn push_down_measure_filter() {
+    //         if !Rewriter::sql_push_down_enabled() {
+    //             return;
+    //         }
+    //         init_logger();
+    //
+    //         let query_plan = convert_select_to_query_plan(
+    //             r#"SELECT
+    //   SUM("KibanaSampleDataEcommerce"."sumPrice") AS "TEMP(Calculation_2760495522911424520)(2472686499)(0)",
+    //   SUM(
+    //     (
+    //       CASE
+    //         WHEN (
+    //           "KibanaSampleDataEcommerce"."order_date" < (TIMESTAMP '2024-01-01 00:00:00.000')
+    //         ) THEN "KibanaSampleDataEcommerce"."sumPrice"
+    //         ELSE NULL
+    //       END
+    //     )
+    //   ) AS "TEMP(Calculation_2760495522922868746)(243454951)(0)"
+    // FROM
+    //   "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    // HAVING
+    //   (COUNT(1) > 0)
+    //   "#
+    //             .to_string(),
+    //             DatabaseProtocol::PostgreSQL,
+    //         )
+    //         .await;
+    //
+    //         let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    //         println!(
+    //             "Physical plan: {}",
+    //             displayable(physical_plan.as_ref()).indent()
+    //         );
+    //
+    //         let logical_plan = query_plan.as_logical_plan();
+    //         assert_eq!(
+    //             logical_plan.find_cube_scan().request,
+    //             V1LoadRequestQuery {
+    //                 measures: Some(vec![]),
+    //                 dimensions: Some(vec![]),
+    //                 segments: Some(vec![]),
+    //                 time_dimensions: None,
+    //                 order: None,
+    //                 limit: None,
+    //                 offset: None,
+    //                 filters: None,
+    //                 ungrouped: Some(true),
+    //             }
+    //         );
+    //     }
 
     #[tokio::test]
     async fn powerbi_inner_decimal_cast() {
@@ -5054,6 +5185,57 @@ limit
                 ungrouped: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_sixteen_char_trunc() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan_with_meta(
+            r#"
+            SELECT MIN(a.sixteen_charchar), MAX(a.sixteen_charchar_foo), MAX(a.sixteen_charchar_bar) FROM (SELECT * FROM SixteenChar) a
+            "#
+            .to_string(),
+            get_sixteen_char_member_cube(),
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("sixteen_charchar_1"));
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("sixteen_charchar_2"));
     }
 
     #[tokio::test]
@@ -15459,7 +15641,7 @@ limit
         }
         init_logger();
 
-        let logical_plan = convert_select_to_query_plan(
+        let query_plan = convert_select_to_query_plan(
             r#"
             select
                 "_"."t1.agentCountApprox" as "agentCountApprox",
@@ -15495,13 +15677,22 @@ limit
             .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await
-        .as_logical_plan();
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
 
         assert_eq!(
-            logical_plan.find_cube_scan().request,
+            query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec!["Logs.agentCountApprox".to_string(),]),
+                measures: Some(vec![
+                    "Logs.agentCount".to_string(),
+                    "Logs.agentCountApprox".to_string(),
+                    "KibanaSampleDataEcommerce.count".to_string()
+                ]),
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
@@ -18664,7 +18855,13 @@ limit
                 order: None,
                 limit: None,
                 offset: None,
-                filters: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.order_date".to_string(),),
+                    operator: Some("beforeDate".to_string(),),
+                    values: Some(vec!["2014-05-31T00:00:00.000Z".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
                 ungrouped: Some(true),
             }
         )
@@ -19756,6 +19953,44 @@ limit
 
         let query_plan = convert_select_to_query_plan(
             "SELECT CASE WHEN COALESCE(customer_gender, 'N/A', 'NN') = 'female' THEN 'f' ELSE 'm' END, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+            .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("CASE WHEN"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_case_wrapper_distinct() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, COUNT(DISTINCT countDistinct) mp 
+            FROM KibanaSampleDataEcommerce a
+            WHERE
+              (
+                (
+                  ( a.order_date ) >= '2024-01-01'
+                  AND ( a.order_date ) < '2024-02-01'
+                )
+              ) 
+            GROUP BY 1"#
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -22018,5 +22253,19 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ungrouped: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_cast_float_to_text() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "cast_float_to_text",
+            execute_query(
+                "SELECT (11.0::double precision)::text AS eleven;".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
     }
 }

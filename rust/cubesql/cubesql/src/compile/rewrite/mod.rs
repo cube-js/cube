@@ -13,8 +13,8 @@ use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
     logical_plan::{
-        window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable, ExprRewriter,
-        JoinConstraint, JoinType, Operator,
+        plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
+        ExprRewriter, JoinConstraint, JoinType, Operator,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -108,6 +108,7 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             subqueries: Vec<LogicalPlan>,
             schema: DFSchemaRef,
+            types: Vec<SubqueryType>,
         },
         Union {
             inputs: Vec<LogicalPlan>,
@@ -171,6 +172,7 @@ crate::plan_to_language! {
             left: Box<Expr>,
             op: Operator,
             right: Box<Expr>,
+            all: bool,
         },
         LikeExpr {
             like_type: LikeType,
@@ -240,6 +242,11 @@ crate::plan_to_language! {
             list: Vec<Expr>,
             negated: bool,
         },
+        InSubquery {
+            expr: Box<Expr>,
+            subquery: Box<Expr>,
+            negated: bool,
+        },
         WildcardExpr {},
         GetIndexedFieldExpr {
             expr: Box<Expr>,
@@ -261,6 +268,7 @@ crate::plan_to_language! {
             order_expr: Vec<Expr>,
             alias: Option<String>,
             ungrouped: bool,
+            ungrouped_scan: bool,
         },
         WrappedSelectJoin {
             input: Arc<LogicalPlan>,
@@ -434,12 +442,14 @@ crate::plan_to_language! {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
         WrapperPullupReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
             ungrouped: bool,
+            in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
         // NOTE: converting this to a list might provide rewrite improvements
@@ -779,9 +789,10 @@ fn wrapped_select(
     order_expr: impl Display,
     alias: impl Display,
     ungrouped: impl Display,
+    ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
@@ -796,6 +807,7 @@ fn wrapped_select(
         order_expr,
         alias,
         ungrouped,
+        ungrouped_scan
     )
 }
 
@@ -1263,11 +1275,12 @@ fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    in_projection: impl Display,
     cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPushdownReplacer {} {} {} {})",
-        members, alias_to_cube, ungrouped, cube_members
+        "(WrapperPushdownReplacer {} {} {} {} {})",
+        members, alias_to_cube, ungrouped, in_projection, cube_members
     )
 }
 
@@ -1275,11 +1288,12 @@ fn wrapper_pullup_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
     ungrouped: impl Display,
+    in_projection: impl Display,
     cube_members: impl Display,
 ) -> String {
     format!(
-        "(WrapperPullupReplacer {} {} {} {})",
-        members, alias_to_cube, ungrouped, cube_members
+        "(WrapperPullupReplacer {} {} {} {} {})",
+        members, alias_to_cube, ungrouped, in_projection, cube_members
     )
 }
 

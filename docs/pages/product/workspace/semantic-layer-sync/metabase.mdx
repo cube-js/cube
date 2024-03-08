@@ -1,0 +1,74 @@
+# Semantic Layer Sync with Metabase
+
+This page details the support for [Metabase](https://www.metabase.com)
+in [Semantic Layer Sync](/product/workspace/semantic-layer-sync).
+
+Semantic Layer Sync works with managed and self-hosted Metabase instances.
+
+## Configuration
+
+To create a new sync, choose <Btn>Metabase</Btn>:
+
+<Screenshot
+  highlight="inset(34% 35% 55% 50% round 10px)"
+  src="https://ucarecdn.com/36c23111-871d-4d2a-927f-877df954b090/"
+/>
+
+Data model is synchronized via [Metabase API][metabase-api] which uses a `user`
+name and a `password` for authentication. You can use your own user name and
+password or create a new service account. You can copy a `url` at any page of
+your Metabase workspace.
+
+Example confguration for Metabase:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'metabase',
+      'name': 'Metabase Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'example.metabaseapp.com',
+        'database': 'Cube Cloud: production-deployment'
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "metabase",
+        name: "Metabase Sync",
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "example.metabaseapp.com",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+</CodeTabs>
+
+When a sync is run, Metabase will send an email with a new login notification.
+You can ignore such emails, [configure Metabase][metabase-skip-emails] to skip
+sending them, or use a service account with a different email address:
+
+<Screenshot src="https://ucarecdn.com/2e7ac466-73a5-4dd6-9c85-ed98d9df8979/" />
+
+
+[metabase-api]: https://www.metabase.com/learn/administration/metabase-api#authenticate-your-requests-with-a-session-token
+[metabase-skip-emails]: https://www.metabase.com/docs/latest/configuring-metabase/environment-variables#mb_send_email_on_first_login_from_new_device

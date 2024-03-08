@@ -3,6 +3,47 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.34.60](https://github.com/cube-js/cube.js/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Allow different `Timestamp` types in `DATEDIFF` ([de9ef08](https://github.com/cube-js/cube.js/commit/de9ef081cae21f551a38219bb64749e08e7ca6fc))
+* **cubesql:** Prioritize ungrouped aggregate scans over ungrouped projection scans so most of the members can be pushed down without wrapping ([#7865](https://github.com/cube-js/cube.js/issues/7865)) ([addde0d](https://github.com/cube-js/cube.js/commit/addde0d373f01e69485b8a0333850917ffad9a2d))
+* **cubesql:** Remove excessive limit on inner wrapped queries ([#7864](https://github.com/cube-js/cube.js/issues/7864)) ([b97268f](https://github.com/cube-js/cube.js/commit/b97268fe5caf55c5b7806c597b9f7b75410f6ba4))
+
+
+### Features
+
+* **cubesql:** In subquery support ([#7851](https://github.com/cube-js/cube.js/issues/7851)) ([8e2a3ec](https://github.com/cube-js/cube.js/commit/8e2a3ecc348c4ab9e6a5ab038c46fcf7f4c3dfcc))
+* **cubesql:** Support split and SUM(1) ([16e2ee0](https://github.com/cube-js/cube.js/commit/16e2ee0d290c502f796891e137556aad2275e52d))
+
+
+
+
+
+## [0.34.59](https://github.com/cube-js/cube.js/compare/v0.34.58...v0.34.59) (2024-02-28)
+
+
+### Bug Fixes
+
+* **cubesql:** Replace only simple ungrouped measures in projections to avoid aggregate over aggregate statements ([#7852](https://github.com/cube-js/cube.js/issues/7852)) ([fa2a89b](https://github.com/cube-js/cube.js/commit/fa2a89b89f91c8eba175130fca33975200690288))
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube.js/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+
+### Bug Fixes
+
+* **cubesql:** Ambiguous reference in case of same two 16 char prefixes are in query ([5051f66](https://github.com/cube-js/cube.js/commit/5051f663b4142735ee1cc455936300f765de62a7))
+
+
+
+
+
 ## [0.34.57](https://github.com/cube-js/cube.js/compare/v0.34.56...v0.34.57) (2024-02-26)
 
 

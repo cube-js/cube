@@ -31,6 +31,7 @@ describe('materialize', () => {
         CUBEJS_DB_NAME: 'materialize',
         CUBEJS_DB_USER: 'materialize',
         CUBEJS_DB_PASS: 'materialize',
+        CUBEJS_DB_SSL: 'false',
 
         ...DEFAULT_CONFIG,
       },

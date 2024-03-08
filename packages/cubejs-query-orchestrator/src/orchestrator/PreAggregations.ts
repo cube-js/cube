@@ -1201,7 +1201,10 @@ export class PreAggregationLoader {
         tableData = await this.getTableDataWithoutTempTable(client, table, saveCancelFn, queryOptions, capabilities);
       }
 
-      this.logger('Downloading external pre-aggregation completed', queryOptions);
+      this.logger('Downloading external pre-aggregation completed', {
+        ...queryOptions,
+        isUnloadSupported: await this.isUnloadSupported(capabilities, client)
+      });
 
       return tableData;
     } catch (error: any) {
@@ -1213,13 +1216,18 @@ export class PreAggregationLoader {
     }
   }
 
+  protected async isUnloadSupported(externalDriverCapabilities: DriverCapabilities, client: DriverInterface) {
+    const isUnloadSupported = externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions());
+    return isUnloadSupported;
+  }
+
   /**
    * prepares download data when temp table = true
    */
   protected async getTableDataWithTempTable(client: DriverInterface, table: string, saveCancelFn: SaveCancelFn, queryOptions: QueryOptions, externalDriverCapabilities: DriverCapabilities) {
     let tableData: DownloadTableData;
 
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
       tableData = await saveCancelFn(
         client.unload(table, this.getUnloadOptions()),
       );
@@ -1257,7 +1265,7 @@ export class PreAggregationLoader {
         Array.isArray(this.preAggregation.sql) ? this.preAggregation.sql : [this.preAggregation.sql, []];
 
     let tableData: DownloadTableData;
-    if (externalDriverCapabilities.csvImport && client.unload && await client.isUnloadSupported(this.getUnloadOptions())) {
+    if (await this.isUnloadSupported(externalDriverCapabilities, client)) {
       return saveCancelFn(
         client.unload(
           table,

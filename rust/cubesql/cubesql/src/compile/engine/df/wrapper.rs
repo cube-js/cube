@@ -3,6 +3,7 @@ use crate::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
         rewrite::WrappedSelectType,
     },
+    config::ConfigObj,
     sql::AuthContextRef,
     transport::{
         AliasedColumn, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlTemplates,
@@ -107,6 +108,7 @@ pub struct CubeScanWrapperNode {
     pub request: Option<V1LoadRequestQuery>,
     pub member_fields: Option<Vec<MemberField>>,
     pub span_id: Option<Arc<SpanId>>,
+    pub config_obj: Arc<dyn ConfigObj>,
 }
 
 impl CubeScanWrapperNode {
@@ -115,6 +117,7 @@ impl CubeScanWrapperNode {
         meta: Arc<MetaContext>,
         auth_context: AuthContextRef,
         span_id: Option<Arc<SpanId>>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Self {
         Self {
             wrapped_plan,
@@ -124,6 +127,7 @@ impl CubeScanWrapperNode {
             request: None,
             member_fields: None,
             span_id,
+            config_obj,
         }
     }
 
@@ -141,6 +145,7 @@ impl CubeScanWrapperNode {
             request: Some(request),
             member_fields: Some(member_fields),
             span_id: self.span_id.clone(),
+            config_obj: self.config_obj.clone(),
         }
     }
 }
@@ -214,11 +219,12 @@ impl CubeScanWrapperNode {
         load_request_meta: Arc<LoadRequestMeta>,
     ) -> result::Result<Self, CubeError> {
         let schema = self.schema();
+        let wrapped_plan = self.wrapped_plan.clone();
         let (sql, request, member_fields) = Self::generate_sql_for_node(
             Arc::new(self.clone()),
             transport,
             load_request_meta,
-            self.wrapped_plan.clone(),
+            self.clone().set_max_limit_for_node(wrapped_plan),
             true,
         )
         .await
@@ -254,6 +260,45 @@ impl CubeScanWrapperNode {
             Ok((sql, request, member_fields))
         })?;
         Ok(self.with_sql_and_request(sql, request, member_fields))
+    }
+
+    pub fn set_max_limit_for_node(self, node: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
+        let stream_mode = self.config_obj.stream_mode();
+        if stream_mode {
+            return node;
+        }
+
+        let query_limit = self.config_obj.non_streaming_query_max_row_limit();
+        match node.as_ref() {
+            LogicalPlan::Extension(Extension {
+                node: extension_node,
+            }) => {
+                let cube_scan_node = extension_node
+                    .as_any()
+                    .downcast_ref::<CubeScanNode>()
+                    .cloned();
+                let wrapped_select_node = extension_node
+                    .as_any()
+                    .downcast_ref::<WrappedSelectNode>()
+                    .cloned();
+                if let Some(node) = cube_scan_node {
+                    let mut new_node = node.clone();
+                    new_node.request.limit = Some(query_limit);
+                    Arc::new(LogicalPlan::Extension(Extension {
+                        node: Arc::new(new_node),
+                    }))
+                } else if let Some(node) = wrapped_select_node {
+                    let mut new_node = node.clone();
+                    new_node.limit = Some(query_limit as usize);
+                    Arc::new(LogicalPlan::Extension(Extension {
+                        node: Arc::new(new_node),
+                    }))
+                } else {
+                    node.clone()
+                }
+            }
+            _ => node.clone(),
+        }
     }
 
     pub fn generate_sql_for_node(
@@ -854,25 +899,23 @@ impl CubeScanWrapperNode {
             } else {
                 original_alias.clone()
             };
-            if original_alias != alias {
-                if !next_remapping.contains_key(&Column::from_name(&alias)) {
-                    next_remapping.insert(original_alias_key, Column::from_name(&alias));
-                    next_remapping.insert(
-                        Column {
-                            name: original_alias.clone(),
-                            relation: from_alias.clone(),
-                        },
-                        Column {
-                            name: alias.clone(),
-                            relation: from_alias.clone(),
-                        },
-                    );
-                } else {
-                    return Err(CubeError::internal(format!(
-                        "Can't generate SQL for column expr: duplicate alias {}",
-                        alias
-                    )));
-                }
+            if !next_remapping.contains_key(&Column::from_name(&alias)) {
+                next_remapping.insert(original_alias_key, Column::from_name(&alias));
+                next_remapping.insert(
+                    Column {
+                        name: original_alias.clone(),
+                        relation: from_alias.clone(),
+                    },
+                    Column {
+                        name: alias.clone(),
+                        relation: from_alias.clone(),
+                    },
+                );
+            } else {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for column expr: duplicate alias {}",
+                    alias
+                )));
             }
 
             aliased_columns.push(AliasedColumn {
@@ -1789,6 +1832,7 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             request: self.request.clone(),
             member_fields: self.member_fields.clone(),
             span_id: self.span_id.clone(),
+            config_obj: self.config_obj.clone(),
         })
     }
 }

@@ -1232,6 +1232,23 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /** ****************************************************************
+   * Materialize Driver                                              *
+   ***************************************************************** */
+
+  /**
+   * Materialize cluster.
+   */
+  materializeCluster: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_MATERIALIZE_CLUSTER', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
    * Snowflake Driver                                                *
    ***************************************************************** */
 
@@ -1534,7 +1551,7 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
   cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
-    .default('10')
+    .default('20')
     .asInt(),
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')

@@ -7,7 +7,7 @@ use crate::{
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_window_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
-        WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        WrappedSelectUngrouped, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
@@ -118,6 +118,7 @@ impl WrapperRules {
                         "?cube_scan_input",
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -130,30 +131,35 @@ impl WrapperRules {
                         wrapped_select_projection_expr_empty_tail(),
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_group_expr_empty_tail(),
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_aggr_expr_empty_tail(),
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         wrapped_select_window_expr_empty_tail(),
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     wrapped_select_joins_empty_tail(),
@@ -162,12 +168,14 @@ impl WrapperRules {
                             "?filter_expr",
                             "?alias_to_cube",
                             "?ungrouped",
+                            "?in_projection",
                             "?cube_members",
                         ),
                         wrapper_pullup_replacer(
                             wrapped_select_filter_expr_empty_tail(),
                             "?alias_to_cube",
                             "?ungrouped",
+                            "?in_projection",
                             "?cube_members",
                         ),
                     ),
@@ -178,14 +186,16 @@ impl WrapperRules {
                         wrapped_select_order_expr_empty_tail(),
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     "WrappedSelectAlias:None",
                     "?select_ungrouped",
+                    "?select_ungrouped_scan",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_filter("?ungrouped", "?select_ungrouped"),
+            self.transform_filter("?ungrouped", "?select_ungrouped", "?select_ungrouped_scan"),
         )]);
 
         Self::list_pushdown_pullup_rules(
@@ -200,9 +210,11 @@ impl WrapperRules {
         &self,
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
+        select_ungrouped_scan_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let ungrouped_var = var!(ungrouped_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
+        let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         move |egraph, subst| {
             for ungrouped in
                 var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
@@ -211,6 +223,13 @@ impl WrapperRules {
                     select_ungrouped_var,
                     egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
                         WrappedSelectUngrouped(ungrouped),
+                    )),
+                );
+
+                subst.insert(
+                    select_ungrouped_scan_var,
+                    egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
+                        WrappedSelectUngroupedScan(ungrouped),
                     )),
                 );
                 return true;

@@ -1,0 +1,124 @@
+# Semantic Layer Sync with Tableau
+
+This page details the support for [Tableau](https://www.tableau.com)
+in [Semantic Layer Sync](/product/workspace/semantic-layer-sync).
+
+<SuccessBox>
+
+Semantic Layer Sync with Tableau is available on
+[Enterprise and above](https://cube.dev/pricing) tiers.
+
+</SuccessBox>
+
+Semantic Layer Sync works with Tableau Cloud, Tableau Desktop, and Tableau Server.
+
+## Configuration
+
+To create a new sync, choose either <Btn>Tableau Cloud</Btn>, <Btn>Tableau Desktop</Btn>,
+or <Btn>Tableau Server</Btn>:
+
+<Screenshot
+  highlight="inset(44% 35% 45% 20% round 10px)"
+  src="https://ucarecdn.com/36c23111-871d-4d2a-927f-877df954b090/"
+/>
+
+For Tableau Cloud and Tableau Server,
+data model is synchronized via the [Tableau API][tableau-api] which uses [personal
+access tokens][tableau-pat] for authentication. You can create a new [personal access
+token][tableau-api-authentication] on the&nbsp;<Btn>My Account Settings</Btn> page.
+
+<InfoBox>
+
+Personal access tokens might be disabled in your Tableau site configuration.
+To enable them, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site
+and click&nbsp;<Btn>Enable personal access tokens</Btn>.
+
+By default, personal access tokens are configured with an expiry period of 180 days.
+Please check your Tableau site configuration for details. To customize the expiry
+period, navigate to the&nbsp;<Btn>Settings</Btn> page of your Tableau site. Please
+also make sure to renew your personal access token in time. 
+
+</InfoBox>
+
+<WarningBox>
+
+Personal access tokens expire if they are not used after 15 consecutive days.
+If they are used more frequently than every 15 days, they expire after one year.
+
+</WarningBox>
+
+You will also need to specify a `region` and a Tableau `site` name. Consider the
+following URL of a Tableau site: `https://10ax.online.tableau.com/#/site/cubedev/home`.
+In this case, the region would be `10ax` and the site name would be `cubedev`.
+
+Example configuration for Tableau:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'tableau',
+      'name': 'Tableau Sync',
+      'config': {
+        'region': '10ax',
+        'site': 'mytableausite',
+        'personalAccessToken': 'cube-cloud',
+        'personalAccessTokenSecret': 'HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4',
+        'database': 'Cube Cloud: production-deployment',
+      },
+    },
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "tableau",
+        name: "Tableau Sync",
+        config: {
+          region: "10ax",
+          site: "mytableausite",
+          personalAccessToken: "cube-cloud",
+          personalAccessTokenSecret: "HW8TFrBfJyen+JQleh0/bw==:1BvJLIti9Fud04rN021EfHMnh4yYD3p4",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+</CodeTabs>
+
+When connecting a Cube Cloud data source to your Tableau workbook, you will be prompted
+to enter the user name and password for Cube Cloud. You can find them at the&nbsp;<Btn>SQL
+API Connection</Btn> tab of the&nbsp;<Btn>BI Integrations</Btn> page in Cube Cloud.
+
+## Features
+
+Syncs with Tableau Cloud and Tableau Server run automatically via the [Tableau
+API][tableau-api].
+
+### Tableau Desktop
+
+Click <Btn>Download .tds</Btn> to download a Tableau [data source][tds] file:
+
+<Screenshot
+  highlight="inset(80% 1% 9% 5% round 10px)"
+  src="https://ucarecdn.com/4b93196e-3128-4b01-bd3f-eab8e7d8a37f/"
+/>
+
+Use can open it in Tableau to create a data source.
+
+
+[tds]: https://help.tableau.com/current/pro/desktop/en-us/export_connection.htm
+[tableau-api]: https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api.htm
+[tableau-api-authentication]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm#create-personal-access-tokens
+[tableau-pat]: https://help.tableau.com/current/server/en-us/security_personal_access_tokens.htm

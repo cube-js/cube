@@ -6,6 +6,7 @@ pub mod columns;
 pub mod constraint_column_usage;
 pub mod key_column_usage;
 pub mod referential_constraints;
+pub mod schemata;
 pub mod table_constraints;
 pub mod tables;
 pub mod views;

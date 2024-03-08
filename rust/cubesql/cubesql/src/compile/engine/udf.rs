@@ -771,23 +771,45 @@ pub fn create_datediff_udf() -> ScalarUDF {
         assert!(args.len() == 3);
 
         let datepart_array = downcast_string_arg!(args[0], "datepart", i32);
-        match (&args[1].data_type(), &args[2].data_type()) {
-            (
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-                DataType::Timestamp(TimeUnit::Nanosecond, None),
-            ) => (),
-            _ => {
+
+        let left_date_array = match args[1].data_type() {
+            DataType::Timestamp(TimeUnit::Nanosecond, None) => Arc::clone(&args[1]),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+            | DataType::Timestamp(TimeUnit::Millisecond, None)
+            | DataType::Timestamp(TimeUnit::Second, None) => cast_with_options(
+                &args[1],
+                &DataType::Timestamp(TimeUnit::Nanosecond, None),
+                &CastOptions { safe: false },
+            )?,
+            t => {
                 return Err(DataFusionError::Execution(format!(
-                    "date arguments must be of type TimestampNanosecond, actual: {}, {}",
-                    &args[1].data_type(),
-                    &args[2].data_type(),
-                )));
+                    "second datediff argument must be of type Timestamp actual: {}",
+                    t
+                )))
             }
-        }
+        };
+
+        let right_date_array = match args[2].data_type() {
+            DataType::Timestamp(TimeUnit::Nanosecond, None) => Arc::clone(&args[2]),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+            | DataType::Timestamp(TimeUnit::Millisecond, None)
+            | DataType::Timestamp(TimeUnit::Second, None) => cast_with_options(
+                &args[2],
+                &DataType::Timestamp(TimeUnit::Nanosecond, None),
+                &CastOptions { safe: false },
+            )?,
+            t => {
+                return Err(DataFusionError::Execution(format!(
+                    "third datediff argument must be of type Timestamp actual: {}",
+                    t
+                )))
+            }
+        };
+
         let left_date_array =
-            downcast_primitive_arg!(args[1], "left_date", TimestampNanosecondType);
+            downcast_primitive_arg!(left_date_array, "left_date", TimestampNanosecondType);
         let right_date_array =
-            downcast_primitive_arg!(args[2], "right_date", TimestampNanosecondType);
+            downcast_primitive_arg!(right_date_array, "right_date", TimestampNanosecondType);
 
         let result = izip!(datepart_array, left_date_array, right_date_array)
             .map(|args| {

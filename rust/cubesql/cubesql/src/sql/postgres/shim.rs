@@ -1327,10 +1327,7 @@ impl AsyncPostgresShim {
                 hold,
             } => {
                 // TODO: move envs to config
-                let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
-                    .ok()
-                    .map(|v| v.parse::<bool>().unwrap())
-                    .unwrap_or(false);
+                let stream_mode = self.session.server.config_obj.stream_mode();
                 if stream_mode {
                     return Err(ConnectionError::Protocol(
                         protocol::ErrorResponse::error(

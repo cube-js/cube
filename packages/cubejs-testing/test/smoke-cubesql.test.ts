@@ -180,5 +180,17 @@ from
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
+
+    test('no limit for non matching count push down', async () => {
+      const res = await connection.query(`
+    select
+      max("rows"."createdAt") as "a0",
+      min("rows"."createdAt") as "a1",
+      count(*) as "a2"
+    from
+      "public"."BigOrders" "rows"
+  `);
+      expect(res.rows).toMatchSnapshot('no limit for non matching count push down');
+    });
   });
 });

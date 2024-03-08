@@ -498,6 +498,7 @@ fn filter_push_down(
             subqueries,
             input,
             schema,
+            types,
         }) => {
             // TODO: Push Filter down Subquery
             issue_filter(
@@ -516,6 +517,7 @@ fn filter_push_down(
                         optimizer_config,
                     )?),
                     schema: schema.clone(),
+                    types: types.clone(),
                 }),
             )
         }

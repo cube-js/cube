@@ -3,7 +3,7 @@ use crate::{
         rewrite::{
             rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
             DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-            TimeDimensionGranularity,
+            TimeDimensionGranularity, WrappedSelectUngroupedScan,
         },
         MetaContext,
     },
@@ -44,6 +44,7 @@ pub struct CubePlanCost {
     non_pushed_down_window: i64,
     ungrouped_aggregates: usize,
     wrapper_nodes: i64,
+    wrapped_select_ungrouped_scan: usize,
     ast_size_outside_wrapper: usize,
     filters: i64,
     structure_points: i64,
@@ -134,6 +135,8 @@ impl CubePlanCost {
                 + other.ast_size_outside_wrapper,
             ungrouped_aggregates: self.ungrouped_aggregates + other.ungrouped_aggregates,
             wrapper_nodes: self.wrapper_nodes + other.wrapper_nodes,
+            wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan
+                + other.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes + other.cube_scan_nodes,
             time_dimensions_used_as_dimensions: self.time_dimensions_used_as_dimensions
                 + other.time_dimensions_used_as_dimensions,
@@ -197,6 +200,7 @@ impl CubePlanCost {
                 CubePlanState::Wrapper => 0,
             } + self.ungrouped_aggregates,
             wrapper_nodes: self.wrapper_nodes,
+            wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes,
             ast_size_without_alias: self.ast_size_without_alias,
             ast_size: self.ast_size,
@@ -364,6 +368,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             _ => 0,
         };
 
+        let wrapped_select_ungrouped_scan = match enode {
+            LogicalPlanLanguage::WrappedSelectUngroupedScan(WrappedSelectUngroupedScan(true)) => 1,
+            _ => 0,
+        };
+
         let initial_cost = CubePlanCostAndState {
             cost: CubePlanCost {
                 replacers: this_replacers,
@@ -380,6 +389,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 structure_points,
                 ungrouped_aggregates: 0,
                 wrapper_nodes,
+                wrapped_select_ungrouped_scan,
                 empty_wrappers: 0,
                 ast_size_outside_wrapper: 0,
                 ast_size_inside_wrapper,
