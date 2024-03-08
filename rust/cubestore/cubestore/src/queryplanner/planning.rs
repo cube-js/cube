@@ -2080,7 +2080,7 @@ pub mod tests {
         );
     }
 
-    pub fn default_indices() -> TestIndices {
+    fn default_indices() -> TestIndices {
         make_test_indices(false)
     }
 
@@ -2270,7 +2270,7 @@ pub mod tests {
             .collect()
     }
 
-    pub fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
+    fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
         let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
             Statement::Statement(s) => s,
             other => panic!("not a statement, actual {:?}", other),
