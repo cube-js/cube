@@ -2792,6 +2792,7 @@ async fn physical_plan_flags(service: Box<dyn SqlClient>) {
     let cases = vec![
         ("SELECT SUM(hits) FROM s.Data", true),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
         ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
