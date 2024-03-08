@@ -250,6 +250,8 @@ function wrapNativeFunctionWithStream(
         response.stream.on('error', (err: any) => {
           writable.destroy(err);
         });
+      } else if (response.error) {
+        writerOrChannel.reject(errorString(response));
       } else {
         // TODO remove JSON.stringify()
         writerOrChannel.resolve(JSON.stringify(response));

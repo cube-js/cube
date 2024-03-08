@@ -120,6 +120,9 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(expr)?;
                 self.visit_query(subquery)?;
             }
+            Expr::AnyAllSubquery(query) => {
+                self.visit_query(query)?;
+            }
             Expr::InUnnest {
                 expr, array_expr, ..
             } => {
@@ -370,6 +373,14 @@ trait Visitor<'ast, E: Error> {
         }
         if let Some(limit) = query.limit.as_mut() {
             self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+        }
+        if let Some(offset) = query.offset.as_mut() {
+            self.visit_expr_with_placeholder_type(&mut offset.value, PlaceholderType::Number)?;
+        }
+        if let Some(fetch) = query.fetch.as_mut() {
+            if let Some(quantity) = fetch.quantity.as_mut() {
+                self.visit_expr_with_placeholder_type(quantity, PlaceholderType::Number)?;
+            }
         }
 
         Ok(())
@@ -1379,6 +1390,16 @@ mod tests {
             ],
         )?;
 
+        assert_pg_params_finder(
+            "SELECT 1 OFFSET $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
+
+        assert_pg_params_finder(
+            "SELECT 1 FETCH FIRST $1 ROWS ONLY",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
+
         Ok(())
     }
 
@@ -1418,6 +1439,11 @@ mod tests {
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
+        assert_placeholder_replacer("SELECT 1 OFFSET ?", "SELECT 1 OFFSET 1")?;
+        assert_placeholder_replacer(
+            "SELECT 1 FETCH FIRST ? ROWS ONLY",
+            "SELECT 1 FETCH FIRST 1 ROWS ONLY",
+        )?;
 
         Ok(())
     }

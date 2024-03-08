@@ -3,12 +3,20 @@ redirect_from:
   - /config/downstream/powerbi
 ---
 
-# PowerBI
+# Power BI
 
-You can connect to Cube from Power BI, interactive data visualization software
-product developed by Microsoft, using the [Cube SQL API][ref-sql-api].
+[Power BI](https://www.microsoft.com/en-gb/power-platform/products/power-bi/)
+is an interactive data visualization software product developed by Microsoft.
 
-## Enable Cube SQL API
+## Semantic Layer Sync
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
+Power BI. It automatically synchronizes the [data model][ref-data-model] between
+Cube and Power BI.
+
+## SQL API
+
+You can also use the [SQL API][ref-sql-api] to connect Cube to Tableau.
 
 ### Cube Cloud
 
@@ -50,5 +58,6 @@ are columns.
 [ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
-
+[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-data-model]: /product/data-modeling/overview
 [link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery

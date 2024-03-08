@@ -16,6 +16,9 @@ import {
 } from '@cubejs-backend/shared';
 import { reduce } from 'ramda';
 import fs from 'fs';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
+
 import { cancelCombinator } from './utils';
 import {
   ExternalCreateTableOptions,
@@ -463,7 +466,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
   }
 
@@ -531,5 +534,39 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  /**
+   * Returns an array of signed AWS S3 URLs of the unloaded csv files.
+   */
+  protected async extractUnloadedFilesFromS3(
+    clientOptions: S3ClientConfig,
+    bucketName: string,
+    prefix: string
+  ): Promise<string[]> {
+    const storage = new S3(clientOptions);
+
+    const list = await storage.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: prefix,
+    });
+    if (list) {
+      if (!list.Contents) {
+        return [];
+      } else {
+        const csvFile = await Promise.all(
+          list.Contents.map(async (file) => {
+            const command = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: file.Key,
+            });
+            return getSignedUrl(storage, command, { expiresIn: 3600 });
+          })
+        );
+        return csvFile;
+      }
+    }
+
+    throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
   }
 }

@@ -39,7 +39,11 @@ declare module '@cubejs-client/react' {
   }
 
   type CubeProviderProps = {
-    cubejsApi: CubejsApi | null;
+    cubeApi?: CubejsApi | null;
+    /**
+     * @deprecated Use `cubeApi` instead
+     */
+    cubejsApi?: CubejsApi | null;
     options?: CubeProviderOptions;
     children: React.ReactNode;
   };

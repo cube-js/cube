@@ -64,7 +64,7 @@ interface Query {
   dimensions?: (Member | TimeMember | MemberExpression)[];
   filters?: (QueryFilter | LogicalAndFilter | LogicalOrFilter)[];
   timeDimensions?: QueryTimeDimension[];
-  segments?: Member[];
+  segments?: (Member | MemberExpression)[];
   limit?: null | number;
   offset?: number;
   total?: boolean;

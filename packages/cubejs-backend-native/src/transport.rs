@@ -297,6 +297,19 @@ impl TransportService for NodeBridgeTransport {
         )
         .await?;
 
+        if let Some(error) = response.get("error").and_then(|e| e.as_str()) {
+            if let Some(stack) = response.get("stack").and_then(|e| e.as_str()) {
+                return Err(CubeError::user(format!(
+                    "Error during SQL generation: {}\n{}",
+                    error, stack
+                )));
+            }
+            return Err(CubeError::user(format!(
+                "Error during SQL generation: {}",
+                error
+            )));
+        }
+
         let sql = response
             .get("sql")
             .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?
@@ -369,12 +382,18 @@ impl TransportService for NodeBridgeTransport {
                 streaming: false,
             })?;
 
-            let response: serde_json::Value = call_js_with_channel_as_callback(
+            let result = call_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.on_sql_api_load.clone(),
                 Some(extra),
             )
-            .await?;
+            .await;
+            if let Err(e) = &result {
+                if e.message.to_lowercase().contains("continue wait") {
+                    continue;
+                }
+            }
+            let response: serde_json::Value = result?;
             #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
             #[cfg(not(debug_assertions))]

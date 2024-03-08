@@ -3,7 +3,7 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync},
+    sync::{Arc, RwLock as RwLockSync, Weak},
     time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
@@ -118,6 +118,7 @@ impl SessionState {
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContextRef>,
         auth_context_expiration: Duration,
+        session_manager: Weak<SessionManager>,
     ) -> Self {
         let mut rng = rand::thread_rng();
 
@@ -128,7 +129,7 @@ impl SessionState {
             client_port,
             protocol,
             variables: RwLockSync::new(None),
-            temp_tables: Arc::new(TempTableManager::new()),
+            temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
             auth_context: RwLockSync::new((auth_context, SystemTime::now())),
             transaction: RwLockSync::new(TransactionState::None),

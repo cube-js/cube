@@ -520,7 +520,7 @@ impl Portal {
                                     let temp_table = TempTable::new(Arc::clone(plan.schema()), vec![record_batch]);
                                     let save_result = tokio::task::spawn_blocking(move || {
                                         temp_tables.save(&name.to_ascii_lowercase(), temp_table)
-                                    }).await;
+                                    }).await?;
                                     if let Err(err) = save_result {
                                         return yield Err(err.into())
                                     };

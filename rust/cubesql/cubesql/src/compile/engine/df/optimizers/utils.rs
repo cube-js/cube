@@ -48,7 +48,12 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                 right: Box::new(right),
             })
         }
-        Expr::AnyExpr { left, op, right } => {
+        Expr::AnyExpr {
+            left,
+            op,
+            right,
+            all,
+        } => {
             let rewrites = match (rewrite(left, map)?, rewrite(right, map)?) {
                 (Some(left), Some(right)) => Some((left, right)),
                 _ => None,
@@ -57,6 +62,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
                 left: Box::new(left),
                 op: op.clone(),
                 right: Box::new(right),
+                all: all.clone(),
             })
         }
         Expr::Like(Like {
@@ -310,6 +316,21 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
         // As rewrites are used to push things down or up the plan, wildcards
         // might change the selection and should be marked as non-rewrittable
         Expr::Wildcard | Expr::QualifiedWildcard { .. } => None,
+        Expr::InSubquery {
+            expr,
+            subquery,
+            negated,
+        } => {
+            let rewrites = match (rewrite(expr, map)?, rewrite(subquery, map)?) {
+                (Some(expr), Some(subquery)) => Some((expr, subquery)),
+                _ => None,
+            };
+            rewrites.map(|(expr, subquery)| Expr::InSubquery {
+                expr: Box::new(expr),
+                subquery: Box::new(subquery),
+                negated: negated.clone(),
+            })
+        }
     })
 }
 

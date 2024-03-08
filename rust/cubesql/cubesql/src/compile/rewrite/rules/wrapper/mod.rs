@@ -7,6 +7,7 @@ mod cast;
 mod column;
 mod cube_scan_wrapper;
 mod extract;
+mod filter;
 mod in_list_expr;
 mod is_null_expr;
 mod limit;
@@ -50,6 +51,7 @@ impl RewriteRules for WrapperRules {
         self.aggregate_rules(&mut rules);
         self.projection_rules(&mut rules);
         self.limit_rules(&mut rules);
+        self.filter_rules(&mut rules);
         self.order_rules(&mut rules);
         self.window_rules(&mut rules);
         self.aggregate_function_rules(&mut rules);
@@ -90,7 +92,15 @@ impl WrapperRules {
         rules.extend(replacer_push_down_node(
             rule_name,
             list_node,
-            |node| wrapper_pushdown_replacer(node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            |node| {
+                wrapper_pushdown_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
             false,
         ));
 
@@ -98,16 +108,31 @@ impl WrapperRules {
             rule_name,
             list_node,
             substitute_list_node,
-            |node| wrapper_pullup_replacer(node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            |node| {
+                wrapper_pullup_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
         ));
 
         rules.extend(vec![rewrite(
             rule_name,
-            wrapper_pushdown_replacer(list_node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            wrapper_pushdown_replacer(
+                list_node,
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ),
             wrapper_pullup_replacer(
                 substitute_list_node,
                 "?alias_to_cube",
                 "?ungrouped",
+                "?in_projection",
                 "?cube_members",
             ),
         )]);
@@ -121,7 +146,15 @@ impl WrapperRules {
         rules.extend(replacer_push_down_node(
             rule_name,
             list_node,
-            |node| wrapper_pushdown_replacer(node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            |node| {
+                wrapper_pushdown_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
             false,
         ));
 
@@ -129,13 +162,33 @@ impl WrapperRules {
             rule_name,
             list_node,
             list_node,
-            |node| wrapper_pullup_replacer(node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            |node| {
+                wrapper_pullup_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
         ));
 
         rules.extend(vec![rewrite(
             rule_name,
-            wrapper_pushdown_replacer(list_node, "?alias_to_cube", "?ungrouped", "?cube_members"),
-            wrapper_pullup_replacer(list_node, "?alias_to_cube", "?ungrouped", "?cube_members"),
+            wrapper_pushdown_replacer(
+                list_node,
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ),
+            wrapper_pullup_replacer(
+                list_node,
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ),
         )]);
     }
 }

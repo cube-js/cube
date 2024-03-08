@@ -1847,7 +1847,7 @@ impl RewriteRules for FilterRules {
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
                         "?op",
-                        literal_expr("?date"),
+                        "?date",
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1867,7 +1867,7 @@ impl RewriteRules for FilterRules {
                                         udf_expr(
                                             "date_add",
                                             vec![
-                                                literal_expr("?date"),
+                                                "?date".to_string(),
                                                 literal_expr("?date_add_interval"),
                                             ],
                                         ),
@@ -1898,7 +1898,7 @@ impl RewriteRules for FilterRules {
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
                         "=",
-                        literal_expr("?date"),
+                        "?date".to_string(),
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1911,7 +1911,7 @@ impl RewriteRules for FilterRules {
                             ">=",
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?date")],
+                                vec![literal_expr("?granularity"), "?date".to_string()],
                             ),
                         ),
                         "AND",
@@ -1925,7 +1925,7 @@ impl RewriteRules for FilterRules {
                                     udf_expr(
                                         "date_add",
                                         vec![
-                                            literal_expr("?date"),
+                                            "?date".to_string(),
                                             literal_expr("?date_add_interval"),
                                         ],
                                     ),
@@ -2843,6 +2843,7 @@ impl FilterRules {
                                             Operator::LtEq => "beforeOrOnDate",
                                             Operator::Gt => "afterDate",
                                             Operator::GtEq => "afterOrOnDate",
+                                            Operator::Eq => "inDateRange",
                                             _ => op,
                                         },
                                     };
@@ -2874,8 +2875,8 @@ impl FilterRules {
                                         _ => op,
                                     };
 
-                                    let value = match literal {
-                                        ScalarValue::Utf8(Some(value)) => {
+                                    let values = match literal {
+                                        ScalarValue::Utf8(Some(value)) => vec![{
                                             if op == "startsWith"
                                                 && value.starts_with("^^")
                                                 && value.ends_with(".*$")
@@ -2916,12 +2917,16 @@ impl FilterRules {
                                             } else {
                                                 value.to_string()
                                             }
+                                        }],
+                                        ScalarValue::Int64(Some(value)) => vec![value.to_string()],
+                                        ScalarValue::Boolean(Some(value)) => {
+                                            vec![value.to_string()]
                                         }
-                                        ScalarValue::Int64(Some(value)) => value.to_string(),
-                                        ScalarValue::Boolean(Some(value)) => value.to_string(),
-                                        ScalarValue::Float64(Some(value)) => value.to_string(),
+                                        ScalarValue::Float64(Some(value)) => {
+                                            vec![value.to_string()]
+                                        }
                                         ScalarValue::Decimal128(Some(value), _, scale) => {
-                                            Decimal::new(*value).to_string(*scale)
+                                            vec![Decimal::new(*value).to_string(*scale)]
                                         }
                                         ScalarValue::TimestampNanosecond(_, _)
                                         | ScalarValue::Date32(_)
@@ -2932,10 +2937,11 @@ impl FilterRules {
                                                 let value = format_iso_timestamp(timestamp);
 
                                                 match expr_op {
-                                                    Operator::Lt => value,
-                                                    Operator::LtEq => value,
-                                                    Operator::Gt => value,
-                                                    Operator::GtEq => value,
+                                                    Operator::Lt => vec![value],
+                                                    Operator::LtEq => vec![value],
+                                                    Operator::Gt => vec![value],
+                                                    Operator::GtEq => vec![value],
+                                                    Operator::Eq => vec![value.to_string(), value],
                                                     _ => {
                                                         continue;
                                                     }
@@ -2968,7 +2974,7 @@ impl FilterRules {
                                     subst.insert(
                                         filter_values_var,
                                         egraph.add(LogicalPlanLanguage::FilterMemberValues(
-                                            FilterMemberValues(vec![value.to_string()]),
+                                            FilterMemberValues(values),
                                         )),
                                     );
 
@@ -4047,7 +4053,9 @@ impl FilterRules {
                     if let Some(date_add_interval) =
                         utils::granularity_str_to_interval(&granularity)
                     {
-                        for date in var_iter!(egraph[subst[date_var]], LiteralExprValue) {
+                        if let Some(ConstantFolding::Scalar(date)) =
+                            &egraph[subst[date_var]].data.constant
+                        {
                             if let ScalarValue::TimestampNanosecond(Some(date), None) = date {
                                 if let Some(true) =
                                     utils::is_literal_date_trunced(*date, &granularity)

@@ -277,7 +277,7 @@ describe('SQLInterface', () => {
         const [result] = await connection.query('select CAST(\'2020-12-25 22:48:48.000\' AS timestamp)');
         console.log(result);
 
-        expect(result).toEqual([{ 'TimestampNanosecond(1608936528000000000, None)': '2020-12-25T22:48:48.000' }]);
+        expect(result).toEqual([{ 'CAST(Utf8("2020-12-25 22:48:48.000") AS Timestamp(Nanosecond, None))': '2020-12-25T22:48:48.000' }]);
       }
 
       connection.destroy();

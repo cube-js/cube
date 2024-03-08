@@ -1,0 +1,65 @@
+# Semantic Layer Sync with Apache Superset
+
+This page details the support for [Apache Superset](https://superset.apache.org)
+in [Semantic Layer Sync](/product/workspace/semantic-layer-sync).
+
+## Configuration
+
+To create a new sync, choose <Btn>Apache Superset</Btn>:
+
+<Screenshot
+  highlight="inset(34% 50% 55% 35% round 10px)"
+  src="https://ucarecdn.com/36c23111-871d-4d2a-927f-877df954b090/"
+/>
+
+Data model is synchronized via [Superset API][superset-api] which uses a `user`
+name and a `password` for authentication. You can use your own user name and
+password or create a new service account. You can copy a `url` at any page of
+your Superset workspace.
+
+Example confguration for Superset:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: production-deployment'
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: production-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+</CodeTabs>
+
+
+[superset-api]: https://superset.apache.org/docs/api/

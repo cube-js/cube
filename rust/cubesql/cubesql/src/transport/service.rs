@@ -383,7 +383,7 @@ impl SqlTemplates {
         group_by: Vec<AliasedColumn>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
-        _filter: Option<String>,
+        filter: Option<String>,
         _having: Option<String>,
         order_by: Vec<AliasedColumn>,
         limit: Option<usize>,
@@ -409,6 +409,7 @@ impl SqlTemplates {
                 aggregate => aggregate,
                 projection => projection,
                 order_by => order_by,
+                filter => filter,
                 from_alias => quoted_from_alias,
                 limit => limit,
                 offset => offset,
@@ -652,6 +653,10 @@ impl SqlTemplates {
             true => self.render_template("expressions/true", context! {}),
             false => self.render_template("expressions/false", context! {}),
         }
+    }
+
+    pub fn timestamp_literal_expr(&self, value: String) -> Result<String, CubeError> {
+        self.render_template("expressions/timestamp_literal", context! { value => value })
     }
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {

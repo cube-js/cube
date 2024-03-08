@@ -1180,7 +1180,8 @@ class ApiGateway {
     exportAnnotatedSql,
     memberExpressions,
     expressionParams,
-    disableExternalPreAggregations
+    disableExternalPreAggregations,
+    disableLimitEnforcing,
   }: QueryRequest) {
     const requestStarted = new Date();
 
@@ -1193,7 +1194,7 @@ class ApiGateway {
         query = this.parseMemberExpressionsInQueries(query);
       }
 
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context);
+      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context, disableLimitEnforcing);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
@@ -1233,6 +1234,7 @@ class ApiGateway {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
       dimensions: (query.dimensions || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
+      segments: (query.segments || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
     };
   }
 

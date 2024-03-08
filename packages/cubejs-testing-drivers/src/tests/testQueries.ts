@@ -1500,5 +1500,27 @@ from
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
+
+    executePg('SQL API: powerbi min max ungrouped flag', async () => {
+      const res = await connection.query(`
+      select 
+  count(distinct("rows"."totalSales")) + max( 
+    case 
+      when "rows"."totalSales" is null then 1 
+      else 0 
+    end 
+  ) as "a0", 
+  min("rows"."totalSales") as "a1", 
+  max("rows"."totalSales") as "a2" 
+from 
+  ( 
+    select 
+      "totalSales" 
+    from 
+      "public"."ECommerce" "$Table" 
+  ) "rows" 
+  `);
+      expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
+    });
   });
 }

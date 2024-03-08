@@ -34,6 +34,7 @@ use crate::{
         find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
     },
+    config::ConfigObj,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError,
@@ -341,6 +342,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
     pub meta: LoadRequestMeta,
+    pub config_obj: Arc<dyn ConfigObj>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -369,6 +371,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
                     span_id: scan_node.span_id.clone(),
+                    config_obj: self.config_obj.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
                 // TODO
@@ -404,6 +407,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
                     span_id: scan_node.span_id.clone(),
+                    config_obj: self.config_obj.clone(),
                 }))
             } else {
                 None
@@ -426,6 +430,7 @@ struct CubeScanExecutionPlan {
     // injected by extension planner
     meta: LoadRequestMeta,
     span_id: Option<Arc<SpanId>>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 #[derive(Debug)]
@@ -582,14 +587,8 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         // TODO: move envs to config
-        let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
-        let query_limit = std::env::var("CUBEJS_DB_QUERY_LIMIT")
-            .ok()
-            .map(|v| v.parse::<i32>().unwrap())
-            .unwrap_or(50000);
+        let stream_mode = self.config_obj.stream_mode();
+        let query_limit = self.config_obj.non_streaming_query_max_row_limit();
 
         let stream_mode = match (stream_mode, self.request.limit) {
             (true, None) => true,
@@ -1406,6 +1405,7 @@ mod tests {
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
             span_id: None,
+            config_obj: crate::config::Config::test().config_obj(),
         };
 
         let runtime = Arc::new(

@@ -539,7 +539,7 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -558,7 +558,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
@@ -1196,10 +1196,12 @@ export class BaseQuery {
     const sql = subQuery.evaluateSymbolSqlWithContext(() => subQuery.buildParamAnnotatedSql(), {
       collectOriginalSqlPreAggregations
     });
+    const onCondition = primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`);
+
     return {
       sql: `(${sql})`,
       alias: subQueryAlias,
-      on: primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`)
+      on: onCondition.join(' AND ')
     };
   }
 
@@ -2005,7 +2007,8 @@ export class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        return '1';
+        const sql = symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox' ? evaluateSql : this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
+        return evaluateSql === '*' ? '1' : sql;
       } else {
         return evaluateSql;
       }
@@ -2499,9 +2502,12 @@ export class BaseQuery {
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-          'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
-          '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
-          '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+          'FROM (\n' +
+          '{{ from | indent(2, true) }}\n' +
+          ') AS {{ from_alias }}' +
+          '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
       },
