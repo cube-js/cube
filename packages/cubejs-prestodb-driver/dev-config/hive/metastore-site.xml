@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?><!--
+   Licensed to the Apache Software Foundation (ASF) under one or more
+   contributor license agreements.  See the NOTICE file distributed with
+   this work for additional information regarding copyright ownership.
+   The ASF licenses this file to You under the Apache License, Version 2.0
+   (the "License"); you may not use this file except in compliance with
+   the License.  You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+-->
+<!-- These are default values meant to allow easy smoke testing of the metastore.  You will
+likely need to add a number of new values. -->
+<configuration>
+  <property>
+    <name>metastore.thrift.uris</name>
+    <value>thrift://localhost:9083</value>
+    <description>Thrift URI for the remote metastore. Used by metastore client to connect to remote metastore.</description>
+  </property>
+  <property>
+    <name>metastore.task.threads.always</name>
+    <value>org.apache.hadoop.hive.metastore.events.EventCleanerTask</value>
+  </property>
+  <property>
+    <name>metastore.expression.proxy</name>
+    <value>org.apache.hadoop.hive.metastore.DefaultPartitionExpressionProxy</value>
+  </property>
+  <property>
+    <name>fs.s3.impl</name>
+    <value>org.apache.hadoop.fs.viewfs.ViewFileSystemOverloadScheme</value>
+  </property>
+  <property>
+    <name>fs.s3a.impl</name>
+    <value>org.apache.hadoop.fs.viewfs.ViewFileSystemOverloadScheme</value>
+  </property>
+  <property>
+    <name>fs.viewfs.overload.scheme.target.s3.impl</name>
+    <value>org.apache.hadoop.fs.LocalFileSystem</value>
+  </property>
+  <property>
+    <name>fs.viewfs.overload.scheme.target.s3a.impl</name>
+    <value>org.apache.hadoop.fs.LocalFileSystem</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.test-bucket.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-data-stores.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-1d.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-3d.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-7d.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-30d.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-90d.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>fs.viewfs.mounttable.inloco-global-temporary-workspace-1y.linkMergeSlash</name>
+    <value>file:///tmp/blackhole/</value>
+  </property>
+  <property>
+    <name>metastore.warehouse.dir</name>
+    <value>s3://datalake/prefix/</value>
+  </property>
+</configuration>

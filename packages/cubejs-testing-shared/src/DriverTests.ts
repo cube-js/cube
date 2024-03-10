@@ -72,6 +72,11 @@ export class DriverTests {
     expect(rows).toEqual(expectedRows);
   }
 
+  // We might use the tableName to build the unload SQL for some drivers
+  protected unloadOptions(tableName: string) {
+    return { maxFileSize: 64 };
+  }
+
   public async testUnload() {
     const query = `
       SELECT orders.status AS orders__status, sum(orders.amount) AS orders__amount        
@@ -81,9 +86,10 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
-    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    const data = await this.driver.unload(tableName, this.unloadOptions(tableName));
     expect(data.csvFile.length).toEqual(1);
-    const string = await downloadAndGunzip(data.csvFile[0]);
+    // The order of the rows can be changed by some drivers
+    const string = (await downloadAndGunzip(data.csvFile[0])).split('\n').sort().join('\n');
     let expectedCsvRows = this.getExpectedCsvRows();
     if (this.options.delimiter) {
       expectedCsvRows = expectedCsvRows.replaceAll(/,/g, this.options.delimiter);
@@ -149,20 +155,32 @@ export class DriverTests {
     `;
     const tableName = await this.createUnloadTable(query);
     assert(this.driver.unload);
-    const data = await this.driver.unload(tableName, { maxFileSize: 64 });
+    const data = await this.driver.unload(tableName, this.unloadOptions(tableName));
     expect(data.csvFile.length).toEqual(0);
+  }
+
+  // The table name format can be slightly different for some drivers, so we might need to adjust it
+  protected unloadTableEntryName() {
+    return 'test.orders_order_status';
+  }
+
+  // The table name format can be slightly different for some drivers, so we might need to adjust it
+  protected ctasUnloadTableNameTransform(tableName: string) {
+    return tableName;
   }
 
   private async createUnloadTable(query: string): Promise<string> {
     const versionEntry = {
-      table_name: 'test.orders_order_status',
+      table_name: this.unloadTableEntryName(),
       structure_version: crypto.randomBytes(10).toString('hex'),
       content_version: crypto.randomBytes(10).toString('hex'),
       last_updated_at: new Date().getTime(),
       naming_version: 2
     };
     const tableName = PreAggregations.targetTableName(versionEntry);
-    const loadQuery = this.options.wrapLoadQueryWithCtas ? `CREATE TABLE ${tableName} AS ${query}` : query;
+    const loadQuery = this.options.wrapLoadQueryWithCtas 
+      ? `CREATE TABLE ${this.ctasUnloadTableNameTransform(tableName)} AS ${query}`
+      : query;
     await this.driver.loadPreAggregationIntoTable(
       tableName,
       loadQuery,

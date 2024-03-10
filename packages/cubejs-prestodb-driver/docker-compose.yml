@@ -1,13 +1,89 @@
 version: '2.2'
 
 services:
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-03-05T04-48-44Z
+    container_name: minio
+    command:
+      - server
+      - /data
+      - --console-address 
+      - ":9001"
+      - --address
+      - ":80"
+    ports:
+      - '9000:80'
+      - '9001:9001'
+    networks:
+      - testnetwork
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=admin123
+    healthcheck:
+      test: "mc ready local || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  # This job will create the "datalake" bucket on Minio
+  mc-client:
+    image: quay.io/minio/mc:RELEASE.2024-03-03T00-13-08Z
+    entrypoint: |
+      /bin/bash -c "
+      sleep 5;
+      /usr/bin/mc config --quiet host add myminio http://minio:80 admin admin123;
+      /usr/bin/mc mb --region=us-east-1 --quiet myminio/datalake
+      "
+    networks:
+      - testnetwork
+    depends_on:
+      - minio
+  mc-client-logs:
+    image: quay.io/minio/mc:RELEASE.2024-03-03T00-13-08Z
+    entrypoint: |
+      /bin/bash -c "
+      sleep 5;
+      /usr/bin/mc alias set myminio http://minio:80 admin admin123;
+      /usr/bin/mc admin trace -v myminio
+      "
+    networks:
+      - testnetwork
+    depends_on:
+      - minio
+  hive-metastore:
+    image: 889818756387.dkr.ecr.us-east-1.amazonaws.com/incognia/hive-metastore:3.1.2-b8cd40f
+    container_name: hive-metastore
+    entrypoint: |
+      /bin/bash -c "
+      /opt/hive-metastore/bin/schematool -initSchema -dbType derby;
+      /opt/hive-metastore/bin/start-metastore
+      "
+    environment:
+      - HADOOP_HOME=/opt/hadoop/
+    ports:
+      - '9083:9083'
+    networks:
+      - testnetwork
+    volumes:
+      - ./dev-config/hive/metastore-site.xml:/opt/hive-metastore/conf/metastore-site.xml
+    depends_on:
+      - mc-client
   coordinator:
     image: trinodb/trino
     ports:
       - "8080:8080"
     container_name: "coordinator"
+    networks:
+      - testnetwork
+    volumes:
+      - ./dev-config/trino/catalog/hive.properties:/etc/trino/catalog/hive.properties
+      - ./dev-config/trino/etc/config.properties:/etc/trino/config.properties
+    depends_on:
+      - hive-metastore
     healthcheck:
       test: "trino --execute 'SELECT 1' || exit 1"
       interval: 10s
       timeout: 5s
       retries: 5
+networks:
+  testnetwork:
+    driver: bridge

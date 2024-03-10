@@ -47,7 +47,8 @@ export type PrestoDriverConfiguration = {
   unloadBucket?: string;
   unloadPrefix?: string;
   region?: string;
-  exportBucketCsvEscapeSymbol?: string
+  exportBucketCsvEscapeSymbol?: string,
+  s3Client?: S3
 };
 
 /**
@@ -186,9 +187,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
    * Copied from athena driver
    */
   public async getCsvFiles(tableName: string): Promise<string[]> {
-    const client = new S3({
-      region: this.config.region!,
-    });
+    const client = (typeof this.config.s3Client !== "undefined") 
+    ? this.config.s3Client!
+    : new S3({ region: this.config.region!, });
+    
     const list = await client.listObjectsV2({
       Bucket: this.config.unloadBucket!,
       Prefix: `${this.config.unloadPrefix}/${tableName}`,
