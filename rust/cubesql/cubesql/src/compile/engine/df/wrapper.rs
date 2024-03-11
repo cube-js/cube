@@ -901,16 +901,34 @@ impl CubeScanWrapperNode {
             };
             if !next_remapping.contains_key(&Column::from_name(&alias)) {
                 next_remapping.insert(original_alias_key, Column::from_name(&alias));
-                next_remapping.insert(
-                    Column {
-                        name: original_alias.clone(),
-                        relation: from_alias.clone(),
-                    },
-                    Column {
-                        name: alias.clone(),
-                        relation: from_alias.clone(),
-                    },
-                );
+                if let Some(from_alias) = &from_alias {
+                    next_remapping.insert(
+                        Column {
+                            name: original_alias.clone(),
+                            relation: Some(from_alias.clone()),
+                        },
+                        Column {
+                            name: alias.clone(),
+                            relation: Some(from_alias.clone()),
+                        },
+                    );
+                    if let Expr::Column(column) = &original_expr {
+                        if let Some(original_relation) = &column.relation {
+                            if original_relation != from_alias {
+                                next_remapping.insert(
+                                    Column {
+                                        name: original_alias.clone(),
+                                        relation: Some(original_relation.clone()),
+                                    },
+                                    Column {
+                                        name: alias.clone(),
+                                        relation: Some(from_alias.clone()),
+                                    },
+                                );
+                            }
+                        }
+                    }
+                }
             } else {
                 return Err(CubeError::internal(format!(
                     "Can't generate SQL for column expr: duplicate alias {}",
