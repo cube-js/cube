@@ -400,8 +400,26 @@ cubes:
 
 </CodeTabs>
 
+### Measure types
+
 Measures can be of different types, and you can find them all
 [here][ref-schema-measure-types].
+
+Often, aggregate functions in SQL are mapped to measure types in the following way:
+
+| Aggregate function in SQL | Measure type in Cube |
+| --- | --- |
+| `AVG` | [`avg`](/reference/data-model/types-and-formats#avg) |
+| `BOOL_AND`, `BOOL_OR` | [`boolean`](/reference/data-model/types-and-formats#boolean) |
+| `COUNT` | [`count`](/reference/data-model/types-and-formats#count) |
+| `COUNT(DISTINCT …)` | [`count_distinct`](/reference/data-model/types-and-formats#count_distinct) |
+| `APPROX_COUNT_DISTINCT` | [`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx) |
+| `MAX` | [`max`](/reference/data-model/types-and-formats#max) |
+| `MIN` | [`min`](/reference/data-model/types-and-formats#min) |
+| `PERCENTILE_CONT`, `MEDIAN` | [`number`](/reference/data-model/types-and-formats#number) |
+| `STRING_AGG`, `LISTAGG` | [`string`](/reference/data-model/types-and-formats#string) |
+| `SUM` | [`sum`](/reference/data-model/types-and-formats#sum) |
+| Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/reference/data-model/types-and-formats#time) |
 
 ## Joins
 
