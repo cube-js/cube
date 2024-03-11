@@ -20,6 +20,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -37,6 +41,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
 
 jobs:
   latest-tag-sha:
