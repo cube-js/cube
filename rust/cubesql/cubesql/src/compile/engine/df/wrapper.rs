@@ -901,19 +901,10 @@ impl CubeScanWrapperNode {
             };
             if !next_remapping.contains_key(&Column::from_name(&alias)) {
                 next_remapping.insert(original_alias_key, Column::from_name(&alias));
-                let original_relation = if let Expr::Column(column) = &original_expr {
-                    if column.relation.is_some() {
-                        &column.relation
-                    } else {
-                        &from_alias
-                    }
-                } else {
-                    &from_alias
-                };
                 next_remapping.insert(
                     Column {
                         name: original_alias.clone(),
-                        relation: original_relation.clone(),
+                        relation: from_alias.clone(),
                     },
                     Column {
                         name: alias.clone(),
