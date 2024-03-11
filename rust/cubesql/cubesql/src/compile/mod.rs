@@ -22268,4 +22268,30 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_fetch_next_rows_only() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "fetch_next_rows_only",
+            execute_query(
+                "
+                SELECT i
+                FROM (
+                    SELECT 1 i
+                    UNION ALL
+                    SELECT 2 i
+                    UNION ALL
+                    SELECT 3 i
+                ) t
+                ORDER BY i ASC
+                FETCH NEXT 2 ROWS ONLY
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
