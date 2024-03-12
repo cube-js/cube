@@ -6,14 +6,12 @@ on:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
-      - 'rust/cubesql/**'
     branches:
       - 'master'
   pull_request:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
-      - 'rust/cubesql/**'
       - 'rust/cubesql/**'
 
 jobs:
