@@ -1,4 +1,4 @@
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
@@ -14,7 +14,7 @@ const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 describe('snowflake', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
   let cubeStoreDriver: any;
 
   beforeAll(async () => {

@@ -1,4 +1,4 @@
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { MssqlDbRunner } from '@cubejs-backend/testing-shared';
@@ -14,7 +14,7 @@ import {
 describe('mssql', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     const db = await MssqlDbRunner.startContainer({});
