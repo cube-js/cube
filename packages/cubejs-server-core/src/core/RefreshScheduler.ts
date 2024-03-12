@@ -725,19 +725,19 @@ export class RefreshScheduler {
   public async getCachedBuildJobs(
     context: RequestContext,
     tokens: string[],
-  ): Promise<{ job: PreAggJob, key: string }[]> {
+  ): Promise<{ job: PreAggJob, token: string }[]> {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const jobsPromise = Promise.all(
-      tokens.map(async (key) => {
+      tokens.map(async (token) => {
         const job = await orchestratorApi
           .getQueryOrchestrator()
           .getQueryCache()
           .getCacheDriver()
-          .get<PreAggJob>(`PRE_AGG_JOB_${key}`);
+          .get<PreAggJob>(`PRE_AGG_JOB_${token}`);
 
         return {
           job,
-          key
+          token
         };
       })
     );

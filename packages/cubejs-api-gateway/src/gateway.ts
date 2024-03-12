@@ -904,17 +904,17 @@ class ApiGateway {
     tokens: string[],
     resType = 'array',
   ): Promise<PreAggJobStatusResponse> {
-    const selector: { job: PreAggJob | null, key: string }[] = await this
+    const selector: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
 
     const metaCache: Map<string, any> = new Map();
 
     const response: PreAggJobStatusItem[] = await Promise.all(
-      selector.map(async ({ job, key }, i) => {
+      selector.map(async ({ job, token }) => {
         if (!job) {
           return {
-            token: key,
+            token,
             status: 'not_found',
           };
         }
@@ -922,7 +922,7 @@ class ApiGateway {
         const ctx = { ...context, ...job.context };
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
-        const sel: PreAggsSelector = {
+        const selector: PreAggsSelector = {
           cubes: [job.preagg.split('.')[0]],
           preAggregations: [job.preagg],
           contexts: [job.context],
@@ -935,10 +935,10 @@ class ApiGateway {
         ) {
           // returning from the cache
           return {
-            token: tokens[i],
+            token,
             table: job.target,
             status: job.status,
-            selector: sel,
+            selector,
           };
         } else {
           // checking the queue
@@ -949,10 +949,10 @@ class ApiGateway {
           if (status) {
             // returning queued status
             return {
-              token: tokens[i],
+              token,
               table: job.target,
               status,
-              selector: sel,
+              selector,
             };
           } else {
             const metaCacheKey = JSON.stringify(ctx);
@@ -967,14 +967,14 @@ class ApiGateway {
               compiler,
               metaCache.get(metaCacheKey),
               job,
-              tokens[i],
+              token,
             );
 
             return {
-              token: tokens[i],
+              token,
               table: job.target,
               status: s,
-              selector: sel,
+              selector,
             };
           }
         }
