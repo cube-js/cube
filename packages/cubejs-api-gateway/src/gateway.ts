@@ -904,14 +904,14 @@ class ApiGateway {
     tokens: string[],
     resType = 'array',
   ): Promise<PreAggJobStatusResponse> {
-    const selector: { job: PreAggJob | null, token: string }[] = await this
+    const jobs: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
 
     const metaCache: Map<string, any> = new Map();
 
     const response: PreAggJobStatusItem[] = await Promise.all(
-      selector.map(async ({ job, token }) => {
+      jobs.map(async ({ job, token }) => {
         if (!job) {
           return {
             token,
