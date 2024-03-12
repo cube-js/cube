@@ -1,4 +1,4 @@
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, jest } from '@jest/globals';
 import { StartedTestContainer } from 'testcontainers';
@@ -16,7 +16,7 @@ describe('crate', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     db = await CrateDBRunner.startContainer({});
