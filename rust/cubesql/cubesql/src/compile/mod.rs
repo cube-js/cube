@@ -22294,4 +22294,55 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_time_dimensions_filter_twice() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT customer_gender
+            FROM KibanaSampleDataEcommerce
+            WHERE
+                order_date BETWEEN '2024-01-01T00:00:00' AND '2025-01-01T00:00:00'
+                AND order_date BETWEEN '2024-03-01T00:00:00' AND '2024-06-01T00:00:00'
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![
+                            "2024-01-01T00:00:00".to_string(),
+                            "2025-01-01T00:00:00".to_string(),
+                        ]))
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: None,
+                        date_range: Some(json!(vec![
+                            "2024-03-01T00:00:00".to_string(),
+                            "2024-06-01T00:00:00".to_string(),
+                        ]))
+                    },
+                ]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        )
+    }
 }

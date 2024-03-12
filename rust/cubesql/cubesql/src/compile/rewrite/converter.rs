@@ -1742,7 +1742,13 @@ impl LanguageToLogicalPlanConverter {
                                 query_time_dimensions
                                     .into_iter()
                                     .unique_by(|td| {
-                                        (td.dimension.to_string(), td.granularity.clone())
+                                        (
+                                            td.dimension.to_string(),
+                                            td.granularity.clone(),
+                                            td.date_range
+                                                .as_ref()
+                                                .map(|range| serde_json::to_string(range).unwrap()),
+                                        )
                                     })
                                     .collect(),
                             )
