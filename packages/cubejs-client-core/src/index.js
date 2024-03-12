@@ -30,7 +30,7 @@ function mutexPromise(promise) {
   });
 }
 
-class CubejsApi {
+class CubeApi {
   constructor(apiToken, options) {
     if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
@@ -373,7 +373,7 @@ class CubejsApi {
   }
 }
 
-export default (apiToken, options) => new CubejsApi(apiToken, options);
+export default (apiToken, options) => new CubeApi(apiToken, options);
 
-export { CubejsApi, CubejsApi as CubeApi, HttpTransport, ResultSet, RequestError, Meta };
+export { CubeApi, HttpTransport, ResultSet, RequestError, Meta };
 export * from './utils';

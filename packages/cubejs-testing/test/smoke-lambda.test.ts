@@ -3,7 +3,7 @@ import { StartedTestContainer } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
+import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
@@ -31,7 +31,7 @@ describe('lambda', () => {
 
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
   let postgres: any;
   let cubestore: any;
 

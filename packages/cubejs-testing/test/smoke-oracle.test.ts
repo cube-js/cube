@@ -1,6 +1,6 @@
 import { StartedTestContainer } from 'testcontainers';
 import { OracleDBRunner } from '@cubejs-backend/testing-shared';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { pausePromise } from '@cubejs-backend/shared';

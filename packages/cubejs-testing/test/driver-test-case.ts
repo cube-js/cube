@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import { BirdBox } from '../src';
 
 // eslint-disable-next-line import/prefer-default-export
@@ -10,7 +10,7 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
-    let httpClient: CubejsApi;
+    let httpClient: CubeApi;
 
     // eslint-disable-next-line consistent-return
     beforeAll(async () => {

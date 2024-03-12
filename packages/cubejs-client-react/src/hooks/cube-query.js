@@ -18,16 +18,10 @@ export function useCubeQuery(query, options = {}) {
   let subscribeRequest = null;
 
   const progressCallback = ({ progressResponse }) => setProgress(progressResponse);
-  
-  useEffect(() => {
-    if (options.cubejsApi && !options.cubeApi) {
-      console.warn('"cubejsApi" is deprecated and will be removed in the following version. Use "cubeApi" instead.');
-    }
-  }, [options.cubeApi, options.cubejsApi]);
 
   async function fetch() {
     const { resetResultSetOnChange } = options;
-    const cubeApi = options.cubeApi || options.cubejsApi || context?.cubeApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
 
     if (!cubeApi) {
       throw new Error('Cube API client is not provided');
@@ -68,7 +62,7 @@ export function useCubeQuery(query, options = {}) {
   useEffect(() => {
     const { skip = false, resetResultSetOnChange } = options;
 
-    const cubeApi = options.cubeApi || options.cubejsApi || context?.cubeApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
 
     if (!cubeApi) {
       throw new Error('Cube API client is not provided');
