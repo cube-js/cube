@@ -177,12 +177,19 @@ type PreAggsJobsRequest = {
   resType?: 'object' | 'array'
 };
 
-type PreAggJobStatusItem = {
+type PreAggJobStatusItemNotFound = {
   token: string;
-  table: string;
+  status: 'not_found';
+};
+
+type PreAggJobStatusItemFound = {
+  token: string;
   status: string;
+  table: string;
   selector: PreAggsSelector;
 };
+
+type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
 
 type PreAggJobStatusObject = {
   [token: string]: {
