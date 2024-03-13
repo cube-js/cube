@@ -13,8 +13,13 @@ A measure can only have one type.
 
 ### `string`
 
-This measure type allows defining measures as a `string` value. In the example
-below, we create a `string` measure by converting a numerical value to a string:
+This measure type allows defining measures as a `string` value.
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the string type.
+
+In the example below, we create a `string` measure by converting a numerical
+value to a string:
 
 <CodeTabs>
 
@@ -252,7 +257,7 @@ cubes:
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of any type (without an aggregate function).
 
 <CodeTabs>
@@ -294,7 +299,7 @@ estimate distinct counts, usually based on HyperLogLog or similar algorithms.
 Wherever possible Cube will use multi-stage HLL which significantly improves
 calculation of distinct counts at scale.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of any type (without an aggregate function).
 
 <CodeTabs>
@@ -331,7 +336,7 @@ Adds up the values in a given field. It is similar to SQL’s `SUM` function.
 However, unlike writing raw SQL, Cube will properly calculate sums even if your
 query’s joins will result in row duplication.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeTabs>
@@ -386,7 +391,7 @@ Averages the values in a given field. It is similar to SQL’s AVG function.
 However, unlike writing raw SQL, Cube will properly calculate averages even if
 your query’s joins will result in row duplication.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeTabs>
@@ -421,7 +426,7 @@ cubes:
 
 Type of measure `min` is calculated as a minimum of values defined in `sql`.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeTabs>
@@ -456,7 +461,7 @@ cubes:
 
 Type of measure `max` is calculated as a maximum of values defined in `sql`.
 
-The `sql` parameter is reuired and must include any valid SQL expression
+The `sql` parameter is required and must include any valid SQL expression
 of the numeric type (without an aggregate function).
 
 <CodeTabs>
