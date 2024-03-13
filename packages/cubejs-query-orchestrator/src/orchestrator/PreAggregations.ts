@@ -664,7 +664,7 @@ export class PreAggregationLoader {
       };
     }
 
-    if (!this.waitForRenew) {
+    if (!this.waitForRenew && !this.forceBuild) {
       const versionEntryByStructureVersion = versionEntries.byStructure[`${this.preAggregation.tableName}_${structureVersion}`];
       if (versionEntryByStructureVersion) {
         const targetTableName = this.targetTableName(versionEntryByStructureVersion);
