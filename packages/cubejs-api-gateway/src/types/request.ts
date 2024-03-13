@@ -179,7 +179,7 @@ type PreAggsJobsRequest = {
 
 type PreAggJobStatusItemNotFound = {
   token: string;
-  status: 'not_found';
+  status: 'not_found' | 'pre_agg_not_found';
 };
 
 type PreAggJobStatusItemFound = {
@@ -192,11 +192,7 @@ type PreAggJobStatusItemFound = {
 type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
 
 type PreAggJobStatusObject = {
-  [token: string]: {
-    table: string;
-    status: string;
-    selector: PreAggsSelector;
-  }
+  [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
 
 type PreAggJobStatusResponse =
