@@ -1,0 +1,20 @@
+version: '3.1'
+services:
+  db:
+    image: postgres:16
+    container_name: "postgres"
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - ./mock/docker/dataset:/docker-entrypoint-initdb.d
+    ports:
+      - 5454:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
