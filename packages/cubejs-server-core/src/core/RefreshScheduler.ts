@@ -725,7 +725,7 @@ export class RefreshScheduler {
   public async getCachedBuildJobs(
     context: RequestContext,
     tokens: string[],
-  ): Promise<{ job: PreAggJob, token: string }[]> {
+  ): Promise<{ job: PreAggJob | null, token: string }[]> {
     const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const jobsPromise = Promise.all(
       tokens.map(async (token) => {

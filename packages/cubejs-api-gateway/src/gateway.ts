@@ -38,7 +38,6 @@ import {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
-  PreAggJobStatusObject,
   PreAggJobStatusResponse,
   SqlApiRequest, MetaResponseResultFn,
 } from './types/request';
@@ -1044,19 +1043,24 @@ class ApiGateway {
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
-    const preagg = preaggs.filter(pa => pa.id === job.preagg)[0];
-    const cube = metadata.cubeDefinitions[preagg.cube];
-    const [, status]: [boolean, string] =
-      await orchestrator.isPartitionExist(
-        requestId,
-        preagg.preAggregation.external,
-        cube.dataSource,
-        compiler.preAggregationsSchema,
-        job.target,
-        job.key,
-        token,
-      );
-    return status;
+    const preagg = preaggs.find(pa => pa.id === job.preagg);
+    if (preagg) {
+      const cube = metadata.cubeDefinitions[preagg.cube];
+      const [, status]: [boolean, string] =
+        await orchestrator.isPartitionExist(
+          requestId,
+          preagg.preAggregation.external,
+          cube.dataSource,
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          token,
+        );
+
+      return status;
+    }
+
+    return 'pre_agg_not_found';
   }
 
   public async getPreAggregationsInQueue(
