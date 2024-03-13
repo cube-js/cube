@@ -24,8 +24,12 @@ COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/packag
 
 FROM base AS prod_deps
 
-# Use yarn v2 because of https://github.com/yarnpkg/yarn/issues/6323
-RUN yarn set version berry
+# Use yarn v2+ because of https://github.com/yarnpkg/yarn/issues/6323
+# The yarn versions prior to 1.22.20 have a bug that it always download
+# the latest release, so first we manually go to the 4.1.1 before going 
+# to the target version.
+RUN YARN_IGNORE_NODE=1 yarn set version 4.1.1
+RUN YARN_IGNORE_NODE=1 yarn set version 3.8.1
 RUN yarn plugin import workspace-tools
 RUN yarn config set nodeLinker node-modules
 RUN yarn workspaces focus --production --all
