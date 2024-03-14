@@ -546,14 +546,22 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
 
             // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
             const dateRangeFilters = {};
-            filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
-                dateRangeFilters[f.member] = f.values;
-                return false;
-              }
-
-              return true;
-            });
+            const updateDateRangeFilters = (subFilters: any[]) => {
+              return subFilters.filter((f) => {
+                if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
+                  dateRangeFilters[f.member] = f.values;
+                  return false;
+                }
+                if (f.hasOwnProperty('and')) {
+                  f.and = updateDateRangeFilters(f.and)
+                }
+                if (f.hasOwnProperty('or')) {
+                  f.or = updateDateRangeFilters(f.or)
+                }
+                return true;
+              });
+            }
+            filters = updateDateRangeFilters(filters)
 
             getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
               const memberName = memberNode.name.value;

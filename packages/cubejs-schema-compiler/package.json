@@ -26,6 +26,7 @@
     "integration": "TZ=UTC jest dist/test/integration/*",
     "integration:mssql": "TZ=UTC jest dist/test/integration/mssql",
     "integration:mysql": "TZ=UTC jest dist/test/integration/mysql",
+    "integration:oracle": "TZ=UTC jest dist/test/integration/oracle",
     "integration:postgres": "TZ=UTC jest dist/test/integration/postgres",
     "integration:clickhouse": "TZ=UTC jest dist/test/integration/clickhouse",
     "lint": "eslint src/* test/* --ext .ts,.js",
@@ -55,6 +56,7 @@
     "node-dijkstra": "^2.5.0",
     "ramda": "^0.27.2",
     "syntax-error": "^1.3.0",
+    "oracledb": "^6.3.0",
     "uuid": "^8.3.2"
   },
   "devDependencies": {
@@ -69,6 +71,7 @@
     "@types/jest": "^27",
     "@types/lru-cache": "^5.1.0",
     "@types/node": "^14",
+    "@types/oracledb": "^6.0.4",
     "@types/ramda": "^0.27.34",
     "@types/sqlstring": "^2.3.0",
     "@types/syntax-error": "^1.4.1",

@@ -1,1 +1,6 @@
 dist
+*.rpm
+Dockerfile
+test/integration/oracle/data/
+test/**/docker-compose.yaml
+i
