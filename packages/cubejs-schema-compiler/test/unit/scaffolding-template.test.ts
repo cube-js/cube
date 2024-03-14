@@ -1,3 +1,4 @@
+import { MemberType } from '../../src';
 import {
   ScaffoldingTemplate,
   SchemaFormat,
@@ -5,10 +6,12 @@ import {
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
+  concatStringsSql: (strings: string[]) => strings.join(' || '),
 };
 
 const mySqlDriver = {
   quoteIdentifier: (name) => `\`${name}\``,
+  concatStringsSql: (strings: string[]) => `CONCAT(${strings.join(', ')})`
 };
 
 const bigQueryDriver = {
@@ -587,6 +590,109 @@ describe('ScaffoldingTemplate', () => {
   });
 
   describe('Yaml formatter', () => {
+    it.only('generates schema by cube descriptors', () => {
+      const template = new ScaffoldingTemplate(dbSchema, driver, {
+        format: SchemaFormat.Yaml,
+        snakeCase: true
+      });
+
+      const files = template.generateFilesByCubeDescriptors([
+        {
+          cube: 'orders',
+          tableName: 'public.orders',
+          table: 'orders',
+          schema: 'public',
+          joins: [],
+          shouldGeneratePrimaryKey: true,
+          members: [
+            {
+              memberType: MemberType.Dimension,
+              name: 'user_id',
+              title: 'User Id',
+              types: [
+                'sum',
+                'avg',
+                'min',
+                'max'
+              ],
+              included: true,
+              type: 'number'
+            },
+            {
+              memberType: MemberType.Dimension,
+              name: 'number',
+              title: 'Number',
+              types: [
+                'sum',
+                'avg',
+                'min',
+                'max'
+              ],
+              included: true,
+              type: 'number'
+            },
+            {
+              memberType: MemberType.Dimension,
+              name: 'product_id',
+              title: 'Product Id',
+              types: [
+                'sum',
+                'avg',
+                'min',
+                'max'
+              ],
+              included: true,
+              type: 'number'
+            },
+            // {
+            //   memberType: MemberType.Dimension,
+            //   name: 'id',
+            //   title: 'Id',
+            //   types: [
+            //     'number'
+            //   ],
+            //   isPrimaryKey: true,
+            //   type: 'number',
+            //   included: true
+            // },
+            {
+              memberType: MemberType.Dimension,
+              name: 'status',
+              title: 'Status',
+              types: [
+                'string'
+              ],
+              isPrimaryKey: false,
+              type: 'string',
+              included: true
+            },
+            // {
+            //   memberType: MemberType.Dimension,
+            //   name: 'created_at',
+            //   title: 'Created at',
+            //   types: [
+            //     'time'
+            //   ],
+            //   type: 'time',
+            //   included: true
+            // },
+            // {
+            //   memberType: MemberType.Dimension,
+            //   name: 'completed_at',
+            //   title: 'Completed at',
+            //   types: [
+            //     'time'
+            //   ],
+            //   type: 'time',
+            //   included: true
+            // }
+          ],
+        },
+      ]);
+
+      console.log('>>>', files[0].content);
+    });
+
     it('generates schema for base driver', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.Yaml,
