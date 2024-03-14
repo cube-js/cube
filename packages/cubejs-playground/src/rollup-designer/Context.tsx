@@ -1,4 +1,4 @@
-import { CubejsApi, Query, TransformedQuery } from '@cubejs-client/core';
+import { CubeApi, Query, TransformedQuery } from '@cubejs-client/core';
 import { AvailableMembers, useCubeMeta, useDryRun } from '@cubejs-client/react';
 import {
   createContext,
@@ -32,13 +32,13 @@ export const Context = createContext<RollupDesignerContextValue>(
 type ContextProps = {
   apiUrl: string;
   children: ReactNode;
-  cubejsApi?: CubejsApi;
+  cubeApi?: CubeApi;
   token?: string;
   defaultSchemaFormat?: SchemaFormat
 };
 
 export function RollupDesignerContext({
-  cubejsApi,
+  cubeApi,
   children,
   ...props
 }: ContextProps) {
@@ -56,11 +56,11 @@ export function RollupDesignerContext({
 
   const metaResult = useCubeMeta({
     skip: !isModalOpen,
-    cubejsApi,
+    cubeApi,
   });
   const dryRunResult = useDryRun(query as Query, {
     skip: !isModalOpen || !query,
-    cubejsApi,
+    cubeApi,
   });
 
   useEffect(() => {
