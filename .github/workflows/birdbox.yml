@@ -77,7 +77,7 @@ jobs:
         run: |
           cd packages/cubejs-testing/
           npx cubejs-cli@${{ github.event.inputs.version }} create birdbox-test-project -d postgres
-          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
           yarn run dataset:minimal
           yarn run birdbox:cli:postgresql
       - name: Slack Failure
@@ -97,7 +97,6 @@ jobs:
       fail-fast: false
       matrix:
         target: ['postgresql', 'postgresql-cubestore', 'postgresql-pre-aggregations']
-        arch: ['', '-alpine']
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -143,7 +142,7 @@ jobs:
         run: |
           cd packages/cubejs-testing/
           export DEBUG=testcontainers
-          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}${{ matrix.node-arch }}
+          export BIRDBOX_CUBEJS_VERSION=${{ github.event.inputs.version }}
           yarn run dataset:minimal
           yarn run birdbox:${{ matrix.target }}
       - name: Slack Failure
