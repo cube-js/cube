@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/base-driver",
   "description": "Cube.js Base Driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.62",
+  "version": "0.35.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -31,11 +31,11 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
-    "@cubejs-backend/shared": "^0.34.60",
+    "@cubejs-backend/shared": "^0.35.0",
     "ramda": "^0.27.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.34.25",
+    "@cubejs-backend/linter": "^0.35.0",
     "@types/jest": "^27",
     "@types/node": "^14",
     "@types/ramda": "^0.27.32",
