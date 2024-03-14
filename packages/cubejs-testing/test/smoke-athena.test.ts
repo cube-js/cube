@@ -1,4 +1,4 @@
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
@@ -13,7 +13,7 @@ import {
 describe('athena', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     birdbox = await getBirdbox(

@@ -1,16 +1,9 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import CubeContext from './CubeContext';
 
-export default function CubeProvider({ cubeApi, cubejsApi, children, options = {} }) {
-  useEffect(() => {
-    if (cubejsApi && !cubeApi) {
-      console.warn('"cubejsApi" is deprecated and will be removed in the following version. Use "cubeApi" instead.');
-    }
-  }, [cubeApi, cubejsApi]);
-  
+export default function CubeProvider({ cubeApi, children, options = {} }) {
   return (
     <CubeContext.Provider value={{
-      cubejsApi,
       cubeApi,
       options
     }}

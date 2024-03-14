@@ -99,6 +99,7 @@ const meta_fixture = require('./meta');
       meta,
       stream,
       sqlGenerators,
+      pgPort: '5555',
     });
     console.log({
       server

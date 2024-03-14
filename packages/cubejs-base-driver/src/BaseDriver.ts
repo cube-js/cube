@@ -24,9 +24,7 @@ import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
-  DownloadTableCSVData,
   DownloadTableData,
-  DownloadTableMemoryData,
   DriverInterface,
   ExternalDriverCompatibilities,
   IndexesSQL,
@@ -40,7 +38,8 @@ import {
   DriverCapabilities,
   QuerySchemasResult,
   QueryTablesResult,
-  QueryColumnsResult
+  QueryColumnsResult,
+  TableMemoryData,
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -409,7 +408,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.testConnectionTimeoutValue;
   }
 
-  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<DownloadTableMemoryData | DownloadTableCSVData> {
+  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<TableMemoryData> {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 

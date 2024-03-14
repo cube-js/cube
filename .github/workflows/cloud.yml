@@ -55,7 +55,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 16.x ]
+        node-version: [ 18.x ]
         db: [ 'athena', 'bigquery', 'snowflake' ]
       fail-fast: false
 

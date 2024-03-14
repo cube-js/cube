@@ -2,7 +2,7 @@ import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
 import { Environment } from '../types/Environment';
 import {
@@ -19,7 +19,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     jest.setTimeout(60 * 5 * 1000);
 
     const fixtures = getFixtures(type, extendedEnv);
-    let client: CubejsApi;
+    let client: CubeApi;
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;

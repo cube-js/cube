@@ -6,10 +6,7 @@ use crate::{
         injection::{DIService, Injector},
         processing_loop::ProcessingLoop,
     },
-    sql::{
-        MySqlServer, PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl,
-        SqlAuthService,
-    },
+    sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -59,17 +56,6 @@ impl CubeServices {
     pub async fn spawn_processing_loops(&self) -> Result<Vec<LoopHandle>, CubeError> {
         let mut futures = Vec::new();
 
-        if self.injector.has_service_typed::<MySqlServer>().await {
-            let mysql_server = self.injector.get_service_typed::<MySqlServer>().await;
-            futures.push(tokio::spawn(async move {
-                if let Err(e) = mysql_server.processing_loop().await {
-                    error!("{}", e.to_string());
-                };
-
-                Ok(())
-            }));
-        }
-
         if self.injector.has_service_typed::<PostgresServer>().await {
             let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
@@ -85,14 +71,6 @@ impl CubeServices {
     }
 
     pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        if self.injector.has_service_typed::<MySqlServer>().await {
-            self.injector
-                .get_service_typed::<MySqlServer>()
-                .await
-                .stop_processing()
-                .await?;
-        }
-
         if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
                 .get_service_typed::<PostgresServer>()
@@ -352,18 +330,6 @@ impl Config {
                 Arc::new(SqlAuthDefaultImpl)
             })
             .await;
-
-        if self.config_obj.bind_address().is_some() {
-            self.injector
-                .register_typed::<MySqlServer, _, _, _>(async move |i| {
-                    let config = i.get_service_typed::<dyn ConfigObj>().await;
-                    MySqlServer::new(
-                        config.bind_address().as_ref().unwrap().to_string(),
-                        i.get_service_typed().await,
-                    )
-                })
-                .await;
-        }
 
         if self.config_obj.postgres_bind_address().is_some() {
             self.injector

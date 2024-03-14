@@ -10,7 +10,7 @@
 declare module '@cubejs-client/react' {
   import * as React from 'react';
   import {
-    CubejsApi,
+    CubeApi,
     Query,
     ResultSet,
     SqlQuery,
@@ -39,11 +39,7 @@ declare module '@cubejs-client/react' {
   }
 
   type CubeProviderProps = {
-    cubeApi?: CubejsApi | null;
-    /**
-     * @deprecated Use `cubeApi` instead
-     */
-    cubejsApi?: CubejsApi | null;
+    cubeApi: CubeApi | null;
     options?: CubeProviderOptions;
     children: React.ReactNode;
   };
@@ -52,20 +48,20 @@ declare module '@cubejs-client/react' {
    * Cube.js context provider
    * ```js
    * import React from 'react';
-   * import cubejs from '@cubejs-client/core';
+   * import cube from '@cubejs-client/core';
    * import { CubeProvider } from '@cubejs-client/react';
    *
    * const API_URL = 'https://harsh-eel.aws-us-east-2.cubecloudapp.dev';
-   * const CUBEJS_TOKEN =
+   * const CUBE_TOKEN =
    *   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.* eyJpYXQiOjE1OTE3MDcxNDgsImV4cCI6MTU5NDI5OTE0OH0.* n5jGLQJ14igg6_Hri_Autx9qOIzVqp4oYxmX27V-4T4';
    *
-   * const cubejsApi = cubejs(CUBEJS_TOKEN, {
+   * const cubeApi = cube(CUBE_TOKEN, {
    *   apiUrl: `${API_URL}/cubejs-api/v1`,
    * });
    *
    * export default function App() {
    *   return (
-   *     <CubeProvider cubejsApi={cubejsApi}>
+   *     <CubeProvider cubeApi={cubeApi}>
    *       //...
    *     </CubeProvider>
    *   )
@@ -77,26 +73,26 @@ declare module '@cubejs-client/react' {
   export const CubeProvider: React.FC<CubeProviderProps>;
 
   type CubeContextProps = {
-    cubejsApi: CubejsApi;
+    cubeApi: CubeApi;
     options?: CubeProviderOptions;
   };
 
   /**
-   * In case when you need direct access to `cubejsApi` you can use `CubeContext` anywhere in your app
+   * In case when you need direct access to `cubeApi` you can use `CubeContext` anywhere in your app
    *
    * ```js
    * import React from 'react';
    * import { CubeContext } from '@cubejs-client/react';
    *
    * export default function DisplayComponent() {
-   *   const { cubejsApi } = React.useContext(CubeContext);
+   *   const { cubeApi } = React.useContext(CubeContext);
    *   const [rawResults, setRawResults] = React.useState([]);
    *   const query = {
    *     ...
    *   };
    *
    *   React.useEffect(() => {
-   *     cubejsApi.load(query).then((resultSet) => {
+   *     cubeApi.load(query).then((resultSet) => {
    *       setRawResults(resultSet.rawData());
    *     });
    *   }, [query]);
@@ -140,9 +136,9 @@ declare module '@cubejs-client/react' {
     resetResultSetOnChange?: boolean;
     updateOnlyOnStateChange?: boolean;
     /**
-     * `CubejsApi` instance to use
+     * `CubeApi` instance to use
      */
-    cubejsApi?: CubejsApi;
+    cubeApi?: CubeApi;
     /**
      * Output of this function will be rendered by the `QueryRenderer`
      */
@@ -170,9 +166,9 @@ declare module '@cubejs-client/react' {
 
   type QueryBuilderProps = {
     /**
-     * `CubejsApi` instance to use
+     * `CubeApi` instance to use
      */
-    cubejsApi?: CubejsApi;
+    cubeApi?: CubeApi;
     /**
      * State for the QueryBuilder to start with. Pass in the value previously saved from onVizStateChanged to restore a session.
      */
@@ -358,12 +354,12 @@ declare module '@cubejs-client/react' {
    * import ReactDOM from 'react-dom';
    * import { Layout, Divider, Empty, Select } from 'antd';
    * import { QueryBuilder } from '@cubejs-client/react';
-   * import cubejs from '@cubejs-client/core';
+   * import cube from '@cubejs-client/core';
    * import 'antd/dist/antd.css';
    *
    * import ChartRenderer from './ChartRenderer';
    *
-   * const cubejsApi = cubejs('YOUR-CUBEJS-API-TOKEN', {
+   * const cubeApi = cube('YOUR-CUBE-API-TOKEN', {
    *   apiUrl: 'http://localhost:4000/cubejs-api/v1',
    * });
    *
@@ -377,7 +373,7 @@ declare module '@cubejs-client/react' {
    *         },
    *       ],
    *     }}
-   *     cubejsApi={cubejsApi}
+   *     cubeApi={cubeApi}
    *     render={({ resultSet, measures, availableMeasures, updateMeasures }) => (
    *       <Layout.Content style={{ padding: '20px' }}>
    *         <Select
@@ -462,15 +458,9 @@ declare module '@cubejs-client/react' {
 
   type UseCubeQueryOptions = {
     /**
-     * @deprecated Use the `cubeApi` option
-     * A `CubejsApi` instance to use. Taken from the context if the param is not passed
+     * A `CubeApi` instance to use. Taken from the context if the param is not passed
      */
-    cubejsApi?: CubejsApi;
-
-    /**
-     * A `CubejsApi` instance to use. Taken from the context if the param is not passed
-     */
-    cubeApi?: CubejsApi;
+    cubeApi?: CubeApi;
     /**
      * Query execution will be skipped when `skip` is set to `true`. You can use this flag to avoid sending incomplete queries.
      */
@@ -503,8 +493,7 @@ declare module '@cubejs-client/react' {
    */
   type CubeFetchOptions = {
     skip?: boolean;
-    cubeApi?: CubejsApi;
-    cubejsApi?: CubejsApi;
+    cubeApi?: CubeApi;
     query?: Query;
   };
 
@@ -566,7 +555,7 @@ declare module '@cubejs-client/react' {
    * ```js
    * <QueryBuilder
    *   // ...
-   *   cubejsApi={cubejsApi}
+   *   cubeApi={cubeApi}
    *   render={({
    *     // ...
    *     availableMeasures,
@@ -595,7 +584,7 @@ declare module '@cubejs-client/react' {
    * ```js
    * <QueryBuilder
    *   // ...
-   *   cubejsApi={cubejsApi}
+   *   cubeApi={cubeApi}
    *   render={({
    *     // ...
    *     measures,

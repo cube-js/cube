@@ -2513,7 +2513,7 @@ export class BaseQuery {
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
-        case: 'CASE{% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
+        case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',

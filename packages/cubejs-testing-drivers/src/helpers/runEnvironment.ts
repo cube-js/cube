@@ -115,7 +115,10 @@ export async function runEnvironment(
     composeFile,
   );
   compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
-  compose.withEnvironment({ CUBEJS_TELEMETRY: 'false' });
+  compose.withEnvironment({
+    CUBEJS_TELEMETRY: 'false',
+    CUBEJS_SCHEMA_PATH: 'schema'
+  });
 
   const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
   if (fs.existsSync(_path)) {

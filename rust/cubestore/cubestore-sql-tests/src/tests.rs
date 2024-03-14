@@ -3,6 +3,7 @@ use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
+use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
 use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
@@ -132,6 +133,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
+        t("physical_plan_flags", physical_plan_flags),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -2770,6 +2772,54 @@ async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
         .exec_query("INSERT INTO s.Data(id, hll) VALUES(2, X'020C0200C02FF58941D5F0C6')")
         .await
         .unwrap_err();
+}
+
+async fn physical_plan_flags(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, day text, category text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data(url text, day text, category text, hits int, clicks int) \
+            ADD TO PARTITIONED INDEX s.ind(url, day, category)",
+        )
+        .await
+        .unwrap();
+
+    // (query, is_optimal)
+    let cases = vec![
+        ("SELECT SUM(hits) FROM s.Data", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test' AND category = 'test')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day = 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
+        ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
+        ("SELECT SUM(hits), url, day FROM s.Data GROUP BY url, day", true),
+        ("SELECT SUM(hits), day FROM s.Data GROUP BY day", false),
+        ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false),
+    ];
+
+    for (query, expected_optimal) in cases {
+        let p = service.plan_query(query).await.unwrap();
+        let flags = PhysicalPlanFlags::with_execution_plan(p.router.as_ref());
+        assert_eq!(
+            flags.is_suboptimal_query(),
+            !expected_optimal,
+            "Query failed: {}",
+            query
+        );
+    }
 }
 
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {

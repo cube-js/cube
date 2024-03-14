@@ -20,6 +20,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -37,6 +41,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
 
 jobs:
   latest-tag-sha:
@@ -186,7 +194,7 @@ jobs:
     strategy:
       matrix:
         node: 
-          - 16.x
+          - 18.x
         database:
           - athena
           - bigquery
@@ -210,10 +218,10 @@ jobs:
           override: true
           components: rustfmt
 
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19

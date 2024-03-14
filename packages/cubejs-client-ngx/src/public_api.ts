@@ -2,7 +2,7 @@
  * Public API Surface of cubejs-client-ngx
  */
 
-export { CubejsClientModule } from './module';
+export { CubeClientModule } from './module';
 export * from './client';
 export * from './query-builder/query-builder.service';
 export * from './query-builder/query';
