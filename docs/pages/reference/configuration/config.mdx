@@ -630,8 +630,7 @@ module.exports = {
 </CodeTabs>
 
 Best practice is to run `scheduled_refresh_timer` in a separate worker Cube
-instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
-should be used instead.
+instance.
 
 You may also need to configure
 [`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
@@ -1290,7 +1289,6 @@ If not defined, Cube will lookup for environment variable
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-rest-api]: /reference/rest-api
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-rest-api-sched-refresh]: /reference/rest-api#v1run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /reference/data-model/pre-aggregations#refresh_key
 [ref-schema-cube-ref-refresh-key]:

@@ -218,6 +218,13 @@ Trigger a scheduled refresh run to refresh pre-aggregations.
 
 <WarningBox>
 
+This API endpoint is deprecated and will be removed from Cube in the future.
+Use the [`/v1/pre-aggregations/jobs`](#v1pre-aggregationsjobs) endpoint instead.
+
+</WarningBox>
+
+<WarningBox>
+
 Single call to this API may be not enough to refresh everything is pending. This
 call just populates queue with refresh workload and should be continuously
 called until refresh jobs have completed; otherwise refresh jobs will be marked
