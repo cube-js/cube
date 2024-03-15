@@ -36,7 +36,7 @@ First, you’ll need to install two packages from `npm`:
 - [@cubejs-client/core](https://www.npmjs.com/package/@cubejs-client/core)
 - [@cubejs-client/react](https://www.npmjs.com/package/@cubejs-client/react)
 
-Next, initialize `cubejsApi` within your application.
+Next, initialize `cubeApi` within your application.
 
 Please note that you must sign your request with the correct authentication
 token. Cube uses the [JSON Web Token (JWT)](https://jwt.io/) standard by default
@@ -46,9 +46,9 @@ this token from your secret key. You can learn more about this in the
 [Authentication & Authorization](/product/auth) section of the documentation.
 
 ```jsx
-import cubejs from "@cubejs-client/core";
+import cube from "@cubejs-client/core";
 
-const cubejsApi = cubejs("your-token", {
+const cubeApi = cube("your-token", {
   apiUrl:
     "https://<delpoyment-id>.<region>.cubecloudapp.dev/dev-mode/<dev-branch-name>/cubejs-api/v1",
 });
@@ -60,7 +60,7 @@ application.
 ```jsx
 import { CubeProvider } from "@cubejs-client/react";
 
-<CubeProvider cubejsApi={cubejsApi}>// your application</CubeProvider>;
+<CubeProvider cubeApi={cubeApi}>// your application</CubeProvider>;
 ```
 
 Finally, you can use the `useCubeQuery` hook to load data from Cube into your

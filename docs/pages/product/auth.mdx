@@ -68,7 +68,7 @@ in 30 days. We recommend using the `jsonwebtoken` package for this.
 const jwt = require("jsonwebtoken");
 const CUBE_API_SECRET = "secret";
 
-const cubejsToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: "30d" });
+const cubeToken = jwt.sign({}, CUBE_API_SECRET, { expiresIn: "30d" });
 ```
 
 Then, in a web server or cloud function, create a route which generates and
@@ -86,7 +86,7 @@ app.use((req, res, next) => {
 
 app.get("/auth/cubejs-token", (req, res) => {
   res.json({
-    // Take note: cubejs expects the JWT payload to contain an object!
+    // Take note: Cube expects the JWT payload to contain an object!
     token: jwt.sign(req.user, process.env.CUBEJS_API_SECRET, {
       expiresIn: "1d",
     }),
@@ -100,7 +100,7 @@ the web server:
 ```javascript
 let apiTokenPromise;
 
-const cubejsApi = cubejs(
+const cubeApi = cube(
   () => {
     if (!apiTokenPromise) {
       apiTokenPromise = fetch(`${API_URL}/auth/cubejs-token`)
@@ -237,7 +237,7 @@ security context.
 
 Previous versions of Cube allowed setting a `checkAuthMiddleware()` parameter,
 which is now deprecated. We advise [migrating to a newer version of
-Cube][ref-config-migrate-cubejs].
+Cube][ref-config-migrate-cube].
 
 </WarningBox>
 
@@ -262,7 +262,7 @@ module.exports = {
 [link-jwt-libs]: https://jwt.io/#libraries-io
 [link-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
 [ref-config-check-auth]: /reference/configuration/config#checkauth
-[ref-config-migrate-cubejs]:
+[ref-config-migrate-cube]:
   /product/configuration#migration-from-express-to-docker-template
 [ref-recipe-auth0]: /guides/recipes/auth/auth0-guide
 [ref-recipe-cognito]: /guides/recipes/auth/aws-cognito

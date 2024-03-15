@@ -16,7 +16,7 @@ that only users with a `department` claim in their JWT can query it.
 ```javascript
 module.exports = {
   contextToAppId: ({ securityContext }) => {
-    return `CUBEJS_APP_${securityContext.company}`;
+    return `CUBE_APP_${securityContext.company}`;
   },
   extendContext: ({ securityContext }) => {
     return {
