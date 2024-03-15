@@ -65,7 +65,7 @@ export type TableSchema = {
   dimensions: Dimension[];
   drillMembers?: Dimension[];
   joins: Join[];
-  compositePrimaryKey?: string[];
+  compositePrimaryKey?: any[];
 };
 
 const MEASURE_DICTIONARY = [

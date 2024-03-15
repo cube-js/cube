@@ -590,7 +590,7 @@ describe('ScaffoldingTemplate', () => {
   });
 
   describe('Yaml formatter', () => {
-    it.only('generates schema by cube descriptors', () => {
+    it('generates schema by cube descriptors', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.Yaml,
         snakeCase: true
@@ -607,8 +607,8 @@ describe('ScaffoldingTemplate', () => {
           members: [
             {
               memberType: MemberType.Dimension,
-              name: 'user_id',
-              title: 'User Id',
+              name: 'number',
+              title: 'Number',
               types: [
                 'sum',
                 'avg',
@@ -618,6 +618,49 @@ describe('ScaffoldingTemplate', () => {
               included: true,
               type: 'number'
             },
+            {
+              memberType: MemberType.Dimension,
+              name: 'status',
+              title: 'Status',
+              types: [
+                'string'
+              ],
+              isPrimaryKey: false,
+              type: 'string',
+              included: true
+            },
+            {
+              memberType: MemberType.Dimension,
+              name: 'created_at',
+              title: 'Created At',
+              types: [
+                'number'
+              ],
+              type: 'time',
+              included: true
+            },
+          ],
+        },
+      ]);
+
+      expect(files[0].content).toContain('sql: "{CUBE}.number || \'-\' || {CUBE}.status"');
+    });
+
+    it('generates schema by cube descriptors', () => {
+      const template = new ScaffoldingTemplate(dbSchema, driver, {
+        format: SchemaFormat.JavaScript,
+        snakeCase: true
+      });
+
+      const files = template.generateFilesByCubeDescriptors([
+        {
+          cube: 'orders',
+          tableName: 'public.orders',
+          table: 'orders',
+          schema: 'public',
+          joins: [],
+          shouldGeneratePrimaryKey: true,
+          members: [
             {
               memberType: MemberType.Dimension,
               name: 'number',
@@ -633,30 +676,6 @@ describe('ScaffoldingTemplate', () => {
             },
             {
               memberType: MemberType.Dimension,
-              name: 'product_id',
-              title: 'Product Id',
-              types: [
-                'sum',
-                'avg',
-                'min',
-                'max'
-              ],
-              included: true,
-              type: 'number'
-            },
-            // {
-            //   memberType: MemberType.Dimension,
-            //   name: 'id',
-            //   title: 'Id',
-            //   types: [
-            //     'number'
-            //   ],
-            //   isPrimaryKey: true,
-            //   type: 'number',
-            //   included: true
-            // },
-            {
-              memberType: MemberType.Dimension,
               name: 'status',
               title: 'Status',
               types: [
@@ -666,31 +685,22 @@ describe('ScaffoldingTemplate', () => {
               type: 'string',
               included: true
             },
-            // {
-            //   memberType: MemberType.Dimension,
-            //   name: 'created_at',
-            //   title: 'Created at',
-            //   types: [
-            //     'time'
-            //   ],
-            //   type: 'time',
-            //   included: true
-            // },
-            // {
-            //   memberType: MemberType.Dimension,
-            //   name: 'completed_at',
-            //   title: 'Completed at',
-            //   types: [
-            //     'time'
-            //   ],
-            //   type: 'time',
-            //   included: true
-            // }
+            {
+              memberType: MemberType.Dimension,
+              name: 'created_at',
+              title: 'Created At',
+              types: [
+                'number'
+              ],
+              type: 'time',
+              included: true
+            },
           ],
         },
       ]);
 
-      console.log('>>>', files[0].content);
+      // eslint-disable-next-line
+      expect(files[0].content).toContain('sql: `${CUBE}.number || \'-\' || ${CUBE}.status`');
     });
 
     it('generates schema for base driver', () => {

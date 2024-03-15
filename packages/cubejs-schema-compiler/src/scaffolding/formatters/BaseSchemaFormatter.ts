@@ -4,7 +4,6 @@ import {
   CubeDescriptor,
   CubeDescriptorMember,
   DatabaseSchema,
-  Dimension,
   MemberType,
   ScaffoldingSchema,
   TableName,
@@ -145,16 +144,20 @@ export abstract class BaseSchemaFormatter {
         sql: `SELECT * FROM ${table}`,
       };
 
-    const compositePrimaryKey: any = {
-      name: 'id',
-      title: 'id',
-      sql: this.driver.concatStringsSql(tableSchema.dimensions
-        .filter((d) => !d.isPrimaryKey)
-        .flatMap(
-          (it, index) => [`${this.cubeReference('CUBE')}.${this.escapeName(it.name)}`, index !== tableSchema.dimensions.length - 1 ? '\'-\'' : null].filter(Boolean)
-        )),
-      [this.options.snakeCase ? 'primary_key' : 'primaryKey']: true
-    };
+    let compositePrimaryKey: any;
+
+    if (tableSchema.compositePrimaryKey) {
+      const { length } = tableSchema.compositePrimaryKey;
+      compositePrimaryKey = { id: {
+        name: 'id',
+        title: 'id',
+        sql: this.driver.concatStringsSql(tableSchema.compositePrimaryKey
+          .flatMap(
+            (it, index) => [`${this.cubeReference('CUBE')}.${this.escapeName(it.name)}`, index !== length - 1 ? '\'-\'' : null].filter(Boolean)
+          )),
+        [this.options.snakeCase ? 'primary_key' : 'primaryKey']: true
+      } };
+    }
 
     return {
       cube: tableSchema.cube,
@@ -176,7 +179,7 @@ export abstract class BaseSchemaFormatter {
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
       dimensions: {
-        id: compositePrimaryKey,
+        ...compositePrimaryKey,
         ...tableSchema.dimensions
           .sort((a) => (a.isPrimaryKey ? -1 : 0))
           .map((m) => ({
@@ -251,14 +254,14 @@ export abstract class BaseSchemaFormatter {
 
       let compositePrimaryKey: CubeDescriptorMember[] | undefined = [];
       if (descriptor.shouldGeneratePrimaryKey) {
-        compositePrimaryKey = cubeMembers.dimensions;
+        compositePrimaryKey = cubeMembers.dimensions.filter(d => !d.isPrimaryKey && d.type !== 'time');
       }
 
       return {
         ...generatedDescriptor,
         ...descriptor,
         ...cubeMembers,
-        // compositePrimaryKey
+        compositePrimaryKey
       };
     });
   }
