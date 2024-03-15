@@ -550,6 +550,16 @@ The timeout value for any queries made to the database by Cube.
 | ---------------------------------------- | ---------------------- | --------------------- |
 | A number in seconds or a duration string | `10m`                  | `10m`                 |
 
+## `CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION`
+
+Force fetching of columns by ordinal positions. Certain data-providers (e.g., Redshift) do not guarantee columns in the
+same order on each request (e.g., `SELECT * FROM foo`). This flag ensures that columns will be fetched in proper order
+for pre-aggregation generation.
+
+| Possible Values                                    | Default in Development | Default in Production |
+| -------------------------------------------------- | ---------------------- | --------------------- |
+| Whether to force fetch columns in ordinal position | `true`                 | `true`               |
+
 ## `CUBEJS_DB_SNOWFLAKE_ACCOUNT`
 
 The Snowflake account identifier to use when connecting to the database.
