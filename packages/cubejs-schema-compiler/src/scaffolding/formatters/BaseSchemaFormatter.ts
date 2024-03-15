@@ -1,4 +1,4 @@
-import inflection from 'inflection';
+import inflection, { titleize } from 'inflection';
 import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
 import {
   CubeDescriptor,
@@ -148,15 +148,17 @@ export abstract class BaseSchemaFormatter {
 
     if (tableSchema.compositePrimaryKey) {
       const { length } = tableSchema.compositePrimaryKey;
-      compositePrimaryKey = { id: {
-        name: 'id',
-        title: 'id',
-        sql: this.driver.concatStringsSql(tableSchema.compositePrimaryKey
-          .flatMap(
-            (it, index) => [`${this.cubeReference('CUBE')}.${this.escapeName(it.name)}`, index !== length - 1 ? '\'-\'' : null].filter(Boolean)
-          )),
-        [this.options.snakeCase ? 'primary_key' : 'primaryKey']: true
-      } };
+      const name = tableSchema.dimensions.find(d => d.name === 'id') ? 'generated_composite_primary_key' : 'id';
+      compositePrimaryKey = {
+        [name]: {
+          name,
+          title: titleize(name),
+          sql: this.driver.concatStringsSql(tableSchema.compositePrimaryKey
+            .flatMap(
+              (it, index) => [`${this.cubeReference('CUBE')}.${this.escapeName(it.name)}`, index !== length - 1 ? '\'-\'' : null].filter(Boolean)
+            )),
+          [this.options.snakeCase ? 'primary_key' : 'primaryKey']: true
+        } };
     }
 
     return {
