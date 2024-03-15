@@ -55,7 +55,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -73,7 +73,7 @@ services:
     image: cubejs/cube:latest
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -208,7 +208,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -273,7 +273,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router

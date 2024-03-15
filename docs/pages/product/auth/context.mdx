@@ -131,7 +131,7 @@ token = jwt.encode(token_payload, CUBE_API_SECRET, algorithm='HS256')
 const jwt = require("jsonwebtoken");
 const CUBE_API_SECRET = "secret";
 
-const cubejsToken = jwt.sign({ user_id: 42 }, CUBEJS_API_SECRET, {
+const cubeToken = jwt.sign({ user_id: 42 }, CUBE_API_SECRET, {
   expiresIn: "30d",
 });
 ```
