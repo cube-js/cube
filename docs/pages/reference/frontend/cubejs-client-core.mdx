@@ -2,16 +2,16 @@
 
 Vanilla JavaScript client for Cube.
 
-## `cubejs`
+## `cube`
 
->  **cubejs**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+>  **cube**(**apiToken**: string |  () => *Promise‹string›*, **options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cube-api)*
 
-Creates an instance of the `CubejsApi`. The API entry point.
+Creates an instance of the `CubeApi`. The API entry point.
 
 ```js
-import cubejs from '@cubejs-client/core';
-const cubejsApi = cubejs(
-  'CUBEJS-API-TOKEN',
+import cube from '@cubejs-client/core';
+const cubeApi = cube(
+  'CUBE-API-TOKEN',
   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
 );
 ```
@@ -19,8 +19,8 @@ const cubejsApi = cubejs(
 You can also pass an async function or a promise that will resolve to the API token
 
 ```js
-import cubejs from '@cubejs-client/core';
-const cubejsApi = cubejs(
+import cube from '@cubejs-client/core';
+const cubeApi = cube(
   async () => await Auth.getJwtToken(),
   { apiUrl: 'http://localhost:4000/cubejs-api/v1' }
 );
@@ -31,9 +31,9 @@ const cubejsApi = cubejs(
 Name | Type | Description |
 ------ | ------ | ------ |
 apiToken | string &#124;  () => *Promise‹string›* | [API token][ref-security] is used to authorize requests and determine SQL database you're accessing. In the development mode, Cube will print the API token to the console on startup. In case of async function `authorization` is updated for `options.transport` on each request. |
-options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
+options | [CubeApiOptions](#types-cube-js-api-options) | - |
 
->  **cubejs**(**options**: [CubeJSApiOptions](#types-cube-js-api-options)): *[CubejsApi](#cubejs-api)*
+>  **cube**(**options**: [CubeApiOptions](#types-cube-js-api-options)): *[CubeApi](#cube-api)*
 
 ## `defaultHeuristics`
 
@@ -47,7 +47,7 @@ options | [CubeJSApiOptions](#types-cube-js-api-options) | - |
 
 >  **movePivotItem**(**pivotConfig**: [PivotConfig](#types-pivot-config), **sourceIndex**: number, **destinationIndex**: number, **sourceAxis**: TSourceAxis, **destinationAxis**: TSourceAxis): *[PivotConfig](#types-pivot-config)*
 
-## `CubejsApi`
+## `CubeApi`
 
 Main class for accessing Cube API
 
@@ -68,13 +68,13 @@ Get query related meta without query execution
 Fetch data for the passed `query`.
 
 ```js
-import cubejs from '@cubejs-client/core';
+import cube from '@cubejs-client/core';
 import Chart from 'chart.js';
 import chartjsConfig from './toChartjsData';
 
-const cubejsApi = cubejs('CUBEJS_TOKEN');
+const cubeApi = cube('CUBE_TOKEN');
 
-const resultSet = await cubejsApi.load({
+const resultSet = await cubeApi.load({
  measures: ['Stories.count'],
  timeDimensions: [{
    dimension: 'Stories.time',
@@ -126,7 +126,7 @@ callback? | [LoadMethodCallback](#types-load-method-callback)‹[SqlQuery](#sql-
 Allows you to fetch data and receive updates over time. See [Real-Time Data Fetch](real-time-data-fetch)
 
 ```js
-cubejsApi.subscribe(
+cubeApi.subscribe(
   {
     measures: ['Logs.count'],
     timeDimensions: [
@@ -638,7 +638,7 @@ For example:
 ```js
 import { ResultSet } from '@cubejs-client/core';
 
-const resultSet = await cubejsApi.load(query);
+const resultSet = await cubeApi.load(query);
 // You can store the result somewhere
 const tmp = resultSet.serialize();
 
@@ -718,7 +718,7 @@ key | string |
 series | [] |
 title | string |
 
-### `CubeJSApiOptions`
+### `CubeApiOptions`
 
 Name | Type | Description |
 ------ | ------ | ------ |

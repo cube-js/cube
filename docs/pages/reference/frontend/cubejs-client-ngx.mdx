@@ -13,15 +13,15 @@ npm install --save @cubejs-client/ngx
 yarn add @cubejs-client/ngx
 ```
 
-Now you can add `CubejsClientModule` to your **app.module.ts** file:
+Now you can add `CubeClientModule` to your **app.module.ts** file:
 
 ```typescript
-import { CubejsClientModule } from '@cubejs-client/ngx';
+import { CubeClientModule } from '@cubejs-client/ngx';
 import { environment } from '../../environments/environment';
 
-const cubejsOptions = {
-  token: environment.CUBEJS_API_TOKEN,
-  options: { apiUrl: environment.CUBEJS_API_URL }
+const cubeOptions = {
+  token: environment.CUBE_API_TOKEN,
+  options: { apiUrl: environment.CUBE_API_URL }
 };
 
 @NgModule({
@@ -30,7 +30,7 @@ const cubejsOptions = {
   ],
   imports: [
     ...,
-    CubejsClientModule.forRoot(cubejsOptions)
+    CubeClientModule.forRoot(cubeOptions)
   ],
   providers: [...],
   bootstrap: [...]
@@ -41,17 +41,17 @@ export class AppModule { }
 The `options` object is passed directly to
 [@cubejs-client/core](/reference/frontend/cubejs-client-core).
 
-`CubejsClientModule` provides `CubejsClient`, which you can inject into your
+`CubeClientModule` provides `CubeClient`, which you can inject into your
 components or services:
 
 ```typescript
-import { CubejsClient } from "@cubejs-client/ngx";
+import { CubeClient } from "@cubejs-client/ngx";
 
 export class AppComponent {
-  constructor(private cubejs: CubejsClient) {}
+  constructor(private cube: CubeClient) {}
 
   ngOnInit() {
-    this.cubejs
+    this.cube
       .load({
         measures: ["some_measure"],
       })
@@ -67,8 +67,8 @@ export class AppComponent {
 
 ## API
 
-`CubejsClient` provides the same API methods as
-[@cubejs-client/core](/reference/frontend/cubejs-client-core#cubejsapi). The
+`CubeClient` provides the same API methods as
+[@cubejs-client/core](/reference/frontend/cubejs-client-core#cubeapi). The
 difference is that instead of Promise it returns an
 [Observable](http://reactivex.io/rxjs/class/es6/Observable.js~Observable.html),
 which passes [resultSet](/reference/frontend/cubejs-client-core#resultset) into
@@ -82,7 +82,7 @@ private query;
 
 ngOnInit() {
   this.query = new Subject();
-  this.cubejs.watch(this.query).subscribe(
+  this.cube.watch(this.query).subscribe(
     resultSet => {
       console.log(resultSet.chartPivot()[0].x);
       console.log(resultSet.seriesNames()[0]);

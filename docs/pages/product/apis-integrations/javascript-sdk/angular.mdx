@@ -51,8 +51,8 @@ the `@cubejs-client/core` package.
 The package provides convenient tools to work with Cube in Angular:
 
 **Modules.** Inject
-[CubejsClientModule](/reference/frontend/cubejs-client-vue#query-builder) and
-[CubejsClient](/reference/frontend/cubejs-client-vue#query-renderer) into your
+[CubeClientModule](/reference/frontend/cubejs-client-vue#query-builder) and
+[CubeClient](/reference/frontend/cubejs-client-vue#query-renderer) into your
 components and services to get access to `@cubejs-client/core` API.
 
 **Subjects.** Use [RxJS Subject](/reference/frontend/cubejs-client-ngx#api) and
@@ -70,7 +70,7 @@ Here are the typical steps to query and visualize analytical data in Angular:
   The client is also initialized with an [API token](/product/auth), but it
   takes effect only in [production](/product/deployment/production-checklist).
 - **Query data from Cube Backend and Transform data for visualization.** Use
-  [CubejsClient](/reference/frontend/cubejs-client-ngx#api) to load data. The
+  [CubeClient](/reference/frontend/cubejs-client-ngx#api) to load data. The
   client accepts a query, which is a plain JavaScript object. See
   [Query Format](/product/apis-integrations/rest-api/query-format) for details.
 - **Visualize the data.** Use tools of your choice to draw charts and create

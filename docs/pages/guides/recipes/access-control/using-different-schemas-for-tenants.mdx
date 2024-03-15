@@ -46,7 +46,7 @@ const { FileRepository } = require("@cubejs-backend/server-core");
 
 module.exports = {
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.tenant}`,
+    `CUBE_APP_${securityContext.tenant}`,
 
   repositoryFactory: ({ securityContext }) =>
     new FileRepository(`model/${securityContext.tenant}`),

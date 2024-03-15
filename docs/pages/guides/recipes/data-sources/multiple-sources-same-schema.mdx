@@ -30,7 +30,7 @@ the `tenant` property of the `securityContext`.
 module.exports = {
   // Provides distinct identifiers for each tenant which are used as caching keys
   contextToAppId: ({ securityContext }) =>
-    `CUBEJS_APP_${securityContext.tenant}`,
+    `CUBE_APP_${securityContext.tenant}`,
 
   // Selects the database connection configuration based on the tenant name
   driverFactory: ({ securityContext }) => {

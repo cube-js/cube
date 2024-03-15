@@ -196,12 +196,12 @@ correlate. You can simply pass the queries to the Cube client, and it will merge
 the results which will let you easily display it on the chart.
 
 ```javascript
-import cubejs from "@cubejs-client/core";
+import cube from "@cubejs-client/core";
 
 const API_URL = "http://localhost:4000";
-const CUBEJS_TOKEN = "YOUR_TOKEN";
+const CUBE_TOKEN = "YOUR_TOKEN";
 
-const cubejsApi = cubejs(CUBEJS_TOKEN, {
+const cubeApi = cube(CUBE_TOKEN, {
   apiUrl: `${API_URL}/cubejs-api/v1`,
 });
 
@@ -228,5 +228,5 @@ const queries = [
   },
 ];
 
-const resultSet = await cubejsApi.load(queries);
+const resultSet = await cubeApi.load(queries);
 ```

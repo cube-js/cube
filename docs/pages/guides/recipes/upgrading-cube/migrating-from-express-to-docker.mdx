@@ -15,7 +15,7 @@ For example, your existing `package.json` might look something like:
 
 ```json
 {
-  "name": "cubejs-app",
+  "name": "cube-app",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -32,7 +32,7 @@ It should become:
 
 ```json
 {
-  "name": "cubejs-app",
+  "name": "cube-app",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -53,9 +53,9 @@ You should also rename your `index.js` file to `cube.js` and replace the
 For an `index.js` like the following:
 
 ```javascript
-const CubejsServer = require("@cubejs-backend/server");
+const CubeServer = require("@cubejs-backend/server");
 
-const server = new CubejsServer({
+const server = new CubeServer({
   logger: (msg, params) => {
     console.log(`${msg}: ${JSON.stringify(params)}`);
   },
