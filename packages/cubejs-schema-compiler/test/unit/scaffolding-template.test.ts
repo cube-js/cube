@@ -590,7 +590,7 @@ describe('ScaffoldingTemplate', () => {
   });
 
   describe('Yaml formatter', () => {
-    it('generates schema by cube descriptors', () => {
+    it('generates composite primary key for YAML model', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.Yaml,
         snakeCase: true
@@ -646,7 +646,7 @@ describe('ScaffoldingTemplate', () => {
       expect(files[0].content).toContain('sql: "{CUBE}.number || \'-\' || {CUBE}.status"');
     });
 
-    it('generates schema by cube descriptors', () => {
+    it('generates composite primary key for JS model', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.JavaScript,
         snakeCase: true
