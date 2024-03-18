@@ -5,6 +5,7 @@ export * from './clickhouse';
 export * from './questdb';
 export * from './materialize';
 export * from './crate';
+export * from './vertica';
 export * from './prestodb';
 export * from './mssql';
 export * from './trino';

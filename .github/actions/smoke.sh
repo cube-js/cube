@@ -56,3 +56,7 @@ echo "::endgroup::"
 echo "::group::MongoBI"
 yarn lerna run --concurrency 1 --stream --no-prefix smoke:mongobi
 echo "::endgroup::"
+
+echo "::group::Vertica"
+yarn lerna run --concurrency 1 --stream --no-prefix smoke:vertica
+echo "::endgroup::"

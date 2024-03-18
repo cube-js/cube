@@ -73,6 +73,7 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
+COPY packages/cubejs-vertica-driver/package.json packages/cubejs-vertica-driver/package.json
 # Skip
 # COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
 # COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
@@ -149,6 +150,7 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
+COPY packages/cubejs-vertica-driver/ packages/cubejs-vertica-driver/
 # Skip
 # COPY packages/cubejs-testing/ packages/cubejs-testing/
 # COPY packages/cubejs-docker/ packages/cubejs-docker/

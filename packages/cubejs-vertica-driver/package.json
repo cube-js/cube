@@ -1,0 +1,38 @@
+{
+  "name": "@knowitall/vertica-driver",
+  "description": "Cube.js Vertica database driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.32.3",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.js.git",
+    "directory": "packages/cubejs-vertica-driver"
+  },
+  "engines": {
+    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+  },
+  "main": "src/VerticaDriver.js",
+  "scripts": {
+    "integration": "npm run integration:vertica",
+    "integration:vertica": "jest --verbose ./test",
+    "lint": "eslint **/*.js",
+    "lint:fix": "eslint --fix **/*.js"
+  },
+  "dependencies": {
+    "@cubejs-backend/query-orchestrator": "^0.31.69",
+    "vertica-nodejs": "^1.0.3"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.31.0",
+    "@cubejs-backend/testing-shared": "^0.31.69",
+    "jest": "^26.6.3",
+    "testcontainers": "^8.16.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}
