@@ -13,8 +13,8 @@ use datafusion::arrow::{
         Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
-        ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
+        ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
@@ -392,6 +392,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt64 => Ok(ColumnType::Int64),
+        DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }
@@ -471,6 +472,22 @@ pub fn batch_to_dataframe(
                         } else {
                             TableValue::Date(a.value_as_date(i).expect(
                                 "value_as_date must return Option with NaiveDate for Date64Array",
+                            ))
+                        });
+                    }
+                }
+                DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1_000_000_i64,
+                                tz.clone(),
                             ))
                         });
                     }
@@ -607,6 +624,11 @@ pub fn batch_to_dataframe(
                         } else {
                             TableValue::List(ListValue::new(a.value(i)))
                         });
+                    }
+                }
+                DataType::Null => {
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null)
                     }
                 }
                 x => panic!("Unsupported data type: {:?}", x),

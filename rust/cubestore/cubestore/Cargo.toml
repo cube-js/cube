@@ -17,7 +17,7 @@ libc = { version = "0.2.97", optional = true }
 base64 = "0.13.0"
 bumpalo = "3.6.1"
 tokio = { version = "1.0", features = ["full", "rt"] }
-warp = { version = "0.3.3" }
+warp = { version = "0.3.6" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
@@ -37,7 +37,7 @@ futures = "0.3.26"
 smallvec = "1.11.0"
 flexbuffers = "0.1.1"
 byteorder = "1.3.4"
-log = "=0.4.11"
+log = "0.4.20"
 simple_logger = "1.7.0"
 async-trait = "0.1.36"
 actix-rt = "2.7.0"
@@ -74,7 +74,6 @@ tempfile = "3.2.0"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
-mysql_common = "0.26.0"
 flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
@@ -86,7 +85,7 @@ json = "0.12.4"
 futures-util = "0.3.17"
 url = "2.2.2"
 pin-project = "1.0.8"
-tokio-tungstenite = { version = "0.16.0", features = ["native-tls"] }
+tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 deflate = "1.0.0"
 indoc = "1.0"
 rdkafka = { version = "0.29.0" }

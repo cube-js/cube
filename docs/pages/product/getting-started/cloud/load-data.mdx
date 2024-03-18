@@ -1,0 +1,108 @@
+---
+redirect_from:
+  - /getting-started/cloud/load-data
+---
+
+# Load data
+
+The following steps will guide you through setting up a Snowflake account and
+uploading the demo dataset, which is stored as CSV files in a public S3 bucket.
+
+First, let’s create a warehouse, database, and schema. Paste the following SQL
+into the Editor of the Snowflake worksheet and click Run.
+
+```sql
+CREATE WAREHOUSE cube_demo_wh;
+CREATE DATABASE cube_demo;
+CREATE SCHEMA cube_demo.ecom;
+```
+
+We’re going to create four tables in the `ecom` schema and seed them with data
+from S3.
+
+First, let’s create `line_items` table. Delete the previous SQL in your Editor
+and then run the following command.
+
+```sql
+CREATE TABLE cube_demo.ecom.line_items
+( id INTEGER,
+  order_id INTEGER,
+  product_id INTEGER,
+  price INTEGER,
+  created_at TIMESTAMP
+);
+```
+
+Clear all the content in the Editor and run the following command to load data
+into the `line_items` table.
+
+```sql
+COPY INTO cube_demo.ecom.line_items (id, order_id, product_id, price, created_at)
+FROM 's3://cube-tutorial/line_items.csv'
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```
+
+Now, we’re going to repeat these steps for three other tables.
+
+Run the following command to create the `orders` table.
+
+```sql
+CREATE TABLE cube_demo.ecom.orders
+( id INTEGER,
+  user_id INTEGER,
+  status VARCHAR,
+  completed_at TIMESTAMP,
+  created_at TIMESTAMP
+);
+```
+
+Run the following command to load data into the `orders` table from S3.
+
+```sql
+COPY INTO cube_demo.ecom.orders (id, user_id, status, completed_at, created_at)
+FROM 's3://cube-tutorial/orders.csv'
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```
+
+Run the following command to create the `users` table.
+
+```sql
+CREATE TABLE cube_demo.ecom.users
+( id INTEGER,
+  user_id INTEGER,
+  city VARCHAR,
+  age INTEGER,
+  gender VARCHAR,
+  state VARCHAR,
+  first_name VARCHAR,
+  last_name VARCHAR,
+  created_at TIMESTAMP
+);
+```
+
+Run the following command to load data into the `users` table.
+
+```sql
+COPY INTO cube_demo.ecom.users (id, city, age, gender, state, first_name, last_name, created_at)
+FROM 's3://cube-tutorial/users.csv'
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```
+
+Run the following command to create the `products` table.
+
+```sql
+CREATE TABLE cube_demo.ecom.products
+( id INTEGER,
+  name VARCHAR,
+  product_category VARCHAR,
+  created_at TIMESTAMP
+);
+```
+
+Run the following command to load data into the `products` table.
+
+```sql
+COPY INTO cube_demo.ecom.products (id, name, created_at, product_category)
+FROM 's3://cube-tutorial/products.csv'
+FILE_FORMAT = (TYPE = 'CSV' FIELD_DELIMITER = ',' SKIP_HEADER = 1);
+```

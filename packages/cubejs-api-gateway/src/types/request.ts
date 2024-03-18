@@ -100,6 +100,11 @@ type ResponseResultFn =
     extra?: { status: number }
   ) => void;
 
+type MetaResponseResultFn =
+  (
+    message: { cubes: any[], compilerId?: string }
+  ) => void;
+
 /**
  * Base HTTP request parameters map data type.
  * @todo map it to Request.
@@ -121,12 +126,15 @@ type QueryRequest = BaseRequest & {
   expressionParams?: string[];
   exportAnnotatedSql?: boolean;
   memberExpressions?: boolean;
+  disableExternalPreAggregations?: boolean;
+  disableLimitEnforcing?: boolean;
 };
 
 type SqlApiRequest = BaseRequest & {
   query: Record<string, any>;
   sqlQuery?: [string, string[]];
   apiType?: ApiType;
+  queryKey: any;
   streaming?: boolean;
 };
 
@@ -169,19 +177,22 @@ type PreAggsJobsRequest = {
   resType?: 'object' | 'array'
 };
 
-type PreAggJobStatusItem = {
+type PreAggJobStatusItemNotFound = {
   token: string;
-  table: string;
+  status: 'not_found' | 'pre_agg_not_found';
+};
+
+type PreAggJobStatusItemFound = {
+  token: string;
   status: string;
+  table: string;
   selector: PreAggsSelector;
 };
 
+type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
+
 type PreAggJobStatusObject = {
-  [token: string]: {
-    table: string;
-    status: string;
-    selector: PreAggsSelector;
-  }
+  [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
 
 type PreAggJobStatusResponse =
@@ -198,6 +209,7 @@ export {
   SecurityContextExtractorFn,
   ExtendContextFn,
   ResponseResultFn,
+  MetaResponseResultFn,
   BaseRequest,
   QueryRequest,
   PreAggsJobsRequest,

@@ -3,6 +3,331 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Job API - builds are not triggered, fix [#7726](https://github.com/cube-js/cube/issues/7726) ([#7909](https://github.com/cube-js/cube/issues/7909)) ([738dbde](https://github.com/cube-js/cube/commit/738dbde3ab3767d935f733ab8770aaa8cba9c631))
+
+
+
+
+
+## [0.34.61](https://github.com/cube-js/cube/compare/v0.34.60...v0.34.61) (2024-03-11)
+
+
+### Features
+
+* **query-orchestrator:** Support unload (export bucket) for readOnly drivers ([76ce7ed](https://github.com/cube-js/cube/commit/76ce7ed176e0c8097bc8024a7e5e82bbb48d5d1c))
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* Merge streaming methods to one interface to allow SQL API use batching and Databricks batching implementation ([#7695](https://github.com/cube-js/cube/issues/7695)) ([73ad72d](https://github.com/cube-js/cube/commit/73ad72dd8a104651cf5ef23a60e8b4c116c97eed))
+
+
+
+
+
+## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** QueryQueue - reduce trafic (unexpected call for query stage) ([#7646](https://github.com/cube-js/cube/issues/7646)) ([ecf3826](https://github.com/cube-js/cube/commit/ecf3826df0e8f7ff5855b725ded4ac7d4f566582))
+
+
+### Features
+
+* **query-orchestrator:** Queue - reduce traffic for processing (Cube Store only) ([#7644](https://github.com/cube-js/cube/issues/7644)) ([7db90fb](https://github.com/cube-js/cube/commit/7db90fb7532d53d7ce46ba342e89250110f32c6b))
+
+
+
+
+
+## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.39](https://github.com/cube-js/cube/compare/v0.34.38...v0.34.39) (2023-12-21)
+
+
+### Features
+
+* **jdbc-driver:** Upgrade java to ^0.14 (to support new JDK & Node.js) ([#7566](https://github.com/cube-js/cube/issues/7566)) ([fe10c9b](https://github.com/cube-js/cube/commit/fe10c9b07ef88162044d86f0552f30b61cc618ed))
+
+
+
+
+
+## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.36](https://github.com/cube-js/cube/compare/v0.34.35...v0.34.36) (2023-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.35](https://github.com/cube-js/cube/compare/v0.34.34...v0.34.35) (2023-12-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+
+### Features
+
+* **query-orchestrator:** Reduce number of touches for pre-aggregations ([#7515](https://github.com/cube-js/cube/issues/7515)) ([c22eb91](https://github.com/cube-js/cube/commit/c22eb9183c6c7c02e137662ee935f418ef45f02a))
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Queue - clear timer on streaming ([#7501](https://github.com/cube-js/cube/issues/7501)) ([ac2357d](https://github.com/cube-js/cube/commit/ac2357dd52f3316dc33158795388067097c32ece))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.27](https://github.com/cube-js/cube/compare/v0.34.26...v0.34.27) (2023-11-30)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.26](https://github.com/cube-js/cube/compare/v0.34.25...v0.34.26) (2023-11-28)
+
+
+### Bug Fixes
+
+* **query-orchestartor:** Queue - fix possible memory leak with timer ([#7466](https://github.com/cube-js/cube/issues/7466)) ([535a676](https://github.com/cube-js/cube/commit/535a6765346e08c5848d293c481d9abfa417ca78))
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition with hearbeat/cancellation on error ([#7467](https://github.com/cube-js/cube/issues/7467)) ([9c0ad07](https://github.com/cube-js/cube/commit/9c0ad0746d54543e264789dd36fa0ce2b91b7626))
+
+
+
+
+
+## [0.34.25](https://github.com/cube-js/cube/compare/v0.34.24...v0.34.25) (2023-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.24](https://github.com/cube-js/cube/compare/v0.34.23...v0.34.24) (2023-11-23)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition on removing orphaned queries ([#7426](https://github.com/cube-js/cube/issues/7426)) ([7142e9c](https://github.com/cube-js/cube/commit/7142e9cf146379182cc57e68d4456bd0f00137a5))
+
+
+
+
+
+## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.18](https://github.com/cube-js/cube/compare/v0.34.17...v0.34.18) (2023-11-10)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 

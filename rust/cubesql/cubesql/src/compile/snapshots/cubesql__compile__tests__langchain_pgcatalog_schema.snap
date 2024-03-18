@@ -8,4 +8,5 @@ expression: "execute_query(\"\n                SELECT pg_catalog.pg_class.relnam
 | KibanaSampleDataEcommerce |
 | Logs                      |
 | NumberCube                |
+| WideCube                  |
 +---------------------------+

@@ -2,9 +2,10 @@ use crate::{CubeError, RWLockAsync};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU32, Ordering},
+        atomic::{AtomicU32, AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
 
 use super::{
@@ -17,6 +18,7 @@ pub struct SessionManager {
     // Sessions
     last_id: AtomicU32,
     sessions: RWLockAsync<HashMap<u32, Arc<Session>>>,
+    pub temp_table_size: AtomicUsize,
     // Backref
     pub server: Arc<ServerManager>,
 }
@@ -28,6 +30,7 @@ impl SessionManager {
         Self {
             last_id: AtomicU32::new(1),
             sessions: RWLockAsync::new(HashMap::new()),
+            temp_table_size: AtomicUsize::new(0),
             server,
         }
     }
@@ -49,6 +52,8 @@ impl SessionManager {
                 client_port,
                 protocol,
                 None,
+                Duration::from_secs(self.server.config_obj.auth_expire_secs()),
+                Arc::downgrade(self),
             )),
         };
 
@@ -88,6 +93,11 @@ impl SessionManager {
     pub async fn drop_session(&self, connection_id: u32) {
         let mut guard = self.sessions.write().await;
 
-        guard.remove(&connection_id);
+        if let Some(connection) = guard.remove(&connection_id) {
+            self.temp_table_size.fetch_sub(
+                connection.state.temp_tables().physical_size(),
+                Ordering::SeqCst,
+            );
+        }
     }
 }

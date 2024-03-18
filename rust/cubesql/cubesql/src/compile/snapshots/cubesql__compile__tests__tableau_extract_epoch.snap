@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT EXTRACT(EPOCH FROM (TIMESTAMP '2050-01-01T23:01:01.22')) as t\".to_string(),\n            DatabaseProtocol::MySQL).await?"
+---
++---------------+
+| t             |
++---------------+
+| 2524690861.22 |
++---------------+

@@ -152,7 +152,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
-    .default('schema')
+    .default('model')
     .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
@@ -575,11 +575,40 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   /**
+   * Max number of elements
+   */
+  touchPreAggregationCacheMaxCount: (): number => get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_COUNT')
+    .default(8192)
+    .asInt(),
+
+  /**
+   * Max cache
+   */
+  touchPreAggregationCacheMaxAge: (): number => {
+    // eslint-disable-next-line no-use-before-define
+    const touchPreAggregationTimeout = getEnv('touchPreAggregationTimeout');
+
+    const maxAge = get('CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE')
+      .default(Math.round(touchPreAggregationTimeout / 2))
+      .asIntPositive();
+
+    if (maxAge > touchPreAggregationTimeout) {
+      throw new InvalidConfiguration(
+        'CUBEJS_TOUCH_PRE_AGG_CACHE_MAX_AGE',
+        maxAge,
+        `Must be less or equal then CUBEJS_TOUCH_PRE_AGG_TIMEOUT (${touchPreAggregationTimeout}).`
+      );
+    }
+
+    return maxAge;
+  },
+
+  /**
    * Expire time for touch records
    */
   touchPreAggregationTimeout: (): number => get('CUBEJS_TOUCH_PRE_AGG_TIMEOUT')
     .default(60 * 60 * 24)
-    .asInt(),
+    .asIntPositive(),
 
   /**
    * Expire time for touch records
@@ -595,7 +624,7 @@ const variables: Record<string, (...args: any) => any> = {
    * This will eventually default to true.
    */
   fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************
@@ -1203,6 +1232,23 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /** ****************************************************************
+   * Materialize Driver                                              *
+   ***************************************************************** */
+
+  /**
+   * Materialize cluster.
+   */
+  materializeCluster: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_MATERIALIZE_CLUSTER', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
    * Snowflake Driver                                                *
    ***************************************************************** */
 
@@ -1379,6 +1425,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
   
+  duckdbDatabasePath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_DATABASE_PATH', dataSource)
+    ]
+  ),
+
   duckdbS3Region: ({
     dataSource
   }: {
@@ -1439,6 +1495,36 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  duckdbS3UseSsl: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_SSL', dataSource)
+    ]
+  ),
+
+  duckdbS3UrlStyle: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_URL_STYLE', dataSource)
+    ]
+  ),
+
+  duckdbS3SessionToken: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
+    ]
+  ),
+  
   /**
    * Presto catalog.
    */
@@ -1465,7 +1551,7 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
   cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
-    .default('10')
+    .default('20')
     .asInt(),
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
@@ -1485,7 +1571,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('5000')
     .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default('false')
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
     .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')

@@ -8,4 +8,5 @@ expression: "execute_query(\"SELECT * FROM (SELECT CAST(current_database() AS VA
 | cubedb    | public      | KibanaSampleDataEcommerce | TABLE      | NULL    |          |            |           |                           |                |
 | cubedb    | public      | Logs                      | TABLE      | NULL    |          |            |           |                           |                |
 | cubedb    | public      | NumberCube                | TABLE      | NULL    |          |            |           |                           |                |
+| cubedb    | public      | WideCube                  | TABLE      | NULL    |          |            |           |                           |                |
 +-----------+-------------+---------------------------+------------+---------+----------+------------+-----------+---------------------------+----------------+

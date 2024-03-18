@@ -8,4 +8,5 @@ expression: "execute_query(\"\n                SELECT table_name FROM (\n       
 | KibanaSampleDataEcommerce |
 | Logs                      |
 | NumberCube                |
+| WideCube                  |
 +---------------------------+

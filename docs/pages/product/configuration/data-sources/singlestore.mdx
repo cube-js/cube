@@ -1,0 +1,101 @@
+# SingleStore
+
+[SingleStore][link-singlestore] is a distributed SQL database that offers
+high-throughput transactions (inserts and upserts) and low-latency analytics.
+
+<SuccessBox>
+
+SingleStore support is available in Cube Cloud on
+[Enterprise Premier](https://cube.dev/pricing) tier. [Contact
+us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+## Setup
+
+When creating a new deployment in Cube Cloud, at the <Btn>Set up a database
+connection</Btn> step, choose <Btn>SingleStore</Btn>.
+
+<Screenshot src="https://ucarecdn.com/fd7e2d2d-26f1-4c7a-8b0f-1d82bf78c83b/"/>
+
+Then, provide credetials: host name, database name, user name (`admin` by
+default), and password.
+
+### Host name
+
+To obtain the host name, navigate to the necessary group and workspace
+in the side bar, then click <Btn>Connect</Btn> and choose <Btn>CLI client</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/240d483f-9887-4b59-87bf-1673bc46d0dd/"
+  highlight="inset(20% 42.5% 52.5% 20% round 10px)"
+/>
+
+On the <Btn>Connect to Workspace</Btn> page, you can find the host name
+(`svc-<UUID>-dml.<REGION>.svc.singlestore.com`):
+
+<Screenshot
+  src="https://ucarecdn.com/e15ff010-15fe-43db-8e4a-f3e55f203b81/"
+  highlight="inset(45% 1% 27.5% 35% round 10px)"
+/>
+
+### Database name
+
+To obtain the database name, navigate to the necessary group and workspace
+in the side bar. You'll see databases on the right:
+
+<Screenshot
+  src="https://ucarecdn.com/240d483f-9887-4b59-87bf-1673bc46d0dd/"
+  highlight="inset(20% 1% 55% 72% round 10px)"
+/>
+
+### Password
+
+You have set the password when creating the workspace. If you'd like to reset
+the password, navigate to the <Btn>Access</Btn> tab within your workspace.
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using SingleStore as a source
+database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ✅             |     ✅      |
+| Batching      |             -              |      -      |
+| Export Bucket |             -              |      -      |
+
+By default, SingleStore uses a [simple][self-preaggs-simple] strategy
+to build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for SingleStore.
+
+### Batching
+
+SingleStore does not support batching.
+
+### Export Bucket
+
+SingleStore does not support export buckets.
+
+[link-singlestore]: https://www.singlestore.com
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[self-preaggs-simple]: #simple

@@ -35,7 +35,7 @@ async function loadPythonCtxFromUtils(fileName: string) {
 function testTemplateBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
     const { jinjaEngine } = await init();
-    const actual = jinjaEngine.renderTemplate(templateName, ctx, null);
+    const actual = await jinjaEngine.renderTemplate(templateName, ctx, null);
 
     expect(actual).toMatchSnapshot(templateName);
   });
@@ -44,12 +44,29 @@ function testTemplateBySnapshot(init: InitJinjaFn, templateName: string, ctx: un
 function testTemplateWithPythonCtxBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
   test(`render ${templateName}`, async () => {
     const { jinjaEngine, pyCtx } = await init();
-    const actual = jinjaEngine.renderTemplate(templateName, ctx, {
+    const actual = await jinjaEngine.renderTemplate(templateName, ctx, {
       ...pyCtx.variables,
       ...pyCtx.functions,
     });
 
     expect(actual).toMatchSnapshot(templateName);
+  });
+}
+
+function testTemplateErrorWithPythonCtxBySnapshot(init: InitJinjaFn, templateName: string, ctx: unknown) {
+  test(`render ${templateName}`, async () => {
+    const { jinjaEngine, pyCtx } = await init();
+
+    try {
+      await jinjaEngine.renderTemplate(templateName, ctx, {
+        ...pyCtx.variables,
+        ...pyCtx.functions,
+      });
+
+      throw new Error(`Template ${templateName} should throw an error!`);
+    } catch (e) {
+      expect(e).toMatchSnapshot(templateName);
+    }
   });
 }
 
@@ -85,6 +102,7 @@ suite('Python model', () => {
       new_safe_string: expect.any(Object),
       new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
+      throw_exception: expect.any(Object),
     });
 
     expect(pythonModule.variables).toEqual({
@@ -118,6 +136,7 @@ darwinSuite('Scope Python model', () => {
       new_safe_string: expect.any(Object),
       new_object_from_dict: expect.any(Object),
       load_class_model: expect.any(Object),
+      throw_exception: expect.any(Object),
     });
   });
 });
@@ -138,7 +157,8 @@ suite('Jinja (new api)', () => {
       pyCtx = await loadPythonCtxFromUtils('jinja-instance.py');
       jinjaEngine = nativeInstance.newJinjaEngine({
         debugInfo: true,
-        filters: pyCtx.filters
+        filters: pyCtx.filters,
+        workers: 1,
       });
 
       return {
@@ -159,6 +179,7 @@ suite('Jinja (new api)', () => {
     loadTemplateFile(jinjaEngine, 'python.yml');
     loadTemplateFile(jinjaEngine, 'variables.yml.jinja');
     loadTemplateFile(jinjaEngine, 'filters.yml.jinja');
+    loadTemplateFile(jinjaEngine, 'template_error_python.jinja');
 
     for (let i = 1; i < 9; i++) {
       loadTemplateFile(jinjaEngine, `0${i}.yml.jinja`);
@@ -187,8 +208,9 @@ suite('Jinja (new api)', () => {
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'python.yml', {});
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'variables.yml.jinja', {});
   testTemplateWithPythonCtxBySnapshot(initJinjaEngine, 'filters.yml.jinja', {});
+  testTemplateErrorWithPythonCtxBySnapshot(initJinjaEngine, 'template_error_python.jinja', {});
 
-  testLoadBrokenTemplateBySnapshot(initJinjaEngine, 'template_error.jinja');
+  testLoadBrokenTemplateBySnapshot(initJinjaEngine, 'template_error_syntax.jinja');
 
   for (let i = 1; i < 9; i++) {
     testTemplateBySnapshot(initJinjaEngine, `0${i}.yml.jinja`, {});

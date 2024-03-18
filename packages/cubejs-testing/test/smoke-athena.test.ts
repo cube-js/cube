@@ -1,16 +1,19 @@
-import fetch from 'node-fetch';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, jest, expect } from '@jest/globals';
+import { afterAll, beforeAll, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_API_TOKEN, DEFAULT_CONFIG, testQueryMeasure } from './smoke-tests';
-
-const delay = (t: number) => new Promise(resolve => setTimeout(() => resolve(null), t));
+import {
+  DEFAULT_API_TOKEN,
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+  testQueryMeasure,
+} from './smoke-tests';
 
 describe('athena', () => {
   jest.setTimeout(60 * 5 * 1000);
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     birdbox = await getBirdbox(
@@ -28,11 +31,11 @@ describe('athena', () => {
     client = cubejs(async () => DEFAULT_API_TOKEN, {
       apiUrl: birdbox.configuration.apiUrl,
     });
-  });
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
     await birdbox.stop();
-  });
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   test('query measure', () => testQueryMeasure(client));
 });

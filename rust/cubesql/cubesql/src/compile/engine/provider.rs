@@ -14,7 +14,10 @@ use datafusion::{
 
 use crate::{
     compile::MetaContext,
-    sql::{session::DatabaseProtocol, ColumnType, SessionManager, SessionState},
+    sql::{
+        session::DatabaseProtocol, temp_tables::TempTableProvider, ColumnType, SessionManager,
+        SessionState,
+    },
     transport::V1CubeMetaExt,
     CubeError,
 };
@@ -37,6 +40,7 @@ use super::information_schema::postgres::{
     constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
     key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
     referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
+    schemata::InfoSchemaSchemataProvider as PostgresSchemaSchemataProvider,
     table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
     tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
     views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
@@ -46,11 +50,13 @@ use super::information_schema::postgres::{
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
     PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
-    PgCatalogIndexProvider, PgCatalogMatviewsProvider, PgCatalogNamespaceProvider,
-    PgCatalogProcProvider, PgCatalogRangeProvider, PgCatalogRolesProvider,
-    PgCatalogSequenceProvider, PgCatalogSettingsProvider, PgCatalogStatActivityProvider,
+    PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
+    PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
+    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
     PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
-    PgCatalogTypeProvider, PgCatalogUserProvider, PgPreparedStatementsProvider,
+    PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
+    PgPreparedStatementsProvider,
 };
 
 use super::information_schema::redshift::{
@@ -270,7 +276,9 @@ impl DatabaseProtocol {
         table_provider: Arc<dyn datasource::TableProvider>,
     ) -> Result<String, CubeError> {
         let any = table_provider.as_any();
-        Ok(if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
+        Ok(if let Some(t) = any.downcast_ref::<TempTableProvider>() {
+            t.name().to_string()
+        } else if let Some(t) = any.downcast_ref::<CubeTableProvider>() {
             t.table_name().to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaColumnsProvider>() {
             "information_schema.columns".to_string()
@@ -288,6 +296,8 @@ impl DatabaseProtocol {
             "information_schema.role_table_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaRoleColumnGrantsProvider>() {
             "information_schema.role_column_grants".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresSchemaSchemataProvider>() {
+            "information_schema.schemata".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -338,6 +348,14 @@ impl DatabaseProtocol {
             "pg_catalog.pg_user".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogExtensionProvider>() {
             "pg_catalog.pg_extension".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogPartitionedTableProvider>() {
+            "pg_catalog.pg_partitioned_table".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogInheritsProvider>() {
+            "pg_catalog.pg_inherits".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogViewsProvider>() {
+            "pg_catalog.pg_views".to_string()
+        } else if let Some(_) = any.downcast_ref::<PgCatalogStatUserTablesProvider>() {
+            "pg_catalog.pg_stat_user_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
@@ -389,23 +407,28 @@ impl DatabaseProtocol {
                 table.to_ascii_lowercase(),
             ),
             datafusion::catalog::TableReference::Bare { table } => {
-                if table.starts_with("pg_") {
-                    (
-                        context.session_state.database().unwrap_or("db".to_string()),
-                        "pg_catalog".to_string(),
-                        table.to_ascii_lowercase(),
-                    )
+                let table_lower = table.to_ascii_lowercase();
+                let schema = if context.session_state.temp_tables().has(&table_lower) {
+                    "pg_temp_3"
+                } else if table.starts_with("pg_") {
+                    "pg_catalog"
                 } else {
-                    (
-                        context.session_state.database().unwrap_or("db".to_string()),
-                        "public".to_string(),
-                        table.to_ascii_lowercase(),
-                    )
-                }
+                    "public"
+                };
+                (
+                    context.session_state.database().unwrap_or("db".to_string()),
+                    schema.to_string(),
+                    table_lower,
+                )
             }
         };
 
         match schema.as_str() {
+            "pg_temp_3" => {
+                if let Some(temp_table) = context.session_state.temp_tables().get(&table) {
+                    return Some(Arc::new(TempTableProvider::new(table, temp_table)));
+                }
+            }
             "public" => {
                 if let Some(cube) = context
                     .meta
@@ -489,6 +512,11 @@ impl DatabaseProtocol {
                     return Some(Arc::new(PostgresSchemaConstraintColumnUsageProvider::new()))
                 }
                 "views" => return Some(Arc::new(PostgresSchemaViewsProvider::new())),
+                "schemata" => {
+                    return Some(Arc::new(PostgresSchemaSchemataProvider::new(
+                        &context.session_state.database().unwrap_or("db".to_string()),
+                    )))
+                }
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
@@ -568,6 +596,16 @@ impl DatabaseProtocol {
                     )))
                 }
                 "pg_extension" => return Some(Arc::new(PgCatalogExtensionProvider::new())),
+                "pg_partitioned_table" => {
+                    return Some(Arc::new(PgCatalogPartitionedTableProvider::new()))
+                }
+                "pg_inherits" => return Some(Arc::new(PgCatalogInheritsProvider::new())),
+                "pg_views" => return Some(Arc::new(PgCatalogViewsProvider::new())),
+                "pg_stat_user_tables" => {
+                    return Some(Arc::new(PgCatalogStatUserTablesProvider::new(
+                        &context.meta.tables,
+                    )))
+                }
                 _ => return None,
             },
             _ => return None,

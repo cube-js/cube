@@ -1,4 +1,5 @@
-import mysql from 'mysql2/promise';
+import { Client } from 'pg';
+import { isCI } from '@cubejs-backend/shared';
 
 import * as native from '../js';
 import metaFixture from './meta';
@@ -7,7 +8,7 @@ import { FakeRowStream } from './response-fake';
 const logger = jest.fn(({ event }) => {
   if (!event.error.includes('load - strange response, success which contains error')) {
     expect(event.apiType).toEqual('sql');
-    expect(event.protocol).toEqual('mysql');
+    expect(event.protocol).toEqual('postgres');
   }
   console.log(event);
 });
@@ -31,11 +32,12 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client'
       };
     });
 
@@ -56,11 +58,12 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' }
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client'
       };
     });
 
@@ -73,7 +76,7 @@ describe('SQLInterface', () => {
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client'
       };
     });
 
@@ -98,6 +101,7 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
+        securityContext: { foo: 'bar' },
       });
 
       return metaFixture;
@@ -125,6 +129,7 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_allowed_user',
           superuser: false,
+          securityContext: { foo: 'bar' },
         };
       }
 
@@ -132,21 +137,28 @@ describe('SQLInterface', () => {
         return {
           password: 'password_for_admin',
           superuser: true,
+          securityContext: { foo: 'admin' },
         };
       }
 
       throw new Error('Please specify user');
     });
 
+    const logLoadEvent = ({ event, properties }: { event: string, properties: any }) => {
+      console.log(`Load event: ${JSON.stringify({ type: event, ...properties })}`);
+    };
+
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       port: 4545,
+      pgPort: 5555,
       checkAuth,
       load,
       sqlApiLoad,
       sql,
       meta,
       stream,
+      logLoadEvent,
       sqlGenerators,
       canSwitchUserForSession: (_payload) => true,
     });
@@ -154,17 +166,21 @@ describe('SQLInterface', () => {
 
     try {
       const testConnectionFailed = async (/** input */ { user, password }: { user?: string, password?: string }) => {
+        const client = new Client({
+          host: '127.0.0.1',
+          database: 'test',
+          port: 5555,
+          ssl: false,
+          user,
+          password,
+        });
+
         try {
-          await mysql.createConnection({
-            host: '127.0.0.1',
-            port: 4545,
-            user,
-            password,
-          });
+          await client.connect();
 
           throw new Error('must throw error');
         } catch (e: any) {
-          expect(e.message).toContain('Incorrect user name or password');
+          expect(e.message).toContain('password authentication failed for user');
         }
 
         console.log(checkAuth.mock.calls);
@@ -175,11 +191,12 @@ describe('SQLInterface', () => {
             meta: null,
           },
           user: user || null,
+          password: password || (isCI() && process.platform === 'win32' ? 'root' : ''),
         });
       };
 
       await testConnectionFailed({
-        user: undefined,
+        user: 'random user',
         password: undefined
       });
       checkAuth.mockClear();
@@ -196,25 +213,29 @@ describe('SQLInterface', () => {
       });
       checkAuth.mockClear();
 
-      const connection = await mysql.createConnection({
+      const connection = new Client({
         host: '127.0.0.1',
-        port: 4545,
+        database: 'test',
+        port: 5555,
         user: 'allowed_user',
-        password: 'password_for_allowed_user'
+        password: 'password_for_allowed_user',
       });
+      await connection.connect();
 
       {
-        const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
+        const result = await connection.query(
+          'SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name DESC'
+        );
         console.log(result);
 
-        expect(result).toEqual([
+        expect(result.rows).toEqual([
           {
-            Tables_in_db: 'KibanaSampleDataEcommerce',
-            Table_type: 'BASE TABLE',
+            table_name: 'Logs',
+            table_type: 'BASE TABLE',
           },
           {
-            Tables_in_db: 'Logs',
-            Table_type: 'BASE TABLE',
+            table_name: 'KibanaSampleDataEcommerce',
+            table_type: 'BASE TABLE',
           },
         ]);
       }
@@ -226,9 +247,9 @@ describe('SQLInterface', () => {
           meta: null,
         },
         user: 'allowed_user',
+        password: 'password_for_allowed_user',
       });
 
-      expect(meta.mock.calls.length).toEqual(1);
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
@@ -237,7 +258,9 @@ describe('SQLInterface', () => {
         session: {
           user: 'allowed_user',
           superuser: false,
-        }
+          securityContext: { foo: 'bar' },
+        },
+        onlyCompilerId: true
       });
 
       try {
@@ -246,28 +269,25 @@ describe('SQLInterface', () => {
 
         throw new Error('Error was not passed from transport to the client');
       } catch (e: any) {
-        expect(e.sqlState).toEqual('HY000');
-        expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
+        expect(e.code).toEqual('XX000');
+        expect(e.message).toContain('This error should be passed back to PostgreSQL client');
       }
 
       if (process.env.CUBESQL_STREAM_MODE === 'true') {
-        const [result, _columns] = (await connection.query({
-          sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
-          rowsAsArray: false,
-        })) as any;
-        expect(result.length).toEqual(50001);
-        expect(result[0].id).toEqual(0);
-        expect(result[50000].id).toEqual(50000);
+        const result = await connection.query('select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001');
+        expect(result.rows.length).toEqual(50001);
+        expect(result.rows[0].id).toEqual(0);
+        expect(result.rows[50000].id).toEqual(50000);
       }
 
       {
-        const [result] = await connection.query('select CAST(\'2020-12-25 22:48:48.000\' AS timestamp)');
+        const result = await connection.query('SELECT CAST(\'2020-12-25 22:48:48.000\' AS timestamp) as column1');
         console.log(result);
 
-        expect(result).toEqual([{ 'TimestampNanosecond(1608936528000000000, None)': '2020-12-25T22:48:48.000' }]);
+        expect(result.rows).toEqual([{ column1: new Date('2020-12-25T22:48:48.000Z') }]);
       }
 
-      connection.destroy();
+      await connection.end();
     } finally {
       await native.shutdownInterface(instance);
     }

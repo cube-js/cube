@@ -175,7 +175,9 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins WHERE \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')}
+      select * from visitor_checkins WHERE 
+      \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
+      \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
       \`,
       
       rewriteQueries: true,
@@ -205,6 +207,13 @@ describe('SQL Generation', () => {
         },
         google_sourced_checkins: {
           type: 'count',
+          sql: 'id',
+          filters: [{
+            sql: \`\${visitors}.source = 'google'\`
+          }]
+        },
+        unique_google_sourced_checkins: {
+          type: 'countDistinct',
           sql: 'id',
           filters: [{
             sql: \`\${visitors}.source = 'google'\`
@@ -456,6 +465,7 @@ describe('SQL Generation', () => {
   });
 
   async function runQueryTest(q, expectedResult) {
+    await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
     console.log(query.buildSqlAndParams());
@@ -1432,6 +1442,54 @@ describe('SQL Generation', () => {
     }],
   }, [{ reference_visitors__google_sourced_count: '1' }]));
 
+  it('ungrouped filtered count', () => runQueryTest({
+    measures: [
+      'visitor_checkins.google_sourced_checkins',
+    ],
+    timezone: 'America/Los_Angeles',
+    order: [{
+      id: 'visitor_checkins.created_at',
+    }],
+    timeDimensions: [{
+      dimension: 'visitor_checkins.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-03-30'],
+    }],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [
+    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__google_sourced_checkins: 1 },
+  ]));
+
+  it('ungrouped filtered distinct count', () => runQueryTest({
+    measures: [
+      'visitor_checkins.unique_google_sourced_checkins',
+    ],
+    timezone: 'America/Los_Angeles',
+    order: [{
+      id: 'visitor_checkins.created_at',
+    }],
+    timeDimensions: [{
+      dimension: 'visitor_checkins.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-03-30'],
+    }],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [
+    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 6 },
+  ]));
+
   it('builds geo dimension', () => runQueryTest({
     dimensions: [
       'visitors.location'
@@ -1834,6 +1892,158 @@ describe('SQL Generation', () => {
       order: []
     }, [
       { visitors__visitor_count: '6' }
+    ])
+  );
+
+  it(
+    'filter group',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          member: 'visitor_checkins.created_at',
+          operator: 'inDateRange',
+          values: ['2017-01-01', '2017-01-10']
+        }, {
+          member: 'visitor_checkins.source',
+          operator: 'equals',
+          values: ['google_123_123']
+        }]
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group sub filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        and: [{
+          or: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google_123_123']
+          }]
+        }, {
+          member: 'visitor_checkins.visitor_id',
+          operator: 'gte',
+          values: ['1']
+        }]
+      }, {
+        member: 'visitor_checkins.visitor_id',
+        operator: 'lte',
+        values: ['100']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group simple filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        member: 'visitor_checkins.created_at',
+        operator: 'inDateRange',
+        values: ['2017-01-01', '2017-01-10']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '4' }
+    ])
+  );
+
+  it(
+    'filter group double tree',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google']
+          }]
+        }, {
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-05', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: [null]
+          }]
+        }]
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '1' }
+    ])
+  );
+
+  it(
+    'filter group double tree and non matching filter',
+    () => runQueryTest({
+      measures: ['visitor_checkins.visitor_checkins_count'],
+      dimensions: [],
+      timeDimensions: [],
+      timezone: 'America/Los_Angeles',
+      filters: [{
+        or: [{
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-01', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: ['google']
+          }]
+        }, {
+          and: [{
+            member: 'visitor_checkins.created_at',
+            operator: 'inDateRange',
+            values: ['2017-01-05', '2017-01-10']
+          }, {
+            member: 'visitor_checkins.source',
+            operator: 'equals',
+            values: [null]
+          }]
+        }]
+      }, {
+        member: 'visitor_checkins.visitor_id',
+        operator: 'equals',
+        values: ['1']
+      }],
+      order: []
+    }, [
+      { visitor_checkins__visitor_checkins_count: '1' }
     ])
   );
 

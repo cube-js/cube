@@ -1,0 +1,67 @@
+---
+redirect_from:
+  - /config/downstream/hex
+---
+
+# Hex
+
+You can connect to Cube from Hex, a collaborative data platform, using the [Cube
+SQL API][ref-sql-api].
+
+Here's a short video guide on how to connect Hex to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/8a35dfd4713947ddbfd4b7e0aa6142a1" />
+
+## Enable Cube SQL API
+
+### Cube Cloud
+
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
+
+<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Hex later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+
+## Connecting from Hex
+
+Hex connects to Cube as to a Postgres database.
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+You can write SQL in Hex that will be executed in Cube. Learn more about Cube
+SQL syntax on the [reference page][ref-sql-api].
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/93e1aa12-b418-47a1-9567-c29384c25275/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+You can also create a visualization of the executed SQL query.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    src="https://ucarecdn.com/f59e28d5-bc94-4052-85e1-4cf115e7fd19/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-getting-started]: /product/getting-started/cloud
+[ref-sql-api]: /product/apis-integrations/sql-api

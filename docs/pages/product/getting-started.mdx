@@ -1,0 +1,85 @@
+---
+redirect_from:
+  - /getting-started
+---
+
+# Getting started with Cube
+
+Cube is a cloud-native application, designed to run in a cloud. You can get
+started with Cube in one of two ways:
+- Run Cube in Cube Cloud and use its managed infrastructure and workspace tools.
+- Deploy Cube to your own infrastructure with Docker.
+
+## Getting started with Cube Cloud
+
+**We recommend using [Cube Cloud][cube-cloud], our managed platform for Cube.**
+It's the easiest way to build, test, deploy, and manage Cube projects and
+it comes with a free tier for development and proof-of-concept projects.
+
+Cube Cloud provides [managed infrastructure][ref-infrastructure] and
+[workspace tools][ref-workspace], including features such as collaboration
+for teams, a web-based data model editor, synchronization with BI tools,
+auto-scaling, and observability.
+
+Please get started with the following guides, tailored for Snowflake and
+Databricks users. You may find them insightful even if you
+have one of many other supported [data sources][ref-data-sources].
+
+<Grid cols={2} imageSize={[undefined, 50]}>
+  <GridItem
+    url="getting-started/cloud"
+    imageUrl="https://static.cube.dev/icons/cube.svg"
+    title="Cube Cloud and Snowflake"
+  />
+  <GridItem
+    url="getting-started/databricks"
+    imageUrl="https://static.cube.dev/icons/cube.svg"
+    title="Cube Cloud and Databricks"
+  />
+</Grid>
+
+Alternatively, you can explore Cube Cloud on your own or learn by example
+in a demo deployment:
+
+<Grid cols={3} imageSize={[undefined, 50]}>
+  <GridItem
+    url="deployment/cloud/deployments#creating-a-new-deployment"
+    imageUrl="https://static.cube.dev/icons/cube.svg"
+    title="Create a new deployment"
+  />
+  <GridItem
+    url="deployment/cloud/deployments#demo-deployments"
+    imageUrl="https://static.cube.dev/icons/cube.svg"
+    title="Create a demo deployment"
+  />
+</Grid>
+
+## Getting started with Cube Core
+
+Cube Core is packaged and distributed as Docker images that can be run in
+a containerized environment. You can run Cube Core on your own
+infrastructure with Docker.
+
+<Grid cols={2} imageSize={[undefined, 50]}>
+  <GridItem
+    url="getting-started/core"
+    imageUrl="https://static.cube.dev/icons/docker.svg"
+    title="Cube Core"
+  />
+</Grid>
+
+## Migrating from Cube Core to Cube Cloud
+
+Cube Cloud supports several ways for importing existing Cube projects:
+
+- [Import a GitHub repository](/product/getting-started/migrate-from-core/import-github-repository)
+- [Import a GitLab repository](/product/getting-started/migrate-from-core/import-gitlab-repository-via-ssh)
+- [Import a Bitbucket repository](/product/getting-started/migrate-from-core/import-bitbucket-repository-via-ssh)
+- [Import a Git repository](/product/getting-started/migrate-from-core/import-git-repository-via-ssh)
+- [Import a local project with CLI](/product/getting-started/migrate-from-core/upload-with-cli)
+
+[cube-repo]: https://github.com/cube-js/cube
+[cube-cloud]: https://cube.dev/cloud/
+[ref-infrastructure]: /product/deployment/cloud
+[ref-workspace]: /product/workspace
+[ref-data-sources]: /product/configuration/data-sources

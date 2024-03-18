@@ -256,31 +256,6 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     });
   }
 
-  public async streamQuery(sql: string, values: string[]): Promise<QueryStream> {
-    const conn = await this.pool.connect();
-    try {
-      await this.prepareConnection(conn);
-      const query: QueryStream = new QueryStream(sql, values, {
-        types: { getTypeParser: this.getTypeParser },
-        highWaterMark: getEnv('dbQueryStreamHighWaterMark'),
-      });
-      const rowsStream: QueryStream = await conn.query(query);
-      const cleanup = (err?: Error) => {
-        if (!rowsStream.destroyed) {
-          conn.release();
-          rowsStream.destroy(err);
-        }
-      };
-      rowsStream.once('end', cleanup);
-      rowsStream.once('error', cleanup);
-      rowsStream.once('close', cleanup);
-      return rowsStream;
-    } catch (e) {
-      await conn.release();
-      throw e;
-    }
-  }
-
   public async stream(
     query: string,
     values: unknown[],

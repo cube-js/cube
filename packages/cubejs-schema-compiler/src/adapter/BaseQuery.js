@@ -16,7 +16,6 @@ import {
   MAX_SOURCE_ROW_LIMIT,
   inDbTimeZone,
   QueryAlias,
-  getEnv,
 } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
@@ -54,16 +53,14 @@ const SecondsDurations = {
 /**
  * Set of the schema compilers.
  * @typedef {Object} Compilers
- * @property {DataSchemaCompiler} compiler
- * @property {CubeToMetaTransformer} metaTransformer
- * @property {CubeEvaluator} cubeEvaluator
- * @property {ContextEvaluator} contextEvaluator
- * @property {JoinGraph} joinGraph
- * @property {CompilerCache} compilerCache
+ * @property {import('../compiler/DataSchemaCompiler').DataSchemaCompiler} compiler
+ * @property {import('../compiler/CubeToMetaTransformer').CubeToMetaTransformer} metaTransformer
+ * @property {import('../compiler/CubeEvaluator').CubeEvaluator} cubeEvaluator
+ * @property {import('../compiler/ContextEvaluator').ContextEvaluator} contextEvaluator
+ * @property {import('../compiler/JoinGraph').JoinGraph} joinGraph
+ * @property {import('../compiler/CompilerCache').CompilerCache} compilerCache
  * @property {*} headCommitId
  */
-
-export
 
 /**
  * BaseQuery class. BaseQuery object encapsulates the logic of
@@ -78,7 +75,7 @@ export
  * should return query object based on the datasource, database type
  * and {@code CompilerApi} configuration.
  */
-class BaseQuery {
+export class BaseQuery {
   /**
    * BaseQuery class constructor.
    * @param {Compilers|*} compilers
@@ -86,13 +83,16 @@ class BaseQuery {
    */
   constructor(compilers, options) {
     this.compilers = compilers;
+    /** @type {import('../compiler/CubeEvaluator').CubeEvaluator} */
     this.cubeEvaluator = compilers.cubeEvaluator;
+    /** @type {import('../compiler/JoinGraph').JoinGraph} */
     this.joinGraph = compilers.joinGraph;
     this.options = options || {};
 
     this.orderHashToString = this.orderHashToString.bind(this);
     this.defaultOrder = this.defaultOrder.bind(this);
-
+    /** @type {ParamAllocator} */
+    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.initFromOptions();
   }
 
@@ -136,7 +136,7 @@ class BaseQuery {
           return {
             values: this.extractFiltersAsTree(f[operator]),
             operator,
-            dimension: dimension[0],
+            dimensionGroup: true,
             measure: null,
           };
         }
@@ -145,15 +145,13 @@ class BaseQuery {
             values: this.extractFiltersAsTree(f[operator]),
             operator,
             dimension: null,
-            measure: measure[0],
+            measureGroup: true,
           };
         }
         if (!dimension.length && !measure.length) {
           return {
             values: [],
             operator,
-            dimension: null,
-            measure: null,
           };
         }
         throw new UserError(`You cannot use dimension and measure in same condition: ${JSON.stringify(f)}`);
@@ -177,16 +175,14 @@ class BaseQuery {
     });
   }
 
+  /**
+   * @protected
+   */
   initFromOptions() {
     this.contextSymbols = {
       securityContext: {},
       ...this.options.contextSymbols,
     };
-    /**
-     * @protected
-     * @type {ParamAllocator}
-     */
-    this.paramAllocator = this.options.paramAllocator || this.newParamAllocator(this.options.expressionParams);
     this.compilerCache = this.compilers.compiler.compilerCache;
     this.queryCache = this.compilerCache.getQueryCache({
       measures: this.options.measures,
@@ -204,6 +200,7 @@ class BaseQuery {
       className: this.constructor.name,
       externalClassName: this.options.externalQueryClass && this.options.externalQueryClass.name,
       preAggregationQuery: this.options.preAggregationQuery,
+      disableExternalPreAggregations: this.options.disableExternalPreAggregations,
       useOriginalSqlPreAggregationsInPreAggregation: this.options.useOriginalSqlPreAggregationsInPreAggregation,
       cubeLatticeCache: this.options.cubeLatticeCache, // TODO too heavy for key
       historyQueries: this.options.historyQueries, // TODO too heavy for key
@@ -224,9 +221,9 @@ class BaseQuery {
 
     // measure_filter (the one extracted from filters parameter on measure and
     // used in drill downs) should go to WHERE instead of HAVING
-    this.filters = filters.filter(f => f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
-    this.measureFilters = filters.filter(f => f.measure && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
-
+    /** @type {(BaseFilter|BaseGroupFilter)[]} */
+    this.filters = filters.filter(f => f.dimensionGroup || f.dimension || f.operator === 'measure_filter' || f.operator === 'measureFilter').map(this.initFilter.bind(this));
+    this.measureFilters = filters.filter(f => (f.measureGroup || f.measure) && f.operator !== 'measure_filter' && f.operator !== 'measureFilter').map(this.initFilter.bind(this));
     this.timeDimensions = (this.options.timeDimensions || []).map(dimension => {
       if (!dimension.dimension) {
         const join = this.joinGraph.buildJoin(this.collectJoinHints(true));
@@ -415,20 +412,27 @@ class BaseQuery {
     return new BaseSegment(this, segmentPath);
   }
 
+  /**
+   * @returns {BaseGroupFilter|BaseFilter}
+   */
   initFilter(filter) {
     if (filter.operator === 'and' || filter.operator === 'or') {
       filter.values = filter.values.map(this.initFilter.bind(this));
       return this.newGroupFilter(filter);
     }
+
     return this.newFilter(filter);
   }
 
+  /**
+   * @returns {BaseFilter}
+   */
   newFilter(filter) {
     return new BaseFilter(this, filter);
   }
 
   newGroupFilter(filter) {
-    return new BaseGroupFilter(this, filter);
+    return new BaseGroupFilter(filter);
   }
 
   newTimeDimension(timeDimension) {
@@ -462,6 +466,9 @@ class BaseQuery {
     if (!this.options.preAggregationQuery && !this.ungrouped) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
+      if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
+        preAggForQuery = undefined;
+      }
     }
     if (preAggForQuery) {
       const {
@@ -532,7 +539,7 @@ class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -551,7 +558,7 @@ class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
@@ -1055,7 +1062,7 @@ class BaseQuery {
   }
 
   /**
-   * @param {string} timeDimension
+   * @param {import('./BaseDimension').BaseDimension|import('./BaseTimeDimension').BaseTimeDimension} timeDimension
    * @return {string}
    */
   timeStampParam(timeDimension) {
@@ -1189,10 +1196,12 @@ class BaseQuery {
     const sql = subQuery.evaluateSymbolSqlWithContext(() => subQuery.buildParamAnnotatedSql(), {
       collectOriginalSqlPreAggregations
     });
+    const onCondition = primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`);
+
     return {
       sql: `(${sql})`,
       alias: subQueryAlias,
-      on: primaryKeys.map((pk) => `${subQueryAlias}.${this.newDimension(this.primaryKeyName(cubeName, pk)).aliasName()} = ${this.primaryKeySql(pk, cubeName)}`)
+      on: onCondition.join(' AND ')
     };
   }
 
@@ -1648,13 +1657,16 @@ class BaseQuery {
     ).filter(s => !!s).join(', ');
   }
 
+  /**
+   * @returns {Array<BaseDimension|BaseMeasure>}
+   */
   forSelect() {
     return this.dimensionsForSelect().concat(this.measures);
   }
 
   /**
    * Returns a complete list of the dimensions, including time dimensions.
-   * @returns {Array<BaseDimension>}
+   * @returns {(BaseDimension|BaseTimeDimension)[]}
    */
   dimensionsForSelect() {
     return this.dimensions.concat(this.timeDimensions);
@@ -1995,7 +2007,8 @@ class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        return '1';
+        const sql = symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox' ? evaluateSql : this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
+        return evaluateSql === '*' ? '1' : sql;
       } else {
         return evaluateSql;
       }
@@ -2190,7 +2203,7 @@ class BaseQuery {
    * @param {boolean?} isPreAggregationName Pre-agg flag.
    * @returns {string}
    */
-  aliasName(name, isPreAggregationName) {
+  aliasName(name, isPreAggregationName = false) {
     if (this.options.memberToAlias && this.options.memberToAlias[name]) {
       return this.options.memberToAlias[name];
     }
@@ -2429,6 +2442,12 @@ class BaseQuery {
         COUNT: 'COUNT({{ args_concat }})',
         COUNT_DISTINCT: 'COUNT(DISTINCT {{ args_concat }})',
         AVG: 'AVG({{ args_concat }})',
+        STDDEV_POP: 'STDDEV_POP({{ args_concat }})',
+        STDDEV_SAMP: 'STDDEV_SAMP({{ args_concat }})',
+        VAR_POP: 'VAR_POP({{ args_concat }})',
+        VAR_SAMP: 'VAR_SAMP({{ args_concat }})',
+        COVAR_POP: 'COVAR_POP({{ args_concat }})',
+        COVAR_SAMP: 'COVAR_SAMP({{ args_concat }})',
 
         COALESCE: 'COALESCE({{ args_concat }})',
         CONCAT: 'CONCAT({{ args_concat }})',
@@ -2440,21 +2459,71 @@ class BaseQuery {
         UPPER: 'UPPER({{ args_concat }})',
         LEFT: 'LEFT({{ args_concat }})',
         RIGHT: 'RIGHT({{ args_concat }})',
+        SQRT: 'SQRT({{ args_concat }})',
+        ABS: 'ABS({{ args_concat }})',
+        ACOS: 'ACOS({{ args_concat }})',
+        ASIN: 'ASIN({{ args_concat }})',
+        ATAN: 'ATAN({{ args_concat }})',
+        COS: 'COS({{ args_concat }})',
+        EXP: 'EXP({{ args_concat }})',
+        LN: 'LN({{ args_concat }})',
+        LOG: 'LOG({{ args_concat }})',
+        DLOG10: 'LOG10({{ args_concat }})',
+        PI: 'PI()',
+        POWER: 'POWER({{ args_concat }})',
+        SIN: 'SIN({{ args_concat }})',
+        TAN: 'TAN({{ args_concat }})',
+        REPEAT: 'REPEAT({{ args_concat }})',
+        NULLIF: 'NULLIF({{ args_concat }})',
+        ROUND: 'ROUND({{ args_concat }})',
+        GREATEST: 'GREATEST({{ args_concat }})',
+
+        STDDEV: 'STDDEV_SAMP({{ args_concat }})',
+        SUBSTR: 'SUBSTRING({{ args_concat }})',
+        CHARACTERLENGTH: 'CHAR_LENGTH({{ args[0] }})',
+
+        // Non-ANSI functions
+        BTRIM: 'BTRIM({{ args_concat }})',
+        LTRIM: 'LTRIM({{ args_concat }})',
+        RTRIM: 'RTRIM({{ args_concat }})',
+        ATAN2: 'ATAN2({{ args_concat }})',
+        COT: 'COT({{ args_concat }})',
+        DEGREES: 'DEGREES({{ args_concat }})',
+        RADIANS: 'RADIANS({{ args_concat }})',
+        SIGN: 'SIGN({{ args_concat }})',
+        ASCII: 'ASCII({{ args_concat }})',
+        STRPOS: 'POSITION({{ args[1] }} IN {{ args[0] }})',
+        REPLACE: 'REPLACE({{ args_concat }})',
+        DATEDIFF: 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})',
+        TO_CHAR: 'TO_CHAR({{ args_concat }})',
+        // DATEADD is being rewritten to DATE_ADD
+        // DATEADD: 'DATEADD({{ date_part }}, {{ interval }}, {{ args[2] }})',
+        DATE: 'DATE({{ args_concat }})',
       },
       statements: {
         select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
-          'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
-          '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
-          '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
+          'FROM (\n' +
+          '{{ from | indent(2, true) }}\n' +
+          ') AS {{ from_alias }}' +
+          '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
-        case: 'CASE {% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %}WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
+        case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
+        is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
+        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
+        in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
+        negative: '-({{ expr }})',
+        not: 'NOT ({{ expr }})',
+        true: 'TRUE',
+        false: 'FALSE',
       },
       quotes: {
         identifiers: '"',
@@ -2614,10 +2683,10 @@ class BaseQuery {
   /**
    * @protected
    * @param {string} interval
-   * @return {(number|*)[]}
+   * @return {[number, string]}
    */
   parseInterval(interval) {
-    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week)s?$/);
+    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }
@@ -2833,6 +2902,7 @@ class BaseQuery {
     if (!this.parametrizedContextSymbolsValue) {
       this.parametrizedContextSymbolsValue = Object.assign({
         filterParams: this.filtersProxy(),
+        filterGroup: this.filterGroupFunction(),
         sqlUtils: {
           convertTz: this.convertTz.bind(this)
         }
@@ -2846,7 +2916,8 @@ class BaseQuery {
 
   static emptyParametrizedContextSymbols(cubeEvaluator, allocateParam) {
     return {
-      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam),
+      filterParams: BaseQuery.filterProxyFromAllFilters(null, cubeEvaluator, allocateParam, (filter) => new BaseGroupFilter(filter)),
+      filterGroup: () => '1 = 1',
       sqlUtils: {
         convertTz: (field) => field,
       },
@@ -2892,16 +2963,106 @@ class BaseQuery {
     });
   }
 
+  static extractFilterMembers(filter) {
+    if (filter.operator === 'and' || filter.operator === 'or') {
+      return filter.values.map(f => BaseQuery.extractFilterMembers(f)).reduce((a, b) => ((a && b) ? { ...a, ...b } : null), {});
+    } else if (filter.measure || filter.dimension) {
+      return {
+        [filter.measure || filter.dimension]: true
+      };
+    } else {
+      return null;
+    }
+  }
+
+  static findAndSubTreeForFilterGroup(filter, groupMembers, newGroupFilter) {
+    if ((filter.operator === 'and' || filter.operator === 'or') && !filter.values?.length) {
+      return null;
+    }
+    const filterMembers = BaseQuery.extractFilterMembers(filter);
+    if (filterMembers && Object.keys(filterMembers).every(m => groupMembers.indexOf(m) !== -1)) {
+      return filter;
+    }
+    if (filter.operator === 'and') {
+      const result = filter.values.map(f => BaseQuery.findAndSubTreeForFilterGroup(f, groupMembers, newGroupFilter)).filter(f => !!f);
+      if (!result.length) {
+        return null;
+      }
+      if (result.length === 1) {
+        return result[0];
+      }
+      return newGroupFilter({
+        operator: 'and',
+        values: result
+      });
+    }
+    return null;
+  }
+
   filtersProxy() {
     const { allFilters } = this;
     return BaseQuery.filterProxyFromAllFilters(
       allFilters,
       this.cubeEvaluator,
-      this.paramAllocator.allocateParam.bind(this.paramAllocator)
+      this.paramAllocator.allocateParam.bind(this.paramAllocator),
+      this.newGroupFilter.bind(this),
     );
   }
 
-  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam) {
+  static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter) {
+    if (!filter) {
+      return '1 = 1';
+    }
+
+    if (filter.operator === 'and' || filter.operator === 'or') {
+      const values = filter.values
+        .map(f => BaseQuery.renderFilterParams(f, filterParamArgs, allocateParam, newGroupFilter))
+        .map(v => ({ filterToWhere: () => v }));
+
+      return newGroupFilter({ operator: filter.operator, values }).filterToWhere();
+    }
+
+    const filterParams = filter && filter.filterParams();
+    const filterParamArg = filterParamArgs.filter(p => p.__member() === filter.measure || p.__member() === filter.dimension)[0];
+    if (!filterParamArg) {
+      throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
+    }
+    if (
+      filterParams && filterParams.length
+    ) {
+      if (typeof filterParamArg.__column() === 'function') {
+        // eslint-disable-next-line prefer-spread
+        return filterParamArg.__column().apply(
+          null,
+          filterParams.map(allocateParam),
+        );
+      } else {
+        return filter.conditionSql(filterParamArg.__column());
+      }
+    } else {
+      return '1 = 1';
+    }
+  }
+
+  filterGroupFunction() {
+    const { allFilters } = this;
+    const allocateParam = this.paramAllocator.allocateParam.bind(this.paramAllocator);
+    const newGroupFilter = this.newGroupFilter.bind(this);
+    return (...filterParamArgs) => {
+      const groupMembers = filterParamArgs.map(f => {
+        if (!f.__member) {
+          throw new UserError(`FILTER_GROUP expects FILTER_PARAMS args to be passed. For example FILTER_GROUP(FILTER_PARAMS.foo.bar.filter('bar'), FILTER_PARAMS.foo.jar.filter('jar')). But found: ${f}`);
+        }
+        return f.__member();
+      });
+
+      const filter = BaseQuery.findAndSubTreeForFilterGroup(newGroupFilter({ operator: 'and', values: allFilters }), groupMembers, newGroupFilter);
+
+      return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter)})`;
+    };
+  }
+
+  static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
     return new Proxy({}, {
       get: (target, name) => {
         if (name === '_objectWithResolvedProperties') {
@@ -2911,36 +3072,24 @@ class BaseQuery {
         // and do not check cube validity as it's part of compilation step.
         const cubeName = allFilters && cubeEvaluator.cubeNameFromPath(name);
         return new Proxy({ cube: cubeName }, {
-          get: (cubeNameObj, propertyName) => {
-            const filters =
-              allFilters?.filter(f => f.dimension === cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]));
-            return {
-              filter: (column) => {
-                if (!filters || !filters.length) {
-                  return '1 = 1';
-                }
-
-                return filters.map(filter => {
-                  const filterParams = filter && filter.filterParams();
-                  if (
-                    filterParams && filterParams.length
-                  ) {
-                    if (typeof column === 'function') {
-                      // eslint-disable-next-line prefer-spread
-                      return column.apply(
-                        null,
-                        filterParams.map(allocateParam),
-                      );
-                    } else {
-                      return filter.conditionSql(column);
-                    }
-                  } else {
-                    return '1 = 1';
-                  }
-                }).join(' AND ');
+          get: (cubeNameObj, propertyName) => ({
+            filter: (column) => ({
+              __column() {
+                return column;
+              },
+              __member() {
+                return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
+              },
+              toString() {
+                const filter = BaseQuery.findAndSubTreeForFilterGroup(
+                  newGroupFilter({ operator: 'and', values: allFilters }),
+                  [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
+                  newGroupFilter
+                );
+                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter)})`;
               }
-            };
-          }
+            })
+          })
         });
       }
     });

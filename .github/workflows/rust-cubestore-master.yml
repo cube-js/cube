@@ -142,7 +142,7 @@ jobs:
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -244,9 +244,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
-          # We should use a separate key for testing to pass disk space limitations
-          shared-key: cubestore-testing
-          key: ubuntu-20.04
+          prefix-key: v0-rust-cubestore-cross
+          key: target-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
@@ -256,7 +255,7 @@ jobs:
       #  env:
       #    VCPKG_ROOT: 'C:\vcpkg'
       - name: Set Env Variables for Darwin
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ matrix.target == 'x86_64-apple-darwin' }}
         with:
           OPENSSL_STATIC: "true"

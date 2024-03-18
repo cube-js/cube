@@ -8,4 +8,5 @@ expression: "execute_query(\"select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE\n      
 | public       | KibanaSampleDataEcommerce | BASE TABLE |
 | public       | Logs                      | BASE TABLE |
 | public       | NumberCube                | BASE TABLE |
+| public       | WideCube                  | BASE TABLE |
 +--------------+---------------------------+------------+

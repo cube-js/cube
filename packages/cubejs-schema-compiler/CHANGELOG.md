@@ -3,6 +3,533 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.61](https://github.com/cube-js/cube/compare/v0.34.60...v0.34.61) (2024-03-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix push down `CASE` with expr ([f1d1242](https://github.com/cube-js/cube/commit/f1d12428870cd6e1a159bd559a3402bb6be778aa))
+* **cubesql:** Partition pruning doesn't work when view uses proxy member ([#7866](https://github.com/cube-js/cube/issues/7866)) ([c02a07f](https://github.com/cube-js/cube/commit/c02a07f99141bcd549ffbbcaa37e95d138ff72a2)), closes [#6623](https://github.com/cube-js/cube/issues/6623)
+* Wrong sql generation when multiple primary keys used ([#6689](https://github.com/cube-js/cube/issues/6689)) Thanks [@alexanderlz](https://github.com/alexanderlz) ! ([2540a22](https://github.com/cube-js/cube/commit/2540a224f406b8fd3c09183b826fb899dad7a915))
+
+
+### Features
+
+* **clickhouse-driver:** Support export bucket for S3 (write only) ([#7849](https://github.com/cube-js/cube/issues/7849)) ([db7e2c1](https://github.com/cube-js/cube/commit/db7e2c10c97dc4b81d136bb1205931ea5eab2918))
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Incorrect CASE WHEN generated during ungrouped filtered count ([#7859](https://github.com/cube-js/cube/issues/7859)) ([f970937](https://github.com/cube-js/cube/commit/f9709376e5dadfbcbffe9a65dfa9f0ea16df7bab)), closes [#7858](https://github.com/cube-js/cube/issues/7858)
+* **cubesql:** Remove excessive limit on inner wrapped queries ([#7864](https://github.com/cube-js/cube/issues/7864)) ([b97268f](https://github.com/cube-js/cube/commit/b97268fe5caf55c5b7806c597b9f7b75410f6ba4))
+
+
+
+
+
+## [0.34.59](https://github.com/cube-js/cube/compare/v0.34.58...v0.34.59) (2024-02-28)
+
+
+### Bug Fixes
+
+* Ungrouped filtered count should contain `CASE WHEN` statement bu… ([#7853](https://github.com/cube-js/cube/issues/7853)) ([8c37a40](https://github.com/cube-js/cube/commit/8c37a407b9d8c8f97dab51c9e0e97067c91ff90e))
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+
+### Bug Fixes
+
+* **cubesql:** `ungrouped` query can be routed to Cube Store ([#7810](https://github.com/cube-js/cube/issues/7810)) ([b122837](https://github.com/cube-js/cube/commit/b122837de9cd4fcaca4ddc0e7f85ff695de09483))
+
+
+### Features
+
+* **cubesql:** `WHERE` SQL push down ([#7808](https://github.com/cube-js/cube/issues/7808)) ([98b5709](https://github.com/cube-js/cube/commit/98b570946905586f16a502f83b0a1cf8e4aa92a6))
+
+
+
+
+
+## [0.34.56](https://github.com/cube-js/cube/compare/v0.34.55...v0.34.56) (2024-02-20)
+
+
+### Bug Fixes
+
+* Gracefully handle logical expressions in FILTER_PARAMS and introduce FILTER_GROUP to allow use FILTER_PARAMS for logical expressions ([#7766](https://github.com/cube-js/cube/issues/7766)) ([736070d](https://github.com/cube-js/cube/commit/736070d5a33c25d212420a61da6c98a4b4d31188))
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+
+### Bug Fixes
+
+* **cubesql:** Cannot read properties of undefined (reading 'preAggregation') with enabled SQL push down ([ac2cc17](https://github.com/cube-js/cube/commit/ac2cc177fc5d53a213603efd849acb2b4abf7a48))
+
+
+
+
+
+## [0.34.53](https://github.com/cube-js/cube/compare/v0.34.52...v0.34.53) (2024-02-13)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down can be incorrectly routed to Cube Store pre-aggregations ([#7752](https://github.com/cube-js/cube/issues/7752)) ([1a6451c](https://github.com/cube-js/cube/commit/1a6451c2c0bef6f5efbba2870ec0a11238b1addb))
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+
+### Features
+
+* **cubesql:** Support Athena OFFSET and LIMIT push down ([00c2a6b](https://github.com/cube-js/cube/commit/00c2a6b3cc88fde5d65d02549d3458818e4a8e42))
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Features
+
+* **cubesql:** Extend `DATEDIFF` push down support ([ecaaf1c](https://github.com/cube-js/cube/commit/ecaaf1ca5566ff7cc27289468440e6a902a09609))
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.49](https://github.com/cube-js/cube/compare/v0.34.48...v0.34.49) (2024-01-26)
+
+
+### Bug Fixes
+
+* Revert drillMembers include in views as it's a breaking change. Need to re-introduce it through evaluation on cube level and validating drillMembers are included in view ([#7692](https://github.com/cube-js/cube/issues/7692)) ([6cbbaa0](https://github.com/cube-js/cube/commit/6cbbaa009c87eef4250cebca79de3c9cbb2ace11))
+
+
+
+
+
+## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
+
+
+### Bug Fixes
+
+* Join order is incorrect for snowflake schema views with defined join paths ([#7689](https://github.com/cube-js/cube/issues/7689)) ([454d456](https://github.com/cube-js/cube/commit/454d4563120f591445c219c42dd5bd2fd937f7a6)), closes [#7663](https://github.com/cube-js/cube/issues/7663)
+
+
+### Features
+
+* View members inherit title, format and drillMembers attribute ([#7617](https://github.com/cube-js/cube/issues/7617)) Thanks @CallumWalterWhite ! ([302a756](https://github.com/cube-js/cube/commit/302a7560fd65e1437249701e1fc42b32da5df8fa))
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.45](https://github.com/cube-js/cube/compare/v0.34.44...v0.34.45) (2024-01-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.42](https://github.com/cube-js/cube/compare/v0.34.41...v0.34.42) (2024-01-07)
+
+
+### Features
+
+* **cubesql:** Compiler cache for rewrite rules ([#7604](https://github.com/cube-js/cube/issues/7604)) ([995889f](https://github.com/cube-js/cube/commit/995889fb7722cda3bf839095949d6d71693dd329))
+
+
+
+
+
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+
+### Features
+
+* **cubesql:** Support Domo data queries ([#7509](https://github.com/cube-js/cube/issues/7509)) ([6d644dc](https://github.com/cube-js/cube/commit/6d644dc5265245b8581eb2c2e3b75f5d6d9f929c))
+
+
+
+
+
+## [0.34.40](https://github.com/cube-js/cube/compare/v0.34.39...v0.34.40) (2023-12-21)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.39](https://github.com/cube-js/cube/compare/v0.34.38...v0.34.39) (2023-12-21)
+
+
+### Bug Fixes
+
+* **base-driver:** Support parsing intervals with month|quarter|year granularity ([#7561](https://github.com/cube-js/cube/issues/7561)) ([24c850c](https://github.com/cube-js/cube/commit/24c850ccb74b08f74b5314ed97f872b95cb46b43))
+
+
+
+
+
+## [0.34.38](https://github.com/cube-js/cube/compare/v0.34.37...v0.34.38) (2023-12-19)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+
+### Bug Fixes
+
+* **clickhouse-driver:** Initial support for DateTime64, fix [#7537](https://github.com/cube-js/cube/issues/7537) ([#7538](https://github.com/cube-js/cube/issues/7538)) ([401e9e1](https://github.com/cube-js/cube/commit/401e9e1b9c07e115804a1f84fade2bb82b55ca29))
+* Internal: Error during planning: No field named for pre-aggregat… ([#7554](https://github.com/cube-js/cube/issues/7554)) ([412213c](https://github.com/cube-js/cube/commit/412213cbec40748d0de6f54731686c3d0b263e5c))
+
+
+
+
+
+## [0.34.36](https://github.com/cube-js/cube/compare/v0.34.35...v0.34.36) (2023-12-16)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.35](https://github.com/cube-js/cube/compare/v0.34.34...v0.34.35) (2023-12-13)
+
+
+### Features
+
+* Add meta property for cube definition ([#7327](https://github.com/cube-js/cube/issues/7327)) Thanks [@mharrisb1](https://github.com/mharrisb1) ! ([0ea12c4](https://github.com/cube-js/cube/commit/0ea12c440b3b3fb8280063a1da7d7f9e6b9b6754))
+
+
+
+
+
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+
+### Features
+
+* **cubesql:** Add CURRENT_DATE function definitions for Postgres and Snowflake so those can be pushed down ([ac1ca88](https://github.com/cube-js/cube/commit/ac1ca889add970dd05820b8f077edb968c985994))
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.30](https://github.com/cube-js/cube/compare/v0.34.29...v0.34.30) (2023-12-04)
+
+
+### Bug Fixes
+
+* View tries to join cube twice in case there's join ambiguity ([#7487](https://github.com/cube-js/cube/issues/7487)) ([66f7c17](https://github.com/cube-js/cube/commit/66f7c17a19fb594a8c71ff6d449f25a5a9e727aa))
+
+
+
+
+
+## [0.34.29](https://github.com/cube-js/cube/compare/v0.34.28...v0.34.29) (2023-12-01)
+
+
+### Bug Fixes
+
+* **schema-compiler:** td.isDateOperator is not a function ([#7483](https://github.com/cube-js/cube/issues/7483)) ([31c272a](https://github.com/cube-js/cube/commit/31c272ae929bc8e7f7972e46666f84bf8509cc3f))
+
+
+
+
+
+## [0.34.27](https://github.com/cube-js/cube/compare/v0.34.26...v0.34.27) (2023-11-30)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.26](https://github.com/cube-js/cube/compare/v0.34.25...v0.34.26) (2023-11-28)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Incorrect excludes resolution, fix [#7100](https://github.com/cube-js/cube/issues/7100) ([#7468](https://github.com/cube-js/cube/issues/7468)) ([f89ef8d](https://github.com/cube-js/cube/commit/f89ef8d638fafa760ea6415bc670c0c3939ea06b))
+* **schema-compiler:** Missing pre-aggregation filter for partitioned pre-aggregation via view, fix [#6623](https://github.com/cube-js/cube/issues/6623) ([#7454](https://github.com/cube-js/cube/issues/7454)) ([567b92f](https://github.com/cube-js/cube/commit/567b92fe716bcc11b19d42815699b476339ef201))
+
+
+### Features
+
+* **cubesql:** Support SQL push down for several functions ([79e5ac8](https://github.com/cube-js/cube/commit/79e5ac8e998005ebf8b5f72ccf1d63f425f6003c))
+
+
+
+
+
+## [0.34.25](https://github.com/cube-js/cube/compare/v0.34.24...v0.34.25) (2023-11-24)
+
+
+### Bug Fixes
+
+* **mongobi-driver:** Correct time zone conversion for minutes, fix [#7152](https://github.com/cube-js/cube/issues/7152) ([#7456](https://github.com/cube-js/cube/issues/7456)) ([5ae2009](https://github.com/cube-js/cube/commit/5ae2009a8231432020e09fb6dfeaa8f40ef152fa))
+
+
+
+
+
+## [0.34.24](https://github.com/cube-js/cube/compare/v0.34.23...v0.34.24) (2023-11-23)
+
+
+### Features
+
+* **schema-compiler:** add dimension primaryKey property to transform result ([#7443](https://github.com/cube-js/cube/issues/7443)) ([baabd41](https://github.com/cube-js/cube/commit/baabd41fed8bd1476d0489dc97c3f78c9106a63b))
+
+
+
+
+
+## [0.34.23](https://github.com/cube-js/cube/compare/v0.34.22...v0.34.23) (2023-11-19)
+
+
+### Bug Fixes
+
+* Match additive pre-aggregations with missing members for views and proxy members ([#7433](https://github.com/cube-js/cube/issues/7433)) ([e236079](https://github.com/cube-js/cube/commit/e236079ad0ecef2b43f285f4a5154bcd8cb8a9e2))
+
+
+### Features
+
+* **cubesql:** Support `-` (unary minus) SQL push down ([a0a2e12](https://github.com/cube-js/cube/commit/a0a2e129e4cf3264df75bbdf53a962a892e4e9c2))
+* **cubesql:** Support `NOT` SQL push down ([#7422](https://github.com/cube-js/cube/issues/7422)) ([7b1ff0d](https://github.com/cube-js/cube/commit/7b1ff0d897ec9a5cfffba1e09444ff7baa8bea5b))
+
+
+
+
+
+## [0.34.22](https://github.com/cube-js/cube/compare/v0.34.21...v0.34.22) (2023-11-16)
+
+
+### Bug Fixes
+
+* **cubesql:** Window PARTITION BY, ORDER BY queries fail for SQL push down ([62b359f](https://github.com/cube-js/cube/commit/62b359f2d33d0c8fd59aa570e7e3a83718a3f7e8))
+
+
+
+
+
+## [0.34.21](https://github.com/cube-js/cube/compare/v0.34.20...v0.34.21) (2023-11-15)
+
+
+### Features
+
+* **cubesql:** Support SQL push down for more functions ([#7406](https://github.com/cube-js/cube/issues/7406)) ([b1606da](https://github.com/cube-js/cube/commit/b1606daba70ab92952b1cbbacd94dd7294b17ad5))
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+
+### Bug Fixes
+
+* Expose `isVisible` and `public` properties in meta consistently ([35ca1d0](https://github.com/cube-js/cube/commit/35ca1d0c104ea6111d4db3b8649cd52a5fabcf79))
+
+
+### Features
+
+* **cubesql:** Support `[NOT] IN` SQL push down ([c64994a](https://github.com/cube-js/cube/commit/c64994ac26e1174ce121c79af46fa6a62747b7e9))
+
+
+
+
+
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+
+### Features
+
+* **cubesql:** SQL push down support for window functions ([#7403](https://github.com/cube-js/cube/issues/7403)) ([b1da6c0](https://github.com/cube-js/cube/commit/b1da6c0e38e3b586c3d4b1ddf9c00be57065d960))
+
+
+
+
+
+## [0.34.18](https://github.com/cube-js/cube/compare/v0.34.17...v0.34.18) (2023-11-10)
+
+
+### Bug Fixes
+
+* Non-additive pre-aggregations based on proxy dimension doesn't match anymore ([#7396](https://github.com/cube-js/cube/issues/7396)) ([910a49d](https://github.com/cube-js/cube/commit/910a49d87ebfade22ab5ac2463eca9b43f2d5742))
+
+
+
+
+
+## [0.34.17](https://github.com/cube-js/cube/compare/v0.34.16...v0.34.17) (2023-11-09)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
+## [0.34.16](https://github.com/cube-js/cube/compare/v0.34.15...v0.34.16) (2023-11-06)
+
+
+### Features
+
+* **cubesql:** Enable `COVAR` aggr functions push down ([89d841a](https://github.com/cube-js/cube/commit/89d841a049c0064b902bf3cdc631cb056984ddd4))
+* **native:** Jinja - async render ([#7309](https://github.com/cube-js/cube/issues/7309)) ([cd1019c](https://github.com/cube-js/cube/commit/cd1019c9fa904ba76b334e941726ff871d2e3a44))
+
+
+
+
+
+## [0.34.15](https://github.com/cube-js/cube/compare/v0.34.14...v0.34.15) (2023-11-06)
+
+
+### Bug Fixes
+
+* Single value non-additive pre-aggregation match in views ([9666f24](https://github.com/cube-js/cube/commit/9666f24650e93ad6fd6990f6b82fb957e26c2885))
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+
+### Bug Fixes
+
+* Views with proxy dimensions and non-additive measures don't not match pre-aggregations ([#7374](https://github.com/cube-js/cube/issues/7374)) ([7189720](https://github.com/cube-js/cube/commit/718972090612f31326bad84fcf792d674ea622a9)), closes [#7099](https://github.com/cube-js/cube/issues/7099)
+
+
+### Features
+
+* **cubesql:** SQL push down for several ANSI SQL functions ([ac2bf15](https://github.com/cube-js/cube/commit/ac2bf15954e6b143b9014ff4b8f72c6098253c82))
+
+
+
+
+
+## [0.34.13](https://github.com/cube-js/cube/compare/v0.34.12...v0.34.13) (2023-10-31)
+
+**Note:** Version bump only for package @cubejs-backend/schema-compiler
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

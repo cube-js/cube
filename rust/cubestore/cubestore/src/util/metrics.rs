@@ -61,6 +61,10 @@ pub const fn distribution(name: &'static str) -> IntMetric {
     }
 }
 
+pub fn format_tag(name: &'static str, value: &str) -> String {
+    format!("{}:{}", name, value)
+}
+
 pub struct Counter {
     metric: Metric,
 }

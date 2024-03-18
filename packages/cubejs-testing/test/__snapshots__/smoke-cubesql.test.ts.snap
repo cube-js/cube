@@ -16,3 +16,22 @@ Array [
   },
 ]
 `;
+
+exports[`SQL API Postgres (Data) no limit for non matching count push down: no limit for non matching count push down 1`] = `
+Array [
+  Object {
+    "a0": 2024-01-05T00:00:00.000Z,
+    "a1": 2024-01-01T00:00:00.000Z,
+    "a2": "100000",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) powerbi min max push down: powerbi_min_max_push_down 1`] = `
+Array [
+  Object {
+    "a0": 2024-01-05T00:00:00.000Z,
+    "a1": 2024-01-01T00:00:00.000Z,
+  },
+]
+`;

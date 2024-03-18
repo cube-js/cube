@@ -1,0 +1,42 @@
+# LangChain
+
+[LangChain][langchain] is a framework designed to simplify the creation of
+applications using large language models.
+
+To get started with LangChain, follow the [instructions][langchain-docs-getting-started].
+
+## Document loader
+
+Cube's integration with LangChain comes as the [document loader][langchain-docs-cube]
+that is intended to be used to populate a vector database with embeddings derived
+from the data model. Later, this vector database can be queried to find best-matching
+entities of the semantic layer. This is useful to match free-form input, e.g., queries
+in a natural language, with the views and their members in the data model.
+
+<Diagram src="https://ucarecdn.com/32e98c8b-a920-4620-a8d2-05d57618db8e/" />
+
+We're also providing an chat-based demo application (see source code on GitHub) with example OpenAI prompts for constructing queries to Cube's SQL API. If you wish to create an AI-powered conversational interface for the semantic layer, functioning similar to Delphi, these prompts can be a good starting point.
+
+## Configuring the connection to Cube
+
+The document loader connects to Cube using the [REST API][ref-rest-api], and will need a
+[JWT][ref-jwt] to authenticate.
+
+If you're using Cube Cloud, you can retrieve these details from a deployment's
+<Btn>Overview</Btn> page.
+
+## Querying Cube
+
+Please refer to the [blog post](https://cube-blog-preview.vercel.app/blog/introducing-the-langchain-integration)
+for details on querying Cube and building a complete AI-based application.
+
+Also, please feel free to review a chat-based demo application [source code](https://github.com/cube-js/cube/tree/master/examples/langchain)
+on GitHub.
+
+[langchain]: https://python.langchain.com/
+[langchain-docs-getting-started]:
+  https://python.langchain.com/docs/get_started/installation
+[langchain-docs-cube]:
+  https://python.langchain.com/docs/integrations/document_loaders/cube_semantic#example
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-jwt]: /product/auth#generating-json-web-tokens-jwt

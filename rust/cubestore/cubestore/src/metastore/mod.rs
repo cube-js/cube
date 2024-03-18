@@ -845,6 +845,7 @@ pub trait MetaStore: DIService + Send + Sync {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
@@ -1490,6 +1491,37 @@ impl RocksMetaStore {
     {
         self.store.write_operation(f).await
     }
+
+    fn drop_table_impl(
+        table_id: u64,
+        db_ref: DbTableRef,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Table>, CubeError> {
+        let tables_table = TableRocksTable::new(db_ref.clone());
+        let indexes_table = IndexRocksTable::new(db_ref.clone());
+        let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
+        let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
+        let indexes = indexes_table
+            .get_row_ids_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?;
+        let trace_objects = trace_objects_table.get_rows_by_index(
+            &TraceObjectIndexKey::ByTableId(table_id),
+            &TraceObjectRocksIndex::ByTableId,
+        )?;
+        for trace_object in trace_objects {
+            trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
+        }
+        let replay_handles = replay_handles_table.get_rows_by_index(
+            &ReplayHandleIndexKey::ByTableId(table_id),
+            &ReplayHandleRocksIndex::ByTableId,
+        )?;
+        for replay_handle in replay_handles {
+            replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
+        }
+        for index in indexes {
+            RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
+        }
+        Ok(tables_table.delete(table_id, batch_pipe)?)
+    }
 }
 
 impl RocksMetaStore {
@@ -2033,9 +2065,15 @@ impl MetaStore for RocksMetaStore {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
+            if drop_if_exists {
+                if let Ok(exists_table) = get_table_impl(db_ref.clone(), schema_name.clone(), table_name.clone()) {
+                    RocksMetaStore::drop_table_impl(exists_table.get_id(), db_ref.clone(), batch_pipe)?;
+                }
+            }
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
@@ -2379,32 +2417,7 @@ impl MetaStore for RocksMetaStore {
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
-            let tables_table = TableRocksTable::new(db_ref.clone());
-            let indexes_table = IndexRocksTable::new(db_ref.clone());
-            let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
-            let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
-            let indexes = indexes_table.get_row_ids_by_index(
-                &IndexIndexKey::TableId(table_id),
-                &IndexRocksIndex::TableID,
-            )?;
-            let trace_objects = trace_objects_table.get_rows_by_index(
-                &TraceObjectIndexKey::ByTableId(table_id),
-                &TraceObjectRocksIndex::ByTableId,
-            )?;
-            for trace_object in trace_objects {
-                trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
-            }
-            let replay_handles = replay_handles_table.get_rows_by_index(
-                &ReplayHandleIndexKey::ByTableId(table_id),
-                &ReplayHandleRocksIndex::ByTableId,
-            )?;
-            for replay_handle in replay_handles {
-                replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
-            }
-            for index in indexes {
-                RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
-            }
-            Ok(tables_table.delete(table_id, batch_pipe)?)
+            RocksMetaStore::drop_table_impl(table_id, db_ref, batch_pipe)
         })
         .await
     }
@@ -5108,6 +5121,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5130,6 +5144,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5251,6 +5266,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5275,6 +5291,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5363,6 +5380,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5452,6 +5470,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5524,6 +5543,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5546,6 +5566,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5571,6 +5592,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -6047,6 +6069,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        false,
                     )
                     .await
                     .unwrap();
@@ -6269,6 +6292,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -6409,6 +6433,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();

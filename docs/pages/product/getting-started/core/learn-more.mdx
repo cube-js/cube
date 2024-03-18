@@ -1,0 +1,42 @@
+---
+redirect_from:
+  - /getting-started/core/learn-more
+---
+
+# Learn more
+
+Now that you've set up your first project, learn more about what else Cube can
+do for you.
+
+## Data Modeling
+
+Learn more about [data modeling](/product/data-modeling/concepts)
+and how to effectively define metrics in your data models. Advanced users: check
+out [related recipes][ref-recipes-data-modeling] for tackling specific data
+modeling problems.
+
+## Querying
+
+Cube can be queried in a variety of ways. Explore how to use
+[REST API](/reference/rest-api), [GraphQL API](/reference/graphql-api), and
+[SQL API](/product/apis-integrations/sql-api), or how to
+[connect a BI or data visualization tool](/product/configuration/visualization-tools).
+
+## Caching
+
+Learn more about the [two-level cache](/product/caching) and how
+[pre-aggregations help speed up queries](/product/caching/getting-started-pre-aggregations).
+For a deeper dive, take a look at the [related recipes][ref-recipes-caching].
+
+## Access Control
+
+Cube uses [JSON Web Tokens](https://jwt.io/) to
+[authenticate requests for the HTTP APIs](/product/auth), and
+[`check_sql_auth`](/reference/configuration/config#check_sql_auth) to
+[authenticate requests for the SQL API](/product/apis-integrations/sql-api/security).
+Cube also supports using JWT claims for securing access to data, check out these
+[related recipes][ref-recipes-access-control].
+
+[ref-recipes-data-modeling]: /guides/recipes#data-modeling
+[ref-recipes-caching]: /guides/recipes#query-acceleration
+[ref-recipes-access-control]: /guides/recipes#access-control

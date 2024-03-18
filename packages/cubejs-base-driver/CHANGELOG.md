@@ -3,6 +3,163 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+
+### Bug Fixes
+
+* Job API - correct handling when job is not_found ([#7894](https://github.com/cube-js/cube/issues/7894)) ([cae1866](https://github.com/cube-js/cube/commit/cae1866dabd1bd13829221f6576a649117bcd142))
+
+
+
+
+
+## [0.34.61](https://github.com/cube-js/cube/compare/v0.34.60...v0.34.61) (2024-03-11)
+
+
+### Features
+
+* **clickhouse-driver:** Support export bucket for S3 (write only) ([#7849](https://github.com/cube-js/cube/issues/7849)) ([db7e2c1](https://github.com/cube-js/cube/commit/db7e2c10c97dc4b81d136bb1205931ea5eab2918))
+* **query-orchestrator:** Support unload (export bucket) for readOnly drivers ([76ce7ed](https://github.com/cube-js/cube/commit/76ce7ed176e0c8097bc8024a7e5e82bbb48d5d1c))
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.47](https://github.com/cube-js/cube/compare/v0.34.46...v0.34.47) (2024-01-23)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.44](https://github.com/cube-js/cube/compare/v0.34.43...v0.34.44) (2024-01-15)
+
+
+### Features
+
+* **query-orchestrator:** Queue - reduce traffic for processing (Cube Store only) ([#7644](https://github.com/cube-js/cube/issues/7644)) ([7db90fb](https://github.com/cube-js/cube/commit/7db90fb7532d53d7ce46ba342e89250110f32c6b))
+
+
+
+
+
+## [0.34.41](https://github.com/cube-js/cube/compare/v0.34.40...v0.34.41) (2024-01-02)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.33](https://github.com/cube-js/cube/compare/v0.34.32...v0.34.33) (2023-12-11)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.31](https://github.com/cube-js/cube/compare/v0.34.30...v0.34.31) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.26](https://github.com/cube-js/cube/compare/v0.34.25...v0.34.26) (2023-11-28)
+
+
+### Features
+
+* **cubestore-driver:** Queue - protect possible race condition with hearbeat/cancellation on error ([#7467](https://github.com/cube-js/cube/issues/7467)) ([9c0ad07](https://github.com/cube-js/cube/commit/9c0ad0746d54543e264789dd36fa0ce2b91b7626))
+
+
+
+
+
+## [0.34.25](https://github.com/cube-js/cube/compare/v0.34.24...v0.34.25) (2023-11-24)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+**Note:** Version bump only for package @cubejs-backend/base-driver
+
+
+
+
+
 ## [0.34.12](https://github.com/cube-js/cube/compare/v0.34.11...v0.34.12) (2023-10-30)
 
 

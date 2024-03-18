@@ -1,0 +1,112 @@
+# Error message reference
+
+Working with Cube, you might encounter various error messages in logs and API responses.
+This page lists some of them with some practical advice on mitigation.
+
+## `Aggregate function calls cannot be nested`
+
+```
+Aggregate function calls cannot be nested
+```
+
+Error message above comes from an upsream data source and indicates that
+there's a nested aggregation in a query, e.g., that there's a measure
+with an aggregation that references another measure with an aggregation.
+
+**Please check your data model for such cases.**
+
+Nested aggregations are indeed useful in some cases. Please [see a
+recipe](/guides/recipes/data-modeling/nested-aggregates) that explains
+how to model them.
+
+
+## `Can't find join path`
+
+```
+Can't find join path to join 'cube_a', 'cube_b'
+```
+
+Error message above indicates that a query failed because it includes members from cubes
+that can't be joined in order to generate a valid query to the upstream data source.
+
+**Please check that you've defined necessary [joins](/reference/data-model/joins)
+and that they have [correct directions](/product/data-modeling/concepts/working-with-joins#transitive-join-pitfalls).**
+
+Also, please consider using [views](/reference/data-model/view) since they
+incapsulate join paths and completely remove the possibility of the error in question.
+You might also consider setting [`public: false`](/reference/data-model/cube#public)
+on your cubes to hide them from end users.
+
+If you’re building a custom data application, you might use the [`meta` endpoint](/reference/rest-api#v1meta)
+of the REST API. It groups cubes into `connectedComponents` to help select those ones
+that can be joined together.
+
+## `Can't parse timestamp`
+
+```
+Can't parse timestamp: 2023-11-07T14:33:23.16.000
+```
+
+Error message above indicates that the data source was unable to recognize
+the value of a [time dimension](/reference/data-model/types-and-formats#time-1)
+as a timestamp.
+
+**Please check that the [SQL expression](/product/data-modeling/syntax#sql-expressions)
+of this time dimension evaluates to a `TIMESTAMP` type.**
+
+Also, check this recipe to see how you can [work around string values in
+time dimensions](/guides/recipes/data-modeling/string-time-dimensions).
+
+## `Primary key is required when join is defined`
+
+```
+cube_a cube: primary key for 'cube_a' is required when join is defined
+in order to make aggregates work properly
+```
+
+Error message above indicates that you have a [cube](/reference/data-model/cube)
+with [joins](/reference/data-model/joins) and
+[pre-aggregations](/reference/data-model/pre-aggregations). However, that cube
+doesn't have a primary key.
+
+When generating SQL queries, Cube uses primary keys to avoid fanouts.
+A fanout happens when two tables are joined and a single value gets duplicated in the end result,
+meaning that some values can be double counted. 
+
+**Please define a [primary key](/reference/data-model/dimensions#primary_key) dimension in this cube to make joins and pre-aggregations work correctly.**
+
+If your data doesn't have a natural primary key, e.g., `id`, you can define a composite
+primary key by concatenating most or all of the columns in the table, e.g.:
+
+
+```yml
+cubes:
+  - name: cube_a
+    # ...
+
+    dimensions:
+      - name: composite_key
+        sql: CONCAT(column_a, '-', column_b, '-', column_c)
+        type: string
+        primary_key: true
+```
+
+## `Refresh Scheduler Interval Error`
+
+```json
+{
+  "message": "Refresh Scheduler Interval Error",
+  "error": "Previous interval #2 was not finished with 60000 interval"
+}
+```
+
+Error message above indicates that your refresh worker is overloaded. You probably have
+a lot of [tenants](/product/configuration/advanced/multitenancy), a lot of
+[pre-aggregations](/product/caching/using-pre-aggregations) to refresh, or both.
+
+**If you're using [multitenancy](/product/configuration/advanced/multitenancy), you'd need
+to deploy several Cube clusters (each one per a reduced set of tenants) so there will be
+multiple refresh workers which will work only on a subset of your tenants.**
+
+If you're using Cube Cloud, you can use a [production multi-cluster](/product/deployment/cloud/deployment-types#production-multi-cluster)
+that would automatically do this for you.

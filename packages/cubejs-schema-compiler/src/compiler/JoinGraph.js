@@ -3,6 +3,10 @@ import Graph from 'node-dijkstra';
 import { UserError } from './UserError';
 
 export class JoinGraph {
+  /**
+   * @param {import('./CubeValidator').CubeValidator} cubeValidator
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   */
   constructor(cubeValidator, cubeEvaluator) {
     this.cubeValidator = cubeValidator;
     this.cubeEvaluator = cubeEvaluator;
@@ -126,18 +130,23 @@ export class JoinGraph {
       }
       root = newRoot;
     }
+    const nodesJoined = {};
     const result = cubesToJoin.map(joinHints => {
       if (!Array.isArray(joinHints)) {
         joinHints = [joinHints];
       }
       let prevNode = root;
       return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
+        if (nodesJoined[toJoin]) {
+          return { joins: [] };
+        }
         const path = this.graph.path(prevNode, toJoin);
         if (!path) {
           return null;
         }
         const foundJoins = self.joinsByPath(path);
         prevNode = toJoin;
+        nodesJoined[toJoin] = true;
         return { cubes: path, joins: foundJoins };
       });
     }).reduce((a, b) => a.concat(b), []).reduce((joined, res) => {
@@ -145,7 +154,7 @@ export class JoinGraph {
         return null;
       }
       const indexedPairs = R.compose(
-        R.addIndex(R.map)((j, i) => [i, j])
+        R.addIndex(R.map)((j, i) => [i + joined.joins.length, j])
       );
       return {
         joins: joined.joins.concat(indexedPairs(res.joins))

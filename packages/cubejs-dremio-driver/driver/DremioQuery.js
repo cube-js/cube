@@ -73,7 +73,7 @@ class DremioQuery extends BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
-    return `SELECT TIMESTAMP(dates.f) date_from, TIMESTAMP(dates.t) date_to FROM (${values}) AS dates`;
+    return `SELECT TO_TIMESTAMP(dates.f, 'YYYY-MM-DDTHH:MI:SS.FFF') date_from, TO_TIMESTAMP(dates.t, 'YYYY-MM-DDTHH:MI:SS.FFF') date_to FROM (${values}) AS dates`;
   }
 
   concatStringsSql(strings) {

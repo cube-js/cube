@@ -6,15 +6,22 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    physical_plan::aggregates::AggregateFunction,
+    logical_plan::window_frames::WindowFrame,
+    physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
-use std::{collections::HashMap, fmt::Debug, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 use tokio::{
     sync::{mpsc::Receiver, RwLock as RwLockAsync},
     time::Instant,
 };
+use uuid::Uuid;
 
 use crate::{
     compile::{
@@ -22,7 +29,7 @@ use crate::{
         MetaContext,
     },
     sql::{AuthContextRef, HttpAuthContext},
-    CubeError,
+    CubeError, RWLockAsync,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -62,14 +69,56 @@ pub struct SqlResponse {
     pub sql: SqlQuery,
 }
 
+#[derive(Debug)]
+pub struct SpanId {
+    pub span_id: String,
+    pub query_key: serde_json::Value,
+    span_start: SystemTime,
+    is_data_query: RWLockAsync<bool>,
+}
+
+impl SpanId {
+    pub fn new(span_id: String, query_key: serde_json::Value) -> Self {
+        Self {
+            span_id,
+            query_key,
+            span_start: SystemTime::now(),
+            is_data_query: tokio::sync::RwLock::new(false),
+        }
+    }
+
+    pub async fn set_is_data_query(&self, is_data_query: bool) {
+        let mut write = self.is_data_query.write().await;
+        *write = is_data_query;
+    }
+
+    pub async fn is_data_query(&self) -> bool {
+        let read = self.is_data_query.read().await;
+        *read
+    }
+
+    pub fn duration(&self) -> u64 {
+        self.span_start
+            .elapsed()
+            .unwrap_or_else(|_| Duration::from_secs(0))
+            .as_millis() as u64
+    }
+}
+
 #[async_trait]
 pub trait TransportService: Send + Sync + Debug {
     // Load meta information about cubes
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError>;
 
+    async fn compiler_id(&self, ctx: AuthContextRef) -> Result<Uuid, CubeError> {
+        let meta = self.meta(ctx).await?;
+        Ok(meta.compiler_id)
+    }
+
     // Get sql for query to be used in wrapped SQL query
     async fn sql(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
@@ -80,6 +129,7 @@ pub trait TransportService: Send + Sync + Debug {
     // Execute load query
     async fn load(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -88,6 +138,7 @@ pub trait TransportService: Send + Sync + Debug {
 
     async fn load_stream(
         &self,
+        span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -101,6 +152,15 @@ pub trait TransportService: Send + Sync + Debug {
         ctx: AuthContextRef,
         to_user: String,
     ) -> Result<bool, CubeError>;
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError>;
 }
 
 #[async_trait]
@@ -182,6 +242,7 @@ impl TransportService for HttpTransport {
             response.cubes.unwrap_or_else(Vec::new),
             HashMap::new(),
             HashMap::new(),
+            Uuid::new_v4(),
         ));
 
         *store = Some(MetaCacheBucket {
@@ -194,6 +255,7 @@ impl TransportService for HttpTransport {
 
     async fn sql(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         _query: V1LoadRequestQuery,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
@@ -205,6 +267,7 @@ impl TransportService for HttpTransport {
 
     async fn load(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         query: V1LoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
@@ -230,6 +293,7 @@ impl TransportService for HttpTransport {
 
     async fn load_stream(
         &self,
+        _span_id: Option<Arc<SpanId>>,
         _query: V1LoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
@@ -246,6 +310,21 @@ impl TransportService for HttpTransport {
         _to_user: String,
     ) -> Result<bool, CubeError> {
         panic!("Does not work for standalone mode yet");
+    }
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError> {
+        println!(
+            "Load state: {:?} {:?} {:?} {} {:?}",
+            span_id, ctx, meta_fields, event, properties
+        );
+        Ok(())
     }
 }
 
@@ -304,7 +383,7 @@ impl SqlTemplates {
         group_by: Vec<AliasedColumn>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
-        _filter: Option<String>,
+        filter: Option<String>,
         _having: Option<String>,
         order_by: Vec<AliasedColumn>,
         limit: Option<usize>,
@@ -320,6 +399,7 @@ impl SqlTemplates {
             .chain(projection.iter())
             .map(|c| c.clone())
             .collect::<Vec<_>>();
+        let quoted_from_alias = self.quote_identifier(&alias)?;
         self.render_template(
             "statements/select",
             context! {
@@ -329,7 +409,8 @@ impl SqlTemplates {
                 aggregate => aggregate,
                 projection => projection,
                 order_by => order_by,
-                from_alias => alias,
+                filter => filter,
+                from_alias => quoted_from_alias,
                 limit => limit,
                 offset => offset,
             },
@@ -409,12 +490,66 @@ impl SqlTemplates {
         scalar_function: String,
         args: Vec<String>,
         date_part: Option<String>,
+        interval: Option<String>,
     ) -> Result<String, CubeError> {
         let function = scalar_function.to_string().to_uppercase();
         let args_concat = args.join(", ");
         self.render_template(
             &format!("functions/{}", function),
-            context! { args_concat => args_concat, args => args, date_part => date_part },
+            context! {
+                args_concat => args_concat,
+                args => args,
+                date_part => date_part,
+                interval => interval,
+            },
+        )
+    }
+
+    pub fn window_function_name(&self, window_function: WindowFunction) -> String {
+        match window_function {
+            WindowFunction::AggregateFunction(aggregate_function) => {
+                self.aggregate_function_name(aggregate_function, false)
+            }
+            WindowFunction::BuiltInWindowFunction(built_in_window_function) => {
+                built_in_window_function.to_string()
+            }
+        }
+    }
+
+    pub fn window_function(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+    ) -> Result<String, CubeError> {
+        let function = self.window_function_name(window_function);
+        let args_concat = args.join(", ");
+        self.render_template(
+            &format!("functions/{}", function),
+            context! { args_concat => args_concat, args => args },
+        )
+    }
+
+    pub fn window_function_expr(
+        &self,
+        window_function: WindowFunction,
+        args: Vec<String>,
+        partition_by: Vec<String>,
+        order_by: Vec<String>,
+        _window_frame: Option<WindowFrame>,
+    ) -> Result<String, CubeError> {
+        let fun_call = self.window_function(window_function, args)?;
+        let partition_by_concat = partition_by.join(", ");
+        let order_by_concat = order_by.join(", ");
+        // TODO window_frame
+        self.render_template(
+            "expressions/window_function",
+            context! {
+                fun_call => fun_call,
+                partition_by => partition_by,
+                partition_by_concat => partition_by_concat,
+                order_by => order_by,
+                order_by_concat => order_by_concat
+            },
         )
     }
 
@@ -440,6 +575,21 @@ impl SqlTemplates {
             "expressions/binary",
             context! { left => left, op => op, right => right },
         )
+    }
+
+    pub fn is_null_expr(&self, expr: String, negate: bool) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/is_null",
+            context! { expr => expr, negate => negate },
+        )
+    }
+
+    pub fn negative_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/negative", context! { expr => expr })
+    }
+
+    pub fn not_expr(&self, expr: String) -> Result<String, CubeError> {
+        self.render_template("expressions/not", context! { expr => expr })
     }
 
     pub fn sort_expr(
@@ -478,6 +628,35 @@ impl SqlTemplates {
             "expressions/cast",
             context! { expr => expr, data_type => data_type },
         )
+    }
+
+    pub fn in_list_expr(
+        &self,
+        expr: String,
+        in_exprs: Vec<String>,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        let in_exprs_concat = in_exprs.join(", ");
+        self.render_template(
+            "expressions/in_list",
+            context! {
+                expr => expr,
+                in_exprs_concat => in_exprs_concat,
+                in_exprs => in_exprs,
+                negated => negated
+            },
+        )
+    }
+
+    pub fn literal_bool_expr(&self, value: bool) -> Result<String, CubeError> {
+        match value {
+            true => self.render_template("expressions/true", context! {}),
+            false => self.render_template("expressions/false", context! {}),
+        }
+    }
+
+    pub fn timestamp_literal_expr(&self, value: String) -> Result<String, CubeError> {
+        self.render_template("expressions/timestamp_literal", context! { value => value })
     }
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {

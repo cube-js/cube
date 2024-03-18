@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                with table_privileges as (\n\t select\n\t   NULL as role,\n\t   t.schemaname as schema,\n\t   t.objectname as table,\n\t   pg_catalog.has_table_privilege(current_user, '\"' || t.schemaname || '\"' || '.' || '\"' || t.objectname || '\"',  'UPDATE') as update,\n\t   pg_catalog.has_table_privilege(current_user, '\"' || t.schemaname || '\"' || '.' || '\"' || t.objectname || '\"',  'SELECT') as select,\n\t   pg_catalog.has_table_privilege(current_user, '\"' || t.schemaname || '\"' || '.' || '\"' || t.objectname || '\"',  'INSERT') as insert,\n\t   pg_catalog.has_table_privilege(current_user, '\"' || t.schemaname || '\"' || '.' || '\"' || t.objectname || '\"',  'DELETE') as delete\n\t from (\n\t   select schemaname, tablename as objectname from pg_catalog.pg_tables\n\t   union\n\t   select schemaname, viewname as objectname from pg_catalog.pg_views\n\t   union\n\t   select schemaname, matviewname as objectname from pg_catalog.pg_matviews\n\t ) t\n\t where t.schemaname !~ '^pg_'\n\t   and t.schemaname <> 'information_schema'\n\t   and pg_catalog.has_schema_privilege(current_user, t.schemaname, 'USAGE')\n\t)\n\tselect t.*\n\tfrom table_privileges t\n    order by t.schema, t.table\n                \"#.to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------+--------+---------------------------+--------+--------+--------+--------+
+| role | schema | table                     | update | select | insert | delete |
++------+--------+---------------------------+--------+--------+--------+--------+
+| NULL | public | KibanaSampleDataEcommerce | false  | true   | false  | false  |
+| NULL | public | Logs                      | false  | true   | false  | false  |
+| NULL | public | NumberCube                | false  | true   | false  | false  |
+| NULL | public | WideCube                  | false  | true   | false  | false  |
++------+--------+---------------------------+--------+--------+--------+--------+

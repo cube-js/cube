@@ -3,6 +3,130 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+
+### Features
+
+* **materialize-driver:** Add cluster option to Materialize driver ([#7773](https://github.com/cube-js/cube/issues/7773)) Thanks [@bobbyiliev](https://github.com/bobbyiliev)! ([917004e](https://github.com/cube-js/cube/commit/917004ebccfeb6509a08e5b9b51e1ae8542cf0af))
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Bug Fixes
+
+* **playground:** replace antd daterange picker ([#7735](https://github.com/cube-js/cube/issues/7735)) ([484f1ca](https://github.com/cube-js/cube/commit/484f1ca0d0fa67a148f2db01041837a95d35c1c5))
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* **playground:** replace antd popover for settings ([#7699](https://github.com/cube-js/cube/issues/7699)) ([56b44ee](https://github.com/cube-js/cube/commit/56b44eefe02fa21fe0ae89d2bc45ee83f20a5210))
+
+
+
+
+
+## [0.34.46](https://github.com/cube-js/cube/compare/v0.34.45...v0.34.46) (2024-01-18)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.43](https://github.com/cube-js/cube/compare/v0.34.42...v0.34.43) (2024-01-11)
+
+
+### Bug Fixes
+
+* **playground:** replace antd overlay ([#7645](https://github.com/cube-js/cube/issues/7645)) ([bb6a7d3](https://github.com/cube-js/cube/commit/bb6a7d3ff4b6d6b7972c196877749d3dbc2aecf6))
+
+
+
+
+
+## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.32](https://github.com/cube-js/cube/compare/v0.34.31...v0.34.32) (2023-12-07)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.27](https://github.com/cube-js/cube/compare/v0.34.26...v0.34.27) (2023-11-30)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.24](https://github.com/cube-js/cube/compare/v0.34.23...v0.34.24) (2023-11-23)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.20](https://github.com/cube-js/cube/compare/v0.34.19...v0.34.20) (2023-11-14)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.19](https://github.com/cube-js/cube/compare/v0.34.18...v0.34.19) (2023-11-11)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.34.14](https://github.com/cube-js/cube/compare/v0.34.13...v0.34.14) (2023-11-05)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
 ## [0.34.9](https://github.com/cube-js/cube/compare/v0.34.8...v0.34.9) (2023-10-26)
 
 

@@ -11,7 +11,7 @@ use datafusion::physical_plan::aggregates::AggregateFunction;
 use egg::{EGraph, Rewrite, Subst};
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(
+    pub fn window_function_rules(
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
@@ -22,6 +22,7 @@ impl WrapperRules {
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
                     "?ungrouped",
+                    "?in_projection",
                     "?cube_members",
                 ),
                 agg_fun_expr(
@@ -30,6 +31,7 @@ impl WrapperRules {
                         "?expr",
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     )],
                     "?distinct",
@@ -43,6 +45,7 @@ impl WrapperRules {
                         "?expr",
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     )],
                     "?distinct",
@@ -51,6 +54,7 @@ impl WrapperRules {
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
                     "?ungrouped",
+                    "?in_projection",
                     "?cube_members",
                 ),
                 self.transform_agg_fun_expr("?fun", "?distinct", "?alias_to_cube"),
@@ -67,7 +71,7 @@ impl WrapperRules {
         let fun_var = var!(fun_var);
         let distinct_var = var!(distinct_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
-        let meta = self.cube_context.meta.clone();
+        let meta = self.meta_context.clone();
         move |egraph, subst| {
             for alias_to_cube in var_iter!(
                 egraph[subst[alias_to_cube_var]],

@@ -334,6 +334,7 @@ export async function startBirdBoxFromContainer(
       process.env.BIRDBOX_CUBESTORE_VERSION
     )
     .withEnv('CUBEJS_TELEMETRY', 'false')
+    .withEnv('CUBEJS_SCHEMA_PATH', 'schema')
     .up();
 
   const host = '127.0.0.1';
@@ -538,6 +539,7 @@ export async function startBirdBoxFromCli(
     CUBEJS_DB_TYPE: options.type === 'postgresql'
       ? 'postgres'
       : options.type,
+    CUBEJS_SCHEMA_PATH: 'schema',
     CUBEJS_DEV_MODE: 'true',
     CUBEJS_API_SECRET: 'mysupersecret',
     CUBEJS_WEB_SOCKETS: 'true',
@@ -607,7 +609,9 @@ export async function startBirdBoxFromCli(
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Done with DB\n');
       }
-      process.kill(-cli.pid, 'SIGINT');
+      if (cli.pid) {
+        process.kill(-cli.pid, 'SIGINT');
+      }
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closed\n');
       }

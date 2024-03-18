@@ -1,5 +1,5 @@
 /* eslint-disable */
-import ClickHouse from '@apla/clickhouse';
+import ClickHouse from '@cubejs-backend/apla-clickhouse';
 import { GenericContainer } from 'testcontainers';
 import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
@@ -68,9 +68,9 @@ export class ClickHouseDbRunner {
 
   testQueries = async (queries, prepareDataSet) => {
     if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
-      const version = process.env.TEST_CLICKHOUSE_VERSION || '21.1.2';
+      const version = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
 
-      this.container = await new GenericContainer(`yandex/clickhouse-server:${version}`)
+      this.container = await new GenericContainer(`clickhouse/clickhouse-server:${version}`)
         .withExposedPorts(8123)
         .start();
     }

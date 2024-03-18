@@ -6,12 +6,19 @@ import { UserError } from './UserError';
 import { BaseMeasure, BaseQuery } from '../adapter';
 
 export class CubeToMetaTransformer {
+  /**
+   * @param {import('./CubeValidator').CubeValidator} cubeValidator
+   * @param {import('./CubeEvaluator').CubeEvaluator} cubeEvaluator
+   * @param {import('./ContextEvaluator').ContextEvaluator} contextEvaluator
+   * @param {import('./JoinGraph').JoinGraph} joinGraph
+   */
   constructor(cubeValidator, cubeEvaluator, contextEvaluator, joinGraph) {
     this.cubeValidator = cubeValidator;
     this.cubeSymbols = cubeEvaluator;
     this.cubeEvaluator = cubeEvaluator;
     this.contextEvaluator = contextEvaluator;
     this.joinGraph = joinGraph;
+    this.cubes = [];
   }
 
   compile(cubes, errorReporter) {
@@ -36,17 +43,20 @@ export class CubeToMetaTransformer {
     const isCubeVisible = this.isVisible(cube, true);
 
     return {
-      isVisible: isCubeVisible,
       config: {
         name: cube.name,
         type: cube.isView ? 'view' : 'cube',
         title: cubeTitle,
+        isVisible: isCubeVisible,
+        public: isCubeVisible,
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
+        meta: cube.meta,
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),
-            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false
+            isVisible: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
+            public: isCubeVisible ? this.isVisible(nameToMetric[1], true) : false,
           })),
           R.toPairs
         )(cube.measures || {}),
@@ -58,10 +68,18 @@ export class CubeToMetaTransformer {
             description: nameToDimension[1].description,
             shortTitle: this.title(cubeTitle, nameToDimension, true),
             suggestFilterValues:
-              nameToDimension[1].suggestFilterValues == null ? true : nameToDimension[1].suggestFilterValues,
+              nameToDimension[1].suggestFilterValues == null
+                ? true
+                : nameToDimension[1].suggestFilterValues,
             format: nameToDimension[1].format,
             meta: nameToDimension[1].meta,
-            isVisible: isCubeVisible ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey) : false
+            isVisible: isCubeVisible
+              ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+              : false,
+            public: isCubeVisible
+              ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
+              : false,
+            primaryKey: !!nameToDimension[1].primaryKey,
           })),
           R.toPairs
         )(cube.dimensions || {}),
@@ -72,11 +90,12 @@ export class CubeToMetaTransformer {
             shortTitle: this.title(cubeTitle, nameToSegment, true),
             description: nameToSegment[1].description,
             meta: nameToSegment[1].meta,
-            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false
+            isVisible: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
+            public: isCubeVisible ? this.isVisible(nameToSegment[1], true) : false,
           })),
           R.toPairs
-        )(cube.segments || {})
-      }
+        )(cube.segments || {}),
+      },
     };
   }
 

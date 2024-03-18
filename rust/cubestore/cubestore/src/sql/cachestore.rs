@@ -1,6 +1,7 @@
 use crate::cachestore::{CacheItem, CacheStore, EvictionResult, QueueItem};
 use crate::metastore::{Column, ColumnType};
 
+use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
 use crate::queryplanner::{QueryPlan, QueryPlanner};
 use crate::sql::parser::{
     CacheCommand, CacheStoreCommand, CubeStoreParser, QueueCommand,
@@ -9,26 +10,34 @@ use crate::sql::parser::{
 use crate::sql::{QueryPlans, SqlQueryContext, SqlService};
 use crate::store::DataFrame;
 use crate::table::{Row, TableValue};
+use crate::util::metrics;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 use datafusion::sql::parser::Statement as DFStatement;
+use deepsize::DeepSizeOf;
 use sqlparser::ast::Statement;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 pub struct CacheStoreSqlService {
     cachestore: Arc<dyn CacheStore>,
     query_planner: Arc<dyn QueryPlanner>,
+    process_rate_limiter: Arc<dyn ProcessRateLimiter>,
 }
 
 crate::di_service!(CacheStoreSqlService, [SqlService]);
 
 impl CacheStoreSqlService {
-    pub fn new(cachestore: Arc<dyn CacheStore>, query_planner: Arc<dyn QueryPlanner>) -> Self {
+    pub fn new(
+        cachestore: Arc<dyn CacheStore>,
+        query_planner: Arc<dyn QueryPlanner>,
+        process_rate_limiter: Arc<dyn ProcessRateLimiter>,
+    ) -> Self {
         Self {
             cachestore,
             query_planner,
+            process_rate_limiter,
         }
     }
 
@@ -174,21 +183,33 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: CacheCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::CACHE_QUERIES.increment();
+        app_metrics::CACHE_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                command.as_tag_command(),
+            )]),
+        );
+
+        let timeout = Some(Duration::from_secs(90));
+        let wait_ms = self
+            .process_rate_limiter
+            .wait_for_allow(TaskType::Cache, timeout)
+            .await?;
+
         let execution_time = SystemTime::now();
 
-        let (result, track_time) = match command {
+        let (result, additional_traffic, track_time) = match command {
             CacheCommand::Set {
                 key,
                 value,
                 ttl,
                 nx,
             } => {
-                let key = key.value;
-
+                let value_size = key.value.deep_size_of() + value.deep_size_of();
                 let success = self
                     .cachestore
-                    .cache_set(CacheItem::new(key, ttl, value), nx)
+                    .cache_set(CacheItem::new(key.value, ttl, value), nx)
                     .await?;
 
                 (
@@ -196,6 +217,7 @@ impl CacheStoreSqlService {
                         vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
                         vec![Row::new(vec![TableValue::Boolean(success)])],
                     )),
+                    Some(value_size),
                     true,
                 )
             }
@@ -212,11 +234,13 @@ impl CacheStoreSqlService {
                         vec![Column::new("value".to_string(), ColumnType::String, 0)],
                         vec![Row::new(vec![value])],
                     )),
+                    None,
                     true,
                 )
             }
             CacheCommand::Keys { prefix } => {
                 let rows = self.cachestore.cache_keys(prefix.value).await?;
+
                 (
                     Arc::new(DataFrame::new(
                         vec![Column::new("key".to_string(), ColumnType::String, 0)],
@@ -224,18 +248,19 @@ impl CacheStoreSqlService {
                             .map(|i| Row::new(vec![TableValue::String(i.get_row().get_path())]))
                             .collect(),
                     )),
+                    None,
                     true,
                 )
             }
             CacheCommand::Remove { key } => {
                 self.cachestore.cache_delete(key.value).await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), true)
+                (Arc::new(DataFrame::new(vec![], vec![])), None, true)
             }
             CacheCommand::Truncate {} => {
                 self.cachestore.cache_truncate().await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), false)
+                (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }
             CacheCommand::Incr { path } => {
                 let row = self.cachestore.cache_incr(path.value).await?;
@@ -247,10 +272,25 @@ impl CacheStoreSqlService {
                             row.get_row().get_value().clone(),
                         )])],
                     )),
+                    None,
                     true,
                 )
             }
         };
+
+        let trace_index = TraceIndex {
+            // Important, it is used to aggregate all stats for cache by id
+            table_id: Some(1),
+            trace_obj: None,
+        };
+        self.process_rate_limiter
+            .commit_task_usage(
+                TaskType::Cache,
+                (result.deep_size_of() + additional_traffic.unwrap_or(0)) as i64,
+                wait_ms,
+                trace_index,
+            )
+            .await;
 
         let execution_time = execution_time.elapsed()?;
 
@@ -268,16 +308,30 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: QueueCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::QUEUE_QUERIES.increment();
+        app_metrics::QUEUE_QUERIES.add_with_tags(
+            1,
+            Some(&vec![metrics::format_tag(
+                "command",
+                command.as_tag_command(),
+            )]),
+        );
+
+        let timeout = Some(Duration::from_secs(90));
+        let wait_ms = self
+            .process_rate_limiter
+            .wait_for_allow(TaskType::Queue, timeout)
+            .await?;
+
         let execution_time = SystemTime::now();
 
-        let (result, track_time) = match command {
+        let (result, additional_traffic, track_time) = match command {
             QueueCommand::Add {
                 key,
                 priority,
                 orphaned,
                 value,
             } => {
+                let value_size = key.value.deep_size_of() + value.deep_size_of();
                 let response = self
                     .cachestore
                     .queue_add(QueueItem::new(
@@ -302,13 +356,14 @@ impl CacheStoreSqlService {
                             TableValue::Int(response.pending as i64),
                         ])],
                     )),
+                    Some(value_size),
                     true,
                 )
             }
             QueueCommand::Truncate {} => {
                 self.cachestore.queue_truncate().await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), false)
+                (Arc::new(DataFrame::new(vec![], vec![])), None, false)
             }
             QueueCommand::Cancel { key } => {
                 let columns = vec![
@@ -323,19 +378,25 @@ impl CacheStoreSqlService {
                     vec![]
                 };
 
-                (Arc::new(DataFrame::new(columns, rows)), true)
+                (Arc::new(DataFrame::new(columns, rows)), None, true)
             }
             QueueCommand::Heartbeat { key } => {
                 self.cachestore.queue_heartbeat(key).await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), true)
+                (Arc::new(DataFrame::new(vec![], vec![])), None, true)
             }
             QueueCommand::MergeExtra { key, payload } => {
+                let payload_size = payload.deep_size_of();
                 self.cachestore.queue_merge_extra(key, payload).await?;
 
-                (Arc::new(DataFrame::new(vec![], vec![])), true)
+                (
+                    Arc::new(DataFrame::new(vec![], vec![])),
+                    Some(payload_size),
+                    true,
+                )
             }
             QueueCommand::Ack { key, result } => {
+                let result_size = result.as_ref().map(|r| r.deep_size_of());
                 let success = self.cachestore.queue_ack(key, result).await?;
 
                 (
@@ -343,6 +404,7 @@ impl CacheStoreSqlService {
                         vec![Column::new("success".to_string(), ColumnType::Boolean, 0)],
                         vec![Row::new(vec![TableValue::Boolean(success)])],
                     )),
+                    result_size,
                     true,
                 )
             }
@@ -362,6 +424,7 @@ impl CacheStoreSqlService {
                         ],
                         rows,
                     )),
+                    None,
                     true,
                 )
             }
@@ -388,6 +451,7 @@ impl CacheStoreSqlService {
                             .map(|item| QueueItem::queue_to_cancel_row(item))
                             .collect(),
                     )),
+                    None,
                     true,
                 )
             }
@@ -421,6 +485,7 @@ impl CacheStoreSqlService {
                             .map(|item| QueueItem::queue_list_row(item, with_payload))
                             .collect(),
                     )),
+                    None,
                     true,
                 )
             }
@@ -445,6 +510,7 @@ impl CacheStoreSqlService {
                         ],
                         result.into_queue_retrieve_rows(extended),
                     )),
+                    None,
                     true,
                 )
             }
@@ -464,6 +530,7 @@ impl CacheStoreSqlService {
                         ],
                         rows,
                     )),
+                    None,
                     true,
                 )
             }
@@ -484,10 +551,25 @@ impl CacheStoreSqlService {
                         ],
                         rows,
                     )),
+                    None,
                     false,
                 )
             }
         };
+
+        let trace_index = TraceIndex {
+            // Important, it is used to aggregate all stats for queue by id
+            table_id: Some(1),
+            trace_obj: None,
+        };
+        self.process_rate_limiter
+            .commit_task_usage(
+                TaskType::Queue,
+                (result.deep_size_of() + additional_traffic.unwrap_or(0)) as i64,
+                wait_ms,
+                trace_index,
+            )
+            .await;
 
         let execution_time = execution_time.elapsed()?;
 
