@@ -4330,7 +4330,7 @@ mod tests {
                         let res = service
                             .exec_query(
                                 "SELECT gender, state FROM test.nested where \
-                                    state = 'nj' and ((gender = 'male' and state = 'nj') or state = 'sc') ORDER BY 1, 2",
+                                    state = 'nj' and ((gender = 'male' and state = 'nj') or state = 'sc')",
                             )
                             .await
                             .unwrap();
