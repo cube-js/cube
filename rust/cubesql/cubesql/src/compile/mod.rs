@@ -52,9 +52,9 @@ use self::{
             create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_ends_with_udf,
             create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
             create_has_schema_privilege_udf, create_has_table_privilege_udf, create_hour_udf,
-            create_if_udf, create_inet_server_addr_udf, create_instr_udf, create_interval_mul_udf,
-            create_isnull_udf, create_json_build_object_udf, create_least_udf, create_locate_udf,
-            create_makedate_udf, create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
+            create_if_udf, create_inet_server_addr_udf, create_instr_udf, create_isnull_udf,
+            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
+            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
             create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
             create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
             create_pg_get_indexdef_udf, create_pg_get_serial_sequence_udf,
@@ -1455,7 +1455,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
-        ctx.register_udf(create_interval_mul_udf());
         ctx.register_udf(create_ends_with_udf());
         ctx.register_udf(create_position_udf());
         ctx.register_udf(create_date_to_timestamp_udf());
@@ -6205,12 +6204,12 @@ limit
 
     #[tokio::test]
     async fn test_date_add_sub_postgres() {
-        async fn check_fun(name: &str, t: &str, i: &str, expected: &str) {
+        async fn check_fun(op: &str, t: &str, i: &str, expected: &str) {
             assert_eq!(
                 execute_query(
                     format!(
-                        "SELECT {}(Str_to_date('{}', '%Y-%m-%d %H:%i:%s'), INTERVAL '{}') as result",
-                        name, t, i
+                        "SELECT Str_to_date('{}', '%Y-%m-%d %H:%i:%s') {} INTERVAL '{}' as result",
+                        t, op, i
                     ),
                     DatabaseProtocol::PostgreSQL
                 )
@@ -6228,11 +6227,11 @@ limit
         }
 
         async fn check_adds_to(t: &str, i: &str, expected: &str) {
-            check_fun("DATE_ADD", t, i, expected).await
+            check_fun("+", t, i, expected).await
         }
 
         async fn check_subs_to(t: &str, i: &str, expected: &str) {
-            check_fun("DATE_SUB", t, i, expected).await
+            check_fun("-", t, i, expected).await
         }
 
         check_adds_to("2021-01-01 00:00:00", "1 second", "2021-01-01T00:00:01.000").await;

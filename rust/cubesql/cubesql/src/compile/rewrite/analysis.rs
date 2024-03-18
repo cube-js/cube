@@ -972,7 +972,6 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
                         || &fun.name == "date_to_timestamp"
-                        || &fun.name == "interval_mul"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
@@ -1062,22 +1061,6 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
-
-                match &expr {
-                    Expr::BinaryExpr { left, right, .. } => match (&**left, &**right) {
-                        (Expr::Literal(ScalarValue::IntervalYearMonth(_)), Expr::Literal(_))
-                        | (Expr::Literal(ScalarValue::IntervalDayTime(_)), Expr::Literal(_))
-                        | (Expr::Literal(ScalarValue::IntervalMonthDayNano(_)), Expr::Literal(_))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalYearMonth(_)))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalDayTime(_)))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalMonthDayNano(_))) => {
-                            return None
-                        }
-                        _ => (),
-                    },
-                    _ => (),
-                }
-
                 Self::eval_constant_expr(&egraph, &expr)
             }
             _ => None,
