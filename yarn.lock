@@ -14564,10 +14564,10 @@ draft-js@^0.10.0, draft-js@~0.10.0:
     immutable "~3.7.4"
     object-assign "^4.1.0"
 
-duckdb@^0.9.2:
-  version "0.9.2"
-  resolved "https://registry.yarnpkg.com/duckdb/-/duckdb-0.9.2.tgz#9bde60b6d2b66b97bbc302bd91d3736ee9df8687"
-  integrity sha512-POZ37Vf5cHVmk4W8z0PsdGi67VeQsr9HRrBbmivDt9AQ8C1XLESVE79facydbroNiqm7+n7fx6jqjyxyrBFYlQ==
+duckdb@^0.10.0:
+  version "0.10.0"
+  resolved "https://registry.yarnpkg.com/duckdb/-/duckdb-0.10.0.tgz#91312cc5f2277df529fa71423838f92f4e9bb2e7"
+  integrity sha512-+yVccZZTCYVHccKUUKeqCiQQ5/jggdnfyafN01Cgzzx2F0NSSSqNO9vT39oLmpIhEqsJIHYXVC/LuawN3AxUyA==
   dependencies:
     "@mapbox/node-pre-gyp" "^1.0.0"
     node-addon-api "^7.0.0"
