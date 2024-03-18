@@ -4296,7 +4296,7 @@ mod tests {
             .block_on(async {
 
                 Config::test("nested_boolean_operators").update_config(|mut c| {
-                    c.partition_split_threshold = 2;
+                    c.partition_split_threshold = 200;
                     c
                 }).start_test(async move |services| {
                         let service = services.sql_service;
