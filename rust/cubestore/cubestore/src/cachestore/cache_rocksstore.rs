@@ -31,6 +31,7 @@ use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
+use deepsize::DeepSizeOf;
 use itertools::Itertools;
 use log::{trace, warn};
 use serde_derive::{Deserialize, Serialize};
@@ -352,7 +353,15 @@ impl RocksCacheStore {
         Ok(())
     }
 
+    fn send_zero_gauge_stats(&self) {
+        app_metrics::CACHESTORE_ROCKSDB_ESTIMATE_LIVE_DATA_SIZE.report(0);
+        app_metrics::CACHESTORE_ROCKSDB_LIVE_SST_FILES_SIZE.report(0);
+        app_metrics::CACHESTORE_ROCKSDB_CF_DEFAULT_SIZE.report(0);
+    }
+
     pub async fn stop_processing_loops(&self) {
+        self.send_zero_gauge_stats();
+
         self.cache_eviction_manager.stop_processing_loops();
         self.upload_loop.stop();
         self.metrics_loop.stop();
@@ -584,7 +593,7 @@ impl RocksCacheStore {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, DeepSizeOf)]
 pub enum QueueKey {
     ById(u64),
     ByPath(String),
@@ -715,6 +724,15 @@ impl CacheStore for RocksCacheStore {
         item: CacheItem,
         update_if_not_exists: bool,
     ) -> Result<bool, CubeError> {
+        if item.get_value().len() >= self.store.config.cachestore_cache_max_entry_size() {
+            return Err(CubeError::user(format!(
+                "Unable to SET cache with '{}' key, exceeds maximum allowed size for payload: {}, max allowed: {}",
+                item.key,
+                humansize::format_size(item.get_value().len(), humansize::DECIMAL),
+                humansize::format_size(self.store.config.cachestore_cache_max_entry_size(), humansize::DECIMAL),
+            )));
+        }
+
         self.cache_eviction_manager
             .before_insert(item.get_value().len() as u64)
             .await?;
@@ -1517,6 +1535,38 @@ mod tests {
         assert_eq!(row.expire.is_some(), true);
 
         RocksCacheStore::cleanup_test_cachestore("cache_set");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_cache_set_max_entry_size() -> Result<(), CubeError> {
+        init_test_logger().await;
+
+        let config = Config::test("cachestore_set").update_config(|mut c| {
+            c.cachestore_cache_max_entry_size = 1 << 20;
+            c
+        });
+
+        let (_, cachestore) =
+            RocksCacheStore::prepare_test_cachestore("cache_set_max_entry_size", config);
+
+        let err = cachestore
+            .cache_set(
+                CacheItem::new(
+                    "prefix:key-with-wrong-size".to_string(),
+                    Some(60),
+                    "a".repeat(2 << 20),
+                ),
+                false,
+            )
+            .await;
+
+        assert_eq!(err, Err(CubeError::user(
+            "Unable to SET cache with 'key-with-wrong-size' key, exceeds maximum allowed size for payload: 2.10 MB, max allowed: 1.05 MB".to_string()
+        )));
+
+        RocksCacheStore::cleanup_test_cachestore("cache_set_max_entry_size");
 
         Ok(())
     }

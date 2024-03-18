@@ -182,7 +182,7 @@ pub struct ChunkStore {
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
     config: Arc<dyn ConfigObj>,
-    memory_chunks: RwLock<HashMap<u64, RecordBatch>>,
+    memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
 }
 
@@ -250,9 +250,13 @@ pub trait ChunkDataStore: DIService + Send + Sync {
         index: IdRow<Index>,
         sort_key_size: usize,
     ) -> Result<(Vec<ArrayRef>, Vec<u64>), CubeError>;
-    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError>;
-    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError>;
-    async fn free_deleted_memory_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError>;
+    async fn add_memory_chunk(
+        &self,
+        chunk_name: String,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError>;
+    async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError>;
+    async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError>;
     async fn add_persistent_chunk(
         &self,
         index: IdRow<Index>,
@@ -575,8 +579,9 @@ impl ChunkDataStore for ChunkStore {
                 return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
             }
             let memory_chunks = self.memory_chunks.read().await;
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             Ok(vec![memory_chunks
-                .get(&chunk.get_id())
+                .get(&chunk_name)
                 .map(|b| b.clone())
                 .unwrap_or(RecordBatch::new_empty(Arc::new(
                     arrow_schema(&index.get_row()),
@@ -669,8 +674,9 @@ impl ChunkDataStore for ChunkStore {
             if node_name != server_name {
                 return Err(CubeError::internal(format!("In memory chunk {:?} with owner node '{}' is trying to be repartitioned or compacted on non owner node '{}'", chunk, node_name, server_name)));
             }
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             let memory_chunks = self.memory_chunks.read().await;
-            Ok(memory_chunks.contains_key(&chunk.get_id()))
+            Ok(memory_chunks.contains_key(&chunk_name))
         } else {
             return Err(CubeError::internal(format!(
                 "Chunk {:?} is not in memory",
@@ -679,10 +685,14 @@ impl ChunkDataStore for ChunkStore {
         }
     }
 
-    async fn add_memory_chunk(&self, chunk_id: u64, batch: RecordBatch) -> Result<(), CubeError> {
+    async fn add_memory_chunk(
+        &self,
+        chunk_name: String,
+        batch: RecordBatch,
+    ) -> Result<(), CubeError> {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.insert(chunk_id, batch);
+        memory_chunks.insert(chunk_name, batch);
         Ok(())
     }
     async fn add_persistent_chunk(
@@ -701,19 +711,19 @@ impl ChunkDataStore for ChunkStore {
         .await?
     }
 
-    async fn free_memory_chunk(&self, chunk_id: u64) -> Result<(), CubeError> {
+    async fn free_memory_chunk(&self, chunk_name: String) -> Result<(), CubeError> {
         self.report_in_memory_metrics().await?;
         let mut memory_chunks = self.memory_chunks.write().await;
-        memory_chunks.remove(&chunk_id);
+        memory_chunks.remove(&chunk_name);
         Ok(())
     }
 
     #[tracing::instrument(level = "trace", skip(self))]
-    async fn free_deleted_memory_chunks(&self, chunk_ids: Vec<u64>) -> Result<(), CubeError> {
-        let ids_set = chunk_ids.into_iter().collect::<HashSet<_>>();
+    async fn free_deleted_memory_chunks(&self, chunk_names: Vec<String>) -> Result<(), CubeError> {
+        let names_set = chunk_names.into_iter().collect::<HashSet<_>>();
         {
             let mut memory_chunks = self.memory_chunks.write().await;
-            memory_chunks.retain(|id, _| !ids_set.contains(id));
+            memory_chunks.retain(|name, _| !names_set.contains(name));
         }
 
         self.report_in_memory_metrics().await?;
@@ -793,6 +803,19 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
 
+    #[test]
+    fn dataframe_deep_size_of() {
+        for (v, expected_size) in [(
+            DataFrame::new(
+                vec![Column::new("payload".to_string(), ColumnType::String, 0)],
+                vec![Row::new(vec![TableValue::String("foo".to_string())])],
+            ),
+            162_usize,
+        )] {
+            assert_eq!(v.deep_size_of(), expected_size, "size for {:?}", v);
+        }
+    }
+
     #[tokio::test]
     async fn create_wal_test() {
         let config = Config::test("create_chunk_test");
@@ -860,6 +883,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -955,6 +979,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -1064,6 +1089,7 @@ mod tests {
                     Some(vec![("sum".to_string(), "sum_int".to_string())]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -1328,9 +1354,10 @@ impl ChunkStore {
             let node_name = self.cluster.node_name_by_partition(&partition);
             let cluster = self.cluster.clone();
 
+            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
             Ok(cube_ext::spawn(async move {
                 cluster
-                    .add_memory_chunk(&node_name, chunk.get_id(), batch)
+                    .add_memory_chunk(&node_name, chunk_name, batch)
                     .await?;
 
                 Ok((chunk, None))

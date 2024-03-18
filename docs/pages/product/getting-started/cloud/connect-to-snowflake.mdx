@@ -1,0 +1,87 @@
+---
+redirect_from:
+  - /getting-started/cloud/connect-to-snowflake
+---
+
+# Connect to Snowflake
+
+In this section, we’ll create a Cube Cloud deployment and connect it to
+Snowflake. A deployment represents a data model, configuration, and managed
+infrastructure.
+
+To continue with this guide, you'll need to have a Cube Cloud account. If you
+don't have one yet, [click here to sign up][cube-cloud-signup] for free.
+
+First, [sign in to your Cube Cloud account][cube-cloud-signin]. Then,
+click <Btn>Create Deployment</Btn>:
+
+Give the deployment a name, select the cloud provider and region of your choice,
+and click <Btn>Next</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Create Deployment Screen"
+  src="https://ucarecdn.com/2338323e-0db8-4224-8e7a-3b4daf9c60ec/"
+/>
+
+<SuccessBox>
+
+Microsoft Azure is available in Cube Cloud on
+[Premium](https://cube.dev/pricing) tier. [Contact us](https://cube.dev/contact)
+for details.
+
+</SuccessBox>
+
+## Set up a Cube project
+
+Next, click <Btn>Create</Btn> to create a new project from scratch:
+
+<Screenshot
+  alt="Cube Cloud Upload Project Screen"
+  src="https://ucarecdn.com/46b72b61-b650-4271-808d-55203f1c8d8b/"
+/>
+
+## Connect to your Snowflake
+
+The last step is to connect Cube Cloud to Snowflake. First, select it from the
+grid:
+
+<Screenshot
+  alt="Cube Cloud Setup Database Screen"
+  src="https://ucarecdn.com/1d656ba9-dd83-4ff4-a59e-8b5f97a9ddcc/"
+/>
+
+Then enter your Snowflake credentials:
+
+- **Username:** Your Snowflake username. Please note, it is usually **not** your
+  email address.
+- **Password:** Your Snowflake password.
+- **Database:** `CUBE_DEMO`, that is the database we've created in the previous
+  step.
+- **Account:** Your snowflake account identifier. You can find it in your
+  Snowflake URL as the `account_locator` part.
+- **Region:** Your Snowflake account region. You can find it in your Snowflake
+  URL. If your URL includes a `cloud` part, use both the `cloud_region_id` and
+  `cloud` together e.g. `us-east-2.aws`, otherwise just use `cloud_region_id`
+- **Warehouse:** `CUBE_DEMO_WH`, that is the warehouse we've created in the
+  previous step.
+- **Role:** You can leave it blank.
+
+Click <Btn>Apply</Btn>, Cube Cloud will test the connection and proceed to the
+next step.
+
+## Generate data model from your Snowflake schema
+
+Cube can now generate a basic data model from your data warehouse schema, which
+helps getting started with data modeling faster. Select all four tables in our
+`ECOM` schema and click through the data model generation wizard. We'll inspect
+these generated files in the next section and start making changes to them.
+
+[aws-docs-sec-group]:
+  https://docs.aws.amazon.com/vpc/latest/userguide/security-groups.html
+[aws-docs-sec-group-rule]:
+  https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html
+[cube-cloud-signin]: https://cubecloud.dev/auth
+[cube-cloud-signup]: https://cubecloud.dev/auth/signup
+[ref-conf-db]: /product/configuration/data-sources
+[ref-getting-started-cloud-generate-models]:
+  /getting-started/cloud/generate-models

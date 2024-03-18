@@ -83,7 +83,10 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 
-export const extractDate = (data: any): string => {
+export const extractDate = (data: any): string | null => {
+  if (!data) {
+    return null;
+  }
   data = JSON.parse(JSON.stringify(data));
   const value = data[0] && data[0][Object.keys(data[0])[0]];
   if (!value) {

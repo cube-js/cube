@@ -70,6 +70,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::time::SystemTime;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::runtime::Runtime;
 use tokio::sync::broadcast::{Receiver, Sender};
 use tokio::sync::{oneshot, watch, Notify, RwLock};
 use tokio::time::timeout;
@@ -133,15 +134,16 @@ pub trait Cluster: DIService + Send + Sync {
     async fn add_memory_chunk(
         &self,
         node_name: &str,
-        chunk_id: u64,
+        chunk_name: String,
         batch: RecordBatch,
     ) -> Result<(), CubeError>;
 
-    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError>;
+    async fn free_memory_chunk(&self, node_name: &str, chunk_name: String)
+        -> Result<(), CubeError>;
     async fn free_deleted_memory_chunks(
         &self,
         node_name: &str,
-        chunk_ids: Vec<u64>,
+        chunk_names: Vec<String>,
     ) -> Result<(), CubeError>;
 
     fn job_result_listener(&self) -> JobResultListener;
@@ -172,6 +174,7 @@ crate::di_service!(MockCluster, [Cluster]);
 pub enum JobEvent {
     Started(RowKey, JobType),
     Success(RowKey, JobType),
+    Orphaned(RowKey, JobType),
     Error(RowKey, JobType, String),
 }
 
@@ -225,6 +228,14 @@ impl Configurator for WorkerConfigurator {
     type Config = Config;
     type ServicesRequest = ();
     type ServicesResponse = ();
+
+    fn setup(runtime: &Runtime) {
+        let startup = SELECT_WORKER_SETUP.read().unwrap();
+        if startup.is_some() {
+            startup.as_ref().unwrap()(runtime);
+        }
+    }
+
     async fn configure(
         _services_client: Arc<
             dyn Callable<Request = Self::ServicesRequest, Response = Self::ServicesResponse>,
@@ -258,6 +269,10 @@ impl WorkerProcessing for WorkerProcessor {
             func(config);
         }
         Ok(())
+    }
+
+    fn is_single_job_process() -> bool {
+        false
     }
 
     async fn process(
@@ -347,6 +362,17 @@ lazy_static! {
 lazy_static! {
     static ref SELECT_WORKER_SPAWN_BACKGROUND_FN: std::sync::RwLock<Option<Box<dyn Fn(Config) + Send + Sync>>> =
         std::sync::RwLock::new(None);
+}
+
+lazy_static! {
+    static ref SELECT_WORKER_SETUP: std::sync::RwLock<Option<Box<dyn Fn(&Runtime) + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
+pub fn register_select_worker_setup(f: fn(&Runtime)) {
+    let mut setup = SELECT_WORKER_SETUP.write().unwrap();
+    assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
 }
 
 pub fn register_select_worker_configure_fn(f: fn() -> BoxFuture<'static, Config>) {
@@ -477,7 +503,7 @@ impl Cluster for ClusterImpl {
     async fn add_memory_chunk(
         &self,
         node_name: &str,
-        chunk_id: u64,
+        chunk_name: String,
         batch: RecordBatch,
     ) -> Result<(), CubeError> {
         let record_batch = SerializedRecordBatchStream::write(&batch.schema(), vec![batch])?;
@@ -485,7 +511,7 @@ impl Cluster for ClusterImpl {
             .send_or_process_locally(
                 node_name,
                 NetworkMessage::AddMemoryChunk {
-                    chunk_id,
+                    chunk_name,
                     data: record_batch.into_iter().next().unwrap(),
                 },
             )
@@ -496,9 +522,13 @@ impl Cluster for ClusterImpl {
         }
     }
 
-    async fn free_memory_chunk(&self, node_name: &str, chunk_id: u64) -> Result<(), CubeError> {
+    async fn free_memory_chunk(
+        &self,
+        node_name: &str,
+        chunk_name: String,
+    ) -> Result<(), CubeError> {
         let response = self
-            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_id })
+            .send_or_process_locally(node_name, NetworkMessage::FreeMemoryChunk { chunk_name })
             .await?;
         match response {
             NetworkMessage::FreeMemoryChunkResult(r) => r,
@@ -509,12 +539,12 @@ impl Cluster for ClusterImpl {
     async fn free_deleted_memory_chunks(
         &self,
         node_name: &str,
-        chunk_ids: Vec<u64>,
+        chunk_names: Vec<String>,
     ) -> Result<(), CubeError> {
         let response = self
             .send_or_process_locally(
                 node_name,
-                NetworkMessage::FreeDeletedMemoryChunks(chunk_ids),
+                NetworkMessage::FreeDeletedMemoryChunks(chunk_names),
             )
             .await?;
         match response {
@@ -633,7 +663,7 @@ impl Cluster for ClusterImpl {
             | NetworkMessage::ExplainAnalyzeResult(_) => {
                 panic!("result sent to worker");
             }
-            NetworkMessage::AddMemoryChunk { chunk_id, data } => {
+            NetworkMessage::AddMemoryChunk { chunk_name, data } => {
                 let res = match data.read() {
                     Ok(batch) => {
                         let chunk_store = self
@@ -642,7 +672,7 @@ impl Cluster for ClusterImpl {
                             .unwrap()
                             .get_service_typed::<dyn ChunkDataStore>()
                             .await;
-                        chunk_store.add_memory_chunk(chunk_id, batch).await
+                        chunk_store.add_memory_chunk(chunk_name, batch).await
                     }
                     Err(e) => Err(e),
                 };
@@ -651,24 +681,24 @@ impl Cluster for ClusterImpl {
             NetworkMessage::AddMemoryChunkResult(_) => {
                 panic!("AddChunkResult sent to worker");
             }
-            NetworkMessage::FreeMemoryChunk { chunk_id } => {
+            NetworkMessage::FreeMemoryChunk { chunk_name } => {
                 let chunk_store = self
                     .injector
                     .upgrade()
                     .unwrap()
                     .get_service_typed::<dyn ChunkDataStore>()
                     .await;
-                let res = chunk_store.free_memory_chunk(chunk_id).await;
+                let res = chunk_store.free_memory_chunk(chunk_name).await;
                 NetworkMessage::FreeMemoryChunkResult(res)
             }
-            NetworkMessage::FreeDeletedMemoryChunks(ids) => {
+            NetworkMessage::FreeDeletedMemoryChunks(names) => {
                 let chunk_store = self
                     .injector
                     .upgrade()
                     .unwrap()
                     .get_service_typed::<dyn ChunkDataStore>()
                     .await;
-                let res = chunk_store.free_deleted_memory_chunks(ids).await;
+                let res = chunk_store.free_deleted_memory_chunks(names).await;
                 NetworkMessage::FreeDeletedMemoryChunksResult(res)
             }
             NetworkMessage::FreeMemoryChunkResult(_) => {
@@ -795,6 +825,10 @@ impl JobResultListener {
                             new.get_row().row_reference().clone(),
                             new.get_row().job_type().clone(),
                             "Job timed out".to_string(),
+                        )),
+                        JobStatus::Orphaned => Some(JobEvent::Orphaned(
+                            new.get_row().row_reference().clone(),
+                            new.get_row().job_type().clone(),
                         )),
                         JobStatus::Error(e) => Some(JobEvent::Error(
                             new.get_row().row_reference().clone(),
@@ -1147,7 +1181,8 @@ impl ClusterImpl {
         &self,
         plan_node: SerializedPlan,
     ) -> Result<(SchemaRef, Vec<SerializedRecordBatchStream>), CubeError> {
-        self.process_rate_limiter
+        let wait_ms = self
+            .process_rate_limiter
             .wait_for_allow(
                 TaskType::Select,
                 Some(Duration::from_secs(self.config_obj.query_timeout())),
@@ -1161,13 +1196,18 @@ impl ClusterImpl {
         match res {
             Ok((schema, records, data_loaded_size)) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, data_loaded_size as i64, trace_index)
+                    .commit_task_usage(
+                        TaskType::Select,
+                        data_loaded_size as i64,
+                        wait_ms,
+                        trace_index,
+                    )
                     .await;
                 Ok((schema, records))
             }
             Err(e) => {
                 self.process_rate_limiter
-                    .commit_task_usage(TaskType::Select, 0, trace_index)
+                    .commit_task_usage(TaskType::Select, 0, wait_ms, trace_index)
                     .await;
                 Err(e)
             }

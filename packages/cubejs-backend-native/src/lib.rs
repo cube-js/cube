@@ -1,4 +1,6 @@
 #![feature(async_closure)]
+#![feature(thread_id_value)]
+#![allow(clippy::result_large_err)]
 
 extern crate findshlibs;
 
@@ -117,6 +119,9 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let transport_meta = options
         .get::<JsFunction, _, _>(&mut cx, "meta")?
         .root(&mut cx);
+    let transport_log_load_event = options
+        .get::<JsFunction, _, _>(&mut cx, "logLoadEvent")?
+        .root(&mut cx);
     let transport_sql_generator = options
         .get::<JsFunction, _, _>(&mut cx, "sqlGenerators")?
         .root(&mut cx);
@@ -159,6 +164,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         transport_sql_api_load,
         transport_sql,
         transport_meta,
+        transport_log_load_event,
         transport_sql_generator,
         transport_can_switch_user_for_session,
     );

@@ -47,7 +47,7 @@ export class FireboltQuery extends BaseQuery {
     return `DATE_TRUNC('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new FireboltFilter(this, filter);
   }
 }

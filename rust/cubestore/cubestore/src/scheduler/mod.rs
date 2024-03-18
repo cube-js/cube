@@ -1,5 +1,6 @@
 use crate::cluster::{pick_worker_by_ids, Cluster};
 use crate::config::ConfigObj;
+use crate::metastore::chunks::chunk_file_name;
 use crate::metastore::job::{Job, JobStatus, JobType};
 use crate::metastore::partition::partition_file_name;
 use crate::metastore::replay_handle::ReplayHandle;
@@ -44,7 +45,7 @@ pub struct SchedulerImpl {
     reconcile_loop: WorkerLoop,
     chunk_processing_loop: WorkerLoop,
     chunk_events_queue: Mutex<Vec<(SystemTime, u64)>>,
-    in_memory_chunks_to_delete: Mutex<Vec<(String, u64)>>, //(node, chunk_is)
+    in_memory_chunks_to_delete: Mutex<Vec<(String, String)>>, //(node, chunk_is)
     node_last_actions: Mutex<HashMap<String, LastNodeActionTimes>>,
 }
 
@@ -686,6 +687,9 @@ impl SchedulerImpl {
             .await?;
         for job in orphaned_jobs {
             log::info!("Removing orphaned job: {:?}", job);
+            self.meta_store
+                .update_status(job.get_id(), JobStatus::Orphaned)
+                .await?;
             self.meta_store.delete_job(job.get_id()).await?;
         }
         Ok(())
@@ -758,8 +762,9 @@ impl SchedulerImpl {
                     .get_partition(chunk.get_row().get_partition_id())
                     .await?;
                 let node_name = self.cluster.node_name_by_partition(&partition);
+                let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
                 let mut to_delete = self.in_memory_chunks_to_delete.lock().await;
-                to_delete.push((node_name, chunk.get_id()))
+                to_delete.push((node_name, chunk_name))
             } else if chunk.get_row().uploaded() {
                 let file_name =
                     ChunkStore::chunk_remote_path(chunk.get_id(), chunk.get_row().suffix());
@@ -913,11 +918,11 @@ impl SchedulerImpl {
             };
             if !chunks_to_delete.is_empty() {
                 let chunks_to_delete = chunks_to_delete.into_iter().into_group_map();
-                for (node, ids) in chunks_to_delete {
-                    if !ids.is_empty() {
+                for (node, names) in chunks_to_delete {
+                    if !names.is_empty() {
                         if let Err(e) = self
                             .cluster
-                            .free_deleted_memory_chunks(&node, ids.clone())
+                            .free_deleted_memory_chunks(&node, names.clone())
                             .await
                         {
                             log::error!(
@@ -927,7 +932,7 @@ impl SchedulerImpl {
                             );
 
                             let mut chunks = self.in_memory_chunks_to_delete.lock().await;
-                            chunks.extend(ids.iter().map(|v| (node.clone(), *v)));
+                            chunks.extend(names.iter().map(|v| (node.clone(), v.clone())));
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 use datafusion::{arrow::datatypes::DataType, logical_plan::Column};
 use itertools::Itertools;
 use std::{collections::HashMap, ops::RangeFrom, sync::Arc};
+use uuid::Uuid;
 
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
 
@@ -14,6 +15,7 @@ pub struct MetaContext {
     pub tables: Vec<CubeMetaTable>,
     pub cube_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
+    pub compiler_id: Uuid,
 }
 
 #[derive(Debug, Clone)]
@@ -38,6 +40,7 @@ impl MetaContext {
         cubes: Vec<V1CubeMeta>,
         cube_to_data_source: HashMap<String, String>,
         data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
+        compiler_id: Uuid,
     ) -> Self {
         // 18000 - max system table oid
         let mut oid_iter: RangeFrom<u32> = 18000..;
@@ -66,6 +69,7 @@ impl MetaContext {
             tables,
             cube_to_data_source,
             data_source_to_sql_generator,
+            compiler_id,
         }
     }
 
@@ -169,6 +173,24 @@ impl MetaContext {
         }
     }
 
+    pub fn is_synthetic_field(&self, name: String) -> bool {
+        let cube_and_member_name = name.split(".").collect::<Vec<_>>();
+        if cube_and_member_name.len() == 1
+            && MetaContext::is_synthetic_field_name(cube_and_member_name[0])
+        {
+            return true;
+        }
+        if let Some(_) = self.find_cube_with_name(cube_and_member_name[0]) {
+            MetaContext::is_synthetic_field_name(cube_and_member_name[1])
+        } else {
+            false
+        }
+    }
+
+    pub fn is_synthetic_field_name(field_name: &str) -> bool {
+        field_name == "__user" || field_name == "__cubeJoinField"
+    }
+
     pub fn find_df_data_type(&self, member_name: String) -> Option<DataType> {
         self.find_cube_with_name(member_name.split(".").next()?)?
             .df_data_type(member_name.as_str())
@@ -219,7 +241,8 @@ mod tests {
         ];
 
         // TODO
-        let test_context = MetaContext::new(test_cubes, HashMap::new(), HashMap::new());
+        let test_context =
+            MetaContext::new(test_cubes, HashMap::new(), HashMap::new(), Uuid::new_v4());
 
         match test_context.find_cube_table_with_oid(18000) {
             Some(table) => assert_eq!(18000, table.oid),

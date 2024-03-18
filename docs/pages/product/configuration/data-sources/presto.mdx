@@ -1,0 +1,66 @@
+---
+redirect_from:
+  - /config/databases/prestodb
+  - /config/databases/presto
+---
+
+# Presto
+
+## Prerequisites
+
+- The hostname for the [Presto][presto] database server
+- The username/password for the [Presto][presto] database server
+- The name of the database to use within the [Presto][presto] database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=prestodb
+CUBEJS_DB_HOST=my.presto.host
+CUBEJS_DB_USER=presto_user
+CUBEJS_DB_PASS=**********
+CUBEJS_DB_PRESTO_CATALOG=my_presto_catalog
+CUBEJS_DB_SCHEMA=my_presto_schema
+```
+
+## Environment Variables
+
+| Environment Variable       | Description                                                                         | Possible Values                               | Required |
+| -------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- | :------: |
+| `CUBEJS_DB_HOST`           | The host URL for a database                                                         | A valid database host URL                     |    ✅    |
+| `CUBEJS_DB_PORT`           | The port for the database connection                                                | A valid port number                           |    ❌    |
+| `CUBEJS_DB_USER`           | The username used to connect to the database                                        | A valid database username                     |    ✅    |
+| `CUBEJS_DB_PASS`           | The password used to connect to the database                                        | A valid database password                     |    ✅    |
+| `CUBEJS_DB_PRESTO_CATALOG` | The catalog within Presto to connect to                                             | A valid catalog name within a Presto database |    ✅    |
+| `CUBEJS_DB_SCHEMA`         | The schema within the database to connect to                                        | A valid schema name within a Presto database  |    ✅    |
+| `CUBEJS_DB_SSL`            | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                               |    ❌    |
+| `CUBEJS_CONCURRENCY`       | The number of concurrent connections each queue has to the database. Default is `2` | A valid number                                |    ❌    |
+| `CUBEJS_DB_MAX_POOL`       | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                |    ❌    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using Presto as a source database. To learn
+more about Presto support for approximate aggregate functions, [click
+here][presto-docs-approx-agg-fns].
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and Presto, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+[presto]: https://prestodb.io/
+[presto-docs-approx-agg-fns]:
+  https://prestodb.io/docs/current/functions/aggregate.html
+[ref-recipe-enable-ssl]:
+  /guides/recipes/data-sources/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx

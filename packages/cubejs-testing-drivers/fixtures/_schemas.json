@@ -249,6 +249,27 @@
           "sql": "profit",
           "type": "sum",
           "shown": false
+        },
+        {
+          "name": "rollingCountBy2Day",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "2 day"
+          }
+        },
+        {
+          "name": "rollingCountBy2Week",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "2 week"
+          }
+        },
+        {
+          "name": "rollingCountBy2Month",
+          "type": "count",
+          "rolling_window": {
+            "trailing": "2 month"
+          }
         }
       ]
     }

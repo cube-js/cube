@@ -11,8 +11,6 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
-      - 'docs-gen/**'
-      - 'docs/**'
     branches:
       - master
 jobs:
@@ -48,7 +46,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

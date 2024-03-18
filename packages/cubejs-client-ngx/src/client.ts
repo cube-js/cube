@@ -1,8 +1,8 @@
 import { Injectable, Inject } from '@angular/core';
 import { Observable, from, BehaviorSubject } from 'rxjs';
-import cubejs, {
-  CubejsApi,
-  CubeJSApiOptions,
+import cube, {
+  CubeApi,
+  CubeApiOptions,
   DryRunResponse,
   LoadMethodOptions,
   Meta,
@@ -11,16 +11,16 @@ import cubejs, {
   SqlQuery,
 } from '@cubejs-client/core';
 
-export type CubejsConfig = {
+export type CubeConfig = {
   token: string;
-  options?: CubeJSApiOptions;
+  options?: CubeApiOptions;
 };
 
 @Injectable()
-export class CubejsClient {
+export class CubeClient {
   public ready$: BehaviorSubject<boolean> = new BehaviorSubject(false);
 
-  private cubeJsApi: CubejsApi;
+  private cubeApi: CubeApi;
 
   constructor(@Inject('config') private config: any | Observable<any>) {
     if (this.config instanceof Observable) {
@@ -32,24 +32,24 @@ export class CubejsClient {
     }
   }
 
-  private apiInstance(): CubejsApi {
-    if (!this.cubeJsApi) {
+  private apiInstance(): CubeApi {
+    if (!this.cubeApi) {
       if (this.config instanceof Observable) {
         this.config.subscribe((config) => {
-          this.cubeJsApi = cubejs(config.token, config.options);
+          this.cubeApi = cube(config.token, config.options);
 
-          if (!this.cubeJsApi) {
+          if (!this.cubeApi) {
             throw new Error(
-              'Cannot create CubejsApi instance. Please check that the config is passed correctly and contains all required options.'
+              'Cannot create CubeApi instance. Please check that the config is passed correctly and contains all required options.'
             );
           }
         });
       } else {
-        this.cubeJsApi = cubejs(this.config.token, this.config.options);
+        this.cubeApi = cube(this.config.token, this.config.options);
       }
     }
 
-    return this.cubeJsApi;
+    return this.cubeApi;
   }
 
   public load(

@@ -1,0 +1,250 @@
+---
+redirect_from:
+  - /security/context
+---
+
+# Security context
+
+Your authentication server issues JWTs to your client application, which, when
+sent as part of the request, are verified and decoded by Cube to get security
+context claims to evaluate access control rules. Inbound JWTs are decoded and
+verified using industry-standard [JSON Web Key Sets (JWKS)][link-auth0-jwks].
+
+For access control or authorization, Cube allows you to define granular access
+control rules for every cube in your data model. Cube uses both the request and
+security context claims in the JWT token to generate a SQL query, which includes
+row-level constraints from the access control rules.
+
+JWTs sent to Cube should be passed in the `Authorization: <JWT>` header to
+authenticate requests.
+
+JWTs can also be used to pass additional information about the user, known as a
+**security context**. A security context is a verified set of claims about the
+current user that the Cube server can use to ensure that users only have access
+to the data that they are authorized to access.
+
+It will be accessible as the [`securityContext`][ref-config-sec-ctx] property
+inside:
+
+- The [`query_rewrite`][ref-config-queryrewrite] configuration option in your
+  Cube configuration  file.
+- the [`COMPILE_CONTEXT`][ref-cubes-compile-ctx] global, which is used to
+  support [multi-tenant deployments][link-multitenancy].
+
+## Using query_rewrite
+
+You can use [`query_rewrite`][ref-config-queryrewrite] to amend incoming queries
+with filters. For example, let's take the following query:
+
+```json
+{
+  "measures": [
+    "orders_view.count"
+  ],
+  "dimensions": [
+    "orders_view.status"
+  ]
+}
+```
+
+We'll also use the following as a JWT payload; `user_id`, `sub` and `iat` will
+be injected into the security context:
+
+```json
+{
+  "sub": "1234567890",
+  "iat": 1516239022,
+  "user_id": 42
+}
+```
+
+<WarningBox>
+
+Cube expects the context to be an object. If you don't provide an object as the
+JWT payload, you will receive the following error:
+
+```bash
+Cannot create proxy with a non-object as target or handler
+```
+
+</WarningBox>
+
+To ensure that users making this query only receive their own orders, define
+`query_rewrite` in the configuration file:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  if 'user_id' in ctx['securityContext']:
+    query['filters'].append({
+      'member': 'orders_view.users_id',
+      'operator': 'equals',
+      'values': [ctx['securityContext']['user_id']]
+    })
+  return query
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    
+    if (securityContext.user_id) {
+      query.filters.push({
+        member: "orders_view.users_id",
+        operator: "equals",
+        values: [securityContext.user_id],
+      });  
+    }
+
+    return query;
+  },
+};
+```
+
+</CodeTabs>
+
+To test this, we can generate an API token as follows:
+
+<CodeTabs>
+```python
+# Install the PyJWT with pip install PyJWT
+import jwt
+import datetime
+
+# Secret key to sign the token
+CUBE_API_SECRET = 'secret'
+
+# Create the token
+token_payload = {
+  'user_id': 42
+}
+
+# Generate the JWT token
+token = jwt.encode(token_payload, CUBE_API_SECRET, algorithm='HS256')
+```
+
+```javascript
+const jwt = require("jsonwebtoken");
+const CUBE_API_SECRET = "secret";
+
+const cubeToken = jwt.sign({ user_id: 42 }, CUBE_API_SECRET, {
+  expiresIn: "30d",
+});
+```
+</CodeTabs>
+
+Using this token, we authorize our request to the Cube API by passing it in the
+Authorization HTTP header.
+
+```bash{outputLines: 2-5}
+curl \
+  -H "Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1Ijp7ImlkIjo0Mn0sImlhdCI6MTU1NjAyNTM1MiwiZXhwIjoxNTU4NjE3MzUyfQ._8QBL6nip6SkIrFzZzGq2nSF8URhl5BSSSGZYp7IJZ4" \
+  -G \
+  --data-urlencode 'query={"measures":["orders.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load
+```
+
+And Cube will generate the following SQL:
+
+```sql
+SELECT
+  "orders".STATUS "orders_view__status",
+  count("orders".ID) "orders_view__count"
+FROM
+  ECOM.ORDERS AS "orders"
+  LEFT JOIN ECOM.USERS AS "users" ON "orders".USER_ID = "users".ID
+WHERE
+  ("users".ID = 42)
+GROUP BY
+  1
+ORDER BY
+  2 DESC
+LIMIT
+  5000
+```
+
+## Using COMPILE_CONTEXT
+
+`COMPILE_CONTEXT` can be used to create fully dynamic data models. It enables you to create multiple versions of data model based on the incoming security context.
+The first thing you need to do is to define the mapping rule from a security context to the id of the compiled data model.
+It is done with `context_to_app_id` configuration option.
+
+```python
+from cube import config
+ 
+@config('context_to_app_id')
+def context_to_app_id(ctx: dict) -> str:
+  return ctx['securityContext']['team']
+```
+
+It is common to use some field from the incoming security context as an id for your data model. 
+In our example, as illustrated below, we are using `team` property of the security context as a data model id.
+
+<Diagram
+  alt="COMPILE_CONTEXT mapping"
+  src="https://ucarecdn.com/7b6a2257-ca50-45e9-a4a4-a177a931407c/"
+/>
+
+Once you have this mapping, you can use `COMPILE_CONTEXT` inside your data model. 
+In the example below we are passing it as a variable into `masked` helper function.
+
+```yaml
+cubes:
+  - name: users
+    sql_table: ECOM.USERS
+    public: false
+
+    dimensions:
+      - name: last_name
+        sql: {{ masked('LAST_NAME', COMPILE_CONTEXT.securityContext) }}
+        type: string
+```
+
+This `masked` helper function is defined in `model/globals.py` as follows: it checks if the current `team` is inside the list of trusted teams. 
+If that's the case, it will render the SQL to get the value of the dimension; if not, it will return just the masked string.
+
+
+```python
+from cube import TemplateContext
+ 
+template = TemplateContext()
+
+@template.function('masked')
+def masked(sql, security_context):
+  trusted_teams = ['cx', 'exec' ]
+  is_trusted_team = security_context.setdefault('team') in trusted_teams
+  if is_trusted_team:
+    return sql
+  else:
+    return "\"'--- masked ---'\""
+```
+
+
+### Usage with pre-aggregations
+
+To generate pre-aggregations that rely on `COMPILE_CONTEXT`, [configure
+`scheduledRefreshContexts` in your `cube.js` configuration
+file][ref-config-sched-refresh].
+
+## Testing during development
+
+During development, it is often useful to be able to edit the security context
+to test access control rules. The [Developer
+Playground][ref-devtools-playground] allows you to set your own JWTs, or you can
+build one from a JSON object.
+
+[link-auth0-jwks]:
+  https://auth0.com/docs/tokens/json-web-tokens/json-web-key-sets
+[link-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-config-queryrewrite]: /reference/configuration/config#query_rewrite
+[ref-config-sched-refresh]:
+  /reference/configuration/config#scheduledrefreshcontexts
+[ref-config-sec-ctx]: /reference/configuration/config#securitycontext
+[ref-schema-sec-ctx]: /reference/data-model/cube#security-context
+[ref-cubes-compile-ctx]: /reference/data-model/context-variables#compile_context
+[ref-devtools-playground]:
+  /product/workspace/playground#editing-the-security-context

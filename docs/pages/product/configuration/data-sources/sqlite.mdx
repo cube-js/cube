@@ -1,0 +1,34 @@
+---
+redirect_from:
+  - /config/databases/sqlite
+---
+
+# SQLite
+
+<CommunitySupportedDriver dataSource="SQLite" />
+
+## Prerequisites
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=sqlite
+CUBEJS_DB_NAME=my_sqlite_database
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values       | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | --------------------- | :------: |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name |    ✅    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number        |    ❌    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number        |    ❌    |
+
+## SSL
+
+SQLite does not support SSL connections.
+

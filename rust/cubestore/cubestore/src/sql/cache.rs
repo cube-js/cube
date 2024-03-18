@@ -1,3 +1,4 @@
+use crate::metastore::{table::Table, IdRow};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::sql::InlineTables;
 use crate::sql::SqlQueryContext;
@@ -7,7 +8,7 @@ use deepsize::DeepSizeOf;
 use futures::Future;
 use log::trace;
 use moka::future::{Cache, ConcurrentCacheExt, Iter};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{watch, Mutex};
@@ -69,6 +70,8 @@ pub struct SqlResultCache {
         lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
     result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
+    create_table_cache:
+        Mutex<HashMap<(String, String), watch::Receiver<Option<Result<IdRow<Table>, CubeError>>>>>,
 }
 
 pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
@@ -91,6 +94,7 @@ impl SqlResultCache {
                 .max_capacity(capacity_bytes)
                 .weigher(sql_result_cache_sizeof)
                 .build(),
+            create_table_cache: Mutex::new(HashMap::new()),
         }
     }
 
@@ -188,6 +192,56 @@ impl SqlResultCache {
         self.wait_for_queue(receiver, query).await
     }
 
+    pub async fn create_table<F>(
+        &self,
+        schema_name: String,
+        table_name: String,
+        exec: impl FnOnce() -> F,
+    ) -> Result<IdRow<Table>, CubeError>
+    where
+        F: Future<Output = Result<IdRow<Table>, CubeError>> + Send + 'static,
+    {
+        let key = (schema_name.clone(), table_name.clone());
+        let (sender, mut receiver) = {
+            let mut cache = self.create_table_cache.lock().await;
+            let key = key.clone();
+            if !cache.contains_key(&key) {
+                let (tx, rx) = watch::channel(None);
+                cache.insert(key, rx);
+
+                (Some(tx), None)
+            } else {
+                (None, cache.get(&key).cloned())
+            }
+        };
+
+        if let Some(sender) = sender {
+            let result = exec().await;
+            if let Err(e) = sender.send(Some(result.clone())) {
+                trace!(
+                    "Failed to set cached query result, possibly flushed from LRU cache: {}",
+                    e
+                );
+            }
+
+            self.create_table_cache.lock().await.remove(&key);
+
+            return result;
+        }
+
+        if let Some(receiver) = &mut receiver {
+            loop {
+                receiver.changed().await?;
+                let x = receiver.borrow();
+                let value = x.as_ref();
+                if let Some(value) = value {
+                    return value.clone();
+                }
+            }
+        }
+        panic!("Unexpected state: wait receiver expected but cache was empty")
+    }
+
     #[tracing::instrument(level = "trace", skip(self, receiver))]
     async fn wait_for_queue(
         &self,
@@ -206,6 +260,13 @@ impl SqlResultCache {
             }
         }
         panic!("Unexpected state: wait receiver expected but cache was empty")
+    }
+}
+
+impl Drop for SqlResultCache {
+    fn drop(&mut self) {
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
     }
 }
 

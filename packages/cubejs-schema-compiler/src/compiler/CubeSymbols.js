@@ -11,6 +11,7 @@ const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
+  FILTER_GROUP: 'filterGroup',
   SQL_UTILS: 'sqlUtils'
 };
 
@@ -219,13 +220,19 @@ export class CubeSymbols {
     if (!cube.includes && !cube.cubes) {
       return;
     }
+
     const types = ['measures', 'dimensions', 'segments'];
     for (const type of types) {
       const cubeIncludes = cube.cubes && this.membersFromCubes(cube, cube.cubes, type, errorReporter, splitViews) || [];
       const includes = cube.includes && this.membersFromIncludeExclude(cube.includes, cube.name, type) || [];
       const excludes = cube.excludes && this.membersFromIncludeExclude(cube.excludes, cube.name, type) || [];
+
       // cube includes will take precedence in case of member clash
-      const finalIncludes = this.diffByMember(this.diffByMember(includes, cubeIncludes).concat(cubeIncludes), excludes);
+      const finalIncludes = this.diffByMember(
+        this.diffByMember(includes, cubeIncludes).concat(cubeIncludes),
+        excludes
+      );
+
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
     }
@@ -250,8 +257,10 @@ export class CubeSymbols {
       const split = fullPath.split('.');
       const cubeReference = split[split.length - 1];
       const cubeName = cubeInclude.alias || cubeReference;
+
       let includes;
       const fullMemberName = (memberName) => (cubeInclude.prefix ? `${cubeName}_${memberName}` : memberName);
+
       if (cubeInclude.includes === '*') {
         const membersObj = this.symbols[cubeReference]?.cubeObj()?.[type] || {};
         includes = Object.keys(membersObj).map(memberName => ({ member: `${fullPath}.${memberName}`, name: fullMemberName(memberName) }));
@@ -261,6 +270,7 @@ export class CubeSymbols {
           if (member.indexOf('.') !== -1) {
             errorReporter.error(`Paths aren't allowed in cube includes but '${member}' provided as include member`);
           }
+
           const name = fullMemberName(include.alias || member);
           if (include.name) {
             const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[include.name];
@@ -282,9 +292,10 @@ export class CubeSymbols {
         if (exclude.indexOf('.') !== -1) {
           errorReporter.error(`Paths aren't allowed in cube excludes but '${exclude}' provided as exclude member`);
         }
+
         const resolvedMember = this.symbols[cubeReference]?.cubeObj()?.[type]?.[exclude];
         return resolvedMember ? {
-          member: `${cubeReference}.${exclude}`
+          member: `${fullPath}.${exclude}`
         } : undefined;
       });
 
@@ -315,10 +326,12 @@ export class CubeSymbols {
 
   diffByMember(includes, excludes) {
     const excludesMap = new Map();
+
     for (const exclude of excludes) {
       excludesMap.set(exclude.member, true);
     }
-    return includes.filter(include => !excludesMap.get(include.member));
+
+    return includes.filter(include => !excludesMap.has(include.member));
   }
 
   membersFromIncludeExclude(referencesFn, cubeName, type) {
@@ -357,14 +370,18 @@ export class CubeSymbols {
           type: 'number',
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
+          title: resolvedMember.title,
           description: resolvedMember.description,
+          format: resolvedMember.format,
         };
       } else if (type === 'segments') {
         memberDefinition = {

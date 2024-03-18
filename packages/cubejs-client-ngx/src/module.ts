@@ -1,15 +1,15 @@
 import { NgModule, ModuleWithProviders } from '@angular/core';
-import { CubejsClient } from './client';
+import { CubeClient } from './client';
 
 @NgModule({
-  providers: [CubejsClient],
+  providers: [CubeClient],
 })
-export class CubejsClientModule {
-  public static forRoot(config: any): ModuleWithProviders<CubejsClientModule> {
+export class CubeClientModule {
+  public static forRoot(config: any): ModuleWithProviders<CubeClientModule> {
     return {
-      ngModule: CubejsClientModule,
+      ngModule: CubeClientModule,
       providers: [
-        CubejsClient,
+        CubeClient,
         {
           provide: 'config',
           useValue: config,

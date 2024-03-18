@@ -1,0 +1,115 @@
+---
+redirect_from:
+  - /config/databases/mysql
+---
+
+# MySQL
+
+## Prerequisites
+
+- The hostname for the [MySQL][mysql] database server
+- The username/password for the [MySQL][mysql] database server
+- The name of the database to use within the [MySQL][mysql] database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=mysql
+CUBEJS_DB_HOST=my.mysql.host
+CUBEJS_DB_NAME=my_mysql_database
+CUBEJS_DB_USER=mysql_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable    | Description                                                                         | Possible Values           | Required |
+| ----------------------- | ----------------------------------------------------------------------------------- | ------------------------- | :------: |
+| `CUBEJS_DB_HOST`        | The host URL for a database                                                         | A valid database host URL |    ✅    |
+| `CUBEJS_DB_SOCKET_PATH` | See [connecting via a Unix socket](#connecting-via-a-unix-socket)                   | A valid path to a socket  |    ❌    |
+| `CUBEJS_DB_PORT`        | The port for the database connection                                                | A valid port number       |    ❌    |
+| `CUBEJS_DB_NAME`        | The name of the database to connect to                                              | A valid database name     |    ✅    |
+| `CUBEJS_DB_USER`        | The username used to connect to the database                                        | A valid database username |    ✅    |
+| `CUBEJS_DB_PASS`        | The password used to connect to the database                                        | A valid database password |    ✅    |
+| `CUBEJS_DB_SSL`         | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`           |    ❌    |
+| `CUBEJS_CONCURRENCY`    | The number of concurrent connections each queue has to the database. Default is `2` | A valid number            |    ❌    |
+| `CUBEJS_DB_MAX_POOL`    | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number            |    ❌    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using MySQL as a source database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ✅             |     ✅      |
+| Export Bucket |             -              |      -      |
+
+By default, MySQL uses [batching][self-preaggs-batching] to build
+pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for MySQL.
+
+### Export Bucket
+
+MySQL does not support export buckets.
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and MySQL, set the
+`CUBEJS_DB_SSL` environment variable to `true`. For more information on how to
+configure custom certificates, please check out [Enable SSL Connections to the
+Database][ref-recipe-enable-ssl].
+
+## Additional configuration
+
+### Connecting via a Unix socket
+
+To connect to a local MySQL database using a Unix socket, use the
+`CUBEJS_DB_SOCKET_PATH` environment variable, for example:
+
+```dotenv
+CUBEJS_DB_SOCKET_PATH=/var/run/mysqld/mysqld.sock
+```
+
+When doing so, `CUBEJS_DB_HOST` will be ignored.
+
+### Connecting to MySQL 8
+
+MySQL 8 uses a new default authentication plugin (`caching_sha2_password`)
+whereas previous version used `mysql_native_password`. Please
+[see this answer on StackOverflow](https://stackoverflow.com/a/50377944)
+for a workaround.
+
+<InfoBox>
+
+For additional details, check the [relevant issue](https://github.com/cube-js/cube/issues/3525) on GitHub.
+
+</InfoBox>
+
+[mysql]: https://www.mysql.com/
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-recipe-enable-ssl]:
+  /guides/recipes/data-sources/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[self-preaggs-batching]: #batching
+[self-ssl]: #ssl

@@ -25,8 +25,6 @@ import {
   QueryTablesResult,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
@@ -458,7 +456,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   /**
    * Returns an array of queried fields meta info.
    */
-  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<TableStructure> {
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<TableStructure> {
     const connection = await this.getConnection();
     return new Promise((resolve, reject) => connection.execute({
       sqlText: `${sql} LIMIT 0`,
@@ -583,8 +581,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       <SnowflakeDriverExportBucket> this.config.exportBucket;
     switch (bucketType) {
       case 's3':
-        return this.extractFilesFromS3(
-          new S3({
+        return this.extractUnloadedFilesFromS3(
+          {
             credentials: {
               accessKeyId: (
                 <SnowflakeDriverExportAWS> this.config.exportBucket
@@ -596,7 +594,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
             region: (
               <SnowflakeDriverExportAWS> this.config.exportBucket
             ).region,
-          }),
+          },
           bucketName,
           tableName,
         );
@@ -613,37 +611,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       default:
         throw new Error('Unsupported export bucket type.');
     }
-  }
-
-  /**
-   * Returns an array of signed AWS S3 URLs of the unloaded csv files.
-   */
-  protected async extractFilesFromS3(
-    storage: S3,
-    bucketName: string,
-    tableName: string
-  ): Promise<string[]> {
-    const list = await storage.listObjectsV2({
-      Bucket: bucketName,
-      Prefix: tableName,
-    });
-    if (list) {
-      if (!list.Contents) {
-        return [];
-      } else {
-        const csvFile = await Promise.all(
-          list.Contents.map(async (file) => {
-            const command = new GetObjectCommand({
-              Bucket: bucketName,
-              Key: file.Key,
-            });
-            return getSignedUrl(storage, command, { expiresIn: 3600 });
-          })
-        );
-        return csvFile;
-      }
-    }
-    throw new Error('Unable to unload.');
   }
 
   /**

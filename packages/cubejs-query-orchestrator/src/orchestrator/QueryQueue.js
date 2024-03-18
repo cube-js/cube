@@ -148,24 +148,26 @@ export class QueryQueue {
    * Returns stream object which will be used to pipe data from data source.
    *
    * @param {QueryKeyHash} queryKeyHash
+   * @return {QueryStream | undefined}
    */
   getQueryStream(queryKeyHash) {
     return this.streams.get(queryKeyHash);
   }
 
   /**
-   * @param {*} queryKey
+   * @param {QueryKeyHash} key
    * @param {{ [alias: string]: string }} aliasNameToMember
+   * @return {QueryStream}
    */
-  createQueryStream(queryKeyHash, aliasNameToMember) {
-    const key = queryKeyHash;
+  createQueryStream(key, aliasNameToMember) {
     const stream = new QueryStream({
       key,
       streams: this.streams,
       aliasNameToMember,
     });
     this.streams.set(key, stream);
-    this.streamEvents.emit('streamStarted', queryKeyHash);
+    this.streamEvents.emit('streamStarted', key);
+
     return stream;
   }
 
@@ -307,25 +309,37 @@ export class QueryQueue {
 
       // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
       // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.
+      // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+      // while EventListener doesnt start to listen for started stream event
       if (queryHandler === 'stream') {
         const self = this;
         result = await new Promise((resolve) => {
+          let timeoutTimerId = null;
+
           const onStreamStarted = (streamStartedHash) => {
             if (streamStartedHash === queryKeyHash) {
+              if (timeoutTimerId) {
+                clearTimeout(timeoutTimerId);
+              }
+
               resolve(self.getQueryStream(queryKeyHash));
             }
           };
 
-          setTimeout(() => {
-            self.streamEvents.removeListener('streamStarted', onStreamStarted);
-            resolve(null);
-          }, this.continueWaitTimeout * 1000);
-
           self.streamEvents.addListener('streamStarted', onStreamStarted);
-          const stream = this.getQueryStream(this.redisHash(queryKey));
+
+          const stream = this.getQueryStream(queryKeyHash);
           if (stream) {
             self.streamEvents.removeListener('streamStarted', onStreamStarted);
             resolve(stream);
+          } else {
+            timeoutTimerId = setTimeout(
+              () => {
+                self.streamEvents.removeListener('streamStarted', onStreamStarted);
+                resolve(null);
+              },
+              this.continueWaitTimeout * 10000
+            );
           }
         });
       } else {
@@ -515,7 +529,7 @@ export class QueryQueue {
       const toCancel = await queueConnection.getQueriesToCancel();
 
       await Promise.all(toCancel.map(async ([queryKey, queueId]) => {
-        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey);
+        const [queryDef] = await queueConnection.getQueryAndRemove(queryKey, queueId);
         if (queryDef) {
           this.logger('Removing orphaned query', {
             queueId: queueId || queryDef.queueId /** Special handling for Redis */,
@@ -533,6 +547,13 @@ export class QueryQueue {
         }
       }));
 
+      /**
+       * There is a bug somewhere in Redis (maybe in memory too?),
+       * which doesn't remove queue item from pending, while it's in active state
+       *
+       * TODO(ovr): Check LocalQueueDriver for strict guarantees that item cannot be in active & pending in the same time
+       * TODO(ovr): Migrate to getToProcessQueries after removal of Redis
+       */
       const [active, toProcess] = await queueConnection.getActiveAndToProcess();
 
       await Promise.all(
@@ -768,8 +789,20 @@ export class QueryQueue {
         });
         await queueConnection.optimisticQueryUpdate(queryKeyHashed, { startQueryTime }, processingId, queueId);
 
+        let queryProcessHeartbeat = Date.now();
         const heartBeatTimer = setInterval(
-          () => queueConnection.updateHeartBeat(queryKeyHashed),
+          () => {
+            if ((Date.now() - queryProcessHeartbeat) > 5 * 60 * 1000) {
+              this.logger('Query processing heartbeat', {
+                queueId,
+                queryKey: query.queryKey,
+                requestId: query.requestId,
+              });
+              queryProcessHeartbeat = Date.now();
+            }
+
+            return queueConnection.updateHeartBeat(queryKeyHashed);
+          },
           this.heartBeatInterval * 1000
         );
         try {
@@ -857,7 +890,7 @@ export class QueryQueue {
             error: (e.stack || e).toString()
           });
           if (e instanceof TimeoutError) {
-            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed);
+            const queryWithCancelHandle = await queueConnection.getQueryDef(queryKeyHashed, queueId);
             if (queryWithCancelHandle) {
               this.logger('Cancelling query due to timeout', {
                 queueId,
@@ -875,9 +908,10 @@ export class QueryQueue {
               await this.sendCancelMessageFn(queryWithCancelHandle, queueId);
             }
           }
+        } finally {
+          // catch block can throw an exception, it's why it's important to clearInterval here
+          clearInterval(heartBeatTimer);
         }
-
-        clearInterval(heartBeatTimer);
 
         if (!(await queueConnection.setResultAndRemoveQuery(queryKeyHashed, executionResult, processingId, queueId))) {
           this.logger('Orphaned execution result', {

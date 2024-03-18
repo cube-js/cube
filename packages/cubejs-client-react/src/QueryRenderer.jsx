@@ -6,9 +6,9 @@ import CubeContext from './CubeContext';
 
 export default class QueryRenderer extends React.Component {
   static contextType = CubeContext;
-  
+
   static defaultProps = {
-    cubejsApi: null,
+    cubeApi: null,
     query: null,
     render: null,
     queries: null,
@@ -16,8 +16,8 @@ export default class QueryRenderer extends React.Component {
     updateOnlyOnStateChange: false,
     resetResultSetOnChange: true
   };
-  
-  // @deprected use `isQueryPresent` from `@cubejs-client/core`
+
+  // @deprecated use `isQueryPresent` from `@cubejs-client/core`
   static isQueryPresent(query) {
     return isQueryPresent(query);
   }
@@ -40,7 +40,7 @@ export default class QueryRenderer extends React.Component {
 
   shouldComponentUpdate(nextProps, nextState) {
     const {
-      query, queries, render, cubejsApi, loadSql, updateOnlyOnStateChange
+      query, queries, render, cubeApi, loadSql, updateOnlyOnStateChange
     } = this.props;
     if (!updateOnlyOnStateChange) {
       return true;
@@ -48,7 +48,7 @@ export default class QueryRenderer extends React.Component {
     return !equals(nextProps.query, query)
       || !equals(nextProps.queries, queries)
       || ((nextProps.render == null || render == null) && nextProps.render !== render)
-      || nextProps.cubejsApi !== cubejsApi
+      || nextProps.cubeApi !== cubeApi
       || nextProps.loadSql !== loadSql
       || !equals(nextState, this.state)
       || nextProps.updateOnlyOnStateChange !== updateOnlyOnStateChange;
@@ -65,9 +65,9 @@ export default class QueryRenderer extends React.Component {
     }
   }
 
-  cubejsApi() {
+  cubeApi() {
     // eslint-disable-next-line react/destructuring-assignment
-    return this.props.cubejsApi || this.context && this.context.cubejsApi;
+    return this.props.cubeApi || this.context && this.context.cubeApi;
   }
 
   load(query) {
@@ -79,11 +79,11 @@ export default class QueryRenderer extends React.Component {
       ...(resetResultSetOnChange ? { resultSet: null } : {})
     });
     const { loadSql } = this.props;
-    const cubejsApi = this.cubejsApi();
+    const cubeApi = this.cubeApi();
 
     if (query && isQueryPresent(query)) {
       if (loadSql === 'only') {
-        cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
+        cubeApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' })
           .then(sqlQuery => this.setState({ sqlQuery, error: null, isLoading: false }))
           .catch(error => this.setState({
             ...(resetResultSetOnChange ? { resultSet: null } : {}),
@@ -92,8 +92,8 @@ export default class QueryRenderer extends React.Component {
           }));
       } else if (loadSql) {
         Promise.all([
-          cubejsApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
-          cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+          cubeApi.sql(query, { mutexObj: this.mutexObj, mutexKey: 'sql' }),
+          cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
         ]).then(([sqlQuery, resultSet]) => this.setState({
           sqlQuery, resultSet, error: null, isLoading: false
         }))
@@ -103,7 +103,7 @@ export default class QueryRenderer extends React.Component {
             isLoading: false
           }));
       } else {
-        cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
+        cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: 'query' })
           .then(resultSet => this.setState({ resultSet, error: null, isLoading: false }))
           .catch(error => this.setState({
             ...(resetResultSetOnChange ? { resultSet: null } : {}),
@@ -115,7 +115,7 @@ export default class QueryRenderer extends React.Component {
   }
 
   loadQueries(queries) {
-    const cubejsApi = this.cubejsApi();
+    const cubeApi = this.cubeApi();
     const { resetResultSetOnChange } = this.props;
     this.setState({
       isLoading: true,
@@ -124,7 +124,7 @@ export default class QueryRenderer extends React.Component {
     });
 
     const resultPromises = Promise.all(toPairs(queries).map(
-      ([name, query]) => cubejsApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
+      ([name, query]) => cubeApi.load(query, { mutexObj: this.mutexObj, mutexKey: name }).then(r => [name, r])
     ));
 
     resultPromises

@@ -1,0 +1,107 @@
+# Microsoft SQL Server
+
+## Prerequisites
+
+- The hostname for the [Microsoft SQL Server][mssql] database server
+- The username/password for the [Microsoft SQL Server][mssql] database server
+- The name of the database to use within the [Microsoft SQL Server][mssql]
+  database server
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=mssql
+CUBEJS_DB_HOST=my.mssql.host
+CUBEJS_DB_NAME=my_mssql_database
+CUBEJS_DB_USER=mssql_user
+CUBEJS_DB_PASS=**********
+```
+
+## Environment Variables
+
+| Environment Variable | Description                                                                         | Possible Values                                            | Required |
+| -------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------- | :------: |
+| `CUBEJS_DB_HOST`     | The host URL for a database                                                         | A valid database host URL                                  |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection                                                | A valid port number                                        |    ❌    |
+| `CUBEJS_DB_NAME`     | The name of the database to connect to                                              | A valid database name                                      |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the database                                        | A valid database username                                  |    ✅    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the database                                        | A valid database password                                  |    ✅    |
+| `CUBEJS_DB_DOMAIN`   | A domain name within the database to connect to                                     | A valid domain name within a Microsoft SQL Server database |    ❌    |
+| `CUBEJS_DB_SSL`      | If `true`, enables SSL encryption for database connections from Cube                | `true`, `false`                                            |    ❌    |
+| `CUBEJS_CONCURRENCY` | The number of concurrent connections each queue has to the database. Default is `2` | A valid number                                             |    ❌    |
+| `CUBEJS_DB_MAX_POOL` | The maximum number of concurrent database connections to pool. Default is `8`       | A valid number                                             |    ❌    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+not be used in pre-aggregations when using Microsoft SQL Server as a source
+database.
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Simple        |             ✅             |     ✅      |
+| Batching      |             -              |      -      |
+| Export Bucket |             -              |      -      |
+
+By default, Microsoft SQL Server uses a [simple][self-preaggs-simple] strategy
+to build pre-aggregations.
+
+### Simple
+
+No extra configuration is required to configure simple pre-aggregation builds
+for Microsoft SQL Server.
+
+### Batching
+
+Microsoft SQL Server does not support batching.
+
+### Export Bucket
+
+Microsoft SQL Server does not support export buckets.
+
+## SSL
+
+To enable SSL-encrypted connections between Cube and Microsoft SQL Server, set
+the `CUBEJS_DB_SSL` environment variable to `true`. For more information on how
+to configure custom certificates, please check out [Enable SSL Connections to
+the Database][ref-recipe-enable-ssl].
+
+## Additional Configuration
+
+### Windows Authentication
+
+To connect to a Microsoft SQL Server database using Windows Authentication (also
+sometimes known as `trustedConnection`), instantiate the driver with
+`trustedConnection: true` in your `cube.js` configuration file:
+
+```javascript
+const MssqlDriver = require("@cubejs-backend/mssql-driver");
+module.exports = {
+  driverFactory: ({ dataSource }) =>
+    new MssqlDriver({ database: dataSource, trustedConnection: true }),
+};
+```
+
+[mssql]: https://www.microsoft.com/en-gb/sql-server/sql-server-2019
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-recipe-enable-ssl]:
+  /guides/recipes/data-sources/using-ssl-connections-to-data-source
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[self-preaggs-simple]: #simple

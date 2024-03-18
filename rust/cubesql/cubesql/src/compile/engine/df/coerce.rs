@@ -10,6 +10,7 @@ pub fn is_signed_numeric(dt: &DataType) -> bool {
             | DataType::Float16
             | DataType::Float32
             | DataType::Float64
+            | DataType::Null
     )
 }
 
@@ -33,6 +34,9 @@ pub fn numerical_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<Da
     }
 
     match (lhs_type, rhs_type) {
+        (_, DataType::Null) => Some(lhs_type.clone()),
+        (DataType::Null, _) => Some(rhs_type.clone()),
+        //
         (_, DataType::UInt64) => Some(DataType::UInt64),
         (DataType::UInt64, _) => Some(DataType::UInt64),
         //
@@ -50,6 +54,9 @@ pub fn if_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<DataType>
     }
 
     let hack_ty = match (lhs_type, rhs_type) {
+        (_, DataType::Null) => Some(lhs_type.clone()),
+        (DataType::Null, _) => Some(rhs_type.clone()),
+        //
         (DataType::Utf8, DataType::UInt64) => Some(DataType::Utf8),
         (DataType::Utf8, DataType::Int64) => Some(DataType::Utf8),
         //
@@ -69,6 +76,9 @@ pub fn least_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<DataTy
     }
 
     let hack_ty = match (lhs_type, rhs_type) {
+        (_, DataType::Null) => Some(lhs_type.clone()),
+        (DataType::Null, _) => Some(rhs_type.clone()),
+        //
         (DataType::Utf8, DataType::UInt64) => Some(DataType::Utf8),
         (DataType::Utf8, DataType::Int64) => Some(DataType::Utf8),
         //

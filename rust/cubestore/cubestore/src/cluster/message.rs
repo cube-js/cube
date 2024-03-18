@@ -33,17 +33,17 @@ pub enum NetworkMessage {
     WarmupDownloadResult(Result<(), CubeError>),
 
     AddMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
         data: SerializedRecordBatchStream,
     },
     AddMemoryChunkResult(Result<(), CubeError>),
 
     FreeMemoryChunk {
-        chunk_id: u64,
+        chunk_name: String,
     },
     FreeMemoryChunkResult(Result<(), CubeError>),
 
-    FreeDeletedMemoryChunks(Vec<u64>),
+    FreeDeletedMemoryChunks(Vec<String>),
     FreeDeletedMemoryChunksResult(Result<(), CubeError>),
 
     MetaStoreCall(MetaStoreRpcMethodCall),

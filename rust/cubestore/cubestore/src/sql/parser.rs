@@ -91,6 +91,19 @@ pub enum CacheCommand {
     },
 }
 
+impl CacheCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            CacheCommand::Set { .. } => "set",
+            CacheCommand::Get { .. } => "get",
+            CacheCommand::Keys { .. } => "keys",
+            CacheCommand::Remove { .. } => "remove",
+            CacheCommand::Truncate { .. } => "truncate",
+            CacheCommand::Incr { .. } => "incr",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum QueueCommand {
     Add {
@@ -140,6 +153,29 @@ pub enum QueueCommand {
         timeout: u64,
     },
     Truncate {},
+}
+
+impl QueueCommand {
+    pub fn as_tag_command(&self) -> &'static str {
+        match self {
+            QueueCommand::Add { .. } => "add",
+            QueueCommand::Get { .. } => "get",
+            QueueCommand::ToCancel { .. } => "to_cancel",
+            QueueCommand::List { status_filter, .. } => match status_filter {
+                Some(QueueItemStatus::Active) => "active",
+                Some(QueueItemStatus::Pending) => "pending",
+                _ => "list",
+            },
+            QueueCommand::Cancel { .. } => "cancel",
+            QueueCommand::Heartbeat { .. } => "heartbeat",
+            QueueCommand::Ack { .. } => "ack",
+            QueueCommand::MergeExtra { .. } => "merge_extra",
+            QueueCommand::Retrieve { .. } => "retrieve",
+            QueueCommand::Result { .. } => "result",
+            QueueCommand::ResultBlocking { .. } => "result_blocking",
+            QueueCommand::Truncate { .. } => "truncate",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

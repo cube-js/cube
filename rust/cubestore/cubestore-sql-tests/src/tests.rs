@@ -3,6 +3,7 @@ use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
+use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
 use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
@@ -132,6 +133,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
+        t("physical_plan_flags", physical_plan_flags),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -174,6 +176,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_extra_aggregate,
         ),
         t(
+            "rolling_window_extra_aggregate_addon",
+            rolling_window_extra_aggregate_addon,
+        ),
+        t(
             "rolling_window_extra_aggregate_timestamps",
             rolling_window_extra_aggregate_timestamps,
         ),
@@ -186,6 +192,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_one_quarter_interval,
         ),
         t("rolling_window_offsets", rolling_window_offsets),
+        t("rolling_window_filtered", rolling_window_filtered),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -1583,7 +1590,8 @@ async fn ilike(service: Box<dyn SqlClient>) {
              ('test [ special 1', '%test [%'),\
              ('test ( special 2', '%test (%'),\
              ('111 test {)?*|+aaa', '%test {)?*|+aaa'),\
-             ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%')\
+             ('test2 }]\\\\222 ', 'test2 }]\\\\\\\\%'),\
+             ('test2 -[]{}()*+?.,^$|# 2', '%-[]{}()*+?.,^$|#%')\
              ",
 
         )
@@ -1625,13 +1633,24 @@ async fn ilike(service: Box<dyn SqlClient>) {
         .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '(', '%') ORDER BY t")
         .await
         .unwrap();
-    assert_eq!(to_rows(&r), rows(&["test ( special 2"]));
+    assert_eq!(
+        to_rows(&r),
+        rows(&["test ( special 2", "test2 -[]{}()*+?.,^$|# 2"])
+    );
 
     let r = service
         .exec_query("SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '?*|+', '%') ORDER BY t")
         .await
         .unwrap();
     assert_eq!(to_rows(&r), rows(&["111 test {)?*|+aaa"]));
+
+    let r = service
+        .exec_query(
+            "SELECT t FROM s.strings WHERE t ILIKE CONCAT('%', '-[]{}()*+?.,^', '%') ORDER BY t",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&["test2 -[]{}()*+?.,^$|# 2"]));
     // Compare constant string with a bunch of patterns.
     // Inputs are: ('aba', '%ABA'), ('ABa', '%aba%'), ('CABA', 'aba%'), ('ZABA', '%a%b%a%'),
     //             ('ZZZ', 'zzz'), ('TTT', 'TTT').
@@ -1664,7 +1683,8 @@ async fn ilike(service: Box<dyn SqlClient>) {
             ("some_underscore", "%some\\_underscore%"),
             ("test ( special 2", "%test (%"),
             ("test [ special 1", "%test [%"),
-            ("test2 }]\\222 ", "test2 }]\\\\%")
+            ("test2 -[]{}()*+?.,^$|# 2", "%-[]{}()*+?.,^$|#%"),
+            ("test2 }]\\222 ", "test2 }]\\\\%"),
         ])
     );
 
@@ -2754,6 +2774,54 @@ async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
         .unwrap_err();
 }
 
+async fn physical_plan_flags(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, day text, category text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data(url text, day text, category text, hits int, clicks int) \
+            ADD TO PARTITIONED INDEX s.ind(url, day, category)",
+        )
+        .await
+        .unwrap();
+
+    // (query, is_optimal)
+    let cases = vec![
+        ("SELECT SUM(hits) FROM s.Data", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test' AND category = 'test')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day = 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
+        ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
+        ("SELECT SUM(hits), url, day FROM s.Data GROUP BY url, day", true),
+        ("SELECT SUM(hits), day FROM s.Data GROUP BY day", false),
+        ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false),
+    ];
+
+    for (query, expected_optimal) in cases {
+        let p = service.plan_query(query).await.unwrap();
+        let flags = PhysicalPlanFlags::with_execution_plan(p.router.as_ref());
+        assert_eq!(
+            flags.is_suboptimal_query(),
+            !expected_optimal,
+            "Query failed: {}",
+            query
+        );
+    }
+}
+
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -2802,6 +2870,48 @@ async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
        \n        Merge\
        \n          Scan, index: default:1:[1], fields: [day, hits]\
        \n            Empty"
+    );
+
+    service
+        .exec_query("CREATE TABLE s.DataBool(url text, segment boolean, day int, hits int)")
+        .await
+        .unwrap();
+
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = true  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
+    );
+    let p = service
+        .plan_query(
+            "SELECT url, day, SUM(hits) FROM s.DataBool where segment = false  GROUP BY 1, 2",
+        )
+        .await
+        .unwrap();
+    let phys_plan = pp_phys_plan(p.worker.as_ref());
+    assert_eq!(
+        phys_plan,
+        "Projection, [url, day, SUM(s.DataBool.hits)@2:SUM(hits)]\
+         \n  FinalInplaceAggregate\
+         \n    Worker\
+         \n      PartialInplaceAggregate\
+         \n        Filter\
+         \n          MergeSort\
+         \n            Scan, index: default:2:[2]:sort_on[url, segment, day], fields: *\
+         \n              Empty"
     );
 }
 
@@ -4977,6 +5087,49 @@ async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
         .unwrap_err();
 }
 
+async fn rolling_window_extra_aggregate_addon(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (11, 'john', 10), \
+                                                     (11, 'sara', 7), \
+                                                     (13, 'sara', 3), \
+                                                     (13, 'john', 9), \
+                                                     (13, 'john', 11), \
+                                                     (15, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 9 TO 15 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (9, None, None),
+            (10, None, None),
+            (11, Some(17), Some(17)),
+            (12, Some(17), None),
+            (13, Some(23), Some(23)),
+            (14, Some(23), None),
+            (15, Some(5), Some(5))
+        ])
+    );
+}
+
 async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5160,6 +5313,89 @@ async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
             (6, None),
             (8, Some(9)),
             (10, None)
+        ])
+    );
+}
+
+async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.data(category text, day timestamp, count int, claimed_count int)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data(category, day, count, claimed_count)\
+                        VALUES \
+                         ('eth', '2023-12-12T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-08T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-06T00:00:00.000Z', 2, 2), \
+                         ('starkex', '2023-12-05T00:00:00.000Z', 0, 0), \
+                         ('starkex', '2023-12-07T00:00:00.000Z', 1, 1)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "
+                SELECT \
+                `day`, \
+                ROLLING( \
+                    sum( \
+                    `claimed_count` \
+                    ) RANGE UNBOUNDED PRECEDING OFFSET end \
+                ) `claimed_count`, \
+                sum( \
+                `count` \
+                ) `count` \
+                FROM \
+                ( \
+                    SELECT \
+                    `day` `day`, \
+                    sum( \
+                        `count` \
+                    ) `count`, \
+                    sum( \
+                        `claimed_count` \
+                    ) `claimed_count`
+                    FROM \
+                    ( \
+                        SELECT \
+                        * \
+                        FROM \
+                        s.data \
+                         \
+                    ) AS `starknet_test_provisions__eth_cumulative` \
+                    WHERE `starknet_test_provisions__eth_cumulative`.category = 'github'
+                    GROUP BY \
+                    1 \
+                ) `base` ROLLING_WINDOW DIMENSION `day` \
+                GROUP BY \
+                DIMENSION `day` \
+                FROM \
+                date_trunc('day', to_timestamp('2023-12-04T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-10T13:41:12.000')) EVERY INTERVAL '1 day'
+                ORDER BY 1
+            ",
+        )
+        .await
+        .unwrap();
+    let days = (4..=10)
+        .map(|d| timestamp_from_string(&format!("2023-12-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (days[0], None, None),
+            (days[1], None, None),
+            (days[2], Some(2), Some(2)),
+            (days[3], Some(2), None),
+            (days[4], Some(3), Some(1)),
+            (days[5], Some(3), None),
+            (days[6], Some(3), None),
         ])
     );
 }

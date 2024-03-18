@@ -1,0 +1,175 @@
+---
+redirect_from:
+  - /backend/sql/security
+---
+
+# Authentication and Authorization
+
+Cube can be configured with dynamic username & password verification system by
+setting a [`checkSqlAuth()`][ref-config-check-sql-auth] function in the
+configuration file. This function should verify username and return
+an object with password and security context.
+
+If password returned from this function matches provided in connection string
+user will be authenticated with provided security context.
+
+```javascript
+module.exports = {
+  checkSqlAuth: async (req, username) => {
+    if (username === "fooUser") {
+      return {
+        password: "mypassword",
+        securityContext: {},
+      };
+    }
+
+    throw new Error("Incorrect user name or password");
+  },
+};
+```
+
+Check [this recipe](/guides/recipes/auth/sql-api-ldap) for an example of
+using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
+
+## Security Context (Row-Level Security)
+
+Cube's SQL API can also use the Security Context for [Dynamic data model
+creation][ref-dynamic-schemas] or [`queryRewrite`][ref-config-queryrewrite]
+property in your configuration file.
+
+By default, the SQL API uses the current user's Security Context, but this
+behaviour can be modified so that certain users are allowed to switch. To do
+this, we must first define which user is allowed to change Security Context:
+
+### Example
+
+First, you need to define what user is allowed to change security context:
+
+```dotenv
+CUBEJS_SQL_SUPER_USER=admin
+```
+
+Then configure the [`contextToAppId()`][ref-config-ctx-to-app-id],
+[`queryRewrite()`][ref-config-queryrewrite] and
+[`checkSqlAuth()`][ref-config-check-sql-auth] properties in your `cube.js`
+configuration file:
+
+```javascript filename="cube.js"
+module.exports = {
+  // Create a new appId for each team, this prevents teams from seeing each
+  // other's data
+  // https://cube.dev/docs/reference/configuration/config#contexttoappid
+  contextToAppId: ({ securityContext }) => {
+    return securityContext.team;
+  },
+
+  // Enforce a default value for `team` if one is not provided
+  // in the security context
+  // https://cube.dev/docs/reference/configuration/config#extendcontext
+  extendContext: ({ securityContext }) => {
+    if (!securityContext.team) {
+      securityContext.team = "public";
+    }
+
+    return {
+      securityContext,
+    };
+  },
+
+  // Here we create a new security context for each team so that we can
+  // use it in our data model later
+  checkSqlAuth: (query, username) => {
+    const securityContext = {
+      team: username,
+    };
+
+    return {
+      password: process.env.CUBEJS_SQL_PASSWORD,
+      securityContext: securityContext,
+    };
+  },
+};
+```
+
+Now, you can use the `securityContext` in your data model:
+
+```twig filename="model/cubes/users.yml"
+{# Is the current team trusted? #}
+{% set trusted_teams = ['cx', 'exec' ] %}
+{% set is_trusted_team = COMPILE_CONTEXT.securityContext.team in trusted_teams %}
+
+{# Convenient function to mask values if the current team is not trusted #}
+{% macro masked(sql, is_visible) -%}
+{{ sql if is_visible else "\"'--- masked ---'\"" }}
+{%- endmacro %}
+
+cubes:
+  - name: users
+    sql_table: users
+    public: false
+
+    dimensions:
+
+      {# This property will be masked unless the requesting user is part of a trusted team #}
+      - name: first_name
+        sql: {{ masked('first_name', is_trusted_team) }}
+        type: string
+
+      {# This property will be masked unless the requesting user is part of a trusted team #}
+      - name: last_name
+        sql: {{ masked('last_name', is_trusted_team) }}
+        type: string
+
+      - name: state
+        sql: state
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+```
+
+## Virtual User Filter
+
+With the above now configured, we can query Cube using SQL with a user that is
+part of a trusted team:
+
+```sql
+SELECT users_city, users_first_name, users_last_name
+FROM users
+WHERE __user = 'cx'
+```
+
+This pairs well with other security functionality in tools like Preset, which
+allows configuring [row-level security to allow
+access][preset-docs-rls-inclusive] to data based on the current user's security
+context.
+
+If it's not enough for your case, you define your logic for check with
+[`canSwitchSqlUser` property][ref-config-can-switch-sql-user] in your `cube.js`
+configuration file.
+
+You can change security context for specific query via virtual filter on:
+
+```sql
+SELECT * FROM orders WHERE __user = 'anotheruser';
+```
+
+[preset-docs-rls-inclusive]:
+  https://docs.preset.io/docs/row-level-security-rls#define-inclusive-regular-rls-filter
+[ref-config-can-switch-sql-user]:
+  /reference/configuration/config#canswitchsqluser
+[ref-config-check-sql-auth]: /reference/configuration/config#checksqlauth
+[ref-config-ctx-to-app-id]: /reference/configuration/config#contexttoappid
+[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
+[ref-dynamic-schemas]: /product/data-modeling/dynamic
+[ref-config-js]: /reference/configuration/config

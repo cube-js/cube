@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:16.20.2-bullseye-slim AS base
+FROM node:18.19.0-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -87,18 +87,15 @@ RUN yarn policies set-version v1.22.19
 RUN yarn config set network-timeout 120000 -g
 
 ######################################################################
-# Production dependencies for all but the databricks driver          #
-######################################################################
-FROM base as prod_base_dependencies
-
-RUN yarn install --prod
-
-######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM prod_base_dependencies as prod_dependencies
-
+FROM base as prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
+RUN yarn install --prod
+
+FROM prod_base_dependencies as prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 

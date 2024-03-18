@@ -1,0 +1,232 @@
+---
+redirect_from:
+  - /data-blending
+  - /recipes/data-blending
+  - /schema/advanced/data-blending
+---
+
+# Data blending
+
+In case you want to plot two measures from different cubes on a single chart, or
+create a calculated measure based on it, you need to create a join between these
+two cubes. If there's no way to join two cubes other than by time dimension, you
+need to use the data blending approach.
+
+Data blending is a pattern that allows creating a cube based on two or more
+existing cubes, and contains a union of the underlying cubes' date to query it
+together.
+
+For an example omnichannel store which has both online and offline sales, let's
+calculate summary metrics for revenue, customer count, etc. We have
+`retail_orders` cube for offline sales:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: retail_orders
+    sql_table: retail_orders
+
+    measures:
+      - name: customer_count
+        sql: customer_id
+        type: count_distinct
+
+      - name: revenue
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`retail_orders`, {
+  sql_table: `retail_orders`,
+
+  measures: {
+    customer_count: {
+      sql: `customer_id`,
+      type: `count_distinct`,
+    },
+
+    revenue: {
+      sql: `amount`,
+      type: `sum`,
+    },
+  },
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+An `online_orders` cube for online sales:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: online_orders
+    sql_table: online_orders
+
+    measures:
+      - name: customer_count
+        sql: user_id
+        type: count_distinct
+
+      - name: revenue
+        sql: amount
+        type: sum
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`online_orders`, {
+  sql_table: `online_orders`,
+
+  measures: {
+    customer_count: {
+      sql: `user_id`,
+      type: `count_distinct`,
+    },
+
+    revenue: {
+      sql: `amount`,
+      type: `sum`,
+    },
+  },
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Given the above cubes, a data blending cube can be introduced as follows:
+
+```javascript
+cube(`all_sales`, {
+  sql: `
+    SELECT
+      amount,
+      user_id AS customer_id,
+      created_at,
+      'online' AS row_type
+    FROM (${online_orders.sql()}) AS online
+    UNION ALL
+    SELECT
+      amount,
+      customer_id,
+      created_at,
+      'retail' AS row_type
+    FROM (${retail_orders.sql()}) AS retail
+ `,
+
+  measures: {
+    customer_count: {
+      sql: `customer_id`,
+      type: `count_distinct`,
+    },
+
+    revenue: {
+      sql: `amount`,
+      type: `sum`,
+    },
+
+    online_revenue: {
+      sql: `amount`,
+      type: `sum`,
+      filters: [{ sql: `${CUBE}.row_type = 'online'` }],
+    },
+
+    offline_revenue: {
+      sql: `amount`,
+      type: `sum`,
+      filters: [{ sql: `${CUBE}.row_type = 'retail'` }],
+    },
+
+    online_revenue_percentage: {
+      sql: `
+        ${online_revenue} /
+        NULLIF(${online_revenue} + ${offline_revenue}, 0)
+      `,
+      type: `number`,
+      format: `percent`,
+    },
+  },
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+
+    revenue_type: {
+      sql: `row_type`,
+      type: `string`,
+    },
+  },
+});
+```
+
+Another use case of the Data Blending approach would be when you want to chart
+some measures (business related) together and see how they correlate.
+
+Provided we have the aforementioned tables `online_orders` and `retail_orders`
+let's assume that we want to chart those measures together and see how they
+correlate. You can simply pass the queries to the Cube client, and it will merge
+the results which will let you easily display it on the chart.
+
+```javascript
+import cube from "@cubejs-client/core";
+
+const API_URL = "http://localhost:4000";
+const CUBE_TOKEN = "YOUR_TOKEN";
+
+const cubeApi = cube(CUBE_TOKEN, {
+  apiUrl: `${API_URL}/cubejs-api/v1`,
+});
+
+const queries = [
+  {
+    measures: ["online_orders.revenue"],
+    timeDimensions: [
+      {
+        dimension: "online_orders.created_at",
+        granularity: "day",
+        dateRange: ["2020-08-01", "2020-08-07"],
+      },
+    ],
+  },
+  {
+    measures: ["retail_orders.revenue"],
+    timeDimensions: [
+      {
+        dimension: "retail_orders.created_at",
+        granularity: "day",
+        dateRange: ["2020-08-01", "2020-08-07"],
+      },
+    ],
+  },
+];
+
+const resultSet = await cubeApi.load(queries);
+```

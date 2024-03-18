@@ -20,9 +20,18 @@ import {
 } from '@google-cloud/bigquery';
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
-  BaseDriver, DownloadQueryResultsOptions, DownloadQueryResultsResult, DownloadTableCSVData,
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  DownloadTableCSVData,
   DriverCapabilities,
-  DriverInterface, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, StreamTableData,
+  DriverInterface,
+  QueryColumnsResult,
+  QueryOptions,
+  QuerySchemasResult,
+  QueryTablesResult,
+  StreamTableData,
+  TableCSVData,
 } from '@cubejs-backend/base-driver';
 import { Query } from '@google-cloud/bigquery/build/src/bigquery';
 import { HydrationStream } from './HydrationStream';
@@ -308,7 +317,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  public async unload(table: string): Promise<DownloadTableCSVData> {
+  public async unload(table: string): Promise<TableCSVData> {
     if (!this.bucket) {
       throw new Error('Unload is not configured');
     }

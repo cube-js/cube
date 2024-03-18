@@ -1,5 +1,5 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { CubejsApi, Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
+import { CubeApi, Query, QueryRecordType, ResultSet } from '@cubejs-client/core';
 import { uniqBy } from 'ramda';
 import { Schemas } from '../../src';
 
@@ -43,7 +43,7 @@ type DriverTestFnArg = {
   name: string;
   schemas: Schemas,
   skip?: boolean;
-  testFn: (client: CubejsApi) => Promise<void>;
+  testFn: (client: CubeApi) => Promise<void>;
 };
 
 export type DriverTestFn = DriverTestFnArg & {

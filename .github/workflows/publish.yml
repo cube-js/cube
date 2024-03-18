@@ -17,13 +17,13 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
@@ -69,7 +69,7 @@ jobs:
     strategy:
       matrix:
         node-version: [16]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
           - target: x86_64-unknown-linux-gnu
@@ -90,7 +90,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
@@ -134,7 +134,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         with:
           PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
@@ -167,10 +167,10 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [18.x]
         os-version: ["macos-11"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
-        python-version: ["3.9", "3.10", "3.11", "fallback"]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         include:
           - target: x86_64-apple-darwin
             package_target_arch: x64
@@ -190,6 +190,8 @@ jobs:
             python-version: "3.10"
           - target: "aarch64-apple-darwin"
             python-version: "3.11"
+          - target: "aarch64-apple-darwin"
+            python-version: "3.12"
       fail-fast: false
 
     steps:
@@ -198,7 +200,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
           target: ${{ matrix.target }}
@@ -273,7 +275,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [18.x]
         python-version: ["fallback"]
         os-version: [windows-2019]
         include:
@@ -293,7 +295,7 @@ jobs:
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-22
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
       - name: Install Python
@@ -402,7 +404,7 @@ jobs:
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -435,78 +437,6 @@ jobs:
           config-inline: |
             [worker.oci]
               max-parallelism = 1
-          build-args: |
-            IMAGE_VERSION=${{ steps.prep.outputs.version }}
-
-  docker-alpine:
-    needs: [npm, cubestore_linux, native_linux]
-    name: Alpine docker image
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-      - name: Repo metadata
-        id: repo
-        uses: actions/github-script@v3
-        with:
-          script: |
-            const { data } = await github.repos.get(context.repo)
-            const reg = new RegExp('📊 ', 'ug');
-            data.description = data.description.replace(reg, "")
-            return data
-      - name: Prepare
-        id: prep
-        run: |
-          DOCKER_IMAGE=cubejs/cube
-          VERSION=noop
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          fi
-          TAGS="${DOCKER_IMAGE}:${VERSION}-alpine"
-          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            MINOR=${VERSION%.*}
-            MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-alpine,${DOCKER_IMAGE}:${MAJOR}-alpine,${DOCKER_IMAGE}:alpine"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-alpine"
-          fi
-          echo ::set-output name=version::${VERSION}
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          version: v0.9.1
-      - name: Copy yarn.lock file
-        run: cp yarn.lock packages/cubejs-docker
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v3
-        with:
-          context: ./packages/cubejs-docker
-          file: ./packages/cubejs-docker/latest-alpine.Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.prep.outputs.tags }}
-          labels: |
-            org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
-            org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
-            org.opencontainers.image.url=${{ fromJson(steps.repo.outputs.result).html_url }}
-            org.opencontainers.image.source=${{ fromJson(steps.repo.outputs.result).clone_url }}
-            org.opencontainers.image.version=${{ steps.prep.outputs.version }}
-            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
@@ -550,7 +480,7 @@ jobs:
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -646,7 +576,7 @@ jobs:
           echo ::set-output name=tags::${TAGS}
           echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -737,11 +667,11 @@ jobs:
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: rust/cubestore
-          key: cross-${{ runner.OS }}-${{ matrix.target }}
-          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+          workspaces: ./rust/cubestore -> target
+          prefix-key: v0-rust-cubestore-cross
+          key: target-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
@@ -824,11 +754,11 @@ jobs:
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
         with:
-          working-directory: rust/cubestore
-          key: cross-${{ runner.OS }}-${{ matrix.target }}
-          sharedKey:  cross-${{ runner.OS }}-${{ matrix.target }}
+          workspaces: ./rust/cubestore -> target
+          prefix-key: v0-rust-cubestore-cross
+          key: target-${{ matrix.target }}
       - run: source .github/actions/${{ matrix.before_script }}.sh
         if: ${{ matrix.before_script }}
         shell: bash
@@ -841,7 +771,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 9.0.1
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v2.0.0
+        uses: allenevans/set-env@v3.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'

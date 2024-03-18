@@ -1,0 +1,78 @@
+# Deployment warm-up
+
+Deployment warm-up improves querying performance by executing time-consuming
+tasks after a Cube Cloud deployment is spun up but before it's exposed to
+requests from users.
+
+<SuccessBox>
+
+Deployment warm-up is available in Cube Cloud on
+[Starter and above tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+<InfoBox>
+
+Deployment warm-up is only available for [production cluster][ref-prod-cluster]
+and [production multi-cluster][ref-prod-multi-cluster] deployments.
+
+</InfoBox>
+
+There are two warm-up options:
+
+* [Data model warm-up](#data-model-warm-up) — compiles the data model and
+populates data model compilation cache ahead of time.
+* [Pre-aggregation warm-up](#pre-aggregation-warm-up) — builds and refreshes
+pre-aggregations ahead of time.
+
+## Data model warm-up
+
+By default, an API instance compiles the [data model][ref-data-model] and
+stores results in the data model compilation cache when the first request hits
+that API instance. For [multi-tenant][ref-multitenancy] configurations, a
+request from a particular tenant would only trigger the data model compilation
+for that tenant.
+
+Depending on the complexity of the data model (i.e., the number of cubes,
+views, and their members) and the use of [dynamic data models][ref-dynamic-data-model],
+its compilation might take from a few milliseconds to a few seconds.
+
+Data-model warm-up will compile the data model before a Cube Cloud deployment
+is exposed to requests from users, making sure that they aren't affected by
+the data model compilation time.
+
+### Configuring data model warm-up
+
+To configure data model warm-up, navigate to <Btn>Settings → Configuration</Btn>
+and enable <Btn>Warm-up data model before deploying API</Btn>:
+
+<Screenshot src="https://ucarecdn.com/6d036fb1-4e6c-49c2-a301-fe97847a19a0/"/>
+
+## Pre-aggregation warm-up
+
+By default, the refresh worker takes care of [pre-aggregation][ref-pre-aggs]
+refresh and runs pre-aggregation builds. When first requests hit API instances,
+it's possible that pre-aggregations would still be being built and users would
+need to wait or the completion of that process.
+
+Depending on the volume of data and the configuration of pre-aggregations,
+their builds might take from seconds to minutes.
+
+Pre-aggregation warm-up will refresh pre-aggregations before a Cube Cloud
+deployment is exposed to requests from users, making sure they aren't affected
+by the pre-aggregation build time.
+
+### Configuring pre-aggregation warm-up
+
+To configure pre-aggregation warm-up, navigate to <Btn>Settings → Configuration</Btn>
+and enable <Btn>Warm-up pre-aggregations before deploying API</Btn>:
+
+<Screenshot src="https://ucarecdn.com/6d036fb1-4e6c-49c2-a301-fe97847a19a0/"/>
+
+
+[ref-prod-cluster]: /product/deployment/cloud/deployment-types#production-cluster
+[ref-prod-multi-cluster]: /product/deployment/cloud/deployment-types#production-multi-cluster
+[ref-data-model]: /product/data-modeling/overview
+[ref-dynamic-data-model]: /product/data-modeling/dynamic
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-pre-aggs]: /product/caching#pre-aggregations
