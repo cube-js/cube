@@ -20,7 +20,7 @@
     "@cubejs-backend/base-driver": "^0.35.0",
     "@cubejs-backend/schema-compiler": "^0.35.1",
     "@cubejs-backend/shared": "^0.35.0",
-    "axios": "^0.21.1",
+    "axios": "^0.28.0",
     "moment-timezone": "^0.5.31",
     "sqlstring": "^2.3.1"
   },
