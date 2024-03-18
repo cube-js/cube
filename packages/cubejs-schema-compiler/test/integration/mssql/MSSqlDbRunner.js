@@ -12,7 +12,11 @@ export class MSSqlDbRunner extends BaseDbRunner {
           server: 'localhost',
           port,
           user: 'sa',
-          password: this.password()
+          password: this.password(),
+          options: {
+            // local dev / self-signed certs
+            trustServerCertificate: true,
+          }
         });
 
         await pool.connect();
