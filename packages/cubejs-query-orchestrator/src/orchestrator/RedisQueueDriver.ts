@@ -291,20 +291,23 @@ export class RedisQueueDriverConnection implements QueueDriverConnectionInterfac
           .zadd([this.heartBeatRedisKey(), 'NX', new Date().getTime(), this.redisHash(queryKey)])
           .execAsync();
 
-      if (result) {
-        result[4] = JSON.parse(result[4]);
+      if (!result) {
+        // transaction failed due to OOM
+        return null;
+      }
+    
+      result[4] = JSON.parse(result[4]);
 
-        if (this.getQueueEventsBus) {
-          await this.redisClient.publish(
-            this.getQueueEventsBus().eventsChannel,
-            JSON.stringify({
-              event: 'retrievedForProcessing',
-              redisQueuePrefix: this.redisQueuePrefix,
-              queryKey: this.redisHash(queryKey),
-              payload: result[4]
-            })
-          );
-        }
+      if (this.getQueueEventsBus) {
+        await this.redisClient.publish(
+          this.getQueueEventsBus().eventsChannel,
+          JSON.stringify({
+            event: 'retrievedForProcessing',
+            redisQueuePrefix: this.redisQueuePrefix,
+            queryKey: this.redisHash(queryKey),
+            payload: result[4]
+          })
+        );
       }
 
       const [insertedCount, _b, activeKeys, queueSize, query, processingLockAcquired] = result;
