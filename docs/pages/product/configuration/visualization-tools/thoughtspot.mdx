@@ -21,7 +21,7 @@ below with your connection credentials:
 ### Self-hosted Cube
 
 You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Tableau later.
+These credentials will be required to connect to Cube from Thoughtspot later.
 
 ```dotenv
 CUBEJS_PG_SQL_PORT=5432
@@ -31,23 +31,21 @@ CUBEJS_SQL_PASSWORD=mypassword
 
 ## Connecting from Thoughtspot
 
-Thoughtspot connects to Cube as a Redshift database.
+Thoughtspot connects to Cube as a Postgres database.
 
-In Thoughtspot, go to the Setup tab, then click **Connect now** to add a new
+In Thoughtspot, go to the Setup tab, then click <BtnConnect now</Btn to add a new
 data source:
 
 <Screenshot src="https://ucarecdn.com/85bd8325-efd9-4cae-a463-e9b025a667cc/" />
 
-Enter a name for the data source, choose **Amazon Redshift** as the data
-warehouse and click **Continue** in the header:
+Enter a name for the data source, choose <Btn>Postgres</Btn> as the data
+warehouse and click <Btn>Continue</Btn> in the header.
 
-<Screenshot src="https://ucarecdn.com/36aad090-b8c8-4e2b-8684-dc83ce2578c3/" />
-
-Enter credentials from the previous step and click **Continue**:
+Enter credentials from the previous step and click <BtnContinue</Btn:
 
 <Screenshot src="https://ucarecdn.com/bddba9ac-1e24-4651-9086-75f1d0c3c811/" />
 
-Select columns from the desired cubes and click **Create Connection** on the
+Select columns from the desired cubes and click <BtnCreate Connection</Btn on the
 next screen:
 
 <Screenshot src="https://ucarecdn.com/95692c63-e620-42a5-9355-b4df27d6b3c4/" />
