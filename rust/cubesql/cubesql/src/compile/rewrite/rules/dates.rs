@@ -293,66 +293,6 @@ impl RewriteRules for DateRules {
                 ),
             ),
             transforming_rewrite_with_root(
-                "binary-expr-interval-add-right",
-                binary_expr("?left", "+", "?interval"),
-                alias_expr(udf_expr("date_add", vec!["?left", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-add-left",
-                binary_expr("?interval", "+", "?right"),
-                alias_expr(udf_expr("date_add", vec!["?right", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-sub",
-                binary_expr("?left", "-", "?interval"),
-                alias_expr(udf_expr("date_sub", vec!["?left", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-mul-right",
-                binary_expr("?left", "*", "?interval"),
-                alias_expr(
-                    udf_expr("interval_mul", vec!["?interval", "?left"]),
-                    "?alias",
-                ),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-mul-left",
-                binary_expr("?interval", "*", "?right"),
-                alias_expr(
-                    udf_expr("interval_mul", vec!["?interval", "?right"]),
-                    "?alias",
-                ),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-neg",
-                negative_expr("?interval"),
-                udf_expr(
-                    "interval_mul",
-                    vec!["?interval".to_string(), literal_int(-1)],
-                ),
-                self.transform_interval_binary_expr("?interval"),
-            ),
-            transforming_rewrite_with_root(
                 "redshift-dateadd-to-interval-cast-unwrap",
                 udf_expr(
                     "dateadd",
@@ -460,43 +400,6 @@ impl RewriteRules for DateRules {
 impl DateRules {
     pub fn new() -> Self {
         Self {}
-    }
-
-    fn transform_interval_binary_expr(
-        &self,
-        interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
-        self.transform_interval_binary_expr_with_chain_transform(interval_var, |_, _, _| true)
-    }
-
-    fn transform_interval_binary_expr_with_chain_transform<T>(
-        &self,
-        interval_var: &'static str,
-        chain_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
-    {
-        let interval_var = var!(interval_var);
-        move |egraph, root, subst| {
-            if let Some(ConstantFolding::Scalar(interval)) =
-                &egraph[subst[interval_var]].data.constant
-            {
-                match interval {
-                    ScalarValue::IntervalYearMonth(_)
-                    | ScalarValue::IntervalDayTime(_)
-                    | ScalarValue::IntervalMonthDayNano(_) => {
-                        if chain_transform_fn(egraph, root, subst) {
-                            return true;
-                        }
-                    }
-                    _ => (),
-                }
-            }
-
-            false
-        }
     }
 
     fn transform_interval_parts_to_interval(
