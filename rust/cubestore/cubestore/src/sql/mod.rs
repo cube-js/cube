@@ -4286,54 +4286,64 @@ mod tests {
         //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
     }
 
-    #[tokio::test]
-    async fn nested_boolean_operators() {
-        Config::test("nested_boolean_operators").update_config(|mut c| {
-            c.partition_split_threshold = 2;
-            c
-        }).start_test(async move |services| {
-                let service = services.sql_service;
+    #[test]
+    fn nested_boolean_operators() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on(async {
 
-                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+                Config::test("nested_boolean_operators").update_config(|mut c| {
+                    c.partition_split_threshold = 2;
+                    c
+                }).start_test(async move |services| {
+                        let service = services.sql_service;
 
-                service
-                    .exec_query("CREATE TABLE test.nested (gender text, state text)")
-                    .await
-                    .unwrap();
+                        let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
 
-                service
-                    .exec_query(
-                        "INSERT INTO test.nested (gender, state) values \
-                            ('male', 'nj'),\
-                            ('male', 'nj'),\
-                            ('male', 'nj'),\
-                            ('female', 'nj'),\
-                            ('female', 'nj'),\
-                            ('female', 'nj'),\
-                            ('male', 'sc'),\
-                            ('male', 'sc'),\
-                            ('male', 'sc'),\
-                            ('female', 'sc'),\
-                            ('female', 'sc'),\
-                            ('female', 'sc') \
-                            ",
-                    )
-                    .await
-                    .unwrap();
-                let res = service
-                    .exec_query(
-                        "SELECT gender, state FROM test.nested where \
-                            state = 'nj' and ((gender = 'male' and state = 'nj') or state = 'sc') ORDER BY 1, 2",
-                    )
-                    .await
-                    .unwrap();
-                assert_eq!(res.get_rows(), &vec![
-                           Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
-                           Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
-                           Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
-                ]);
+                        service
+                            .exec_query("CREATE TABLE test.nested (gender text, state text)")
+                            .await
+                            .unwrap();
 
-        }).await;
+                        service
+                            .exec_query(
+                                "INSERT INTO test.nested (gender, state) values \
+                                    ('male', 'nj'),\
+                                    ('male', 'nj'),\
+                                    ('male', 'nj'),\
+                                    ('female', 'nj'),\
+                                    ('female', 'nj'),\
+                                    ('female', 'nj'),\
+                                    ('male', 'sc'),\
+                                    ('male', 'sc'),\
+                                    ('male', 'sc'),\
+                                    ('female', 'sc'),\
+                                    ('female', 'sc'),\
+                                    ('female', 'sc') \
+                                    ",
+                            )
+                            .await
+                            .unwrap();
+                        let res = service
+                            .exec_query(
+                                "SELECT gender, state FROM test.nested where \
+                                    state = 'nj' and ((gender = 'male' and state = 'nj') or state = 'sc') ORDER BY 1, 2",
+                            )
+                            .await
+                            .unwrap();
+                        assert_eq!(res.get_rows(), &vec![
+                                Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
+                                Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
+                                Row::new(vec![TableValue::String("male".to_string()), TableValue::String("nj".to_string())]),
+                        ]);
+
+                }).await;
+
+
+            });
     }
 }
 
