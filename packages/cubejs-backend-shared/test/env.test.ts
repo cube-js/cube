@@ -94,4 +94,13 @@ describe('getEnv', () => {
     process.env.CUBEJS_LIVE_PREVIEW = 'false';
     expect(getEnv('livePreview')).toBe(false);
   });
+
+  test('apiBasePath', () => {
+    expect(getEnv('basePath')).toBe('/cube-api');
+
+    process.env.CUBEJS_API_BASE_PATH = '/test/base/path';
+    expect(getEnv('basePath')).toBe('/test/base/path');
+
+  });
+ 
 });
