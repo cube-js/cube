@@ -35,7 +35,7 @@ bytes = "0.5.4"
 serde_json = "1.0.56"
 futures = "0.3.26"
 smallvec = "1.11.0"
-flexbuffers = "0.1.1"
+flexbuffers = { version = "0.2.2", features = ["deserialize_human_readable", "serialize_human_readable"]}
 byteorder = "1.3.4"
 log = "0.4.20"
 simple_logger = "1.7.0"
