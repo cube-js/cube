@@ -556,11 +556,11 @@ impl WriteBatchContainer {
         batch
     }
 
-    pub async fn write_to_file(&self, file_name: &str) -> Result<(), CubeError> {
-        let mut ser = flexbuffers::FlexbufferSerializer::new();
-        self.serialize(&mut ser)?;
+    pub async fn write_to_file(self, file_name: &str) -> Result<(), CubeError> {
+        let serialized = flexbuffers::to_vec(self)?;
+
         let mut file = File::create(file_name).await?;
-        Ok(tokio::io::AsyncWriteExt::write_all(&mut file, ser.view()).await?)
+        Ok(tokio::io::AsyncWriteExt::write_all(&mut file, &serialized).await?)
     }
 
     pub async fn read_from_file(file_name: &str) -> Result<Self, CubeError> {
@@ -1081,7 +1081,7 @@ impl RocksStore {
                 let checkpoint_time = self.last_checkpoint_time.read().await;
                 let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
                 self.metastore_fs
-                    .upload_log(&dir_name, min.unwrap(), &serializer)
+                    .upload_log(&dir_name, min.unwrap(), serializer)
                     .await?;
             }
             let mut seq = self.last_upload_seq.write().await;
