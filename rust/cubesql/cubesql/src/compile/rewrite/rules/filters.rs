@@ -4117,7 +4117,7 @@ impl FilterRules {
             }
 
             fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
@@ -4128,7 +4128,7 @@ impl FilterRules {
             }
 
             fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),
