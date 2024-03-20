@@ -1,3 +1,8 @@
+## Incognia Fork Note
+This project is a fork of Cubejs's Cube, adding some patches that are important for the Incognia use case.
+
+Before starting the Cube update process, please take a moment to review [this document](https://www.notion.so/inlocoglobal/Cube-API-and-Cubestore-base-update-process-and-obstacles-92589ff0ca2643ad9b3a664162e1ecbd?pvs=4). It outlines the steps required for the update and highlights some obstacles that have been encountered during previous updates.
+
 <p align="center">
   <a href="https://cube.dev?ref=github-readme"><img src="https://raw.githubusercontent.com/cube-js/cube/master/docs/content/cube-logo-with-bg.png" alt="Cube — Semantic Layer for Data Applications" width="300px"></a>
 </p>
