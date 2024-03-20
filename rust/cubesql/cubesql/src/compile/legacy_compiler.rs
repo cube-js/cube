@@ -125,7 +125,7 @@ impl CompiledExpression {
             CompiledExpression::DateLiteral(date) => Some(*date),
             CompiledExpression::StringLiteral(s) => {
                 if let Ok(datetime) =
-                    NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+                    NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f")
                 {
                     return Some(Utc.from_utc_datetime(&datetime));
                 };
@@ -231,7 +231,7 @@ fn str_to_date_function(f: &ast::Function) -> CompilationResult<CompiledExpressi
         )));
     }
 
-    let parsed_date = NaiveDateTime::parse_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+    let parsed_date = NaiveDateTime::parse_from_str(date.as_str(), "%Y-%m-%d %H:%M:%S%.f")
         .map_err(|e| {
             CompilationError::user(format!("Unable to parse {}, err: {}", date, e.to_string(),))
         })?;
@@ -258,7 +258,7 @@ fn date_function(f: &ast::Function, ctx: &QueryContext) -> CompilationResult<Com
     match compiled {
         date @ CompiledExpression::DateLiteral(_) => Ok(date),
         CompiledExpression::StringLiteral(ref input) => {
-            let parsed_date = NaiveDateTime::parse_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S.%f")
+            let parsed_date = NaiveDateTime::parse_from_str(input.as_str(), "%Y-%m-%d %H:%M:%S%.f")
                 .map_err(|e| {
                     CompilationError::user(format!(
                         "Unable to parse {}, err: {}",
