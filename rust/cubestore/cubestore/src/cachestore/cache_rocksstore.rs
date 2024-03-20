@@ -1144,7 +1144,7 @@ impl CacheStore for RocksCacheStore {
                             id,
                             path,
                             result: QueueResultAckEventResult::WithResult {
-                                result: result_row.into_row().value,
+                                result: Arc::new(result_row.into_row().value),
                             },
                         }));
                     } else {
@@ -1209,7 +1209,7 @@ impl CacheStore for RocksCacheStore {
                         }
 
                         Ok(Some(QueueResultResponse::Success {
-                            value: Some(result),
+                            value: Some(result.to_string()),
                         }))
                     }
                 },
