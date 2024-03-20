@@ -22344,4 +22344,14 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_exponentiate_op() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "exponentiate_op",
+            execute_query("SELECT 3^5 AS e".to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
 }
