@@ -239,6 +239,7 @@ export type ServerCoreInitializedOptions = Required<
 
 export type SystemOptions = {
   isCubeConfigEmpty: boolean;
+  driverFactoryCache: DriverFactoryAsyncFn,
 };
 
 // Types to support the ContextAcceptance mechanism
