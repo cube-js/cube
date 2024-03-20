@@ -452,6 +452,12 @@ crate::plan_to_language! {
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
+        FlattenPushdownReplacer {
+            expr: Arc<Expr>,
+            inner_expr: Vec<Expr>,
+            inner_alias: Option<String>,
+            top_level: bool,
+        },
         // NOTE: converting this to a list might provide rewrite improvements
         CaseExprReplacer {
             members: Vec<LogicalPlan>,
@@ -676,6 +682,33 @@ where
         TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
             transform_fn(egraph, subst)
         }),
+    )
+    .unwrap()
+}
+
+pub fn transforming_chain_rewrite_with_root<T>(
+    name: &str,
+    main_searcher: String,
+    chain: Vec<(&str, String)>,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        ChainSearcher {
+            main: main_searcher.parse().unwrap(),
+            chain: chain
+                .into_iter()
+                .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
+                .collect(),
+        },
+        TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
 }
@@ -1294,6 +1327,18 @@ fn wrapper_pullup_replacer(
     format!(
         "(WrapperPullupReplacer {} {} {} {} {})",
         members, alias_to_cube, ungrouped, in_projection, cube_members
+    )
+}
+
+fn flatten_pushdown_replacer(
+    expr: impl Display,
+    inner_expr: impl Display,
+    inner_alias: impl Display,
+    top_level: impl Display,
+) -> String {
+    format!(
+        "(FlattenPushdownReplacer {} {} {} {})",
+        expr, inner_expr, inner_alias, top_level,
     )
 }
 

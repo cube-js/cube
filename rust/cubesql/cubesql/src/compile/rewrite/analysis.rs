@@ -845,6 +845,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::NegativeExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::CaseExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[1], &mut vec)?;

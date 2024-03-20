@@ -39,11 +39,13 @@ use cubeclient::models::{
 use datafusion::{
     arrow::datatypes::{DataType, TimeUnit},
     catalog::TableReference,
+    error::DataFusionError,
     logical_plan::{
         build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
-        replace_col_to_expr, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct, EmptyRelation,
-        Expr, Like, Limit, LogicalPlan, LogicalPlanBuilder, TableScan, Union,
+        replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
+        EmptyRelation, Expr, ExprRewritable, ExprRewriter, Like, Limit, LogicalPlan,
+        LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
@@ -1075,6 +1077,7 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Projection(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], ProjectionExpr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
+                let expr = replace_qualified_col_with_flat_name_if_missing(expr, &input)?;
                 let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
                 let input_schema = DFSchema::new_with_metadata(
                     exprlist_to_fields(&expr, input.schema())?,
@@ -1118,8 +1121,14 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[1], AggregateGroupExpr);
                 let aggr_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[2], AggregateAggrExpr);
-                let group_expr = normalize_cols(group_expr, &input)?;
-                let aggr_expr = normalize_cols(aggr_expr, &input)?;
+                let group_expr = normalize_cols(
+                    replace_qualified_col_with_flat_name_if_missing(group_expr, &input)?,
+                    &input,
+                )?;
+                let aggr_expr = normalize_cols(
+                    replace_qualified_col_with_flat_name_if_missing(aggr_expr, &input)?,
+                    &input,
+                )?;
                 let all_expr = group_expr.iter().chain(aggr_expr.iter());
                 let schema = Arc::new(DFSchema::new_with_metadata(
                     exprlist_to_fields(all_expr, input.schema())?,
@@ -1894,9 +1903,18 @@ impl LanguageToLogicalPlanConverter {
                 let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
                 let ungrouped = match_data_node!(node_by_id, params[13], WrappedSelectUngrouped);
 
-                let filter_expr = normalize_cols(filter_expr, &from)?;
-                let group_expr = normalize_cols(group_expr, &from)?;
-                let aggr_expr = normalize_cols(aggr_expr, &from)?;
+                let filter_expr = normalize_cols(
+                    replace_qualified_col_with_flat_name_if_missing(filter_expr, &from)?,
+                    &from,
+                )?;
+                let group_expr = normalize_cols(
+                    replace_qualified_col_with_flat_name_if_missing(group_expr, &from)?,
+                    &from,
+                )?;
+                let aggr_expr = normalize_cols(
+                    replace_qualified_col_with_flat_name_if_missing(aggr_expr, &from)?,
+                    &from,
+                )?;
                 let projection_expr = if projection_expr.is_empty()
                     && matches!(select_type, WrappedSelectType::Projection)
                 {
@@ -1906,7 +1924,10 @@ impl LanguageToLogicalPlanConverter {
                         .map(|f| Expr::Column(f.qualified_column()))
                         .collect::<Vec<_>>()
                 } else {
-                    normalize_cols(projection_expr, &from)?
+                    normalize_cols(
+                        replace_qualified_col_with_flat_name_if_missing(projection_expr, &from)?,
+                        &from,
+                    )?
                 };
                 let all_expr_without_window = match select_type {
                     WrappedSelectType::Projection => projection_expr.clone(),
@@ -2032,4 +2053,60 @@ pub fn expr_relation(expr: &Expr) -> Option<&str> {
         Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
         _ => None,
     }
+}
+
+/// This function replaces fully qualified names with flat names in case of it is missing in the input from schema.
+/// This is required to make sure schema matches when flatten replacers were applied to Aggregate nodes.
+/// Columns referenced within Aggregate node would have fully qualified names in output schema while all other expressions won't contain qualifiers.
+/// So aliases, which are introduced by flatten replacers on top of referenced columns, won't be able to have fully qualified names.
+/// Due to this there's no way for flatten replacer to generate compilable schema.
+/// Instead flatten replacers would introduce flat name aliases in a format of `qualifier.column` (`.` will be part of a string).
+/// This function then replaces fully qualified references with flat name references repairing the schema.
+/// TODO: introduce fully qualified names for aliases in Datafusion and remove this function.
+fn replace_qualified_col_with_flat_name_if_missing(
+    expr: Vec<Expr>,
+    from: &Arc<LogicalPlan>,
+) -> Result<Vec<Expr>, CubeError> {
+    struct FlattenColumnReplacer<'a> {
+        schema: &'a Arc<DFSchema>,
+    }
+
+    impl<'a> ExprRewriter for FlattenColumnReplacer<'a> {
+        fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
+            if let Expr::Column(c) = expr {
+                if self.schema.field_from_column(&c).is_err() {
+                    if self
+                        .schema
+                        .field_with_unqualified_name(&c.flat_name())
+                        .is_ok()
+                    {
+                        // This code expects that it operates on Projection level.
+                        // Exposing this function to Aggregate or top level would most likely fail.
+                        Ok(Expr::Alias(
+                            Box::new(Expr::Column(Column {
+                                name: c.flat_name(),
+                                relation: None,
+                            })),
+                            c.name.to_string(),
+                        ))
+                    } else {
+                        Ok(Expr::Column(c))
+                    }
+                } else {
+                    Ok(Expr::Column(c))
+                }
+            } else {
+                Ok(expr)
+            }
+        }
+    }
+
+    expr.into_iter()
+        .map(|e| {
+            e.rewrite(&mut FlattenColumnReplacer {
+                schema: from.schema(),
+            })
+            .map_err(|e| CubeError::from(e))
+        })
+        .collect::<Result<Vec<_>, _>>()
 }

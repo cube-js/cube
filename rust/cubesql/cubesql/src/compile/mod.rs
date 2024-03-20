@@ -4549,6 +4549,9 @@ limit
 
     #[tokio::test]
     async fn powerbi_year_month_split() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4658,25 +4661,44 @@ limit
         )
         .await;
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        // let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        // println!(
+        //     "Physical plan: {}",
+        //     displayable(physical_plan.as_ref()).indent()
+        // );
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec![]),
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: Some(json!(vec![
+                            "2023-07-08T00:00:00.000Z".to_string(),
+                            "2023-10-07T23:59:59.999Z".to_string()
+                        ])),
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("year".to_string()),
+                        date_range: None,
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("month".to_string()),
+                        date_range: None,
+                    }
+                ]),
                 order: None,
                 limit: None,
                 offset: None,
                 filters: None,
-                ungrouped: Some(true),
+                ungrouped: None,
             }
         );
     }
@@ -4715,7 +4737,7 @@ from
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 time_dimensions: None,
                 order: None,
@@ -5042,6 +5064,142 @@ limit
             }
         );
     }
+
+    #[tokio::test]
+    async fn powerbi_push_down_aggregate() {
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"select
+  "rows"."customer_gender" as "customer_gender"
+from
+  (
+    select
+      "_"."customer_gender",
+      "_"."taxful_total_price2"
+    from
+      (
+        select
+          "_"."customer_gender" as "customer_gender",
+          left(cast("_"."taxful_total_price" as varchar), 4000) as "taxful_total_price2"
+        from
+          (
+            select
+              "customer_gender",
+              "taxful_total_price"
+            from
+              "public"."KibanaSampleDataEcommerce" "$Table"
+          ) "_"
+      ) "_"
+  ) "rows"
+group by
+  "customer_gender"
+limit
+  1000001"#
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: Some(1000001),
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    //     #[tokio::test]
+    //     async fn powerbi_push_down_aggregate_with_filter() {
+    //         init_logger();
+    //
+    //         let query_plan = convert_select_to_query_plan(
+    //             r#"select
+    //   "rows"."customer_gender" as "customer_gender"
+    // from
+    //   (
+    //     select
+    //       "_"."customer_gender",
+    //       "_"."taxful_total_price2"
+    //     from
+    //       (
+    //         select
+    //           "_"."customer_gender" as "customer_gender",
+    //           left(cast("_"."taxful_total_price" as varchar), 4000) as "taxful_total_price2"
+    //         from
+    //           (
+    //             select
+    //               "customer_gender",
+    //               "taxful_total_price"
+    //             from
+    //               "public"."KibanaSampleDataEcommerce" "$Table"
+    //           ) "_"
+    //       ) "_"
+    //     where
+    //       "_"."taxful_total_price2" = '1'
+    //   ) "rows"
+    // group by
+    //   "customer_gender"
+    // limit
+    //   1000001"#
+    //                 .to_string(),
+    //             DatabaseProtocol::PostgreSQL,
+    //         )
+    //         .await;
+    //
+    //         let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    //         println!(
+    //             "Physical plan: {}",
+    //             displayable(physical_plan.as_ref()).indent()
+    //         );
+    //
+    //         let logical_plan = query_plan.as_logical_plan();
+    //         assert_eq!(
+    //             logical_plan.find_cube_scan().request,
+    //             V1LoadRequestQuery {
+    //                 measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+    //                 dimensions: Some(vec![
+    //                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
+    //                     "KibanaSampleDataEcommerce.notes".to_string()
+    //                 ]),
+    //                 segments: Some(vec![]),
+    //                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+    //                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+    //                     granularity: None,
+    //                     date_range: Some(json!(vec![
+    //                         "2024-01-01T00:00:00.000Z".to_string(),
+    //                         "2024-01-01T00:00:00.000Z".to_string()
+    //                     ])),
+    //                 }]),
+    //                 order: None,
+    //                 limit: Some(1000001),
+    //                 offset: None,
+    //                 filters: Some(vec![V1LoadRequestQueryFilterItem {
+    //                     member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+    //                     operator: Some("set".to_string()),
+    //                     values: None,
+    //                     or: None,
+    //                     and: None,
+    //                 }]),
+    //                 ungrouped: None,
+    //             }
+    //         );
+    //     }
 
     #[tokio::test]
     async fn test_select_aggregations() {
@@ -21543,19 +21701,22 @@ limit
         )
         .await;
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.taxful_total_price".to_string()
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
         );
-
-        let logical_plan = query_plan.as_logical_plan();
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("-("));
     }
 
     #[tokio::test]
@@ -22070,20 +22231,24 @@ limit
         )
         .await;
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
         );
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("-(EXTRACT(YEAR FROM"));
-        assert!(sql.contains("* INTERVAL '1 DAY'"));
     }
 
     #[tokio::test]

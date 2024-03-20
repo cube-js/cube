@@ -5,6 +5,7 @@ pub mod case;
 pub mod common;
 pub mod dates;
 pub mod filters;
+pub mod flatten;
 pub mod members;
 pub mod old_split;
 pub mod order;
