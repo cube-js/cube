@@ -50,6 +50,9 @@ class MSSqlDriver extends BaseDriver {
       config.dataSource ||
       assertDataSource('default');
 
+    /**
+     * @type {import('mssql').config}
+     */
     this.config = {
       readOnly: true,
       server: getEnv('dbHost', { dataSource }),
@@ -69,11 +72,8 @@ class MSSqlDriver extends BaseDriver {
           getEnv('dbMaxPoolSize', { dataSource }) ||
           8,
         min: 0,
-        evictionRunIntervalMillis: 10000,
-        softIdleTimeoutMillis: 30000,
-        idleTimeoutMillis: 30000,
-        testOnBorrow: true,
-        acquireTimeoutMillis: 20000
+        idleTimeoutMillis: 30 * 1000,
+        acquireTimeoutMillis: 20 * 1000
       },
       ...config
     };
