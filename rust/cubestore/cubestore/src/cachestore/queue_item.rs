@@ -8,6 +8,7 @@ use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
 use rocksdb::WriteBatch;
 use std::cmp::Ordering;
+use std::sync::Arc;
 
 use crate::cachestore::QueueKey;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -35,7 +36,12 @@ fn merge(a: serde_json::Value, b: serde_json::Value) -> Option<serde_json::Value
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
 pub enum QueueResultAckEventResult {
     Empty,
-    WithResult { result: String },
+    WithResult {
+        // It can be a large string, 20 mb
+        // Arc is used as temporarily solution to protect cloning on receiving from broadcast::channel
+        // TODO(ovr): Rewrite Queue without holding queue result in channel
+        result: Arc<String>
+    },
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq, Hash)]
