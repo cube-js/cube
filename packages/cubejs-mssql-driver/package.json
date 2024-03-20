@@ -16,6 +16,10 @@
     "@cubejs-backend/base-driver": "^0.35.0",
     "mssql": "^10.0.2"
   },
+  "devDependencies": {
+    "@types/node": "^16",
+    "@types/mssql": "^9.1.5"
+  },
   "jest": {
     "testEnvironment": "node"
   },
