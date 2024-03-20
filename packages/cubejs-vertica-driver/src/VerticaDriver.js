@@ -1,5 +1,6 @@
 const { Pool } = require('vertica-nodejs');
 const { BaseDriver } = require('@cubejs-backend/query-orchestrator');
+const VerticaQuery = require('./VerticaQuery');
 
 const defaultGenericType = 'text';
 const VerticaTypeToGenericType = {
@@ -27,6 +28,10 @@ class VerticaDriver extends BaseDriver {
       ssl: this.getSslOptions(),
       ...config,
     });
+  }
+
+  static dialectClass() {
+    return VerticaQuery;
   }
 
   async query(query, values) {

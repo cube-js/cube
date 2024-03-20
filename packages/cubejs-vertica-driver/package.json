@@ -20,6 +20,8 @@
   },
   "dependencies": {
     "@cubejs-backend/query-orchestrator": "^0.31.69",
+    "@cubejs-backend/schema-compiler": "^0.34.62",
+    "moment-timezone": "^0.5.45",
     "vertica-nodejs": "^1.0.3"
   },
   "license": "Apache-2.0",

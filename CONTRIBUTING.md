@@ -53,7 +53,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Development
 
 1. After cloning Cube repository run `yarn install` to install dependencies.
-2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
+2. From the `packages/cubejs-docker` directory, use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build a stable development image.
 
 ### Cube Client
 

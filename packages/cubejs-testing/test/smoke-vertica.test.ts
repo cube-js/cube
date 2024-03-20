@@ -1,9 +1,9 @@
 import fetch from 'node-fetch';
 import { StartedTestContainer } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
 import { VerticaDBRunner } from '@cubejs-backend/testing-shared';
+import cubejs, { CubeApi, Query } from '@cubejs-client/core';
+import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG } from './smoke-tests';
 
@@ -11,7 +11,7 @@ describe('vertica pa', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     db = await VerticaDBRunner.startContainer();
