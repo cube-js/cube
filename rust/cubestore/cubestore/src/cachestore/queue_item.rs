@@ -40,7 +40,7 @@ pub enum QueueResultAckEventResult {
         // It can be a large string, 20 mb
         // Arc is used as temporarily solution to protect cloning on receiving from broadcast::channel
         // TODO(ovr): Rewrite Queue without holding queue result in channel
-        result: Arc<String>
+        result: Arc<String>,
     },
 }
 
