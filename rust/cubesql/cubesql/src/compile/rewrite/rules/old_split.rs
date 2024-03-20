@@ -5705,13 +5705,14 @@ impl OldSplitRules {
                     | Operator::Minus
                     | Operator::Multiply
                     | Operator::Divide
-                    | Operator::Modulo => {
+                    | Operator::Modulo
+                    | Operator::Exponentiate => {
                         let check_is_zero = match operator {
                             Operator::Plus
                             | Operator::Minus
                             | Operator::Divide
                             | Operator::Modulo => false,
-                            Operator::Multiply => true,
+                            Operator::Multiply | Operator::Exponentiate => true,
                             _ => continue,
                         };
 

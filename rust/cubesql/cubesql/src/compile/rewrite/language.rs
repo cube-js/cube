@@ -406,6 +406,7 @@ macro_rules! variant_field_struct {
                 Operator::Multiply => "*",
                 Operator::Divide => "/",
                 Operator::Modulo => "%",
+                Operator::Exponentiate => "^",
                 Operator::And => "AND",
                 Operator::Or => "OR",
                 Operator::Like => "LIKE",
