@@ -23,7 +23,7 @@ class VerticaFilter extends BaseFilter {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOLEAN)';
     } else if (this.measure || this.definition().type === 'number') {
-      return 'CAST(? AS DOUBLE)';
+      return 'CAST(? AS NUMERIC)';
     }
 
     return '?';
@@ -68,7 +68,7 @@ class VerticaQuery extends BaseQuery {
   }
 
   concatStringsSql(strings) {
-    return `CONCAT(${strings.join(', ')})`;
+    return strings.join('||');
   }
 
   unixTimestampSql() {
@@ -76,7 +76,7 @@ class VerticaQuery extends BaseQuery {
   }
 
   wrapSegmentForDimensionSelect(sql) {
-    return `IF(${sql}, 1, 0)`;
+    return `CASE WHEN ${sql} THEN 1 ELSE 0 END::BOOLEAN`;
   }
 }
 
