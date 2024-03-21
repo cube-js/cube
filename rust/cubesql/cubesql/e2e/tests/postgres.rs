@@ -274,7 +274,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -303,7 +303,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
