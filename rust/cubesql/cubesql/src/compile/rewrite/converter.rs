@@ -25,8 +25,9 @@ use crate::{
             TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
             TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
             WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
-            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
+            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
+            WrappedSelectOffset, WrappedSelectSelectType, WrappedSelectType,
+            WrappedSelectUngrouped,
         },
     },
     sql::AuthContextRef,
@@ -1905,7 +1906,8 @@ impl LanguageToLogicalPlanConverter {
                 let order_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[11], WrappedSelectOrderExpr);
                 let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
-                let ungrouped = match_data_node!(node_by_id, params[13], WrappedSelectUngrouped);
+                let distinct = match_data_node!(node_by_id, params[13], WrappedSelectDistinct);
+                let ungrouped = match_data_node!(node_by_id, params[14], WrappedSelectUngrouped);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(filter_expr, &from)?,
@@ -1997,6 +1999,7 @@ impl LanguageToLogicalPlanConverter {
                         offset,
                         order_expr,
                         alias,
+                        distinct,
                         ungrouped,
                     )),
                 })

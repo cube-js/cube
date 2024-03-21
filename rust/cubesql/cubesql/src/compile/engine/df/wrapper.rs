@@ -403,6 +403,7 @@ impl CubeScanWrapperNode {
                         offset,
                         order_expr,
                         alias,
+                        distinct,
                         ungrouped,
                     }) = wrapped_select_node
                     {
@@ -777,6 +778,7 @@ impl CubeScanWrapperNode {
                                         order,
                                         limit,
                                         offset,
+                                        distinct,
                                     )
                                     .map_err(|e| {
                                         DataFusionError::Internal(format!(
