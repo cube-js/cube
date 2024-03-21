@@ -53,7 +53,6 @@ export type CubeDescriptor = {
   schema: string;
   members: CubeDescriptorMember[];
   joins: Join[];
-  shouldGeneratePrimaryKey?: boolean;
 };
 
 export type TableSchema = {
@@ -65,7 +64,6 @@ export type TableSchema = {
   dimensions: Dimension[];
   drillMembers?: Dimension[];
   joins: Join[];
-  compositePrimaryKey?: any[];
 };
 
 const MEASURE_DICTIONARY = [
