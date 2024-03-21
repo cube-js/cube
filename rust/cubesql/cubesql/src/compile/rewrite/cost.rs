@@ -303,6 +303,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             LogicalPlanLanguage::CaseExprReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPushdownReplacer(_) => 1,
             LogicalPlanLanguage::WrapperPullupReplacer(_) => 1,
+            LogicalPlanLanguage::FlattenPushdownReplacer(_) => 1,
+            LogicalPlanLanguage::AggregateSplitPushDownReplacer(_) => 1,
+            LogicalPlanLanguage::AggregateSplitPullUpReplacer(_) => 1,
+            LogicalPlanLanguage::ProjectionSplitPushDownReplacer(_) => 1,
+            LogicalPlanLanguage::ProjectionSplitPullUpReplacer(_) => 1,
             LogicalPlanLanguage::QueryParam(_) => 1,
             // Not really replacers but those should be deemed as mandatory rewrites and as soon as
             // there's always rewrite rule it's fine to have replacer cost.

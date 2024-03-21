@@ -7033,6 +7033,124 @@ limit
     }
 
     #[tokio::test]
+    async fn test_thought_spot_cte_flatten_alias() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            r#"
+WITH "qt_0" AS (
+  SELECT 
+    "ta_1"."read" "ca_1", 
+    CASE
+      WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
+      ELSE 0
+    END "ca_2", 
+    (CASE
+      WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
+      ELSE 0
+    END > 10.0) "ca_3"
+  FROM "tpch5k"."public"."KibanaSampleDataEcommerce" "ta_2"
+    JOIN "public"."Logs" "ta_1"
+      ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
+    JOIN "public"."NumberCube" "ta_3"
+      ON "ta_2"."__cubeJoinField" = "ta_3"."__cubeJoinField"
+  GROUP BY "ca_1"
+)
+SELECT "ta_4"."ca_3" "ca_4"
+FROM "qt_0" "ta_4"
+GROUP BY "ca_4"
+ORDER BY "ca_4" ASC
+        "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["Logs.read".to_string()]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_thought_spot_cte_flatten_replacer() -> Result<(), CubeError> {
+        init_logger();
+
+        // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
+        let query_plan = convert_select_to_query_plan(
+            r#"
+WITH "qt_0" AS (
+  SELECT 
+    "ta_1"."read" "ca_1", 
+    DATE_TRUNC('month', "ta_2"."order_date") "ca_2", 
+    CASE
+      WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
+      ELSE 0
+    END "ca_3"
+  FROM "public"."KibanaSampleDataEcommerce" "ta_2"
+    JOIN "tpch5k"."public"."Logs" "ta_1"
+      ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
+  GROUP BY 
+    "ca_1", 
+    "ca_2"
+  
+)
+SELECT 
+  "ta_3"."ca_1" "ca_4", 
+  DATE_TRUNC('month', DATEADD(day, CAST(2 AS int), DATE '2014-01-01')) "ca_5", 
+  CASE
+    WHEN sum(3) IS NOT NULL THEN sum(3)
+    ELSE 0
+  END "ca_6"
+FROM "qt_0" "ta_3"
+GROUP BY "ca_4"
+ORDER BY 
+  "ca_4" ASC, 
+  "ca_6" ASC
+        "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                segments: Some(vec![]),
+                dimensions: Some(vec!["Logs.read".to_string()]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("month".to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_thought_spot_qrt_granularity() -> Result<(), CubeError> {
         init_logger();
 
