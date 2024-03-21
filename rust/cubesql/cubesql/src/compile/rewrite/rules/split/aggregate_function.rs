@@ -1,8 +1,8 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr,
+        agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        column_expr, literal_expr, literal_int,
+        cast_expr, column_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
@@ -25,6 +25,38 @@ impl SplitRules {
             || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
             // ?distinct would always match
             |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            self.transform_aggregate_function(
+                Some("?fun_name"),
+                Some("?column"),
+                Some("?distinct"),
+                "?output_fun_name",
+                "?alias_to_cube",
+                true,
+            ),
+            true,
+            rules,
+        );
+        self.single_arg_split_point_rules(
+            "aggregate-function-cast",
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![cast_expr(
+                        alias_expr(column_expr("?column"), "?column_alias"),
+                        "?data_type",
+                    )],
+                    "?distinct",
+                )
+            },
+            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            // ?distinct would always match
+            |alias_column| {
+                agg_fun_expr(
+                    "?output_fun_name",
+                    vec![cast_expr(alias_column, "?data_type")],
+                    "?distinct",
+                )
+            },
             self.transform_aggregate_function(
                 Some("?fun_name"),
                 Some("?column"),
