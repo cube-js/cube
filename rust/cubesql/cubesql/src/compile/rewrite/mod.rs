@@ -267,6 +267,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             order_expr: Vec<Expr>,
             alias: Option<String>,
+            distinct: bool,
             ungrouped: bool,
             ungrouped_scan: bool,
         },
@@ -821,11 +822,12 @@ fn wrapped_select(
     offset: impl Display,
     order_expr: impl Display,
     alias: impl Display,
+    distinct: impl Display,
     ungrouped: impl Display,
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
@@ -839,6 +841,7 @@ fn wrapped_select(
         offset,
         order_expr,
         alias,
+        distinct,
         ungrouped,
         ungrouped_scan
     )
@@ -1480,6 +1483,10 @@ fn cube_scan(
 
 fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
     format!("(CubeScanWrapper {} {})", input, finalized)
+}
+
+fn distinct(input: impl Display) -> String {
+    format!("(Distinct {})", input)
 }
 
 pub fn original_expr_name(

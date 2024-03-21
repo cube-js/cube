@@ -388,6 +388,7 @@ impl SqlTemplates {
         order_by: Vec<AliasedColumn>,
         limit: Option<usize>,
         offset: Option<usize>,
+        distinct: bool,
     ) -> Result<String, CubeError> {
         let group_by = self.to_template_columns(group_by)?;
         let aggregate = self.to_template_columns(aggregate)?;
@@ -413,6 +414,7 @@ impl SqlTemplates {
                 from_alias => quoted_from_alias,
                 limit => limit,
                 offset => offset,
+                distinct => distinct,
             },
         )
     }
