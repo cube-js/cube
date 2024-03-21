@@ -2501,7 +2501,8 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+        select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
           ') AS {{ from_alias }}' +

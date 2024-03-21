@@ -157,6 +157,7 @@ pub struct WrappedSelectNode {
     pub offset: Option<usize>,
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
+    pub distinct: bool,
     pub ungrouped: bool,
 }
 
@@ -176,6 +177,7 @@ impl WrappedSelectNode {
         offset: Option<usize>,
         order_expr: Vec<Expr>,
         alias: Option<String>,
+        distinct: bool,
         ungrouped: bool,
     ) -> Self {
         Self {
@@ -193,6 +195,7 @@ impl WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            distinct,
             ungrouped,
         }
     }
@@ -229,7 +232,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
             self.select_type,
             self.projection_expr,
             self.group_expr,
@@ -243,6 +246,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.offset,
             self.order_expr,
             self.alias,
+            self.distinct,
         )
     }
 
@@ -332,6 +336,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            self.distinct,
             self.ungrouped,
         ))
     }

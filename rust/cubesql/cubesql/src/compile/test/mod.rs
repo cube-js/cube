@@ -342,7 +342,8 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
-                        r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
+                        r#"SELECT {% if distinct %}DISTINCT {% endif %}
+  {{ select_concat | map(attribute='aliased') | join(', ') }} 
 FROM (
   {{ from | indent(2) }}
 ) AS {{ from_alias }}{% if filter %}

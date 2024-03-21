@@ -6,6 +6,7 @@ mod case;
 mod cast;
 mod column;
 mod cube_scan_wrapper;
+mod distinct;
 mod extract;
 mod filter;
 mod in_list_expr;
@@ -70,6 +71,7 @@ impl RewriteRules for WrapperRules {
         self.in_list_expr_rules(&mut rules);
         self.negative_expr_rules(&mut rules);
         self.not_expr_rules(&mut rules);
+        self.distinct_rules(&mut rules);
 
         rules
     }
