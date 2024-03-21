@@ -1070,27 +1070,27 @@ export class BaseQuery {
   }
 
   timeRangeFilter(dimensionSql, fromTimeStampParam, toTimeStampParam) {
-    return `${timeStampCast(dimensionSql)} >= ${fromTimeStampParam} AND ${timeStampCast(dimensionSql)} <= ${toTimeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} >= ${fromTimeStampParam} AND ${this.timeStampCast(dimensionSql)} <= ${toTimeStampParam}`;
   }
 
   timeNotInRangeFilter(dimensionSql, fromTimeStampParam, toTimeStampParam) {
-    return `${timeStampCast(dimensionSql)} < ${fromTimeStampParam} OR ${timeStampCast(dimensionSql)} > ${toTimeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} < ${fromTimeStampParam} OR ${this.timeStampCast(dimensionSql)} > ${toTimeStampParam}`;
   }
 
   beforeDateFilter(dimensionSql, timeStampParam) {
-    return `${timeStampCast(dimensionSql)} < ${timeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} < ${timeStampParam}`;
   }
 
   beforeOrOnDateFilter(dimensionSql, timeStampParam) {
-    return `${timeStampCast(dimensionSql)} <= ${timeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} <= ${timeStampParam}`;
   }
 
   afterDateFilter(dimensionSql, timeStampParam) {
-    return `${timeStampCast(dimensionSql)} > ${timeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} > ${timeStampParam}`;
   }
 
   afterOrOnDateFilter(dimensionSql, timeStampParam) {
-    return `${timeStampCast(dimensionSql)} >= ${timeStampParam}`;
+    return `${this.timeStampCast(dimensionSql)} >= ${timeStampParam}`;
   }
 
   timeStampCast(value) {
