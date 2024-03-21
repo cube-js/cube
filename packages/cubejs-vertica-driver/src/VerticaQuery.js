@@ -13,12 +13,6 @@ const GRANULARITY_TO_INTERVAL = {
 };
 
 class VerticaFilter extends BaseFilter {
-  likeIgnoreCase(column, not, param, type) {
-    const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
-    const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return ` ILIKE (${column}${not ? ' NOT' : ''}, CONCAT('${p}', ${this.allocateParam(param)}, '${s}'))`;
-  }
-
   castParameter() {
     if (this.definition().type === 'boolean') {
       return 'CAST(? AS BOOLEAN)';
