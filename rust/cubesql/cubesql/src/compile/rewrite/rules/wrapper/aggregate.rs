@@ -102,7 +102,12 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_aggregate("?ungrouped", "?select_ungrouped"),
+            self.transform_aggregate(
+                "?group_expr",
+                "?aggr_expr",
+                "?ungrouped",
+                "?select_ungrouped",
+            ),
         )]);
 
         // TODO add flag to disable dimension rules
@@ -162,12 +167,22 @@ impl WrapperRules {
 
     fn transform_aggregate(
         &self,
+        group_expr_var: &'static str,
+        aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let group_expr_var = var!(group_expr_var);
+        let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
         move |egraph, subst| {
+            if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
+                return false;
+            }
+            if egraph[subst[aggr_expr_var]].data.referenced_expr.is_none() {
+                return false;
+            }
             for ungrouped in
                 var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
             {

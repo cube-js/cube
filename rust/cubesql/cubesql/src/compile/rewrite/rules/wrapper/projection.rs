@@ -98,6 +98,7 @@ impl WrapperRules {
                 "CubeScanWrapperFinalized:false",
             ),
             self.transform_projection(
+                "?expr",
                 "?projection_alias",
                 "?ungrouped",
                 "?select_alias",
@@ -116,45 +117,51 @@ impl WrapperRules {
 
     fn transform_projection(
         &self,
+        expr_var: &'static str,
         projection_alias_var: &'static str,
         ungrouped_var: &'static str,
         select_alias_var: &'static str,
         select_ungrouped_var: &'static str,
         select_ungrouped_scan_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let expr_var = var!(expr_var);
         let projection_alias_var = var!(projection_alias_var);
         let ungrouped_var = var!(ungrouped_var);
         let select_alias_var = var!(select_alias_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         move |egraph, subst| {
-            for projection_alias in
-                var_iter!(egraph[subst[projection_alias_var]], ProjectionAlias).cloned()
-            {
-                for ungrouped in
-                    var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
+            if let Some(_) = &egraph[subst[expr_var]].data.referenced_expr {
+                for projection_alias in
+                    var_iter!(egraph[subst[projection_alias_var]], ProjectionAlias).cloned()
                 {
-                    subst.insert(
-                        select_ungrouped_var,
-                        egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
-                            WrappedSelectUngrouped(ungrouped),
-                        )),
-                    );
-                    subst.insert(
-                        select_ungrouped_scan_var,
-                        egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
-                            WrappedSelectUngroupedScan(ungrouped),
-                        )),
-                    );
-                    subst.insert(
-                        select_alias_var,
-                        egraph.add(LogicalPlanLanguage::WrappedSelectAlias(WrappedSelectAlias(
-                            projection_alias,
-                        ))),
-                    );
-                    return true;
+                    for ungrouped in
+                        var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped)
+                            .cloned()
+                    {
+                        subst.insert(
+                            select_ungrouped_var,
+                            egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
+                                WrappedSelectUngrouped(ungrouped),
+                            )),
+                        );
+                        subst.insert(
+                            select_ungrouped_scan_var,
+                            egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
+                                WrappedSelectUngroupedScan(ungrouped),
+                            )),
+                        );
+                        subst.insert(
+                            select_alias_var,
+                            egraph.add(LogicalPlanLanguage::WrappedSelectAlias(
+                                WrappedSelectAlias(projection_alias),
+                            )),
+                        );
+                        return true;
+                    }
                 }
             }
+
             false
         }
     }

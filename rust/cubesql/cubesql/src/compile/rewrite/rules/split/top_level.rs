@@ -361,6 +361,25 @@ impl SplitRules {
             ) {
                 return false;
             }
+            if let Some(projection_expr_var) = projection_expr_var {
+                if egraph[subst[projection_expr_var]]
+                    .data
+                    .referenced_expr
+                    .is_none()
+                {
+                    return false;
+                }
+            }
+            if let Some(group_expr_var) = group_expr_var {
+                if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
+                    return false;
+                }
+            }
+            if let Some(aggr_expr_var) = aggr_expr_var {
+                if egraph[subst[aggr_expr_var]].data.referenced_expr.is_none() {
+                    return false;
+                }
+            }
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
             {
@@ -397,6 +416,12 @@ impl SplitRules {
                     .map(|(a, b)| a.max(b)),
                 Some(0) | Some(1)
             ) {
+                return false;
+            }
+            if egraph[subst[aggr_expr_var]].data.referenced_expr.is_none() {
+                return false;
+            }
+            if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
                 return false;
             }
             for alias_to_cube in
