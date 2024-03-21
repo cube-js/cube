@@ -1,8 +1,7 @@
-import inflection, { titleize } from 'inflection';
+import inflection from 'inflection';
 import { CubeMembers, SchemaContext } from '../ScaffoldingTemplate';
 import {
   CubeDescriptor,
-  CubeDescriptorMember,
   DatabaseSchema,
   MemberType,
   ScaffoldingSchema,
@@ -32,9 +31,9 @@ export abstract class BaseSchemaFormatter {
   protected readonly scaffoldingSchema: ScaffoldingSchema;
 
   public constructor(
-    protected readonly dbSchema: DatabaseSchema,
-    protected readonly driver: any,
-    protected readonly options: SchemaFormatterOptions
+      protected readonly dbSchema: DatabaseSchema,
+      protected readonly driver: any,
+      protected readonly options: SchemaFormatterOptions
   ) {
     this.scaffoldingSchema = new ScaffoldingSchema(dbSchema, this.options);
   }
@@ -43,9 +42,7 @@ export abstract class BaseSchemaFormatter {
 
   protected abstract cubeReference(cube: string): string;
 
-  protected abstract renderFile(
-    fileDescriptor: Record<string, unknown>
-  ): string;
+  protected abstract renderFile(fileDescriptor: Record<string, unknown>): string;
 
   public generateFilesByTableNames(
     tableNames: TableName[],
@@ -57,9 +54,7 @@ export abstract class BaseSchemaFormatter {
 
     return schemaForTables.map((tableSchema) => ({
       fileName: `${tableSchema.cube}.${this.fileExtension()}`,
-      content: this.renderFile(
-        this.schemaDescriptorForTable(tableSchema, schemaContext)
-      ),
+      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
     }));
   }
 
@@ -67,14 +62,10 @@ export abstract class BaseSchemaFormatter {
     cubeDescriptors: CubeDescriptor[],
     schemaContext: SchemaContext = {}
   ): SchemaFile[] {
-    return this.schemaForTablesByCubeDescriptors(cubeDescriptors).map(
-      (tableSchema) => ({
-        fileName: `${tableSchema.cube}.${this.fileExtension()}`,
-        content: this.renderFile(
-          this.schemaDescriptorForTable(tableSchema, schemaContext)
-        ),
-      })
-    );
+    return this.schemaForTablesByCubeDescriptors(cubeDescriptors).map((tableSchema) => ({
+      fileName: `${tableSchema.cube}.${this.fileExtension()}`,
+      content: this.renderFile(this.schemaDescriptorForTable(tableSchema, schemaContext)),
+    }));
   }
 
   protected sqlForMember(m) {
@@ -86,8 +77,7 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected memberTitle(m) {
-    return inflection.titleize(inflection.underscore(this.memberName(m))) !==
-      m.title
+    return inflection.titleize(inflection.underscore(this.memberName(m))) !== m.title
       ? m.title
       : undefined;
   }
@@ -113,16 +103,11 @@ export abstract class BaseSchemaFormatter {
     return !!name.match(/^[a-z0-9_]+$/i);
   }
 
-  public schemaDescriptorForTable(
-    tableSchema: TableSchema,
-    schemaContext: SchemaContext = {}
-  ) {
+  public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {
     let table = `${
-      tableSchema.schema?.length
-        ? `${this.escapeName(tableSchema.schema)}.`
-        : ''
+      tableSchema.schema?.length ? `${this.escapeName(tableSchema.schema)}.` : ''
     }${this.escapeName(tableSchema.table)}`;
-
+    
     if (this.options.catalog) {
       table = `${this.escapeName(this.options.catalog)}.${table}`;
     }
@@ -131,9 +116,7 @@ export abstract class BaseSchemaFormatter {
 
     let dataSourceProp = {};
     if (dataSource) {
-      dataSourceProp = this.options.snakeCase
-        ? { data_source: dataSource }
-        : { dataSource };
+      dataSourceProp = this.options.snakeCase ? { data_source: dataSource } : { dataSource };
     }
 
     const sqlOption = this.options.snakeCase
@@ -143,24 +126,7 @@ export abstract class BaseSchemaFormatter {
       : {
         sql: `SELECT * FROM ${table}`,
       };
-
-    let compositePrimaryKey: any;
-
-    if (tableSchema.compositePrimaryKey) {
-      const { length } = tableSchema.compositePrimaryKey;
-      const name = tableSchema.dimensions.find(d => d.name === 'id') ? 'generated_composite_primary_key' : 'id';
-      compositePrimaryKey = {
-        [name]: {
-          name,
-          title: titleize(name),
-          sql: this.driver.concatStringsSql(tableSchema.compositePrimaryKey
-            .flatMap(
-              (it, index) => [`${this.cubeReference('CUBE')}.${this.escapeName(it.name)}`, index !== length - 1 ? '\'-\'' : null].filter(Boolean)
-            )),
-          [this.options.snakeCase ? 'primary_key' : 'primaryKey']: true
-        } };
-    }
-
+      
     return {
       cube: tableSchema.cube,
       ...sqlOption,
@@ -171,30 +137,25 @@ export abstract class BaseSchemaFormatter {
           [j.cubeToJoin]: {
             sql: `${this.cubeReference('CUBE')}.${this.escapeName(
               j.thisTableColumn
-            )} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(
-              j.columnToJoin
-            )}`,
+            )} = ${this.cubeReference(j.cubeToJoin)}.${this.escapeName(j.columnToJoin)}`,
             relationship: this.options.snakeCase
               ? JOIN_RELATIONSHIP_MAP[j.relationship]
               : j.relationship,
           },
         }))
         .reduce((a, b) => ({ ...a, ...b }), {}),
-      dimensions: {
-        ...compositePrimaryKey,
-        ...tableSchema.dimensions
-          .sort((a) => (a.isPrimaryKey ? -1 : 0))
-          .map((m) => ({
-            [this.memberName(m)]: {
-              sql: this.sqlForMember(m),
-              type: m.type ?? m.types[0],
-              title: this.memberTitle(m),
-              [this.options.snakeCase ? 'primary_key' : 'primaryKey']:
-                  m.isPrimaryKey ? true : undefined,
-            },
-          }))
-          .reduce((a, b) => ({ ...a, ...b }), {})
-      },
+      dimensions: tableSchema.dimensions.sort((a) => (a.isPrimaryKey ? -1 : 0))
+        .map((m) => ({
+          [this.memberName(m)]: {
+            sql: this.sqlForMember(m),
+            type: m.type ?? m.types[0],
+            title: this.memberTitle(m),
+            [this.options.snakeCase ? 'primary_key' : 'primaryKey']: m.isPrimaryKey
+              ? true
+              : undefined,
+          },
+        }))
+        .reduce((a, b) => ({ ...a, ...b }), {}),
       measures: tableSchema.measures
         .map((m) => ({
           [this.memberName(m)]: {
@@ -211,24 +172,21 @@ export abstract class BaseSchemaFormatter {
 
       ...(this.options.snakeCase
         ? Object.fromEntries(
-          Object.entries(contextProps).map(([key, value]) => [
-            toSnakeCase(key),
-            value,
-          ])
+          Object.entries(contextProps).map(([key, value]) => [toSnakeCase(key), value])
         )
         : contextProps),
 
-      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']:
-        new ValueWithComments(null, [
+      [this.options.snakeCase ? 'pre_aggregations' : 'preAggregations']: new ValueWithComments(
+        null,
+        [
           'Pre-aggregation definitions go here.',
           'Learn more in the documentation: https://cube.dev/docs/caching/pre-aggregations/getting-started',
-        ]),
+        ]
+      ),
     };
   }
 
-  protected schemaForTablesByCubeDescriptors(
-    cubeDescriptors: CubeDescriptor[]
-  ) {
+  protected schemaForTablesByCubeDescriptors(cubeDescriptors: CubeDescriptor[]) {
     const tableNames = cubeDescriptors.map(({ tableName }) => tableName);
     const generatedSchemaForTables = this.scaffoldingSchema.generateForTables(
       tableNames.map((n) => this.scaffoldingSchema.resolveTableName(n))
@@ -254,16 +212,10 @@ export abstract class BaseSchemaFormatter {
         }
       );
 
-      let compositePrimaryKey: CubeDescriptorMember[] | undefined = [];
-      if (descriptor.shouldGeneratePrimaryKey) {
-        compositePrimaryKey = cubeMembers.dimensions.filter(d => !d.isPrimaryKey && d.type !== 'time');
-      }
-
       return {
         ...generatedDescriptor,
         ...descriptor,
         ...cubeMembers,
-        compositePrimaryKey
       };
     });
   }

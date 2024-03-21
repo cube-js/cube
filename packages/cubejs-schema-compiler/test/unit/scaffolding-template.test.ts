@@ -1,4 +1,3 @@
-import { MemberType } from '../../src';
 import {
   ScaffoldingTemplate,
   SchemaFormat,
@@ -6,12 +5,10 @@ import {
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
-  concatStringsSql: (strings: string[]) => strings.join(' || '),
 };
 
 const mySqlDriver = {
   quoteIdentifier: (name) => `\`${name}\``,
-  concatStringsSql: (strings: string[]) => `CONCAT(${strings.join(', ')})`
 };
 
 const bigQueryDriver = {
@@ -590,119 +587,6 @@ describe('ScaffoldingTemplate', () => {
   });
 
   describe('Yaml formatter', () => {
-    it('generates composite primary key for YAML model', () => {
-      const template = new ScaffoldingTemplate(dbSchema, driver, {
-        format: SchemaFormat.Yaml,
-        snakeCase: true
-      });
-
-      const files = template.generateFilesByCubeDescriptors([
-        {
-          cube: 'orders',
-          tableName: 'public.orders',
-          table: 'orders',
-          schema: 'public',
-          joins: [],
-          shouldGeneratePrimaryKey: true,
-          members: [
-            {
-              memberType: MemberType.Dimension,
-              name: 'number',
-              title: 'Number',
-              types: [
-                'sum',
-                'avg',
-                'min',
-                'max'
-              ],
-              included: true,
-              type: 'number'
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'status',
-              title: 'Status',
-              types: [
-                'string'
-              ],
-              isPrimaryKey: false,
-              type: 'string',
-              included: true
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'created_at',
-              title: 'Created At',
-              types: [
-                'number'
-              ],
-              type: 'time',
-              included: true
-            },
-          ],
-        },
-      ]);
-
-      expect(files[0].content).toContain('sql: "{CUBE}.number || \'-\' || {CUBE}.status"');
-    });
-
-    it('generates composite primary key for JS model', () => {
-      const template = new ScaffoldingTemplate(dbSchema, driver, {
-        format: SchemaFormat.JavaScript,
-        snakeCase: true
-      });
-
-      const files = template.generateFilesByCubeDescriptors([
-        {
-          cube: 'orders',
-          tableName: 'public.orders',
-          table: 'orders',
-          schema: 'public',
-          joins: [],
-          shouldGeneratePrimaryKey: true,
-          members: [
-            {
-              memberType: MemberType.Dimension,
-              name: 'number',
-              title: 'Number',
-              types: [
-                'sum',
-                'avg',
-                'min',
-                'max'
-              ],
-              included: true,
-              type: 'number'
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'status',
-              title: 'Status',
-              types: [
-                'string'
-              ],
-              isPrimaryKey: false,
-              type: 'string',
-              included: true
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'created_at',
-              title: 'Created At',
-              types: [
-                'number'
-              ],
-              type: 'time',
-              included: true
-            },
-          ],
-        },
-      ]);
-
-      // eslint-disable-next-line
-      expect(files[0].content).toContain('sql: `${CUBE}.number || \'-\' || ${CUBE}.status`');
-    });
-
     it('generates schema for base driver', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.Yaml,
