@@ -5,7 +5,7 @@ use crate::{
         rules::flatten::FlattenRules, transforming_rewrite, AliasExprAlias, ColumnExprColumn,
         FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
     },
-    var, var_iter,
+    var, var_iter, CubeError,
 };
 use egg::Rewrite;
 
@@ -65,7 +65,14 @@ impl FlattenRules {
                         {
                             // Currently there are no cases where it can fail when adding expression
                             let output_expr =
-                                LogicalPlanToLanguageConverter::add_expr(egraph, &expr).unwrap();
+                                LogicalPlanToLanguageConverter::add_expr(egraph, &expr)
+                                    .map_err(|e| {
+                                        CubeError::internal(format!(
+                                "FlattenColumnPushdown: Can't add expression to egraph: {:?}: {}",
+                                expr, e
+                            ))
+                                    })
+                                    .unwrap();
                             let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
                                 AliasExprAlias(if top_level {
                                     column.name.to_string()

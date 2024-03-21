@@ -2,9 +2,8 @@ mod column;
 mod pass_through;
 mod top_level;
 
-use crate::compile::{
-    rewrite::{analysis::LogicalPlanAnalysis, rewriter::RewriteRules, LogicalPlanLanguage},
-    MetaContext,
+use crate::compile::rewrite::{
+    analysis::LogicalPlanAnalysis, rewriter::RewriteRules, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
