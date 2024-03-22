@@ -7083,7 +7083,10 @@ ORDER BY "ca_4" ASC
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(), "KibanaSampleDataEcommerce.count".to_string()]),
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                    "KibanaSampleDataEcommerce.count".to_string()
+                ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
                 time_dimensions: None,
