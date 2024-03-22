@@ -2007,7 +2007,7 @@ export class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        const sql = symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox' ? evaluateSql : this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
+        const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
         return evaluateSql === '*' ? '1' : sql;
       } else {
         return evaluateSql;

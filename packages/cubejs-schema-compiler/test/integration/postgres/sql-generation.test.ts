@@ -99,6 +99,10 @@ describe('SQL Generation', () => {
           sql: \`CASE WHEN \${visitor_count} > 1 THEN 'More than 1' ELSE (\${visitor_revenue})::text END\`,
           type: \`string\`
         },
+        unique_sources: {
+          type: 'countDistinct',
+          sql: \`source\`
+        },
         ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
       },
 
@@ -218,6 +222,10 @@ describe('SQL Generation', () => {
           filters: [{
             sql: \`\${visitors}.source = 'google'\`
           }]
+        },
+        unique_sources_per_checking: {
+          sql: \`\${visitors.unique_sources} / \${visitor_checkins_count}\`,
+          type: 'number'
         },
         minDate: {
           type: 'min',
@@ -1487,7 +1495,31 @@ describe('SQL Generation', () => {
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 6 },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 1 },
+  ]));
+
+  it('ungrouped ratio measure', () => runQueryTest({
+    measures: [
+      'visitor_checkins.unique_sources_per_checking',
+    ],
+    timezone: 'America/Los_Angeles',
+    order: [{
+      id: 'visitor_checkins.created_at',
+    }],
+    timeDimensions: [{
+      dimension: 'visitor_checkins.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-03-30'],
+    }],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [
+    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
   ]));
 
   it('builds geo dimension', () => runQueryTest({
