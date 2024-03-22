@@ -7034,6 +7034,9 @@ limit
 
     #[tokio::test]
     async fn test_thought_spot_cte_flatten_alias() -> Result<(), CubeError> {
+        if !Rewriter::sql_push_down_enabled() {
+            return Ok(());
+        }
         init_logger();
 
         // CTE called qt_1 is used as ta_2, under the hood DF will use * projection
@@ -7041,19 +7044,22 @@ limit
             r#"
 WITH "qt_0" AS (
   SELECT 
-    "ta_1"."read" "ca_1", 
+    "ta_1"."read" "ca_1",
     CASE
       WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
       ELSE 0
-    END "ca_2", 
-    (CASE
+    END "ca_2",
+    ((CASE
       WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
       ELSE 0
-    END > 10.0) "ca_3"
-  FROM "tpch5k"."public"."KibanaSampleDataEcommerce" "ta_2"
-    JOIN "public"."Logs" "ta_1"
+    END - CASE
+      WHEN sum("ta_2"."count") IS NOT NULL THEN sum("ta_2"."count")
+      ELSE 0
+    END) > 500000.0) "ca_3"
+  FROM "db"."public"."KibanaSampleDataEcommerce" "ta_2"
+    JOIN "db"."public"."Logs" "ta_1"
       ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
-    JOIN "public"."NumberCube" "ta_3"
+    JOIN "db"."public"."NumberCube" "ta_3"
       ON "ta_2"."__cubeJoinField" = "ta_3"."__cubeJoinField"
   GROUP BY "ca_1"
 )
@@ -7067,11 +7073,17 @@ ORDER BY "ca_4" ASC
         )
         .await;
 
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string(), "KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
                 time_dimensions: None,
