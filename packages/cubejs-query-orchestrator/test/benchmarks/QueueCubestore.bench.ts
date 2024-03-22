@@ -1,8 +1,8 @@
-import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import { QueryQueueBenchmark } from './QueueBench.abstract';
-
 // eslint-disable-next-line import/no-extraneous-dependencies
 import 'source-map-support/register';
+
+import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
+import { QueryQueueBenchmark } from './QueueBench.abstract';
 
 let cubeStoreDriver;
 
