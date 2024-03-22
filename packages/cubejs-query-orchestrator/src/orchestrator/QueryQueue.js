@@ -266,6 +266,15 @@ export class QueryQueue {
       );
 
       if (added > 0) {
+        waitingContext = {
+          queueId,
+          spanId: options.spanId,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          waitingForRequestId: options.requestId
+        };
+
         this.logger('Added to queue', {
           queueId,
           spanId: options.spanId,
@@ -286,16 +295,7 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      if (added > 0) {
-        waitingContext = {
-          queueId,
-          spanId: options.spanId,
-          queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: options.requestId,
-          waitingForRequestId: options.requestId
-        };
-      } else {
+      if (!added) {
         const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
         if (queryDef) {
           waitingContext = {
