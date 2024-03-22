@@ -53,10 +53,12 @@ features:
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default)       | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                         | v0.30.0    |           |
 | Deprecated | [`dbType`](#dbtype)                                                                                                                     | v0.30.30   |           |
-| Deprecated | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   | v0.35.0   |
+| Removed | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                                | v0.32.0    | v0.35.0   |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                             | v0.33.39   |           |
 | Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
+| Removed | [MySQL-based SQL API](#mysql-based-sql-api) | v0.35.0 |   |
+| Removed | [`initApp` hook](#initapp-hook)
 
 ### Node.js 8
 
@@ -368,3 +370,17 @@ Node.js 16 reached [End of Life on September 11, 2023][link-nodejs-eol]. This me
 no more updates. Please upgrade to Node.js 18 or higher.
 
 [link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
+
+### MySQL-based SQL API
+
+**Removed in release: v0.35.0**
+
+Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-compatible
+[SQL API](https://cube.dev/docs/product/apis-integrations/sql-api), together with the
+`CUBEJS_SQL_PORT` environment variable.
+
+### `initApp` hook
+
+**Removed in release: v0.35.0**
+
+The `initApp` hook is removed as it's not relevant anymore for Docker-based architecture.
