@@ -198,6 +198,7 @@ export type PreAggregationDescription = {
   timestampFormat: string;
   expandedPartition: boolean;
   unionWithSourceData: LambdaOptions;
+  buildRangeStart?: string;
   buildRangeEnd?: string;
   updateWindowSeconds?: number;
   sealAt?: string;
@@ -1656,6 +1657,7 @@ export class PreAggregationPartitionRangeLoader {
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+      buildRangeStart: loadRange[0],
       buildRangeEnd: loadRange[1],
       sealAt, // Used only for kSql pre aggregations
     };
