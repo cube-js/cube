@@ -1105,6 +1105,8 @@ impl LanguageToLogicalPlanConverter {
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 let window_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[1], WindowWindowExpr);
+                let window_expr =
+                    replace_qualified_col_with_flat_name_if_missing(window_expr, &input)?;
                 let mut window_fields: Vec<DFField> =
                     exprlist_to_fields(window_expr.iter(), input.schema())?;
                 window_fields.extend_from_slice(input.schema().fields());
@@ -1145,6 +1147,7 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::Sort(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], SortExp);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
+                let expr = replace_qualified_col_with_flat_name_if_missing(expr, &input)?;
 
                 LogicalPlan::Sort(Sort { expr, input })
             }
@@ -1232,6 +1235,7 @@ impl LanguageToLogicalPlanConverter {
             LogicalPlanLanguage::TableUDFs(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], TableUDFsExpr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
+                let expr = replace_qualified_col_with_flat_name_if_missing(expr, &input)?;
                 let schema = build_table_udf_schema(&input, expr.as_slice())?;
 
                 LogicalPlan::TableUDFs(TableUDFs {
