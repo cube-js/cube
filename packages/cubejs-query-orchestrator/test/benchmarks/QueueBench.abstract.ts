@@ -1,16 +1,8 @@
-import { CubeStoreDriver, CubeStoreQueueDriver, CubestoreQueueDriverConnection } from '@cubejs-backend/cubestore-driver';
-import { QueryQueue } from '../../src';
+import { CubeStoreDriver, CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 import crypto from 'crypto';
 import { createPromiseLock, pausePromise } from '@cubejs-backend/shared';
-import {
-  AddToQueueOptions,
-  AddToQueueQuery, AddToQueueResponse,
-  QueryKey,
-  QueryKeysTuple,
-  QueueDriverConnectionInterface,
-  QueueDriverInterface,
-  QueueDriverOptions,
-} from '@cubejs-backend/base-driver';
+import { QueueDriverConnectionInterface, QueueDriverInterface, } from '@cubejs-backend/base-driver';
+import { LocalQueueDriver, QueryQueue } from '../../src';
 
 export type QueryQueueTestOptions = {
   cacheAndQueueDriver?: string,
@@ -53,6 +45,7 @@ function patchQueueDriverConnectionForTrack(connection: QueueDriverConnectionInt
     freeProcessingLock: wrapAsyncMethod('freeProcessingLock'),
     optimisticQueryUpdate: wrapAsyncMethod('optimisticQueryUpdate'),
     getQueryAndRemove: wrapAsyncMethod('getQueryAndRemove'),
+    release: connection.release,
   };
 }
 
@@ -64,9 +57,7 @@ function patchQueueDriverForTrack(driver: QueueDriverInterface, counters: any): 
 
       return patchQueueDriverConnectionForTrack(await driver.createConnection(), counters);
     },
-    redisHash: (...args) => {
-      return driver.redisHash(...args);
-    },
+    redisHash: (...args) => driver.redisHash(...args),
     release: async (...args) => {
       counters.connections--;
 
@@ -93,13 +84,26 @@ export function QueryQueueBenchmark(name: string, options: QueryQueueTestOptions
         queueDriverQueriesStarted: 0,
       };
 
-      const queueDriverFactory = (_, queueDriverOptions) => {
-        const queueDriver = new CubeStoreQueueDriver(
-          async () => options.cubeStoreDriverFactory(),
-          queueDriverOptions
-        );
-
-        return patchQueueDriverForTrack(queueDriver, counters);
+      const queueDriverFactory = (driverType, queueDriverOptions) => {
+        switch (driverType) {
+          case 'memory':
+            return patchQueueDriverForTrack(
+              new LocalQueueDriver(
+                queueDriverOptions
+              ) as any,
+              counters
+            );
+          case 'cubestore':
+            return patchQueueDriverForTrack(
+              new CubeStoreQueueDriver(
+                async () => options.cubeStoreDriverFactory(),
+                queueDriverOptions
+              ),
+              counters
+            );
+          default:
+            throw new Error(`Unsupported driver: ${driverType}`);
+        }
       };
 
       const tenantPrefix = crypto.randomBytes(6).toString('hex');

@@ -38,7 +38,7 @@ type CubeStoreListResponse = {
   status: string
 };
 
-export class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
+class CubestoreQueueDriverConnection implements QueueDriverConnectionInterface {
   public constructor(
     protected readonly driver: CubeStoreDriver,
     protected readonly options: QueueDriverOptions,
