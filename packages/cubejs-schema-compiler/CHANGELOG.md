@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.3](https://github.com/cube-js/cube/compare/v0.35.2...v0.35.3) (2024-03-22)
+
+
+### Bug Fixes
+
+* Render all distinct counts as `1` for ungrouped queries to not fail ratio measures ([#7987](https://github.com/cube-js/cube/issues/7987)) ([f756e4b](https://github.com/cube-js/cube/commit/f756e4bd7d48a0e60d505ac0de50ae1469637011))
+
+
+
+
+
 ## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
 
 
