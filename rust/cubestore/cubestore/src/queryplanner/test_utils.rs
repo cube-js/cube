@@ -1,5 +1,6 @@
 use crate::cachestore::{
-    CacheItem, CacheStore, QueueItem, QueueItemStatus, QueueKey, QueueResult, QueueResultResponse,
+    CacheItem, CacheStore, QueueAddPayload, QueueAllItem, QueueCancelResponse, QueueGetResponse,
+    QueueItem, QueueItemStatus, QueueKey, QueueListItem, QueueResult, QueueResultResponse,
     QueueRetrieveResponse,
 };
 use crate::metastore::job::{Job, JobStatus, JobType};
@@ -785,7 +786,7 @@ impl CacheStore for CacheStoreMock {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError> {
         panic!("CacheStore mock!")
     }
 
@@ -802,9 +803,9 @@ impl CacheStore for CacheStoreMock {
 
     async fn queue_add(
         &self,
-        _item: QueueItem,
+        payload: QueueAddPayload,
     ) -> Result<crate::cachestore::QueueAddResponse, CubeError> {
-        panic!("CacheStore mock!")
+        panic!("CacheStore mock queue_add, payload: {:?}!", payload)
     }
 
     async fn queue_truncate(&self) -> Result<(), CubeError> {
@@ -825,15 +826,16 @@ impl CacheStore for CacheStoreMock {
         _prefix: String,
         _status_filter: Option<QueueItemStatus>,
         _priority_sort: bool,
-    ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+        _with_payload: bool,
+    ) -> Result<Vec<QueueListItem>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 
-    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
         panic!("CacheStore mock!")
     }
 

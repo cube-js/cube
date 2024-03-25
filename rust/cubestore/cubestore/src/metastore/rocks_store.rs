@@ -80,7 +80,8 @@ enum_from_primitive! {
         CacheItems = 0x0C00,
         QueueItems = 0x0D00,
         QueueResults = 0x0E00,
-        TraceObjects = 0x0F00
+        TraceObjects = 0x0F00,
+        QueueItemPayload = 0x1000
 
     }
 }
@@ -103,6 +104,7 @@ impl TableId {
             TableId::QueueItems => true,
             TableId::QueueResults => true,
             TableId::TraceObjects => false,
+            TableId::QueueItemPayload => true,
         }
     }
 }
