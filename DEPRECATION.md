@@ -360,7 +360,8 @@ no more updates. Please upgrade to Node.js 16 or higher.
 **Deprecated in release: v0.32.0**
 
 Cube Store is now the default cache and queue engine, [replacing
-Redis](https://cube.dev/blog/replacing-redis-with-cube-store).
+Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
+[Cube Store](https://cube.dev/blog/how-you-win-by-using-cube-store-part-1).
 
 ### `running_total` measure type
 
