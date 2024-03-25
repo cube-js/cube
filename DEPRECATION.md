@@ -55,6 +55,7 @@ features:
 | Deprecated | [`dbType`](#dbtype)                                                                                                                     | v0.30.30   |           |
 | Removed | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                                | v0.32.0    | v0.35.0   |
+| Deprecated | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue) | v0.32.0 |   |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                             | v0.33.39   |           |
 | Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
 | Removed | [MySQL-based SQL API](#mysql-based-sql-api) | v0.35.0 | v0.35.0 |
@@ -353,6 +354,14 @@ instead.
 
 Node.js 14 reached [End of Life on April 30, 2023][link-nodejs-eol]. This means
 no more updates. Please upgrade to Node.js 16 or higher.
+
+### Using Redis for in-memory cache and queue
+
+**Deprecated in release: v0.32.0**
+
+Cube Store is now the default cache and queue engine, [replacing
+Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
+[Cube Store](https://cube.dev/blog/how-you-win-by-using-cube-store-part-1).
 
 ### `running_total` measure type
 
