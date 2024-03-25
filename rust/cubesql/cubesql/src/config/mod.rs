@@ -163,7 +163,7 @@ impl ConfigObjImpl {
             query_cache_size: env_parse("CUBESQL_QUERY_CACHE_SIZE", 500),
             enable_parameterized_rewrite_cache: env_optparse("CUBESQL_PARAMETERIZED_REWRITE_CACHE")
                 .unwrap_or(sql_push_down),
-            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
+            enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(false),
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),

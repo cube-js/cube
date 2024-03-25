@@ -258,6 +258,7 @@ crate::plan_to_language! {
         WrappedSelect {
             select_type: WrappedSelectType,
             projection_expr: Vec<Expr>,
+            subqueries: Vec<LogicalPlan>,
             group_expr: Vec<Expr>,
             aggr_expr: Vec<Expr>,
             window_expr: Vec<Expr>,
@@ -819,6 +820,7 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,
+    subqueries: impl Display,
     group_expr: impl Display,
     aggr_expr: impl Display,
     window_expr: impl Display,
@@ -838,6 +840,7 @@ fn wrapped_select(
         "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
+        subqueries,
         group_expr,
         aggr_expr,
         window_expr,
@@ -862,6 +865,14 @@ fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> St
 
 fn wrapped_select_projection_expr_empty_tail() -> String {
     "WrappedSelectProjectionExpr".to_string()
+}
+
+fn wrapped_select_subqueries(left: impl Display, right: impl Display) -> String {
+    format!("(WrappedSelectSubqueries {} {})", left, right)
+}
+
+fn wrapped_select_subqueries_empty_tail() -> String {
+    "WrappedSelectSubqueries".to_string()
 }
 
 #[allow(dead_code)]
@@ -1134,6 +1145,14 @@ fn sort(expr: impl Display, input: impl Display) -> String {
 
 fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
+}
+
+fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) -> String {
+    format!("(Subquery {} {} {})", input, subqueries, types)
+}
+
+fn wrapped_subquery(input: impl Display, subqueries: impl Display) -> String {
+    format!("(WrappedSubquery {} {})", input, subqueries)
 }
 
 fn join(

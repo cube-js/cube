@@ -15,6 +15,7 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             wrapped_select_window_expr_empty_tail(),
@@ -44,6 +45,13 @@ impl WrapperRules {
                     "?select_type",
                     wrapper_pullup_replacer(
                         "?projection_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?subqueries",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",

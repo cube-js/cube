@@ -28,6 +28,13 @@ impl WrapperRules {
                             "?cube_members",
                         ),
                         wrapper_pullup_replacer(
+                            "?subqueries",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
                             "?group_expr",
                             "?alias_to_cube",
                             "?ungrouped",
@@ -85,6 +92,7 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             "?window_expr",
@@ -122,6 +130,7 @@ impl WrapperRules {
                             "?in_projection",
                             "?cube_members",
                         ),
+                        "?subqueries",
                         wrapper_pullup_replacer(
                             "?group_expr",
                             "?alias_to_cube",
@@ -147,6 +156,7 @@ impl WrapperRules {
                             wrapped_select(
                                 "?inner_select_type",
                                 "?inner_projection_expr",
+                                "?inner_subqueries",
                                 "?inner_group_expr",
                                 "?inner_aggr_expr",
                                 "?inner_window_expr",
@@ -197,12 +207,14 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             "?window_expr",
                             wrapped_select(
                                 "?inner_select_type",
                                 "?inner_projection_expr",
+                                "?inner_subqueries",
                                 "?inner_group_expr",
                                 "?inner_aggr_expr",
                                 "?inner_window_expr",
@@ -274,6 +286,7 @@ impl WrapperRules {
         _inner_group_expr_var: &'static str,
         _inner_aggr_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        println!("!!!!!!!!BBBBBBBBBBB!!!!!");
         let select_type_var = var!(select_type_var);
         let projection_expr_var = var!(projection_expr_var);
         let inner_select_type_var = var!(inner_select_type_var);
@@ -304,6 +317,7 @@ impl WrapperRules {
                     };
                 }
             }
+            println!("!!!!!!!!RRRRRRRRR!!!!!");
             false
         }
     }

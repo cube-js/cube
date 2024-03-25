@@ -1870,6 +1870,7 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Extension(Extension { node })
             }
             LogicalPlanLanguage::CubeScanWrapper(params) => {
+                println!("--- !!!!! ------");
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(CubeScanWrapperNode::new(
@@ -1890,13 +1891,13 @@ impl LanguageToLogicalPlanConverter {
                     WrappedSelectProjectionExpr
                 );
                 let group_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[2], WrappedSelectGroupExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectGroupExpr);
                 let aggr_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectAggrExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectAggrExpr);
                 let window_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectWindowExpr);
-                let from = Arc::new(self.to_logical_plan(params[5])?);
-                let joins = match_list_node!(node_by_id, params[6], WrappedSelectJoins)
+                    match_expr_list_node!(node_by_id, to_expr, params[5], WrappedSelectWindowExpr);
+                let from = Arc::new(self.to_logical_plan(params[6])?);
+                let joins = match_list_node!(node_by_id, params[7], WrappedSelectJoins)
                     .into_iter()
                     .map(|j| {
                         if let LogicalPlanLanguage::WrappedSelectJoin(params) = j {
@@ -1912,16 +1913,16 @@ impl LanguageToLogicalPlanConverter {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let filter_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[7], WrappedSelectFilterExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectFilterExpr);
                 let having_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectHavingExpr);
-                let limit = match_data_node!(node_by_id, params[9], WrappedSelectLimit);
-                let offset = match_data_node!(node_by_id, params[10], WrappedSelectOffset);
+                    match_expr_list_node!(node_by_id, to_expr, params[9], WrappedSelectHavingExpr);
+                let limit = match_data_node!(node_by_id, params[10], WrappedSelectLimit);
+                let offset = match_data_node!(node_by_id, params[11], WrappedSelectOffset);
                 let order_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[11], WrappedSelectOrderExpr);
-                let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
-                let distinct = match_data_node!(node_by_id, params[13], WrappedSelectDistinct);
-                let ungrouped = match_data_node!(node_by_id, params[14], WrappedSelectUngrouped);
+                    match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
+                let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
+                let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
+                let ungrouped = match_data_node!(node_by_id, params[15], WrappedSelectUngrouped);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(

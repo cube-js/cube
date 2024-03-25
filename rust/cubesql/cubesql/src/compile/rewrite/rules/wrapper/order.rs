@@ -1,7 +1,7 @@
 use crate::compile::rewrite::{
     analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules, sort,
-    wrapped_select, wrapped_select_order_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer, LogicalPlanLanguage,
+    wrapped_select, wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
+    wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -16,6 +16,7 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             "?window_expr",
@@ -49,6 +50,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
+                    wrapped_select_subqueries_empty_tail(),
                     wrapper_pullup_replacer(
                         "?group_expr",
                         "?alias_to_cube",
