@@ -59,7 +59,10 @@ fn sort_push_down(
             // Sort can be pushed down to projection, however we only map specific expressions.
             // Complex expressions can't be pushed down, so if there are any, Sort is issued
             // before the projection.
-            if plan_has_projections(input) {
+            // We also don't push sort down to projection if its input is an aggregate,
+            // as that would conflict with SQL push down.
+            let input_is_aggregate = matches!(&**input, LogicalPlan::Aggregate(_));
+            if !input_is_aggregate && plan_has_projections(input) {
                 if let Some(sort_expr) = &sort_expr {
                     let rewrite_map = rewrite_map_for_projection(expr, schema);
                     if let Some(new_sort_expr) = sort_expr
