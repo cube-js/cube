@@ -13,6 +13,10 @@ const VerticaTypeToGenericType = {
   numeric: 'decimal',
 };
 
+const connectListener = async (client) => {
+  await client.query('SET TIMEZONE TO \'UTC\'');
+};
+
 class VerticaDriver extends BaseDriver {
   constructor(config) {
     super();
@@ -28,6 +32,8 @@ class VerticaDriver extends BaseDriver {
       ssl: this.getSslOptions(),
       ...config,
     });
+
+    this.pool.addListener('connect', connectListener);
   }
 
   static dialectClass() {
@@ -44,7 +50,7 @@ class VerticaDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return this.query('select 1 as n');
+    return this.query('SELECT 1 AS n');
   }
 
   async release() {

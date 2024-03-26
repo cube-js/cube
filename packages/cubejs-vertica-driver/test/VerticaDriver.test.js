@@ -35,6 +35,12 @@ describe('VerticaDriver', () => {
     ]);
   });
 
+  test('test default tz', async () => {
+    const result = await driver.query('SHOW TIMEZONE');
+    expect(result[0].name).toBe('timezone');
+    expect(result[0].setting).toBe('UTC');
+  });
+
   test('simple query', async () => {
     const data = await driver.query(
       `

@@ -1,4 +1,4 @@
-/* globals describe, it, afterAll, beforeAll, test, expect, jest */
+/* globals describe, it, expect */
 const { prepareCompiler } = require('@cubejs-backend/schema-compiler');
 const VerticaQuery = require('../src/VerticaQuery.js');
 
