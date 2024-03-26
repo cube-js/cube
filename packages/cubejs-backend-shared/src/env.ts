@@ -1642,6 +1642,8 @@ const variables: Record<string, (...args: any) => any> = {
     .asString(),
   defaultApiScope: () => get('CUBEJS_DEFAULT_API_SCOPES')
     .asArray(','),
+  basePath: () => get('CUBEJS_API_BASE_PATH')
+    .asArray(','),
   jwkUrl: () => get('CUBEJS_JWK_URL')
     .asString(),
   jwtKey: () => get('CUBEJS_JWT_KEY')
