@@ -103,7 +103,10 @@ const querySchema = Joi.object().keys({
   }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
     Joi.object().pattern(id, Joi.valid('asc', 'desc')),
-    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
+    Joi.array().items(
+      Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')),
+      Joi.object().pattern(id, Joi.valid('asc', 'desc'))
+    )
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
   timezone: Joi.string(),
@@ -119,9 +122,15 @@ const normalizeQueryOrder = order => {
   let result = [];
   const normalizeOrderItem = (k, direction) => ([k, direction]);
   if (order) {
-    result = Array.isArray(order) ?
-      order.map(([k, direction]) => normalizeOrderItem(k, direction)) :
-      Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+    if (Array.isArray(order)) {
+      result = order.map(order => {
+        return Array.isArray(order) ?
+          normalizeOrderItem(order[0], order[1]) :
+          (k = Object.keys(order)[0], normalizeOrderItem(k, order[k]))
+      });
+    } else {
+      result = Object.keys(order).map(k => normalizeOrderItem(k, order[k]));
+    }
   }
   return result;
 };
