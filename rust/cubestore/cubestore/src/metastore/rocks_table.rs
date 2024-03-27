@@ -457,13 +457,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
     fn indexes() -> Vec<Box<dyn BaseRocksSecondaryIndex<Self::T>>>;
 
     fn migrate_table_by_truncate(&self, mut batch: &mut WriteBatch) -> Result<(), CubeError> {
-        log::trace!("Truncating rows from {:?} table", self);
-        self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
+        log::info!("Migrating by truncating rows from {:?} table", self);
+        let total = self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
 
         for index in Self::indexes() {
-            log::trace!("Truncating rows from {:?} index", index);
+            log::trace!("Migrating by truncating rows from {:?} index", index);
             self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
         }
+
+        log::info!(
+            "Migrating by truncating rows from {:?} table: done ({} rows)",
+            self,
+            total
+        );
 
         Ok(())
     }
@@ -1293,7 +1299,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         &self,
         table_id: TableId,
         batch: &mut WriteBatch,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
+        let mut total = 0;
         let ref db = self.snapshot();
         let key_min = RowKey::Table(table_id, 0);
 
@@ -1304,16 +1311,19 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         for kv_res in iter {
             let (key, _) = kv_res?;
-            let row_key = RowKey::from_bytes(&key);
+
+            let row_key = RowKey::try_from_bytes(&key)?;
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
+                    total += 1;
                     batch.delete(key);
                 } else {
-                    return Ok(());
+                    return Ok(total);
                 }
             }
         }
-        Ok(())
+
+        Ok(total)
     }
 
     fn delete_all_rows_from_index(
@@ -1333,7 +1343,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         for kv_res in iter {
             let (key, _) = kv_res?;
-            let row_key = RowKey::from_bytes(&key);
+
+            let row_key = RowKey::try_from_bytes(&key)?;
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
                     batch.delete(key);

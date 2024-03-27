@@ -32,12 +32,16 @@ use tokio::sync::{oneshot, Mutex as AsyncMutex, Notify, RwLock};
 
 macro_rules! enum_from_primitive_impl {
     ($name:ident, $( $variant:ident )*) => {
-        impl From<u32> for $name {
-            fn from(n: u32) -> Self {
+        impl TryFrom<u32> for $name {
+            type Error = crate::CubeError;
+
+            fn try_from(n: u32) -> Result<Self, Self::Error> {
                 $( if n == $name::$variant as u32 {
-                    $name::$variant
+                    Ok($name::$variant)
                 } else )* {
-                    panic!("Unknown {}: {}", stringify!($name), n);
+                    Err(crate::CubeError::internal(
+                        format!("Unknown {}: {}", stringify!($name), n)
+                    ))
                 }
             }
         }
@@ -394,16 +398,16 @@ impl RowKey {
         let mut reader = Cursor::new(bytes);
         match reader.read_u8()? {
             1 => Ok(RowKey::Table(
-                TableId::from(reader.read_u32::<BigEndian>()?),
+                TableId::try_from(reader.read_u32::<BigEndian>()?)?,
                 {
                     // skip zero for fixed key padding
                     reader.read_u64::<BigEndian>()?;
                     reader.read_u64::<BigEndian>()?
                 },
             )),
-            2 => Ok(RowKey::Sequence(TableId::from(
+            2 => Ok(RowKey::Sequence(TableId::try_from(
                 reader.read_u32::<BigEndian>()?,
-            ))),
+            )?)),
             3 => {
                 let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
                 let mut secondary_key: SecondaryKey = SecondaryKey::new();
@@ -421,7 +425,7 @@ impl RowKey {
                 Ok(RowKey::SecondaryIndexInfo { index_id })
             }
             5 => {
-                let table_id = TableId::from(reader.read_u32::<BigEndian>()?);
+                let table_id = TableId::try_from(reader.read_u32::<BigEndian>()?)?;
 
                 Ok(RowKey::TableInfo { table_id })
             }
@@ -927,6 +931,11 @@ impl RocksStore {
         let meta_store_to_move = meta_store.clone();
 
         cube_ext::spawn_blocking(move || {
+            trace!(
+                "Migration for {}: started",
+                meta_store_to_move.details.get_name()
+            );
+
             let table_ref = DbTableRef {
                 db: &meta_store_to_move.db,
                 snapshot: &meta_store_to_move.db.snapshot(),
@@ -939,6 +948,11 @@ impl RocksStore {
                     "Error during {} migration: {}",
                     meta_store_to_move.details.get_name(),
                     e
+                );
+            } else {
+                trace!(
+                    "Migration for {}: done",
+                    meta_store_to_move.details.get_name()
                 );
             }
         })
