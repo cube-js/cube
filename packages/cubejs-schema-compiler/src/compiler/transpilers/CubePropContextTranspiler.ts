@@ -1,8 +1,8 @@
 import * as t from '@babel/types';
 import R from 'ramda';
-import { NodePath } from '@babel/traverse';
 
-import { TranspilerInterface, TraverseObject } from './transpiler.interface';
+import type { NodePath } from '@babel/traverse';
+import type { TranspilerInterface, TraverseObject } from './transpiler.interface';
 import type { CubeSymbols } from '../CubeSymbols';
 import type { CubeDictionary } from '../CubeDictionary';
 
