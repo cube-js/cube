@@ -1,6 +1,7 @@
 module.exports = {
   "playground": "Playground",
   "data-model": "Data Model",
+  "rollup-designer": "Rollup Designer",
   "dev-mode": "Development mode",
   "semantic-layer-sync": "Semantic Layer Sync",
   "sql-runner": "SQL Runner",
