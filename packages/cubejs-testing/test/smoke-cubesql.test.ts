@@ -217,7 +217,7 @@ GROUP BY
   "source"."status",
   "source"."pivot-grouping"
 ORDER BY
-  "source"."id" ASC,
+  "source"."id" DESC,
   "source"."status" ASC,
   "source"."pivot-grouping" ASC
   `);
