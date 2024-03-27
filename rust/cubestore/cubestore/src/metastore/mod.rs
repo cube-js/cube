@@ -1335,6 +1335,10 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     fn get_name(&self) -> &'static str {
         &"metastore"
     }
+
+    fn cachestore_log_enabled(&self) -> bool {
+        true
+    }
 }
 
 pub struct RocksMetaStore {

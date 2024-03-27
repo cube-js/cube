@@ -430,6 +430,10 @@ pub trait ConfigObj: DIService {
 
     fn metastore_remote_address(&self) -> &Option<String>;
 
+    fn cachestore_log_upload_interval(&self) -> u64;
+
+    fn cachestore_log_enabled(&self) -> bool;
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn cachestore_gc_loop_interval(&self) -> u64;
@@ -581,6 +585,8 @@ pub struct ConfigObjImpl {
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
     pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_log_upload_interval: u64,
+    pub cachestore_log_enabled: bool,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_cache_eviction_loop_interval: u64,
@@ -782,6 +788,14 @@ impl ConfigObj for ConfigObjImpl {
 
     fn metastore_remote_address(&self) -> &Option<String> {
         &self.metastore_remote_address
+    }
+
+    fn cachestore_log_upload_interval(&self) -> u64 {
+        self.cachestore_log_upload_interval
+    }
+
+    fn cachestore_log_enabled(&self) -> bool {
+        self.cachestore_log_enabled
     }
 
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
@@ -1329,6 +1343,13 @@ impl Config {
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: env_parse_duration(
+                    "CACHESTORE_LOG_UPLOAD_INTERVAL",
+                    30,
+                    Some(60),
+                    Some(15),
+                ),
+                cachestore_log_enabled: env_bool("CACHESTORE_LOG_ENABLED", true),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
@@ -1559,6 +1580,8 @@ impl Config {
                 metastore_bind_address: None,
                 metastore_remote_address: None,
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: 30,
+                cachestore_log_enabled: true,
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
