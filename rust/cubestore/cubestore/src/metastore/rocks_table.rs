@@ -1304,7 +1304,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         for kv_res in iter {
             let (key, _) = kv_res?;
-            let row_key = RowKey::from_bytes(&key);
+
+            let row_key = RowKey::try_from_bytes(&key)?;
             if let RowKey::Table(row_table_id, _) = row_key {
                 if row_table_id == table_id {
                     batch.delete(key);
@@ -1333,7 +1334,8 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
         for kv_res in iter {
             let (key, _) = kv_res?;
-            let row_key = RowKey::from_bytes(&key);
+
+            let row_key = RowKey::try_from_bytes(&key)?;
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
                     batch.delete(key);
