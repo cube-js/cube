@@ -59,6 +59,7 @@ export class PostgresQuery extends BaseQuery {
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'timestamptz \'{{ value }}\'';
+    templates.window_frame_types.groups = 'GROUPS';
 
     return templates;
   }
