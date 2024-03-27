@@ -39,6 +39,7 @@ const getPivotQuery = (queryType, queries) => {
 };
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
 const memberExpression = Joi.object().keys({
   expression: Joi.func().required(),
@@ -102,8 +103,8 @@ const querySchema = Joi.object().keys({
     compareDateRange: Joi.array()
   }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
-    Joi.object().pattern(id, Joi.valid('asc', 'desc')),
-    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
+    Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
+    Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
   segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
   timezone: Joi.string(),

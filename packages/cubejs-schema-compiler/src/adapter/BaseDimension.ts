@@ -17,6 +17,7 @@ export class BaseDimension {
     if (dimension && dimension.expression) {
       this.expression = dimension.expression;
       this.expressionCubeName = dimension.cubeName;
+      // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
       this.isMemberExpression = !!dimension.definition;
     }

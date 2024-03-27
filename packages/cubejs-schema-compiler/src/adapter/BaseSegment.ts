@@ -16,6 +16,7 @@ export class BaseSegment {
     if (segment.expression) {
       this.expression = segment.expression;
       this.expressionCubeName = segment.cubeName;
+      // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = segment.expressionName || `${segment.cubeName}.${segment.name}`;
       this.isMemberExpression = !!segment.definition;
     }
