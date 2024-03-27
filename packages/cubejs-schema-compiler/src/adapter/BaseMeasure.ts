@@ -17,6 +17,7 @@ export class BaseMeasure {
     if (measure.expression) {
       this.expression = measure.expression;
       this.expressionCubeName = measure.cubeName;
+      // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
       this.isMemberExpression = !!measure.definition;
     }

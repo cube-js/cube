@@ -21,12 +21,17 @@ cube(`Orders`, {
     toRemove: {
       type: `count`,
     },
+    numberTotal: {
+      sql: `${totalAmount}`,
+      type: `number`
+    }
   },
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primaryKey: true,
+      public: true,
     },
 
     status: {
