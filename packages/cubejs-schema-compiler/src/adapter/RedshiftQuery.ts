@@ -18,6 +18,8 @@ export class RedshiftQuery extends PostgresQuery {
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, {{ args[1] }}, {{ args[2] }})';
     delete templates.functions.COVAR_POP;
     delete templates.functions.COVAR_SAMP;
+    delete templates.window_frame_types.range;
+    delete templates.window_frame_types.groups;
     return templates;
   }
 }
