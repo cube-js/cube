@@ -149,6 +149,15 @@ screen:
 Clicking <Btn>Accelerate</Btn> takes you to the Rollup Designer, where you can
 add a pre-aggregation to accelerate similar queries in the future.
 
+### Security context
+
+The <Btn>Security Context</Btn> tab shows the [security context][ref-security-context]
+that was used to process this query:
+
+<Screenshot src="https://ucarecdn.com/4ea5f5b6-f5a0-4d62-93f9-b9adfe5a2a07/" />
+
+This is helpful in case [multitenancy][ref-multitenancy] is configured.
+
 ### Queue graph
 
 The <Btn>Queue Graph</Btn> tab details any activity in the query queue while
@@ -208,3 +217,5 @@ while the query is in the query execution queue:
 [ref-workspace-sqlrunner]: /product/workspace/sql-runner
 [ref-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-cache-types]: /product/caching#cache-type
+[ref-security-context]: /product/auth/context
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
