@@ -13558,9 +13558,11 @@ ORDER BY
   "source"."dim3" ASC,
   "source"."dim4" ASC,
   "source"."pivot-grouping" ASC
-            "#.to_string(),
-            DatabaseProtocol::PostgreSQL
-        ).await;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -13588,19 +13590,18 @@ ORDER BY
                 order: None,
                 limit: None,
                 offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("WideCube.dim1".to_string()),
-                        operator: Some("equals".to_string()),
-                        values: Some(vec!["foo".to_string()]),
-                        or: None,
-                        and: None,
-                    }
-                ]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("WideCube.dim1".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["foo".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
                 ungrouped: Some(true),
             }
         );
-        assert!(!query_plan.as_logical_plan()
+        assert!(!query_plan
+            .as_logical_plan()
             .find_cube_scan_wrapper()
             .wrapped_sql
             .unwrap()
@@ -13628,9 +13629,11 @@ FROM (
 ) AS "source"
 GROUP BY "source"."str0"
 ORDER BY "source"."str0" ASC
-            "#.to_string(),
-            DatabaseProtocol::PostgreSQL
-        ).await;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -13652,7 +13655,8 @@ ORDER BY "source"."str0" ASC
                 ungrouped: Some(true),
             }
         );
-        assert!(!query_plan.as_logical_plan()
+        assert!(!query_plan
+            .as_logical_plan()
             .find_cube_scan_wrapper()
             .wrapped_sql
             .unwrap()

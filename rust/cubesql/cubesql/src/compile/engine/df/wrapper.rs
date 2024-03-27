@@ -16,8 +16,8 @@ use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr,
-        LogicalPlan, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+        UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
