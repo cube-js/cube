@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.4](https://github.com/cube-js/cube/compare/v0.35.3...v0.35.4) (2024-03-27)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Missing dataSource in pre-aggregation preview query ([#7989](https://github.com/cube-js/cube/issues/7989)) ([d3012c8](https://github.com/cube-js/cube/commit/d3012c8075382a4bf66156cb56765f0483d111dc))
+
+
+
+
+
 ## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
 
 

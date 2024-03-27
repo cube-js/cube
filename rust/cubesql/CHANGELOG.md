@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.4](https://github.com/cube-js/cube.js/compare/v0.35.3...v0.35.4) (2024-03-27)
+
+
+### Bug Fixes
+
+* **cubesql:** Flatten aliasing breaks wrapped select `ORDER BY` expressions ([#8004](https://github.com/cube-js/cube.js/issues/8004)) ([eea88ec](https://github.com/cube-js/cube.js/commit/eea88ecaf3267091d1fbdd761db0451775b9fbe9))
+
+
+### Features
+
+* **cubesql:** Support `DISTINCT` push down ([fc79188](https://github.com/cube-js/cube.js/commit/fc79188b5a205d29d9acd3669677cc829b0a9013))
+
+
+
+
+
 ## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
 
 
