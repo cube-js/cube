@@ -405,9 +405,9 @@ impl RowKey {
                     reader.read_u64::<BigEndian>()?
                 },
             )),
-            2 => Ok(RowKey::Sequence(
-                TableId::try_from(reader.read_u32::<BigEndian>()?)?,
-            )),
+            2 => Ok(RowKey::Sequence(TableId::try_from(
+                reader.read_u32::<BigEndian>()?,
+            )?)),
             3 => {
                 let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
                 let mut secondary_key: SecondaryKey = SecondaryKey::new();
@@ -931,6 +931,11 @@ impl RocksStore {
         let meta_store_to_move = meta_store.clone();
 
         cube_ext::spawn_blocking(move || {
+            trace!(
+                "Migration for {}: started",
+                meta_store_to_move.details.get_name()
+            );
+
             let table_ref = DbTableRef {
                 db: &meta_store_to_move.db,
                 snapshot: &meta_store_to_move.db.snapshot(),
@@ -943,6 +948,11 @@ impl RocksStore {
                     "Error during {} migration: {}",
                     meta_store_to_move.details.get_name(),
                     e
+                );
+            } else {
+                trace!(
+                    "Migration for {}: done",
+                    meta_store_to_move.details.get_name()
                 );
             }
         })

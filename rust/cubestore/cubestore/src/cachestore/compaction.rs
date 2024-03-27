@@ -4,7 +4,7 @@ use crate::metastore::{
 use crate::TableId;
 
 use chrono::{DateTime, Utc};
-use log::{error, warn, trace};
+use log::{error, trace, warn};
 use rocksdb::compaction_filter::CompactionFilter;
 use rocksdb::compaction_filter_factory::{CompactionFilterContext, CompactionFilterFactory};
 use rocksdb::CompactionDecision;
