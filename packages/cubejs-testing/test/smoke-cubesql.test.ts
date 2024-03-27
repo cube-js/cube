@@ -192,5 +192,36 @@ from
   `);
       expect(res.rows).toMatchSnapshot('no limit for non matching count push down');
     });
+
+    test('metabase max number', async () => {
+      const res = await connection.query(`
+SELECT
+  "source"."id" AS "id",
+  "source"."status" AS "status",
+  "source"."pivot-grouping" AS "pivot-grouping",
+  MAX("source"."numberTotal") AS "numberTotal"
+FROM
+  (
+    SELECT
+      "public"."Orders"."numberTotal" AS "numberTotal",
+      "public"."Orders"."id" AS "id",
+      "public"."Orders"."status" AS "status",
+      ABS(0) AS "pivot-grouping"
+    FROM
+      "public"."Orders"
+    WHERE
+      "public"."Orders"."status" = 'new'
+  ) AS "source"
+GROUP BY
+  "source"."id",
+  "source"."status",
+  "source"."pivot-grouping"
+ORDER BY
+  "source"."id" DESC,
+  "source"."status" ASC,
+  "source"."pivot-grouping" ASC
+  `);
+      expect(res.rows).toMatchSnapshot('metabase max number');
+    });
   });
 });

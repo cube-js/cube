@@ -13607,6 +13607,14 @@ ORDER BY
             .unwrap()
             .sql
             .contains("ungrouped"));
+
+        assert!(query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("[\"dim2\",\"asc\"]"));
     }
 
     #[tokio::test]
