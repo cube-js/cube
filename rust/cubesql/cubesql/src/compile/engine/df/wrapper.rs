@@ -16,8 +16,8 @@ use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, replace_col_to_expr, Column, DFSchema, DFSchemaRef, Expr,
-        LogicalPlan, UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
+        UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -558,50 +558,11 @@ impl CubeScanWrapperNode {
                                 ungrouped_scan_node.clone(),
                             )
                             .await?;
-                            // Sort node always comes on top and pushed down to select so we need to replace columns here by appropriate column definitions
-                            let order_replace_map = projection_expr
-                                .iter()
-                                .chain(group_expr.iter())
-                                .chain(aggr_expr.iter())
-                                .map(|e| {
-                                    let name = expr_name(&e, &schema)?;
-                                    Ok(vec![
-                                        (
-                                            Column {
-                                                relation: alias.clone(),
-                                                name: name.clone(),
-                                            },
-                                            e.clone(),
-                                        ),
-                                        (
-                                            Column {
-                                                relation: None,
-                                                name: name,
-                                            },
-                                            e.clone(),
-                                        ),
-                                    ])
-                                })
-                                .collect::<Result<Vec<_>>>()?
-                                .into_iter()
-                                .flatten()
-                                .collect::<HashMap<_, _>>();
 
                             let (order, mut sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                order_expr
-                                    .iter()
-                                    .map(|o| {
-                                        replace_col_to_expr(
-                                            o.clone(),
-                                            &order_replace_map
-                                                .iter()
-                                                .map(|(k, v)| (k, v))
-                                                .collect(),
-                                        )
-                                    })
-                                    .collect::<Result<Vec<_>>>()?,
+                                order_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
@@ -697,9 +658,9 @@ impl CubeScanWrapperNode {
                                                             DataFusionError::Execution(format!(
                                                                 "Can't find column {} in projection {:?} or aggregate {:?} or group {:?}",
                                                                 col_name,
-                                                                projection,
-                                                                aggregate,
-                                                                group_by
+                                                                projection_expr,
+                                                                aggr_expr,
+                                                                group_expr
                                                             ))
                                                         })?;
                                                     Ok(vec![
@@ -999,14 +960,14 @@ impl CubeScanWrapperNode {
                             .ok_or_else(|| {
                                 DataFusionError::Internal(format!(
                                     "Can't find column {} in ungrouped scan node",
-                                    c.name
+                                    c
                                 ))
                             })?
                             .0;
                         let member = scan_node.member_fields.get(field_index).ok_or_else(|| {
                             DataFusionError::Internal(format!(
                                 "Can't find member for column {} in ungrouped scan node",
-                                c.name
+                                c
                             ))
                         })?;
                         match member {

@@ -13514,6 +13514,157 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn metabase_max_sum_wrapper() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+SELECT
+  "source"."dim2" AS "dim2",
+  "source"."dim3" AS "dim3",
+  "source"."dim4" AS "dim4",
+  "source"."pivot-grouping" AS "pivot-grouping",
+  MAX("source"."measure1") AS "max",
+  MAX("source"."measure2") AS "max_2",
+  SUM("source"."measure3") AS "sum",
+  MAX("source"."measure4") AS "max_3"
+FROM
+  (
+    SELECT
+      "public"."WideCube"."measure1" AS "measure1",
+      "public"."WideCube"."measure2" AS "measure2",
+      "public"."WideCube"."measure3" AS "measure3",
+      "public"."WideCube"."measure4" AS "measure4",
+      "public"."WideCube"."dim1" AS "dim1",
+      "public"."WideCube"."dim2" AS "dim2",
+      "public"."WideCube"."dim3" AS "dim3",
+      "public"."WideCube"."dim4" AS "dim4",
+      ABS(0) AS "pivot-grouping"
+    FROM
+      "public"."WideCube"
+    WHERE
+      "public"."WideCube"."dim1" = 'foo'
+  ) AS "source"
+GROUP BY
+  "source"."dim2",
+  "source"."dim3",
+  "source"."dim4",
+  "source"."pivot-grouping"
+ORDER BY
+  "source"."dim2" ASC,
+  "source"."dim3" ASC,
+  "source"."dim4" ASC,
+  "source"."pivot-grouping" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![
+                    "WideCube.measure1".to_string(),
+                    "WideCube.measure2".to_string(),
+                    "WideCube.measure3".to_string(),
+                    "WideCube.measure4".to_string(),
+                ]),
+                dimensions: Some(vec![
+                    "WideCube.dim1".to_string(),
+                    "WideCube.dim2".to_string(),
+                    "WideCube.dim3".to_string(),
+                    "WideCube.dim4".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("WideCube.dim1".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["foo".to_string()]),
+                    or: None,
+                    and: None,
+                }]),
+                ungrouped: Some(true),
+            }
+        );
+        assert!(!query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("ungrouped"));
+    }
+
+    #[tokio::test]
+    async fn metabase_sum_dim_wrapper() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+SELECT
+  "source"."str0" AS "str0",
+  SUM("source"."num1") AS "sum"
+FROM (
+  SELECT
+    "public"."WideCube"."dim1" AS "str0",
+    "public"."WideCube"."dim2" AS "num1"
+  FROM "public"."WideCube"
+) AS "source"
+GROUP BY "source"."str0"
+ORDER BY "source"."str0" ASC
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        assert_eq!(
+            query_plan.as_logical_plan().find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+        assert!(!query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("ungrouped"));
+    }
+
+    #[tokio::test]
     async fn test_outer_aggr_simple_count() {
         let logical_plan = convert_select_to_query_plan(
             "

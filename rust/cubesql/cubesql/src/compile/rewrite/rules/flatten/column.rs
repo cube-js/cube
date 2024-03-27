@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
         alias_expr, analysis::LogicalPlanAnalysis, column_expr,
-        converter::LogicalPlanToLanguageConverter, flatten_pushdown_replacer,
-        rules::flatten::FlattenRules, transforming_rewrite, AliasExprAlias, ColumnExprColumn,
-        FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
+        converter::LogicalPlanToLanguageConverter, flatten_pushdown_replacer, literal_expr,
+        rewrite, rules::flatten::FlattenRules, transforming_rewrite, AliasExprAlias,
+        ColumnExprColumn, FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
     },
     var, var_iter, CubeError,
 };
@@ -11,24 +11,36 @@ use egg::Rewrite;
 
 impl FlattenRules {
     pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
-        rules.extend(vec![transforming_rewrite(
-            "flatten-column-pushdown",
-            flatten_pushdown_replacer(
-                column_expr("?column"),
-                "?inner_expr",
-                "?inner_alias",
-                "?top_level",
+        rules.extend(vec![
+            transforming_rewrite(
+                "flatten-column-pushdown",
+                flatten_pushdown_replacer(
+                    column_expr("?column"),
+                    "?inner_expr",
+                    "?inner_alias",
+                    "?top_level",
+                ),
+                alias_expr("?out_expr", "?column_alias"),
+                self.flatten_column(
+                    "?column",
+                    "?top_level",
+                    "?inner_expr",
+                    "?inner_alias",
+                    "?column_alias",
+                    "?out_expr",
+                ),
             ),
-            alias_expr("?out_expr", "?column_alias"),
-            self.flatten_column(
-                "?column",
-                "?top_level",
-                "?inner_expr",
-                "?inner_alias",
-                "?column_alias",
-                "?out_expr",
+            rewrite(
+                "flatten-literal",
+                flatten_pushdown_replacer(
+                    literal_expr("?literal"),
+                    "?inner_expr",
+                    "?inner_alias",
+                    "?top_level",
+                ),
+                literal_expr("?literal"),
             ),
-        )])
+        ])
     }
 
     fn flatten_column(
