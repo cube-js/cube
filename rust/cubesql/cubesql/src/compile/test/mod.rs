@@ -301,6 +301,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
             ),
             ("Logs".to_string(), "default".to_string()),
             ("NumberCube".to_string(), "default".to_string()),
+            ("WideCube".to_string(), "default".to_string()),
         ]
         .into_iter()
         .collect(),
