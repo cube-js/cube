@@ -210,7 +210,7 @@ FROM
     FROM
       "public"."Orders"
     WHERE
-      "public"."Orders"."id" = '1'
+      "public"."Orders"."status" = 'new'
   ) AS "source"
 GROUP BY
   "source"."id",
