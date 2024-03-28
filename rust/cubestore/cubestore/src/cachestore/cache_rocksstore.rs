@@ -155,6 +155,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         CacheItemRocksTable::new(table_ref.clone()).migrate()?;
         QueueItemRocksTable::new(table_ref.clone()).migrate()?;
         QueueResultRocksTable::new(table_ref.clone()).migrate()?;
+        QueueItemPayloadRocksTable::new(table_ref.clone()).migrate()?;
 
         table_ref
             .db
