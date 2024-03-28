@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.5](https://github.com/cube-js/cube.js/compare/v0.35.4...v0.35.5) (2024-03-28)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - improve panic safety on migration ([#8031](https://github.com/cube-js/cube.js/issues/8031)) ([f81e2cb](https://github.com/cube-js/cube.js/commit/f81e2cb1bbcb5f37d01b85bfbeef4b4634fe8332))
+
+
+
+
+
 ## [0.35.4](https://github.com/cube-js/cube.js/compare/v0.35.3...v0.35.4) (2024-03-27)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore
