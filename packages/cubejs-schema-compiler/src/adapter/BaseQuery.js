@@ -1951,7 +1951,7 @@ export class BaseQuery {
       return renderContext.measuresToRender.length ?
         R.uniq(renderContext.measuresToRender) :
         [renderContext.rootMeasure.value];
-    }
+    };
   }
 
   collectLeafMeasures(fn) {
