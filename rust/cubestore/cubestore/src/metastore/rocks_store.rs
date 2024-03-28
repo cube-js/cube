@@ -437,7 +437,7 @@ impl RowKey {
         RowKey::try_from_bytes(bytes).unwrap()
     }
 
-    pub fn to_iterate_range(&self) -> impl rocksdb::IterateBounds {
+    pub fn to_iterate_range(&self) -> std::ops::Range<Vec<u8>> {
         let mut min = Vec::with_capacity(5);
         let mut max = Vec::with_capacity(5);
 
@@ -1591,6 +1591,21 @@ mod tests {
             .await
             .unwrap();
     }
+
+    #[test]
+    fn test_row_key_to_iterate_range() -> Result<(), CubeError> {
+        {
+            let row_key = RowKey::Table(TableId::CacheItems, 0);
+            let range = row_key.to_iterate_range();
+
+            assert_eq!(range.start, vec![1, 0, 0, 12, 0]);
+
+            assert_eq!(range.end, vec![1, 0, 0, 12, 1]);
+        }
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_snapshot_uploads() -> Result<(), CubeError> {
         let config = Config::test("test_snapshots_uploads").update_config(|mut c| {
