@@ -10,4 +10,4 @@ updates:
       interval: "monthly"
     labels: [ ]
     ignore:
-      - dependency-name: "*
+      - dependency-name: "*"
