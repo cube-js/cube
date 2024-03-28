@@ -88,10 +88,10 @@ the given query plan. Overall, rewriting is a seamless process. There are some
 practical considerations that you should keep in mind while querying, though.
 
 In the SQL API, each cube is represented as a table. Measures, dimensions, and
-segments in this table are columns. We call these tables **cube tables**.
+segments in this table are columns. We call these tables *cube tables*.
 
 Consider the `orders` cube in your data model, the following query is performing
-a `SELECT` from the `orders` **cube**.
+a `SELECT` from the `orders` cube.
 
 ```sql
 SELECt
@@ -102,9 +102,9 @@ WHERE status = 'shipped'
 GROUP BY 1
 ```
 
-The SQL API transforms `SELECT` query fragments from **cube tables** into
+The SQL API transforms `SELECT` query fragments from *cube tables* into
 [Cube's internal query format](/product/apis-integrations/rest-api/query-format).
-This process is called **Cube query rewrite**.
+This process is called *Cube query rewrite*.
 
 The SQL query above would be rewritten into the following Cube query:
 
@@ -183,38 +183,83 @@ query rewrite and pushdown. Please refer to the reference to see whether
 specific functions, operators or expressions are supported in Cube query
 rewrite.
 
-### Aggregated vs Non-aggregated queries
+### Aggregated and non-aggregated queries
 
-There are two types of queries supported against **cube tables**: aggregated and
-non-aggregated. Aggregated are those with `GROUP BY` statement, and
-non-aggregated are those without. Cube queries issued to your database will
-always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query
-or not.
+SQL API supports two types of queries against *cube tables*: aggregated
+(those with `GROUP BY` statement) and non-aggregated (those without).
 
-Whenever you use a non-aggregated query you need to provide only column names in
-SQL:
+<InfoBox>
+
+Queries that Cube runs against to your database will always be aggregated,
+regardless of whether you use aggregated (with `GROUP BY`) or non-aggregated
+queries with the SQL API.
+
+</InfoBox>
+
+A non-aggregated query would only include bare column names in SQL:
 
 ```sql
-SELECT status, count FROM orders
+SELECT
+  status,  -- dimension
+  count    -- measure
+FROM orders
 ```
 
-The same aggregated query should always aggregate measure columns using a
-corresponding aggregating function or special `MEASURE()` function:
+An equivalent aggregated query must aggregate all measure columns and group by
+all dimension columns. You can use the special `MEASURE` aggregate function
+for measures of [any type][ref-measure-types]. This is quite convenient, especially
+in case you're manually writing ad-hoc queries:
+
+```sql
+SELECT
+  status,         -- dimension
+  MEASURE(count)  -- measure
+FROM orders
+GROUP BY 1
+```
 
 <WarningBox>
 
-In cases where measure columns are not aggregated or dimensions columns aren't included in `GROUP BY`,
-`Projection references non-aggregate values` error will be thrown. This error means
-there are columns that are neither in `GROUP BY` nor aggregated. This is a
-standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
-This error can be also thrown if you forget to `GROUP BY` all dimensions included in the query as well.
+If any measure columns are not aggregated or any dimension columns aren't included
+in `GROUP BY`, the following error will be thrown: `Projection references
+non-aggregate values`. This is a standard SQL consistency check for the `GROUP BY`
+operation, and it's enforced by the SQL API as well. 
 
 </WarningBox>
 
+Instead of the special `MEASURE` function, measure columns can be aggregated with
+the following aggregate functions that correspond to [measure types][ref-measure-types]:
+
+| Measure type in Cube | Aggregate function in an aggregated query |
+| --- | --- |
+| [`avg`](/reference/data-model/types-and-formats#avg) | `MEASURE` or `AVG` | 
+| [`boolean`](/reference/data-model/types-and-formats#boolean) | `MEASURE` |
+| [`count`](/reference/data-model/types-and-formats#count) | `MEASURE` or `COUNT` |
+| [`count_distinct`](/reference/data-model/types-and-formats#count_distinct) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`max`](/reference/data-model/types-and-formats#max) | `MEASURE` or `MAX` |
+| [`min`](/reference/data-model/types-and-formats#min) | `MEASURE` or `MIN` |
+| [`number`](/reference/data-model/types-and-formats#number) | `MEASURE` or any other function from this table |
+| [`string`](/reference/data-model/types-and-formats#string) | `MEASURE` or `STRING_AGG` |
+| [`sum`](/reference/data-model/types-and-formats#sum) | `MEASURE` or `SUM` |
+| [`time`](/reference/data-model/types-and-formats#time) | `MEASURE` or `MAX` or `MIN` |
+
+Example query:
+
 ```sql
-SELECT status, SUM(count) FROM orders GROUP BY 1
-SELECT status, MEASURE(count) FROM orders GROUP BY 1
+SELECT
+  status,         -- dimension
+  COUNT(count)    -- measure
+FROM orders
+GROUP BY 1
 ```
+
+<WarningBox>
+
+If an aggregate function doesn't match the measure type, the following error
+will be thrown: `Measure aggregation type doesn't match`.
+
+</WarningBox>
 
 ### Filtering
 
@@ -557,3 +602,4 @@ WHERE is_completed = true
 [postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [ref-ref-sql-api]: /reference/sql-api
+[ref-measure-types]: /reference/data-model/types-and-formats#measure-types
