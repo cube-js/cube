@@ -458,17 +458,18 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
 
     fn migrate_table_by_truncate(&self, mut batch: &mut WriteBatch) -> Result<(), CubeError> {
         log::info!("Migrating by truncating rows from {:?} table", self);
-        let total = self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
+        let total_rows = self.delete_all_rows_from_table(Self::table_id(), &mut batch)?;
 
         for index in Self::indexes() {
             log::trace!("Migrating by truncating rows from {:?} index", index);
-            self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
+            let total = self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
+            log::trace!("Migrating by truncating rows from {:?} index: done ({} rows)", index, total);
         }
 
         log::info!(
             "Migrating by truncating rows from {:?} table: done ({} rows)",
             self,
-            total
+            total_rows
         );
 
         Ok(())
@@ -1301,13 +1302,15 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         batch: &mut WriteBatch,
     ) -> Result<u64, CubeError> {
         let mut total = 0;
-        let ref db = self.snapshot();
-        let key_min = RowKey::Table(table_id, 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..get_fixed_prefix()],
-            Direction::Forward,
-        ));
+        let ref db = self.snapshot();
+        let row_key = RowKey::Table(table_id, 0);
+
+        let mut opts = ReadOptions::default();
+        opts.set_prefix_same_as_start(false);
+        opts.set_iterate_range(row_key.to_iterate_range());
+
+        let iter = db.iterator_opt(IteratorMode::Start, opts);
 
         for kv_res in iter {
             let (key, _) = kv_res?;
@@ -1330,16 +1333,17 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         &self,
         secondary_id: u32,
         batch: &mut WriteBatch,
-    ) -> Result<(), CubeError> {
+    ) -> Result<u64, CubeError> {
         let ref db = self.snapshot();
         let zero_vec = vec![0 as u8; 8];
-        let key_len = zero_vec.len();
         let key_min = RowKey::SecondaryIndex(Self::index_id(secondary_id), zero_vec.clone(), 0);
 
-        let iter = db.iterator(IteratorMode::From(
-            &key_min.to_bytes()[0..(key_len + 5)],
-            Direction::Forward,
-        ));
+        let mut opts = ReadOptions::default();
+        opts.set_prefix_same_as_start(false);
+        opts.set_iterate_range(key_min.to_iterate_range());
+
+        let iter = db.iterator_opt(IteratorMode::Start, opts);
+        let mut total = 0;
 
         for kv_res in iter {
             let (key, _) = kv_res?;
@@ -1347,13 +1351,15 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
             let row_key = RowKey::try_from_bytes(&key)?;
             if let RowKey::SecondaryIndex(index_id, _, _) = row_key {
                 if index_id == Self::index_id(secondary_id) {
+                    total += 1;
                     batch.delete(key);
                 } else {
-                    return Ok(());
+                    return Ok(total);
                 }
             }
         }
-        Ok(())
+
+        Ok(total)
     }
 
     fn scan_rows(&self, limit: Option<usize>) -> Result<Vec<IdRow<Self::T>>, CubeError> {
