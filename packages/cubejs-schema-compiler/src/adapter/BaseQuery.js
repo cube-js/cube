@@ -890,8 +890,8 @@ export class BaseQuery {
     return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
-  fullKeyQueryAggregateMeasures() {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy();
+  fullKeyQueryAggregateMeasures(context) {
+    const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
 
     const measuresToRender = (multiplied, cumulative) => R.pipe(
       R.values,
@@ -1108,15 +1108,15 @@ export class BaseQuery {
       ${this.query()}`;
   }
 
-  collectRootMeasureToHieararchy() {
+  collectRootMeasureToHieararchy(context) {
     const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
       const collectedMeasures = this.collectFrom(
         [m],
-        this.collectMultipliedMeasures.bind(this),
-        'collectMultipliedMeasures',
+        this.collectMultipliedMeasures(context),
+        context ? ['collectMultipliedMeasures', JSON.stringify(context)] : 'collectMultipliedMeasures',
         this.queryCache
       );
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
@@ -1495,12 +1495,13 @@ export class BaseQuery {
   }
 
   collectFrom(membersToCollectFrom, fn, methodName, cache) {
+    const methodCacheKey = Array.isArray(methodName) ? methodName : [methodName];
     return R.pipe(
       R.map(f => f.getMembers()),
       R.flatten,
       R.map(s => (
         (cache || this.compilerCache).cache(
-          ['collectFrom', methodName].concat(
+          ['collectFrom'].concat(methodCacheKey).concat(
             s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
@@ -1932,23 +1933,25 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
-  collectMultipliedMeasures(fn) {
-    const foundCompositeCubeMeasures = {};
-    this.evaluateSymbolSqlWithContext(
-      fn,
-      { compositeCubeMeasures: foundCompositeCubeMeasures }
-    );
+  collectMultipliedMeasures(context) {
+    return (fn) => {
+      const foundCompositeCubeMeasures = {};
+      this.evaluateSymbolSqlWithContext(
+        fn,
+        { ...context, compositeCubeMeasures: foundCompositeCubeMeasures }
+      );
 
-    const renderContext = {
-      measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {}, rootMeasure: {}
+      const renderContext = {
+        ...context, measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {}, rootMeasure: {}
+      };
+      this.evaluateSymbolSqlWithContext(
+        fn,
+        renderContext
+      );
+      return renderContext.measuresToRender.length ?
+        R.uniq(renderContext.measuresToRender) :
+        [renderContext.rootMeasure.value];
     };
-    this.evaluateSymbolSqlWithContext(
-      fn,
-      renderContext
-    );
-    return renderContext.measuresToRender.length ?
-      R.uniq(renderContext.measuresToRender) :
-      [renderContext.rootMeasure.value];
   }
 
   collectLeafMeasures(fn) {
@@ -1981,10 +1984,12 @@ export class BaseQuery {
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
-      symbol.type === 'number' && evaluateSql === 'count(*)' ||
       symbol.type === 'countDistinct' ||
-      symbol.type === 'count' && !symbol.sql)
-    ) {
+      !this.safeEvaluateSymbolContext().hasMultipliedForPreAggregation && (
+        symbol.type === 'number' && evaluateSql === 'count(*)' ||
+        symbol.type === 'count' && !symbol.sql
+      )
+    )) {
       resultMultiplied = false;
     }
     if (parentMeasure &&

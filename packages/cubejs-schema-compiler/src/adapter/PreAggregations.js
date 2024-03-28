@@ -369,7 +369,7 @@ export class PreAggregations {
       .map(m => m.windowGranularity())
       .reduce((a, b) => query.minGranularity(a, b), null);
     const granularityHierarchies = query.granularityHierarchies();
-    const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures().multipliedMeasures.length > 0;
+    const hasMultipliedMeasures = query.fullKeyQueryAggregateMeasures({ hasMultipliedForPreAggregation: true }).multipliedMeasures.length > 0;
 
     let filterDimensionsSingleValueEqual = this.collectFilterDimensionsWithSingleValueEqual(
       query.filters,
