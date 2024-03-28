@@ -41,9 +41,17 @@ use std::time::Duration;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 
-pub(crate) struct RocksCacheStoreDetails {}
+pub(crate) struct RocksCacheStoreDetails {
+    log_enabled: bool,
+}
 
 impl RocksCacheStoreDetails {
+    pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
+        Self {
+            log_enabled: config.cachestore_log_enabled(),
+        }
+    }
+
     pub fn get_compaction_state() -> CompactionPreloadedState {
         let mut indexes = HashMap::new();
 
@@ -157,6 +165,10 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
     fn get_name(&self) -> &'static str {
         &"cachestore"
     }
+
+    fn log_enabled(&self) -> bool {
+        self.log_enabled
+    }
 }
 
 pub struct RocksCacheStore {
@@ -184,12 +196,13 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
         Self::new_from_store(RocksStore::with_listener(
             path,
             vec![],
             metastore_fs,
             config,
-            Arc::new(RocksCacheStoreDetails {}),
+            details,
         )?)
     }
 
@@ -210,14 +223,10 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
-        let store = RocksStore::load_from_dump(
-            path,
-            dump_path,
-            metastore_fs,
-            config,
-            Arc::new(RocksCacheStoreDetails {}),
-        )
-        .await?;
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
+
+        let store =
+            RocksStore::load_from_dump(path, dump_path, metastore_fs, config, details).await?;
 
         Self::new_from_store(store)
     }
@@ -227,8 +236,9 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
         let store = metastore_fs
-            .load_from_remote(&path, config, Arc::new(RocksCacheStoreDetails {}))
+            .load_from_remote(&path, config, details)
             .await?;
 
         Self::new_from_store(store)
@@ -246,7 +256,7 @@ impl RocksCacheStore {
         let mut loops = vec![];
 
         if self.store.config.upload_to_remote() {
-            let upload_interval = self.store.config.meta_store_log_upload_interval();
+            let upload_interval = self.store.config.cachestore_log_upload_interval();
             let cachestore = self.clone();
             loops.push(cube_ext::spawn(async move {
                 cachestore
@@ -430,12 +440,13 @@ impl RocksCacheStore {
 
         let _ = std::fs::remove_dir_all(remote_store_path.clone());
 
-        let details = Arc::new(RocksCacheStoreDetails {});
+        let config_obj = config.config_obj();
+        let details = Arc::new(RocksCacheStoreDetails::new(&config_obj));
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let store = RocksStore::new(
             store_path.clone().join(details.get_name()).as_path(),
-            BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
-            config.config_obj(),
+            BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config_obj.clone()),
+            config_obj,
             details,
         )
         .unwrap();
