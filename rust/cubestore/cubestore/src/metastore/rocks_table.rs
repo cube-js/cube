@@ -463,7 +463,11 @@ pub trait RocksTable: BaseRocksTable + Debug + Send + Sync {
         for index in Self::indexes() {
             log::trace!("Migrating by truncating rows from {:?} index", index);
             let total = self.delete_all_rows_from_index(index.get_id(), &mut batch)?;
-            log::trace!("Migrating by truncating rows from {:?} index: done ({} rows)", index, total);
+            log::trace!(
+                "Migrating by truncating rows from {:?} index: done ({} rows)",
+                index,
+                total
+            );
         }
 
         log::info!(
