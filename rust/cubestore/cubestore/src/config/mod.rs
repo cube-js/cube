@@ -1036,9 +1036,9 @@ fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
         .map(|x| match x.as_str() {
-            "0" => false,
-            "1" => true,
-            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+            "0" | "false" => false,
+            "1" | "true" => true,
+            _ => panic!("expected '0'/'1'/true/false for '{}', found '{}'", name, &x),
         })
         .unwrap_or(default)
 }

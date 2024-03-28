@@ -1089,7 +1089,7 @@ impl RocksStore {
                 self.write_completed_notify.notify_waiters();
             }
         } else {
-            trace!("Persisting {}: Logs are disabled", self.details.get_name());
+            trace!("Persisting {}: logs are disabled", self.details.get_name());
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
