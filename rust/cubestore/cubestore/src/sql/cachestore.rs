@@ -1,4 +1,4 @@
-use crate::cachestore::{CacheItem, CacheStore, EvictionResult, QueueItem};
+use crate::cachestore::{CacheItem, CacheStore, EvictionResult, QueueAddPayload, QueueItem};
 use crate::metastore::{Column, ColumnType};
 
 use crate::cluster::rate_limiter::{ProcessRateLimiter, TaskType, TraceIndex};
@@ -183,13 +183,9 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: CacheCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::CACHE_QUERIES.add_with_tags(
-            1,
-            Some(&vec![metrics::format_tag(
-                "command",
-                command.as_tag_command(),
-            )]),
-        );
+        let command_tag = command.as_tag_command();
+        app_metrics::CACHE_QUERIES
+            .add_with_tags(1, Some(&vec![metrics::format_tag("command", command_tag)]));
 
         let timeout = Some(Duration::from_secs(90));
         let wait_ms = self
@@ -298,7 +294,11 @@ impl CacheStoreSqlService {
             app_metrics::CACHE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         }
 
-        log::trace!("Cache command processing time: {:?}", execution_time,);
+        log::trace!(
+            "Cache {} processing time: {:?}",
+            command_tag,
+            execution_time
+        );
 
         Ok(result)
     }
@@ -308,13 +308,9 @@ impl CacheStoreSqlService {
         _context: SqlQueryContext,
         command: QueueCommand,
     ) -> Result<Arc<DataFrame>, CubeError> {
-        app_metrics::QUEUE_QUERIES.add_with_tags(
-            1,
-            Some(&vec![metrics::format_tag(
-                "command",
-                command.as_tag_command(),
-            )]),
-        );
+        let command_tag = command.as_tag_command();
+        app_metrics::QUEUE_QUERIES
+            .add_with_tags(1, Some(&vec![metrics::format_tag("command", command_tag)]));
 
         let timeout = Some(Duration::from_secs(90));
         let wait_ms = self
@@ -334,13 +330,12 @@ impl CacheStoreSqlService {
                 let value_size = key.value.deep_size_of() + value.deep_size_of();
                 let response = self
                     .cachestore
-                    .queue_add(QueueItem::new(
-                        key.value,
+                    .queue_add(QueueAddPayload {
+                        path: key.value,
                         value,
-                        QueueItem::status_default(),
                         priority,
                         orphaned,
-                    ))
+                    })
                     .await?;
 
                 (
@@ -373,7 +368,7 @@ impl CacheStoreSqlService {
 
                 let result = self.cachestore.queue_cancel(key).await?;
                 let rows = if let Some(result) = result {
-                    vec![result.into_row().into_queue_cancel_row()]
+                    vec![result.into_queue_cancel_row()]
                 } else {
                     vec![]
                 };
@@ -411,7 +406,7 @@ impl CacheStoreSqlService {
             QueueCommand::Get { key } => {
                 let result = self.cachestore.queue_get(key).await?;
                 let rows = if let Some(result) = result {
-                    vec![result.into_row().into_queue_get_row()]
+                    vec![result.into_queue_get_row()]
                 } else {
                     vec![]
                 };
@@ -463,7 +458,7 @@ impl CacheStoreSqlService {
             } => {
                 let rows = self
                     .cachestore
-                    .queue_list(prefix.value, status_filter, sort_by_priority)
+                    .queue_list(prefix.value, status_filter, sort_by_priority, with_payload)
                     .await?;
 
                 let mut columns = vec![
@@ -482,7 +477,7 @@ impl CacheStoreSqlService {
                     Arc::new(DataFrame::new(
                         columns,
                         rows.into_iter()
-                            .map(|item| QueueItem::queue_list_row(item, with_payload))
+                            .map(|item| item.into_queue_list_row())
                             .collect(),
                     )),
                     None,
@@ -577,7 +572,11 @@ impl CacheStoreSqlService {
             app_metrics::QUEUE_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         }
 
-        log::debug!("Queue command processing time: {:?}", execution_time,);
+        log::debug!(
+            "Queue {} processing time: {:?}",
+            command_tag,
+            execution_time
+        );
 
         Ok(result)
     }
