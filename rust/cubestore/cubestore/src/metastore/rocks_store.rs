@@ -789,6 +789,8 @@ pub trait RocksStoreDetails: Send + Sync {
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
 
     fn get_name(&self) -> &'static str;
+
+    fn log_enabled(&self) -> bool;
 }
 
 #[derive(Clone)]
@@ -1055,52 +1057,53 @@ impl RocksStore {
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
         let time = SystemTime::now();
-        trace!("Persisting {} snapshot", self.details.get_name());
+        trace!("Persisting {}", self.details.get_name());
 
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            trace!(
-                "Persisting {} snapshot: nothing to update",
-                self.details.get_name()
-            );
+            trace!("Persisting {}: nothing to update", self.details.get_name());
             return Ok(());
         }
 
-        let last_upload_seq = self.last_upload_seq().await;
-        let (serializer, min, max) = {
-            let updates = self.db.get_updates_since(last_upload_seq)?;
-            let mut serializer = WriteBatchContainer::new();
+        if self.details.log_enabled() {
+            let last_upload_seq = self.last_upload_seq().await;
+            let (serializer, min, max) = {
+                let updates = self.db.get_updates_since(last_upload_seq)?;
+                let mut serializer = WriteBatchContainer::new();
 
-            let mut seq_numbers = Vec::new();
-            let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
-            for update in updates.into_iter() {
-                let (n, write_batch) = update?;
-                seq_numbers.push(n);
-                write_batch.iterate(&mut serializer);
-                if serializer.size() > size_limit {
-                    break;
+                let mut seq_numbers = Vec::new();
+                let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
+                for update in updates.into_iter() {
+                    let (n, write_batch) = update?;
+                    seq_numbers.push(n);
+                    write_batch.iterate(&mut serializer);
+                    if serializer.size() > size_limit {
+                        break;
+                    }
                 }
-            }
 
-            (
-                serializer,
-                seq_numbers.iter().min().map(|v| *v),
-                seq_numbers.iter().max().map(|v| *v),
-            )
-        };
-        if max.is_some() {
-            let snapshot_uploaded = self.snapshot_uploaded.read().await;
-            if *snapshot_uploaded {
-                let checkpoint_time = self.last_checkpoint_time.read().await;
-                let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
-                self.metastore_fs
-                    .upload_log(&dir_name, min.unwrap(), serializer)
-                    .await?;
+                (
+                    serializer,
+                    seq_numbers.iter().min().map(|v| *v),
+                    seq_numbers.iter().max().map(|v| *v),
+                )
+            };
+            if max.is_some() {
+                let snapshot_uploaded = self.snapshot_uploaded.read().await;
+                if *snapshot_uploaded {
+                    let checkpoint_time = self.last_checkpoint_time.read().await;
+                    let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+                    self.metastore_fs
+                        .upload_log(&dir_name, min.unwrap(), serializer)
+                        .await?;
+                }
+                let mut seq = self.last_upload_seq.write().await;
+                *seq = max.unwrap();
+                self.write_completed_notify.notify_waiters();
             }
-            let mut seq = self.last_upload_seq.write().await;
-            *seq = max.unwrap();
-            self.write_completed_notify.notify_waiters();
+        } else {
+            trace!("Persisting {}: logs are disabled", self.details.get_name());
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
