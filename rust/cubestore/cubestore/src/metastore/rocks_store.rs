@@ -786,7 +786,7 @@ pub trait RocksStoreDetails: Send + Sync {
 
     fn get_name(&self) -> &'static str;
 
-    fn cachestore_log_enabled(&self) -> bool;
+    fn log_enabled(&self) -> bool;
 }
 
 #[derive(Clone)]
@@ -1052,7 +1052,7 @@ impl RocksStore {
             return Ok(());
         }
 
-        if self.details.cachestore_log_enabled() {
+        if self.details.log_enabled() {
             let last_upload_seq = self.last_upload_seq().await;
             let (serializer, min, max) = {
                 let updates = self.db.get_updates_since(last_upload_seq)?;

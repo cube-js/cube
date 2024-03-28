@@ -1336,7 +1336,7 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         &"metastore"
     }
 
-    fn cachestore_log_enabled(&self) -> bool {
+    fn log_enabled(&self) -> bool {
         true
     }
 }

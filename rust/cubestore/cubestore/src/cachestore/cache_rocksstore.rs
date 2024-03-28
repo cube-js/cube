@@ -42,13 +42,13 @@ use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 
 pub(crate) struct RocksCacheStoreDetails {
-    cachestore_log_enabled: bool,
+    log_enabled: bool,
 }
 
 impl RocksCacheStoreDetails {
     pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
         Self {
-            cachestore_log_enabled: config.cachestore_log_enabled(),
+            log_enabled: config.cachestore_log_enabled(),
         }
     }
 
@@ -166,8 +166,8 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         &"cachestore"
     }
 
-    fn cachestore_log_enabled(&self) -> bool {
-        self.cachestore_log_enabled
+    fn log_enabled(&self) -> bool {
+        self.log_enabled
     }
 }
 
