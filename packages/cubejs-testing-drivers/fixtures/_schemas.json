@@ -6,17 +6,23 @@
         {
           "name": "category",
           "type": "string",
-          "sql": "category"
+          "sql": "category",
+          "primary_key": true,
+          "shown": true
         },
         {
           "name": "subCategory",
           "type": "string",
-          "sql": "sub_category"
+          "sql": "sub_category",
+          "primary_key": true,
+          "shown": true
         },
         {
           "name": "productName",
           "type": "string",
-          "sql": "product_name"
+          "sql": "product_name",
+          "primary_key": true,
+          "shown": true
         }
       ]
     },
@@ -151,7 +157,6 @@
     },
     {
       "name": "BigECommerce",
-      "extends": "Products",
       "joins": [
         {
           "name": "Customers",
@@ -166,6 +171,21 @@
           "type": "number",
           "primary_key": true,
           "shown": true
+        },
+        {
+          "name": "category",
+          "type": "string",
+          "sql": "category"
+        },
+        {
+          "name": "subCategory",
+          "type": "string",
+          "sql": "sub_category"
+        },
+        {
+          "name": "productName",
+          "type": "string",
+          "sql": "product_name"
         },
         {
           "name": "orderId",
