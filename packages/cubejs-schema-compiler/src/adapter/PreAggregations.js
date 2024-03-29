@@ -314,6 +314,17 @@ export class PreAggregations {
       });
     }).map(d => query.newTimeDimension(d));
 
+    let sortedAllCubeNames;
+    let sortedUsedCubePrimaryKeys;
+
+    if (query.ungrouped) {
+      const { allCubeNames } = query;
+      sortedAllCubeNames = allCubeNames.concat([]);
+      sortedAllCubeNames.sort();
+      sortedUsedCubePrimaryKeys = query.allCubeNames.flatMap(c => query.primaryKeyNames(c));
+      sortedUsedCubePrimaryKeys.sort();
+    }
+
     const measureToLeafMeasures = {};
 
     const leafMeasurePaths =
@@ -398,7 +409,10 @@ export class PreAggregations {
       ownedDimensions,
       ownedTimeDimensionsWithRollupGranularity,
       ownedTimeDimensionsAsIs,
-      allBackAliasMembers
+      allBackAliasMembers,
+      ungrouped: query.ungrouped,
+      sortedUsedCubePrimaryKeys,
+      sortedAllCubeNames
     };
   }
 
@@ -665,6 +679,20 @@ export class PreAggregations {
           (references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions))
       );
 
+      if (transformedQuery.ungrouped) {
+        const allReferenceCubes = R.pipe(R.map(m => (m.dimension || m).split('.')[0]), R.uniq, R.sortBy(R.identity))(
+          references.measures.concat(references.dimensions).concat(references.timeDimensions)
+        );
+        if (
+          !R.equals(transformedQuery.sortedAllCubeNames, allReferenceCubes) ||
+          !(
+            dimensionsMatch(transformedQuery.sortedUsedCubePrimaryKeys, true) || dimensionsMatch(transformedQuery.sortedUsedCubePrimaryKeys, false)
+          )
+        ) {
+          return false;
+        }
+      }
+
       const backAliasMeasures = backAlias(references.measures);
       return ((
         windowGranularityMatches(references)
@@ -687,9 +715,9 @@ export class PreAggregations {
      * @returns {boolean}
      */
     const canUseFn =
-      transformedQuery.leafMeasureAdditive &&
-      !transformedQuery.hasMultipliedMeasures
-        ? (r) => canUsePreAggregationLeafMeasureAdditive(r) ||
+      (
+        transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures || transformedQuery.ungrouped
+      ) ? (r) => canUsePreAggregationLeafMeasureAdditive(r) ||
           canUsePreAggregationNotAdditive(r)
         : canUsePreAggregationNotAdditive;
 
@@ -1293,12 +1321,12 @@ export class PreAggregations {
         const measure = this.query.newMeasure(path);
         return [
           path,
-          this.query.aggregateOnGroupedColumn(
+          this.query.ungrouped ? measure.aliasName() : (this.query.aggregateOnGroupedColumn(
             measure.measureDefinition(),
             measure.aliasName(),
             !this.query.safeEvaluateSymbolContext().overTimeSeriesAggregate,
             path,
-          ) || `sum(${measure.aliasName()})`,
+          ) || `sum(${measure.aliasName()})`),
         ];
       }),
       R.fromPairs,
