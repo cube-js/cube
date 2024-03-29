@@ -1522,5 +1522,17 @@ from
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
     });
+
+    executePg('SQL API: ungrouped pre-agg', async () => {
+      const res = await connection.query(`
+    select
+      "productName",
+      "totalSales" 
+    from 
+      "public"."BigECommerce" "$Table" 
+    order by 2 desc, 1 asc
+  `);
+      expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
+    });
   });
 }

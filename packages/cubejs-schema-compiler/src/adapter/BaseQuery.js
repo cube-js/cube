@@ -463,7 +463,7 @@ export class BaseQuery {
   buildParamAnnotatedSql() {
     let sql;
     let preAggForQuery;
-    if (!this.options.preAggregationQuery && !this.ungrouped) {
+    if (!this.options.preAggregationQuery) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
@@ -539,7 +539,7 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -558,7 +558,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
@@ -1848,7 +1848,7 @@ export class BaseQuery {
   primaryKeyNames(cubeName) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     if (!primaryKeys || !primaryKeys.length) {
-      throw new UserError(`One or more Primary key is required for '${cubeName}`);
+      throw new UserError(`One or more Primary key is required for '${cubeName}' cube`);
     }
     return primaryKeys.map((pk) => this.primaryKeyName(cubeName, pk));
   }
