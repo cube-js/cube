@@ -10,7 +10,7 @@ homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-ipc-channel = { version = "0.14.1" }
+ipc-channel = { version = "0.18.0" }
 libc = { version = "0.2.97", optional = true }
 
 [dependencies]
