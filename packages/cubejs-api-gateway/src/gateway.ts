@@ -1421,7 +1421,7 @@ class ApiGateway {
       const normalizedTotal = structuredClone(normalizedQuery);
       normalizedTotal.totalQuery = true;
       
-      delete normalizedTotal.order
+      delete normalizedTotal.order;
 
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
