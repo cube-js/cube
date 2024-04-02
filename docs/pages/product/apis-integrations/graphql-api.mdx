@@ -18,6 +18,19 @@ Under the hood, the GraphQL API is exposed via the `/graphql` endpoint of the
 See [GraphQL API reference][ref-ref-graphql-api] for the list of supported
 requests and parameters.
 
+<WarningBox>
+
+Compared to the [REST API][ref-rest-api], GraphQL API currently has the
+following limitations:
+
+- No support for the [WebSockets transport][ref-websockets].
+- No support for [subscriptions to changes][ref-subscriptions].
+- No support for [`compareDateRange` queries][ref-compare-date-range].
+- No support for querying [data model metadata][ref-metadata].
+- No ability to apply a [pivot config][ref-pivot-config] on the front-end.
+
+</WarningBox>
+
 ## Configuration
 
 GraphQL API is enabled by default and secured using [API scopes][ref-api-scopes]
@@ -223,3 +236,8 @@ to our query as follows:
 [graphql]: https://graphql.org
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [ref-ref-graphql-api]: /reference/graphql-api
+[ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch#web-sockets
+[ref-subscriptions]: /product/apis-integrations/rest-api/real-time-data-fetch#client-subscriptions
+[ref-compare-date-range]: /product/apis-integrations/rest-api/query-format#time-dimensions-format
+[ref-metadata]: /reference/rest-api#v1meta
+[ref-pivot-config]: /reference/frontend/cubejs-client-core#pivotconfig
