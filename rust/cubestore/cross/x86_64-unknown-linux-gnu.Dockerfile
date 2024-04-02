@@ -4,17 +4,17 @@ FROM debian:bullseye-slim
 RUN apt-get update && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-14 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 make cmake \
       lzma-dev liblzma-dev libpython3-dev \
     && rm -rf /var/lib/apt/lists/*;
 
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-14 100
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
-RUN update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-14 100
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-14 100
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-14 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-18 100
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100
 
 # https://www.openssl.org/source/old/1.1.1/
 ARG OPENSSL_VERSION=1.1.1w
