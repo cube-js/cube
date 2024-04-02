@@ -40,7 +40,7 @@ ENV ARCH=arm \
     CPP=aarch64-linux-gnu-cpp \
     LD=aarch64-linux-gnu-ld
 
-ENV ZLIB_VERSION=1.3
+ENV ZLIB_VERSION=1.3.1
 RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd zlib-${ZLIB_VERSION} && \
     ./configure --prefix=/usr/aarch64-linux-gnu && \
@@ -49,7 +49,7 @@ RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd .. && rm -rf zlib-${ZLIB_VERSION};
 
 # https://www.openssl.org/source/old/1.1.1/
-ENV OPENSSL_VERSION=1.1.1q
+ENV OPENSSL_VERSION=1.1.1w
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 && \
