@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - migrate table by truncate (unknown tables) ([#8053](https://github.com/cube-js/cube/issues/8053)) ([509d895](https://github.com/cube-js/cube/commit/509d89561eb23283fb0bda14ec03ca4d4a0a7aab))
+
+
+### Features
+
+* **cubestore:** CacheStore - allow to disable logs ([#8027](https://github.com/cube-js/cube/issues/8027)) ([ce6303c](https://github.com/cube-js/cube/commit/ce6303c5944f7ab0ac6c8411af26d396b0d3d7a8))
+
+
+
+
+
 ## [0.35.5](https://github.com/cube-js/cube.js/compare/v0.35.4...v0.35.5) (2024-03-28)
 
 

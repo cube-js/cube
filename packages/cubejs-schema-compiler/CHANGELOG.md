@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
+
+
+### Features
+
+* Ungrouped query pre-aggregation support ([#8058](https://github.com/cube-js/cube/issues/8058)) ([2ca99de](https://github.com/cube-js/cube/commit/2ca99de3e7ea813bdb7ea684bed4af886bde237b))
+
+
+
+
+
 ## [0.35.5](https://github.com/cube-js/cube/compare/v0.35.4...v0.35.5) (2024-03-28)
 
 
