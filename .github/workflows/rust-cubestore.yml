@@ -149,13 +149,6 @@ jobs:
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
         shell: bash
-      - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2024-01-29
-          target: ${{ matrix.target }}
-          override: true
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target

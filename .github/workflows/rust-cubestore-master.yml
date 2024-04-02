@@ -262,7 +262,7 @@ jobs:
       - name: Build with Cross
         if: ${{ matrix.cross }}
         run: |
-          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
+          wget -c https://github.com/cross-rs/cross/releases/download/v0.2.5/cross-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
           chmod +x cross && sudo mv cross /usr/local/bin/cross
           cd rust/cubestore
           cross build --release --target=${{ matrix.target }}
