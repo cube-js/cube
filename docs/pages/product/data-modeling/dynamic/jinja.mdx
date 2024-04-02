@@ -53,8 +53,8 @@ cubes:
     sql_table: public.orders
 
     measures:
-      {%- for name, days in metrics.items() %}
-      - name: {{ name }}
+      {%- for name, days in metrics | items %}
+      - name: {{ name | safe }}
         type: count_distinct
         sql: user_id
         rolling_window:
