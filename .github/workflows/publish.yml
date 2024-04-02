@@ -82,7 +82,7 @@ jobs:
             package_target_libc: glibc
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-30052023
+      image: cubejs/rust-cross:${{ matrix.target }}-02042024
 
     steps:
       - name: Checkout
@@ -769,7 +769,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y --force llvm --version 9.0.1
+        run: choco install -y --force llvm --version 18.1.2
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v3.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
