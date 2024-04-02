@@ -21,7 +21,7 @@ RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm &
 RUN mkdir /musl
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1q
+ARG OPENSSL_VERSION=1.1.1w
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64 && \
