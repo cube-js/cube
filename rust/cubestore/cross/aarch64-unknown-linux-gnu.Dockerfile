@@ -40,7 +40,7 @@ ENV ARCH=arm \
     CPP=aarch64-linux-gnu-cpp \
     LD=aarch64-linux-gnu-ld
 
-ENV ZLIB_VERSION=1.3
+ENV ZLIB_VERSION=1.3.1
 RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd zlib-${ZLIB_VERSION} && \
     ./configure --prefix=/usr/aarch64-linux-gnu && \
