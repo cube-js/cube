@@ -7,7 +7,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*;
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1l
+ARG OPENSSL_VERSION=1.1.1w
 
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz
 WORKDIR /openssl-${OPENSSL_VERSION}

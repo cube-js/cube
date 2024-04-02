@@ -49,7 +49,7 @@ RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd .. && rm -rf zlib-${ZLIB_VERSION};
 
 # https://www.openssl.org/source/old/1.1.1/
-ENV OPENSSL_VERSION=1.1.1q
+ENV OPENSSL_VERSION=1.1.1w
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 && \
