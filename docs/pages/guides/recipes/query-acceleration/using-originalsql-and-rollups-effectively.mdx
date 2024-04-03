@@ -3,20 +3,33 @@ redirect_from:
   - /recipes/using-originalsql-and-rollups-effectively
 ---
 
-# Using originalSql and rollup pre-aggregations effectively
+# Using `original_sql` and `rollup` pre-aggregations effectively
 
 ## Use case
 
-For cubes that are built from an expensive SQL query, we can optimize
-pre-aggregation builds so that they don't have to re-run the SQL query.
+You can use the [`sql` parameter][ref-cube-sql] to define [cubes][ref-cubes]
+over arbitrary SQL queries. Sometimes, these queries might be fairly complex
+and take substantial time to execute. That's totally okay because you can use
+[pre-aggregations][ref-preaggs] to accelerate queries to such cubes.
+
+However, if you have more than one pre-aggregation that references members of
+such a cube, its `sql` expression would have to be executed each time every
+pre-aggregation is built. This also the case if you run both pre-aggregated
+and non-pre-aggregated queries against such a cube.
+
+A special [`original_sql` pre-aggregation][ref-schema-ref-preaggs-type-origsql]
+can help:
+* First, it will materialize the results of the `sql` expression in the data source.
+* Then, it will make these results available to other `rollup` pre-aggregations
+and non-pre-aggregated queries.
 
 ## Configuration
 
 We can do this by creating a pre-aggregation of type
-[`originalSql`][ref-schema-ref-preaggs-type-origsql] on the source (also known
-as internal) database, and then configuring our existing `rollup`
-pre-aggregations to use the `originalSql` pre-aggregation with the
-[`useOriginalSqlPreAggregations` property][ref-schema-ref-preaggs-use-origsql].
+[`original_sql`][ref-schema-ref-preaggs-type-origsql] on the data source
+database, and then configuring our existing `rollup`
+pre-aggregations to use the `original_sql` pre-aggregation with the
+[`use_original_sql_pre_aggregations` property][ref-schema-ref-preaggs-use-origsql].
 
 <WarningBox>
 
@@ -36,6 +49,7 @@ cubes:
       - name: base
         type: original_sql
         external: false
+
       - name: main
         dimensions:
           - id
@@ -54,7 +68,7 @@ cube("orders", {
   pre_aggregations: {
     base: {
       type: `original_sql`,
-      external: false,
+      external: false
     },
 
     main: {
@@ -62,12 +76,10 @@ cube("orders", {
       measures: [count],
       time_dimension: created_at,
       granularity: `day`,
-      use_original_sql_pre_aggregations: true,
-    },
-  },
-
-  // ...
-});
+      use_original_sql_pre_aggregations: true
+    }
+  }
+})
 ```
 
 </CodeTabs>
@@ -81,3 +93,6 @@ pre-aggregation.
   /reference/data-model/pre-aggregations#original_sql
 [ref-schema-ref-preaggs-use-origsql]:
   /reference/data-model/pre-aggregations#use_original_sql_pre_aggregations
+[ref-cubes]: /reference/data-model/cube
+[ref-cube-sql]: /reference/data-model/cube#sql
+[ref-preaggs]: /product/caching/using-pre-aggregations
