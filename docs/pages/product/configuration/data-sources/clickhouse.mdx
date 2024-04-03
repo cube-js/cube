@@ -5,6 +5,10 @@ redirect_from:
 
 # ClickHouse
 
+[ClickHouse](https://clickhouse.com) is a fast and resource efficient
+[open-source database](https://github.com/ClickHouse/ClickHouse) for real-time
+applications and analytics.
+
 ## Prerequisites
 
 - The hostname for the [ClickHouse][clickhouse] database server
@@ -40,11 +44,26 @@ CUBEJS_DB_PASS=**********
 
 ## Pre-Aggregation Feature Support
 
-### count_distinct_approx
+When using [pre-aggregations][ref-preaggs] with ClickHouse, you have to define
+[indexes][ref-preaggs-indexes] in pre-aggregations. Otherwise, you might get
+the following error: `ClickHouse doesn't support pre-aggregations without indexes`.
+
+### `count_distinct_approx`
 
 Measures of type
 [`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
 not be used in pre-aggregations when using ClickHouse as a source database.
+
+### `rollup_join`
+
+You can use [`rollup_join` pre-aggregations][ref-preaggs-rollup-join] to join
+data from ClickHouse and other data sources inside Cube Store.
+
+Alternatively, you can leverage ClickHouse support for [integration table
+engines](https://clickhouse.com/docs/en/engines/table-engines#integration-engines)
+to join data from ClickHouse and other data sources inside ClickHouse.
+To do so, define table engines in ClickHouse and connect your ClickHouse as the
+only data source to Cube.
 
 ## Pre-Aggregation Build Strategies
 
@@ -121,3 +140,6 @@ You can connect to a ClickHouse database when your user's permissions are
   /product/caching/using-pre-aggregations#export-bucket
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
+[ref-preaggs]: /product/caching/using-pre-aggregations
+[ref-preaggs-indexes]: /reference/data-model/pre-aggregations#indexes
+[ref-preaggs-rollup-join]: /reference/data-model/pre-aggregations#rollup_join
