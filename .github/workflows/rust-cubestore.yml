@@ -213,7 +213,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
-      RUSTFLAGS: '-Ctarget-feature=+crt-static'
       OPENSSL_STATIC: 1
     strategy:
       matrix:
