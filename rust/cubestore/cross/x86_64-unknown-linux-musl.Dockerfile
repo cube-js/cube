@@ -1,6 +1,7 @@
 # Based on top of ubuntu 20.04
+# Take a look at DEVELOPMENT.md to rebuild base
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.x86_64-unknown-linux-musl
-FROM rustembedded/cross:x86_64-unknown-linux-musl
+FROM cubejs/cross-x86_64-unknown-linux-musl:03042024
 
 RUN apt-get update \
     && apt-get -y upgrade \

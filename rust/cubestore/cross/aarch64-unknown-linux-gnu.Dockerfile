@@ -1,7 +1,7 @@
 # Based on top of ubuntu 20.04
-# TODO: Migrate to https://github.com/cross-rs/cross/pkgs/container/aarch64-unknown-linux-gnu, when it will be released!
+# Take a look at DEVELOPMENT.md to rebuild base
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.aarch64-unknown-linux-gnu
-FROM cubejs/cross-aarch64-unknown-linux-gnu:31122022
+FROM cubejs/cross-aarch64-unknown-linux-gnu:03042024
 
 RUN apt-get update \
     && apt-get -y upgrade \
