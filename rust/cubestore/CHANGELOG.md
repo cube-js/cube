@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.7](https://github.com/cube-js/cube/compare/v0.35.6...v0.35.7) (2024-04-03)
+
+
+### Features
+
+* **cross:** Upgrade LLVM from 14 to 18 (02042024) ([#8064](https://github.com/cube-js/cube/issues/8064)) ([9b30eac](https://github.com/cube-js/cube/commit/9b30eac57442af586d146bbb947b9dcba634cd60))
+* **cubestore:** Upgrade LLVM from 14 to 18 ([#8068](https://github.com/cube-js/cube/issues/8068)) ([d1f0cbc](https://github.com/cube-js/cube/commit/d1f0cbc3c76ee5025aa26919a2563f85964a20a8))
+
+
+
+
+
 ## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
 
 
