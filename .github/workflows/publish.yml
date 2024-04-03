@@ -768,10 +768,6 @@ jobs:
           OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
           OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
-      # Hotfix before https://github.com/actions/runner-images/pull/7125 will be released/rolled on the productions servers
-      - name: Hotfix for macOS (pkg-config)
-        if: contains(runner.os, 'macos')
-        run: brew install pkg-config
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
