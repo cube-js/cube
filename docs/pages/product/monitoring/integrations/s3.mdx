@@ -10,7 +10,7 @@ Cloud.
 
 ### Exporting logs
 
-To export logs to Amazon S3, start by creating an S3 bucket.
+To export logs to Amazon S3, start by creating an S3 bucket for Cube Cloud logs.
 
 Then, configure the [`aws_s3`](https://vector.dev/docs/reference/configuration/sinks/aws_s3/)
 sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
@@ -32,7 +32,8 @@ region = "us-east-1"
 compression = "gzip"
 
 [sinks.aws_s3.auth]
-assume_role = "arn:aws:iam::123456789098:role/your-role"
+access_key_id = "$CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID"
+secret_access_key = "$CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY"
 
 [sinks.aws_s3.encoding]
 codec = "json"
