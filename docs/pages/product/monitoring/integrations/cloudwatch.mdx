@@ -1,0 +1,53 @@
+# Integration with Amazon CloudWatch
+
+[Amazon CloudWatch](https://aws.amazon.com/cloudwatch/) is an application
+monitoring service that collects and visualizes logs, metrics, and event data.
+This guide demonstrates how to set up Cube Cloud to export logs to Amazon
+CloudWatch.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube
+Cloud.
+
+### Exporting logs
+
+To export logs to Amazon CloudWatch, start by creating [a log group and a log
+stream](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Working-with-log-groups-and-streams.html)
+for Cube Cloud logs.
+
+Then, configure the [`aws_cloudwatch_logs`](https://vector.dev/docs/reference/configuration/sinks/aws_cloudwatch_logs/)
+sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.aws_cloudwatch_logs]
+type = "aws_cloudwatch_logs"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+region = "us-east-1"
+group_name = "your-group-name"
+stream_name = "your-stream-name"
+create_missing_group = true
+create_missing_stream = true
+
+[sinks.aws_cloudwatch_logs.auth]
+access_key_id = "$CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID"
+secret_access_key = "$CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY"
+
+[sinks.aws_cloudwatch_logs.encoding]
+codec = "json"
+```
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to Amazon CloudWatch and watch the logs coming.
+
+
+[ref-monitoring-integrations]: /product/monitoring/integrations
+[ref-monitoring-integrations-conf]: /product/monitoring/integrations#configuration
