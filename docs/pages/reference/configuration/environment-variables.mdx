@@ -185,6 +185,16 @@ To accept the license terms for the Databricks JDBC driver, this must be set to
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | N/A                    | N/A                   |
 
+## `CUBEJS_DB_DATABRICKS_CATALOG`
+
+The name of the [Databricks catalog][databricks-catalog] to connect to.
+
+| Possible Values                 | Default in Development | Default in Production |
+| ------------------------------- | ---------------------- | --------------------- |
+| A valid Databricks catalog name | N/A                    | N/A                   |
+
+[databricks-catalog]: (https://docs.databricks.com/en/data-governance/unity-catalog/create-catalogs.html)
+
 ## `CUBEJS_DB_DATABRICKS_TOKEN`
 
 The [personal access token][databricks-docs-pat] used to authenticate the
