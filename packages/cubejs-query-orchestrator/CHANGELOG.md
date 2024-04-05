@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.8](https://github.com/cube-js/cube/compare/v0.35.7...v0.35.8) (2024-04-05)
+
+
+### Features
+
+* **cubestore:** Queue - optimize list/pending operations ([#7998](https://github.com/cube-js/cube/issues/7998)) ([815be2f](https://github.com/cube-js/cube/commit/815be2fb90bf84d095f2ab6b208167b8cc8433e7))
+
+
+
+
+
 ## [0.35.7](https://github.com/cube-js/cube/compare/v0.35.6...v0.35.7) (2024-04-03)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator
