@@ -84,7 +84,9 @@ use std::mem::take;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
+use crate::cachestore::{
+    CacheItem, QueueItem, QueueItemPayload, QueueItemStatus, QueueResult, QueueResultAckEvent,
+};
 use crate::remotefs::LocalDirRemoteFs;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
@@ -1231,6 +1233,9 @@ pub enum MetaStoreEvent {
 
     UpdateQueueResult(IdRow<QueueResult>, IdRow<QueueResult>),
     DeleteQueueResult(IdRow<QueueResult>),
+
+    UpdateQueueItemPayload(IdRow<QueueItemPayload>, IdRow<QueueItemPayload>),
+    DeleteQueueItemPayload(IdRow<QueueItemPayload>),
 }
 
 fn meta_store_merge(

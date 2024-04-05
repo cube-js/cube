@@ -1,5 +1,4 @@
-use crate::cachestore::QueueItem;
-use crate::metastore::IdRow;
+use crate::cachestore::QueueAllItem;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
 use arrow::array::{ArrayRef, Int64Array, StringArray, TimestampNanosecondArray};
@@ -11,7 +10,7 @@ pub struct SystemQueueTableDef;
 
 #[async_trait]
 impl InfoSchemaTableDef for SystemQueueTableDef {
-    type T = IdRow<QueueItem>;
+    type T = QueueAllItem;
 
     async fn rows(
         &self,
@@ -51,19 +50,21 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
         vec![
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| Some(row.get_row().get_key())),
+                    items.iter().map(|row| Some(row.item.get_row().get_key())),
                 ))
             }),
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| row.get_row().get_prefix().clone()),
+                    items
+                        .iter()
+                        .map(|row| row.item.get_row().get_prefix().clone()),
                 ))
             }),
             Box::new(|items| {
                 Arc::new(TimestampNanosecondArray::from(
                     items
                         .iter()
-                        .map(|row| row.get_row().get_created().timestamp_nanos())
+                        .map(|row| row.item.get_row().get_created().timestamp_nanos())
                         .collect::<Vec<_>>(),
                 ))
             }),
@@ -71,7 +72,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 Arc::new(StringArray::from(
                     items
                         .iter()
-                        .map(|row| format!("{:?}", row.get_row().get_status()))
+                        .map(|row| format!("{:?}", row.item.get_row().get_status()))
                         .collect::<Vec<_>>(),
                 ))
             }),
@@ -79,7 +80,7 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                 Arc::new(Int64Array::from(
                     items
                         .iter()
-                        .map(|row| row.get_row().get_priority().clone())
+                        .map(|row| row.item.get_row().get_priority().clone())
                         .collect::<Vec<_>>(),
                 ))
             }),
@@ -88,7 +89,8 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                     items
                         .iter()
                         .map(|row| {
-                            row.get_row()
+                            row.item
+                                .get_row()
                                 .get_heartbeat()
                                 .as_ref()
                                 .map(|v| v.timestamp_nanos())
@@ -101,7 +103,8 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
                     items
                         .iter()
                         .map(|row| {
-                            row.get_row()
+                            row.item
+                                .get_row()
                                 .get_orphaned()
                                 .as_ref()
                                 .map(|v| v.timestamp_nanos())
@@ -111,12 +114,14 @@ impl InfoSchemaTableDef for SystemQueueTableDef {
             }),
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| Some(row.get_row().get_value())),
+                    items.iter().map(|row| row.payload.as_ref()),
                 ))
             }),
             Box::new(|items| {
                 Arc::new(StringArray::from_iter(
-                    items.iter().map(|row| row.get_row().get_extra().clone()),
+                    items
+                        .iter()
+                        .map(|row| row.item.get_row().get_extra().clone()),
                 ))
             }),
         ]
