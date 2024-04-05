@@ -2036,7 +2036,14 @@ impl LanguageToLogicalPlanConverter {
                     true,
                 )?
                 .iter()
-                .map(|e| replace_col_to_expr(e.clone(), &replace_map))
+                .map(|e| {
+                    let original_expr_name = e.name(&without_window_fields_schema)?;
+                    let new_expr = match replace_col_to_expr(e.clone(), &replace_map)? {
+                        Expr::Alias(expr, _) => Expr::Alias(expr, original_expr_name),
+                        expr => Expr::Alias(Box::new(expr), original_expr_name),
+                    };
+                    Ok::<_, DataFusionError>(new_expr)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
                 let order_expr_rebased = replace_qualified_col_with_flat_name_if_missing(
                     order_expr,
