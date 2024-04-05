@@ -1212,19 +1212,23 @@ impl CacheStore for RocksCacheStore {
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
                 let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
-                let id_row_opt = queue_schema.get_row_by_key(key)?;
 
-                if let Some(id_row) = id_row_opt {
+                if let Some(id_row) = queue_schema.get_row_by_key(key)? {
                     let row_id = id_row.get_id();
                     let queue_item = queue_schema.delete_row(id_row, batch_pipe)?;
-                    let queue_payload = queue_payload_schema
-                        .try_delete(row_id, batch_pipe)?
-                        .unwrap();
 
-                    Ok(Some(QueueCancelResponse {
-                        extra: queue_item.into_row().extra,
-                        value: queue_payload.into_row().value,
-                    }))
+                    if let Some(queue_payload) =
+                        queue_payload_schema.try_delete(row_id, batch_pipe)?
+                    {
+                        Ok(Some(QueueCancelResponse {
+                            extra: queue_item.into_row().extra,
+                            value: queue_payload.into_row().value,
+                        }))
+                    } else {
+                        error!("Unable to find payload for queue item, id = {}", row_id);
+
+                        Ok(None)
+                    }
                 } else {
                     Ok(None)
                 }
