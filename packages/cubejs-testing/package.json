@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing",
-  "version": "0.35.7",
+  "version": "0.35.8",
   "description": "Cube.js e2e tests",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -87,13 +87,13 @@
     "birdbox-fixtures"
   ],
   "dependencies": {
-    "@cubejs-backend/cubestore-driver": "^0.35.7",
+    "@cubejs-backend/cubestore-driver": "^0.35.8",
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/postgres-driver": "^0.35.7",
-    "@cubejs-backend/query-orchestrator": "^0.35.7",
-    "@cubejs-backend/schema-compiler": "^0.35.7",
+    "@cubejs-backend/postgres-driver": "^0.35.8",
+    "@cubejs-backend/query-orchestrator": "^0.35.8",
+    "@cubejs-backend/schema-compiler": "^0.35.8",
     "@cubejs-backend/shared": "^0.35.2",
-    "@cubejs-backend/testing-shared": "^0.35.7",
+    "@cubejs-backend/testing-shared": "^0.35.8",
     "@cubejs-client/ws-transport": "^0.35.0",
     "dedent": "^0.7.0",
     "fs-extra": "^8.1.0",
