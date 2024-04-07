@@ -20158,7 +20158,7 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_wrapper() {
+    async fn test_simple_wrapper_1() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
@@ -20178,6 +20178,14 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("COALESCE"));
+        println!(
+            "!! sql: {}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -20194,7 +20202,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, avg(avgPrice) FROM KibanaSampleDataEcommerce a group by 1"
+            "SELECT COALESCE(customer_gender, 'N/A', 'NN') FROM KibanaSampleDataEcommerce a "
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )

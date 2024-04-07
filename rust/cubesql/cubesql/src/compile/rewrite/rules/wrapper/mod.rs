@@ -52,6 +52,7 @@ impl RewriteRules for WrapperRules {
         self.wrapper_pull_up_rules(&mut rules);
         self.aggregate_rules(&mut rules);
         self.projection_rules(&mut rules);
+        //self.projection_rules_subquery(&mut rules);
         self.limit_rules(&mut rules);
         self.filter_rules(&mut rules);
         self.subquery_rules(&mut rules);

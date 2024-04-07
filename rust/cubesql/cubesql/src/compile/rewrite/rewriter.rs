@@ -155,7 +155,6 @@ pub struct IterInfo {
 
 impl IterInfo {
     pub fn egraph_debug_enabled() -> bool {
-        return true;
         env::var("CUBESQL_DEBUG_EGRAPH")
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(false)
@@ -351,15 +350,8 @@ impl Rewriter {
                         .map(|(i, n)| format!("{}: {:?}", i, n))
                         .join(", ")
                 );
-                println!(
-                    "!!! ========== !!!!!! Best: {}",
-                    best.as_ref()
-                        .iter()
-                        .enumerate()
-                        .map(|(i, n)| format!("{}: {:?}", i, n))
-                        .join(", ")
-                );
                 log::debug!("Best cost: {:?}", best_cost);
+                println!("!!!!!!!!!!");
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
@@ -388,7 +380,6 @@ impl Rewriter {
         rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
-        println!("!!!!!!! ===== AAAA ==== !!!");
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
         let runner = runner.run(rules.iter());
         if !IterInfo::egraph_debug_enabled() {

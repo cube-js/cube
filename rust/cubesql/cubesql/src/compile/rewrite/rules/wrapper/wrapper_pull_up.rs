@@ -286,7 +286,6 @@ impl WrapperRules {
         _inner_group_expr_var: &'static str,
         _inner_aggr_expr_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        println!("!!!!!!!!BBBBBBBBBBB!!!!!");
         let select_type_var = var!(select_type_var);
         let projection_expr_var = var!(projection_expr_var);
         let inner_select_type_var = var!(inner_select_type_var);
@@ -317,7 +316,6 @@ impl WrapperRules {
                     };
                 }
             }
-            println!("!!!!!!!!RRRRRRRRR!!!!!");
             false
         }
     }

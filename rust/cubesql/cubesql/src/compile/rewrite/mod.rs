@@ -279,6 +279,10 @@ crate::plan_to_language! {
             expr: Arc<Expr>,
             join_type: JoinType,
         },
+        WrappedSubquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
+        },
 
         CubeScan {
             alias_to_cube: Vec<(String, String)>,
@@ -1153,6 +1157,14 @@ fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) 
 
 fn wrapped_subquery(input: impl Display, subqueries: impl Display) -> String {
     format!("(WrappedSubquery {} {})", input, subqueries)
+}
+
+fn subquery_pushdown_replacer(members: impl Display) -> String {
+    format!("(SubqueryPushdownReplacer {})", members)
+}
+
+fn subquery_pullup_replacer(members: impl Display) -> String {
+    format!("(SubqueryPullupReplacer {})", members)
 }
 
 fn join(

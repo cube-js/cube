@@ -19,9 +19,6 @@ pub fn replacer_push_down_node(
     replacer_node: impl Fn(String) -> String,
     include_tail: bool,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-    if name.starts_with("wrapper-projection-expr") {
-        println!("!!! === {}", name);
-    }
     let push_down_rule = rewrite(
         &format!("{}-push-down", name),
         replacer_node(format!("({} ?left ?right)", list_node)),

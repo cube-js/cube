@@ -220,7 +220,6 @@ impl CubeScanWrapperNode {
     ) -> result::Result<Self, CubeError> {
         let schema = self.schema();
         let wrapped_plan = self.wrapped_plan.clone();
-        println!("!!! --- wplan: {:?}", wrapped_plan);
         let (sql, request, member_fields) = Self::generate_sql_for_node(
             Arc::new(self.clone()),
             transport,
@@ -260,7 +259,6 @@ impl CubeScanWrapperNode {
             sql.finalize_query(sql_templates).map_err(|e| CubeError::internal(e.to_string()))?;
             Ok((sql, request, member_fields))
         })?;
-        println!("!!!! --- {}", sql.sql);
         Ok(self.with_sql_and_request(sql, request, member_fields))
     }
 
@@ -310,7 +308,6 @@ impl CubeScanWrapperNode {
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
     ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
-        println!("!!!!!SSSSSSS!!!!!!!!");
         Box::pin(async move {
             match node.as_ref() {
                 // LogicalPlan::Projection(_) => {}
@@ -339,7 +336,6 @@ impl CubeScanWrapperNode {
                     let wrapped_select_node =
                         node.as_any().downcast_ref::<WrappedSelectNode>().cloned();
                     if let Some(node) = cube_scan_node {
-                        println!("!!!!!AAAAAAAAAA!!!!!!!!");
                         let data_sources = node
                             .used_cubes
                             .iter()
@@ -440,7 +436,6 @@ impl CubeScanWrapperNode {
                             sql,
                             request,
                         } = if let Some(ungrouped_scan_node) = ungrouped_scan_node.clone() {
-                            println!("!!!!!TTTTTTT!!!!!!!!");
                             let data_sources = ungrouped_scan_node
                                 .used_cubes
                                 .iter()
@@ -473,7 +468,6 @@ impl CubeScanWrapperNode {
                                 request: ungrouped_scan_node.request.clone(),
                             }
                         } else {
-                            println!("!!!!!CCCCCCCCCC!!!!!!!!");
                             Self::generate_sql_for_node(
                                 plan.clone(),
                                 transport.clone(),

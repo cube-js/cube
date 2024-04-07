@@ -1870,7 +1870,6 @@ impl LanguageToLogicalPlanConverter {
                 LogicalPlan::Extension(Extension { node })
             }
             LogicalPlanLanguage::CubeScanWrapper(params) => {
-                println!("--- !!!!! ------");
                 let input = Arc::new(self.to_logical_plan(params[0])?);
                 LogicalPlan::Extension(Extension {
                     node: Arc::new(CubeScanWrapperNode::new(
