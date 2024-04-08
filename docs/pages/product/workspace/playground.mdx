@@ -34,9 +34,25 @@ set to `true`.
 <WarningBox>
 
 Since Playground exposes all data models and allows running all possible
-queries, it should not be used in production. You can use the
-[JavaScript SDKs](/product/apis-integrations/javascript-sdk) to build your own
-query builder and use it to query your Cube API in a secure way.
+queries, it should not be used in production. You can [connect a BI
+tool][ref-dataviz-tools] or use the [JavaScript SDKs][ref-js-sdk] to build your
+own query builder and use it to query your Cube in a secure way.
+
+</WarningBox>
+
+You can use this Playground to view and [generate data model][ref-data-model]
+files.
+
+<WarningBox>
+
+Data model generator currently has the following limitations:
+- Even if [multiple data sources][ref-multiple-data-sources] are configured,
+it will only show the tables from in default data source. As a workaround, you
+can configure the second data source as default, generate data model files for
+it, then change the default data source back.
+- With each generation, files in the data model folder will be rewritten. If
+you'd like to combine files from multiple generations, please back them up
+manually. 
 
 </WarningBox>
 
@@ -111,3 +127,7 @@ to accelerate the query:
 [ref-caching-preaggs-gs]: /product/caching/getting-started-pre-aggregations
 [ref-workspace-sqlrunner]: /product/workspace/sql-runner
 [ref-rollup-designer]: /product/workspace/rollup-designer
+[ref-dataviz-tools]: /product/configuration/visualization-tools
+[ref-js-sdk]: /product/apis-integrations/javascript-sdk
+[ref-data-model]: /product/workspace/data-model#generating-data-model-files
+[ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
