@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.8",
+  "version": "0.35.9",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -60,7 +60,7 @@
   "devDependencies": {
     "@cubejs-backend/apla-clickhouse": "^1.7.0",
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/query-orchestrator": "^0.35.8",
+    "@cubejs-backend/query-orchestrator": "^0.35.9",
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.5",
