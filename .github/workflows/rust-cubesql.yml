@@ -56,12 +56,6 @@ jobs:
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubesql -> target
