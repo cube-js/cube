@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.9](https://github.com/cube-js/cube/compare/v0.35.8...v0.35.9) (2024-04-08)
+
+
+### Features
+
+* **docker:** Security upgrade Node.js from 18.19.1 to 18.20.1 ([#8094](https://github.com/cube-js/cube/issues/8094)) ([51921cc](https://github.com/cube-js/cube/commit/51921ccfd60ff739a638b32205e2f4eb48110789))
+
+
+
+
+
 ## [0.35.8](https://github.com/cube-js/cube/compare/v0.35.7...v0.35.8) (2024-04-05)
 
 **Note:** Version bump only for package @cubejs-backend/docker
