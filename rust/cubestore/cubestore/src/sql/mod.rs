@@ -1690,7 +1690,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1766,7 +1766,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1872,7 +1872,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 

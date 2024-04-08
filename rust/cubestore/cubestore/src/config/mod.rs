@@ -1155,8 +1155,8 @@ where
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
         let trigger_size = match cache_max_size >> 20 {
-            d if d < 32 => (640 << 20),
-            d if d < 64 => (1280 << 20),
+            d if d < 32 => 640 << 20,
+            d if d < 64 => 1280 << 20,
             d if d < 512 => cache_max_size * 5,
             d if d < 1024 => cache_max_size * 4,
             d if d < 4096 => cache_max_size * 3,

@@ -1629,7 +1629,7 @@ impl RocksMetaStore {
                 }
 
                 taken[i] = true;
-                index_columns.push(c.clone().replace_index(index_columns.len()));
+                index_columns.push(c.replace_index(index_columns.len()));
             }
 
             let seq_column = table_id.get_row().seq_column().ok_or_else(|| {

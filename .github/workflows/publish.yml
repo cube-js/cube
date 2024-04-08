@@ -661,7 +661,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-06-22
+          toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
           override: true
           components: rustfmt
@@ -738,7 +738,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-06-22
+          toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
           override: true
           components: rustfmt

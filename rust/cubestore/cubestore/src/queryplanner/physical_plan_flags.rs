@@ -116,7 +116,7 @@ fn check_predicate_order(
             .iter()
             .filter_map(|(col, op)| {
                 if matches!(op, Operator::Eq) {
-                    Some(col.name().clone().to_string())
+                    Some(col.name().to_string())
                 } else {
                     None
                 }
