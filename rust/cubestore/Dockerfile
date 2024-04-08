@@ -1,8 +1,8 @@
 FROM rust:1-bullseye as builder
 
 RUN rustup update && \
-    rustup default nightly-2022-06-22 && \
-    rustup component add --toolchain nightly-2022-06-22 rustfmt;
+    rustup default nightly-2024-01-10 && \
+    rustup component add --toolchain nightly-2024-01-10 rustfmt;
 
 RUN apt update \
 	&& apt upgrade -y \

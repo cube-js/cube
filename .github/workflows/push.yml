@@ -225,23 +225,16 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
           # Separate path for release key to protect cache bloating
           shared-key: cubestore-release
           key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
+      - name: Build Cube Store
+        run: |
+          cd rust/cubestore
+          cargo build --release -j 4
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
         uses: actions/upload-artifact@v3
         with:
