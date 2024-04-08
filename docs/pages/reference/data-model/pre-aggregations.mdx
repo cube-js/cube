@@ -1322,7 +1322,7 @@ The SQL queries for the build range (as defined by the `sql` property) are
 executed based on the [`refresh_key`][self-refreshkey] settings of the
 pre-aggregation.
 
-In case of `FILTER_PARAMS` are used in the [`refresh_key`][self-refreshkey] definition 
+In case of very small `update_window` or `FILTER_PARAMS` are used in the [`refresh_key`][self-refreshkey] definition 
 and the current timestamp is used as `build_range_end`, there's a possibility 
 to write [`refresh_key`][self-refreshkey] which won't refresh due to cycle dependency on each other.
 To address such cases, you can use relative date in the future for the `build_range_end`.
