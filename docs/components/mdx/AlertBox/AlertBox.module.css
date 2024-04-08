@@ -30,7 +30,7 @@
   color: #831414;
 }
 
-.AlertBox__Wrapper--error * {
+.AlertBox__Wrapper--error p {
   background-color: #FCEBEB;
   border-left-color: #EF3F2C;
   color: #831414;
@@ -42,7 +42,7 @@
   color: #2A4475;
 }
 
-.AlertBox__Wrapper--info * {
+.AlertBox__Wrapper--info p {
   background-color: #EBF4FC;
   border-left-color: #3C94E5;
   color: #2A4475;
@@ -54,7 +54,7 @@
   color: #7A442A;
 }
 
-.AlertBox__Wrapper--warning * {
+.AlertBox__Wrapper--warning p {
   background-color: #FEF6EF;
   border-left-color: #F0A45E;
   color: #7A442A;
@@ -66,7 +66,7 @@
   color: #26534B;
 }
 
-.AlertBox__Wrapper--default * {
+.AlertBox__Wrapper--default p {
   background-color: #E9F9F2;
   border-left-color: #27C27C;
   color: #26534B;
