@@ -1,0 +1,40 @@
+# Query lifecycle
+
+To understand how Cube works, you can review the following steps that each query
+takes in order to be executed and fulfilled by Cube.
+
+<WarningBox>
+
+This page is work-in-progress and incomplete.
+
+</WarningBox>
+
+## Initiation
+
+Cube provides a [rich set of APIs][ref-apis] for various use cases, and the
+exact way to initiate a query depends on the API flavor.
+
+For example, you can let your [BI tool][ref-dataviz-tools] connect to the
+[SQL API][ref-sql-api] endpoint and run a SQL query using the Postgres protocol
+or you can let your application code call the [JavaScript SDK][ref-js-sdk],
+connect to the [REST API][ref-rest-api] endpoint, and send a
+[JSON-based query][ref-rest-api-query-format] using the HTTP protocol. 
+
+### Batching queries
+
+Cube is [designed][blog-cube-store-ftw] to handle a high volume of concurrent
+queries efficiently, so there's generally no need to "batch" queries, i.e.,
+no need to combine multiple queries into a single API request.
+
+When using the REST API, you can choose the [WebSockets transport][ref-websockets]
+to send multiple queries over a single network connection.
+
+
+[ref-apis]: /product/apis-integrations
+[ref-dataviz-tools]: /product/configuration/visualization-tools
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-js-sdk]: /product/apis-integrations/javascript-sdk
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-query-format]: /product/apis-integrations/rest-api/query-format
+[ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch#web-sockets
+[blog-cube-store-ftw]: https://cube.dev/blog/how-you-win-by-using-cube-store-part-1
