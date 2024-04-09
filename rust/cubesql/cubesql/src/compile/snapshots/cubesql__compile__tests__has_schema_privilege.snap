@@ -1,11 +1,12 @@
 ---
 source: cubesql/src/compile/mod.rs
-expression: "execute_query(\"SELECT\n                    nspname,\n                    has_schema_privilege('ovr', nspname, 'CREATE') create,\n                    has_schema_privilege('ovr', nspname, 'USAGE') usage\n                FROM pg_namespace\n                ORDER BY nspname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+assertion_line: 9882
+expression: "execute_query(\"SELECT\n                    nspname,\n                    has_schema_privilege('ovr', nspname, 'CREATE') create_top,\n                    has_schema_privilege('ovr', nspname, 'create') create_lower,\n                    has_schema_privilege('ovr', nspname, 'USAGE') usage_top,\n                    has_schema_privilege('ovr', nspname, 'usage') usage_lower\n                FROM pg_namespace\n                ORDER BY nspname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
-+--------------------+--------+-------+
-| nspname            | create | usage |
-+--------------------+--------+-------+
-| information_schema | false  | true  |
-| pg_catalog         | false  | true  |
-| public             | false  | true  |
-+--------------------+--------+-------+
++--------------------+------------+--------------+-----------+-------------+
+| nspname            | create_top | create_lower | usage_top | usage_lower |
++--------------------+------------+--------------+-----------+-------------+
+| information_schema | false      | false        | true      | true        |
+| pg_catalog         | false      | false        | true      | true        |
+| public             | false      | false        | true      | true        |
++--------------------+------------+--------------+-----------+-------------+
