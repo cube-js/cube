@@ -16,13 +16,31 @@ us](https://cube.dev/contact) for details.
 
 </SuccessBox>
 
+See how you can use ksqlDB and Cube Cloud to power real-time analytics in Power BI:
+
+<YouTubeVideo url="https://www.youtube.com/embed/RD_HZ7xE8G0" />
+
 ## Prerequisites
 
 - Hostname for the ksqlDB server
-- Username and password to connect to ksqlDB server
+- Username and password (or an API key) to connect to ksqlDB server
 
-If you are using Confluent Cloud, you need to generate API key and use **key as
-username** and **secret as password**.
+### Confluent Cloud
+
+If you are using [Confluent Cloud](https://www.confluent.io/confluent-cloud/),
+you need to generate an API key and use the API key name as your username and
+the API key secret as your password.
+
+You can generate an API key by installing `confluent-cli` and running the
+following commands in the command line:
+
+```sh
+brew install --cask confluent-cli
+confluent login
+confluent environment use <YOUR-ENVIRONMENT-ID>
+confluent ksql cluster list
+confluent api-key create --resource <YOUR-KSQL-CLUSTER-ID>
+```
 
 ## Setup
 
