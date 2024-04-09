@@ -2698,7 +2698,10 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
                         };
 
                         let requested = if privilege.contains(",") {
-                            privilege.split(",").map(|v| v.trim().to_lowercase()).collect()
+                            privilege
+                                .split(",")
+                                .map(|v| v.trim().to_lowercase())
+                                .collect()
                         } else {
                             vec![privilege.to_lowercase()]
                         };
@@ -2709,8 +2712,8 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
                             match request.as_str() {
                                 "create" => {
                                     result = false;
-                                },
-                                "usage" => {},
+                                }
+                                "usage" => {}
                                 _ => {
                                     return Err(DataFusionError::Execution(format!(
                                         "unrecognized privilege type: \"{}\"",
