@@ -34,23 +34,18 @@ A Query has the following properties:
   It is an array of objects in [timeDimension format.](#time-dimensions-format)
 - `segments`: An array of segments. A segment is a named filter, created in the
   data model.
-- `limit`: A row limit for your query. The default value is `10000`. The maximum
-  allowed limit is `50000`. If you'd like to request more rows than the maximum
-  allowed limit, consider using [pagination][ref-recipe-pagination].
-- `total`: If set to `true`, Cube will return the total number of rows for a
-  query. The default value is `false`.
+- `limit`: A [row limit][ref-row-limit] for your query.
+- `total`: If set to `true`, Cube will run a [total query][ref-total-query] and
+return the total number of rows as if no row limit or offset are set in the query.
+The default value is `false`.
 - `offset`: The number of initial rows to be skipped for your query. The default
   value is `0`.
 - `order`: An object, where the keys are measures or dimensions to order by and
   their corresponding values are either `asc` or `desc`. The order of the fields
   to order on is based on the order of the keys in the object.
-- `timezone`: All time based calculations performed within Cube are
-  timezone-aware. This property is applied to all time dimensions during
-  aggregation and filtering. It isn't applied to the time dimension referenced
-  in a `dimensions` query property unless granularity or date filter is
-  specified. Using this property you can set your desired timezone in
-  [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database) format, e.g.:
-  `America/Los_Angeles`. The default value is `UTC`.
+- `timezone`: A [time zone][ref-time-zone] for your query. You can set the
+desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
+format, e.g., `America/Los_Angeles`.
 - `renewQuery`: If `renewQuery` is set to `true`, Cube will renew all
   [`refreshKey`][ref-schema-ref-preaggs-refreshkey] for queries and query
   results in the foreground. However, if the
@@ -536,8 +531,8 @@ provides a convenient shortcut to pass a dimension and a filter as a
   specified it's equivalent to passing two of the same dates as a date range.
   You can also pass a string with a [relative date
   range][ref-relative-date-range], for example, `last quarter`.
-- `compareDateRange`: An array of date ranges to compare a measure change over
-  previous period
+- `compareDateRange`: An array of date ranges to compare measure values. See
+[compare date range queries][ref-compare-date-range] for details.
 - `granularity`: A granularity for a time dimension. It supports the following
   values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `year`.
   If you pass `null` to the granularity, Cube will only perform filtering by a
@@ -556,10 +551,10 @@ provides a convenient shortcut to pass a dimension and a filter as a
 }
 ```
 
-You can use compare date range queries when you want to see, for example, how a
-metric performed over a period in the past and how it performs now. You can pass
-two or more date ranges where each of them is in the same format as a
-`dateRange`
+You can use [compare date range queries][ref-compare-date-range] when you want
+to see, for example, how a metric performed over a period in the past and how it
+performs now. You can pass two or more date ranges where each of them is in the
+same format as a `dateRange`:
 
 ```javascript
 // ...
@@ -608,7 +603,6 @@ refer to its documentation for more examples.
 
 </InfoBox>
 
-[ref-recipe-pagination]: /guides/recipes/queries/pagination
 [ref-client-core-resultset-drilldown]:
   /reference/frontend/cubejs-client-core#result-set-drill-down
 [ref-schema-ref-preaggs-refreshkey]:
@@ -621,3 +615,7 @@ refer to its documentation for more examples.
   /reference/data-model/pre-aggregations#time_dimension
 [ref-relative-date-range]: #relative-date-range
 [chrono-website]: https://github.com/wanasit/chrono
+[ref-row-limit]: /product/data-modeling/queries#row-limit
+[ref-time-zone]: /product/data-modeling/queries#time-zone
+[ref-compare-date-range]: /product/data-modeling/queries#compare-date-range-query
+[ref-total-query]: /product/data-modeling/queries#total-query

@@ -638,11 +638,11 @@ You may also need to configure
 
 ### `scheduled_refresh_time_zones`
 
-All time-based calculations performed within Cube are timezone-aware. Using this
-property you can specify multiple timezones in [TZ Database Name][link-wiki-tz]
-format e.g. `America/Los_Angeles`. The default value is `UTC`.
+This option specifies a list of time zones that pre-aggregations will be built
+for. It has impact on [pre-aggregation matching][ref-matching-preaggs].
 
-You can define one or multiple timezones:
+You can specify multiple timezones in the [TZ Database Name][link-wiki-tz]
+format, e.g., `America/Los_Angeles`:
 
 <CodeTabs>
 
@@ -666,14 +666,10 @@ module.exports = {
 
 </CodeTabs>
 
-This configuration option can be also set using the
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. You can set a
-comma-separated list of timezones to refresh in
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. For example:
+The default value is a list of a single time zone. `UTC`.
 
-```dotenv
-CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
-```
+This configuration option can be also set using the
+`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
 
 ### `scheduled_refresh_contexts`
 
@@ -1317,7 +1313,7 @@ If not defined, Cube will lookup for environment variable
 [self-orchestrator-id]: #context_to_orchestrator_id
 [ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
 [ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch
-
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
