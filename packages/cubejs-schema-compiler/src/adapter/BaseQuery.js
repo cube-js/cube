@@ -593,11 +593,16 @@ export class BaseQuery {
         ['buildSqlAndParams', exportAnnotatedSql],
         () => this.paramAllocator.buildSqlAndParams(
           this.buildParamAnnotatedSql(),
-          exportAnnotatedSql
+          exportAnnotatedSql,
+          this.shouldReuseParams
         ),
         { cache: this.queryCache }
       )
     );
+  }
+
+  get shouldReuseParams() {
+    return false;
   }
 
   /**

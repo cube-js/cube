@@ -63,4 +63,8 @@ export class PostgresQuery extends BaseQuery {
 
     return templates;
   }
+
+  public get shouldReuseParams() {
+    return true;
+  }
 }
