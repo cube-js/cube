@@ -5658,7 +5658,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5773,7 +5773,7 @@ mod tests {
             assert!(snapshots[2].current);
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5871,7 +5871,7 @@ mod tests {
 
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5910,7 +5910,7 @@ mod tests {
                 .set_current_snapshot(snapshots[2].id)
                 .await;
             assert!(res.is_ok());
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6116,7 +6116,7 @@ mod tests {
             }
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6213,7 +6213,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
