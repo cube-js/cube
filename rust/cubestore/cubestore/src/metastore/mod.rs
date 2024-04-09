@@ -4879,7 +4879,7 @@ fn swap_active_partitions_impl(
 mod tests {
     use super::table::AggregateColumn;
     use super::*;
-    use crate::config::Config;
+    use crate::config::{init_test_logger, Config};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use futures_timer::Delay;
     use rocksdb::IteratorMode;
@@ -5798,6 +5798,8 @@ mod tests {
     }
     #[tokio::test]
     async fn set_current_snapshot() {
+        init_test_logger().await;
+
         {
             let config = Config::test("set_current_snapshot");
 
@@ -6031,6 +6033,8 @@ mod tests {
 
     #[tokio::test]
     async fn log_replay_ordering() {
+        init_test_logger().await;
+
         {
             let config = Config::test("log_replay_ordering");
 
@@ -6115,8 +6119,7 @@ mod tests {
                     .unwrap();
             }
             services.stop_processing_loops().await.unwrap();
-
-            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await;
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
