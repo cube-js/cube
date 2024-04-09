@@ -676,6 +676,22 @@ The username used to connect to the database.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
 
+## `CUBEJS_DB_QUERY_LIMIT`
+
+The maximum [row limit][ref-row-limit] in the result set.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `50000`                | `50000`               |
+
+<WarningBox>
+
+Increasing the maximum row limit may cause out-of-memory (OOM) crashes and make
+Cube susceptible to denial-of-service (DoS) attacks if it's exposed to
+untrusted environments.
+
+</WarningBox>
+
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
 [API scopes][ref-rest-scopes] used to allow or disallow access to REST API
@@ -955,7 +971,9 @@ If `true`, this instance of Cube will **only** refresh pre-aggregations.
 
 ## `CUBEJS_ROLLUP_ONLY`
 
-If `true`, this instance of Cube will **only** query rollup pre-aggregations.
+If `true`, the API instance of Cube will **only** fulfill queries from
+pre-aggregations. See [rollup-only
+mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -974,8 +992,7 @@ accordingly
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
 A comma-separated [list of timezones to schedule refreshes
-for][ref-config-sched-refresh-timer]. Used in conjunction with
-[`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs-scheduled-refresh-concurrency).
+for][ref-config-sched-refresh-timer].
 
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
@@ -1449,3 +1466,4 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-row-limit]: /product/data-modeling/queries#row-limit
