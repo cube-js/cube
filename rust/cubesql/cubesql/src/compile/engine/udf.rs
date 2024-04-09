@@ -2697,16 +2697,33 @@ pub fn create_has_schema_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
                             }
                         };
 
-                        match privilege {
-                            "CREATE" => Some(false),
-                            "USAGE" => Some(true),
-                            _ => {
-                                return Err(DataFusionError::Execution(format!(
-                                    "unrecognized privilege type: \"{}\"",
-                                    privilege
-                                )))
+                        let requested = if privilege.contains(",") {
+                            privilege
+                                .split(",")
+                                .map(|v| v.trim().to_lowercase())
+                                .collect()
+                        } else {
+                            vec![privilege.to_lowercase()]
+                        };
+
+                        let mut result = true;
+
+                        for request in requested {
+                            match request.as_str() {
+                                "create" => {
+                                    result = false;
+                                }
+                                "usage" => {}
+                                _ => {
+                                    return Err(DataFusionError::Execution(format!(
+                                        "unrecognized privilege type: \"{}\"",
+                                        privilege
+                                    )))
+                                }
                             }
                         }
+
+                        Some(result)
                     }
                     _ => None,
                 })

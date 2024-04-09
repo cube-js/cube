@@ -9884,8 +9884,10 @@ ORDER BY
             execute_query(
                 "SELECT
                     nspname,
-                    has_schema_privilege('ovr', nspname, 'CREATE') create,
-                    has_schema_privilege('ovr', nspname, 'USAGE') usage
+                    has_schema_privilege('ovr', nspname, 'CREATE') create_top,
+                    has_schema_privilege('ovr', nspname, 'create') create_lower,
+                    has_schema_privilege('ovr', nspname, 'USAGE') usage_top,
+                    has_schema_privilege('ovr', nspname, 'usage') usage_lower
                 FROM pg_namespace
                 ORDER BY nspname ASC
                 "
@@ -9900,8 +9902,26 @@ ORDER BY
             execute_query(
                 "SELECT
                     nspname,
-                    has_schema_privilege(nspname, 'CREATE') create,
-                    has_schema_privilege(nspname, 'USAGE') usage
+                    has_schema_privilege(nspname, 'CREATE') create_top,
+                    has_schema_privilege(nspname, 'create') create_lower,
+                    has_schema_privilege(nspname, 'USAGE') usage_top,
+                    has_schema_privilege(nspname, 'usage') usage_lower
+                FROM pg_namespace
+                ORDER BY nspname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "has_schema_privilege_multiple",
+            execute_query(
+                "SELECT
+                    nspname,
+                    has_schema_privilege(nspname, 'create,usage') create_usage,
+                    has_schema_privilege(nspname, 'usage,create') usage_create
                 FROM pg_namespace
                 ORDER BY nspname ASC
                 "
