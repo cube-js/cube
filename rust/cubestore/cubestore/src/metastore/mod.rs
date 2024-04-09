@@ -4879,7 +4879,7 @@ fn swap_active_partitions_impl(
 mod tests {
     use super::table::AggregateColumn;
     use super::*;
-    use crate::config::Config;
+    use crate::config::{init_test_logger, Config};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
     use futures_timer::Delay;
     use rocksdb::IteratorMode;
@@ -5658,7 +5658,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5773,7 +5773,7 @@ mod tests {
             assert!(snapshots[2].current);
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5798,6 +5798,8 @@ mod tests {
     }
     #[tokio::test]
     async fn set_current_snapshot() {
+        init_test_logger().await;
+
         {
             let config = Config::test("set_current_snapshot");
 
@@ -5871,7 +5873,7 @@ mod tests {
 
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5910,7 +5912,7 @@ mod tests {
                 .set_current_snapshot(snapshots[2].id)
                 .await;
             assert!(res.is_ok());
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6031,6 +6033,8 @@ mod tests {
 
     #[tokio::test]
     async fn log_replay_ordering() {
+        init_test_logger().await;
+
         {
             let config = Config::test("log_replay_ordering");
 
@@ -6115,8 +6119,7 @@ mod tests {
                     .unwrap();
             }
             services.stop_processing_loops().await.unwrap();
-
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await;
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6213,7 +6216,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
