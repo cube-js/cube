@@ -278,7 +278,6 @@ export class CubeSymbols {
   }
 
   applyIncludeMembers(includeMembers, cube, type, errorReporter) {
-    // console.log('>>>@', includeMembers)
     for (const [memberName, memberDefinition] of includeMembers) {
       if (cube[type]?.[memberName]) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);
