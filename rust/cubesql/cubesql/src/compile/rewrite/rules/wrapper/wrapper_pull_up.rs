@@ -130,7 +130,13 @@ impl WrapperRules {
                             "?in_projection",
                             "?cube_members",
                         ),
-                        "?subqueries",
+                        wrapper_pullup_replacer(
+                            "?subqueries",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
                         wrapper_pullup_replacer(
                             "?group_expr",
                             "?alias_to_cube",
@@ -313,6 +319,7 @@ impl WrapperRules {
                             // TODO write rules for non trivial wrapped aggregate
                             true
                         }
+                        WrappedSelectType::Subquery => false,
                     };
                 }
             }

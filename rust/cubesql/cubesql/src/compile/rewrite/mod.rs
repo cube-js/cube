@@ -58,6 +58,7 @@ impl Display for LikeType {
 pub enum WrappedSelectType {
     Projection,
     Aggregate,
+    Subquery,
 }
 
 crate::plan_to_language! {
@@ -244,7 +245,7 @@ crate::plan_to_language! {
             list: Vec<Expr>,
             negated: bool,
         },
-        InSubquery {
+        InSubqueryExpr {
             expr: Box<Expr>,
             subquery: Box<Expr>,
             negated: bool,
@@ -1003,6 +1004,10 @@ fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> Str
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
     format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {
+    format!("(InSubqueryExpr {} {} {})", expr, subquery, negated)
 }
 
 fn between_expr(

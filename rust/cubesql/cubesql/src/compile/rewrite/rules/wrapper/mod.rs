@@ -10,6 +10,7 @@ mod distinct;
 mod extract;
 mod filter;
 mod in_list_expr;
+mod in_subquery_expr;
 mod is_null_expr;
 mod limit;
 mod literal;
@@ -72,6 +73,7 @@ impl RewriteRules for WrapperRules {
         self.column_rules(&mut rules);
         self.literal_rules(&mut rules);
         self.in_list_expr_rules(&mut rules);
+        self.in_subquery_expr_rules(&mut rules);
         self.negative_expr_rules(&mut rules);
         self.not_expr_rules(&mut rules);
         self.distinct_rules(&mut rules);

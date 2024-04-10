@@ -351,7 +351,6 @@ impl Rewriter {
                         .join(", ")
                 );
                 log::debug!("Best cost: {:?}", best_cost);
-                println!("!!!!!!!!!!");
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),

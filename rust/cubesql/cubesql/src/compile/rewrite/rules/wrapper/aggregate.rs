@@ -50,7 +50,13 @@ impl WrapperRules {
                         "WrapperPullupReplacerInProjection:false",
                         "?cube_members",
                     ),
-                    wrapped_select_subqueries_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_subqueries_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
                     wrapper_pushdown_replacer(
                         "?group_expr",
                         "?alias_to_cube",

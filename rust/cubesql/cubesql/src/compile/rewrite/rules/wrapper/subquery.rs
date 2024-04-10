@@ -11,7 +11,7 @@ use crate::{
         wrapped_subquery, wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
         WrappedSelectUngrouped, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
-    var, var_iter,
+    var, var_iter, var_list_iter,
 };
 use egg::{EGraph, Rewrite, Subst};
 
@@ -39,7 +39,7 @@ impl WrapperRules {
                 ),
                 cube_scan_wrapper(
                     wrapped_select(
-                        "WrappedSelectSelectType:Projection",
+                        "WrappedSelectSelectType:Subquery",
                         wrapper_pullup_replacer(
                             wrapped_select_projection_expr_empty_tail(),
                             "?alias_to_cube",
@@ -130,7 +130,7 @@ impl WrapperRules {
                         "?wihdow_expr",
                         wrapper_pullup_replacer(
                             wrapped_select(
-                                "WrappedSelectSelectType:Projection",
+                                "WrappedSelectSelectType:Subquery",
                                 wrapped_select_projection_expr_empty_tail(),
                                 "?subqueries",
                                 wrapped_select_group_expr_empty_tail(),
@@ -198,7 +198,7 @@ impl WrapperRules {
                     "CubeScanWrapperFinalized:false",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "wrapper-subqueries-wrapped-scan-to-pull-up",
                 wrapper_pushdown_replacer(
                     cube_scan_wrapper(
@@ -223,6 +223,7 @@ impl WrapperRules {
                     "?in_projection",
                     "?cube_members",
                 ),
+                self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
         ]);
         Self::list_pushdown_pullup_rules(
@@ -259,6 +260,19 @@ impl WrapperRules {
                         WrappedSelectUngroupedScan(ungrouped),
                     )),
                 );
+                return true;
+            }
+            false
+        }
+    }
+
+    fn transform_check_subquery_wrapped(
+        &self,
+        cube_scan_input_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let cube_scan_input_var = var!(cube_scan_input_var);
+        move |egraph, subst| {
+            for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return true;
             }
             false

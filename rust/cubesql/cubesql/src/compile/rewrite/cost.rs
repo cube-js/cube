@@ -39,6 +39,7 @@ pub struct CubePlanCost {
     table_scans: i64,
     empty_wrappers: i64,
     non_detected_cube_scans: i64,
+    unwrapped_subqueries: usize,
     member_errors: i64,
     // TODO if pre-aggregation can be used for window functions, then it'd be suboptimal
     non_pushed_down_window: i64,
@@ -58,7 +59,6 @@ pub struct CubePlanCost {
     ast_size: usize,
     ast_size_inside_wrapper: usize,
     ungrouped_nodes: usize,
-    unwrapped_subqueries: usize,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]

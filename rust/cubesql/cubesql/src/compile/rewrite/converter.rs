@@ -14,7 +14,7 @@ use crate::{
             ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
             CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, InListExprNegated, InSubqueryNegated, JoinJoinConstraint, JoinJoinType,
+            FilterOpOp, InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType,
             JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
             LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
@@ -432,9 +432,11 @@ impl LogicalPlanToLanguageConverter {
             } => {
                 let expr = Self::add_expr_replace_params(graph, expr, query_params)?;
                 let subquery = Self::add_expr_replace_params(graph, subquery, query_params)?;
-                let negated = add_expr_data_node!(graph, negated, InSubqueryNegated);
+                let negated = add_expr_data_node!(graph, negated, InSubqueryExprNegated);
 
-                graph.add(LogicalPlanLanguage::InSubquery([expr, subquery, negated]))
+                graph.add(LogicalPlanLanguage::InSubqueryExpr([
+                    expr, subquery, negated,
+                ]))
             }
             Expr::Wildcard => graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
@@ -1035,10 +1037,10 @@ pub fn node_to_expr(
                 "QueryParam can't be evaluated as an Expr node".to_string(),
             ));
         }
-        LogicalPlanLanguage::InSubquery(params) => {
+        LogicalPlanLanguage::InSubqueryExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
             let subquery = Box::new(to_expr(params[1].clone())?);
-            let negated = match_data_node!(node_by_id, params[2], InSubqueryNegated);
+            let negated = match_data_node!(node_by_id, params[2], InSubqueryExprNegated);
             Expr::InSubquery {
                 expr,
                 subquery,
@@ -1889,6 +1891,14 @@ impl LanguageToLogicalPlanConverter {
                     params[1],
                     WrappedSelectProjectionExpr
                 );
+                let subqueries =
+                    match_list_node_ids!(node_by_id, params[2], WrappedSelectSubqueries)
+                        .into_iter()
+                        .map(|j| {
+                            let input = Arc::new(self.to_logical_plan(j)?);
+                            Ok(input)
+                        })
+                        .collect::<Result<Vec<_>, CubeError>>()?;
                 let group_expr =
                     match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectGroupExpr);
                 let aggr_expr =
@@ -1970,6 +1980,11 @@ impl LanguageToLogicalPlanConverter {
                     WrappedSelectType::Aggregate => {
                         group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
                     }
+                    WrappedSelectType::Subquery => {
+                        return Err(CubeError::internal(
+                            "Subquery wrapped select cannot appear in final plan".to_string(),
+                        ));
+                    }
                 };
                 // TODO support asterisk query?
                 let all_expr_without_window = if all_expr_without_window.is_empty() {
@@ -1981,8 +1996,15 @@ impl LanguageToLogicalPlanConverter {
                 } else {
                     all_expr_without_window
                 };
+
+                let mut subqueries_schema = DFSchema::empty();
+                for subquery in subqueries.iter() {
+                    subqueries_schema.merge(subquery.schema());
+                }
+                let schema_with_subqueries = from.schema().join(&subqueries_schema)?;
+
                 let without_window_fields =
-                    exprlist_to_fields(all_expr_without_window.iter(), from.schema())?;
+                    exprlist_to_fields(all_expr_without_window.iter(), &schema_with_subqueries)?;
                 let replace_map = all_expr_without_window
                     .iter()
                     .zip(without_window_fields.iter())
@@ -2034,8 +2056,11 @@ impl LanguageToLogicalPlanConverter {
                     without_window_fields
                         .into_iter()
                         .chain(
-                            exprlist_to_fields(window_expr_rebased.iter(), from.schema())?
-                                .into_iter(),
+                            exprlist_to_fields(
+                                window_expr_rebased.iter(),
+                                &schema_with_subqueries,
+                            )?
+                            .into_iter(),
                         )
                         .collect(),
                     HashMap::new(),
@@ -2051,6 +2076,7 @@ impl LanguageToLogicalPlanConverter {
                         Arc::new(schema),
                         select_type,
                         projection_expr,
+                        subqueries,
                         group_expr,
                         aggr_expr,
                         window_expr_rebased,

@@ -465,6 +465,7 @@ macro_rules! variant_field_struct {
             @enum_struct $variant, $var_field, { WrappedSelectType } -> {
                 WrappedSelectType::Projection => "Projection",
                 WrappedSelectType::Aggregate => "Aggregate",
+                WrappedSelectType::Subquery => "Subquery",
             }
         );
     };
