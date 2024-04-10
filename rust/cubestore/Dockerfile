@@ -23,6 +23,7 @@ WORKDIR /usr/src
 WORKDIR /build/cubestore
 COPY Cargo.toml .
 COPY Cargo.lock .
+COPY cuberockstore cuberockstore
 COPY cubehll cubehll
 COPY cubezetasketch cubezetasketch
 COPY cuberpc cuberpc
