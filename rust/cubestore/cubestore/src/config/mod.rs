@@ -43,13 +43,13 @@ use crate::telemetry::{
 };
 use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
 use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
-use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;

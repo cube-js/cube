@@ -22,8 +22,8 @@ use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
+use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Options, DB};
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
 use crate::cachestore::cache_eviction_manager::{CacheEvictionManager, EvictionResult};
 use crate::cachestore::compaction::CompactionPreloadedState;
@@ -31,6 +31,7 @@ use crate::cachestore::listener::RocksCacheStoreListener;
 use crate::cachestore::queue_item_payload::QueueItemPayloadRocksTable;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
+use cuberockstore::rocksdb;
 use datafusion::cube_ext;
 use deepsize::DeepSizeOf;
 use itertools::Itertools;
@@ -87,7 +88,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
         opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
             compaction_state,
         ));
@@ -125,7 +128,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         let rocksdb_config = config.cachestore_rocksdb_config();
 
         let mut opts = Options::default();
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();

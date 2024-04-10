@@ -4,7 +4,7 @@ use crate::metastore::{
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
-use rocksdb::WriteBatch;
+use cuberockstore::rocksdb::WriteBatch;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]

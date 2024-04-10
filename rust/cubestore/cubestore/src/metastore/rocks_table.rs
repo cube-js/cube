@@ -8,8 +8,10 @@ use crate::metastore::{
 use crate::CubeError;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Utc};
+use cuberockstore::rocksdb::{
+    DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB,
+};
 use itertools::Itertools;
-use rocksdb::{DBIterator, Direction, IteratorMode, ReadOptions, Snapshot, WriteBatch, DB};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -35,7 +37,7 @@ macro_rules! rocks_table_impl {
         impl<'a> crate::metastore::BaseRocksTable for $rocks_table<'a> {
             fn migrate_table(
                 &self,
-                _batch: &mut rocksdb::WriteBatch,
+                _batch: &mut cuberockstore::rocksdb::WriteBatch,
                 table_info: crate::metastore::TableInfo,
             ) -> Result<(), crate::CubeError> {
                 Err(crate::CubeError::internal(format!(
@@ -55,11 +57,11 @@ macro_rules! rocks_table_new {
         impl<'a> crate::metastore::RocksTable for $rocks_table<'a> {
             type T = $table;
 
-            fn db(&self) -> &rocksdb::DB {
+            fn db(&self) -> &cuberockstore::rocksdb::DB {
                 self.db.db
             }
 
-            fn snapshot(&self) -> &rocksdb::Snapshot {
+            fn snapshot(&self) -> &cuberockstore::rocksdb::Snapshot {
                 self.db.snapshot
             }
 

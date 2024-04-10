@@ -1398,8 +1398,8 @@ mod tests {
     use arrow::array::{Int64Array, StringArray};
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
+    use cuberockstore::rocksdb::{Options, DB};
     use datafusion::physical_plan::collect;
-    use rocksdb::{Options, DB};
     use std::fs;
     use std::path::{Path, PathBuf};
 

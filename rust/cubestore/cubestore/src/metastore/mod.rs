@@ -22,8 +22,8 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
+use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
-use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -61,6 +61,7 @@ use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::fmt;
 use cubehll::HllSketch;
+use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions};
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
 use futures_timer::Delay;
@@ -72,7 +73,6 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
-use rocksdb::backup::{BackupEngine, BackupEngineOptions};
 
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -1263,7 +1263,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
         // TODO(ovr): Decrease after additional fix for get_updates_since
         opts.set_wal_ttl_seconds(
@@ -1296,7 +1298,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
@@ -4881,8 +4885,8 @@ mod tests {
     use super::*;
     use crate::config::{init_test_logger, Config};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use cuberockstore::rocksdb::IteratorMode;
     use futures_timer::Delay;
-    use rocksdb::IteratorMode;
     use std::thread::sleep;
     use std::time::Duration;
     use std::{env, fs};

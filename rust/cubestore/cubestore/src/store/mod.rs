@@ -799,7 +799,7 @@ mod tests {
     use crate::table::data::{concat_record_batches, rows_to_columns};
     use crate::{metastore::ColumnType, table::TableValue};
     use arrow::array::{Int64Array, StringArray};
-    use rocksdb::{Options, DB};
+    use cuberockstore::rocksdb::{Options, DB};
     use std::fs;
     use std::path::{Path, PathBuf};
 
