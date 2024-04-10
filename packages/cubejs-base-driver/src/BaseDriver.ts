@@ -40,6 +40,7 @@ import {
   QueryTablesResult,
   QueryColumnsResult,
   TableMemoryData,
+  PrimeryKeysQueryResult,
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -187,6 +188,24 @@ export abstract class BaseDriver implements DriverInterface {
     return query;
   }
 
+  protected primaryKeysQuery(): string | null {
+    return null;
+  }
+
+  protected async primaryKeys(): Promise<PrimeryKeysQueryResult[]> {
+    const query = this.primaryKeysQuery();
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query(query) as PrimeryKeysQueryResult[]);
+    } catch (_) {
+      return [];
+    }
+  }
+
   protected getColumnNameForSchemaName() {
     return 'table_schema';
   }
@@ -316,7 +335,11 @@ export abstract class BaseDriver implements DriverInterface {
     let schema = (result[i.table_schema] || {});
     const tables = (schema[i.table_name] || []);
 
-    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+    tables.push({
+      name: i.column_name,
+      type: i.data_type,
+      attributes: i.key_type ? ['primaryKey'] : []
+    });
 
     tables.sort();
     schema[i.table_name] = tables;
@@ -326,10 +349,25 @@ export abstract class BaseDriver implements DriverInterface {
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public async tablesSchema() {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    const primaryKeys = await this.primaryKeys();
+    const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+
+    for (const pk of primaryKeys) {
+      if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
+        tablesSchema[pk.table_schema][pk.table_name] = tablesSchema[pk.table_schema][pk.table_name].map((it: any) => {
+          if (it.name === pk.column_name) {
+            it.attributes = ['primaryKey'];
+          }
+          return it;
+        });
+      }
+    }
+    console.log('>>>', 'res', JSON.stringify(tablesSchema.public, null, 2));
+
+    return tablesSchema;
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {

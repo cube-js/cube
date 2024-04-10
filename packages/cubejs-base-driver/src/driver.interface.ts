@@ -181,6 +181,15 @@ export type QueryTablesResult = { schema_name: string, table_name: string };
 // eslint-disable-next-line camelcase
 export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
 
+export type PrimeryKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+};
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(

@@ -142,6 +142,18 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
+  protected primaryKeysQuery() {
+    return `SELECT 
+      c.table_schema as ${this.quoteIdentifier('table_schema')}, 
+      c.table_name as ${this.quoteIdentifier('table_name')}, 
+      c.column_name as ${this.quoteIdentifier('column_name')}
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
+      AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+    WHERE constraint_type = 'PRIMARY KEY'`;
+  }
+
   /**
    * The easiest way how to add additional configuration from env variables, because
    * you cannot call method in RedshiftDriver.constructor before super.
