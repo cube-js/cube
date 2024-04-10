@@ -365,7 +365,6 @@ export abstract class BaseDriver implements DriverInterface {
         });
       }
     }
-    console.log('>>>', 'res', JSON.stringify(tablesSchema.public, null, 2));
 
     return tablesSchema;
   }
