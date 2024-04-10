@@ -140,12 +140,23 @@ export class CubeSymbols {
     this.camelCaseTypes(cube.segments);
     this.camelCaseTypes(cube.preAggregations);
 
+    if (Array.isArray(cube.hierarchies)) {
+      cube.hierarchies = cube.hierarchies.map(hierarchy => ({
+        ...hierarchy,
+        levels: hierarchy.levels.map(level => (level.includes('.') ? level : `${cubeName}.${level}`))
+      }));
+    }
+
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
     }
 
     if (this.evaluateViews) {
       this.prepareIncludes(cube, errorReporter, splitViews);
+      
+      if (cube.isView) {
+        this.assignHierarchies(cube);
+      }
     }
 
     return Object.assign(
@@ -155,6 +166,29 @@ export class CubeSymbols {
       cube.segments || {},
       cube.preAggregations || {}
     );
+  }
+
+  assignHierarchies(view) {
+    if (!view.hierarchies && view.includedMembers) {
+      const includedCubeNames = R.uniq(view.includedMembers.map(m => m.split('.')[0]));
+
+      for (const cubeName of includedCubeNames) {
+        const { hierarchies } = this.symbols[cubeName]?.cubeObj() || {};
+
+        if (Array.isArray(hierarchies) && hierarchies.length) {
+          const filteredHierarchies = hierarchies.map(it => {
+            const levels = it.levels.filter(level => view.includedMembers.includes(level));
+
+            return {
+              ...it,
+              levels
+            };
+          }).filter(it => it.levels.length);
+
+          view.hierarchies = [...(view.hierarchies || []), ...filteredHierarchies];
+        }
+      }
+    }
   }
 
   /**
@@ -235,10 +269,16 @@ export class CubeSymbols {
 
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
+
+      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(finalIncludes.map((it) => {
+        const split = it.member.split('.');
+        return [split[split.length - 2], split[split.length - 1]].join('.');
+      })))];
     }
   }
 
   applyIncludeMembers(includeMembers, cube, type, errorReporter) {
+    // console.log('>>>@', includeMembers)
     for (const [memberName, memberDefinition] of includeMembers) {
       if (cube[type]?.[memberName]) {
         errorReporter.error(`Included member '${memberName}' conflicts with existing member of '${cube.name}'. Please consider excluding this member.`);

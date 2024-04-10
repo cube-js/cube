@@ -596,6 +596,11 @@ const baseSchema = {
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
+  hierarchies: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    title: Joi.string(),
+    levels: Joi.array().items(Joi.string())
+  })),
 };
 
 const cubeSchema = inherit(baseSchema, {
