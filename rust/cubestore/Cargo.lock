@@ -2547,7 +2547,7 @@ checksum = "348108ab3fba42ec82ff6e9564fc4ca0247bdccdc68dd8af9764bbc79c3c8ffb"
 [[package]]
 name = "librocksdb-sys"
 version = "0.10.0+7.9.2"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#6ce33cfef170fc7b09d1945af3733c2a2a48725f"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#4334e9f8e6c541aaf20afaa57cf6b5c494240bd9"
 dependencies = [
  "bindgen",
  "bzip2-sys",
@@ -2555,6 +2555,7 @@ dependencies = [
  "glob",
  "libc",
  "libz-sys",
+ "tikv-jemalloc-sys",
  "zstd-sys",
 ]
 
@@ -4168,7 +4169,7 @@ dependencies = [
 [[package]]
 name = "rocksdb"
 version = "0.20.1"
-source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#6ce33cfef170fc7b09d1945af3733c2a2a48725f"
+source = "git+https://github.com/cube-js/rust-rocksdb?branch=cubestore#4334e9f8e6c541aaf20afaa57cf6b5c494240bd9"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -4905,6 +4906,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tikv-jemalloc-sys"
+version = "0.5.4+5.3.0-patched"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9402443cb8fd499b6f327e40565234ff34dbda27460c5b47db0db77443dd85d1"
+dependencies = [
+ "cc",
+ "libc",
+]
+
+[[package]]
 name = "time"
 version = "0.1.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5442,7 +5453,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "rand 0.8.4",
  "static_assertions",
 ]
