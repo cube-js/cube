@@ -1653,12 +1653,12 @@ mod tests {
     use crate::metastore::job::JobType;
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
+    use cuberockstore::rocksdb::{Options, DB};
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use rocksdb::{Options, DB};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 

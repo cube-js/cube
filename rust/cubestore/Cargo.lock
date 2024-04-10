@@ -1163,6 +1163,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cuberockstore"
+version = "0.1.0"
+dependencies = [
+ "rocksdb",
+]
+
+[[package]]
 name = "cuberpc"
 version = "0.1.0"
 dependencies = [
@@ -1198,6 +1205,7 @@ dependencies = [
  "csv",
  "ctor",
  "cubehll",
+ "cuberockstore",
  "cuberpc",
  "cubezetasketch",
  "datafusion",
@@ -1238,7 +1246,6 @@ dependencies = [
  "rdkafka",
  "regex",
  "reqwest 0.12.3",
- "rocksdb",
  "rust-s3",
  "sasl2-sys",
  "scopeguard",
@@ -1271,6 +1278,7 @@ dependencies = [
  "async-trait",
  "base64 0.13.0",
  "criterion",
+ "cuberockstore",
  "cubestore",
  "flate2",
  "futures 0.3.26",
@@ -1282,7 +1290,6 @@ dependencies = [
  "log",
  "pretty_assertions",
  "reqwest 0.12.3",
- "rocksdb",
  "scopeguard",
  "serde",
  "serde_derive",

@@ -9,10 +9,12 @@ use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use datafusion::cube_ext;
 
+use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
+use cuberockstore::rocksdb::checkpoint::Checkpoint;
+use cuberockstore::rocksdb::{
+    DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB,
+};
 use log::{info, trace};
-use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
-use rocksdb::checkpoint::Checkpoint;
-use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
@@ -21,6 +23,7 @@ use std::io::{Cursor, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use cuberockstore::rocksdb;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};

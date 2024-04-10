@@ -6,7 +6,7 @@ use crate::table::{Row, TableValue};
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::{ts_seconds, ts_seconds_option};
 use chrono::{DateTime, Duration, Utc};
-use rocksdb::WriteBatch;
+use cuberockstore::rocksdb::WriteBatch;
 use std::cmp::Ordering;
 use std::sync::Arc;
 

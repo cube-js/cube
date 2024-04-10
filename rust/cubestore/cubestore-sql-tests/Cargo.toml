@@ -53,7 +53,7 @@ tar = "0.4.38"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["async_tokio", "html_reports"] }
-rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy", "jemalloc"] }
+cuberockstore = { path = "../cuberockstore" }
 
 [[bench]]
 name = "in_process"
