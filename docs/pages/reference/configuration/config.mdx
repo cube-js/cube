@@ -771,14 +771,36 @@ module.exports = {
       query.filters.push({
         member: 'regions.id',
         operator: 'equals',
-        values: [securityContext.region_id],
-      });
+        values: [securityContext.region_id]
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 
 
+```
+
+</CodeTabs>
+
+Raising an exception would prevent a query from running:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  raise Exception('You shall not pass! 🧙')
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    throw new Error('You shall not pass! 🧙')
+  }
+}
 ```
 
 </CodeTabs>
