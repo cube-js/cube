@@ -1028,6 +1028,8 @@ cube(`Users`, {
 
 Used in both REST and WebSockets API.
 
+Called on each request.
+
 Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization`
 header and sets payload to `securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
@@ -1035,7 +1037,12 @@ information on how to generate these tokens is [here][ref-sec-ctx].
 You can set `securityContext = userContextObj` inside the middleware if you
 want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
-Called on each request.
+<ReferenceBox>
+
+Currently, assigning to security context doesn't work in Python.
+Please [track this issue](https://github.com/cube-js/cube/issues/8133).
+
+</ReferenceBox>
 
 You can use empty `check_auth` function to disable built-in security or
 raise an exception to fail the authentication check.
