@@ -11,7 +11,7 @@ use datafusion::{
     physical_plan::functions::make_scalar_function,
 };
 use itertools::izip;
-use std::{any::type_name, collections::HashMap, sync::Arc, thread};
+use std::{any::type_name, sync::Arc};
 
 // has_any_column_privilege ( [ user name or oid, ] table text or oid, privilege text ) → boolean
 pub fn create_has_any_column_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
