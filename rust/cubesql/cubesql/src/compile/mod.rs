@@ -9976,7 +9976,7 @@ ORDER BY
                     relname,
                     has_any_column_privilege(relname, 'select') \"select\",
                     has_any_column_privilege(relname, 'insert') \"insert\",
-                    has_any_column_privilege(relname, 'delete') \"select\",
+                    has_any_column_privilege(relname, 'delete') \"delete\",
                     has_any_column_privilege(relname, 'update') \"update\"
                 FROM pg_class
                 ORDER BY relname ASC
