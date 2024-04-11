@@ -161,12 +161,10 @@ export class DevServer {
       });
       const files = scaffoldingTemplate.generateFilesByTableNames(req.body.tables, { dataSource });
 
-      const schemaPath = options.schemaPath || 'schema';
-
-      await fs.emptyDir(path.join(schemaPath, 'cubes'));
-      await fs.emptyDir(path.join(schemaPath, 'views'));
+      await fs.emptyDir(path.join(options.schemaPath, 'cubes'));
+      await fs.emptyDir(path.join(options.schemaPath, 'views'));
       
-      await fs.writeFile(path.join(schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
+      await fs.writeFile(path.join(options.schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
 # You can control which measures and dimensions are exposed to BIs or data apps, 
 # as well as the direction of joins between the exposed cubes.
 # You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
@@ -195,7 +193,7 @@ export class DevServer {
 #         prefix: true
 #         includes: 
 #           - city`);
-      await Promise.all(files.map(file => fs.writeFile(path.join(schemaPath, 'cubes', file.fileName), file.content)));
+      await Promise.all(files.map(file => fs.writeFile(path.join(options.schemaPath, 'cubes', file.fileName), file.content)));
 
       res.json({ files });
     }));
