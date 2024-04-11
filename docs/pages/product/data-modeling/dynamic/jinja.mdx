@@ -10,6 +10,20 @@ Jinja is supported in all YAML data model files.
 
 Please check the [Jinja documentation][jinja-docs] for details on Jinja syntax.
 
+<ReferenceBox>
+
+Currently, there's no way to preview the data model code in YAML after applying
+Jinja templates.
+Please [track this issue](https://github.com/cube-js/cube/issues/8134).
+
+As a workaround, you can view the resulting data model in
+[Playground](/product/workspace/playground) and
+[Data Graph](http://localhost:3000/product/workspace/data-model#data-graph).
+You can also introspect the data model using the [`/v1/meta` REST API
+endpoint](/reference/rest-api#v1meta).
+
+</ReferenceBox>
+
 ### Loops
 
 Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
