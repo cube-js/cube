@@ -45,6 +45,7 @@ use crate::{
     },
     sql::SessionState,
 };
+use crate::compile::engine::udf::utils::downcast_string_arg;
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
@@ -234,21 +235,6 @@ macro_rules! downcast_primitive_arg {
                     $NAME,
                     $ARG.data_type(),
                     type_name::<$T>()
-                ))
-            })?
-    }};
-}
-
-macro_rules! downcast_string_arg {
-    ($ARG:expr, $NAME:expr, $T:ident) => {{
-        $ARG.as_any()
-            .downcast_ref::<GenericStringArray<$T>>()
-            .ok_or_else(|| {
-                DataFusionError::Internal(format!(
-                    "could not cast {} from {} to {}",
-                    $NAME,
-                    $ARG.data_type(),
-                    type_name::<GenericStringArray<$T>>()
                 ))
             })?
     }};
@@ -2785,9 +2771,9 @@ pub fn create_has_table_privilege_udf(state: Arc<SessionState>) -> ScalarUDF {
 
                         // TODO: check if table exists
 
-                        match privilege {
-                            "SELECT" => Some(true),
-                            "UPDATE" | "INSERT" | "DELETE" => Some(false),
+                        match privilege.to_lowercase().as_str() {
+                            "select" => Some(true),
+                            "update" | "insert" | "delete" => Some(false),
                             _ => {
                                 return Err(DataFusionError::Execution(format!(
                                     "unrecognized privilege type: \"{}\"",
@@ -3736,20 +3722,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         vol = Volatile
     );
     register_fun_stub!(udf, "greatest", argc = 2);
-    register_fun_stub!(
-        udf,
-        "has_any_column_privilege",
-        tsigs = [
-            [Utf8, Utf8],
-            [Oid, Utf8],
-            [Utf8, Utf8, Utf8],
-            [Utf8, Oid, Utf8],
-            [Oid, Utf8, Utf8],
-            [Oid, Oid, Utf8],
-        ],
-        rettyp = Boolean,
-        vol = Stable
-    );
     register_fun_stub!(
         udf,
         "has_column_privilege",
