@@ -63,7 +63,7 @@ pub fn create_has_any_column_privilege_udf(state: Arc<SessionState>) -> ScalarUD
 
                         for request in requested {
                             match request.as_str() {
-                                "update" | "insert" => {
+                                "update" | "insert" | "delete" => {
                                     result = false;
                                 }
                                 "select" => {}
