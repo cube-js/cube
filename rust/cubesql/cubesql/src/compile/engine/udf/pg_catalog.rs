@@ -1,11 +1,16 @@
-use datafusion::arrow::array::BooleanArray;
-use datafusion::logical_expr::{ScalarUDF, Signature, TypeSignature, Volatility};
-use datafusion::physical_plan::functions::make_scalar_function;
+use crate::{
+    compile::engine::{
+        df::scan::{ArrayRef, DataFusionError, DataType},
+        udf::{common::ReturnTypeFunction, utils::downcast_string_arg},
+    },
+    sql::SessionState,
+};
+use datafusion::{
+    arrow::array::BooleanArray,
+    logical_expr::{ScalarUDF, Signature, TypeSignature, Volatility},
+    physical_plan::functions::make_scalar_function,
+};
 use itertools::izip;
-use crate::compile::engine::df::scan::{ArrayRef, DataFusionError, DataType};
-use crate::compile::engine::udf::common::ReturnTypeFunction;
-use crate::sql::SessionState;
-use crate::compile::engine::udf::utils::downcast_string_arg;
 use std::{any::type_name, collections::HashMap, sync::Arc, thread};
 
 // has_any_column_privilege ( [ user name or oid, ] table text or oid, privilege text ) → boolean
@@ -60,7 +65,7 @@ pub fn create_has_any_column_privilege_udf(state: Arc<SessionState>) -> ScalarUD
                             match request.as_str() {
                                 "update" | "insert" => {
                                     result = false;
-                                },
+                                }
                                 "select" => {}
                                 _ => {
                                     return Err(DataFusionError::Execution(format!(

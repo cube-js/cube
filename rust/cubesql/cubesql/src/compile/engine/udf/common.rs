@@ -39,13 +39,15 @@ use regex::Regex;
 use sha1_smol::Sha1;
 
 use crate::{
-    compile::engine::df::{
-        coerce::{if_coercion, least_coercion},
-        columar::if_then_else,
+    compile::engine::{
+        df::{
+            coerce::{if_coercion, least_coercion},
+            columar::if_then_else,
+        },
+        udf::utils::downcast_string_arg,
     },
     sql::SessionState,
 };
-use crate::compile::engine::udf::utils::downcast_string_arg;
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =

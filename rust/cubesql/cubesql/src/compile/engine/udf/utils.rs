@@ -1,13 +1,10 @@
 use datafusion::{
-    arrow::{
-        array::{
-            new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
-        },
+    arrow::array::{
+        new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder, Float64Array,
+        GenericStringArray, Int32Builder, Int64Array, Int64Builder, IntervalDayTimeBuilder,
+        ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+        StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, TimestampSecondArray, UInt32Builder,
     },
     error::{DataFusionError, Result},
 };
