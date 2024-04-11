@@ -9929,11 +9929,55 @@ ORDER BY
 
         insta::assert_snapshot!(
             "has_table_privilege_default_user",
+            // + testing priveleges in lowercase
             execute_query(
                 "SELECT
                     relname,
-                    has_table_privilege(relname, 'SELECT') \"select\",
-                    has_table_privilege(relname, 'INSERT') \"insert\"
+                    has_table_privilege(relname, 'select') \"select\",
+                    has_table_privilege(relname, 'insert') \"insert\",
+                    has_table_privilege(relname, 'delete') \"delete\"
+                FROM pg_class
+                ORDER BY relname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "has_any_column_privilege",
+            execute_query(
+                "SELECT
+                    relname,
+                    has_any_column_privilege('ovr', relname, 'SELECT') \"select\",
+                    has_any_column_privilege('ovr', relname, 'INSERT') \"insert\",
+                    has_any_column_privilege('ovr', relname, 'DELETE') \"delete\",
+                    has_any_column_privilege('ovr', relname, 'UPDATE') \"update\"
+                FROM pg_class
+                ORDER BY relname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "has_any_column_privilege_default_user",
+            // + testing priveleges in lowercase
+            execute_query(
+                "SELECT
+                    relname,
+                    has_any_column_privilege(relname, 'select') \"select\",
+                    has_any_column_privilege(relname, 'insert') \"insert\",
+                    has_any_column_privilege(relname, 'delete') \"select\",
+                    has_any_column_privilege(relname, 'update') \"update\"
                 FROM pg_class
                 ORDER BY relname ASC
                 "
