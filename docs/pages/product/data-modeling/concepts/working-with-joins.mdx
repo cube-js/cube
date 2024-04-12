@@ -835,199 +835,226 @@ We can then query the cube as follows:
 ## Transitive join pitfalls
 
 Let's consider an example where we have a many-to-many relationship between
-`users` and `organizations` through an `organization_users` cube:
+`users` and `companies` through the `companies_to_users` cube:
 
 <CodeTabs>
 
 ```javascript
 cube(`users`, {
-  // ...
+  sql: `
+    SELECT 1 AS id, 'Ali' AS name UNION ALL
+    SELECT 2 AS id, 'Bob' AS name UNION ALL
+    SELECT 3 AS id, 'Eve' AS name
+  `,
 
   measures: {
     count: {
-      type: `count`,
-    },
+      type: `count`
+    }
   },
 
   dimensions: {
     id: {
       sql: `id`,
       type: `string`,
-      primary_key: true,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 
-cube(`organization_users`, {
-  // ...
+cube(`companies`, {
+  sql: `
+    SELECT 11 AS id, 'Acme Corporation' AS name UNION ALL
+    SELECT 12 AS id, 'Stark Industries' AS name
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `string`,
+      primary_key: true
+    },
+
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  }
+})
+
+cube(`companies_to_users`, {
+  sql: `
+    SELECT 11 AS company_id, 1 AS user_id UNION ALL
+    SELECT 11 AS company_id, 2 AS user_id UNION ALL
+    SELECT 12 AS company_id, 3 AS user_id
+  `,
 
   joins: {
     users: {
       sql: `${CUBE}.user_id = ${users.id}`,
-      relationship: `one_to_many`,
+      relationship: `one_to_many`
     },
 
-    organizations: {
-      sql: `${CUBE}.organization_id = ${organizations.id}`,
-      relationship: `one_to_many`,
-    },
+    companies: {
+      sql: `${CUBE}.company_id = ${companies.id}`,
+      relationship: `one_to_many`
+    }
   },
 
   dimensions: {
     id: {
       // Joins require a primary key, so we'll create one on-the-fly
-      sql: `CONCAT(${CUBE}.user_id, ':', ${CUBE}.organization_id)`,
+      sql: `CONCAT(${CUBE}.user_id, ':', ${CUBE}.company_id)`,
       type: `string`,
-      primary_key: true,
-    },
-  },
-});
-
-cube(`organizations`, {
-  // ...
-
-  dimensions: {
-    id: {
-      sql: `id`,
-      type: `string`,
-      primary_key: true,
-    },
-
-    name: {
-      sql: `category`,
-      type: `string`,
-    },
-  },
-});
+      primary_key: true
+    }
+  }
+})
 ```
 
 ```yaml
 cubes:
   - name: users
-    # ...
-
+    sql: >
+      SELECT 1 AS id, 'Ali' AS name UNION ALL
+      SELECT 2 AS id, 'Bob' AS name UNION ALL
+      SELECT 3 AS id, 'Eve' AS name
+ 
     measures:
       - name: count
         type: count
-
+ 
     dimensions:
       - name: id
         sql: id
         type: string
         primary_key: true
-
-  - name: organization_users
-    # ...
-
+ 
+  - name: companies
+    sql: >
+      SELECT 11 AS id, 'Acme Corporation' AS name UNION ALL
+      SELECT 12 AS id, 'Stark Industries' AS name
+ 
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+ 
+      - name: name
+        sql: name
+        type: string
+ 
+  - name: companies_to_users
+    sql: >
+      SELECT 11 AS company_id, 1 AS user_id UNION ALL
+      SELECT 11 AS company_id, 2 AS user_id UNION ALL
+      SELECT 12 AS company_id, 3 AS user_id
+ 
     joins:
       - name: users
         sql: "{CUBE}.user_id = {users.id}"
         relationship: one_to_many
-
-      - name: organizations
-        sql: "{CUBE}.organization_id = {organizations.id}"
+ 
+      - name: companies
+        sql: "{CUBE}.company_id = {companies.id}"
         relationship: one_to_many
-
+ 
     dimensions:
       - name: id
         # Joins require a primary key, so we'll create one on-the-fly
-        sql: "CONCAT({CUBE}.user_id, ':', {CUBE}.organization_id)"
+        sql: "CONCAT({CUBE}.user_id, ':', {CUBE}.company_id)"
         type: string
         primary_key: true
-
-  - name: organizations
-    # ...
-
-    dimensions:
-      - name: id
-        sql: id
-        type: string
-        primary_key: true
-
-      - name: name
-        sql: category
-        type: string
 ```
 
 </CodeTabs>
 
-Let's try and execute a query:
+With this data model, querying `users.count` as a measure and `companies.name`
+as a dimension would yield the following error: `Can't find join path to join
+'users', 'companies'`.
 
-```json
-{
-  "measures": ["users.count"],
-  "dimensions": ["organizations.name"]
-}
-```
+The root cause is that joins are [directed](#direction-of-joins) and there's no
+join path that goes *by join definitions in the data model* from `users` to
+`companies` or in the opposite direction.
 
-You'll get an error:
-`Error: Can't find join path to join 'users', 'organizations'`. The problem is
-that joins are directed and if we try to connect `users` and `organizations`
-there's no path from `users` to `organizations` or either from `organizations`
-to `users`. One possible solution is to move the `users → organization_users`
-join from `organization_users` cube to `users`, although this affects the query
-semantics and thus the final results:
+In [Data Graph][ref-data-graph], you can see that both `users` and `companies`
+are to the right of `companies_to_users`, meaning that there's no way to go
+from `users` to `companies` moving left to right or right to left:
+
+<Diagram src="https://ucarecdn.com/c7374e2c-7359-4c13-adee-74cb32623dc6/" />
+
+One possible solution is to move one of two joins from the `companies_to_users`
+cube to either `users` or `companies` cube. Please note that it would affect
+the query semantics and thus the final result:
 
 <CodeTabs>
 
 ```javascript
 cube(`users`, {
-  // ...
-
   joins: {
-    organization_users: {
-      sql: `${organization_users.user_id} = ${users.id}`,
-      relationship: `one_to_many`,
-    },
-  },
+    companies_to_users: {
+      sql: `${CUBE}.id = ${companies_to_users}.user_id`,
+      relationship: `one_to_many`
+    }
+  }
 
-  measures: {
-    type: `count`,
-  },
-});
-
-cube(`organization_users`, {
   // ...
+})
 
+cube(`companies_to_users`, {
   joins: {
-    organizations: {
-      sql: `${organization_users.organization_id} = ${organizations.id}`,
-      relationship: `one_to_many`,
-    },
-  },
-});
+    // users: {
+    //   sql: `${CUBE}.user_id = ${users.id}`,
+    //   relationship: `one_to_many`
+    // },
+
+    companies: {
+      sql: `${CUBE}.company_id = ${companies.id}`,
+      relationship: `one_to_many`
+    }
+  }
+
+  // ...
+})
 ```
 
 ```yaml
 cubes:
-  - name: Users
-    # ...
+  - name: users
 
     joins:
-      - name: organization_users
-        sql: "{organization_users.user_id} = {users.id}"
+      - name: companies_to_users
+        sql: "{CUBE}.id = {companies_to_users}.user_id"
         relationship: one_to_many
 
-    measures:
-      - name: type
-        type: count
-
-  - name: organization_users
     # ...
 
+  - name: companies_to_users
+
     joins:
-      - name: organizations
-        sql: "{organization_users.organization_id} = {organizations.id}"
+      # - name: users
+      #   sql: "{CUBE}.user_id = {users.id}"
+      #   relationship: one_to_many
+ 
+      - name: companies
+        sql: "{CUBE}.company_id = {companies.id}"
         relationship: one_to_many
+
+    # ...
 ```
 
 </CodeTabs>
 
+Now there's a join path that goes *by join definitions in the data model* from
+`users` to `companies_to_users` to `companies`. [Data Graph][ref-data-graph]
+also shows that you can reach `companies` from `cubes` by going left to right.
+
+<Diagram src="https://ucarecdn.com/0736a570-c1c2-45b5-a806-e90a216ce202/" />
+
 [ref-schema-ref-view]: /reference/data-model/view
 [ref-schema-ref-joins]: /reference/data-model/joins
-[ref-schema-ref-joins-relationship]:
-  /reference/data-model/joins#relationship
-[self-many-to-many-no-assoc-table]:
-  #many-to-many-relationship-without-an-associative-table
-[self-join-direction]:
-  /product/data-modeling/concepts/working-with-joins#directions-of-joins
+[ref-schema-ref-joins-relationship]: /reference/data-model/joins#relationship
+[self-many-to-many-no-assoc-table]: #many-to-many-relationship-without-an-associative-table
+[self-join-direction]: /product/data-modeling/concepts/working-with-joins#directions-of-joins
+[ref-data-graph]: /product/workspace/data-model#data-graph
