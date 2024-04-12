@@ -33,7 +33,8 @@ query {
 desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
 format, e.g., `America/Los_Angeles`.
 - **`renewQuery` (`Boolean`):** If `renewQuery` is set to `true`, Cube will renew all `refreshKey` for queries and query results in the foreground. The default value is `false`.
-- **`ungrouped` (`Boolean`):** If `ungrouped` is set to `true`, no `GROUP BY` statement will be added to the query. Instead, the raw results after filtering and joining will be returned without grouping. By default, ungrouped queries require a primary key as a dimension of every cube involved in the query for security purposes. For an ungrouped query, measures will be rendered without aggregation and time dimensions will be truncated as usual.
+- **`ungrouped` (`Boolean`):** If set to `true`, Cube will run an
+[ungrouped query][ref-ungrouped-query].
 
 [ref-recipe-pagination]: /guides/recipes/queries/pagination
 
@@ -116,3 +117,4 @@ format, e.g., `America/Los_Angeles`.
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-row-limit]: /product/data-modeling/queries#row-limit
 [ref-time-zone]: /product/data-modeling/queries#time-zone
+[ref-ungrouped-query]: /product/data-modeling/queries#ungrouped-query

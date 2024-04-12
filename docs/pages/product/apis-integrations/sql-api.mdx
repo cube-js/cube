@@ -67,6 +67,45 @@ You can also use
 [`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
 to configure [custom authentication][ref-sql-api-auth].
 
+#### Example
+
+The following Docker Compose file will run Cube with the SQL API enabled on
+port 15432, accessible using `user` as the user name, `pass` as the password,
+and any string as the database name:
+
+
+```yaml filename="docker-compose.yml"
+version: "2.2"
+ 
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_API_SECRET=SECRET
+
+      - CUBEJS_DB_USER=cube
+      - CUBEJS_DB_PASS=12345
+      - CUBEJS_DB_HOST=demo-db-examples.cube.dev
+      - CUBEJS_DB_TYPE=postgres
+
+      - CUBEJS_PG_SQL_PORT=15432  # SQL API credential
+      - CUBEJS_SQL_USER=user      # SQL API credential
+      - CUBEJS_SQL_PASSWORD=pass  # SQL API credential
+    volumes:
+      - .:/cube/conf
+```
+
+After running it with `docker compose up`, you can use the [`psql`
+utility][link-psql] to test the connection:
+
+```bash
+PGPASSWORD=pass psql -h localhost -p 15432 -U user cube
+```
+
 ### Cube Cloud
 
 **SQL API is enabled by default.** You can find credentials for the SQL API on
@@ -603,3 +642,4 @@ WHERE is_completed = true
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [ref-ref-sql-api]: /reference/sql-api
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types
+[link-psql]: https://www.postgresql.org/docs/current/app-psql.html

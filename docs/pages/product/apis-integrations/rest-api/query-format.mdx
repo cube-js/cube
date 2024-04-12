@@ -57,13 +57,8 @@ format, e.g., `America/Los_Angeles`.
   > [`refreshKey.every`][ref-schema-ref-preaggs-refreshkey-every] value together
   > with `renewQuery` to achieve immediate consistency can lead to endless
   > refresh loops and overall system instability.
-- `ungrouped`: If `ungrouped` is set to `true` no `GROUP BY` statement will be
-  added to the query. Instead, the raw results after filtering and joining will
-  be returned without grouping. By default `ungrouped` queries require a primary
-  key as a dimension of every cube involved in the query for security purposes.
-  In case of `ungrouped` query measures will be rendered as underlying `sql` of
-  measures without aggregation and time dimensions will be truncated as usual
-  however not grouped by.
+- `ungrouped`: If set to `true`, Cube will run an [ungrouped
+query][ref-ungrouped-query].
 
 ```json
 {
@@ -619,3 +614,4 @@ refer to its documentation for more examples.
 [ref-time-zone]: /product/data-modeling/queries#time-zone
 [ref-compare-date-range]: /product/data-modeling/queries#compare-date-range-query
 [ref-total-query]: /product/data-modeling/queries#total-query
+[ref-ungrouped-query]: /product/data-modeling/queries#ungrouped-query

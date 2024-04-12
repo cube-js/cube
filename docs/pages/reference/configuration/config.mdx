@@ -771,22 +771,44 @@ module.exports = {
       query.filters.push({
         member: 'regions.id',
         operator: 'equals',
-        values: [securityContext.region_id],
-      });
+        values: [securityContext.region_id]
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 
 
 ```
 
 </CodeTabs>
 
+Raising an exception would prevent a query from running:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  raise Exception('You shall not pass! 🧙')
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    throw new Error('You shall not pass! 🧙')
+  }
+}
+```
+
+</CodeTabs>
+
 ### `allow_ungrouped_without_primary_key`
 
-Setting `allow_ungrouped_without_primary_key` to `True` disables primary key inclusion
-check for `ungrouped` queries.
+Setting `allow_ungrouped_without_primary_key` to `True` disables the primary
+key inclusion check for [ungrouped queries][ref-ungrouped-query].
 
 <CodeTabs>
 
@@ -1006,6 +1028,8 @@ cube(`Users`, {
 
 Used in both REST and WebSockets API.
 
+Called on each request.
+
 Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization`
 header and sets payload to `securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
@@ -1013,7 +1037,12 @@ information on how to generate these tokens is [here][ref-sec-ctx].
 You can set `securityContext = userContextObj` inside the middleware if you
 want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
-Called on each request.
+<ReferenceBox>
+
+Currently, assigning to security context doesn't work in Python.
+Please [track this issue](https://github.com/cube-js/cube/issues/8133).
+
+</ReferenceBox>
 
 You can use empty `check_auth` function to disable built-in security or
 raise an exception to fail the authentication check.
@@ -1317,3 +1346,4 @@ If not defined, Cube will lookup for environment variable
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
+[ref-ungrouped-query]: /product/data-modeling/queries#ungrouped-query
