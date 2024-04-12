@@ -105,6 +105,7 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.quotes.identifiers = '`';
     return templates;
   }
 }
