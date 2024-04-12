@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.12](https://github.com/cube-js/cube/compare/v0.35.11...v0.35.12) (2024-04-12)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Unable to detect a Project Id in the current environment for GCS export bucket ([03ca8fa](https://github.com/cube-js/cube/commit/03ca8fa9b7222ddaf0d52c1ead221ac26827c054))
+
+
+
+
+
 ## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
 
 **Note:** Version bump only for package @cubejs-backend/snowflake-driver
