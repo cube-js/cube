@@ -40,7 +40,8 @@ import {
   QueryTablesResult,
   QueryColumnsResult,
   TableMemoryData,
-  PrimeryKeysQueryResult,
+  PrimaryKeysQueryResult,
+  ForeignKeysQueryResult,
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -192,7 +193,11 @@ export abstract class BaseDriver implements DriverInterface {
     return null;
   }
 
-  protected async primaryKeys(): Promise<PrimeryKeysQueryResult[]> {
+  protected foreignKeysQuery(): string | null {
+    return null;
+  }
+
+  protected async primaryKeys(): Promise<PrimaryKeysQueryResult[]> {
     const query = this.primaryKeysQuery();
 
     if (!query) {
@@ -200,7 +205,21 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     try {
-      return (await this.query(query) as PrimeryKeysQueryResult[]);
+      return (await this.query(query) as PrimaryKeysQueryResult[]);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  protected async foreignKeys(): Promise<ForeignKeysQueryResult[]> {
+    const query = this.foreignKeysQuery();
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query(query) as ForeignKeysQueryResult[]);
     } catch (_) {
       return [];
     }
@@ -349,17 +368,39 @@ export abstract class BaseDriver implements DriverInterface {
     return sortByKeys(result);
   }
 
-  public async tablesSchema() {
+  public tablesSchema() {
     const query = this.informationSchemaQuery();
 
-    const primaryKeys = await this.primaryKeys();
+    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+  }
+
+  // Extended version of tablesSchema containing primary and foreign keys
+  public async tablesSchemaV2() {
+    const query = this.informationSchemaQuery();
+
     const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    const primaryKeys = await this.primaryKeys();
+    const foreignKeys = await this.foreignKeys();
 
     for (const pk of primaryKeys) {
       if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
         tablesSchema[pk.table_schema][pk.table_name] = tablesSchema[pk.table_schema][pk.table_name].map((it: any) => {
           if (it.name === pk.column_name) {
             it.attributes = ['primaryKey'];
+          }
+          return it;
+        });
+      }
+    }
+
+    for (const foreignKey of foreignKeys) {
+      if (Array.isArray(tablesSchema?.[foreignKey.table_schema]?.[foreignKey.table_name])) {
+        tablesSchema[foreignKey.table_schema][foreignKey.table_name] = tablesSchema[foreignKey.table_schema][foreignKey.table_name].map((it: any) => {
+          if (it.name === foreignKey.column_name) {
+            it.foreignKeys = [...(it.foreignKeys || []), {
+              targetTable: foreignKey.target_table,
+              targetColumn: foreignKey.target_column
+            }];
           }
           return it;
         });

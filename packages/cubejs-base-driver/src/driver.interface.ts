@@ -181,13 +181,26 @@ export type QueryTablesResult = { schema_name: string, table_name: string };
 // eslint-disable-next-line camelcase
 export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
 
-export type PrimeryKeysQueryResult = {
+export type PrimaryKeysQueryResult = {
   // eslint-disable-next-line camelcase
   table_schema: string
   // eslint-disable-next-line camelcase
   table_name: string
   // eslint-disable-next-line camelcase
   column_name: string
+};
+
+export type ForeignKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+  // eslint-disable-next-line camelcase
+  target_table: string
+  // eslint-disable-next-line camelcase
+  target_column: string
 };
 
 export interface DriverInterface {

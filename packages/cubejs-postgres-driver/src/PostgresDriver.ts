@@ -142,7 +142,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
-  protected primaryKeysQuery() {
+  protected primaryKeysQuery(): string | null {
     return `SELECT 
       c.table_schema as ${this.quoteIdentifier('table_schema')}, 
       c.table_name as ${this.quoteIdentifier('table_name')}, 
@@ -152,6 +152,24 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
       AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
     WHERE constraint_type = 'PRIMARY KEY'`;
+  }
+
+  protected foreignKeysQuery(): string | null {
+    return `SELECT
+        tc.table_schema as ${this.quoteIdentifier('table_schema')},
+        tc.table_name as ${this.quoteIdentifier('table_name')},
+        kcu.column_name as ${this.quoteIdentifier('column_name')},
+        ccu.table_name as ${this.quoteIdentifier('target_table')},
+        ccu.column_name as ${this.quoteIdentifier('target_column')},
+        constraint_type
+      FROM
+        information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS ccu
+        ON ccu.constraint_name = tc.constraint_name
+      WHERE
+         constraint_type = 'FOREIGN KEY'`;
   }
 
   /**
