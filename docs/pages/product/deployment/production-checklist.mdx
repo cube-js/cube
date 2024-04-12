@@ -64,18 +64,16 @@ the [instructions here][ref-caching-cubestore] to set it up.
 
 Depending on your database, Cube may need to "stage" pre-aggregations inside
 your database first before ingesting them into Cube Store. In this case, Cube
-will require write access to the `prod_pre_aggregations` schema inside your
-database. The schema name can be modified by the
-[`CUBEJS_PRE_AGGREGATIONS_SCHEMA`][ref-conf-ref-env-preaggs-schema] environment
-variable; see the [Environment Variables reference][ref-env-vars] for more
-details.
+will require write access to a dedicated schema inside your database.
+The schema name is `prod_pre_aggregations` by default. It can be set using the
+[`pre_aggregations_schema` configration option][ref-conf-preaggs-schema].
 
 <InfoBox>
 
 You may consider enabling an export bucket which allows Cube to build large
 pre-aggregations in a much faster manner. It is currently supported for
-BigQuery, Redshift and Snowflake. Check [the relevant documentation for your
-configured database][ref-config-connect-db] to set it up.
+BigQuery, Redshift, Snowflake, and some other data sources. Check [the relevant
+documentation for your configured database][ref-config-connect-db] to set it up.
 
 </InfoBox>
 
@@ -155,8 +153,7 @@ performance numbers can differ as it has different Cube runtime.
 [ref-caching-cubestore]: /product/caching/running-in-production
 [ref-conf-ref-env-cachequeue-driver]:
   /reference/configuration/environment-variables#cubejs_cache_and_queue_driver
-[ref-conf-ref-env-preaggs-schema]:
-  /reference/configuration/environment-variables#cubejs_pre_aggregations_schema
+[ref-conf-preaggs-schema]: /reference/configuration/config#pre_aggregations_schema
 [ref-env-vars]: /reference/configuration/environment-variables
 [ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
 [ref-sec-ctx]: /product/auth/context
