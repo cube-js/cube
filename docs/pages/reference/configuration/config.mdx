@@ -546,19 +546,27 @@ module.exports = {
 
 ### `pre_aggregations_schema`
 
-Schema name to use for storing pre-aggregations. Either string or function
-could be passed. Providing a function allows to dynamically set the
-pre-aggregation schema name depending on the security context.
+Database schema name to use for storing pre-aggregations.
+
+Either string or function can be passed. Providing a function allows to set
+the schema name dynamically depending on the security context.
 
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
 and `prod_pre_aggregations` in production.
 
-Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
+Can be also set via the `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable.
 
 <WarningBox>
 
-We **strongly** recommend using different pre-aggregation schemas in development
-and production environments to avoid pre-aggregation tables clashes.
+It's **strongly** recommended to use different pre-aggregation schemas in
+development and production environments to avoid pre-aggregation table clashes.
+
+</WarningBox>
+
+<WarningBox>
+
+Cube will wipe out the contents of this database schema before use. It shall
+be used exclusively by Cube and shall not be shared with any application.
 
 </WarningBox>
 
