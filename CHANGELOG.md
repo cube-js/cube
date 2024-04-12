@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.12](https://github.com/cube-js/cube/compare/v0.35.11...v0.35.12) (2024-04-12)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Unable to detect a Project Id in the current environment for GCS export bucket ([03ca8fa](https://github.com/cube-js/cube/commit/03ca8fa9b7222ddaf0d52c1ead221ac26827c054))
+
+
+### Reverts
+
+* Revert "fix(server-core): Handle schemaPath default value correctly everywhere (#8131)" ([22a6f8b](https://github.com/cube-js/cube/commit/22a6f8b5e959db02f8eab89e2a9e873ef0a8ce87)), closes [#8131](https://github.com/cube-js/cube/issues/8131)
+
+
+
+
+
 ## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
 
 
