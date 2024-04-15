@@ -1082,7 +1082,7 @@ export class BaseQuery {
     const fromSubQuery = fromMeasures && this.newSubQuery({
       measures: fromMeasures,
       // TODO get rid of this postAggregate filter
-      dimensions: fromDimensions, //.filter(d => !this.newDimension(d).isPostAggregate()),
+      dimensions: fromDimensions, // .filter(d => !this.newDimension(d).isPostAggregate()),
       postAggregateDimensions: withQuery.postAggregateDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
