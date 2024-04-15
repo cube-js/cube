@@ -166,11 +166,13 @@ export async function runEnvironment(
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
       CUBEJS_CUBESTORE_PORT: process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${store.port}`,
+      CUBEJS_SCHEMA_PATH: 'schema'
     });
     if (mappedDataPort) {
       cliEnv.withEnvironment({
         CUBEJS_DB_HOST: '127.0.0.1',
         CUBEJS_DB_PORT: `${mappedDataPort}`,
+        CUBEJS_SCHEMA_PATH: 'schema'
       });
     }
     await cliEnv.up();
