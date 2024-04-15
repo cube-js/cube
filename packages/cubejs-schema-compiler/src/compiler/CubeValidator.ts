@@ -101,7 +101,7 @@ const BaseDimensionWithoutSubQuery = {
       label: Joi.string().required()
     })
   ]),
-  meta: Joi.any()
+  meta: Joi.any(),
 };
 
 const BaseDimension = Object.assign({
@@ -440,7 +440,29 @@ const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
 );
 
-const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(
+const postAggregateMeasureType = Joi.string().valid(
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
+  'rank'
+);
+
+const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.postAggregate'), [
+  {
+    is: true,
+    then: inherit(BaseMeasure, {
+      postAggregate: Joi.boolean().strict(),
+      type: postAggregateMeasureType.required(),
+      sql: Joi.func(), // TODO .required(),
+      groupBy: Joi.func(),
+      reduceBy: Joi.func(),
+      addGroupBy: Joi.func(),
+      // TODO validate for order window functions
+      orderBy: Joi.array().items(Joi.object().keys({
+        sql: Joi.func().required(),
+        dir: Joi.string().valid('asc', 'desc')
+      })),
+    })
+  }
+]).conditional(
   Joi.ref('.type'), [
     {
       is: 'count',
@@ -534,6 +556,12 @@ const baseSchema = {
     }),
     inherit(BaseDimension, {
       sql: Joi.func().required()
+    }),
+    inherit(BaseDimension, {
+      postAggregate: Joi.boolean().valid(true),
+      type: Joi.any().valid('number').required(),
+      sql: Joi.func().required(),
+      addGroupBy: Joi.func(),
     })
   )),
   segments: SegmentsSchema,
