@@ -13,6 +13,8 @@ export type SegmentDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
+  // TODO should we have it here?
+  postAggregate?: boolean,
 };
 
 export type DimensionDefinition = {
@@ -21,6 +23,7 @@ export type DimensionDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
+  postAggregate?: boolean,
 };
 
 export type MeasureDefinition = {
@@ -30,7 +33,14 @@ export type MeasureDefinition = {
   rollingWindow?: any
   filters?: any
   primaryKey?: true,
-  drillFilters?: any
+  drillFilters?: any,
+  postAggregate?: boolean,
+  groupBy?: Function,
+  reduceBy?: Function,
+  addGroupBy?: Function,
+  groupByReferences?: string[],
+  reduceByReferences?: string[],
+  addGroupByReferences?: string[],
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -72,6 +82,30 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareMembers(cube.measures, cube, errorReporter);
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
+
+    this.evaluatePostAggregateReferences(cube.name, cube.measures);
+    this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+  }
+
+  private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
+    if (!obj) {
+      return;
+    }
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const member of Object.values(obj)) {
+      if (member.postAggregate) {
+        if (member.groupBy) {
+          member.groupByReferences = this.evaluateReferences(cubeName, member.groupBy);
+        }
+        if (member.reduceBy) {
+          member.reduceByReferences = this.evaluateReferences(cubeName, member.reduceBy);
+        }
+        if (member.addGroupBy) {
+          member.addGroupByReferences = this.evaluateReferences(cubeName, member.addGroupBy);
+        }
+      }
+    }
   }
 
   protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
