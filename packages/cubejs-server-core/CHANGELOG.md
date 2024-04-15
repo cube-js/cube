@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+
+### Bug Fixes
+
+* **server-core:** Handle schemaPath default value correctly everywhere (refix) ([#8152](https://github.com/cube-js/cube/issues/8152)) ([678f17f](https://github.com/cube-js/cube/commit/678f17f2ef5a2cf38b28e3c095a721f1cd38fb56))
+
+
+
+
+
 ## [0.35.13](https://github.com/cube-js/cube/compare/v0.35.12...v0.35.13) (2024-04-15)
 
 **Note:** Version bump only for package @cubejs-backend/server-core
