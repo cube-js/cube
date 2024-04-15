@@ -964,7 +964,16 @@ export class BaseQuery {
         allMemberChildren,
         withQueries
       ));
-    return { multipliedMeasures, regularMeasures, cumulativeMeasures, postAggregateMembers, withQueries };
+    const usedWithQueries = {};
+    postAggregateMembers.forEach(m => this.collectUsedWithQueries(usedWithQueries, m));
+
+    return {
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+      postAggregateMembers,
+      withQueries: withQueries.filter(q => usedWithQueries[q.alias])
+    };
   }
 
   collectAllMemberChildren(context) {
@@ -1018,6 +1027,11 @@ export class BaseQuery {
     withQueries.push(subQuery);
 
     return subQuery;
+  }
+
+  collectUsedWithQueries(usedQueries, member) {
+    usedQueries[member.alias] = true;
+    member.memberFrom?.forEach(m => this.collectUsedWithQueries(usedQueries, m));
   }
 
   childrenPostAggregateContext(memberPath, queryContext) {
