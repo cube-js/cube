@@ -111,7 +111,6 @@ impl QueryPlanner {
     async fn select_to_plan(
         &self,
         stmt: &ast::Statement,
-        _q: &Box<ast::Query>,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
@@ -175,7 +174,7 @@ impl QueryPlanner {
                     }
                 }
 
-                self.select_to_plan(stmt, q, qtrace, span_id.clone()).await
+                self.select_to_plan(stmt, qtrace, span_id.clone()).await
             }
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -997,12 +996,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
-        let ast::Statement::Query(query) = stmt else {
-            return Err(CompilationError::internal(
-                "statement is unexpectedly not a Query".to_string(),
-            ));
-        };
-        let plan = self.select_to_plan(stmt, query, qtrace, span_id).await?;
+        let plan = self.select_to_plan(stmt, qtrace, span_id).await?;
         let QueryPlan::DataFusionSelect(flags, plan, ctx) = plan else {
             return Err(CompilationError::internal(
                 "unable to build DataFusion plan from Query".to_string(),
