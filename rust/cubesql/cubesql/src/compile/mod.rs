@@ -1738,6 +1738,7 @@ mod tests {
     use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
     use regex::Regex;
+    use std::env;
 
     use super::{
         test::{get_test_session, get_test_tenant_ctx},
@@ -1745,6 +1746,7 @@ mod tests {
     };
     use crate::{
         compile::{
+            engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
             test::{
                 get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
