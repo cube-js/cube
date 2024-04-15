@@ -71,7 +71,6 @@ jobs:
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
-          CUBESQL_REWRITE_ENGINE: true
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
@@ -83,37 +82,6 @@ jobs:
           verbose: true
           flags: cubesql
           fail_ci_if_error: false
-
-  unit_legacy:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    name: Unit (Legacy)
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          # pulls all commits (needed for codecov)
-          fetch-depth: 2
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2023-12-13
-          override: true
-          components: rustfmt
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ./rust/cubesql -> target
-          # default key
-          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu-16
-      - name: Unit tests (Legacy Engine)
-        env:
-          CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
-          CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
-          CUBESQL_SQL_PUSH_DOWN: true
-          CUBESQL_REWRITE_CACHE: true
-        run: cd rust/cubesql && cargo test
 
   native_linux:
     needs: [lint]
