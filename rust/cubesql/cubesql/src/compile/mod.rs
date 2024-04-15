@@ -7,7 +7,7 @@ use datafusion::{
         SessionContext as DFSessionContext,
     },
     logical_plan::{
-        plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
+        plan::{Analyze, Explain, Extension, ToStringifiedPlan},
         DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     optimizer::{
@@ -26,19 +26,18 @@ use log::warn;
 use serde::Serialize;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
-    backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
+    backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
     sync::Arc, time::SystemTime,
 };
 
 use self::{
     builder::*,
-    context::*,
     engine::{
         context::VariablesProvider,
         df::{
             optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
-            scan::{CubeScanNode, MemberField},
+            scan::{CubeScanNode},
         },
         information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
@@ -49,7 +48,6 @@ use self::{
     rewrite::converter::LogicalPlanToLanguageConverter,
 };
 use crate::{
-    compile::engine::df::scan::CubeScanOptions,
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
@@ -113,7 +111,7 @@ impl QueryPlanner {
     async fn select_to_plan(
         &self,
         stmt: &ast::Statement,
-        q: &Box<ast::Query>,
+        _q: &Box<ast::Query>,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
