@@ -1,4 +1,4 @@
-use std::{any::type_name, collections::HashMap, sync::Arc, thread};
+use std::{any::type_name, sync::Arc, thread};
 
 use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
@@ -11,7 +11,7 @@ use datafusion::{
             TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
             UInt32Builder,
         },
-        compute::{cast, cast_with_options, concat, CastOptions},
+        compute::{cast, concat},
         datatypes::{
             DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
             IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
