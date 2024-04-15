@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/questdb-driver",
   "description": "Cube.js QuestDB database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.11",
+  "version": "0.35.13",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.2",
-    "@cubejs-backend/schema-compiler": "^0.35.11",
+    "@cubejs-backend/schema-compiler": "^0.35.13",
     "@cubejs-backend/shared": "^0.35.2",
     "@types/pg": "^8.6.0",
     "moment": "^2.24.0",
@@ -38,7 +38,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/testing-shared": "^0.35.11",
+    "@cubejs-backend/testing-shared": "^0.35.13",
     "testcontainers": "^8.4.0",
     "typescript": "~5.2.2"
   },
