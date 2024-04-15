@@ -117,7 +117,6 @@ export async function runEnvironment(
   compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
   compose.withEnvironment({
     CUBEJS_TELEMETRY: 'false',
-    CUBEJS_SCHEMA_PATH: 'schema'
   });
 
   const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;

@@ -22,7 +22,7 @@ export function getComposePath(type: string, isLocal: boolean): [path: string, f
   const volumes = [
     './cube.js:/cube/conf/cube.js',
     './package.json:/cube/conf/package.json',
-    './schema/ecommerce.yaml:/cube/conf/schema/ecommerce.yaml',
+    './model/ecommerce.yaml:/cube/conf/model/ecommerce.yaml',
   ];
   const compose: any = {
     version: '2.2',

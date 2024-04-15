@@ -230,6 +230,7 @@ export type ServerCoreInitializedOptions = Required<
   'telemetry' |
   'dashboardAppPath' |
   'dashboardAppPort' |
+  'schemaPath' |
   'driverFactory' |
   'dialectFactory' |
   'externalDriverFactory' |
