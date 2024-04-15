@@ -960,7 +960,12 @@ export class BaseQuery {
       .map(m => m.measure || m.dimension)
       .map(m => this.postAggregateWithQueries(
         m,
-        { dimensions: this.dimensions.map(d => d.dimension), postAggregateDimensions: this.dimensions.map(d => d.dimension), filters: this.filters },
+        {
+          dimensions: this.dimensions.map(d => d.dimension),
+          postAggregateDimensions: this.dimensions.map(d => d.dimension),
+          // TODO accessing filters directly from options might miss some processing logic
+          filters: this.options.filters
+        },
         allMemberChildren,
         withQueries
       ));
@@ -992,17 +997,19 @@ export class BaseQuery {
   }
 
   postAggregateWithQueries(member, queryContext, memberChildren, withQueries) {
+    // TODO calculate based on remove_filter in future
+    const wouldNodeApplyFilters = !memberChildren[member];
     let memberFrom = memberChildren[member]
-      ?.map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, queryContext), memberChildren, withQueries));
+      ?.map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, queryContext, wouldNodeApplyFilters), memberChildren, withQueries));
     const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
     const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isPostAggregate()) };
     // TODO is calling postAggregateWithQueries twice optimal? If so make sure to keep only used CTE
     memberFrom = memberChildren[member] &&
       R.uniqBy(
         f => f.alias,
-        memberChildren[member].map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, unionDimensionsContext), memberChildren, withQueries))
+        memberChildren[member].map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, unionDimensionsContext, wouldNodeApplyFilters), memberChildren, withQueries))
       );
-    const selfContext = this.selfPostAggregateContext(member, queryContext, unionDimensionsContext);
+    const selfContext = this.selfPostAggregateContext(member, queryContext, wouldNodeApplyFilters);
     const subQuery = {
       ...selfContext,
       ...(this.cubeEvaluator.isMeasure(member) ? { measures: [member] } : { measures: [], dimensions: R.uniq(selfContext.dimensions.concat(member)) }),
@@ -1034,7 +1041,7 @@ export class BaseQuery {
     member.memberFrom?.forEach(m => this.collectUsedWithQueries(usedQueries, m));
   }
 
-  childrenPostAggregateContext(memberPath, queryContext) {
+  childrenPostAggregateContext(memberPath, queryContext, wouldNodeApplyFilters) {
     let member;
     if (this.cubeEvaluator.isMeasure(memberPath)) {
       member = this.newMeasure(memberPath);
@@ -1046,10 +1053,18 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
+    if (wouldNodeApplyFilters) {
+      const filterMeasuresAndDimensions = this.extractDimensionsAndMeasures(queryContext.filters);
+      queryContext = {
+        ...queryContext,
+        dimensions: R.uniq(queryContext.dimensions.concat(filterMeasuresAndDimensions.map(m => m.dimension).filter(m => !!m))),
+        measures: R.uniq(queryContext.dimensions.concat(filterMeasuresAndDimensions.map(m => m.measures).filter(m => !!m))),
+      };
+    }
     return queryContext;
   }
 
-  selfPostAggregateContext(memberPath, queryContext, unionDimensionsContext) {
+  selfPostAggregateContext(memberPath, queryContext, wouldNodeApplyFilters) {
     let member;
     if (this.cubeEvaluator.isMeasure(memberPath)) {
       member = this.newMeasure(memberPath);
@@ -1072,6 +1087,13 @@ export class BaseQuery {
       queryContext = {
         ...queryContext,
         postAggregateDimensions: R.intersection(queryContext.postAggregateDimensions, memberDef.groupByReferences)
+      };
+    }
+    if (!wouldNodeApplyFilters) {
+      queryContext = {
+        ...queryContext,
+        originalFilters: queryContext.filters,
+        filters: undefined,
       };
     }
     return queryContext;
