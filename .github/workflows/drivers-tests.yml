@@ -10,6 +10,8 @@ on:
       - 'packages/cubejs-testing-drivers/**'
       - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-server-core/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
@@ -31,6 +33,8 @@ on:
       - 'packages/cubejs-testing-drivers/**'
       - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-server-core/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
