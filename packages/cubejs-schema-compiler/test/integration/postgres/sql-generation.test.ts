@@ -167,6 +167,9 @@ describe('SQL Generation', () => {
           post_aggregate: true,
           sql: \`\${visitor_revenue} + 0.1 * \${date_rank}\`,
           type: 'number',
+          filters: [{
+            sql: \`\${date_rank} <= 3\`
+          }]
         },
         customer_revenue: {
           post_aggregate: true,
@@ -2345,6 +2348,34 @@ describe('SQL Generation', () => {
     }, {
       visitors__percentage_of_total: 70,
       visitors__revenue: '1400',
+      visitors__source: null
+    }]
+  ));
+
+  it('post aggregate percentage of total filtered', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'some'
+    }, {
+      visitors__percentage_of_total: 40,
+      visitors__revenue: '400',
       visitors__source: null
     }]
   ));
