@@ -63,6 +63,13 @@ export class BaseDimension {
     return [this];
   }
 
+  public isPostAggregate() {
+    if (this.expression) { // TODO
+      return false;
+    }
+    return this.dimensionDefinition().postAggregate;
+  }
+
   public cube() {
     if (this.expression) {
       return this.query.cubeEvaluator.cubeFromPath(this.expressionCubeName);

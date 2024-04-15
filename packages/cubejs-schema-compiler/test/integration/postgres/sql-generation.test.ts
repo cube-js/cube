@@ -40,6 +40,10 @@ describe('SQL Generation', () => {
           sql: \`count(*)\`,
           aliases: ['users count']
         },
+        revenue: {
+          type: 'sum',
+          sql: 'amount',
+        },
         visitor_revenue: {
           type: 'sum',
           sql: 'amount',
@@ -103,10 +107,82 @@ describe('SQL Generation', () => {
           type: 'countDistinct',
           sql: \`source\`
         },
-        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
+        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b }))),
+        second_rank_sum: {
+          post_aggregate: true,
+          sql: \`\${visitor_revenue}\`,
+          filters: [{
+            sql: \`\${revenue_rank} = 1\`
+          }],
+          type: 'sum',
+        },
+        adjusted_rank_sum: {
+          post_aggregate: true,
+          sql: \`\${adjusted_revenue}\`,
+          filters: [{
+            sql: \`\${adjusted_revenue_rank} = 1\`
+          }],
+          type: 'sum',
+          add_group_by: [visitors.created_at],
+        },
+        revenue_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${visitor_revenue}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.source],
+        },
+        date_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${visitors.created_at}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.created_at]
+        },
+        adjusted_revenue_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${adjusted_revenue}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.created_at]
+        },
+        visitors_revenue_total: {
+          post_aggregate: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: []
+        },
+        percentage_of_total: {
+          post_aggregate: true,
+          sql: \`(100 * \${revenue} / NULLIF(\${visitors_revenue_total}, 0))::int\`,
+          type: 'number'
+        },
+        adjusted_revenue: {
+          post_aggregate: true,
+          sql: \`\${visitor_revenue} + 0.1 * \${date_rank}\`,
+          type: 'number',
+        },
+        customer_revenue: {
+          post_aggregate: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: [id]
+        }
       },
 
       dimensions: {
+        revenue_bucket: {
+          post_aggregate: true,
+          sql: \`CASE WHEN \${revenue} < 100 THEN 1 WHEN \${revenue} >= 100 THEN 2 END\`,
+          type: 'number',
+          add_group_by: [id]
+        },
         id: {
           type: 'number',
           sql: 'id',
@@ -1207,6 +1283,7 @@ describe('SQL Generation', () => {
   ]).then(() => {
     throw new Error();
   }).catch((error) => {
+    console.log('Error: ', error);
     expect(error).toBeInstanceOf(UserError);
   }));
 
@@ -2178,6 +2255,123 @@ describe('SQL Generation', () => {
       { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
     ]
   ));
+
+  it('rank measure', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_rank'],
+    },
+    [{ visitors__revenue_rank: '1' }]
+  ));
+
+  it('rank measure with dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_rank'],
+      dimensions: ['visitors.source'],
+    },
+    [{
+      visitors__revenue_rank: '2',
+      visitors__source: null
+    }, {
+      visitors__revenue_rank: '2',
+      visitors__source: 'google'
+    }, {
+      visitors__revenue_rank: '1',
+      visitors__source: 'some'
+    }]
+  ));
+
+  it('post aggregate measure with multiple dependencies', async () => runQueryTest(
+    {
+      measures: ['visitors.second_rank_sum', 'visitors.visitor_revenue', 'visitors.revenue_rank'],
+      dimensions: ['visitors.source'],
+    },
+    [{
+      visitors__revenue_rank: '2',
+      visitors__second_rank_sum: null,
+      visitors__source: null,
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__revenue_rank: '2',
+      visitors__second_rank_sum: null,
+      visitors__source: 'google',
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__revenue_rank: '1',
+      visitors__second_rank_sum: '300',
+      visitors__source: 'some',
+      visitors__visitor_revenue: '300',
+    }]
+  ));
+
+  it('post aggregate complex graph', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+    },
+    [{
+      visitors__source: 'google',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__source: 'some',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '300'
+    }, {
+      visitors__source: null,
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null,
+    }]
+  ));
+
+  it('post aggregate percentage of total', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 15,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__percentage_of_total: 15,
+      visitors__revenue: '300',
+      visitors__source: 'some'
+    }, {
+      visitors__percentage_of_total: 70,
+      visitors__revenue: '1400',
+      visitors__source: null
+    }]
+  ));
+
+  // TODO not implemented
+  // it('post aggregate bucketing', async () => runQueryTest(
+  //   {
+  //     measures: ['visitors.revenue'],
+  //     dimensions: ['visitors.revenue_bucket'],
+  //     order: [{
+  //       id: 'visitors.revenue_bucket'
+  //     }],
+  //   },
+  //   [{
+  //     visitors__percentage_of_total: 15,
+  //     visitors__revenue: '300',
+  //     visitors__source: 'google'
+  //   }, {
+  //     visitors__percentage_of_total: 15,
+  //     visitors__revenue: '300',
+  //     visitors__source: 'some'
+  //   }, {
+  //     visitors__percentage_of_total: 70,
+  //     visitors__revenue: '1400',
+  //     visitors__source: null
+  //   }]
+  // ));
 
   it('columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());

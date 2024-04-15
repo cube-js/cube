@@ -95,6 +95,13 @@ export class BaseMeasure {
     return BaseMeasure.isCumulative(this.measureDefinition());
   }
 
+  public isPostAggregate() {
+    if (this.expression) { // TODO
+      return false;
+    }
+    return this.measureDefinition().postAggregate;
+  }
+
   public isAdditive() {
     if (this.expression) { // TODO
       return false;
