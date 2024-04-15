@@ -2380,6 +2380,30 @@ describe('SQL Generation', () => {
     }]
   ));
 
+  it('post aggregate percentage of total filtered and joined', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitor_checkins.source'],
+      order: [{
+        id: 'visitor_checkins.source'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 9,
+      visitors__revenue: '100',
+      visitor_checkins__source: 'google'
+    }, {
+      visitors__percentage_of_total: 91,
+      visitors__revenue: '1000',
+      visitor_checkins__source: null
+    }]
+  ));
+
   // TODO not implemented
   // it('post aggregate bucketing', async () => runQueryTest(
   //   {
