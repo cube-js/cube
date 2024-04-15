@@ -70,7 +70,6 @@ pub mod builder;
 pub mod context;
 pub mod engine;
 pub mod error;
-mod legacy_compiler;
 pub mod parser;
 pub mod qtrace;
 pub mod rewrite;
@@ -118,289 +117,50 @@ impl QueryPlanner {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        // TODO move CUBESQL_REWRITE_ENGINE env to config
-        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(true);
-        if rewrite_engine {
-            let planning_start = SystemTime::now();
-            if let Some(span_id) = span_id.as_ref() {
-                if let Some(auth_context) = self.state.auth_context() {
-                    self.session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.state.get_load_request_meta(),
-                            "SQL API Query Planning".to_string(),
-                            serde_json::json!({
+        let planning_start = SystemTime::now();
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = self.state.auth_context() {
+                self.session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        self.state.get_load_request_meta(),
+                        "SQL API Query Planning".to_string(),
+                        serde_json::json!({
                                 "query": span_id.query_key.clone(),
                             }),
-                        )
-                        .await
-                        .map_err(|e| CompilationError::internal(e.to_string()))?;
-                }
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
             }
-            let result = self
-                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                .await?;
+        }
+        let result = self
+            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+            .await?;
 
-            if let Some(span_id) = span_id.as_ref() {
-                if let Some(auth_context) = self.state.auth_context() {
-                    self.session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.state.get_load_request_meta(),
-                            "SQL API Query Planning Success".to_string(),
-                            serde_json::json!({
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = self.state.auth_context() {
+                self.session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        self.state.get_load_request_meta(),
+                        "SQL API Query Planning Success".to_string(),
+                        serde_json::json!({
                                 "query": span_id.query_key.clone(),
                                 "duration": planning_start.elapsed().unwrap().as_millis() as u64,
                             }),
-                        )
-                        .await
-                        .map_err(|e| CompilationError::internal(e.to_string()))?;
-                }
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
             }
-
-            return Ok(result);
         }
 
-        let select = match &q.body {
-            sqlparser::ast::SetExpr::Select(select) => select,
-            _ => {
-                return Err(CompilationError::unsupported(
-                    "Unsupported Query".to_string(),
-                ));
-            }
-        };
-
-        if select.into.is_some() {
-            return Err(CompilationError::unsupported(
-                "Unsupported query type: SELECT INTO".to_string(),
-            ));
-        }
-
-        let from_table = if select.from.len() == 1 {
-            &select.from[0]
-        } else {
-            return self
-                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                .await;
-        };
-
-        let (db_name, schema_name, table_name) = match &from_table.relation {
-            ast::TableFactor::Table { name, .. } => match name {
-                ast::ObjectName(identifiers) => {
-                    match identifiers.len() {
-                        // db.`KibanaSampleDataEcommerce`
-                        2 => match self.state.protocol {
-                            DatabaseProtocol::MySQL => (
-                                identifiers[0].value.clone(),
-                                "public".to_string(),
-                                identifiers[1].value.clone(),
-                            ),
-                            DatabaseProtocol::PostgreSQL => (
-                                "db".to_string(),
-                                identifiers[0].value.clone(),
-                                identifiers[1].value.clone(),
-                            ),
-                        },
-                        // `KibanaSampleDataEcommerce`
-                        1 => match self.state.protocol {
-                            DatabaseProtocol::MySQL => (
-                                "db".to_string(),
-                                "public".to_string(),
-                                identifiers[0].value.clone(),
-                            ),
-                            DatabaseProtocol::PostgreSQL => (
-                                "db".to_string(),
-                                "public".to_string(),
-                                identifiers[0].value.clone(),
-                            ),
-                        },
-                        _ => {
-                            return Err(CompilationError::unsupported(format!(
-                                "Table identifier: {:?}",
-                                identifiers
-                            )));
-                        }
-                    }
-                }
-            },
-            factor => {
-                return Err(CompilationError::unsupported(format!(
-                    "table factor: {:?}",
-                    factor
-                )));
-            }
-        };
-
-        match self.state.protocol {
-            DatabaseProtocol::MySQL => {
-                if db_name.to_lowercase() == "information_schema"
-                    || db_name.to_lowercase() == "performance_schema"
-                {
-                    return self
-                        .create_df_logical_plan(stmt.clone(), &mut None, span_id.clone())
-                        .await;
-                }
-            }
-            DatabaseProtocol::PostgreSQL => {
-                if schema_name.to_lowercase() == "information_schema"
-                    || schema_name.to_lowercase() == "performance_schema"
-                    || schema_name.to_lowercase() == "pg_catalog"
-                    || schema_name.to_lowercase() == "pg_temp_3"
-                {
-                    return self
-                        .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                        .await;
-                }
-            }
-        };
-
-        if db_name.to_lowercase() != "db" {
-            return Err(CompilationError::unsupported(format!(
-                "Unable to access database {}",
-                db_name
-            )));
-        }
-
-        if !select.from[0].joins.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with JOIN instruction(s)".to_string(),
-            ));
-        }
-
-        if q.with.is_some() {
-            return Err(CompilationError::unsupported(
-                "Query with CTE instruction(s)".to_string(),
-            ));
-        }
-
-        if !select.cluster_by.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with CLUSTER BY instruction(s)".to_string(),
-            ));
-        }
-
-        if !select.distribute_by.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with DISTRIBUTE BY instruction(s)".to_string(),
-            ));
-        }
-
-        if select.having.is_some() {
-            return Err(CompilationError::unsupported(
-                "Query with HAVING instruction(s)".to_string(),
-            ));
-        }
-
-        // @todo Better solution?
-        // Metabase
-        if q.to_string()
-            == format!(
-                "SELECT true AS `_` FROM `{}` WHERE 1 <> 1 LIMIT 0",
-                table_name
-            )
-        {
-            return Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![dataframe::Column::new(
-                        "_".to_string(),
-                        ColumnType::Int8,
-                        ColumnFlags::empty(),
-                    )],
-                    vec![],
-                )),
-            ));
-        };
-
-        if let Some(cube) = self.meta.find_cube_with_name(&table_name) {
-            let mut ctx = QueryContext::new(&cube);
-            let mut builder = legacy_compiler::compile_select(select, &mut ctx)?;
-
-            if let Some(limit_expr) = &q.limit {
-                let limit = limit_expr.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::unsupported(format!(
-                        "Unable to parse limit: {}",
-                        e.to_string()
-                    ))
-                })?;
-
-                builder.with_limit(limit);
-            }
-
-            if let Some(offset_expr) = &q.offset {
-                let offset = offset_expr.value.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::unsupported(format!(
-                        "Unable to parse offset: {}",
-                        e.to_string()
-                    ))
-                })?;
-
-                builder.with_offset(offset);
-            }
-
-            legacy_compiler::compile_group(&select.group_by, &ctx, &mut builder)?;
-            legacy_compiler::compile_order(&q.order_by, &ctx, &mut builder)?;
-
-            if let Some(selection) = &select.selection {
-                legacy_compiler::compile_where(selection, &ctx, &mut builder)?;
-            }
-
-            let query = builder.build();
-            let schema = query.meta_as_df_schema();
-
-            let projection_expr = query.meta_as_df_projection_expr();
-            let projection_schema = query.meta_as_df_projection_schema();
-
-            self.reauthenticate_if_needed().await?;
-
-            let scan_node = LogicalPlan::Extension(Extension {
-                node: Arc::new(CubeScanNode::new(
-                    schema.clone(),
-                    schema
-                        .fields()
-                        .iter()
-                        .map(|f| MemberField::Member(f.name().to_string()))
-                        .collect(),
-                    query.request,
-                    // @todo Remove after split!
-                    self.state.auth_context().unwrap(),
-                    CubeScanOptions {
-                        change_user: None,
-                        max_records: None,
-                    },
-                    // Empty as it's not used in the legacy compiler
-                    Vec::new(),
-                    span_id.clone(),
-                )),
-            });
-            let logical_plan = LogicalPlan::Projection(Projection {
-                expr: projection_expr,
-                input: Arc::new(scan_node),
-                schema: projection_schema,
-                alias: None,
-            });
-
-            let ctx = self.create_execution_ctx();
-            Ok(QueryPlan::DataFusionSelect(
-                StatusFlags::empty(),
-                logical_plan,
-                ctx,
-            ))
-        } else {
-            Err(CompilationError::user(format!(
-                "Unknown cube '{}'. Please ensure your schema files are valid.",
-                table_name,
-            )))
-        }
+        return Ok(result);
     }
 
     pub async fn plan(
