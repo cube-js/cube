@@ -129,8 +129,8 @@ impl QueryPlanner {
                         self.state.get_load_request_meta(),
                         "SQL API Query Planning".to_string(),
                         serde_json::json!({
-                                "query": span_id.query_key.clone(),
-                            }),
+                            "query": span_id.query_key.clone(),
+                        }),
                     )
                     .await
                     .map_err(|e| CompilationError::internal(e.to_string()))?;
@@ -151,9 +151,9 @@ impl QueryPlanner {
                         self.state.get_load_request_meta(),
                         "SQL API Query Planning Success".to_string(),
                         serde_json::json!({
-                                "query": span_id.query_key.clone(),
-                                "duration": planning_start.elapsed().unwrap().as_millis() as u64,
-                            }),
+                            "query": span_id.query_key.clone(),
+                            "duration": planning_start.elapsed().unwrap().as_millis() as u64,
+                        }),
                     )
                     .await
                     .map_err(|e| CompilationError::internal(e.to_string()))?;
