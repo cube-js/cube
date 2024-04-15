@@ -37,7 +37,7 @@ use self::{
         df::{
             optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
-            scan::{CubeScanNode},
+            scan::CubeScanNode,
         },
         information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
