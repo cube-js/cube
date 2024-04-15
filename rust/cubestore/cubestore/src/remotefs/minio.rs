@@ -178,7 +178,7 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_file = File::open(temp_upload_path)?;
+            let mut temp_upload_file = File::open(&temp_upload_path)?;
             let status_code = cube_ext::spawn_blocking(move || {
                 bucket.put_object_stream(&mut temp_upload_file, path)
             })

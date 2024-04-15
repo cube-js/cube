@@ -181,7 +181,7 @@ impl RemoteFs for S3RemoteFs {
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_file = File::open(temp_upload_path)?;
+            let mut temp_upload_file = File::open(&temp_upload_path)?;
 
             let status_code = cube_ext::spawn_blocking(move || {
                 bucket.put_object_stream(&mut temp_upload_file, path)
@@ -285,7 +285,7 @@ impl RemoteFs for S3RemoteFs {
         }
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
+        let local = self.dir.as_path().join(&remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
             LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
