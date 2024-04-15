@@ -10,5 +10,5 @@ export function getTempPath(): void {
     fs.rmdirSync(_temp, { recursive: true });
   }
   fs.mkdirSync(_temp);
-  fs.mkdirSync(path.resolve(_temp, './schema'));
+  fs.mkdirSync(path.resolve(_temp, './model'));
 }

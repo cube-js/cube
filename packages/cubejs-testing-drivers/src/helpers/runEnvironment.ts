@@ -117,7 +117,6 @@ export async function runEnvironment(
   compose.withStartupTimeout((isCI() ? 60 : 30) * 1000);
   compose.withEnvironment({
     CUBEJS_TELEMETRY: 'false',
-    CUBEJS_SCHEMA_PATH: 'schema'
   });
 
   const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
@@ -166,13 +165,11 @@ export async function runEnvironment(
     cliEnv.withEnvironment({
       CUBEJS_CUBESTORE_HOST: '127.0.0.1',
       CUBEJS_CUBESTORE_PORT: process.env.CUBEJS_CUBESTORE_PORT ? process.env.CUBEJS_CUBESTORE_PORT : `${store.port}`,
-      CUBEJS_SCHEMA_PATH: 'schema'
     });
     if (mappedDataPort) {
       cliEnv.withEnvironment({
         CUBEJS_DB_HOST: '127.0.0.1',
         CUBEJS_DB_PORT: `${mappedDataPort}`,
-        CUBEJS_SCHEMA_PATH: 'schema'
       });
     }
     await cliEnv.up();
