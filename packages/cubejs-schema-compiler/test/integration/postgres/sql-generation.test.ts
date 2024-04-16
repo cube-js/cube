@@ -199,6 +199,10 @@ describe('SQL Generation', () => {
           type: 'time',
           sql: 'created_at'
         },
+        updated_at: {
+          type: 'time',
+          sql: 'updated_at'
+        },
         
         createdAtSqlUtils: {
           type: 'time',
@@ -2326,6 +2330,49 @@ describe('SQL Generation', () => {
       visitors__source: null,
       visitors__adjusted_rank_sum: null,
       visitors__visitor_revenue: null,
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          granularity: 'day',
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__updated_at_day: '2017-01-20T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at_day: '2017-01-15T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '200.1',
+      visitors__visitor_revenue: '200'
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at_day: '2017-01-30T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '100'
+    }, {
+      visitors__source: null,
+      visitors__updated_at_day: '2016-09-07T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: null,
+      visitors__updated_at_day: '2017-01-25T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
     }]
   ));
 
