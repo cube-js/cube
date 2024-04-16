@@ -12,6 +12,7 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -55,7 +56,14 @@ impl MINIORemoteFs {
         let s3_region_id = env::var("CUBESTORE_MINIO_REGION").ok();
 
         let credentials =
-            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None)?;
+            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None).map_err(
+                |err| {
+                    CubeError::internal(format!(
+                        "Failed to create minIO credentials: {}",
+                        err.to_string()
+                    ))
+                },
+            )?;
         let region = Region::Custom {
             region: s3_region_id.as_deref().unwrap_or("").to_string(),
             endpoint: minio_server_endpoint
@@ -63,11 +71,9 @@ impl MINIORemoteFs {
                 .unwrap_or("localhost:")
                 .to_string(),
         };
-        let bucket = std::sync::RwLock::new(Bucket::new_with_path_style(
-            &bucket_name,
-            region.clone(),
-            credentials,
-        )?);
+        let bucket = std::sync::RwLock::new(
+            Bucket::new(&bucket_name, region.clone(), credentials)?.with_path_style(),
+        );
         let fs = Arc::new(Self {
             dir,
             bucket,
@@ -116,13 +122,14 @@ fn spawn_creds_refresh_loop(
                     continue;
                 }
             };
-            let b = match Bucket::new_with_path_style(&bucket_name, region.clone(), c) {
+            let b = match Bucket::new(&bucket_name, region.clone(), c) {
                 Ok(b) => b,
                 Err(e) => {
                     log::error!("Failed to refresh minIO credentials: {}", e);
                     continue;
                 }
-            };
+            }
+            .with_path_style();
             *fs.bucket.write().unwrap() = b;
             log::debug!("Successfully refreshed minIO credentials")
         }
@@ -171,19 +178,19 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let temp_upload_path_copy = temp_upload_path.to_string();
+            let mut temp_upload_file = File::open(&temp_upload_path)?;
             let status_code = cube_ext::spawn_blocking(move || {
-                bucket.put_object_stream_blocking(temp_upload_path_copy, path)
+                bucket.put_object_stream(&mut temp_upload_file, path)
             })
             .await??;
 
-            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "minIO upload returned non OK status: {}",
                     status_code
                 )));
             }
+            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         }
 
         let size = fs::metadata(&temp_upload_path).await?.len();
@@ -221,13 +228,13 @@ impl RemoteFs for MINIORemoteFs {
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let path = self.s3_path(&remote_path);
-            info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
+
             let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
                 let (mut temp_file, temp_path) =
                     NamedTempFile::new_in(&downloads_dir)?.into_parts();
 
-                let res = bucket.get_object_stream_blocking(path.as_str(), &mut temp_file)?;
+                let res = bucket.get_object_stream(path.as_str(), &mut temp_file)?;
                 temp_file.flush()?;
 
                 temp_path.persist(local_file)?;
@@ -235,13 +242,14 @@ impl RemoteFs for MINIORemoteFs {
                 Ok(res)
             })
             .await??;
-            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
+
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "minIO download returned non OK status: {}",
                     status_code
                 )));
             }
+            info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
         }
         Ok(local_file_str)
     }
@@ -253,13 +261,12 @@ impl RemoteFs for MINIORemoteFs {
         let path = self.s3_path(&remote_path);
         info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
-        let (_, status_code) =
-            cube_ext::spawn_blocking(move || bucket.delete_object_blocking(path)).await??;
-        info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
-        if status_code != 204 {
+        let res = cube_ext::spawn_blocking(move || bucket.delete_object(path)).await??;
+
+        if res.status_code() != 204 {
             return Err(CubeError::user(format!(
                 "minIO delete returned non OK status: {}",
-                status_code
+                res.status_code()
             )));
         }
 
@@ -271,6 +278,7 @@ impl RemoteFs for MINIORemoteFs {
                 .await?;
         }
 
+        info!("Deleted {} ({:?})", remote_path, time.elapsed()?);
         Ok(())
     }
 
@@ -289,11 +297,11 @@ impl RemoteFs for MINIORemoteFs {
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = cube_ext::spawn_blocking(move || bucket.list_blocking(path, None)).await??;
+        let list = cube_ext::spawn_blocking(move || bucket.list(path, None)).await??;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
-            .flat_map(|(res, _)| {
+            .flat_map(|res| {
                 res.contents
                     .iter()
                     .map(|o| -> Result<RemoteFile, CubeError> {
