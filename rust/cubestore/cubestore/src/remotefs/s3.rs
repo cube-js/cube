@@ -8,7 +8,8 @@ use chrono::{DateTime, Utc};
 use datafusion::cube_ext;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
-use s3::creds::Credentials;
+// We dont use re-export from s3, because there is no way to enable http-credentials feature
+use awscreds::Credentials;
 use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
