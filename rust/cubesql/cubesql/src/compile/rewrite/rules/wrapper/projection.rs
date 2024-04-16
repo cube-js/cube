@@ -1,13 +1,13 @@
 use crate::{
     compile::rewrite::{
         analysis::LogicalPlanAnalysis, cube_scan_wrapper, projection, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
+        subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
         wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
         wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
         wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapped_subquery, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias,
-        WrappedSelectUngrouped, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
+        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
+        WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
@@ -128,10 +128,10 @@ impl WrapperRules {
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
         rules.extend(vec![transforming_rewrite(
-            "wrapper-push-down-projection-with-subquery-to-cube-scan",
+            "wrapper-push-down-projection-and-subquery-to-cube-scan",
             projection(
                 "?expr",
-                wrapped_subquery(
+                subquery(
                     cube_scan_wrapper(
                         wrapper_pullup_replacer(
                             "?cube_scan_input",
@@ -142,13 +142,8 @@ impl WrapperRules {
                         ),
                         "CubeScanWrapperFinalized:false",
                     ),
-                    wrapper_pullup_replacer(
-                        "?subqueries",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
+                    "?subqueries",
+                    "?types",
                 ),
                 "?projection_alias",
                 "ProjectionSplit:false",
@@ -163,7 +158,7 @@ impl WrapperRules {
                         "WrapperPullupReplacerInProjection:true",
                         "?cube_members",
                     ),
-                    wrapper_pullup_replacer(
+                    wrapper_pushdown_replacer(
                         "?subqueries",
                         "?alias_to_cube",
                         "?ungrouped",

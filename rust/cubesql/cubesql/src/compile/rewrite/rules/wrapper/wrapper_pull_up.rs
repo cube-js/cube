@@ -319,7 +319,6 @@ impl WrapperRules {
                             // TODO write rules for non trivial wrapped aggregate
                             true
                         }
-                        WrappedSelectType::Subquery => false,
                     };
                 }
             }

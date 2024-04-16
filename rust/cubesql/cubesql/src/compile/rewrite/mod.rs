@@ -58,7 +58,6 @@ impl Display for LikeType {
 pub enum WrappedSelectType {
     Projection,
     Aggregate,
-    Subquery,
 }
 
 crate::plan_to_language! {

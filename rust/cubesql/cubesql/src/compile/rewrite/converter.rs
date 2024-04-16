@@ -1980,11 +1980,6 @@ impl LanguageToLogicalPlanConverter {
                     WrappedSelectType::Aggregate => {
                         group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
                     }
-                    WrappedSelectType::Subquery => {
-                        return Err(CubeError::internal(
-                            "Subquery wrapped select cannot appear in final plan".to_string(),
-                        ));
-                    }
                 };
                 // TODO support asterisk query?
                 let all_expr_without_window = if all_expr_without_window.is_empty() {

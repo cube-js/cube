@@ -4,7 +4,7 @@ use crate::{
         analysis::LogicalPlanAnalysis,
         column_name_to_member_vec, cube_scan_wrapper, original_expr_name,
         rules::{members::MemberRules, wrapper::WrapperRules},
-        transforming_chain_rewrite, transforming_rewrite, wrapped_select,
+        subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
         wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
@@ -170,6 +170,149 @@ impl WrapperRules {
             "wrapper-aggregate-group-expr",
             "AggregateGroupExpr",
             "WrappedSelectGroupExpr",
+        );
+    }
+
+    pub fn aggregate_rules_subquery(
+        &self,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        rules.extend(vec![transforming_rewrite(
+            "wrapper-push-down-aggregate-and-subquery-to-cube-scan",
+            aggregate(
+                subquery(
+                    cube_scan_wrapper(
+                        wrapper_pullup_replacer(
+                            "?cube_scan_input",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
+                        "CubeScanWrapperFinalized:false",
+                    ),
+                    "?subqueries",
+                    "?types",
+                ),
+                "?group_expr",
+                "?aggr_expr",
+                "AggregateSplit:false",
+            ),
+            cube_scan_wrapper(
+                wrapped_select(
+                    "WrappedSelectSelectType:Aggregate",
+                    wrapper_pullup_replacer(
+                        wrapped_select_projection_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?subqueries",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?group_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?aggr_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_window_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?cube_scan_input",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_filter_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapped_select_having_expr_empty_tail(),
+                    "WrappedSelectLimit:None",
+                    "WrappedSelectOffset:None",
+                    wrapper_pullup_replacer(
+                        wrapped_select_order_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    "WrappedSelectAlias:None",
+                    "?select_ungrouped",
+                    "WrappedSelectUngroupedScan:false",
+                ),
+                "CubeScanWrapperFinalized:false",
+            ),
+            self.transform_aggregate(
+                "?group_expr",
+                "?aggr_expr",
+                "?ungrouped",
+                "?select_ungrouped",
+            ),
+        )]);
+
+        // TODO add flag to disable dimension rules
+        MemberRules::measure_rewrites(
+            rules,
+            |name: &'static str,
+             aggr_expr: String,
+             _measure_expr: String,
+             fun_name: Option<&'static str>,
+             distinct: Option<&'static str>,
+             cast_data_type: Option<&'static str>,
+             column: Option<&'static str>| {
+                transforming_chain_rewrite(
+                    &format!("wrapper-{}", name),
+                    wrapper_pushdown_replacer(
+                        "?aggr_expr",
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerUngrouped:true",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    vec![("?aggr_expr", aggr_expr)],
+                    wrapper_pullup_replacer(
+                        "?measure",
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerUngrouped:true",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    self.pushdown_measure(
+                        "?aggr_expr",
+                        column,
+                        fun_name,
+                        distinct,
+                        cast_data_type,
+                        "?cube_members",
+                        "?measure",
+                    ),
+                )
+            },
         );
     }
 

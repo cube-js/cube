@@ -20159,7 +20159,7 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_wrapper_1() {
+    async fn test_simple_wrapper() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
@@ -20196,43 +20196,14 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_wrapper_tmp() {
+    async fn test_simple_subquery_wrapper_projection_1() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT COALESCE(customer_gender, 'N/A', 'NN') FROM KibanaSampleDataEcommerce a "
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT (select customer_gender from KibanaSampleDataEcommerce limit 1), avgPrice FROM KibanaSampleDataEcommerce a"
+            "SELECT (select customer_gender from KibanaSampleDataEcommerce where customer_gender = 'male' limit 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -20270,7 +20241,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (select customer_gender from KibanaSampleDataEcommerce limit 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
+            "SELECT (select customer_gender from KibanaSampleDataEcommerce where customer_gender = 'male' limit 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )

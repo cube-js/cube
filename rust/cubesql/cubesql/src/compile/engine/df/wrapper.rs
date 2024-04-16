@@ -491,6 +491,7 @@ impl CubeScanWrapperNode {
                             let field = subquery.schema().field(0);
                             subqueries_sql.insert(field.qualified_name(), sql);
                         }
+
                         let subqueries_sql = Arc::new(subqueries_sql);
                         let SqlGenerationResult {
                             data_source,
@@ -1014,11 +1015,14 @@ impl CubeScanWrapperNode {
                         subqueries.clone(),
                     )
                     .await?;
+                    println!("alias expr: {}", expr);
                     Ok((expr, sql_query))
                 }
                 // Expr::OuterColumn(_, _) => {}
                 Expr::Column(c) => {
-                    if let Some(scan_node) = ungrouped_scan_node.as_ref() {
+                    if let Some(subquery) = subqueries.get(&c.flat_name()) {
+                        Ok((format!("({})", subquery.sql), sql_query))
+                    } else if let Some(scan_node) = ungrouped_scan_node.as_ref() {
                         let field_index = scan_node
                             .schema
                             .fields()
@@ -1059,8 +1063,6 @@ impl CubeScanWrapperNode {
                                 .await
                             }
                         }
-                    } else if let Some(subquery) = subqueries.get(&c.flat_name()) {
-                        Ok((format!("({})", subquery.sql), sql_query))
                     } else {
                         Ok((
                             match c.relation.as_ref() {
