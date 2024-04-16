@@ -5225,6 +5225,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_test");
         let store_path = env::current_dir().unwrap().join("test-table-local");
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
@@ -5335,6 +5337,8 @@ mod tests {
     }
     #[tokio::test]
     async fn default_index_field_positions_test() {
+        init_test_logger().await;
+
         let config = Config::test("default_index_field_positions_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5426,6 +5430,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_with_aggregate_index_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_with_aggregate_index_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5616,6 +5622,8 @@ mod tests {
 
     #[tokio::test]
     async fn cold_start_test() {
+        init_test_logger().await;
+
         {
             let config = Config::test("cold_start_test");
 
@@ -5685,6 +5693,7 @@ mod tests {
                 .get_schema("bar".to_string())
                 .await
                 .unwrap();
+
             fs::remove_dir_all(config.local_dir()).unwrap();
             fs::remove_dir_all(config.remote_dir()).unwrap();
         }
