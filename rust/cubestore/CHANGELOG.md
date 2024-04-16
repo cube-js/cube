@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix wrong optimization in total count queries ([#7964](https://github.com/cube-js/cube/issues/7964)) ([7a8ddf0](https://github.com/cube-js/cube/commit/7a8ddf056a075c9224657d1497e2679502acc515))
+
+
+### Features
+
+* **cubestore:** Upgrade rust-s3 0.26.3 -> 0.32.3 ([#6019](https://github.com/cube-js/cube/issues/6019)) ([4b8d4d3](https://github.com/cube-js/cube/commit/4b8d4d3c3445dcd817945e3a71a70d0084644d4c))
+* **cubestore:** Use S3 client in async way ([#8158](https://github.com/cube-js/cube/issues/8158)) ([7f286fe](https://github.com/cube-js/cube/commit/7f286fee90897048f8a2735a2a9e171d40e47da4))
+
+
+
+
+
 ## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
 
 
