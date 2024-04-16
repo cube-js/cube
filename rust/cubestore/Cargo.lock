@@ -325,15 +325,6 @@ dependencies = [
 
 [[package]]
 name = "aws-region"
-version = "0.22.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f610af4a396f07592014dc3410f6ad78fab931852a99bb6cfdc1ad04b9329b80"
-dependencies = [
- "simpl",
-]
-
-[[package]]
-name = "aws-region"
 version = "0.25.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42fed2b9fca70f2908268d057a607f2a906f47edbf856ea8587de9038d264e22"
@@ -1128,7 +1119,6 @@ dependencies = [
  "async-std",
  "async-trait",
  "aws-creds 0.36.0",
- "aws-region 0.22.1",
  "base64 0.13.0",
  "bigdecimal 0.2.0",
  "bincode",
@@ -4073,7 +4063,7 @@ checksum = "b6009d9d4cf910505534d62d380a0aa305805a2af0b5c3ad59a3024a0715b847"
 dependencies = [
  "async-trait",
  "aws-creds 0.30.0",
- "aws-region 0.25.4",
+ "aws-region",
  "base64 0.13.0",
  "cfg-if 1.0.0",
  "hex",
@@ -4476,12 +4466,6 @@ checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "simpl"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a30f10c911c0355f80f1c2faa8096efc4a58cdf8590b954d5b395efa071c711"
 
 [[package]]
 name = "simple_asn1"
