@@ -24,6 +24,12 @@ describe('MssqlQuery', () => {
       },
 
       dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primaryKey: true,
+        },
+        
         createdAt: {
           type: 'time',
           sql: 'created_at'
