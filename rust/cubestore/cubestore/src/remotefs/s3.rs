@@ -13,13 +13,13 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
-use std::fs::File;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tempfile::NamedTempFile;
+use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
 pub struct S3RemoteFs {
@@ -181,19 +181,18 @@ impl RemoteFs for S3RemoteFs {
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_file = File::open(&temp_upload_path)?;
+            let mut temp_upload_file = File::open(&temp_upload_path).await?;
 
-            let status_code = cube_ext::spawn_blocking(move || {
-                bucket.put_object_stream(&mut temp_upload_file, path)
-            })
-            .await??;
-
+            let status_code = bucket
+                .put_object_stream(&mut temp_upload_file, path)
+                .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 upload returned non OK status: {}",
                     status_code
                 )));
             }
+
             info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
         }
         let size = fs::metadata(&temp_upload_path).await?.len();
@@ -240,27 +239,32 @@ impl RemoteFs for S3RemoteFs {
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
 
-            let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
-                let (mut temp_file, temp_path) =
-                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
+            let (temp_file, temp_path) =
+                cube_ext::spawn_blocking(move || NamedTempFile::new_in(&downloads_dir))
+                    .await??
+                    .into_parts();
 
-                let res = bucket.get_object_stream(path.as_str(), &mut temp_file)?;
-                temp_file.flush()?;
-
-                temp_path.persist(local_file)?;
-
-                Ok(res)
-            })
-            .await??;
-
+            let mut writter = File::from_std(temp_file);
+            let status_code = bucket
+                .get_object_stream(path.as_str(), &mut writter)
+                .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "S3 download returned non OK status: {}",
                     status_code
                 )));
             }
+
+            writter.flush().await?;
+
+            cube_ext::spawn_blocking(move || -> Result<(), PathPersistError> {
+                temp_path.persist(&local_file)
+            })
+            .await??;
+
             info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
         }
+
         Ok(local_file_str)
     }
 
@@ -276,7 +280,8 @@ impl RemoteFs for S3RemoteFs {
         debug!("Deleting {}", remote_path);
         let path = self.s3_path(&remote_path);
         let bucket = self.bucket.read().unwrap().clone();
-        let res = cube_ext::spawn_blocking(move || bucket.delete_object(path)).await??;
+
+        let res = bucket.delete_object(path).await?;
         if res.status_code() != 204 {
             return Err(CubeError::user(format!(
                 "S3 delete returned non OK status: {}",
@@ -311,7 +316,7 @@ impl RemoteFs for S3RemoteFs {
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = cube_ext::spawn_blocking(move || bucket.list(path, None)).await??;
+        let list = bucket.list(path, None).await?;
         let pages_count = list.len();
         app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
             pages_count as i64,
