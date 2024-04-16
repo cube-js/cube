@@ -189,37 +189,37 @@ export abstract class BaseDriver implements DriverInterface {
     return query;
   }
 
-  protected primaryKeysQuery(): string | null {
+  protected primaryKeysQuery(_?: string): string | null {
     return null;
   }
 
-  protected foreignKeysQuery(): string | null {
+  protected foreignKeysQuery(_?: string): string | null {
     return null;
   }
 
-  protected async primaryKeys(): Promise<PrimaryKeysQueryResult[]> {
-    const query = this.primaryKeysQuery();
+  protected async primaryKeys(conditionString?: string, params?: string[]): Promise<PrimaryKeysQueryResult[]> {
+    const query = this.primaryKeysQuery(conditionString);
 
     if (!query) {
       return [];
     }
 
     try {
-      return (await this.query(query) as PrimaryKeysQueryResult[]);
+      return (await this.query<PrimaryKeysQueryResult>(query, params));
     } catch (_) {
       return [];
     }
   }
 
-  protected async foreignKeys(): Promise<ForeignKeysQueryResult[]> {
-    const query = this.foreignKeysQuery();
+  protected async foreignKeys(conditionString?: string, params?: string[]): Promise<ForeignKeysQueryResult[]> {
+    const query = this.foreignKeysQuery(conditionString);
 
     if (!query) {
       return [];
     }
 
     try {
-      return (await this.query(query) as ForeignKeysQueryResult[]);
+      return (await this.query<ForeignKeysQueryResult>(query, params));
     } catch (_) {
       return [];
     }
@@ -379,8 +379,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = this.informationSchemaQuery();
 
     const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
-    const primaryKeys = await this.primaryKeys();
-    const foreignKeys = await this.foreignKeys();
+    const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
 
     for (const pk of primaryKeys) {
       if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
@@ -434,7 +433,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -460,7 +459,30 @@ export abstract class BaseDriver implements DriverInterface {
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
 
-    return this.query<QueryColumnsResult>(query, parameters);
+    const [primaryKeys, foreignKeys] = await Promise.all([
+      this.primaryKeys(conditionString, parameters),
+      this.foreignKeys(conditionString, parameters)
+    ]);
+
+    const columns = await this.query<QueryColumnsResult>(query, parameters);
+
+    console.log('>>>', JSON.stringify({
+      primaryKeys,
+      foreignKeys
+    }));
+
+    for (const column of columns) {
+      if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
+        column.attributes = ['primaryKey'];
+      }
+
+      column.foreign_keys = foreignKeys.filter(fk => fk.table_schema === column.schema_name && fk.table_name === column.table_name && fk.column_name === column.column_name).map(fk => ({
+        target_table: fk.target_table,
+        target_column: fk.target_column
+      }));
+    }
+
+    return columns;
   }
 
   public getTablesQuery(schemaName: string) {

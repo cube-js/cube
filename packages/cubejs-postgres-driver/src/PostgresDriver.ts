@@ -142,7 +142,17 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
-  protected primaryKeysQuery(): string | null {
+  protected primaryKeysQuery(conditionString?: string): string | null {
+    console.log('>>>', conditionString);
+    console.log('>>>@@', `SELECT 
+    c.table_schema as ${this.quoteIdentifier('table_schema')}, 
+    c.table_name as ${this.quoteIdentifier('table_name')}, 
+    c.column_name as ${this.quoteIdentifier('column_name')}
+  FROM information_schema.table_constraints tc
+  JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+  JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
+    AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
+  WHERE constraint_type = 'PRIMARY KEY' AND c.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`);
     return `SELECT 
       c.table_schema as ${this.quoteIdentifier('table_schema')}, 
       c.table_name as ${this.quoteIdentifier('table_name')}, 
@@ -151,10 +161,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
     JOIN information_schema.columns AS c ON c.table_schema = tc.constraint_schema
       AND tc.table_name = c.table_name AND ccu.column_name = c.column_name
-    WHERE constraint_type = 'PRIMARY KEY'`;
+    WHERE constraint_type = 'PRIMARY KEY' AND c.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
 
-  protected foreignKeysQuery(): string | null {
+  protected foreignKeysQuery(conditionString?: string): string | null {
     return `SELECT
         tc.table_schema as ${this.quoteIdentifier('table_schema')},
         tc.table_name as ${this.quoteIdentifier('table_name')},
@@ -169,7 +179,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       JOIN information_schema.constraint_column_usage AS ccu
         ON ccu.constraint_name = tc.constraint_name
       WHERE
-         constraint_type = 'FOREIGN KEY'`;
+         constraint_type = 'FOREIGN KEY'
+         AND table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+         ${conditionString ? ` AND (${conditionString})` : ''}
+    `;
   }
 
   /**

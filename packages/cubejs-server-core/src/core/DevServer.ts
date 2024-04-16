@@ -112,7 +112,20 @@ export class DevServer {
         requestId: getRequestIdFromRequest(req),
       });
 
-      const tablesSchema = await driver.tablesSchema();
+      const tablesSchema = await driver.tablesSchemaV2();
+
+      const resu = await driver.getColumnsForSpecificTables([
+        {
+          schema_name: 'public',
+          table_name: 'users'
+        },
+        {
+          schema_name: 'public',
+          table_name: 'cities'
+        }
+      ]);
+      // const tablesSchema = await driver.tablesSchemaV2();
+      console.log('>>>@@@', JSON.stringify(resu, null, 2));
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');

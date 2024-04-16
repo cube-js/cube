@@ -9,12 +9,21 @@ export interface TableColumn {
   attributes?: string[]
 }
 
+export type ForeignKey = {
+  // eslint-disable-next-line camelcase
+  target_table: string;
+  // eslint-disable-next-line camelcase
+  target_column: string;
+};
+
 export interface TableColumnQueryResult {
   // eslint-disable-next-line camelcase
   column_name: string;
   // eslint-disable-next-line camelcase
   data_type: GenericDataBaseType;
   attributes?: string[]
+  // eslint-disable-next-line camelcase
+  foreign_keys?: ForeignKey[]
 }
 
 export type TableStructure = TableColumn[];

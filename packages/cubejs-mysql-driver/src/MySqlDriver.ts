@@ -178,6 +178,22 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
     });
   }
 
+  protected primaryKeysQuery(): string | null {
+    return `SELECT
+      TABLE_SCHEMA as ${this.quoteIdentifier('table_schema')}, 
+      TABLE_NAME as ${this.quoteIdentifier('table_name')},
+      COLUMN_NAME as ${this.quoteIdentifier('column_name')}
+  FROM
+      information_schema.KEY_COLUMN_USAGE
+  WHERE
+      CONSTRAINT_NAME = 'PRIMARY'
+      AND TABLE_SCHEMA NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'pg_catalog')
+  ORDER BY
+      TABLE_SCHEMA,
+      TABLE_NAME,
+      ORDINAL_POSITION;`;
+  }
+
   public readOnly() {
     return !!this.config.readOnly;
   }
