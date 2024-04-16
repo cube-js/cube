@@ -250,7 +250,7 @@ impl RemoteFs for S3RemoteFs {
                 .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
-                    "s3 download returned non OK status: {}",
+                    "S3 download returned non OK status: {}",
                     status_code
                 )));
             }
