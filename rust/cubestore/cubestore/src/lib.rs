@@ -480,6 +480,12 @@ impl From<tempfile::PathPersistError> for CubeError {
     }
 }
 
+impl From<async_tempfile::Error> for CubeError {
+    fn from(v: async_tempfile::Error) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
 impl From<tokio::sync::AcquireError> for CubeError {
     fn from(v: tokio::sync::AcquireError) -> Self {
         return CubeError::from_error(v);

@@ -239,6 +239,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-tempfile"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c17d4a3286e6518d84be399efb8901aa74a183753b0bf4a8a4afe5bcfedcbb08"
+dependencies = [
+ "tokio 1.37.0",
+]
+
+[[package]]
 name = "async-trait"
 version = "0.1.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1118,6 +1127,7 @@ dependencies = [
  "arrow",
  "async-compression",
  "async-std",
+ "async-tempfile",
  "async-trait",
  "aws-creds 0.24.1",
  "aws-region 0.22.1",
@@ -4103,7 +4113,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6009d9d4cf910505534d62d380a0aa305805a2af0b5c3ad59a3024a0715b847"
 dependencies = [
  "async-trait",
- "attohttpc 0.19.1",
  "aws-creds 0.30.0",
  "aws-region 0.25.4",
  "base64 0.13.0",
@@ -4115,12 +4124,15 @@ dependencies = [
  "maybe-async",
  "md5",
  "percent-encoding",
+ "reqwest 0.11.10",
  "serde",
  "serde-xml-rs 0.5.1",
  "serde_derive",
  "sha2 0.10.8",
  "thiserror",
  "time 0.3.36",
+ "tokio 1.37.0",
+ "tokio-stream",
  "url",
 ]
 

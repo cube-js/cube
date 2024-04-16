@@ -4,7 +4,6 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use datafusion::cube_ext;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
@@ -12,13 +11,13 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
-use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tempfile::NamedTempFile;
 use tokio::fs;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
 
 pub struct MINIORemoteFs {
@@ -178,11 +177,8 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
-            let mut temp_upload_file = File::open(&temp_upload_path)?;
-            let status_code = cube_ext::spawn_blocking(move || {
-                bucket.put_object_stream(&mut temp_upload_file, path)
-            })
-            .await??;
+            let mut temp_upload_file = File::open(&temp_upload_path).await?;
+            let status_code = bucket.put_object_stream(&mut temp_upload_file, path).await?;
 
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -230,18 +226,16 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
 
-            let status_code = cube_ext::spawn_blocking(move || -> Result<u16, CubeError> {
-                let (mut temp_file, temp_path) =
-                    NamedTempFile::new_in(&downloads_dir)?.into_parts();
+            let status_code = {
+                let mut temp_file = async_tempfile::TempFile::new_in(&downloads_dir).await?;
 
-                let res = bucket.get_object_stream(path.as_str(), &mut temp_file)?;
-                temp_file.flush()?;
+                let res = bucket.get_object_stream(path.as_str(), &mut temp_file).await;
+                temp_file.flush().await?;
 
-                temp_path.persist(local_file)?;
+                tokio::fs::rename(temp_file.file_path(), local_file).await?;
 
-                Ok(res)
-            })
-            .await??;
+                res
+            }?;
 
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -261,7 +255,7 @@ impl RemoteFs for MINIORemoteFs {
         let path = self.s3_path(&remote_path);
         info!("path {}", remote_path);
         let bucket = self.bucket.read().unwrap().clone();
-        let res = cube_ext::spawn_blocking(move || bucket.delete_object(path)).await??;
+        let res = bucket.delete_object(path).await?;
 
         if res.status_code() != 204 {
             return Err(CubeError::user(format!(
@@ -297,7 +291,7 @@ impl RemoteFs for MINIORemoteFs {
     ) -> Result<Vec<RemoteFile>, CubeError> {
         let path = self.s3_path(&remote_prefix);
         let bucket = self.bucket.read().unwrap().clone();
-        let list = cube_ext::spawn_blocking(move || bucket.list(path, None)).await??;
+        let list = bucket.list(path, None).await?;
         let leading_slash = Regex::new(format!("^{}", self.s3_path("")).as_str()).unwrap();
         let result = list
             .iter()
