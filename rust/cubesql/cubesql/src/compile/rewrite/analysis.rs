@@ -31,10 +31,12 @@ use datafusion::{
 use egg::{Analysis, DidMerge, EGraph, Id};
 use std::{fmt::Debug, ops::Index, sync::Arc};
 
+pub type MemberNameToExpr = (Option<String>, Member, Expr);
+
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     pub original_expr: Option<OriginalExpr>,
-    pub member_name_to_expr: Option<Vec<(Option<String>, Member, Expr)>>,
+    pub member_name_to_expr: Option<Vec<MemberNameToExpr>>,
     pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
@@ -647,7 +649,7 @@ impl LogicalPlanAnalysis {
                         .next()
                         .unwrap();
                     let expr = original_expr(params[1])?;
-                    let name = expr_column_name(expr, &None);
+                    let name = expr_column_name(&expr, &None);
                     let column_expr = Expr::Column(Column {
                         relation: relation.clone(),
                         name,
@@ -1226,7 +1228,10 @@ impl LogicalPlanAnalysis {
 impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
     type Data = LogicalPlanData;
 
-    fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
+    fn make(
+        egraph: &mut EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Self::Data {
         LogicalPlanData {
             original_expr: Self::make_original_expr(egraph, enode),
             member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),

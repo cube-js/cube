@@ -28,7 +28,7 @@ futures = "0.3.23"
 rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
-log = "=0.4.11"
+log = "0.4.21"
 rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
 postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
@@ -48,7 +48,7 @@ nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = "0.7.1"
+egg = {rev = "2f1514c58517e2f38acfe337175f843f156530cf", git = "https://github.com/egraphs-good/egg.git"}
 paste = "1.0.6"
 csv = "1.1.6"
 tracing = { version = "0.1.40", features = ["async-await"] }

@@ -28,4 +28,4 @@ features = ["json", "multipart", "rustls-tls"]
 [dev-dependencies]
 wiremock = "0.5"
 tokio = { version = "1", features = ["macros"] }
-log = "=0.4.11"
+log = "0.4.21"
