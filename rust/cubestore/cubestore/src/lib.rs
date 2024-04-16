@@ -328,8 +328,8 @@ impl From<s3::error::S3Error> for CubeError {
     }
 }
 
-impl From<awscreds::AwsCredsError> for CubeError {
-    fn from(v: awscreds::AwsCredsError) -> Self {
+impl From<awscreds::error::CredentialsError> for CubeError {
+    fn from(v: awscreds::error::CredentialsError) -> Self {
         CubeError::user(v.to_string())
     }
 }

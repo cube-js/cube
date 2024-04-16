@@ -94,6 +94,7 @@ fn spawn_creds_refresh_loop(
     if refresh_every.as_secs() == 0 {
         return;
     }
+
     let fs = Arc::downgrade(fs);
     std::thread::spawn(move || {
         log::debug!("Started S3 credentials refresh loop");
