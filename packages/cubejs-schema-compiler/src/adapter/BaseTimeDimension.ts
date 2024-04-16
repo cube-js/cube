@@ -77,6 +77,10 @@ export class BaseTimeDimension extends BaseFilter {
   public dimensionSql() {
     const context = this.query.safeEvaluateSymbolContext();
     const granularity = context.granularityOverride || this.granularity;
+    const path = granularity ? `${this.expressionPath()}.${granularity}` : this.expressionPath();
+    if ((context.renderedReference || {})[path]) {
+      return context.renderedReference[path];
+    }
 
     if (context.rollupQuery || context.wrapQuery) {
       if (context.rollupGranularity === this.granularity) {

@@ -2380,6 +2380,52 @@ describe('SQL Generation', () => {
     }]
   ));
 
+  it('post aggregate percentage of total filtered with time dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+    },
+    [{
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__percentage_of_total: 10,
+      visitors__revenue: '100',
+      visitors__source: 'some'
+    }, {
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__percentage_of_total: 20,
+      visitors__revenue: '200',
+      visitors__source: 'some'
+    }, {
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__percentage_of_total: 40,
+      visitors__revenue: '400',
+      visitors__source: null
+    }]
+  ));
+
   it('post aggregate percentage of total filtered and joined', async () => runQueryTest(
     {
       measures: ['visitors.revenue', 'visitors.percentage_of_total'],
