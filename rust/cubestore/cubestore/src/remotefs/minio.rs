@@ -12,7 +12,6 @@ use s3::{Bucket, Region};
 use std::env;
 use std::fmt;
 use std::fmt::Formatter;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
