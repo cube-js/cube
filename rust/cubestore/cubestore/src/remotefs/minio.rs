@@ -4,6 +4,7 @@ use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use datafusion::cube_ext;
 use log::{debug, info};
 use regex::{NoExpand, Regex};
 use s3::creds::Credentials;
@@ -15,6 +16,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
+use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
@@ -178,7 +180,9 @@ impl RemoteFs for MINIORemoteFs {
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
             let mut temp_upload_file = File::open(&temp_upload_path).await?;
-            let status_code = bucket.put_object_stream(&mut temp_upload_file, path).await?;
+            let status_code = bucket
+                .put_object_stream(&mut temp_upload_file, path)
+                .await?;
 
             if status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -226,25 +230,32 @@ impl RemoteFs for MINIORemoteFs {
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
 
-            let status_code = {
-                let mut temp_file = async_tempfile::TempFile::new_in(&downloads_dir).await?;
+            let (temp_file, temp_path) =
+                cube_ext::spawn_blocking(move || NamedTempFile::new_in(&downloads_dir))
+                    .await??
+                    .into_parts();
 
-                let res = bucket.get_object_stream(path.as_str(), &mut temp_file).await;
-                temp_file.flush().await?;
-
-                tokio::fs::rename(temp_file.file_path(), local_file).await?;
-
-                res
-            }?;
-
+            let mut writter = File::from_std(temp_file);
+            let status_code = bucket
+                .get_object_stream(path.as_str(), &mut writter)
+                .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
                     "minIO download returned non OK status: {}",
                     status_code
                 )));
             }
+
+            writter.flush().await?;
+
+            cube_ext::spawn_blocking(move || -> Result<(), PathPersistError> {
+                temp_path.persist(&local_file)
+            })
+            .await??;
+
             info!("Downloaded {} ({:?})", remote_path, time.elapsed()?);
         }
+
         Ok(local_file_str)
     }
 

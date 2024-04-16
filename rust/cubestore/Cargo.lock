@@ -239,15 +239,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-tempfile"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c17d4a3286e6518d84be399efb8901aa74a183753b0bf4a8a4afe5bcfedcbb08"
-dependencies = [
- "tokio 1.37.0",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1127,7 +1118,6 @@ dependencies = [
  "arrow",
  "async-compression",
  "async-std",
- "async-tempfile",
  "async-trait",
  "aws-creds 0.24.1",
  "aws-region 0.22.1",
