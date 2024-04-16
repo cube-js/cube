@@ -206,6 +206,7 @@ export class BaseQuery {
       from: this.options.from,
       postAggregateQuery: this.options.postAggregateQuery,
       postAggregateDimensions: this.options.postAggregateDimensions,
+      postAggregateTimeDimensions: this.options.postAggregateTimeDimensions,
     });
     this.from = this.options.from;
     this.postAggregateQuery = this.options.postAggregateQuery;
@@ -216,6 +217,7 @@ export class BaseQuery {
     this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
     this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
     this.postAggregateDimensions = (this.options.postAggregateDimensions || []).map(this.newDimension.bind(this));
+    this.postAggregateTimeDimensions = (this.options.postAggregateTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
     this.order = this.options.order || [];
     const filters = this.extractFiltersAsTree(this.options.filters || []);
@@ -963,8 +965,11 @@ export class BaseQuery {
         {
           dimensions: this.dimensions.map(d => d.dimension),
           postAggregateDimensions: this.dimensions.map(d => d.dimension),
+          // TODO accessing timeDimensions directly from options might miss some processing logic
+          timeDimensions: this.options.timeDimensions || [],
+          postAggregateTimeDimensions: this.options.timeDimensions || [],
           // TODO accessing filters directly from options might miss some processing logic
-          filters: this.options.filters
+          filters: this.options.filters || []
         },
         allMemberChildren,
         withQueries
@@ -1057,7 +1062,11 @@ export class BaseQuery {
       const filterMeasuresAndDimensions = this.extractDimensionsAndMeasures(queryContext.filters);
       queryContext = {
         ...queryContext,
-        dimensions: R.uniq(queryContext.dimensions.concat(filterMeasuresAndDimensions.map(m => m.dimension).filter(m => !!m))),
+        dimensions: R.uniq(
+          queryContext.dimensions
+            .concat(filterMeasuresAndDimensions.map(m => m.dimension).filter(m => !!m)
+              .concat(queryContext.timeDimensions.filter(td => !!td.dateRange).map(td => td.dimension)))
+        ),
         measures: R.uniq(queryContext.dimensions.concat(filterMeasuresAndDimensions.map(m => m.measures).filter(m => !!m))),
       };
     }
@@ -1080,19 +1089,21 @@ export class BaseQuery {
       queryContext = {
         ...queryContext,
         postAggregateDimensions: R.difference(queryContext.postAggregateDimensions, memberDef.reduceByReferences),
+        postAggregateTimeDimensions: queryContext.postAggregateTimeDimensions.filter(td => memberDef.reduceByReferences.indexOf(td.dimension) === -1),
         // dimensions: R.uniq(queryContext.dimensions.concat(memberDef.reduceByReferences))
       };
     }
     if (memberDef.groupByReferences) {
       queryContext = {
         ...queryContext,
-        postAggregateDimensions: R.intersection(queryContext.postAggregateDimensions, memberDef.groupByReferences)
+        postAggregateDimensions: R.intersection(queryContext.postAggregateDimensions, memberDef.groupByReferences),
+        postAggregateTimeDimensions: queryContext.postAggregateTimeDimensions.filter(td => memberDef.groupByReferences.indexOf(td.dimension) !== -1),
       };
     }
     if (!wouldNodeApplyFilters) {
       queryContext = {
         ...queryContext,
-        originalFilters: queryContext.filters,
+        timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
         filters: undefined,
       };
     }
@@ -1103,6 +1114,7 @@ export class BaseQuery {
     const fromMeasures = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => f.measures)));
     // TODO get rid of this postAggregate filter
     const fromDimensions = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => f.dimensions)));
+    const fromTimeDimensions = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => (f.timeDimensions || []).map(td => ({ ...td, dateRange: undefined })))));
     const renderedReferenceContext = {
       renderedReference: withQuery.memberFrom && R.fromPairs(
         R.unnest(withQuery.memberFrom.map(from => from.measures.map(m => {
@@ -1111,6 +1123,9 @@ export class BaseQuery {
         }).concat(from.dimensions.map(m => {
           const member = this.newDimension(m);
           return [m, member.aliasName()];
+        })).concat(from.timeDimensions.map(m => {
+          const member = this.newTimeDimension(m);
+          return [member.granularity ? `${member.dimension}.${member.granularity}` : member.dimension, member.aliasName()];
         }))))
       )
     };
@@ -1119,7 +1134,9 @@ export class BaseQuery {
       measures: fromMeasures,
       // TODO get rid of this postAggregate filter
       dimensions: fromDimensions, // .filter(d => !this.newDimension(d).isPostAggregate()),
+      timeDimensions: fromTimeDimensions,
       postAggregateDimensions: withQuery.postAggregateDimensions,
+      postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
       postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
@@ -1128,14 +1145,18 @@ export class BaseQuery {
     const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
     // TODO get rid of this postAggregate filter
     const postAggregateDimensions = fromSubQuery && fromDimensions.map(m => fromSubQuery.newDimension(m)).filter(d => d.isPostAggregate());
-    const membersToSelect = measures?.concat(postAggregateDimensions);
+    const postAggregateTimeDimensions = fromSubQuery && fromTimeDimensions.map(m => fromSubQuery.newTimeDimension(m)).filter(d => d.isPostAggregate());
+    // TODO not working yet
+    const membersToSelect = measures?.concat(postAggregateDimensions).concat(postAggregateTimeDimensions);
     const select = fromSubQuery && fromSubQuery.outerMeasuresJoinFullKeyQueryAggregate(membersToSelect, membersToSelect, withQuery.memberFrom.map(f => f.alias));
     const fromSql = select && this.wrapInParenthesis(select);
 
     const subQuery = this.newSubQuery({
       measures: withQuery.measures,
       dimensions: withQuery.dimensions,
+      timeDimensions: withQuery.timeDimensions,
       postAggregateDimensions: withQuery.postAggregateDimensions,
+      postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       from: fromSql && {
         sql: fromSql,
@@ -2304,11 +2325,15 @@ export class BaseQuery {
       }
     }
     if (symbol.postAggregate) {
-      const partitionBy = this.postAggregateDimensions.length ? `PARTITION BY ${this.postAggregateDimensions.map(d => d.dimensionSql()).join(', ')} ` : '';
+      const partitionBy = (this.postAggregateDimensions.length || this.postAggregateTimeDimensions.length) ?
+        `PARTITION BY ${this.postAggregateDimensions.concat(this.postAggregateTimeDimensions).map(d => d.dimensionSql()).join(', ')} ` : '';
       if (symbol.type === 'rank') {
         return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
       }
-      if (!R.equals(this.postAggregateDimensions.map(d => d.expressionPath()), this.dimensions.map(d => d.expressionPath()))) {
+      if (!(
+        R.equals(this.postAggregateDimensions.map(d => d.expressionPath()), this.dimensions.map(d => d.expressionPath())) &&
+        R.equals(this.postAggregateTimeDimensions.map(d => d.expressionPath()), this.timeDimensions.map(d => d.expressionPath()))
+      )) {
         let funDef;
         if (symbol.type === 'countDistinctApprox') {
           funDef = this.countDistinctApprox(evaluateSql);
