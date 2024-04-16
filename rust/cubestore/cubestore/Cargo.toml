@@ -69,7 +69,7 @@ futures-timer = "3.0.2"
 tokio-stream = { version = "0.1.15", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
-tempfile = "3.2.0"
+tempfile = "3.10.1"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
