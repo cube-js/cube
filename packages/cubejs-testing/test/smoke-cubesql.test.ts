@@ -223,5 +223,35 @@ ORDER BY
   `);
       expect(res.rows).toMatchSnapshot('metabase max number');
     });
+
+    test('power bi post aggregate measure wrap', async () => {
+      const res = await connection.query(`
+select 
+  "_"."createdAt", 
+  "_"."a0" 
+from 
+  ( 
+    select 
+      "rows"."createdAt" as "createdAt", 
+      sum(cast("rows"."amountRankView" as decimal)) as "a0" 
+    from 
+      ( 
+        select 
+          "_"."status", 
+          "_"."createdAt", 
+          "_"."amountRankView"
+        from 
+          "public"."Orders" "_" 
+        where 
+          "_"."status" = 'shipped'
+      ) "rows" 
+    group by 
+      "createdAt" 
+  ) "_" 
+limit 
+  1000001
+  `);
+      expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
+    });
   });
 });

@@ -937,12 +937,20 @@ export class BaseQuery {
   fullKeyQueryAggregateMeasures(context) {
     const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
     const allMemberChildren = this.collectAllMemberChildren(context);
+    const memberToIsPostAggregate = this.collectAllPostAggregateMembers(allMemberChildren);
+
+    const hasPostAggregateMembers = (m) => {
+      if (memberToIsPostAggregate[m]) {
+        return true;
+      }
+      return allMemberChildren[m]?.some(c => hasPostAggregateMembers(c)) || false;
+    };
 
     const measuresToRender = (multiplied, cumulative) => R.pipe(
       R.values,
       R.flatten,
       R.filter(
-        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative && !m.postAggregate
+        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative && !hasPostAggregateMembers(m.measure)
       ),
       R.map(m => m.measure),
       R.uniq,
@@ -958,8 +966,9 @@ export class BaseQuery {
       )([false, true]);
     const withQueries = [];
     const postAggregateMembers = (this.allMembersConcat(false))
-      .filter(m => m.definition && m.definition()?.postAggregate)
-      .map(m => m.measure || m.dimension)
+      // TODO boolean logic filter support
+      .filter(m => m.expressionPath && hasPostAggregateMembers(m.expressionPath()))
+      .map(m => m.expressionPath())
       .map(m => this.postAggregateWithQueries(
         m,
         {
@@ -1001,6 +1010,28 @@ export class BaseQuery {
     ).reduce((a, b) => ({ ...a, ...b }), {});
   }
 
+  collectAllPostAggregateMembers(allMemberChildren) {
+    const allMembers = R.uniq(R.flatten(Object.keys(allMemberChildren).map(k => [k].concat(allMemberChildren[k]))));
+    return R.fromPairs(allMembers.map(m => ([m, this.memberInstanceByPath(m).isPostAggregate()])));
+  }
+
+  memberInstanceByPath(m) {
+    let member;
+    if (!member && this.cubeEvaluator.isMeasure(m)) {
+      member = this.newMeasure(m);
+    }
+    if (!member && this.cubeEvaluator.isDimension(m)) {
+      member = this.newDimension(m);
+    }
+    if (!member && this.cubeEvaluator.isSegment(m)) {
+      member = this.newSegment(m);
+    }
+    if (!member) {
+      throw new Error(`Can't resolve '${m}'`);
+    }
+    return member;
+  }
+
   postAggregateWithQueries(member, queryContext, memberChildren, withQueries) {
     // TODO calculate based on remove_filter in future
     const wouldNodeApplyFilters = !memberChildren[member];
@@ -1008,7 +1039,7 @@ export class BaseQuery {
       ?.map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, queryContext, wouldNodeApplyFilters), memberChildren, withQueries));
     const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
     const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isPostAggregate()) };
-    // TODO is calling postAggregateWithQueries twice optimal? If so make sure to keep only used CTE
+    // TODO is calling postAggregateWithQueries twice optimal?
     memberFrom = memberChildren[member] &&
       R.uniqBy(
         f => f.alias,
@@ -1020,13 +1051,6 @@ export class BaseQuery {
       ...(this.cubeEvaluator.isMeasure(member) ? { measures: [member] } : { measures: [], dimensions: R.uniq(selfContext.dimensions.concat(member)) }),
       memberFrom,
     };
-
-    if (!memberFrom) {
-      const postAggregateMember = subQuery.measures.find(m => this.newMeasure(m).isPostAggregate()) || subQuery.dimensions.find(m => this.newDimension(m).isPostAggregate());
-      if (postAggregateMember) {
-        throw new Error(`Post aggregate member '${postAggregateMember}' lacks FROM clause in sub query: ${JSON.stringify(subQuery)}`);
-      }
-    }
 
     const foundWith = withQueries.find(({ alias, ...q }) => R.equals(subQuery, q));
 
@@ -1151,7 +1175,7 @@ export class BaseQuery {
     const select = fromSubQuery && fromSubQuery.outerMeasuresJoinFullKeyQueryAggregate(membersToSelect, membersToSelect, withQuery.memberFrom.map(f => f.alias));
     const fromSql = select && this.wrapInParenthesis(select);
 
-    const subQuery = this.newSubQuery({
+    const subQueryOptions = {
       measures: withQuery.measures,
       dimensions: withQuery.dimensions,
       timeDimensions: withQuery.timeDimensions,
@@ -1167,7 +1191,16 @@ export class BaseQuery {
         const { type } = this.newMeasure(d).definition();
         return type === 'rank' || type === 'number';
       }),
-    });
+    };
+    const subQuery = this.newSubQuery(subQueryOptions);
+
+    if (!subQuery.from) {
+      const allSubQueryMembers = R.flatten(subQuery.collectFromMembers(false, subQuery.collectMemberNamesFor.bind(subQuery), 'collectMemberNamesFor'));
+      const postAggregateMember = allSubQueryMembers.find(m => this.memberInstanceByPath(m).isPostAggregate());
+      if (postAggregateMember) {
+        throw new Error(`Post aggregate member '${postAggregateMember}' lacks FROM clause in sub query: ${JSON.stringify(subQueryOptions)}`);
+      }
+    }
 
     return {
       query: subQuery.evaluateSymbolSqlWithContext(
