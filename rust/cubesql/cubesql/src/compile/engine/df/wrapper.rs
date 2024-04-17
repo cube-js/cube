@@ -985,7 +985,6 @@ impl CubeScanWrapperNode {
                         subqueries.clone(),
                     )
                     .await?;
-                    println!("alias expr: {}", expr);
                     Ok((expr, sql_query))
                 }
                 // Expr::OuterColumn(_, _) => {}
