@@ -2383,6 +2383,36 @@ describe('SQL Generation', () => {
     }]
   ));
 
+  it('post aggregate complex graph with time dimension no granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '300'
+    }, {
+      visitors__source: null,
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }]
+  ));
+
   it('post aggregate complex graph with time dimension through view', async () => runQueryTest(
     {
       measures: ['visitors_post_aggregate.adjusted_rank_sum', 'visitors_post_aggregate.visitor_revenue'],

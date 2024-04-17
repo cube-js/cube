@@ -976,7 +976,7 @@ export class BaseQuery {
           postAggregateDimensions: this.dimensions.map(d => d.dimension),
           // TODO accessing timeDimensions directly from options might miss some processing logic
           timeDimensions: this.options.timeDimensions || [],
-          postAggregateTimeDimensions: this.options.timeDimensions || [],
+          postAggregateTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
           // TODO accessing filters directly from options might miss some processing logic
           filters: this.options.filters || []
         },
