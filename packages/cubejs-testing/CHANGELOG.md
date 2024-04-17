@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.18](https://github.com/cube-js/cube.js/compare/v0.35.17...v0.35.18) (2024-04-17)
+
+
+### Features
+
+* Post aggregate view support ([#8161](https://github.com/cube-js/cube.js/issues/8161)) ([acb507d](https://github.com/cube-js/cube.js/commit/acb507d21d29b25592050bcf49c09fb9d88a7d93))
+
+
+
+
+
 ## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
 
 **Note:** Version bump only for package @cubejs-backend/testing
