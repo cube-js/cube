@@ -219,6 +219,7 @@ impl Rewriter {
                 .map(|v| v.parse::<u64>().unwrap())
                 .unwrap_or(30),
         ))
+        .with_scheduler(egg::SimpleScheduler)
         .with_egraph(egraph)
     }
 
