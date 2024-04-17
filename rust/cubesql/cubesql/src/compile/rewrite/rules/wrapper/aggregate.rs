@@ -262,6 +262,7 @@ impl WrapperRules {
                         "?cube_members",
                     ),
                     "WrappedSelectAlias:None",
+                    "WrappedSelectDistinct:false",
                     "?select_ungrouped",
                     "WrappedSelectUngroupedScan:false",
                 ),

@@ -841,7 +841,7 @@ fn wrapped_select(
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         subqueries,
