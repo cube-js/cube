@@ -24,7 +24,21 @@ cube(`Orders`, {
     numberTotal: {
       sql: `${totalAmount}`,
       type: `number`
-    }
+    },
+    amountRank: {
+      post_aggregate: true,
+      type: `rank`,
+      order_by: [{
+        sql: `${totalAmount}`,
+        dir: 'asc'
+      }],
+      reduce_by: [status],
+    },
+    amountRankView: {
+      post_aggregate: true,
+      type: `number`,
+      sql: `${amountRank}`,
+    },
   },
   dimensions: {
     id: {
