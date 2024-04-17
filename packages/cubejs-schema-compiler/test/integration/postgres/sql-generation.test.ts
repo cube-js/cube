@@ -258,6 +258,13 @@ describe('SQL Generation', () => {
           type: \`string\`
         }
       }
+    });
+    
+    view('visitors_post_aggregate', {
+      cubes: [{
+        join_path: 'visitors',
+        includes: ['adjusted_rank_sum', 'source', 'updated_at', 'visitor_revenue']
+      }]
     })
 
     cube('visitor_checkins', {
@@ -2373,6 +2380,49 @@ describe('SQL Generation', () => {
       visitors__updated_at_day: '2017-01-25T00:00:00.000Z',
       visitors__adjusted_rank_sum: null,
       visitors__visitor_revenue: null
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension through view', async () => runQueryTest(
+    {
+      measures: ['visitors_post_aggregate.adjusted_rank_sum', 'visitors_post_aggregate.visitor_revenue'],
+      dimensions: ['visitors_post_aggregate.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors_post_aggregate.updated_at',
+          granularity: 'day',
+        },
+      ],
+      order: [{
+        id: 'visitors_post_aggregate.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors_post_aggregate__source: 'google',
+      visitors_post_aggregate__updated_at_day: '2017-01-20T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
+    }, {
+      visitors_post_aggregate__source: 'some',
+      visitors_post_aggregate__updated_at_day: '2017-01-15T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: '200.1',
+      visitors_post_aggregate__visitor_revenue: '200'
+    }, {
+      visitors_post_aggregate__source: 'some',
+      visitors_post_aggregate__updated_at_day: '2017-01-30T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: '100.1',
+      visitors_post_aggregate__visitor_revenue: '100'
+    }, {
+      visitors_post_aggregate__source: null,
+      visitors_post_aggregate__updated_at_day: '2016-09-07T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
+    }, {
+      visitors_post_aggregate__source: null,
+      visitors_post_aggregate__updated_at_day: '2017-01-25T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
     }]
   ));
 

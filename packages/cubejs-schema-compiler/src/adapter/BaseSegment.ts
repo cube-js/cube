@@ -41,7 +41,14 @@ export class BaseSegment {
     return this.query.cubeEvaluator.segmentByPath(this.segment);
   }
 
-  public definition() {
+  public isPostAggregate() {
+    if (this.expression) { // TODO
+      return false;
+    }
+    return this.definition().postAggregate;
+  }
+
+  public definition(): any {
     if (this.expression) {
       return {
         sql: this.expression
