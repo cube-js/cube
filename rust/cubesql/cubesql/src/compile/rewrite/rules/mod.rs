@@ -29,18 +29,6 @@ pub fn replacer_push_down_node(
             replacer_node("?right".to_string())
         ),
     );
-    if name.starts_with("wrapper-projection-expr") {
-        println!(
-            "replacer: {}",
-            replacer_node(format!("({} ?left ?right)", list_node))
-        );
-        println!(
-            "repl ({} {} {})",
-            list_node,
-            replacer_node("?left".to_string()),
-            replacer_node("?right".to_string())
-        );
-    }
     if include_tail {
         vec![
             push_down_rule,
