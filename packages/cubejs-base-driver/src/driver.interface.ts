@@ -212,6 +212,11 @@ export type ForeignKeysQueryResult = {
   target_column: string
 };
 
+export type TableKeysFilter = {
+  tableSchema: string,
+  tableName: string[]
+};
+
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
   uploadTableWithIndexes(

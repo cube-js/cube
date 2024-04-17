@@ -171,7 +171,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
-      FROM information_schema.tables
+      FROM information_schema.tables as ${this.quoteIdentifier('columns')}
       WHERE table_schema IN (${schemasPlaceholders})
     `;
     return query;
@@ -183,9 +183,10 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('schema_name')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
-      FROM information_schema.columns
+      FROM information_schema.columns as ${this.quoteIdentifier('columns')}
       WHERE ${conditionString}
     `;
+
     return query;
   }
 
@@ -226,11 +227,11 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   protected getColumnNameForSchemaName() {
-    return 'table_schema';
+    return 'columns.table_schema';
   }
 
   protected getColumnNameForTableName() {
-    return 'table_name';
+    return 'columns.table_name';
   }
 
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
@@ -458,7 +459,7 @@ export abstract class BaseDriver implements DriverInterface {
     const conditionString = conditions.join(' OR ');
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
-
+    
     const [primaryKeys, foreignKeys] = await Promise.all([
       this.primaryKeys(conditionString, parameters),
       this.foreignKeys(conditionString, parameters)
@@ -467,9 +468,11 @@ export abstract class BaseDriver implements DriverInterface {
     const columns = await this.query<QueryColumnsResult>(query, parameters);
 
     console.log('>>>', JSON.stringify({
+      conditionString,
+      parameters,
       primaryKeys,
       foreignKeys
-    }));
+    }, null, 2));
 
     for (const column of columns) {
       if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
