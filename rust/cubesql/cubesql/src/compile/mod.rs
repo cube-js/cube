@@ -20196,35 +20196,34 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection_1() {
+    async fn test_simple_subquery_wrapper_projection() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (select customer_gender from KibanaSampleDataEcommerce where customer_gender = 'male' limit 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
         println!(
-            "log plan sql {}",
+            "l plan {}",
             logical_plan
                 .find_cube_scan_wrapper()
                 .wrapped_sql
                 .unwrap()
                 .sql
         );
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -20241,28 +20240,19 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (select customer_gender from KibanaSampleDataEcommerce where customer_gender = 'male' limit 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
-        println!(
-            "log plan sql {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -20286,21 +20276,12 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
-        /* println!(
-            "log plan sql {:?}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        ); */
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -20324,59 +20305,12 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
-        /* println!(
-            "log plan sql {:?}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        ); */
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
-
-    #[tokio::test]
-    async fn test_simple_subquery_wrapper_filter_in_aggregate() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, avg(avgPrice) FROM KibanaSampleDataEcommerce a where customer_gender in (select customer_gender from KibanaSampleDataEcommerce) GROUP BY 1"
-                .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
-        /* println!(
-            "log plan sql {:?}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        ); */
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("IN (SELECT"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(
@@ -20400,21 +20334,13 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!("log plan {:?}", logical_plan);
-        /* println!(
-            "log plan sql {:?}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        ); */
-        /* assert!(logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql
-        .contains("COALESCE")); */
+
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("IN (SELECT"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

@@ -1,12 +1,8 @@
-use crate::{
-    compile::rewrite::{
-        analysis::LogicalPlanAnalysis, insubquery_expr, rewrite, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
-    },
-    var, var_iter,
+use crate::compile::rewrite::{
+    analysis::LogicalPlanAnalysis, insubquery_expr, rewrite, rules::wrapper::WrapperRules,
+    wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Rewrite;
 
 impl WrapperRules {
     pub fn in_subquery_expr_rules(
@@ -69,6 +65,5 @@ impl WrapperRules {
                 ),
             ),
         ]);
-
     }
 }

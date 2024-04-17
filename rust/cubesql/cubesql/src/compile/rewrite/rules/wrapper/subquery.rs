@@ -1,15 +1,10 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules,
-        subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
-        wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
-        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
-        wrapped_select_order_expr_empty_tail, wrapped_select_projection_expr_empty_tail,
-        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
-        WrappedSelectUngrouped, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
+        analysis::LogicalPlanAnalysis, cube_scan_wrapper, rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        LogicalPlanLanguage,
     },
-    var, var_iter, var_list_iter,
+    var, var_list_iter,
 };
 use egg::{EGraph, Rewrite, Subst};
 

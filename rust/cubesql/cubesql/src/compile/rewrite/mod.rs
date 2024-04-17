@@ -871,10 +871,6 @@ fn wrapped_select_projection_expr_empty_tail() -> String {
     "WrappedSelectProjectionExpr".to_string()
 }
 
-fn wrapped_select_subqueries(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectSubqueries {} {})", left, right)
-}
-
 fn wrapped_select_subqueries_empty_tail() -> String {
     "WrappedSelectSubqueries".to_string()
 }
@@ -1157,18 +1153,6 @@ fn filter(expr: impl Display, input: impl Display) -> String {
 
 fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) -> String {
     format!("(Subquery {} {} {})", input, subqueries, types)
-}
-
-fn wrapped_subquery(input: impl Display, subqueries: impl Display) -> String {
-    format!("(WrappedSubquery {} {})", input, subqueries)
-}
-
-fn subquery_pushdown_replacer(members: impl Display) -> String {
-    format!("(SubqueryPushdownReplacer {})", members)
-}
-
-fn subquery_pullup_replacer(members: impl Display) -> String {
-    format!("(SubqueryPullupReplacer {})", members)
 }
 
 fn join(
