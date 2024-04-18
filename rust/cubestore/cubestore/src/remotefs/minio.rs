@@ -20,6 +20,7 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use tokio_stream::StreamExt;
 
 pub struct MINIORemoteFs {
     dir: PathBuf,
@@ -179,17 +180,23 @@ impl RemoteFs for MINIORemoteFs {
             info!("path {}", remote_path);
             let bucket = self.bucket.read().unwrap().clone();
             let mut temp_upload_file = File::open(&temp_upload_path).await?;
-            let status_code = bucket
+
+            let response = bucket
                 .put_object_stream(&mut temp_upload_file, path)
                 .await?;
-
-            if status_code != 200 {
+            if response.status_code() != 200 {
                 return Err(CubeError::user(format!(
                     "minIO upload returned non OK status: {}",
-                    status_code
+                    response.status_code()
                 )));
             }
-            info!("Uploaded {} ({:?})", remote_path, time.elapsed()?);
+
+            info!(
+                "Uploaded {} ({:?}) ({})",
+                remote_path,
+                time.elapsed()?,
+                humansize::format_size(response.uploaded_bytes(), humansize::DECIMAL)
+            );
         }
 
         let size = fs::metadata(&temp_upload_path).await?.len();
@@ -234,16 +241,20 @@ impl RemoteFs for MINIORemoteFs {
                     .await??
                     .into_parts();
 
-            let mut writter = File::from_std(temp_file);
-            let status_code = bucket
-                .get_object_stream(path.as_str(), &mut writter)
-                .await?;
-            if status_code != 200 {
+            let mut response = bucket.get_object_stream(path.as_str()).await?;
+            if response.status_code != 200 {
                 return Err(CubeError::user(format!(
                     "minIO download returned non OK status: {}",
-                    status_code
+                    response.status_code
                 )));
             }
+
+            let mut writter = File::from_std(temp_file);
+
+            while let Some(chunk) = response.bytes().next().await {
+                writter.write_all(&chunk?).await?;
+            }
+            drop(response);
 
             writter.flush().await?;
 

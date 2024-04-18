@@ -328,12 +328,6 @@ impl From<s3::error::S3Error> for CubeError {
     }
 }
 
-impl From<awscreds::error::CredentialsError> for CubeError {
-    fn from(v: awscreds::error::CredentialsError) -> Self {
-        CubeError::user(v.to_string())
-    }
-}
-
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
         CubeError::from_error(v)
