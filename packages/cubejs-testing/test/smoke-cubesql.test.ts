@@ -228,18 +228,21 @@ ORDER BY
       const res = await connection.query(`
 select 
   "_"."createdAt", 
-  "_"."a0" 
+  "_"."a0",
+  "_"."a1"
 from 
   ( 
     select 
       "rows"."createdAt" as "createdAt", 
-      sum(cast("rows"."amountRankView" as decimal)) as "a0" 
+      sum(cast("rows"."amountRankView" as decimal)) as "a0",
+      max("rows"."amountRankDate") as "a1" 
     from 
       ( 
         select 
           "_"."status", 
           "_"."createdAt", 
-          "_"."amountRankView"
+          "_"."amountRankView",
+          "_"."amountRankDate"
         from 
           "public"."Orders" "_" 
         where 
@@ -249,7 +252,8 @@ from
       "createdAt" 
   ) "_" 
 where 
-  not "_"."a0" is null
+  not "_"."a0" is null or
+  not "_"."a1" is null
 limit 
   1000001
   `);
