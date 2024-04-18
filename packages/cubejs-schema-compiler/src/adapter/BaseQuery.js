@@ -1157,7 +1157,7 @@ export class BaseQuery {
           return [m, member.aliasName()];
         })).concat(from.timeDimensions.map(m => {
           const member = this.newTimeDimension(m);
-          return [member.granularity ? `${member.dimension}.${member.granularity}` : member.dimension, member.aliasName()];
+          return member.granularity ? [`${member.dimension}.${member.granularity}`, member.aliasName()] : [];
         }))))
       )
     };
