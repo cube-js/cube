@@ -39,6 +39,19 @@ cube(`Orders`, {
       type: `number`,
       sql: `${amountRank}`,
     },
+    amountRankDateMax: {
+      post_aggregate: true,
+      sql: `${createdAt}`,
+      type: `max`,
+      filters: [{
+        sql: `${amountRank} = 1`
+      }]
+    },
+    amountRankDate: {
+      post_aggregate: true,
+      sql: `${amountRankDateMax}`,
+      type: `time`,
+    }
   },
   dimensions: {
     id: {

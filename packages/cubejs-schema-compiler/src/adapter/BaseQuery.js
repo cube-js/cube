@@ -116,9 +116,9 @@ export class BaseQuery {
   keepFilters(filters = [], fn) {
     return filters.map(f => {
       if (f.and) {
-        return this.keepFilters(f.and, fn);
+        return { and: this.keepFilters(f.and, fn) };
       } else if (f.or) {
-        return this.keepFilters(f.or, fn);
+        return { or: this.keepFilters(f.or, fn) };
       } else if (!f.member && !f.dimension) {
         throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
       } else {
@@ -1135,8 +1135,14 @@ export class BaseQuery {
     if (!wouldNodeApplyFilters) {
       queryContext = {
         ...queryContext,
+        // TODO make it same way as keepFilters
         timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
         filters: this.keepFilters(queryContext.filters, filterMember => filterMember === memberPath),
+      };
+    } else {
+      queryContext = {
+        ...queryContext,
+        filters: this.keepFilters(queryContext.filters, filterMember => !this.memberInstanceByPath(filterMember).isPostAggregate()),
       };
     }
     return queryContext;
