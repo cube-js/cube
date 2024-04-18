@@ -1197,7 +1197,7 @@ export class BaseQuery {
       // TODO condition should something else instead of rank
       postAggregateQuery: !!withQuery.measures.find(d => {
         const { type } = this.newMeasure(d).definition();
-        return type === 'rank' || type === 'number';
+        return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
       }),
     };
     const subQuery = this.newSubQuery(subQueryOptions);
