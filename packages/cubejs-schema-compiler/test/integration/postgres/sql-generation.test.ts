@@ -2413,6 +2413,44 @@ describe('SQL Generation', () => {
     }]
   ));
 
+  it('post aggregate complex graph with time dimension no granularity raw dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source', 'visitors.updated_at'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__updated_at: '2017-01-20T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at: '2017-01-15T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '200.1',
+      visitors__visitor_revenue: '200'
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at: '2017-01-30T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '100'
+    }, {
+      visitors__source: null,
+      visitors__updated_at: '2017-01-25T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }]
+  ));
+
   it('post aggregate complex graph with time dimension through view', async () => runQueryTest(
     {
       measures: ['visitors_post_aggregate.adjusted_rank_sum', 'visitors_post_aggregate.visitor_revenue'],
