@@ -67,7 +67,7 @@ export class BaseDimension {
     if (this.expression) { // TODO
       return false;
     }
-    return this.dimensionDefinition().postAggregate;
+    return this.definition().postAggregate;
   }
 
   public cube() {

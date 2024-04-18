@@ -113,6 +113,20 @@ export class BaseQuery {
     return allFilters;
   }
 
+  keepFilters(filters = [], fn) {
+    return filters.map(f => {
+      if (f.and) {
+        return this.keepFilters(f.and, fn);
+      } else if (f.or) {
+        return this.keepFilters(f.or, fn);
+      } else if (!f.member && !f.dimension) {
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
+      } else {
+        return fn(f.member || f.dimension || f.measure) ? f : null;
+      }
+    }).filter(f => !!f);
+  }
+
   extractFiltersAsTree(filters = []) {
     if (!filters) {
       return [];
@@ -965,24 +979,25 @@ export class BaseQuery {
         R.unnest
       )([false, true]);
     const withQueries = [];
-    const postAggregateMembers = (this.allMembersConcat(false))
-      // TODO boolean logic filter support
-      .filter(m => m.expressionPath && hasPostAggregateMembers(m.expressionPath()))
-      .map(m => m.expressionPath())
-      .map(m => this.postAggregateWithQueries(
-        m,
-        {
-          dimensions: this.dimensions.map(d => d.dimension),
-          postAggregateDimensions: this.dimensions.map(d => d.dimension),
-          // TODO accessing timeDimensions directly from options might miss some processing logic
-          timeDimensions: this.options.timeDimensions || [],
-          postAggregateTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
-          // TODO accessing filters directly from options might miss some processing logic
-          filters: this.options.filters || []
-        },
-        allMemberChildren,
-        withQueries
-      ));
+    const postAggregateMembers = R.uniq(
+      this.allMembersConcat(false)
+        // TODO boolean logic filter support
+        .filter(m => m.expressionPath && hasPostAggregateMembers(m.expressionPath()))
+        .map(m => m.expressionPath())
+    ).map(m => this.postAggregateWithQueries(
+      m,
+      {
+        dimensions: this.dimensions.map(d => d.dimension),
+        postAggregateDimensions: this.dimensions.map(d => d.dimension),
+        // TODO accessing timeDimensions directly from options might miss some processing logic
+        timeDimensions: this.options.timeDimensions || [],
+        postAggregateTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
+        // TODO accessing filters directly from options might miss some processing logic
+        filters: this.options.filters || []
+      },
+      allMemberChildren,
+      withQueries
+    ));
     const usedWithQueries = {};
     postAggregateMembers.forEach(m => this.collectUsedWithQueries(usedWithQueries, m));
 
@@ -1082,18 +1097,11 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
-    if (wouldNodeApplyFilters) {
-      const filterMeasuresAndDimensions = this.extractDimensionsAndMeasures(queryContext.filters);
-      queryContext = {
-        ...queryContext,
-        dimensions: R.uniq(
-          queryContext.dimensions
-            .concat(filterMeasuresAndDimensions.map(m => m.dimension).filter(m => !!m)
-              .concat(queryContext.timeDimensions.filter(td => !!td.dateRange).map(td => td.dimension)))
-        ),
-        measures: R.uniq(queryContext.dimensions.concat(filterMeasuresAndDimensions.map(m => m.measures).filter(m => !!m))),
-      };
-    }
+    queryContext = {
+      ...queryContext,
+      // TODO can't remove filters from OR expression
+      filters: this.keepFilters(queryContext.filters, filterMember => filterMember !== memberPath),
+    };
     return queryContext;
   }
 
@@ -1128,7 +1136,7 @@ export class BaseQuery {
       queryContext = {
         ...queryContext,
         timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
-        filters: undefined,
+        filters: this.keepFilters(queryContext.filters, filterMember => filterMember === memberPath),
       };
     }
     return queryContext;
@@ -2338,7 +2346,7 @@ export class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
+        const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
       } else {
         return evaluateSql;
