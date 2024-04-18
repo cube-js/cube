@@ -248,6 +248,8 @@ from
     group by 
       "createdAt" 
   ) "_" 
+where 
+  not "_"."a0" is null
 limit 
   1000001
   `);

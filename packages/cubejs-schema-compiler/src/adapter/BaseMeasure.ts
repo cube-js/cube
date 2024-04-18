@@ -66,7 +66,7 @@ export class BaseMeasure {
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
-  public definition() {
+  public definition(): any {
     if (this.expression) {
       return {
         sql: this.expression,
@@ -99,7 +99,7 @@ export class BaseMeasure {
     if (this.expression) { // TODO
       return false;
     }
-    return this.measureDefinition().postAggregate;
+    return this.definition().postAggregate;
   }
 
   public isAdditive() {
