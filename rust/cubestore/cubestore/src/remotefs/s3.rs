@@ -246,11 +246,6 @@ impl RemoteFs for S3RemoteFs {
             let path = self.s3_path(&remote_path);
             let bucket = self.bucket.read().unwrap().clone();
 
-            let (temp_file, temp_path) =
-                cube_ext::spawn_blocking(move || NamedTempFile::new_in(&downloads_dir))
-                    .await??
-                    .into_parts();
-
             let mut response = bucket.get_object_stream(path.as_str()).await?;
             if response.status_code != 200 {
                 return Err(CubeError::user(format!(
@@ -259,6 +254,10 @@ impl RemoteFs for S3RemoteFs {
                 )));
             }
 
+            let (temp_file, temp_path) =
+                cube_ext::spawn_blocking(move || NamedTempFile::new_in(&downloads_dir))
+                    .await??
+                    .into_parts();
             let mut writter = File::from_std(temp_file);
 
             while let Some(chunk) = response.bytes().next().await {
