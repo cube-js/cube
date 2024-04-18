@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/materialize-driver",
   "description": "Cube.js Materialize database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.18",
+  "version": "0.35.19",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -28,7 +28,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.2",
-    "@cubejs-backend/postgres-driver": "^0.35.18",
+    "@cubejs-backend/postgres-driver": "^0.35.19",
     "@cubejs-backend/shared": "^0.35.2",
     "@types/pg": "^8.6.0",
     "pg": "^8.6.0",
@@ -38,7 +38,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/testing": "^0.35.18",
+    "@cubejs-backend/testing": "^0.35.19",
     "typescript": "~5.2.2"
   },
   "publishConfig": {
