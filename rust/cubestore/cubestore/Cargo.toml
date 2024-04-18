@@ -77,7 +77,7 @@ memchr = "2"
 flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
-tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
+tracing-futures = { version = "0.2.5" }
 lru = "0.6.5"
 moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
