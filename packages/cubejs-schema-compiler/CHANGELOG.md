@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* Logical boolean measure filter for post aggregate measures support ([92cee95](https://github.com/cube-js/cube/commit/92cee954b1252b0234e3008fb74d88d7b1c3c47f))
+
+
+
+
+
 ## [0.35.20](https://github.com/cube-js/cube/compare/v0.35.19...v0.35.20) (2024-04-18)
 
 

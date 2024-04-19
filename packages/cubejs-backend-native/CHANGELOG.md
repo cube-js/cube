@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **native:** Better error message on unexpected values while streaming ([#8172](https://github.com/cube-js/cube/issues/8172)) ([bcf3438](https://github.com/cube-js/cube/commit/bcf3438682951d7b917866870fc029af3efe2362))
+
+
+
+
+
 ## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
 
 
