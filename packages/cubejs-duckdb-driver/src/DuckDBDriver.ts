@@ -23,7 +23,6 @@ export type DuckDBDriverConfiguration = {
 };
 
 type InitPromise = {
-  defaultConnection: Connection,
   db: Database;
 };
 
@@ -77,35 +76,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     // Create a new Database instance with the determined URL and custom user agent
     const db = new Database(dbUrl, dbOptions);
 
+    return {
+      db
+    };
+  }
+
+  protected async createConnection(initPromise: InitPromise): Promise<Connection> {
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
-    const defaultConnection = db.connect();
-    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
-
-    try {
-      await execAsync('INSTALL httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
-    try {
-      await execAsync('LOAD httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on loading httpfs', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
+    const connection = initPromise.db.connect();
+    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(connection.exec).bind(connection) as any;
 
     const configuration = [
       {
@@ -145,7 +124,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         value: getEnv('duckdbS3SessionToken', this.config),
       }
     ];
-    
+
     for (const { key, value } of configuration) {
       if (value) {
         try {
@@ -171,11 +150,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-    
-    return {
-      defaultConnection,
-      db
-    };
+    return connection;
   }
 
   public override informationSchemaQuery(): string {
@@ -212,13 +187,17 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
   }
 
+  protected async getConnection(): Promise<Connection> {
+    return this.createConnection(await this.getInitiatedState());
+  }
+
   public static dialectClass() {
     return DuckDBQuery;
   }
 
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
-    const { defaultConnection } = await this.getInitiatedState();
-    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(defaultConnection.all).bind(defaultConnection) as any;
+    const connection = await this.getConnection();
+    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
     const result = await fetchAsync(query, ...values);
     return result.map((item) => {
