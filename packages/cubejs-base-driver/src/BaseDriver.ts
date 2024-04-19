@@ -207,7 +207,10 @@ export abstract class BaseDriver implements DriverInterface {
 
     try {
       return (await this.query<PrimaryKeysQueryResult>(query, params));
-    } catch (_) {
+    } catch (error: any) {
+      this.logger('Primary Keys Query failed. Primary Keys will be defined by heuristics', {
+        error: (error.stack || error).toString()
+      });
       return [];
     }
   }
@@ -221,7 +224,10 @@ export abstract class BaseDriver implements DriverInterface {
 
     try {
       return (await this.query<ForeignKeysQueryResult>(query, params));
-    } catch (_) {
+    } catch (error: any) {
+      this.logger('Foreign Keys Query failed. Joins will be defined by heuristics', {
+        error: (error.stack || error).toString()
+      });
       return [];
     }
   }
@@ -466,14 +472,7 @@ export abstract class BaseDriver implements DriverInterface {
     ]);
 
     const columns = await this.query<QueryColumnsResult>(query, parameters);
-
-    console.log('>>>', JSON.stringify({
-      conditionString,
-      parameters,
-      primaryKeys,
-      foreignKeys
-    }, null, 2));
-
+  
     for (const column of columns) {
       if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
         column.attributes = ['primaryKey'];
