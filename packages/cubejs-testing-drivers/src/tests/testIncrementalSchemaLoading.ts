@@ -59,6 +59,7 @@ export function incrementalSchemaLoadingSuite(
       table_name: expect.any(String),
       column_name: expect.any(String),
       data_type: expect.any(String),
+      foreign_keys: expect.anything(),
     });
   });
 }
