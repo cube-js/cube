@@ -20179,20 +20179,8 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("COALESCE"));
-        println!(
-            "!! sql: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -20210,14 +20198,6 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        println!(
-            "l plan {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
-        );
         assert!(logical_plan
             .find_cube_scan_wrapper()
             .wrapped_sql
@@ -20225,11 +20205,7 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("(SELECT"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -20254,11 +20230,7 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("(SELECT"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -20283,11 +20255,7 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("(SELECT"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -20312,11 +20280,7 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("IN (SELECT"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -20342,11 +20306,7 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("IN (SELECT"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
