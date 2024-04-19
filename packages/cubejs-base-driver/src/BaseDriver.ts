@@ -392,10 +392,6 @@ export abstract class BaseDriver implements DriverInterface {
     const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
     const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
 
-    console.log('>>>', JSON.stringify({
-      primaryKeys, foreignKeys
-    }, null, 2));
-
     for (const pk of primaryKeys) {
       if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
         tablesSchema[pk.table_schema][pk.table_name] = tablesSchema[pk.table_schema][pk.table_name].map((it: any) => {
