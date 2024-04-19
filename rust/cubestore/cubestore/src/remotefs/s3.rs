@@ -48,17 +48,23 @@ impl S3RemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let key_id = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
-        let access_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
-        let credentials =
-            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None).map_err(
-                |err| {
-                    CubeError::internal(format!(
-                        "Failed to create S3 credentials: {}",
-                        err.to_string()
-                    ))
-                },
-            )?;
+        // Incorrect naming for ENV variables...
+        let access_key = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
+        let secret_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
+
+        let credentials = Credentials::new(
+            access_key.as_deref(),
+            secret_key.as_deref(),
+            None,
+            None,
+            None,
+        )
+        .map_err(|err| {
+            CubeError::internal(format!(
+                "Failed to create S3 credentials: {}",
+                err.to_string()
+            ))
+        })?;
         let region = region.parse::<Region>().map_err(|err| {
             CubeError::internal(format!(
                 "Failed to parse Region '{}': {}",
@@ -73,14 +79,15 @@ impl S3RemoteFs {
             sub_path,
             delete_mut: Mutex::new(()),
         });
-        spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
+        spawn_creds_refresh_loop(access_key, secret_key, bucket_name, region, &fs);
+
         Ok(fs)
     }
 }
 
 fn spawn_creds_refresh_loop(
-    key_id: Option<String>,
     access_key: Option<String>,
+    secret_key: Option<String>,
     bucket_name: String,
     region: Region,
     fs: &Arc<S3RemoteFs>,
@@ -104,8 +111,8 @@ fn spawn_creds_refresh_loop(
                 Some(fs) => fs,
             };
             let c = match Credentials::new(
-                key_id.as_deref(),
                 access_key.as_deref(),
+                secret_key.as_deref(),
                 None,
                 None,
                 None,

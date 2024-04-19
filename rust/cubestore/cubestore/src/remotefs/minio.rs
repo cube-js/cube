@@ -91,6 +91,7 @@ impl MINIORemoteFs {
             delete_mut: Mutex::new(()),
         });
         spawn_creds_refresh_loop(access_key, secret_key, bucket_name, region, &fs);
+
         Ok(fs)
     }
 }
@@ -181,7 +182,7 @@ impl RemoteFs for MINIORemoteFs {
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
-            info!("path {}", remote_path);
+
             let bucket = self.bucket.load();
             let mut temp_upload_file = File::open(&temp_upload_path).await?;
             let status_code = bucket
