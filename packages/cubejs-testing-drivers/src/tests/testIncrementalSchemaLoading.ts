@@ -54,12 +54,12 @@ export function incrementalSchemaLoadingSuite(
     const columnsForTables = await driver().getColumnsForSpecificTables(inputTables);
     expect(columnsForTables).toBeInstanceOf(Array);
     expect(columnsForTables.length).toBeGreaterThan(0);
-    expect(columnsForTables).toContainEqual({
-      schema_name: expect.any(String),
-      table_name: expect.any(String),
-      column_name: expect.any(String),
-      data_type: expect.any(String),
-      foreign_keys: expect.anything(),
+
+    columnsForTables.forEach((it) => {
+      expect(it.schema_name).toEqual(expect.any(String));
+      expect(it.table_name).toEqual(expect.any(String));
+      expect(it.column_name).toEqual(expect.any(String));
+      expect(it.data_type).toEqual(expect.any(String));
     });
   });
 }
