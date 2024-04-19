@@ -13,14 +13,7 @@ as you think about what is right for your business.
 ## Cube Compute Unit
 
 A **Cube Compute Unit** (CCU) is a way to measure compute power used to run Cube Cloud
-infrastructure and resources within it. 
-
-| Resource type             | CCUs per hour (measured in 5 minute intervals) |
-| ------------------------- | :--------------------------------------------: |
-| Production Cluster        |                       4                        |
-| Development Instance      |                       1                        |
-| Cube Store Worker         |                       1                        |
-| Cube API Instance         |                       1                        |
+infrastructure and [resources](#resources) within it. 
 
 The price of a CCU is determined by the pricing plan you're subscribed to.
 
@@ -31,6 +24,35 @@ During your deployment, Premium, Enterprise, and Enterprise Premier customers ca
 [Budgets][ref-cloud-budgets] to make sure you know your usage is on track and as expected.
 
 [ref-cloud-budgets]: /product/workspace/budgets
+
+### Resources
+
+The following resource types incur CCU consumption (measured in 5-minute intervals):
+
+| Resource type             | CCUs per hour                                  |
+| ------------------------- | :--------------------------------------------: |
+| Production Cluster        |                       4                        |
+| Development Instance      |                       1                        |
+| Cube Store Worker         |                       1                        |
+| Cube API Instance         |                       1                        |
+| Dedicated VPC             |                       3                        |
+| Query History             | Depends on [chosen tier](#query-history-tiers) |
+
+### Query History tiers
+
+[Query History][ref-query-history] and [Performance Insights][ref-performance-insights]
+features analyze and visualize the data available under the following tiers:
+
+| Query History tier | CCUs per hour | API requests/day | Data retention |
+| ------------------ | :-----------: | ---------------- | -------------- |
+| XS                 | 0             | Up to 50,000     | 1 day          |
+| S                  | 2             | Up to 100,000    | 7 days         |
+| M                  | 5             | Up to 250,000    | 14 days        |
+| L                  | 10            | Up to 500,000    | 21 days        |
+| XL                 | 20            | Up to 1,000,000  | 30 days        |
+
+You can upgrade to the chosen tier by reaching out to your dedicated customer success
+manager (CSM).
 
 ## Pricing plans
 
@@ -60,9 +82,10 @@ terms][ref-starter-plan-support], and [limits][ref-cloud-limits].
 
 **Premium plan is designed for basic small-scale production deployments.**
 
-It offers everything in the [Starter plan](#starter) as well as support for
-[custom domains][ref-cloud-custom-domains], AWS and GCP support in all regions.
-Cube Cloud provides a 99.95% uptime SLA for this plan.
+It offers everything in the [Starter plan](#starter) as well as enabling
+the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
+support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
+in all regions. Cube Cloud provides a 99.95% uptime SLA for this plan.
 
 You can review its [pricing and minimums][cube-pricing], [support
 terms][ref-premium-plan-support], and [limits][ref-cloud-limits].
@@ -87,8 +110,7 @@ terms][ref-enterprise-plan-support], and [limits][ref-cloud-limits].
 **Enterprise Premier plan caters to high-scale, high-availability
 mission-critical production deployments with security and compliance needs.**
 
-It offers everything in the [Enterprise plan](#enterprise) as well as enabling
-the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
+It offers everything in the [Enterprise plan](#enterprise) as well as
 unlimited pre-aggregation sizes, and support for kSQL and Elasticsearch. Cube
 Cloud provides a 99.995% uptime SLA for this plan.
 
@@ -168,7 +190,8 @@ queries and refresh pre-aggregations 24/7, being active approximately 50% of the
 * Uses a dedicated Development Instance for testing purposes that is active 24 hours a day.
 * Has a team of 10 data engineers who frequently update the data model, with each data engineer
 spending about 4 hours a day in the development mode of the dedicated Development Instance.
-* Uses a Query History tier with 14-day data retention to inform the work of data engineers.
+* Uses a [Query History tier](#query-history-tiers) with 14-day data retention to inform the work
+of data engineers.
 
 | Resource                                        | Usage per month                                                                             | CCU per month                    | Cost per month                             |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------ |
@@ -178,7 +201,7 @@ spending about 4 hours a day in the development mode of the dedicated Developmen
 | Cube Store Worker                               | 1 Production Multi-Cluster ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 5760 hours ×<br/>1 CCU per hour  | 5760 CCUs ×<br/>\$0.4 per CCU = **\$2304** |
 | Development Instance                            | 1 Development Instance ×<br/>24 hours per day ×<br/>30 days                                 | 720 hours ×<br/>1 CCU per hour   | 720 CCUs ×<br/>\$0.4 per CCU = **\$288**   |
 | Development Instance<br/>(for development mode) | 10 users ×<br/>4 hours per day ×<br/>30 days                                                | 1200 hours ×<br/>1 CCU per hour  | 1200 CCUs ×<br/>\$0.4 per CCU = **\$480**  |
-| Query History (14-day data retention)           | 24 hours per day ×<br/>30 days                                                              | 720 hours ×<br/>5 CCU per hour   | 3600 CCUs ×<br/>\$0.4 per CCU = **\$1440** |
+| Query History (M tier)                          | 24 hours per day ×<br/>30 days                                                              | 720 hours ×<br/>5 CCUs per hour  | 3600 CCUs ×<br/>\$0.4 per CCU = **\$1440** |
 | **Total**                                       |                                                                                             |                                  | **\$9984**                                 |
 
 ## Overages and payment terms
@@ -239,3 +262,5 @@ subscription plan level. Payments are non-refundable.
 [ref-premium-plan-support]: /product/deployment/cloud/support#premium
 [ref-enterprise-plan-support]: /product/deployment/cloud/support#enterprise
 [ref-enterprise-premier-plan-support]: /product/deployment/cloud/support#enterprise-premier
+[ref-query-history]: /product/workspace/query-history
+[ref-performance-insights]: /product/workspace/performance
