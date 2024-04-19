@@ -1,8 +1,8 @@
 use crate::config::injection::DIService;
 use crate::CubeError;
-use std::alloc::{GlobalAlloc, Layout, System};
+
 use std::fmt::Debug;
-use std::sync::atomic::{AtomicI64, Ordering::Relaxed};
+
 use std::sync::Arc;
 
 pub trait MemoryHandler: DIService + Debug + Send + Sync {
