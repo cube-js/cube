@@ -208,9 +208,11 @@ export abstract class BaseDriver implements DriverInterface {
     try {
       return (await this.query<PrimaryKeysQueryResult>(query, params));
     } catch (error: any) {
-      this.logger('Primary Keys Query failed. Primary Keys will be defined by heuristics', {
-        error: (error.stack || error).toString()
-      });
+      if (this.logger) {
+        this.logger('Primary Keys Query failed. Primary Keys will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
       return [];
     }
   }
@@ -225,9 +227,11 @@ export abstract class BaseDriver implements DriverInterface {
     try {
       return (await this.query<ForeignKeysQueryResult>(query, params));
     } catch (error: any) {
-      this.logger('Foreign Keys Query failed. Joins will be defined by heuristics', {
-        error: (error.stack || error).toString()
-      });
+      if (this.logger) {
+        this.logger('Foreign Keys Query failed. Joins will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
       return [];
     }
   }
@@ -387,6 +391,10 @@ export abstract class BaseDriver implements DriverInterface {
 
     const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
     const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
+
+    console.log('>>>', JSON.stringify({
+      primaryKeys, foreignKeys
+    }, null, 2));
 
     for (const pk of primaryKeys) {
       if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {

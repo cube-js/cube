@@ -160,8 +160,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         tc.table_name as ${this.quoteIdentifier('table_name')},
         kcu.column_name as ${this.quoteIdentifier('column_name')},
         columns.table_name as ${this.quoteIdentifier('target_table')},
-        columns.column_name as ${this.quoteIdentifier('target_column')},
-        constraint_type
+        columns.column_name as ${this.quoteIdentifier('target_column')}
       FROM
         information_schema.table_constraints AS tc
       JOIN information_schema.key_column_usage AS kcu
