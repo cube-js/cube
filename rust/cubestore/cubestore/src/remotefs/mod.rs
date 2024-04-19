@@ -448,8 +448,11 @@ impl LocalDirRemoteFs {
 
 #[cfg(test)]
 mod tests {
+    use super::gcs::GCSRemoteFs;
+    use super::minio::MINIORemoteFs;
     use super::s3::S3RemoteFs;
     use super::*;
+    use crate::config::init_test_logger;
     use std::io::prelude::*;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
@@ -629,11 +632,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_s3() {
+    async fn aws_s3() -> Result<(), CubeError> {
         if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
-            return;
+            return Ok(());
         }
 
+        init_test_logger().await;
         let region = "us-west-2".to_string();
         let bucket_name = "cube-store-ci-test".to_string();
 
@@ -645,8 +649,7 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             None,
-        )
-        .unwrap();
+        )?;
 
         let name_maker = NameMaker::new(Uuid::new_v4().to_string());
         test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
@@ -664,5 +667,70 @@ mod tests {
         test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
 
         clear_test_dir("aws_s3");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn minio_remote_fs() -> Result<(), CubeError> {
+        if env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").is_err() {
+            return Ok(());
+        }
+
+        init_test_logger().await;
+        let bucket_name = "cube-store-ci-test".to_string();
+
+        clear_test_dir("minio_remote_fs");
+        let local_path = get_test_local_dir("minio_remote_fs");
+
+        let remote_fs = MINIORemoteFs::new(local_path.clone(), bucket_name.clone(), None)?;
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+
+        let remote_fs = MINIORemoteFs::new(
+            local_path.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn gcp_remote_fs() -> Result<(), CubeError> {
+        if env::var("CUBESTORE_GCP_CREDENTIALS").is_err() {
+            return Ok(());
+        }
+
+        init_test_logger().await;
+        let bucket_name = "cube-store-ci-test-v2".to_string();
+
+        clear_test_dir("gcp_remote_fs");
+        let local_path = get_test_local_dir("gcp_remote_fs");
+
+        let remote_fs = GCSRemoteFs::new(local_path.clone(), bucket_name.clone(), None)?;
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("gcp_remote_fs");
+
+        let remote_fs = GCSRemoteFs::new(
+            local_path.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("gcp_remote_fs");
+        Ok(())
     }
 }
