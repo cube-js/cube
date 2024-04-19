@@ -8,6 +8,7 @@ use cubesql::CubeError;
 #[cfg(build = "debug")]
 use log::trace;
 use neon::prelude::*;
+use neon::types::JsDate;
 
 use crate::utils::bind_method;
 
@@ -148,6 +149,17 @@ impl ValueObject for JsValueObject<'_> {
             || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
         {
             Ok(FieldValue::Null)
+        } else if let Ok(b) = value.downcast::<JsArray, _>(&mut self.cx) {
+            Err(CubeError::user(format!(
+                "Expected primitive value but found JsArray({:?})",
+                b
+            )))
+        } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
+            // TODO: Support it?
+            Err(CubeError::user(format!(
+                "Expected primitive value but found JsDate({:?})",
+                b
+            )))
         } else {
             Err(CubeError::user(format!(
                 "Expected primitive value but found: {:?}",
