@@ -47,20 +47,35 @@ impl MINIORemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let key_id = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
-        let access_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
+        // Incorrect naming for ENV variables...
+        let access_key = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
+        let secret_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
+
+        if access_key.is_none() || secret_key.is_none() {
+            return Err(CubeError::user(
+                "Both CUBESTORE_MINIO_ACCESS_KEY_ID and CUBESTORE_MINIO_SECRET_ACCESS_KEY must be defined".to_string()
+            ));
+        }
+
         let minio_server_endpoint = env::var("CUBESTORE_MINIO_SERVER_ENDPOINT").ok();
+        if minio_server_endpoint.is_none() {
+            return Err(CubeError::user(
+                "CUBESTORE_MINIO_SERVER_ENDPOINT must be defined".to_string(),
+            ));
+        }
+
+        // Optional
         let s3_region_id = env::var("CUBESTORE_MINIO_REGION").ok();
 
-        let credentials =
-            Credentials::new(key_id.as_deref(), access_key.as_deref(), None, None, None).map_err(
-                |err| {
-                    CubeError::internal(format!(
-                        "Failed to create minIO credentials: {}",
-                        err.to_string()
-                    ))
-                },
-            )?;
+        // We use direct construction of Credentials, because STS, profile, IAM is not supported
+        let credentials = Credentials {
+            access_key: access_key.clone(),
+            secret_key: secret_key.clone(),
+            security_token: None,
+            session_token: None,
+            expiration: None,
+        };
+
         let region = Region::Custom {
             region: s3_region_id.as_deref().unwrap_or("").to_string(),
             endpoint: minio_server_endpoint
@@ -75,14 +90,15 @@ impl MINIORemoteFs {
             sub_path,
             delete_mut: Mutex::new(()),
         });
-        spawn_creds_refresh_loop(key_id, access_key, bucket_name, region, &fs);
+        spawn_creds_refresh_loop(access_key, secret_key, bucket_name, region, &fs);
+
         Ok(fs)
     }
 }
 
 fn spawn_creds_refresh_loop(
-    key_id: Option<String>,
     access_key: Option<String>,
+    secret_key: Option<String>,
     bucket_name: String,
     region: Region,
     fs: &Arc<MINIORemoteFs>,
@@ -92,6 +108,7 @@ fn spawn_creds_refresh_loop(
     if refresh_every.as_secs() == 0 {
         return;
     }
+
     let fs = Arc::downgrade(fs);
     std::thread::spawn(move || {
         log::debug!("Started MINIO credentials refresh loop");
@@ -104,18 +121,12 @@ fn spawn_creds_refresh_loop(
                 }
                 Some(fs) => fs,
             };
-            let c = match Credentials::new(
-                key_id.as_deref(),
-                access_key.as_deref(),
-                None,
-                None,
-                None,
-            ) {
-                Ok(c) => c,
-                Err(e) => {
-                    log::error!("Failed to refresh minIO credentials: {}", e);
-                    continue;
-                }
+            let c = Credentials {
+                access_key: access_key.clone(),
+                secret_key: secret_key.clone(),
+                security_token: None,
+                session_token: None,
+                expiration: None,
             };
             let b = match Bucket::new(&bucket_name, region.clone(), c) {
                 Ok(b) => b,
@@ -171,7 +182,7 @@ impl RemoteFs for MINIORemoteFs {
             let time = SystemTime::now();
             debug!("Uploading {}", remote_path);
             let path = self.s3_path(&remote_path);
-            info!("path {}", remote_path);
+
             let bucket = self.bucket.load();
             let mut temp_upload_file = File::open(&temp_upload_path).await?;
             let status_code = bucket
