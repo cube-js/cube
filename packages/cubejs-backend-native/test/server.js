@@ -14,14 +14,21 @@ const meta_fixture = require('./meta');
     throw new Error('load is not implemented');
   };
 
-  const sqlApiLoad = async ({ request, session, query }) => {
-    console.log('[js] load', {
+  const sqlApiLoad = async ({ request, session, query, streaming }) => {
+    console.log('[js] sqlApiLoad', {
       request,
       session,
       query,
+      streaming
     });
 
-    throw new Error('load is not implemented');
+    if (streaming) {
+      return {
+        stream: new FakeRowStream(query),
+      };
+    }
+
+    throw new Error('sqlApiLoad is not implemented');
   };
 
   const sql = async () => {
