@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **cubestore:** MINIORemoteFs - use only simple auth from S3 client ([#8170](https://github.com/cube-js/cube/issues/8170)) ([66403ad](https://github.com/cube-js/cube/commit/66403ad1be6ec34d8b68444553c40dbc1543f3e5))
+
+
+
+
+
 ## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
 
 

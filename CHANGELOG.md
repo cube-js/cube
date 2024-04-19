@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **cubestore:** MINIORemoteFs - use only simple auth from S3 client ([#8170](https://github.com/cube-js/cube/issues/8170)) ([66403ad](https://github.com/cube-js/cube/commit/66403ad1be6ec34d8b68444553c40dbc1543f3e5))
+* Logical boolean measure filter for post aggregate measures support ([92cee95](https://github.com/cube-js/cube/commit/92cee954b1252b0234e3008fb74d88d7b1c3c47f))
+* **native:** Better error message on unexpected values while streaming ([#8172](https://github.com/cube-js/cube/issues/8172)) ([bcf3438](https://github.com/cube-js/cube/commit/bcf3438682951d7b917866870fc029af3efe2362))
+
+
+
+
+
 ## [0.35.20](https://github.com/cube-js/cube/compare/v0.35.19...v0.35.20) (2024-04-18)
 
 
