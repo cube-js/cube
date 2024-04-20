@@ -5,6 +5,7 @@ module.exports = {
   "deepnote": "Deepnote",
   "delphi": "Delphi",
   "explo": "Explo",
+  "hashboard": "Hashboard",
   "hex": "Hex",
   "jupyter": "Jupyter",
   "langchain": "LangChain",
