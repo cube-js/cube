@@ -22677,4 +22677,46 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_sort_before_projection() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "source"."customer_gender" AS "customer_gender",
+                SUM("source"."taxful_total_price") AS "sum"
+            FROM (
+                SELECT
+                    "public"."KibanaSampleDataEcommerce"."customer_gender" AS "customer_gender",
+                    "public"."KibanaSampleDataEcommerce"."taxful_total_price" AS "taxful_total_price"
+                FROM "public"."KibanaSampleDataEcommerce"
+            ) AS "source"
+            GROUP BY "source"."customer_gender"
+            ORDER BY "source"."customer_gender" ASC
+            ;
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("ORDER BY "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
 }
