@@ -1661,7 +1661,7 @@ impl QueryPlan {
                 DataFrame::new(ctx.state.clone(), plan)
                     .create_physical_plan()
                     .await
-                    .map_err(|e| CubeError::user(e.to_string()))?
+                    .map_err(|e| CubeError::user(e.to_string()))
             }
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
