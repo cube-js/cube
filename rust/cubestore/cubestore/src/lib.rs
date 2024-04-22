@@ -327,19 +327,6 @@ impl From<s3::error::S3Error> for CubeError {
         CubeError::internal(format!("AWS S3 error: {}", v.to_string()))
     }
 }
-
-impl From<awscreds::AwsCredsError> for CubeError {
-    fn from(v: awscreds::AwsCredsError) -> Self {
-        CubeError::user(v.to_string())
-    }
-}
-
-impl From<awsregion::AwsRegionError> for CubeError {
-    fn from(v: awsregion::AwsRegionError) -> Self {
-        CubeError::user(v.to_string())
-    }
-}
-
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
         CubeError::from_error(v)
