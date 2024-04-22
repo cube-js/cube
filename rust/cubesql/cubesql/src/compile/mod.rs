@@ -1658,11 +1658,10 @@ impl QueryPlan {
         match self {
             QueryPlan::DataFusionSelect(_, plan, ctx)
             | QueryPlan::CreateTempTable(_, plan, ctx, _, _) => {
-                let r = DataFrame::new(ctx.state.clone(), plan)
+                DataFrame::new(ctx.state.clone(), plan)
                     .create_physical_plan()
                     .await
-                    .map_err(|e| CubeError::user(e.to_string()))?;
-                Ok(r)
+                    .map_err(|e| CubeError::user(e.to_string()))?
             }
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
