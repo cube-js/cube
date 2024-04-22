@@ -49,8 +49,8 @@ impl S3RemoteFs {
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
         // Incorrect naming for ENV variables...
-        let access_key = env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").ok();
-        let secret_key = env::var("CUBESTORE_MINIO_SECRET_ACCESS_KEY").ok();
+        let access_key = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
+        let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
 
         let credentials = Credentials::new(
             access_key.as_deref(),
