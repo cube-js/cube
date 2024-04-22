@@ -275,46 +275,6 @@ impl WrapperRules {
                 "?select_ungrouped",
             ),
         )]);
-
-        // TODO add flag to disable dimension rules
-        MemberRules::measure_rewrites(
-            rules,
-            |name: &'static str,
-             aggr_expr: String,
-             _measure_expr: String,
-             fun_name: Option<&'static str>,
-             distinct: Option<&'static str>,
-             cast_data_type: Option<&'static str>,
-             column: Option<&'static str>| {
-                transforming_chain_rewrite(
-                    &format!("wrapper-{}", name),
-                    wrapper_pushdown_replacer(
-                        "?aggr_expr",
-                        "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:true",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                    vec![("?aggr_expr", aggr_expr)],
-                    wrapper_pullup_replacer(
-                        "?measure",
-                        "?alias_to_cube",
-                        "WrapperPullupReplacerUngrouped:true",
-                        "?in_projection",
-                        "?cube_members",
-                    ),
-                    self.pushdown_measure(
-                        "?aggr_expr",
-                        column,
-                        fun_name,
-                        distinct,
-                        cast_data_type,
-                        "?cube_members",
-                        "?measure",
-                    ),
-                )
-            },
-        );
     }
 
     fn transform_aggregate(
