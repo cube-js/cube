@@ -9,12 +9,21 @@ export interface TableColumn {
   attributes?: string[]
 }
 
+export type ForeignKey = {
+  // eslint-disable-next-line camelcase
+  target_table: string;
+  // eslint-disable-next-line camelcase
+  target_column: string;
+};
+
 export interface TableColumnQueryResult {
   // eslint-disable-next-line camelcase
   column_name: string;
   // eslint-disable-next-line camelcase
   data_type: GenericDataBaseType;
   attributes?: string[]
+  // eslint-disable-next-line camelcase
+  foreign_keys?: ForeignKey[]
 }
 
 export type TableStructure = TableColumn[];
@@ -180,6 +189,33 @@ export type QueryTablesResult = { schema_name: string, table_name: string };
 
 // eslint-disable-next-line camelcase
 export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
+
+export type PrimaryKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+};
+
+export type ForeignKeysQueryResult = {
+  // eslint-disable-next-line camelcase
+  table_schema: string
+  // eslint-disable-next-line camelcase
+  table_name: string
+  // eslint-disable-next-line camelcase
+  column_name: string
+  // eslint-disable-next-line camelcase
+  target_table: string
+  // eslint-disable-next-line camelcase
+  target_column: string
+};
+
+export type TableKeysFilter = {
+  tableSchema: string,
+  tableName: string[]
+};
 
 export interface DriverInterface {
   createSchemaIfNotExists(schemaName: string): Promise<void>;
