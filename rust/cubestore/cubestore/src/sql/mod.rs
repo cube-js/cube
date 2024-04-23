@@ -4172,9 +4172,9 @@ mod tests {
 
     #[test]
     fn nested_boolean_operators() {
-        tokio::runtime::Builder::new_multi_thread()
+        tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .thread_stack_size(8 * 1024 * 1024)
+            .thread_stack_size(4 * 1024 * 1024)
             .build()
             .unwrap()
             .block_on(async {
