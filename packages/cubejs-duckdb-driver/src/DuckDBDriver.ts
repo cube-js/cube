@@ -69,12 +69,15 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
 
     let dbOptions;
+    let DUCKDB_NODEJS_READONLY = 1;
     if (token) {
-      dbOptions = { custom_user_agent: `Cube/${version}` };
+      dbOptions = {
+        custom_user_agent: `Cube/${version}`,
+      };
     }
 
     // Create a new Database instance with the determined URL and custom user agent
-    const db = new Database(dbUrl, dbOptions);
+    const db = new Database(dbUrl, DUCKDB_NODEJS_READONLY);
 
     return {
       db
@@ -173,22 +176,13 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return super.getSchemasQuery();
   }
 
-  protected async getInitiatedState(): Promise<InitPromise> {
-    if (!this.initPromise) {
-      this.initPromise = this.init();
-    }
-
-    try {
-      return await this.initPromise;
-    } catch (e) {
-      this.initPromise = null;
-
-      throw e;
-    }
-  }
-
   protected async getConnection(): Promise<Connection> {
-    return this.createConnection(await this.getInitiatedState());
+    let init = await this.init();
+    try {
+      return this.createConnection(await this.init());
+    } finally {
+      init.db.close();
+    }
   }
 
   public static dialectClass() {
@@ -196,15 +190,27 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
+    const startTime = performance.now(); // Start time in milliseconds
     const connection = await this.getConnection();
-    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
+    const endTime = performance.now(); // End time in milliseconds
+    console.log(`getConnection time: ${endTime - startTime} milliseconds`);
+    try {
 
-    const result = await fetchAsync(query, ...values);
-    return result.map((item) => {
-      transformRow(item);
+      const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
-      return item;
-    });
+      const startTime = performance.now(); // Start time in milliseconds
+      const result = await fetchAsync(query, ...values);
+      const endTime = performance.now(); // End time in milliseconds
+      console.log(`fetchAsync time: ${endTime - startTime} milliseconds`);
+      connection.close();
+      return result.map((item) => {
+        transformRow(item);
+
+        return item;
+      });
+    } finally {
+      connection.close();
+    }
   }
 
   public async stream(
@@ -212,13 +218,14 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const { db } = await this.getInitiatedState();
+    const { db } = await this.init();
 
     // new connection, because stream can break with
     // Attempting to execute an unsuccessful or closed pending query result
     // PreAggregation queue has a concurrency limit, it's why pool is not needed here
     const connection = db.connect();
     const closeAsync = promisify(connection.close).bind(connection);
+    const closeDbAsync = promisify(db.close).bind(db);
 
     try {
       const asyncIterator = connection.stream(query, ...(values || []));
@@ -228,6 +235,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         rowStream,
         release: async () => {
           await closeAsync();
+          await closeDbAsync();
         }
       };
     } catch (e) {
