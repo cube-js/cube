@@ -1,6 +1,7 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cast_expr, fun_expr, is_not_null_expr, is_null_expr,
-    literal_expr, negative_expr, rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
+    analysis::LogicalPlanAnalysis, cast_expr, fun_expr, fun_expr_args, is_not_null_expr,
+    is_null_expr, literal_expr, negative_expr, rules::split::SplitRules, udf_expr,
+    LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -17,37 +18,37 @@ impl SplitRules {
         );
         self.single_arg_pass_through_rules(
             "trunc",
-            |expr| fun_expr("Trunc", vec![expr]),
+            |expr| fun_expr("Trunc", fun_expr_args(vec![expr])),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "lower",
-            |expr| fun_expr("Lower", vec![expr]),
+            |expr| fun_expr("Lower", fun_expr_args(vec![expr])),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "upper",
-            |expr| fun_expr("Upper", vec![expr]),
+            |expr| fun_expr("Upper", fun_expr_args(vec![expr])),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "ceil",
-            |expr| fun_expr("Ceil", vec![expr]),
+            |expr| fun_expr("Ceil", fun_expr_args(vec![expr])),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "floor",
-            |expr| fun_expr("Floor", vec![expr]),
+            |expr| fun_expr("Floor", fun_expr_args(vec![expr])),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "char-length",
-            |expr| fun_expr("CharacterLength", vec![expr]),
+            |expr| fun_expr("CharacterLength", fun_expr_args(vec![expr])),
             false,
             rules,
         );
@@ -62,7 +63,7 @@ impl SplitRules {
             |expr| {
                 fun_expr(
                     "Substr",
-                    vec![expr, "?from".to_string(), "?for".to_string()],
+                    fun_expr_args(vec![expr, "?from".to_string(), "?for".to_string()]),
                 )
             },
             false,
@@ -73,7 +74,7 @@ impl SplitRules {
             |expr| {
                 fun_expr(
                     "Lpad",
-                    vec![expr, "?length".to_string(), "?char".to_string()],
+                    fun_expr_args(vec![expr, "?length".to_string(), "?char".to_string()]),
                 )
             },
             false,
@@ -84,7 +85,7 @@ impl SplitRules {
             |expr| {
                 fun_expr(
                     "Rpad",
-                    vec![expr, "?length".to_string(), "?char".to_string()],
+                    fun_expr_args(vec![expr, "?length".to_string(), "?char".to_string()]),
                 )
             },
             false,
@@ -99,25 +100,35 @@ impl SplitRules {
         );
         self.single_arg_pass_through_rules(
             "coalesce-constant",
-            |expr| fun_expr("Coalesce", vec![expr, literal_expr("?literal")]),
+            |expr| {
+                fun_expr(
+                    "Coalesce",
+                    fun_expr_args(vec![expr, literal_expr("?literal")]),
+                )
+            },
             true,
             rules,
         );
         self.single_arg_pass_through_rules(
             "nullif-constant",
-            |expr| fun_expr("NullIf", vec![expr, literal_expr("?literal")]),
+            |expr| {
+                fun_expr(
+                    "NullIf",
+                    fun_expr_args(vec![expr, literal_expr("?literal")]),
+                )
+            },
             true,
             rules,
         );
         self.single_arg_pass_through_rules(
             "left-constant",
-            |expr| fun_expr("Left", vec![expr, literal_expr("?literal")]),
+            |expr| fun_expr("Left", fun_expr_args(vec![expr, literal_expr("?literal")])),
             true,
             rules,
         );
         self.single_arg_pass_through_rules(
             "right-constant",
-            |expr| fun_expr("Right", vec![expr, literal_expr("?literal")]),
+            |expr| fun_expr("Right", fun_expr_args(vec![expr, literal_expr("?literal")])),
             true,
             rules,
         );

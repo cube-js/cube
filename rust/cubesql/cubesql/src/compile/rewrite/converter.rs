@@ -96,6 +96,16 @@ macro_rules! add_expr_list_node {
     }};
 }
 
+macro_rules! add_expr_list_node_new {
+    ($graph:expr, $value_expr:expr, $query_params:expr, $field_variant:ident) => {{
+        let list = $value_expr
+            .iter()
+            .map(|expr| Self::add_expr_replace_params($graph, expr, $query_params))
+            .collect::<Result<Vec<_>, _>>()?;
+        $graph.add(LogicalPlanLanguage::$field_variant(list))
+    }};
+}
+
 macro_rules! add_binary_expr_list_node {
     ($graph:expr, $value_expr:expr, $query_params:expr, $field_variant:ident) => {{
         fn to_binary_tree(
@@ -355,7 +365,8 @@ impl LogicalPlanToLanguageConverter {
             }
             Expr::ScalarFunction { fun, args } => {
                 let fun = add_expr_data_node!(graph, fun, ScalarFunctionExprFun);
-                let args = add_expr_list_node!(graph, args, query_params, ScalarFunctionExprArgs);
+                let args =
+                    add_expr_list_node_new!(graph, args, query_params, ScalarFunctionExprArgs);
 
                 graph.add(LogicalPlanLanguage::ScalarFunctionExpr([fun, args]))
             }

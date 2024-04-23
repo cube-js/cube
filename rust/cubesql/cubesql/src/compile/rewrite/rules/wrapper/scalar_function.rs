@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, fun_expr_var_arg, rewrite, rules::wrapper::WrapperRules,
-        scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, transforming_rewrite,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
-        ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        analysis::LogicalPlanAnalysis, fun_expr, fun_expr_args_empty, list_rewrite,
+        list_rewrite_with_vars, rewrite, rules::wrapper::WrapperRules, transforming_rewrite,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListPattern, ListType,
+        LogicalPlanLanguage, ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -18,13 +18,13 @@ impl WrapperRules {
             rewrite(
                 "wrapper-push-down-function",
                 wrapper_pushdown_replacer(
-                    fun_expr_var_arg("?fun", "?args"),
+                    fun_expr("?fun", "?args"),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
-                fun_expr_var_arg(
+                fun_expr(
                     "?fun",
                     wrapper_pushdown_replacer(
                         "?args",
@@ -37,7 +37,7 @@ impl WrapperRules {
             ),
             transforming_rewrite(
                 "wrapper-pull-up-function",
-                fun_expr_var_arg(
+                fun_expr(
                     "?fun",
                     wrapper_pullup_replacer(
                         "?args",
@@ -48,7 +48,7 @@ impl WrapperRules {
                     ),
                 ),
                 wrapper_pullup_replacer(
-                    fun_expr_var_arg("?fun", "?args"),
+                    fun_expr("?fun", "?args"),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
@@ -56,69 +56,75 @@ impl WrapperRules {
                 ),
                 self.transform_fun_expr("?fun", "?alias_to_cube"),
             ),
-            rewrite(
-                "wrapper-push-down-scalar-function-args",
-                wrapper_pushdown_replacer(
-                    scalar_fun_expr_args("?left", "?right"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                scalar_fun_expr_args(
-                    wrapper_pushdown_replacer(
-                        "?left",
+            list_rewrite(
+                "wrapper-push-down-scalar-functions-args",
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: wrapper_pushdown_replacer(
+                        "?args",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
-                    wrapper_pushdown_replacer(
-                        "?right",
+                    list_var: "?args".to_string(),
+                    elem: "?arg".to_string(),
+                },
+                ListPattern {
+                    pattern: "?new_args".to_string(),
+                    list_var: "?new_args".to_string(),
+                    elem: wrapper_pushdown_replacer(
+                        "?arg",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
-                ),
+                },
             ),
-            rewrite(
+            list_rewrite_with_vars(
                 "wrapper-pull-up-scalar-function-args",
-                scalar_fun_expr_args(
-                    wrapper_pullup_replacer(
-                        "?left",
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: "?args".to_string(),
+                    list_var: "?args".to_string(),
+                    elem: wrapper_pullup_replacer(
+                        "?arg",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
-                    wrapper_pullup_replacer(
-                        "?right",
+                },
+                ListPattern {
+                    pattern: wrapper_pullup_replacer(
+                        "?new_args",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
-                ),
-                wrapper_pullup_replacer(
-                    scalar_fun_expr_args("?left", "?right"),
+                    list_var: "?new_args".to_string(),
+                    elem: "?arg".to_string(),
+                },
+                &[
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
                     "?cube_members",
-                ),
+                ],
             ),
             rewrite(
-                "wrapper-push-down-scalar-function-empty-tail",
+                "wrapper-push-down-scalar-function-empty",
                 wrapper_pushdown_replacer(
-                    scalar_fun_expr_args_empty_tail(),
+                    fun_expr_args_empty(),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
-                    scalar_fun_expr_args_empty_tail(),
+                    fun_expr_args_empty(),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",

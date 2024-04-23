@@ -1,13 +1,11 @@
 use crate::compile::rewrite::{analysis::LogicalPlanAnalysis, rewrite, LogicalPlanLanguage};
 use egg::Rewrite;
 
-pub mod case;
 pub mod common;
 pub mod dates;
 pub mod filters;
 pub mod flatten;
 pub mod members;
-pub mod old_split;
 pub mod order;
 pub mod split;
 pub mod utils;

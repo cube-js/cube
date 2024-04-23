@@ -2,8 +2,8 @@ use crate::{
     compile::rewrite::{
         alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
-        literal_float, literal_int, literal_string,
+        binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, fun_expr_args,
+        literal_expr, literal_float, literal_int, literal_string,
         rules::split::SplitRules,
         udf_expr, LogicalPlanLanguage,
     },
@@ -29,7 +29,10 @@ impl SplitRules {
                                     binary_expr(
                                         fun_expr(
                                             "DatePart",
-                                            vec![literal_string("YEAR"), column_expr("?column")],
+                                            fun_expr_args(vec![
+                                                literal_string("YEAR"),
+                                                column_expr("?column"),
+                                            ]),
                                         ),
                                         "*",
                                         literal_int(100),
@@ -51,7 +54,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("year"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("year"), column_expr("?column")]),
                 )
             },
             |alias_column| alias_column,
@@ -65,7 +68,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![
+                    fun_expr_args(vec![
                         // Any granularity will do as long as our max is YEAR.
                         // If maximum raises to DECADE, ?granularity needs to be checked
                         literal_expr("?granularity"),
@@ -77,10 +80,10 @@ impl SplitRules {
                                             binary_expr(
                                                 fun_expr(
                                                     "DatePart",
-                                                    vec![
+                                                    fun_expr_args(vec![
                                                         literal_string("YEAR"),
                                                         "?column".to_string(),
-                                                    ],
+                                                    ]),
                                                 ),
                                                 "*",
                                                 literal_int(100),
@@ -98,13 +101,13 @@ impl SplitRules {
                             ),
                             "?timestamp_type",
                         ),
-                    ],
+                    ]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("year"), "?column".to_string()],
+                    fun_expr_args(vec![literal_string("year"), "?column".to_string()]),
                 )
             },
             |alias_column| alias_column,
@@ -118,11 +121,11 @@ impl SplitRules {
             || {
                 fun_expr(
                     "Floor",
-                    vec![binary_expr(
+                    fun_expr_args(vec![binary_expr(
                         binary_expr(
                             fun_expr(
                                 "DatePart",
-                                vec![
+                                fun_expr_args(vec![
                                     literal_string("DAY"),
                                     udf_expr(
                                         "dateadd",
@@ -163,7 +166,7 @@ impl SplitRules {
                                             column_expr("?column"),
                                         ],
                                     ),
-                                ],
+                                ]),
                             ),
                             "+",
                             literal_int(6),
@@ -171,37 +174,37 @@ impl SplitRules {
                         "/",
                         fun_expr(
                             "NullIf",
-                            vec![
+                            fun_expr_args(vec![
                                 cast_expr_explicit(literal_int(7), ArrowDataType::Float64),
                                 literal_float(0.0),
-                            ],
+                            ]),
                         ),
-                    )],
+                    )]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("week"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("week"), column_expr("?column")]),
                 )
             },
             |alias_column| {
                 fun_expr(
                     "Ceil",
-                    vec![binary_expr(
+                    fun_expr_args(vec![binary_expr(
                         fun_expr(
                             "DatePart",
-                            vec![
+                            fun_expr_args(vec![
                                 literal_string("day"),
                                 udf_expr(
                                     "dateadd",
                                     vec![literal_string("day"), literal_int(3), alias_column],
                                 ),
-                            ],
+                            ]),
                         ),
                         "/",
                         literal_float(7.0),
-                    )],
+                    )]),
                 )
             },
             |_, _, _| true,
@@ -225,10 +228,10 @@ impl SplitRules {
                                             binary_expr(
                                                 fun_expr(
                                                     "DatePart",
-                                                    vec![
+                                                    fun_expr_args(vec![
                                                         literal_string("YEAR"),
                                                         column_expr("?column"),
-                                                    ],
+                                                    ]),
                                                 ),
                                                 "||",
                                                 literal_string("-"),
@@ -236,10 +239,10 @@ impl SplitRules {
                                             "||",
                                             fun_expr(
                                                 "DatePart",
-                                                vec![
+                                                fun_expr_args(vec![
                                                     literal_string("MONTH"),
                                                     column_expr("?column"),
-                                                ],
+                                                ]),
                                             ),
                                         ),
                                         "||",
@@ -258,10 +261,10 @@ impl SplitRules {
                                                             binary_expr(
                                                                 fun_expr(
                                                                     "DatePart",
-                                                                    vec![
+                                                                    fun_expr_args(vec![
                                                                         literal_string("MONTH"),
                                                                         column_expr("?column"),
-                                                                    ],
+                                                                    ]),
                                                                 ),
                                                                 "-",
                                                                 literal_int(1),
@@ -297,7 +300,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("day"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("day"), column_expr("?column")]),
                 )
             },
             |alias_column| {
@@ -306,7 +309,10 @@ impl SplitRules {
                         cast_expr_explicit(alias_column.clone(), ArrowDataType::Date32),
                         "-",
                         cast_expr_explicit(
-                            fun_expr("DateTrunc", vec![literal_string("quarter"), alias_column]),
+                            fun_expr(
+                                "DateTrunc",
+                                fun_expr_args(vec![literal_string("quarter"), alias_column]),
+                            ),
                             ArrowDataType::Date32,
                         ),
                     ),
@@ -329,7 +335,10 @@ impl SplitRules {
                             binary_expr(
                                 fun_expr(
                                     "DatePart",
-                                    vec![literal_string("YEAR"), column_expr("?column")],
+                                    fun_expr_args(vec![
+                                        literal_string("YEAR"),
+                                        column_expr("?column"),
+                                    ]),
                                 ),
                                 "||",
                                 literal_string("-"),
@@ -339,14 +348,14 @@ impl SplitRules {
                                 binary_expr(
                                     fun_expr(
                                         "Floor",
-                                        vec![binary_expr(
+                                        fun_expr_args(vec![binary_expr(
                                             binary_expr(
                                                 fun_expr(
                                                     "DatePart",
-                                                    vec![
+                                                    fun_expr_args(vec![
                                                         literal_string("MONTH"),
                                                         column_expr("?column"),
-                                                    ],
+                                                    ]),
                                                 ),
                                                 "-",
                                                 literal_int(1),
@@ -354,9 +363,9 @@ impl SplitRules {
                                             "/",
                                             fun_expr(
                                                 "NullIf",
-                                                vec![literal_int(3), literal_int(0)],
+                                                fun_expr_args(vec![literal_int(3), literal_int(0)]),
                                             ),
-                                        )],
+                                        )]),
                                     ),
                                     "*",
                                     literal_int(3),
@@ -374,7 +383,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("quarter"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("quarter"), column_expr("?column")]),
                 )
             },
             |alias_column| cast_expr_explicit(alias_column, ArrowDataType::Date32),
@@ -400,10 +409,10 @@ impl SplitRules {
                                             binary_expr(
                                                 fun_expr(
                                                     "DatePart",
-                                                    vec![
+                                                    fun_expr_args(vec![
                                                         literal_string("MONTH"),
                                                         column_expr("?column"),
-                                                    ],
+                                                    ]),
                                                 ),
                                                 "-",
                                                 literal_int(1),
@@ -421,10 +430,10 @@ impl SplitRules {
                                                         binary_expr(
                                                             fun_expr(
                                                                 "DatePart",
-                                                                vec![
+                                                                fun_expr_args(vec![
                                                                     literal_string("YEAR"),
                                                                     column_expr("?column"),
-                                                                ],
+                                                                ]),
                                                             ),
                                                             "*",
                                                             literal_int(100),
@@ -432,10 +441,10 @@ impl SplitRules {
                                                         "+",
                                                         fun_expr(
                                                             "DatePart",
-                                                            vec![
+                                                            fun_expr_args(vec![
                                                                 literal_string("MONTH"),
                                                                 column_expr("?column"),
-                                                            ],
+                                                            ]),
                                                         ),
                                                     ),
                                                     "*",
@@ -460,10 +469,15 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("day"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("day"), column_expr("?column")]),
                 )
             },
-            |alias_column| fun_expr("DatePart", vec![literal_string("doy"), alias_column]),
+            |alias_column| {
+                fun_expr(
+                    "DatePart",
+                    fun_expr_args(vec![literal_string("doy"), alias_column]),
+                )
+            },
             |_, _, _| true,
             false,
             rules,
@@ -490,10 +504,10 @@ impl SplitRules {
                                                         binary_expr(
                                                             fun_expr(
                                                                 "DatePart",
-                                                                vec![
+                                                                fun_expr_args(vec![
                                                                     literal_string("MONTH"),
                                                                     column_expr("?column"),
-                                                                ],
+                                                                ]),
                                                             ),
                                                             "-",
                                                             literal_int(1),
@@ -520,10 +534,10 @@ impl SplitRules {
                                                         binary_expr(
                                                             fun_expr(
                                                                 "DatePart",
-                                                                vec![
+                                                                fun_expr_args(vec![
                                                                     literal_string("YEAR"),
                                                                     column_expr("?column"),
-                                                                ],
+                                                                ]),
                                                             ),
                                                             "*",
                                                             literal_int(100),
@@ -531,10 +545,10 @@ impl SplitRules {
                                                         "+",
                                                         fun_expr(
                                                             "DatePart",
-                                                            vec![
+                                                            fun_expr_args(vec![
                                                                 literal_string("MONTH"),
                                                                 column_expr("?column"),
-                                                            ],
+                                                            ]),
                                                         ),
                                                     ),
                                                     "*",
@@ -559,7 +573,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("day"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("day"), column_expr("?column")]),
                 )
             },
             |alias_column| {
@@ -570,7 +584,10 @@ impl SplitRules {
                             literal_string("day"),
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_string("quarter"), alias_column.clone()],
+                                fun_expr_args(vec![
+                                    literal_string("quarter"),
+                                    alias_column.clone(),
+                                ]),
                             ),
                             alias_column,
                         ],
@@ -590,14 +607,14 @@ impl SplitRules {
                 binary_expr(
                     fun_expr(
                         "DateTrunc",
-                        vec![
+                        fun_expr_args(vec![
                             literal_string("week"),
                             binary_expr(
                                 cast_expr(column_expr("?column"), "?data_type"),
                                 "+",
                                 "?day_interval",
                             ),
-                        ],
+                        ]),
                     ),
                     "+",
                     "?neg_day_interval",
@@ -606,7 +623,7 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_string("day"), column_expr("?column")],
+                    fun_expr_args(vec![literal_string("day"), column_expr("?column")]),
                 )
             },
             |alias_column| {
@@ -615,13 +632,13 @@ impl SplitRules {
                     vec![
                         fun_expr(
                             "DateTrunc",
-                            vec![
+                            fun_expr_args(vec![
                                 literal_string("week"),
                                 udf_expr(
                                     "date_add",
                                     vec![alias_column, "?day_interval".to_string()],
                                 ),
-                            ],
+                            ]),
                         ),
                         "?neg_day_interval".to_string(),
                     ],
@@ -637,19 +654,25 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![
+                    fun_expr_args(vec![
                         literal_expr("?inner_granularity"),
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?inner_granularity"), column_expr("?column")],
+                            fun_expr_args(vec![
+                                literal_expr("?inner_granularity"),
+                                column_expr("?column"),
+                            ]),
                         ),
-                    ],
+                    ]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?inner_granularity"), column_expr("?column")],
+                    fun_expr_args(vec![
+                        literal_expr("?inner_granularity"),
+                        column_expr("?column"),
+                    ]),
                 )
             },
             |alias_column| alias_column,

@@ -7,9 +7,8 @@ use crate::{
             converter::LanguageToLogicalPlanConverter,
             cost::BestCubePlan,
             rules::{
-                case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
-                flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
-                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
+                common::CommonRules, dates::DateRules, filters::FilterRules, flatten::FlattenRules,
+                members::MemberRules, order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -527,15 +526,7 @@ impl Rewriter {
             );
             rewrites.extend(FlattenRules::new().rewrite_rules());
         }
-        if config_obj.push_down_pull_up_split() {
-            rewrites
-                .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
-        } else {
-            rewrites.extend(
-                OldSplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
-            );
-            rewrites.extend(CaseRules::new().rewrite_rules());
-        }
+        rewrites.extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names
                 .split(",")

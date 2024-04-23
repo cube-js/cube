@@ -10,7 +10,7 @@ use datafusion::{logical_plan::DFSchema, scalar::ScalarValue};
 use egg::{EGraph, Id, Rewrite, Subst};
 
 use crate::compile::rewrite::{
-    fun_expr,
+    fun_expr, fun_expr_args,
     rewriter::{RewriteRules, Rewriter},
     transform_original_expr_to_alias, transforming_rewrite_with_root, udf_expr,
 };
@@ -63,7 +63,10 @@ impl RewriteRules for CommonRules {
             transforming_rewrite_with_root(
                 "redshift-charindex-to-strpos",
                 udf_expr("charindex", vec!["?substring", "?string"]),
-                alias_expr(fun_expr("Strpos", vec!["?string", "?substring"]), "?alias"),
+                alias_expr(
+                    fun_expr("Strpos", fun_expr_args(vec!["?string", "?substring"])),
+                    "?alias",
+                ),
                 transform_original_expr_to_alias("?alias"),
             ),
         ]);

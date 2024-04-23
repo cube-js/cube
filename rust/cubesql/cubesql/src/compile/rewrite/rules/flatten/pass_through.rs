@@ -1,6 +1,6 @@
 use crate::compile::rewrite::{
     agg_fun_expr, alias_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr,
-    flatten_pushdown_replacer, fun_expr_var_arg, is_not_null_expr, is_null_expr, rewrite,
+    flatten_pushdown_replacer, fun_expr, fun_expr_args, is_not_null_expr, is_null_expr, rewrite,
     rules::flatten::FlattenRules, udf_expr_var_arg, LogicalPlanLanguage,
 };
 use egg::Rewrite;
@@ -14,7 +14,7 @@ impl FlattenRules {
         self.single_arg_pass_through_rules("cast", |expr| cast_expr(expr, "?data_type"), rules);
         self.single_arg_pass_through_rules(
             "scalar-function",
-            |expr| fun_expr_var_arg("?fun", expr),
+            |expr| fun_expr("?fun", fun_expr_args(vec![expr])),
             rules,
         );
         self.single_arg_pass_through_rules(

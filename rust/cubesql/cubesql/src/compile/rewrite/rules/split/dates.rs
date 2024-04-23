@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        column_expr, fun_expr, literal_expr,
+        column_expr, fun_expr, fun_expr_args, literal_expr,
         rules::{members::min_granularity, split::SplitRules, utils::parse_granularity_string},
         LiteralExprValue, LogicalPlanLanguage,
     },
@@ -18,19 +18,22 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DatePart",
-                    vec!["?granularity".to_string(), column_expr("?column")],
+                    fun_expr_args(vec!["?granularity".to_string(), column_expr("?column")]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?output_granularity"), column_expr("?column")],
+                    fun_expr_args(vec![
+                        literal_expr("?output_granularity"),
+                        column_expr("?column"),
+                    ]),
                 )
             },
             |alias_column| {
                 fun_expr(
                     "DatePart",
-                    vec![literal_expr("?output_granularity"), alias_column],
+                    fun_expr_args(vec![literal_expr("?output_granularity"), alias_column]),
                 )
             },
             self.transform_date_part("?granularity", "?output_granularity"),
@@ -42,25 +45,31 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DatePart",
-                    vec![
+                    fun_expr_args(vec![
                         "?outer_granularity".to_string(),
                         fun_expr(
                             "DateTrunc",
-                            vec!["?inner_granularity".to_string(), column_expr("?column")],
+                            fun_expr_args(vec![
+                                "?inner_granularity".to_string(),
+                                column_expr("?column"),
+                            ]),
                         ),
-                    ],
+                    ]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?output_granularity"), column_expr("?column")],
+                    fun_expr_args(vec![
+                        literal_expr("?output_granularity"),
+                        column_expr("?column"),
+                    ]),
                 )
             },
             |alias_column| {
                 fun_expr(
                     "DatePart",
-                    vec![literal_expr("?output_granularity"), alias_column],
+                    fun_expr_args(vec![literal_expr("?output_granularity"), alias_column]),
                 )
             },
             self.transform_date_part_within_date_trunc(
@@ -76,13 +85,13 @@ impl SplitRules {
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                 )
             },
             || {
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                 )
             },
             |alias_column| alias_column,
@@ -92,13 +101,23 @@ impl SplitRules {
         );
         self.single_arg_pass_through_rules(
             "date-trunc-pass-through",
-            |expr| fun_expr("DateTrunc", vec![literal_expr("?granularity"), expr]),
+            |expr| {
+                fun_expr(
+                    "DateTrunc",
+                    fun_expr_args(vec![literal_expr("?granularity"), expr]),
+                )
+            },
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "date-part-pass-through",
-            |expr| fun_expr("DatePart", vec![literal_expr("?granularity"), expr]),
+            |expr| {
+                fun_expr(
+                    "DatePart",
+                    fun_expr_args(vec![literal_expr("?granularity"), expr]),
+                )
+            },
             false,
             rules,
         );

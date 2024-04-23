@@ -295,7 +295,6 @@ impl LogicalPlanAnalysis {
                 | LogicalPlanLanguage::CaseExprExpr(params)
                 | LogicalPlanLanguage::AggregateFunctionExprArgs(params)
                 | LogicalPlanLanguage::AggregateUDFExprArgs(params)
-                | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
                 | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
                     let mut list = Vec::new();
                     for id in params {
@@ -304,6 +303,14 @@ impl LogicalPlanAnalysis {
                             OriginalExpr::List(exprs) => list.extend(exprs),
                         }
                     }
+                    Some(OriginalExpr::List(list))
+                }
+                LogicalPlanLanguage::ScalarFunctionExprArgs(params) => {
+                    let list = params
+                        .iter()
+                        .map(|id| id_to_expr(*id))
+                        .collect::<Result<_, _>>()
+                        .ok()?;
                     Some(OriginalExpr::List(list))
                 }
                 _ => None,

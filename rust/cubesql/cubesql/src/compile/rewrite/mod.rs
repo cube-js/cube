@@ -22,14 +22,16 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{
-    rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
-    Symbol, Var,
+    rewrite, Applier, EGraph, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher,
+    Subst, Symbol, Var,
 };
+use itertools::Itertools;
 use std::{
     fmt::{self, Display, Formatter},
     ops::Index,
     slice::Iter,
     str::FromStr,
+    sync::Arc,
 };
 
 use self::analysis::{LogicalPlanData, MemberNameToExpr};
@@ -727,12 +729,290 @@ where
     .unwrap()
 }
 
+type ListMatches = Vec<Subst>;
+
+#[derive(Clone)]
+pub enum ListType {
+    ScalarFunctionExprArgs,
+    Converter {
+        from: Box<ListType>,
+        to: Box<ListType>,
+    },
+}
+
+impl ListType {
+    fn _convert(from: Self, to: Self) -> Self {
+        Self::Converter {
+            from: Box::new(from),
+            to: Box::new(to),
+        }
+    }
+}
+
+struct ListNodeSearcher {
+    list_type: ListType,
+    list_var: Var,
+    list_pattern: Pattern<LogicalPlanLanguage>,
+    elem_pattern: Pattern<LogicalPlanLanguage>,
+    top_level_elem_vars: Vec<Var>,
+}
+
+impl ListNodeSearcher {
+    fn new(list_type: ListType, list_var: &str, list_pattern: &str, elem_pattern: &str) -> Self {
+        Self {
+            list_type,
+            list_var: list_var.parse().unwrap(),
+            list_pattern: list_pattern.parse().unwrap(),
+            elem_pattern: elem_pattern.parse().unwrap(),
+            top_level_elem_vars: vec![],
+        }
+    }
+
+    fn with_top_level_elem_vars(mut self, vars: &[&str]) -> Self {
+        self.top_level_elem_vars = vars.iter().map(|s| s.parse().unwrap()).collect();
+        self
+    }
+
+    pub fn match_node(&self, node: &LogicalPlanLanguage) -> bool {
+        self.match_node_by_list_type(node, &self.list_type)
+    }
+
+    pub fn match_node_by_list_type(
+        &self,
+        node: &LogicalPlanLanguage,
+        list_type: &ListType,
+    ) -> bool {
+        match list_type {
+            ListType::ScalarFunctionExprArgs => {
+                matches!(node, LogicalPlanLanguage::ScalarFunctionExprArgs(_))
+            }
+            ListType::Converter { from, .. } => self.match_node_by_list_type(node, from),
+        }
+    }
+}
+
+impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
+    fn search_eclass_with_limit(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclass: Id,
+        limit: usize,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        let mut matches = self
+            .list_pattern
+            .search_eclass_with_limit(egraph, eclass, limit)?;
+        for subst in &mut matches.substs {
+            let list_id = subst[self.list_var];
+            let list_children: &[Id] = egraph[list_id]
+                .iter()
+                .find(|n| self.match_node(n))?
+                .children();
+
+            if list_children.is_empty() {
+                return None;
+            }
+
+            let list_matches: Option<ListMatches> = self
+                .elem_pattern
+                .search_eclass_with_limit(egraph, list_children[0], limit)
+                .iter()
+                .flat_map(|matches0| matches0.substs.iter())
+                // iterate over every subst from the matches of the first element of the list
+                .find_map(|subst0| {
+                    let mut substs: ListMatches = vec![subst0.clone()];
+                    for &child in &list_children[1..] {
+                        let child_matches = self
+                            .elem_pattern
+                            .search_eclass_with_limit(egraph, child, limit)?;
+                        let child_subst = child_matches.substs.into_iter().find(|s| {
+                            self.top_level_elem_vars
+                                .iter()
+                                .all(|&v| s.get(v) == subst0.get(v))
+                        })?;
+                        substs.push(child_subst);
+                    }
+                    Some(substs)
+                });
+
+            if let Some(list_matches) = list_matches {
+                assert_eq!(list_matches.len(), list_children.len());
+                if let Some(first) = list_matches.first() {
+                    for &var in &self.top_level_elem_vars {
+                        if let Some(id) = first.get(var) {
+                            subst.insert(var, *id);
+                        }
+                    }
+                }
+                subst.data = Some(Arc::new(list_matches));
+            }
+        }
+
+        matches.substs.retain(|s| s.data.is_some());
+        if matches.substs.is_empty() {
+            None
+        } else {
+            Some(matches)
+        }
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.list_pattern.vars();
+        vars.extend(self.elem_pattern.vars());
+        vars.push(self.list_var);
+        vars
+    }
+}
+
+struct ListNodeApplier {
+    list_type: ListType,
+    new_list_var: Var,
+    list_pattern: PatternAst<LogicalPlanLanguage>,
+    elem_pattern: PatternAst<LogicalPlanLanguage>,
+}
+
+impl ListNodeApplier {
+    pub fn new(
+        list_type: ListType,
+        new_list_var: &str,
+        list_pattern: &str,
+        elem_pattern: &str,
+    ) -> Self {
+        Self {
+            list_type,
+            new_list_var: new_list_var.parse().unwrap(),
+            list_pattern: list_pattern.parse().unwrap(),
+            elem_pattern: elem_pattern.parse().unwrap(),
+        }
+    }
+
+    pub fn make_node(&self, list: Vec<Id>) -> LogicalPlanLanguage {
+        self.make_node_by_list_type(list, &self.list_type)
+    }
+
+    pub fn make_node_by_list_type(
+        &self,
+        list: Vec<Id>,
+        list_type: &ListType,
+    ) -> LogicalPlanLanguage {
+        match list_type {
+            ListType::ScalarFunctionExprArgs => LogicalPlanLanguage::ScalarFunctionExprArgs(list),
+            ListType::Converter { to, .. } => self.make_node_by_list_type(list, to),
+        }
+    }
+}
+
+impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclass: Id,
+        subst: &Subst,
+        _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
+        _rule_name: Symbol,
+    ) -> Vec<Id> {
+        let mut subst = subst.clone();
+
+        let data = subst
+            .data
+            .as_ref()
+            .expect("no data, did you use ListNodeSearcher?");
+        let list_matches = data
+            .downcast_ref::<ListMatches>()
+            .expect("wrong data type")
+            .clone();
+
+        let new_list = list_matches
+            .iter()
+            .map(|list_subst| {
+                let mut subst = subst.clone();
+                subst.extend(list_subst.iter());
+                egraph.add_instantiation(&self.elem_pattern, &subst)
+            })
+            .collect();
+
+        subst.insert(self.new_list_var, egraph.add(self.make_node(new_list)));
+        let result_id = egraph.add_instantiation(&self.list_pattern, &subst);
+
+        if egraph.union(eclass, result_id) {
+            vec![result_id]
+        } else {
+            vec![]
+        }
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.list_pattern.vars();
+        vars.extend(self.elem_pattern.vars());
+        vars.retain(|v| *v != self.new_list_var); // this is bound by the applier itself
+        vars
+    }
+}
+
+pub struct ListPattern {
+    pattern: String,
+    list_var: String,
+    elem: String,
+}
+
+pub fn list_rewrite(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier: ListPattern,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    );
+    let applier = ListNodeApplier::new(
+        list_type,
+        &applier.list_var,
+        &applier.pattern,
+        &applier.elem,
+    );
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
+pub fn list_rewrite_with_vars(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier: ListPattern,
+    top_level_elem_vars: &[&str],
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    )
+    .with_top_level_elem_vars(top_level_elem_vars);
+    let applier = ListNodeApplier::new(
+        list_type,
+        &applier.list_var,
+        &applier.pattern,
+        &applier.elem,
+    );
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut current = list_type.to_string();
     for i in list.into_iter().rev() {
         current = format!("({} {} {})", list_type, i, current);
     }
     current
+}
+
+fn list_expr_new(list_type: impl Display, list: Vec<impl Display>) -> String {
+    if list.len() < 1 {
+        return list_type.to_string();
+    }
+    let args_iter = list.iter().map(|arg| arg.to_string());
+    let args_list: String = Itertools::intersperse(args_iter, " ".to_string()).collect();
+    format!("({} {})", list_type, args_list)
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
@@ -756,25 +1036,21 @@ fn udf_fun_expr_args_empty_tail() -> String {
     "ScalarUDFExprArgs".to_string()
 }
 
-fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    fun_expr_var_arg(fun_name, list_expr("ScalarFunctionExprArgs", args))
-}
-
-fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
+fn fun_expr(fun_name: impl Display, args: impl Display) -> String {
     let prefix = if fun_name.to_string().starts_with("?") {
         ""
     } else {
         "ScalarFunctionExprFun:"
     };
-    format!("(ScalarFunctionExpr {}{} {})", prefix, fun_name, arg_list)
+    format!("(ScalarFunctionExpr {}{} {})", prefix, fun_name, args)
 }
 
-fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
-    format!("(ScalarFunctionExprArgs {} {})", left, right)
+fn fun_expr_args(args: Vec<impl Display>) -> String {
+    list_expr_new("ScalarFunctionExprArgs", args)
 }
 
-fn scalar_fun_expr_args_empty_tail() -> String {
-    "ScalarFunctionExprArgs".to_string()
+fn fun_expr_args_empty() -> String {
+    fun_expr_args(Vec::<String>::new())
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
@@ -948,16 +1224,8 @@ fn aggregate(
     format!("(Aggregate {} {} {} {})", input, group, aggr, split)
 }
 
-fn aggr_aggr_expr(left: impl Display, right: impl Display) -> String {
-    format!("(AggregateAggrExpr {} {})", left, right)
-}
-
 fn aggr_aggr_expr_empty_tail() -> String {
     format!("AggregateAggrExpr")
-}
-
-fn aggr_group_expr(left: impl Display, right: impl Display) -> String {
-    format!("(AggregateGroupExpr {} {})", left, right)
 }
 
 fn projection_expr(left: impl Display, right: impl Display) -> String {
@@ -985,7 +1253,7 @@ fn projection_expr_empty_tail() -> String {
 }
 
 fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
-    fun_expr("ToDayInterval", vec![period, unit])
+    fun_expr("ToDayInterval", fun_expr_args(vec![period, unit]))
 }
 
 fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
@@ -1098,14 +1366,6 @@ fn case_expr_expr(expr: Option<String>) -> String {
             None => vec![],
         },
     )
-}
-
-fn case_expr_when_then_expr(left: impl Display, right: impl Display) -> String {
-    format!("(CaseExprWhenThenExpr {} {})", left, right)
-}
-
-fn case_expr_when_then_expr_empty_tail() -> String {
-    format!("CaseExprWhenThenExpr")
 }
 
 fn case_expr_else_expr(else_expr: Option<String>) -> String {
@@ -1252,27 +1512,6 @@ fn filter_simplify_replacer(members: impl Display) -> String {
     format!("(FilterSimplifyReplacer {})", members)
 }
 
-fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!(
-        "(InnerAggregateSplitReplacer {} {})",
-        members, alias_to_cube
-    )
-}
-
-fn outer_projection_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!(
-        "(OuterProjectionSplitReplacer {} {})",
-        members, alias_to_cube
-    )
-}
-
-fn outer_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!(
-        "(OuterAggregateSplitReplacer {} {})",
-        members, alias_to_cube
-    )
-}
-
 fn aggregate_split_pushdown_replacer(
     expr: impl Display,
     list_node: impl Display,
@@ -1319,21 +1558,6 @@ fn projection_split_pullup_replacer(
     )
 }
 
-fn group_expr_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!("(GroupExprSplitReplacer {} {})", members, alias_to_cube)
-}
-
-fn group_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!(
-        "(GroupAggregateSplitReplacer {} {})",
-        members, alias_to_cube
-    )
-}
-
-fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> String {
-    format!("(CaseExprReplacer {} {})", members, alias_to_cube)
-}
-
 fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
@@ -1370,10 +1594,6 @@ fn flatten_pushdown_replacer(
         "(FlattenPushdownReplacer {} {} {} {})",
         expr, inner_expr, inner_alias, top_level,
     )
-}
-
-fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {
-    format!("(EventNotification {} {} {})", name, members, meta)
 }
 
 fn cube_scan_members(left: impl Display, right: impl Display) -> String {

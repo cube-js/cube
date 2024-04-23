@@ -5,7 +5,7 @@ use crate::{
         binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_to_aliases,
         column_name_to_member_vec, cross_join, cube_scan, cube_scan_filters_empty_tail,
         cube_scan_members, cube_scan_members_empty_tail, cube_scan_order_empty_tail,
-        dimension_expr, expr_column_name, fun_expr, join, like_expr, limit,
+        dimension_expr, expr_column_name, fun_expr, fun_expr_args, join, like_expr, limit,
         list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr, literal_member,
         measure_expr, member_pushdown_replacer, member_replacer, merged_members_replacer,
         original_expr_name, projection, referenced_columns, rewrite,
@@ -605,7 +605,7 @@ impl MemberRules {
             "date-trunc",
             fun_expr(
                 "DateTrunc",
-                vec![literal_expr("?granularity"), column_expr("?column")],
+                fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
             ),
         ));
         rules.extend(find_matching_old_member(
@@ -614,7 +614,7 @@ impl MemberRules {
             alias_expr(
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                 ),
                 "?original_alias",
             ),
@@ -661,7 +661,7 @@ impl MemberRules {
                 "?original_expr",
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                 ),
             )],
             time_dimension_expr(
@@ -694,7 +694,7 @@ impl MemberRules {
                 alias_expr(
                     fun_expr(
                         "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
+                        fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                     ),
                     "?original_alias",
                 ),
@@ -732,7 +732,7 @@ impl MemberRules {
                 "?original_expr",
                 fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                 ),
             )],
             time_dimension_expr(
@@ -770,7 +770,7 @@ impl MemberRules {
                 alias_expr(
                     fun_expr(
                         "DateTrunc",
-                        vec![literal_expr("?granularity"), column_expr("?column")],
+                        fun_expr_args(vec![literal_expr("?granularity"), column_expr("?column")]),
                     ),
                     "?original_alias",
                 ),

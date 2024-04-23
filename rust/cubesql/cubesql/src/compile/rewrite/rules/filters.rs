@@ -7,18 +7,18 @@ use crate::{
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit, list_expr,
-        literal_bool, literal_expr, literal_int, literal_string, measure_expr,
-        member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        fun_expr_args, fun_expr_args_empty, inlist_expr, is_not_null_expr, is_null_expr, like_expr,
+        limit, list_expr, list_rewrite, literal_bool, literal_expr, literal_int, literal_string,
+        measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
-        scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
-        time_dimension_date_range_replacer, time_dimension_expr, transform_original_expr_to_alias,
-        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
-        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated,
-        BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
-        CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-        FilterReplacerAliasToCube, FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar,
-        LikeExprNegated, LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage,
+        segment_member, time_dimension_date_range_replacer, time_dimension_expr,
+        transform_original_expr_to_alias, transforming_chain_rewrite, transforming_rewrite,
+        transforming_rewrite_with_root, udf_expr, udf_expr_var_arg, udf_fun_expr_args,
+        udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp, CastExprDataType,
+        ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
+        FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterReplacerAliasToCube,
+        FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar, LikeExprNegated, LimitFetch,
+        LimitSkip, ListPattern, ListType, LiteralExprValue, LogicalPlanLanguage,
         SegmentMemberMember, TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
         TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
     },
@@ -326,7 +326,7 @@ impl RewriteRules for FilterRules {
                 "change-user-lower-equal-filter",
                 filter_replacer(
                     binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         "=",
                         literal_expr("?literal"),
                     ),
@@ -732,7 +732,11 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-replacer-lower-unwrap",
                 filter_replacer(
-                    binary_expr(fun_expr("Lower", vec!["?param"]), "?op", "?right"),
+                    binary_expr(
+                        fun_expr("Lower", fun_expr_args(vec!["?param"])),
+                        "?op",
+                        "?right",
+                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -748,7 +752,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-lower-is-null-unwrap",
                 filter_replacer(
-                    is_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    is_null_expr(fun_expr("Lower", fun_expr_args(vec!["?expr"]))),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -763,7 +767,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-lower-is-not-null-unwrap",
                 filter_replacer(
-                    is_not_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    is_not_null_expr(fun_expr("Lower", fun_expr_args(vec!["?expr"]))),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -779,7 +783,7 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-lower-in-list-unwrap",
                 filter_replacer(
                     not_expr(inlist_expr(
-                        fun_expr("Lower", vec!["?expr"]),
+                        fun_expr("Lower", fun_expr_args(vec!["?expr"])),
                         "?list",
                         "?new_negated",
                     )),
@@ -798,7 +802,11 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-replacer-upper-unwrap",
                 filter_replacer(
-                    binary_expr(fun_expr("Upper", vec!["?param"]), "?op", "?right"),
+                    binary_expr(
+                        fun_expr("Upper", fun_expr_args(vec!["?param"])),
+                        "?op",
+                        "?right",
+                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -814,7 +822,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-upper-is-null-unwrap",
                 filter_replacer(
-                    is_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    is_null_expr(fun_expr("Upper", fun_expr_args(vec!["?expr"]))),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -829,7 +837,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-upper-is-not-null-unwrap",
                 filter_replacer(
-                    is_not_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    is_not_null_expr(fun_expr("Upper", fun_expr_args(vec!["?expr"]))),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -847,7 +855,7 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-lower-equal-workaround",
                 filter_replacer(
                     binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         "=",
                         literal_expr("?str"),
                     ),
@@ -859,7 +867,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
+                            fun_expr_args(vec![column_expr("?column"), literal_expr("?str")]),
                         ),
                         "AND",
                         udf_expr(
@@ -878,7 +886,7 @@ impl RewriteRules for FilterRules {
                 "filter-replacer-lower-not-equal-workaround",
                 filter_replacer(
                     binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         "!=",
                         literal_expr("?str"),
                     ),
@@ -890,7 +898,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         not_expr(fun_expr(
                             "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
+                            fun_expr_args(vec![column_expr("?column"), literal_expr("?str")]),
                         )),
                         "AND",
                         not_expr(udf_expr(
@@ -909,12 +917,18 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
+                            fun_expr_args(vec![
+                                literal_expr("?granularity"),
+                                column_expr("?column"),
+                            ]),
                         ),
                         "=",
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?date")],
+                            fun_expr_args(vec![
+                                literal_expr("?granularity"),
+                                literal_expr("?date"),
+                            ]),
                         ),
                     ),
                     "?alias_to_cube",
@@ -928,7 +942,10 @@ impl RewriteRules for FilterRules {
                             ">=",
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?date")],
+                                fun_expr_args(vec![
+                                    literal_expr("?granularity"),
+                                    literal_expr("?date"),
+                                ]),
                             ),
                         ),
                         "AND",
@@ -938,7 +955,10 @@ impl RewriteRules for FilterRules {
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
-                                    vec![literal_expr("?granularity"), literal_expr("?date")],
+                                    fun_expr_args(vec![
+                                        literal_expr("?granularity"),
+                                        literal_expr("?date"),
+                                    ]),
                                 ),
                                 "+",
                                 literal_expr("?interval"),
@@ -957,7 +977,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![column_expr("?column"), literal_expr("?value")],
+                            fun_expr_args(vec![column_expr("?column"), literal_expr("?value")]),
                         ),
                         ">",
                         literal_int(0),
@@ -987,10 +1007,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                            fun_expr_args(vec![
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                                 literal_expr("?value"),
-                            ],
+                            ]),
                         ),
                         ">",
                         literal_expr("?zero"),
@@ -1003,7 +1023,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![column_expr("?column"), literal_expr("?value")],
+                            fun_expr_args(vec![column_expr("?column"), literal_expr("?value")]),
                         ),
                         ">",
                         literal_expr("?zero"),
@@ -1019,7 +1039,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![
+                            fun_expr_args(vec![
                                 case_expr(
                                     None,
                                     vec![(
@@ -1029,7 +1049,7 @@ impl RewriteRules for FilterRules {
                                     Some(literal_string("")),
                                 ),
                                 literal_expr("?value"),
-                            ],
+                            ]),
                         ),
                         ">",
                         literal_expr("?zero"),
@@ -1042,7 +1062,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Strpos",
-                            vec![column_expr("?column"), literal_expr("?value")],
+                            fun_expr_args(vec![column_expr("?column"), literal_expr("?value")]),
                         ),
                         ">",
                         literal_expr("?zero"),
@@ -1058,7 +1078,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Left",
-                            vec!["?expr".to_string(), literal_expr("?literal_length")],
+                            fun_expr_args(vec![
+                                "?expr".to_string(),
+                                literal_expr("?literal_length"),
+                            ]),
                         ),
                         "=",
                         "?literal",
@@ -1088,7 +1111,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Right",
-                            vec!["?expr".to_string(), literal_expr("?literal_length")],
+                            fun_expr_args(vec![
+                                "?expr".to_string(),
+                                literal_expr("?literal_length"),
+                            ]),
                         ),
                         "=",
                         "?literal",
@@ -1117,7 +1143,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), "?literal".to_string()],
+                        fun_expr_args(vec![column_expr("?column"), "?literal".to_string()]),
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -1142,7 +1168,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     not_expr(fun_expr(
                         "StartsWith",
-                        vec![column_expr("?column"), "?literal".to_string()],
+                        fun_expr_args(vec![column_expr("?column"), "?literal".to_string()]),
                     )),
                     "?alias_to_cube",
                     "?members",
@@ -1222,13 +1248,16 @@ impl RewriteRules for FilterRules {
                                 binary_expr(
                                     fun_expr(
                                         "Strpos",
-                                        vec![
+                                        fun_expr_args(vec![
                                             fun_expr(
                                                 "Substr",
-                                                vec!["?expr".to_string(), literal_int(1)],
+                                                fun_expr_args(vec![
+                                                    "?expr".to_string(),
+                                                    literal_int(1),
+                                                ]),
                                             ),
                                             literal_expr("?literal"),
-                                        ],
+                                        ]),
                                     ),
                                     ">",
                                     literal_int(0),
@@ -1236,13 +1265,16 @@ impl RewriteRules for FilterRules {
                                 alias_expr(
                                     fun_expr(
                                         "Strpos",
-                                        vec![
+                                        fun_expr_args(vec![
                                             fun_expr(
                                                 "Substr",
-                                                vec!["?expr".to_string(), literal_int(1)],
+                                                fun_expr_args(vec![
+                                                    "?expr".to_string(),
+                                                    literal_int(1),
+                                                ]),
                                             ),
                                             literal_expr("?literal"),
-                                        ],
+                                        ]),
                                     ),
                                     "?plus_minus_one_alias",
                                 ),
@@ -1282,7 +1314,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                             ],
                         ),
                         ">",
@@ -1314,7 +1346,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                             ],
                         ),
                         "<=",
@@ -1346,7 +1378,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                             ],
                         ),
                         "=",
@@ -1378,7 +1410,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                             ],
                         ),
                         "!=",
@@ -1409,10 +1441,13 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec!["?literal".to_string()]),
+                                fun_expr("Reverse", fun_expr_args(vec!["?literal".to_string()])),
                                 fun_expr(
                                     "Reverse",
-                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                    fun_expr_args(vec![fun_expr(
+                                        "Lower",
+                                        fun_expr_args(vec![column_expr("?column")]),
+                                    )]),
                                 ),
                             ],
                         ),
@@ -1444,10 +1479,13 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec!["?literal".to_string()]),
+                                fun_expr("Reverse", fun_expr_args(vec!["?literal".to_string()])),
                                 fun_expr(
                                     "Reverse",
-                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                    fun_expr_args(vec![fun_expr(
+                                        "Lower",
+                                        fun_expr_args(vec![column_expr("?column")]),
+                                    )]),
                                 ),
                             ],
                         ),
@@ -1478,32 +1516,32 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         binary_expr(
                             binary_expr(
                                 literal_string("%"),
                                 "||",
                                 fun_expr(
                                     "Replace",
-                                    vec![
+                                    fun_expr_args(vec![
                                         fun_expr(
                                             "Replace",
-                                            vec![
+                                            fun_expr_args(vec![
                                                 fun_expr(
                                                     "Replace",
-                                                    vec![
+                                                    fun_expr_args(vec![
                                                         literal_expr("?literal"),
                                                         literal_string("!"),
                                                         literal_string("!!"),
-                                                    ],
+                                                    ]),
                                                 ),
                                                 literal_string("%"),
                                                 literal_string("!%"),
-                                            ],
+                                            ]),
                                         ),
                                         literal_string("_"),
                                         literal_string("!_"),
-                                    ],
+                                    ]),
                                 ),
                             ),
                             "||",
@@ -1536,29 +1574,29 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         binary_expr(
                             fun_expr(
                                 "Replace",
-                                vec![
+                                fun_expr_args(vec![
                                     fun_expr(
                                         "Replace",
-                                        vec![
+                                        fun_expr_args(vec![
                                             fun_expr(
                                                 "Replace",
-                                                vec![
+                                                fun_expr_args(vec![
                                                     literal_expr("?literal"),
                                                     literal_string("!"),
                                                     literal_string("!!"),
-                                                ],
+                                                ]),
                                             ),
                                             literal_string("%"),
                                             literal_string("!%"),
-                                        ],
+                                        ]),
                                     ),
                                     literal_string("_"),
                                     literal_string("!_"),
-                                ],
+                                ]),
                             ),
                             "||",
                             literal_string("%"),
@@ -1590,31 +1628,31 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                         binary_expr(
                             literal_string("%"),
                             "||",
                             fun_expr(
                                 "Replace",
-                                vec![
+                                fun_expr_args(vec![
                                     fun_expr(
                                         "Replace",
-                                        vec![
+                                        fun_expr_args(vec![
                                             fun_expr(
                                                 "Replace",
-                                                vec![
+                                                fun_expr_args(vec![
                                                     literal_expr("?literal"),
                                                     literal_string("!"),
                                                     literal_string("!!"),
-                                                ],
+                                                ]),
                                             ),
                                             literal_string("%"),
                                             literal_string("!%"),
-                                        ],
+                                        ]),
                                     ),
                                     literal_string("_"),
                                     literal_string("!_"),
-                                ],
+                                ]),
                             ),
                         ),
                         "?escape_char",
@@ -1680,13 +1718,13 @@ impl RewriteRules for FilterRules {
                     inlist_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                                 "=",
                                 literal_expr("?left_literal"),
                             ),
                             "OR",
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                                 "=",
                                 literal_expr("?right_literal"),
                             ),
@@ -1705,13 +1743,13 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                                 "=",
                                 literal_expr("?left_literal"),
                             ),
                             "OR",
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                fun_expr("Lower", fun_expr_args(vec![column_expr("?column")])),
                                 "=",
                                 literal_expr("?right_literal"),
                             ),
@@ -1730,10 +1768,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "Trunc",
-                            vec![fun_expr(
+                            fun_expr_args(vec![fun_expr(
                                 "DatePart",
-                                vec![literal_string("YEAR"), column_expr("?column")],
-                            )],
+                                fun_expr_args(vec![literal_string("YEAR"), column_expr("?column")]),
+                            )]),
                         ),
                         "=",
                         literal_expr("?year"),
@@ -1760,10 +1798,10 @@ impl RewriteRules for FilterRules {
                         binary_expr(
                             fun_expr(
                                 "DateTrunc",
-                                vec![
+                                fun_expr_args(vec![
                                     literal_expr("?granularity"),
                                     binary_expr(column_expr("?column"), "+", "?same_interval"),
-                                ],
+                                ]),
                             ),
                             "-",
                             "?same_interval",
@@ -1772,7 +1810,10 @@ impl RewriteRules for FilterRules {
                         binary_expr(
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), "?literal_expr".to_string()],
+                                fun_expr_args(vec![
+                                    literal_expr("?granularity"),
+                                    "?literal_expr".to_string(),
+                                ]),
                             ),
                             "-",
                             "?same_interval",
@@ -1790,7 +1831,10 @@ impl RewriteRules for FilterRules {
                             binary_expr(
                                 fun_expr(
                                     "DateTrunc",
-                                    vec![literal_expr("?granularity"), "?literal_expr".to_string()],
+                                    fun_expr_args(vec![
+                                        literal_expr("?granularity"),
+                                        "?literal_expr".to_string(),
+                                    ]),
                                 ),
                                 "-",
                                 "?same_interval",
@@ -1811,7 +1855,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
+                            fun_expr_args(vec![
+                                literal_expr("?granularity"),
+                                column_expr("?column"),
+                            ]),
                         ),
                         "?op",
                         "?date",
@@ -1826,7 +1873,7 @@ impl RewriteRules for FilterRules {
                         "?new_op",
                         fun_expr(
                             "DateTrunc",
-                            vec![
+                            fun_expr_args(vec![
                                 literal_expr("?granularity"),
                                 udf_expr(
                                     "date_sub",
@@ -1841,7 +1888,7 @@ impl RewriteRules for FilterRules {
                                         literal_expr("?date_sub_interval"),
                                     ],
                                 ),
-                            ],
+                            ]),
                         ),
                     ),
                     "?alias_to_cube",
@@ -1862,7 +1909,10 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
+                            fun_expr_args(vec![
+                                literal_expr("?granularity"),
+                                column_expr("?column"),
+                            ]),
                         ),
                         "=",
                         "?date".to_string(),
@@ -1878,7 +1928,10 @@ impl RewriteRules for FilterRules {
                             ">=",
                             fun_expr(
                                 "DateTrunc",
-                                vec![literal_expr("?granularity"), "?date".to_string()],
+                                fun_expr_args(vec![
+                                    literal_expr("?granularity"),
+                                    "?date".to_string(),
+                                ]),
                             ),
                         ),
                         "AND",
@@ -1887,7 +1940,7 @@ impl RewriteRules for FilterRules {
                             "<",
                             fun_expr(
                                 "DateTrunc",
-                                vec![
+                                fun_expr_args(vec![
                                     literal_expr("?granularity"),
                                     udf_expr(
                                         "date_add",
@@ -1896,7 +1949,7 @@ impl RewriteRules for FilterRules {
                                             literal_expr("?date_add_interval"),
                                         ],
                                     ),
-                                ],
+                                ]),
                             ),
                         ),
                     ),
@@ -1932,7 +1985,7 @@ impl RewriteRules for FilterRules {
                     between_expr(
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), "?expr".to_string()],
+                            fun_expr_args(vec![literal_expr("?granularity"), "?expr".to_string()]),
                         ),
                         "?negated",
                         "?low",
@@ -2070,21 +2123,27 @@ impl RewriteRules for FilterRules {
             // scalar
             rewrite(
                 "filter-simplify-scalar-fun-push-down",
-                filter_simplify_replacer(fun_expr_var_arg("?fun", "?args")),
-                fun_expr_var_arg("?fun", filter_simplify_replacer("?args")),
+                filter_simplify_replacer(fun_expr("?fun", "?args")),
+                fun_expr("?fun", filter_simplify_replacer("?args")),
             ),
-            rewrite(
+            list_rewrite(
                 "filter-simplify-scalar-args-push-down",
-                filter_simplify_replacer(scalar_fun_expr_args("?left", "?right")),
-                scalar_fun_expr_args(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
-                ),
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: filter_simplify_replacer("?args"),
+                    list_var: "?args".to_string(),
+                    elem: "?arg".to_string(),
+                },
+                ListPattern {
+                    pattern: "?new_args".to_string(),
+                    list_var: "?new_args".to_string(),
+                    elem: filter_simplify_replacer("?arg"),
+                },
             ),
             rewrite(
-                "filter-simplify-scalar-args-empty-tail-push-down",
-                filter_simplify_replacer(scalar_fun_expr_args_empty_tail()),
-                scalar_fun_expr_args_empty_tail(),
+                "filter-simplify-scalar-args-empty-push-down",
+                filter_simplify_replacer(fun_expr_args_empty()),
+                fun_expr_args_empty(),
             ),
             // udf
             rewrite(
@@ -2325,7 +2384,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         fun_expr(
                             "DateTrunc",
-                            vec![literal_string("day"), column_expr("?column")],
+                            fun_expr_args(vec![literal_string("day"), column_expr("?column")]),
                         ),
                         "?op",
                         udf_expr(
@@ -2582,19 +2641,19 @@ impl RewriteRules for FilterRules {
             rules.extend(vec![
                 rewrite(
                     "filter-simplify-now",
-                    filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                    filter_simplify_replacer(fun_expr("Now", fun_expr_args_empty())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_now", Vec::<String>::new()),
                 ),
                 rewrite(
                     "filter-simplify-utc-timestamp",
-                    filter_simplify_replacer(fun_expr("UtcTimestamp", Vec::<String>::new())),
+                    filter_simplify_replacer(fun_expr("UtcTimestamp", fun_expr_args_empty())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_utc_timestamp", Vec::<String>::new()),
                 ),
                 rewrite(
                     "filter-simplify-current-date",
-                    filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                    filter_simplify_replacer(fun_expr("CurrentDate", fun_expr_args_empty())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_current_date", Vec::<String>::new()),
                 ),
