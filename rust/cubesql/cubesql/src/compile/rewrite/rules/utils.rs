@@ -43,6 +43,7 @@ pub fn granularity_str_to_interval(granularity: &str) -> Option<ScalarValue> {
 
 fn granularity_to_interval(granularity: &str) -> Option<ScalarValue> {
     let interval = match granularity.to_lowercase().as_str() {
+        "millisecond" => ScalarValue::IntervalDayTime(Some(1)),
         "second" => ScalarValue::IntervalDayTime(Some(1000)),
         "minute" => ScalarValue::IntervalDayTime(Some(60000)),
         "hour" => ScalarValue::IntervalDayTime(Some(3600000)),

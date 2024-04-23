@@ -1753,7 +1753,7 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            transforming_rewrite(
+            /* transforming_rewrite(
                 "filter-date-trunc-leeq",
                 filter_replacer(
                     binary_expr(
@@ -1785,7 +1785,7 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 self.transform_granularity_to_interval("?granularity", "?interval"),
-            ),
+            ), */
             transforming_rewrite(
                 "filter-date-trunc-sub-leeq",
                 filter_replacer(
@@ -3990,8 +3990,8 @@ impl FilterRules {
             for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 let new_op = match op {
                     Operator::GtEq => Operator::GtEq,
-                    Operator::Gt => Operator::Gt,
-                    Operator::LtEq => Operator::LtEq,
+                    Operator::Gt => Operator::GtEq,
+                    Operator::LtEq => Operator::Lt,
                     Operator::Lt => Operator::Lt,
                     _ => continue,
                 };
@@ -4002,7 +4002,7 @@ impl FilterRules {
                             utils::granularity_str_to_interval(&granularity),
                             match op {
                                 Operator::GtEq | Operator::Lt => {
-                                    utils::granularity_str_to_interval("second")
+                                    utils::granularity_str_to_interval("millisecond")
                                 }
                                 Operator::Gt | Operator::LtEq => {
                                     Some(ScalarValue::IntervalDayTime(Some(0)))
