@@ -171,7 +171,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
-      FROM information_schema.tables as ${this.quoteIdentifier('columns')}
+      FROM information_schema.tables as columns
       WHERE table_schema IN (${schemasPlaceholders})
     `;
     return query;
@@ -183,7 +183,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('schema_name')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
-      FROM information_schema.columns as ${this.quoteIdentifier('columns')}
+      FROM information_schema.columns as columns
       WHERE ${conditionString}
     `;
 
@@ -476,7 +476,7 @@ export abstract class BaseDriver implements DriverInterface {
     ]);
 
     const columns = await this.query<QueryColumnsResult>(query, parameters);
-  
+
     for (const column of columns) {
       if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
         column.attributes = ['primaryKey'];
