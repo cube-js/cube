@@ -142,6 +142,38 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     this.enabled = true;
   }
 
+  protected primaryKeysQuery(conditionString?: string): string | null {
+    return `SELECT 
+      columns.table_schema as ${this.quoteIdentifier('table_schema')},
+      columns.table_name as ${this.quoteIdentifier('table_name')}, 
+      columns.column_name as ${this.quoteIdentifier('column_name')}
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
+    JOIN information_schema.columns AS columns ON columns.table_schema = tc.constraint_schema
+      AND tc.table_name = columns.table_name AND ccu.column_name = columns.column_name
+    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
+  }
+
+  protected foreignKeysQuery(conditionString?: string): string | null {
+    return `SELECT
+        tc.table_schema as ${this.quoteIdentifier('table_schema')},
+        tc.table_name as ${this.quoteIdentifier('table_name')},
+        kcu.column_name as ${this.quoteIdentifier('column_name')},
+        columns.table_name as ${this.quoteIdentifier('target_table')},
+        columns.column_name as ${this.quoteIdentifier('target_column')}
+      FROM
+        information_schema.table_constraints AS tc
+      JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+      JOIN information_schema.constraint_column_usage AS columns
+        ON columns.constraint_name = tc.constraint_name
+      WHERE
+         constraint_type = 'FOREIGN KEY'
+         AND ${this.getColumnNameForSchemaName()} NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+         ${conditionString ? ` AND (${conditionString})` : ''}
+    `;
+  }
+
   /**
    * The easiest way how to add additional configuration from env variables, because
    * you cannot call method in RedshiftDriver.constructor before super.
