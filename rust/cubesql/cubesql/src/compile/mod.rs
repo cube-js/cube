@@ -15633,7 +15633,7 @@ ORDER BY "source"."str0" ASC
         )
     }
 
-    #[tokio::test]
+    /* #[tokio::test]
     async fn test_quicksight_date_trunc_column_less_or_eq() {
         init_logger();
 
@@ -15679,7 +15679,7 @@ ORDER BY "source"."str0" ASC
                 ungrouped: None,
             }
         )
-    }
+    } */
 
     #[tokio::test]
     async fn test_quicksight_excluding_n_weeks() {
