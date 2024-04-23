@@ -12,7 +12,7 @@ use crate::{
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Rewrite, Subst, Var};
 
 impl WrapperRules {
     pub fn filter_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
@@ -317,7 +317,12 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_filter("?ungrouped", "?select_ungrouped", "?select_ungrouped_scan"),
+            self.transform_filter_subquery(
+                "?alias_to_cube",
+                "?ungrouped",
+                "?select_ungrouped",
+                "?select_ungrouped_scan",
+            ),
         )]);
     }
 
@@ -331,25 +336,73 @@ impl WrapperRules {
         let select_ungrouped_var = var!(select_ungrouped_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         move |egraph, subst| {
-            for ungrouped in
-                var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
-            {
-                subst.insert(
-                    select_ungrouped_var,
-                    egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
-                        WrappedSelectUngrouped(ungrouped),
-                    )),
-                );
-
-                subst.insert(
-                    select_ungrouped_scan_var,
-                    egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
-                        WrappedSelectUngroupedScan(ungrouped),
-                    )),
-                );
-                return true;
-            }
-            false
+            Self::transform_filter_impl(
+                egraph,
+                subst,
+                ungrouped_var,
+                select_ungrouped_var,
+                select_ungrouped_scan_var,
+            )
         }
+    }
+
+    fn transform_filter_subquery(
+        &self,
+        alias_to_cube_var: &'static str,
+        ungrouped_var: &'static str,
+        select_ungrouped_var: &'static str,
+        select_ungrouped_scan_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let select_ungrouped_var = var!(select_ungrouped_var);
+        let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
+        let meta = self.meta_context.clone();
+        move |egraph, subst| {
+            if Self::transform_check_subquery_allowed(
+                egraph,
+                subst,
+                meta.clone(),
+                alias_to_cube_var,
+            ) {
+                Self::transform_filter_impl(
+                    egraph,
+                    subst,
+                    ungrouped_var,
+                    select_ungrouped_var,
+                    select_ungrouped_scan_var,
+                )
+            } else {
+                false
+            }
+        }
+    }
+
+    fn transform_filter_impl(
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: &mut Subst,
+        ungrouped_var: Var,
+        select_ungrouped_var: Var,
+        select_ungrouped_scan_var: Var,
+    ) -> bool {
+        for ungrouped in
+            var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
+        {
+            subst.insert(
+                select_ungrouped_var,
+                egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
+                    WrappedSelectUngrouped(ungrouped),
+                )),
+            );
+
+            subst.insert(
+                select_ungrouped_scan_var,
+                egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
+                    WrappedSelectUngroupedScan(ungrouped),
+                )),
+            );
+            return true;
+        }
+        false
     }
 }

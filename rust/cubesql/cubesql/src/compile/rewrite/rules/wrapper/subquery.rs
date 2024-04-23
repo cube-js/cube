@@ -1,12 +1,16 @@
 use crate::{
-    compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage,
+    compile::{
+        rewrite::{
+            analysis::LogicalPlanAnalysis, cube_scan_wrapper, rules::wrapper::WrapperRules,
+            transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+            LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        },
+        MetaContext,
     },
-    var, var_list_iter,
+    var, var_iter, var_list_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{EGraph, Rewrite, Subst, Var};
+use std::sync::Arc;
 
 impl WrapperRules {
     pub fn subquery_rules(
@@ -46,6 +50,31 @@ impl WrapperRules {
             "SubquerySubqueries",
             "WrappedSelectSubqueries",
         );
+    }
+
+    pub fn transform_check_subquery_allowed(
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: &mut Subst,
+        meta: Arc<MetaContext>,
+        alias_to_cube_var: Var,
+    ) -> bool {
+        for alias_to_cube in var_iter!(
+            egraph[subst[alias_to_cube_var]],
+            WrapperPullupReplacerAliasToCube
+        )
+        .cloned()
+        {
+            if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
+                if sql_generator
+                    .get_sql_templates()
+                    .templates
+                    .contains_key("expressions/subquery")
+                {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn transform_check_subquery_wrapped(
