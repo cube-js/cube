@@ -77,7 +77,7 @@ import {
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
 import { SQLServer } from './sql-server';
-import { makeSchema } from './graphql';
+import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
 import {
@@ -206,6 +206,25 @@ class ApiGateway {
     /** **************************************************************
      * graphql scope                                                 *
      *************************************************************** */
+
+    app.post(`${this.basePath}/graphql-to-json`, userMiddlewares, async (req: any, res) => {
+      const { query, variables } = req.body;
+      const compilerApi = await this.getCompilerApi(req.context);
+
+      const metaConfig = await compilerApi.metaConfig({
+        requestId: req.context.requestId,
+      });
+
+      let schema = compilerApi.getGraphQLSchema();
+      if (!schema) {
+        schema = makeSchema(metaConfig);
+        compilerApi.setGraphQLSchema(schema);
+      }
+      
+      const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig);
+
+      res.json({ jsonQuery });
+    });
 
     app.use(
       `${this.basePath}/graphql`,
