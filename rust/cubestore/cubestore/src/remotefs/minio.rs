@@ -242,7 +242,7 @@ impl RemoteFs for MINIORemoteFs {
 
             let mut writter = File::from_std(temp_file);
             let status_code = bucket
-                .get_object_stream(path.as_str(), &mut writter)
+                .get_object_to_writer(path.as_str(), &mut writter)
                 .await?;
             if status_code != 200 {
                 return Err(CubeError::user(format!(
