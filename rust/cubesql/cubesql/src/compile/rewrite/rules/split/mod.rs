@@ -12,11 +12,12 @@ use crate::{
     compile::rewrite::{
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
         analysis::LogicalPlanAnalysis,
-        original_expr_name, projection_split_pullup_replacer, projection_split_pushdown_replacer,
-        rewrite,
+        list_rewrite_with_lists_and_vars, original_expr_name, projection_split_pullup_replacer,
+        projection_split_pushdown_replacer, rewrite,
         rewriter::RewriteRules,
-        rules::{members::MemberRules, replacer_push_down_node},
-        transforming_chain_rewrite, AliasExprAlias, LogicalPlanLanguage,
+        rules::{members::MemberRules, replacer_push_down_node, replacer_push_down_node_new},
+        transforming_chain_rewrite, AliasExprAlias, ListApplierListPattern, ListPattern, ListType,
+        LogicalPlanLanguage,
     },
     config::ConfigObj,
     transport::MetaContext,
@@ -311,11 +312,97 @@ impl SplitRules {
         ));
     }
 
+    fn list_pushdown_pullup_rules_new(
+        name: &str,
+        list_type: ListType,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        let possible_inner_list_types = Self::possible_inner_list_types_new();
+
+        // Aggregate split replacer
+        let rule_name = &format!("split-{}-aggregate", name);
+        rules.extend(replacer_push_down_node_new(
+            rule_name,
+            list_type.clone(),
+            |node| aggregate_split_pushdown_replacer(node, "?list_node", "?alias_to_cube"),
+            false,
+        ));
+
+        rules.extend(Self::replacer_pull_up_node_new(
+            rule_name,
+            &list_type,
+            &list_type,
+            |inner, outer, inner_list_node| {
+                aggregate_split_pullup_replacer(inner, outer, inner_list_node, "?alias_to_cube")
+            },
+            &possible_inner_list_types,
+            &["?alias_to_cube"],
+        ));
+
+        rules.extend(Self::replacer_pushdown_pullup_empty_new(
+            rule_name,
+            &list_type,
+            &list_type,
+            |node, list_node| aggregate_split_pushdown_replacer(node, list_node, "?alias_to_cube"),
+            |inner, outer, inner_list_node| {
+                aggregate_split_pullup_replacer(inner, outer, inner_list_node, "?alias_to_cube")
+            },
+            &possible_inner_list_types,
+        ));
+
+        // Projection split replacer
+        let rule_name = &format!("split-{}-projection", name);
+        rules.extend(replacer_push_down_node_new(
+            rule_name,
+            list_type.clone(),
+            |node| projection_split_pushdown_replacer(node, "?list_node", "?alias_to_cube"),
+            false,
+        ));
+
+        let projection_substitute_type =
+            if possible_inner_list_types.iter().any(|n| n == &list_type) {
+                ListType::ProjectionExpr
+            } else {
+                list_type.clone()
+            };
+        rules.extend(Self::replacer_pull_up_node_new(
+            rule_name,
+            &list_type,
+            &projection_substitute_type,
+            |inner, outer, inner_list_node| {
+                projection_split_pullup_replacer(inner, outer, inner_list_node, "?alias_to_cube")
+            },
+            &possible_inner_list_types,
+            &["?alias_to_cube"],
+        ));
+
+        rules.extend(Self::replacer_pushdown_pullup_empty_new(
+            rule_name,
+            &list_type,
+            &projection_substitute_type,
+            |node, inner_list_node| {
+                projection_split_pushdown_replacer(node, inner_list_node, "?alias_to_cube")
+            },
+            |inner, outer, inner_list_node| {
+                projection_split_pullup_replacer(inner, outer, inner_list_node, "?alias_to_cube")
+            },
+            &possible_inner_list_types,
+        ));
+    }
+
     fn possible_inner_list_nodes() -> Vec<String> {
         vec![
             "ProjectionExpr".to_string(),
             "AggregateAggrExpr".to_string(),
             "AggregateGroupExpr".to_string(),
+        ]
+    }
+
+    fn possible_inner_list_types_new() -> Vec<ListType> {
+        vec![
+            ListType::ProjectionExpr,
+            //ListType::AggregateGroupExpr,
+            //ListType::AggregateAggrExpr,
         ]
     }
 
@@ -355,6 +442,52 @@ impl SplitRules {
             .collect()
     }
 
+    fn replacer_pull_up_node_new(
+        name: &str,
+        list_type: &ListType,
+        substitute_list_type: &ListType,
+        replacer_node: impl Fn(String, String, String) -> String,
+        possible_inner_list_types: &Vec<ListType>,
+        top_level_elem_vars: &[&str],
+    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        possible_inner_list_types
+            .iter()
+            .map(|inner_list_type| {
+                list_rewrite_with_lists_and_vars(
+                    &format!("{}-{}-pull-up", name, inner_list_type),
+                    list_type.clone(),
+                    ListPattern {
+                        pattern: "?list".to_string(),
+                        list_var: "?list".to_string(),
+                        elem: replacer_node(
+                            "?inner".to_string(),
+                            "?outer".to_string(),
+                            inner_list_type.to_string(),
+                        ),
+                    },
+                    &replacer_node(
+                        "?inner_list".to_string(),
+                        "?outer_list".to_string(),
+                        inner_list_type.to_string(),
+                    ),
+                    [
+                        ListApplierListPattern {
+                            list_type: inner_list_type.clone(),
+                            new_list_var: "?inner_list".to_string(),
+                            elem_pattern: "?inner".to_string(),
+                        },
+                        ListApplierListPattern {
+                            list_type: substitute_list_type.clone(),
+                            new_list_var: "?outer_list".to_string(),
+                            elem_pattern: "?outer".to_string(),
+                        },
+                    ],
+                    top_level_elem_vars,
+                )
+            })
+            .collect()
+    }
+
     fn replacer_pushdown_pullup_tail(
         name: &str,
         list_node: &str,
@@ -373,6 +506,30 @@ impl SplitRules {
                         inner_list_node.clone(),
                         substitute_list_node.to_string(),
                         inner_list_node.clone(),
+                    ),
+                )
+            })
+            .collect()
+    }
+
+    fn replacer_pushdown_pullup_empty_new(
+        name: &str,
+        list_type: &ListType,
+        substitute_list_type: &ListType,
+        push_down_replacer_node: impl Fn(String, String) -> String,
+        pull_up_replacer_node: impl Fn(String, String, String) -> String,
+        possible_inner_list_types: &Vec<ListType>,
+    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        possible_inner_list_types
+            .iter()
+            .map(|inner_list_type| {
+                rewrite(
+                    &format!("{}-push-down-pull-up-{}-empty", name, inner_list_type),
+                    push_down_replacer_node(list_type.empty_list(), inner_list_type.to_string()),
+                    pull_up_replacer_node(
+                        inner_list_type.empty_list(),
+                        substitute_list_type.empty_list(),
+                        inner_list_type.to_string(),
                     ),
                 )
             })

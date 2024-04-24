@@ -10,7 +10,10 @@ use crate::{
         measure_expr, member_pushdown_replacer, member_replacer, merged_members_replacer,
         original_expr_name, projection, referenced_columns, rewrite,
         rewriter::RewriteRules,
-        rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
+        rules::{
+            replacer_push_down_node, replacer_push_down_node_substitute_rules,
+            replacer_push_down_node_substitute_rules_new, utils,
+        },
         segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
         transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
         udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
@@ -18,12 +21,12 @@ use crate::{
         CastExprDataType, ChangeUserCube, ColumnExprColumn, CubeScanAliasToCube,
         CubeScanCanPushdownJoin, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, DimensionName,
         JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType,
-        LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation, LiteralMemberValue,
-        LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube, MemberErrorError,
-        MemberErrorPriority, MemberPushdownReplacerAliasToCube, MemberReplacerAliasToCube,
-        ProjectionAlias, SegmentName, TableScanSourceTableName, TableScanTableName,
-        TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
-        VirtualFieldName,
+        LimitFetch, LimitSkip, ListType, LiteralExprValue, LiteralMemberRelation,
+        LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorAliasToCube,
+        MemberErrorError, MemberErrorPriority, MemberPushdownReplacerAliasToCube,
+        MemberReplacerAliasToCube, ProjectionAlias, SegmentName, TableScanSourceTableName,
+        TableScanTableName, TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName,
+        VirtualFieldCube, VirtualFieldName,
     },
     config::ConfigObj,
     transport::{MetaContext, V1CubeMetaDimensionExt, V1CubeMetaExt, V1CubeMetaMeasureExt},
@@ -545,10 +548,10 @@ impl MemberRules {
             "CubeScanMembers",
             member_replacer_fn.clone(),
         ));
-        rules.extend(replacer_push_down_node_substitute_rules(
+        rules.extend(replacer_push_down_node_substitute_rules_new(
             "member-pushdown-replacer-projection",
-            "ProjectionExpr",
-            "CubeScanMembers",
+            ListType::ProjectionExpr,
+            ListType::CubeScanMembers,
             member_replacer_fn.clone(),
         ));
         rules.extend(find_matching_old_member("column", column_expr("?column")));

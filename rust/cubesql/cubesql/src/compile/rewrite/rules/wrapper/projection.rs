@@ -6,7 +6,7 @@ use crate::{
         wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
         wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
+        ListType, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
         WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
@@ -115,11 +115,11 @@ impl WrapperRules {
             ),
         )]);
 
-        Self::list_pushdown_pullup_rules(
+        Self::list_pushdown_pullup_rules_new(
             rules,
             "wrapper-projection-expr",
-            "ProjectionExpr",
-            "WrappedSelectProjectionExpr",
+            ListType::ProjectionExpr,
+            ListType::WrappedSelectProjectionExpr,
         );
     }
 

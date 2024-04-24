@@ -31,8 +31,11 @@ use crate::{
         analysis::LogicalPlanAnalysis,
         rewrite,
         rewriter::RewriteRules,
-        rules::{replacer_pull_up_node, replacer_push_down_node},
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
+        rules::{
+            replacer_pull_up_node, replacer_pull_up_node_new, replacer_push_down_node,
+            replacer_push_down_node_new,
+        },
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
     },
     config::ConfigObj,
     transport::MetaContext,
@@ -139,6 +142,67 @@ impl WrapperRules {
             ),
             wrapper_pullup_replacer(
                 substitute_list_node,
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ),
+        )]);
+    }
+
+    fn list_pushdown_pullup_rules_new(
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rule_name: &str,
+        list_type: ListType,
+        substitute_list_type: ListType,
+    ) {
+        rules.extend(replacer_push_down_node_new(
+            rule_name,
+            list_type.clone(),
+            |node| {
+                wrapper_pushdown_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
+            false,
+        ));
+
+        rules.extend(replacer_pull_up_node_new(
+            rule_name,
+            list_type.clone(),
+            substitute_list_type.clone(),
+            |node| {
+                wrapper_pullup_replacer(
+                    node,
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                )
+            },
+            &[
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ],
+        ));
+
+        rules.extend(vec![rewrite(
+            &format!("{}-empty", rule_name),
+            wrapper_pushdown_replacer(
+                list_type.empty_list(),
+                "?alias_to_cube",
+                "?ungrouped",
+                "?in_projection",
+                "?cube_members",
+            ),
+            wrapper_pullup_replacer(
+                substitute_list_type.empty_list(),
                 "?alias_to_cube",
                 "?ungrouped",
                 "?in_projection",

@@ -471,7 +471,7 @@ impl LogicalPlanToLanguageConverter {
     ) -> Result<Id, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => {
-                let expr = add_binary_expr_list_node!(
+                let expr = add_expr_list_node_new!(
                     &mut self.graph,
                     node.expr,
                     query_params,
