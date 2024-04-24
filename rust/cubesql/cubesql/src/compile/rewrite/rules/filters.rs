@@ -1754,39 +1754,6 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "filter-date-trunc-leeq",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "<=",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), "?expr".to_string()],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        column_expr("?column"),
-                        "<=",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), "?expr".to_string()],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                self.transform_granularity_to_interval("?granularity", "?interval"),
-            ),
-            transforming_rewrite(
                 "filter-date-trunc-sub-leeq",
                 filter_replacer(
                     binary_expr(
@@ -3973,6 +3940,50 @@ impl FilterRules {
         }
     }
 
+    // This transform fn's job is to convert `date_trunc(col) ?op ?expr` filter expression
+    // into a `col ?new_op ?new_expr`, applying the correct filter to the raw column
+    // instead of a date_trunced variant.
+    //
+    // Here's the expression equivalence reference for day granularity:
+    // ```
+    // date_trunc('day', dt) < '2024-01-10 00:00:00.000'
+    // dt < '2024-01-10 00:00:00.000'
+    //
+    // date_trunc('day', dt) <= '2024-01-10 00:00:00.000'
+    // dt < '2024-01-11 00:00:00.000'
+    //
+    // date_trunc('day', dt) >= '2024-01-10 00:00:00.000'
+    // dt >= '2024-01-10 00:00:00.000'
+    //
+    // date_trunc('day', dt) > '2024-01-10 00:00:00.000'
+    // dt >= '2024-01-11 00:00:00.000'
+    //
+    // date_trunc('day', dt) < '2024-01-10 00:00:00.001'
+    // dt < '2024-01-11 00:00:00.000'
+    //
+    // date_trunc('day', dt) <= '2024-01-10 00:00:00.001'
+    // dt < '2024-01-11 00:00:00.000'
+    //
+    // date_trunc('day', dt) >= '2024-01-10 00:00:00.001'
+    // dt >= '2024-01-11 00:00:00.000'
+    //
+    // date_trunc('day', dt) > '2024-01-10 00:00:00.001'
+    // dt >= '2024-01-11 00:00:00.000'
+    // ```
+    //
+    // In all cases, the expression on the right is being offset forward by an interval
+    // of one granularity unit, with the exception of two cases: `<` and `>=` operators being applied
+    // with an expression on the right being exactly date_trunced to granularity;
+    // since we know that the left side is a date_trunced expression, the change
+    // between `>=`/`>` and `<=`/`<` operators only matters if the right side of expression
+    // is truncated to the granularity specified on the left side.
+    //
+    // To replicate this behavior, we add an interval of one granularity unit
+    // to the expression on the right side, and then subtract an interval of one minimal
+    // granularity unit for two operators, `<` and `>=`, to offset the expression
+    // to the previous slice only if it is at the edge of a trunc slice.
+    // The resulting expression is then truncated to the same granularity,
+    // leading to one of the eight cases listed above.
     fn transform_binary_expr_date_trunc_column_with_literal(
         &self,
         granularity_var: &'static str,
@@ -3989,10 +4000,8 @@ impl FilterRules {
         move |egraph, subst| {
             for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
                 let new_op = match op {
-                    Operator::GtEq => Operator::GtEq,
-                    Operator::Gt => Operator::Gt,
-                    Operator::LtEq => Operator::LtEq,
-                    Operator::Lt => Operator::Lt,
+                    Operator::GtEq | Operator::Gt => Operator::GtEq,
+                    Operator::LtEq | Operator::Lt => Operator::Lt,
                     _ => continue,
                 };
 
@@ -4002,7 +4011,7 @@ impl FilterRules {
                             utils::granularity_str_to_interval(&granularity),
                             match op {
                                 Operator::GtEq | Operator::Lt => {
-                                    utils::granularity_str_to_interval("second")
+                                    utils::granularity_str_to_interval("min_unit")
                                 }
                                 Operator::Gt | Operator::LtEq => {
                                     Some(ScalarValue::IntervalDayTime(Some(0)))

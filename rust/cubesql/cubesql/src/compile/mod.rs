@@ -15633,7 +15633,6 @@ ORDER BY "source"."str0" ASC
         )
     }
 
-    /*  TODO Uncomment after fixing the rewrite logic for filters with date_trunc
     #[tokio::test]
     async fn test_quicksight_date_trunc_column_less_or_eq() {
         init_logger();
@@ -15667,7 +15666,7 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
                         "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T00:00:00.000Z", end_date),
+                        format!("{}T23:59:59.999Z", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -15680,7 +15679,7 @@ ORDER BY "source"."str0" ASC
                 ungrouped: None,
             }
         )
-    } */
+    }
 
     #[tokio::test]
     async fn test_quicksight_excluding_n_weeks() {
@@ -19694,27 +19693,27 @@ ORDER BY "source"."str0" ASC
                 "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
+            ("<=", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<=", "2020-04-01", "beforeDate", "2020-05-01T00:00:00.000Z"),
+            ("<=", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
             (
-                "<=",
+                ">",
                 "2020-03-25",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-04-01T00:00:00.000Z",
             ),
             (
-                "<=",
+                ">",
                 "2020-04-01",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
             (
-                "<=",
+                ">",
                 "2020-04-10",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
-            (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
-            (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
             ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
             ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
             ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
@@ -21377,7 +21376,7 @@ ORDER BY "source"."str0" ASC
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterDate".to_string()),
+                    operator: Some("afterOrOnDate".to_string()),
                     values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
                     or: None,
                     and: None,
