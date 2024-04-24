@@ -15633,7 +15633,8 @@ ORDER BY "source"."str0" ASC
         )
     }
 
-    /* #[tokio::test]
+    /*  TODO Uncomment after fixing the rewrite logic for filters with date_trunc
+    #[tokio::test]
     async fn test_quicksight_date_trunc_column_less_or_eq() {
         init_logger();
 
@@ -20197,12 +20198,26 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
+        println!(
+            "log plan {:?}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
         assert!(logical_plan
             .find_cube_scan_wrapper()
             .wrapped_sql
             .unwrap()
             .sql
             .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("\\\"limit\\\":1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20228,6 +20243,12 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("LIMIT 1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20253,6 +20274,12 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("\\\"limit\\\":1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
