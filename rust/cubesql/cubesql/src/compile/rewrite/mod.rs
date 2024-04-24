@@ -244,7 +244,7 @@ crate::plan_to_language! {
             list: Vec<Expr>,
             negated: bool,
         },
-        InSubquery {
+        InSubqueryExpr {
             expr: Box<Expr>,
             subquery: Box<Expr>,
             negated: bool,
@@ -258,6 +258,7 @@ crate::plan_to_language! {
         WrappedSelect {
             select_type: WrappedSelectType,
             projection_expr: Vec<Expr>,
+            subqueries: Vec<LogicalPlan>,
             group_expr: Vec<Expr>,
             aggr_expr: Vec<Expr>,
             window_expr: Vec<Expr>,
@@ -277,6 +278,10 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             expr: Arc<Expr>,
             join_type: JoinType,
+        },
+        WrappedSubquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
         },
 
         CubeScan {
@@ -819,6 +824,7 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,
+    subqueries: impl Display,
     group_expr: impl Display,
     aggr_expr: impl Display,
     window_expr: impl Display,
@@ -835,9 +841,10 @@ fn wrapped_select(
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
+        subqueries,
         group_expr,
         aggr_expr,
         window_expr,
@@ -862,6 +869,10 @@ fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> St
 
 fn wrapped_select_projection_expr_empty_tail() -> String {
     "WrappedSelectProjectionExpr".to_string()
+}
+
+fn wrapped_select_subqueries_empty_tail() -> String {
+    "WrappedSelectSubqueries".to_string()
 }
 
 #[allow(dead_code)]
@@ -988,6 +999,10 @@ fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> Str
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
     format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {
+    format!("(InSubqueryExpr {} {} {})", expr, subquery, negated)
 }
 
 fn between_expr(
@@ -1134,6 +1149,10 @@ fn sort(expr: impl Display, input: impl Display) -> String {
 
 fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
+}
+
+fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) -> String {
+    format!("(Subquery {} {} {})", input, subqueries, types)
 }
 
 fn join(

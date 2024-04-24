@@ -650,6 +650,31 @@ impl SqlTemplates {
         )
     }
 
+    pub fn subquery_expr(&self, subquery_expr: String) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/subquery",
+            context! {
+                expr => subquery_expr,
+            },
+        )
+    }
+
+    pub fn in_subquery_expr(
+        &self,
+        expr: String,
+        subquery_expr: String,
+        negated: bool,
+    ) -> Result<String, CubeError> {
+        self.render_template(
+            "expressions/in_subquery",
+            context! {
+                expr => expr,
+                subquery_expr => subquery_expr,
+                negated => negated
+            },
+        )
+    }
+
     pub fn literal_bool_expr(&self, value: bool) -> Result<String, CubeError> {
         match value {
             true => self.render_template("expressions/true", context! {}),
