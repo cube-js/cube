@@ -821,6 +821,10 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
     format!("(Window {} {})", input, window_expr)
 }
 
+fn empty_relation(produce_one_row: impl Display) -> String {
+    format!("(EmptyRelation {})", produce_one_row)
+}
+
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,

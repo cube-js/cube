@@ -20183,6 +20183,60 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_simple_subquery_wrapper_projection_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (SELECT 'male' ) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+        //println!("phys plan {:?}", physical_plan);
+    }
+
+    /* #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT avgPrice FROM KibanaSampleDataEcommerce a where customer_gender = (SELECT 'male')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+        //println!("phys plan {:?}", physical_plan);
+    } */
+
+    #[tokio::test]
     async fn test_simple_subquery_wrapper_projection() {
         if !Rewriter::sql_push_down_enabled() {
             return;
