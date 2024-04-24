@@ -329,7 +329,7 @@ impl CubeScanWrapperNode {
         load_request_meta: Arc<LoadRequestMeta>,
         node: Arc<LogicalPlan>,
         can_rename_columns: bool,
-        mut values: Vec<Option<String>>,
+        values: Vec<Option<String>>,
         parent_data_source: Option<String>,
     ) -> Pin<Box<dyn Future<Output = result::Result<SqlGenerationResult, CubeError>> + Send>> {
         Box::pin(async move {

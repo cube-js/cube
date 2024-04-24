@@ -241,7 +241,7 @@ impl WrapperRules {
                     ),
                     "?alias_to_cube",
                     "?ungrouped",
-                    "WrapperPullupReplacerInProjection:true",
+                    "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pushdown_replacer(
@@ -317,7 +317,7 @@ impl WrapperRules {
                     ),
                     "?alias_to_cube",
                     "?ungrouped",
-                    "WrapperPullupReplacerInProjection:true",
+                    "?in_projection",
                     "?cube_members",
                 ),
                 self.transform_projection_subquery_empty_rel("?projection_alias", "?select_alias"),
@@ -372,7 +372,6 @@ impl WrapperRules {
                 );
                 return true;
             }
-
             false
         }
     }
