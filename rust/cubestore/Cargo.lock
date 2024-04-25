@@ -285,8 +285,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "aws-creds"
 version = "0.30.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aeeee1a5defa63cba39097a510dfe63ef53658fc8995202a610f6a8a4d03639"
+source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
 dependencies = [
  "attohttpc",
  "dirs",
@@ -300,9 +299,8 @@ dependencies = [
 
 [[package]]
 name = "aws-region"
-version = "0.25.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42fed2b9fca70f2908268d057a607f2a906f47edbf856ea8587de9038d264e22"
+version = "0.25.1"
+source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
 dependencies = [
  "thiserror",
 ]
@@ -2302,7 +2300,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.4",
 ]
 
 [[package]]
@@ -3885,8 +3883,7 @@ dependencies = [
 [[package]]
 name = "rust-s3"
 version = "0.32.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6009d9d4cf910505534d62d380a0aa305805a2af0b5c3ad59a3024a0715b847"
+source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
 dependencies = [
  "async-trait",
  "aws-creds",
