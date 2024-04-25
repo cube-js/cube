@@ -285,7 +285,7 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 [[package]]
 name = "aws-creds"
 version = "0.30.0"
-source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
+source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#4ba2d8b4ea85bdf0081d6577e721675e2e41507f"
 dependencies = [
  "attohttpc",
  "dirs",
@@ -299,8 +299,9 @@ dependencies = [
 
 [[package]]
 name = "aws-region"
-version = "0.25.1"
-source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
+version = "0.25.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42fed2b9fca70f2908268d057a607f2a906f47edbf856ea8587de9038d264e22"
 dependencies = [
  "thiserror",
 ]
@@ -3883,7 +3884,7 @@ dependencies = [
 [[package]]
 name = "rust-s3"
 version = "0.32.3"
-source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#be20af58a314d48e3df36224bde9435af017e3c9"
+source = "git+https://github.com/cube-js/rust-s3.git?branch=cubestore-0.32.3-backport#4ba2d8b4ea85bdf0081d6577e721675e2e41507f"
 dependencies = [
  "async-trait",
  "aws-creds",
