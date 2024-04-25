@@ -221,9 +221,15 @@ class ApiGateway {
         compilerApi.setGraphQLSchema(schema);
       }
       
-      const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig);
-
-      res.json({ jsonQuery });
+      try {
+        const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
+        res.json({ jsonQuery });
+      } catch (e: any) {
+        this.logger('GraphQL to JSON error', {
+          error: (e.stack || e).toString(),
+        });
+        res.json({ jsonQuery: null });
+      }
     });
 
     app.use(

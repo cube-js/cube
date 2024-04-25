@@ -215,7 +215,7 @@ function getFieldNodeChildren(node: FieldNode, infos: GraphQLResolveInfo) {
   )) || []) as FieldNode[];
 }
 
-function parseArgumentValue(value: ValueNode) {
+function parseArgumentValue(value: ValueNode, variables?: Record<string, any>) {
   switch (value.kind) {
     case 'BooleanValue':
     case 'IntValue':
@@ -224,12 +224,18 @@ function parseArgumentValue(value: ValueNode) {
     case 'EnumValue':
       return value.value;
     case 'ListValue':
-      return value.values.map(v => parseArgumentValue(v));
+      return value.values.map(v => parseArgumentValue(v, variables));
     case 'ObjectValue':
       return value.fields.reduce((obj, v) => ({
         ...obj,
-        [v.name.value]: parseArgumentValue(v.value),
+        [v.name.value]: parseArgumentValue(v.value, variables),
       }), {});
+    case 'Variable':
+      if (variables?.[value.name.value] === undefined) {
+        throw new Error(`Variable "${value.name.value}" is not defined`);
+      }
+
+      return variables[value.name.value];
     default:
       return undefined;
   }
@@ -246,7 +252,7 @@ function getArgumentValue(node: FieldNode, argName: string, variables: Record<st
     return variables[argument.name.value];
   }
 
-  return argument ? parseArgumentValue(argument) : argument;
+  return argument ? parseArgumentValue(argument, variables) : argument;
 }
 
 function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
@@ -459,7 +465,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
   };
 }
 
-export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any) {
+export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
   const ast = gql(query);
 
   const operation: any = ast.definitions.find(
@@ -470,22 +476,15 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any) {
 
   let args = {};
   for (const argument of fieldNodes[0].arguments) {
-    args = { ...args, [argument.name.value]: parseArgumentValue(argument.value) };
+    args = { ...args, [argument.name.value]: parseArgumentValue(argument.value, variableValues) };
   }
 
   const resolveInfo: any = {
     fieldName: fieldNodes[0]?.name.value || '',
     fieldNodes,
-    // returnType: null,
-    // parentType: null,
-    // schema: null,
     rootValue: {},
     operation,
-    variableValues: {},
-    // path: {
-    // prev: undefined,
-    // key: ''
-    // },
+    variableValues,
     fragments: {},
   };
   
