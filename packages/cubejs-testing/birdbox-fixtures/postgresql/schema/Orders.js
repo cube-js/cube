@@ -51,7 +51,15 @@ cube(`Orders`, {
       post_aggregate: true,
       sql: `${amountRankDateMax}`,
       type: `time`,
-    }
+    },
+    statusMeasure: {
+      type: "string",
+      sql: `${status}`,
+    },
+    createdAtMeasure: {
+      type: "time",
+      sql: `created_at`,
+    },
   },
   dimensions: {
     id: {
@@ -71,4 +79,12 @@ cube(`Orders`, {
       type: `time`
     }
   },
+});
+
+view(`OrdersView`, {
+  cubes: [{
+    joinPath: Orders,
+    includes: `*`,
+    excludes: [`toRemove`]
+  }]
 });

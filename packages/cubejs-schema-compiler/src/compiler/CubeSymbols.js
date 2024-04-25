@@ -5,6 +5,7 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
+import { BaseQuery } from '../adapter';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
@@ -367,7 +368,7 @@ export class CubeSymbols {
       if (type === 'measures') {
         memberDefinition = {
           sql,
-          type: 'number',
+          type: BaseQuery.measureTypeToDimensionType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
           title: resolvedMember.title,

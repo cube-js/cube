@@ -148,8 +148,7 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
-    // TODO support type qualifiers on min and max
-    const type = BaseQuery.isCalculatedMeasureType(nameToMetric[1].type) ? nameToMetric[1].type : 'number';
+    const type = BaseQuery.measureTypeToDimensionType(nameToMetric[1].type);
 
     return {
       name,

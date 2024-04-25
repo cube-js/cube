@@ -259,5 +259,22 @@ limit
   `);
       expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
+
+    test('date/string measures in view', async () => {
+      const query_ctor = (column: string, from: string) => `SELECT "${column}" AS val FROM ${from} LIMIT 10`;
+      
+      const test_measure = async (measure_column: string) => {
+        const res_expect = await connection.query(query_ctor(measure_column, `Orders`));
+        const res = await connection.query(query_ctor(measure_column, `OrdersView`));
+
+        expect(res_expect.rows.length).toBeGreaterThan(0);
+        expect(res_expect.rows.every((row) => row.val !== null)).toBe(true);
+
+        expect(res.rows).toStrictEqual(res_expect.rows);
+      }
+
+      await test_measure('statusMeasure');
+      await test_measure('createdAtMeasure');
+    });
   });
 });

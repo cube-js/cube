@@ -2422,6 +2422,13 @@ export class BaseQuery {
     return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
   }
 
+  /**
+   TODO: support type qualifiers on min and max
+  */
+  static measureTypeToDimensionType(type) {
+    return this.isCalculatedMeasureType(type) ? type : 'number';
+  }
+
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
     const cumulativeMeasureFilters = (this.safeEvaluateSymbolContext().cumulativeMeasureFilters || {})[measurePath];
     if (cumulativeMeasureFilters) {
