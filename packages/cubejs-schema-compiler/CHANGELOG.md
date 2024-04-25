@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* **cubesql:** In subquery rewrite ([#8162](https://github.com/cube-js/cube/issues/8162)) ([d17c2a7](https://github.com/cube-js/cube/commit/d17c2a7d58beada203009c5d624974d3a68c6af8))
+* primary and foreign keys driver queries ([#8115](https://github.com/cube-js/cube/issues/8115)) ([35bb1d4](https://github.com/cube-js/cube/commit/35bb1d435a75f53f704e9c5e33382093cbc4e115))
+
+
+
+
+
 ## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

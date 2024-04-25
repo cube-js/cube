@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Bug Fixes
+
+* **client-core:** castNumerics option for CubeApi ([#8186](https://github.com/cube-js/cube/issues/8186)) ([6ff2208](https://github.com/cube-js/cube/commit/6ff22088ede88521c6c5a5e8cb1a77c819301ad4))
+
+
+### Features
+
+* **api-gateway:** graphql json query conversion ([#8189](https://github.com/cube-js/cube/issues/8189)) ([55ea7c8](https://github.com/cube-js/cube/commit/55ea7c86f49163b6c65fb277966a0e8b572a5fd5))
+* **cubesql:** In subquery rewrite ([#8162](https://github.com/cube-js/cube/issues/8162)) ([d17c2a7](https://github.com/cube-js/cube/commit/d17c2a7d58beada203009c5d624974d3a68c6af8))
+* primary and foreign keys driver queries ([#8115](https://github.com/cube-js/cube/issues/8115)) ([35bb1d4](https://github.com/cube-js/cube/commit/35bb1d435a75f53f704e9c5e33382093cbc4e115))
+
+
+
+
+
 ## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
 
 

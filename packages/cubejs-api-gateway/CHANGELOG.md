@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* **api-gateway:** graphql json query conversion ([#8189](https://github.com/cube-js/cube/issues/8189)) ([55ea7c8](https://github.com/cube-js/cube/commit/55ea7c86f49163b6c65fb277966a0e8b572a5fd5))
+
+
+
+
+
 ## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway
