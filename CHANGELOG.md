@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix `date_trunc` over column offset in filters ([1a602be](https://github.com/cube-js/cube/commit/1a602bea8fc17cc258c6d125ea8e7904b33454ff))
+* **cubestore:** S3 - STS credentials (backport fix for 0.32.3) ([#8195](https://github.com/cube-js/cube/issues/8195)) ([9d9cb4a](https://github.com/cube-js/cube/commit/9d9cb4a025931da24d560220878b7450f81de22c))
+
+
+
+
+
 ## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
 
 
