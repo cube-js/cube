@@ -858,7 +858,7 @@ checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 [[package]]
 name = "egg"
 version = "0.9.5"
-source = "git+https://github.com/egraphs-good/egg.git?rev=2f1514c58517e2f38acfe337175f843f156530cf#2f1514c58517e2f38acfe337175f843f156530cf"
+source = "git+https://github.com/egraphs-good/egg.git?rev=7e60716cc757448bd672f2dc28ef9a0d074dce71#7e60716cc757448bd672f2dc28ef9a0d074dce71"
 dependencies = [
  "env_logger",
  "fxhash",
@@ -866,6 +866,8 @@ dependencies = [
  "indexmap 1.9.3",
  "instant",
  "log",
+ "num-bigint",
+ "num-traits",
  "saturating",
  "smallvec",
  "symbol_table",

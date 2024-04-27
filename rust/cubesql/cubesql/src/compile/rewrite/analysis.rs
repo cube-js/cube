@@ -1303,4 +1303,8 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             }
         }
     }
+
+    fn allow_ematching_cycles(&self) -> bool {
+        false
+    }
 }
