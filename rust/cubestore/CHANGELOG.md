@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Error in optimization for nested boolean expressions ([#7891](https://github.com/cube-js/cube.js/issues/7891)) ([e5d20d2](https://github.com/cube-js/cube.js/commit/e5d20d228ac07849dbcd4df2f713ea01fc74f0fe))
+
+
+
+
+
 ## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
 
 
