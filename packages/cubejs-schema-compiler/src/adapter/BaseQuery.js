@@ -2425,7 +2425,7 @@ export class BaseQuery {
   /**
    TODO: support type qualifiers on min and max
   */
-  static measureTypeToDimensionType(type) {
+  static toMemberDataType(type) {
     return this.isCalculatedMeasureType(type) ? type : 'number';
   }
 

@@ -52,13 +52,13 @@ cube(`Orders`, {
       sql: `${amountRankDateMax}`,
       type: `time`,
     },
-    statusMeasure: {
+    countAndTotalAmount: {
       type: "string",
-      sql: `${status}`,
+      sql: `CONCAT(${count}, ' / ', ${totalAmount})`,
     },
-    createdAtMeasure: {
+    constTimeMeasure: {
       type: "time",
-      sql: `created_at`,
+      sql: `'2024-01-01'::timestamptz`,
     },
   },
   dimensions: {

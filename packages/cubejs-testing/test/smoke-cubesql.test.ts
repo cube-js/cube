@@ -261,7 +261,7 @@ limit
     });
 
     test('date/string measures in view', async () => {
-      const queryCtor = (column: string, from: string) => `SELECT "${column}" AS val FROM ${from} LIMIT 10`;
+      const queryCtor = (column: string, from: string) => `SELECT "${column}" AS val FROM ${from} ORDER BY id LIMIT 10`;
       
       const testMeasure = async (measureColumn: string) => {
         const resExpect = await connection.query(queryCtor(measureColumn, 'Orders'));
@@ -273,8 +273,8 @@ limit
         expect(res.rows).toStrictEqual(resExpect.rows);
       };
 
-      await testMeasure('statusMeasure');
-      await testMeasure('createdAtMeasure');
+      await testMeasure('countAndTotalAmount');
+      await testMeasure('constTimeMeasure');
     });
   });
 });

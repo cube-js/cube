@@ -368,7 +368,7 @@ export class CubeSymbols {
       if (type === 'measures') {
         memberDefinition = {
           sql,
-          type: BaseQuery.measureTypeToDimensionType(resolvedMember.type),
+          type: BaseQuery.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
           title: resolvedMember.title,

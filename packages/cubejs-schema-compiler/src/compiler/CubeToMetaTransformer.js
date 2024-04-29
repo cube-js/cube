@@ -148,7 +148,7 @@ export class CubeToMetaTransformer {
       cubeName, drillMembers, { originalSorting: true }
     )) || [];
 
-    const type = BaseQuery.measureTypeToDimensionType(nameToMetric[1].type);
+    const type = BaseQuery.toMemberDataType(nameToMetric[1].type);
 
     return {
       name,
