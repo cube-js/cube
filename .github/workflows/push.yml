@@ -95,12 +95,13 @@ jobs:
       - uses: codecov/codecov-action@v4
         if: (matrix.node-version == '18.x')
         with:
-          files: ./packages/*/coverage/clover.xml
+          root_dir: ./packages
+          files: ./*/coverage/clover.xml
           exclude: examples
           flags: cube-backend
           verbose: true # optional (default = false)
           fail_ci_if_error: false
-  
+
   lint:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
