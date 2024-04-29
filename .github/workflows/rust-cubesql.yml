@@ -76,9 +76,10 @@ jobs:
           CUBESQL_REWRITE_TIMEOUT: 60
         run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
       - name: Upload code coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./rust/cubesql/cobertura.xml
+          exclude: examples
           verbose: true
           flags: cubesql
           fail_ci_if_error: false
