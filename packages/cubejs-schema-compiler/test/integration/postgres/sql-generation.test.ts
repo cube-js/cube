@@ -79,6 +79,13 @@ describe('SQL Generation', () => {
             offset: 'start'
           }
         },
+        revenue_qtd: {
+          type: 'sum',
+          sql: 'amount',
+          rollingWindow: {
+            type: 'quarter_to_date'
+          }
+        },
         countDistinctApproxRolling: {
           type: 'countDistinctApprox',
           sql: 'id',
@@ -773,6 +780,28 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__count_rolling: '2' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__count_rolling: null },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__count_rolling: null }
+  ]));
+
+  it('rolling qtd', async () => runQueryTest({
+    measures: [
+      'visitors.revenue_qtd'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2017-01-05', '2017-01-10']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__revenue_qtd: '600' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__revenue_qtd: '1500' },
+    { visitors__created_at_day: '2017-01-07T00:00:00.000Z', visitors__revenue_qtd: '1500' },
+    { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_qtd: '1500' },
+    { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_qtd: '1500' },
+    { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_qtd: '1500' }
   ]));
 
   it('sql utils', async () => runQueryTest({

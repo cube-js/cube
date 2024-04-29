@@ -119,14 +119,22 @@ export class BaseMeasure {
     if (this.measureDefinition().type === 'runningTotal') {
       throw new UserError('runningTotal rollups aren\'t supported. Please consider replacing runningTotal measure with rollingWindow.');
     }
+    const { type } = this.measureDefinition().rollingWindow;
+    if (type && type !== 'fixed') {
+      throw new UserError(`Only fixed rolling windows are supported by Cube Store but got '${type}' rolling window`);
+    }
     return this.measureDefinition().rollingWindow;
   }
 
   public dateJoinCondition() {
-    if (this.measureDefinition().type === 'runningTotal') {
+    const definition = this.measureDefinition();
+    if (definition.type === 'runningTotal') {
       return this.query.runningTotalDateJoinCondition();
     }
-    const { rollingWindow } = this.measureDefinition();
+    const { rollingWindow } = definition;
+    if (rollingWindow.type === 'year_to_date' || rollingWindow.type === 'quarter_to_date' || rollingWindow.type === 'month_to_date') {
+      return this.query.rollingWindowToDateJoinCondition(rollingWindow.type.replace('_to_date', ''));
+    }
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset

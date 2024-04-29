@@ -662,6 +662,15 @@ export class BaseQuery {
     );
   }
 
+  rollingWindowToDateJoinCondition(granularity) {
+    return this.timeDimensions.map(
+      d => [
+        d,
+        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
+      ]
+    );
+  }
+
   rollingWindowDateJoinCondition(trailingInterval, leadingInterval, offset) {
     offset = offset || 'end';
     return this.timeDimensions.map(

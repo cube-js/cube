@@ -109,6 +109,25 @@ const BaseDimension = Object.assign({
   propagateFiltersToSubQuery: Joi.boolean().strict()
 }, BaseDimensionWithoutSubQuery);
 
+const FixedRollingWindow = {
+  type: Joi.string().valid('fixed'),
+  trailing: timeInterval,
+  leading: timeInterval,
+  offset: Joi.any().valid('start', 'end')
+};
+
+const YearToDate = {
+  type: Joi.string().valid('year_to_date'),
+};
+
+const QuarterToDate = {
+  type: Joi.string().valid('quarter_to_date'),
+};
+
+const MonthToDate = {
+  type: Joi.string().valid('month_to_date'),
+};
+
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
   format: Joi.any().valid('percent', 'currency', 'number'),
@@ -125,11 +144,17 @@ const BaseMeasure = {
   ),
   title: Joi.string(),
   description: Joi.string(),
-  rollingWindow: Joi.object().keys({
-    trailing: timeInterval,
-    leading: timeInterval,
-    offset: Joi.any().valid('start', 'end')
-  }),
+  rollingWindow: Joi.alternatives().conditional(
+    Joi.ref('.type'), [
+      { is: 'year_to_date', then: YearToDate },
+      { is: 'quarter_to_date', then: QuarterToDate },
+      { is: 'month_to_date', then: MonthToDate },
+      { is: 'fixed',
+        then: FixedRollingWindow,
+        otherwise: FixedRollingWindow
+      }
+    ]
+  ),
   drillMemberReferences: Joi.func(),
   drillMembers: Joi.func(),
   drillFilters: Joi.array().items(
