@@ -56,9 +56,13 @@ cube(`Orders`, {
       type: "string",
       sql: `CONCAT(${count}, ' / ', ${totalAmount})`,
     },
-    constTimeMeasure: {
+    createdAtMax: {
+      type: `max`,
+      sql: `created_at`,
+    },
+    createdAtMaxProxy: {
       type: "time",
-      sql: `'2024-01-01'::timestamptz`,
+      sql: `${createdAtMax}`,
     },
   },
   dimensions: {

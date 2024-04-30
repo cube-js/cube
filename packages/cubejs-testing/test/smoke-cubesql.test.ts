@@ -274,7 +274,7 @@ limit
       };
 
       await testMeasure('countAndTotalAmount');
-      await testMeasure('constTimeMeasure');
+      await testMeasure('createdAtMaxProxy');
     });
   });
 });
