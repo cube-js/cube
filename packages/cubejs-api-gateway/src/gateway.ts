@@ -506,8 +506,9 @@ class ApiGateway {
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
+    const isDevMode = getEnv('devMode');
     function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+      return isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return cubes
