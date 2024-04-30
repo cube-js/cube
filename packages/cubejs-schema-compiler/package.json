@@ -44,7 +44,7 @@
     "@cubejs-backend/shared": "^0.35.2",
     "antlr4ts": "0.5.0-alpha.4",
     "camelcase": "^6.2.0",
-    "cron-parser": "^3.5.0",
+    "cron-parser": "^4.9.0",
     "humps": "^2.0.1",
     "inflection": "^1.12.0",
     "joi": "^17.8.3",
