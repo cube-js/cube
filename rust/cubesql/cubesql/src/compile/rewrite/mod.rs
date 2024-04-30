@@ -279,9 +279,8 @@ crate::plan_to_language! {
             expr: Arc<Expr>,
             join_type: JoinType,
         },
-        WrappedSubquery {
+        SubqueryNode {
             input: Arc<LogicalPlan>,
-            subqueries: Vec<LogicalPlan>,
         },
 
         CubeScan {
@@ -459,6 +458,16 @@ crate::plan_to_language! {
             ungrouped: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
+        },
+        SubqueryPushdownHolder {
+            input: Arc<LogicalPlan>,
+            alias_to_cube: Vec<(String, String)>,
+            ungrouped: bool,
+            in_projection: bool,
+            cube_members: Vec<LogicalPlan>,
+        },
+        SubqueryInputPushdown {
+            input: Arc<LogicalPlan>,
         },
         FlattenPushdownReplacer {
             expr: Arc<Expr>,
@@ -1159,6 +1168,9 @@ fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) 
     format!("(Subquery {} {} {})", input, subqueries, types)
 }
 
+fn subquery_node(input: impl Display) -> String {
+    format!("(SubqueryNode {})", input)
+}
 fn join(
     left: impl Display,
     right: impl Display,
@@ -1347,6 +1359,19 @@ fn wrapper_pushdown_replacer(
 ) -> String {
     format!(
         "(WrapperPushdownReplacer {} {} {} {} {})",
+        members, alias_to_cube, ungrouped, in_projection, cube_members
+    )
+}
+
+fn subquery_pushdown_holder(
+    members: impl Display,
+    alias_to_cube: impl Display,
+    ungrouped: impl Display,
+    in_projection: impl Display,
+    cube_members: impl Display,
+) -> String {
+    format!(
+        "(SubqueryPushdownHolder {} {} {} {} {})",
         members, alias_to_cube, ungrouped, in_projection, cube_members
     )
 }

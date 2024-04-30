@@ -1,7 +1,8 @@
 use crate::{
     compile::{
         rewrite::{
-            analysis::LogicalPlanAnalysis, cube_scan_wrapper, rules::wrapper::WrapperRules,
+            analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite,
+            rules::wrapper::WrapperRules, subquery_node, subquery_pushdown_holder,
             transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
             LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
         },
@@ -17,33 +18,91 @@ impl WrapperRules {
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
-        rules.extend(vec![transforming_rewrite(
-            "wrapper-subqueries-wrapped-scan-to-pull-up",
-            wrapper_pushdown_replacer(
-                cube_scan_wrapper(
-                    wrapper_pullup_replacer(
-                        "?cube_scan_input",
-                        "?inner_alias_to_cube",
-                        "?nner_ungrouped",
-                        "?inner_in_projection",
-                        "?inner_cube_members",
-                    ),
-                    "CubeScanWrapperFinalized:false",
+        rules.extend(vec![
+            transforming_rewrite(
+                "wrapper-subqueries-wrapped-scan-to-pull",
+                subquery_pushdown_holder(
+                    subquery_node(cube_scan_wrapper(
+                        wrapper_pullup_replacer(
+                            "?cube_scan_input",
+                            "?inner_alias_to_cube",
+                            "?nner_ungrouped",
+                            "?inner_in_projection",
+                            "?inner_cube_members",
+                        ),
+                        "CubeScanWrapperFinalized:false",
+                    )),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
                 ),
-                "?alias_to_cube",
-                "?ungrouped",
-                "?in_projection",
-                "?cube_members",
+                wrapper_pullup_replacer(
+                    subquery_node("?cube_scan_input"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+                self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
-            wrapper_pullup_replacer(
-                "?cube_scan_input",
-                "?alias_to_cube",
-                "?ungrouped",
-                "?in_projection",
-                "?cube_members",
+            transforming_rewrite(
+                "wrapper-subqueries-wrapped-scan-to-pull-upkskip-pushdown", //Non EmptyRalation case
+                subquery_pushdown_holder(
+                    subquery_node(wrapper_pushdown_replacer(
+                        cube_scan_wrapper(
+                            wrapper_pullup_replacer(
+                                "?cube_scan_input",
+                                "?inner_alias_to_cube",
+                                "?nner_ungrouped",
+                                "?inner_in_projection",
+                                "?inner_cube_members",
+                            ),
+                            "CubeScanWrapperFinalized:false",
+                        ),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    )),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+                wrapper_pullup_replacer(
+                    subquery_node("?cube_scan_input"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+                self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
-            self.transform_check_subquery_wrapped("?cube_scan_input"),
-        )]);
+            rewrite(
+                "wrapper-subqueries-add-input-pushdown",
+                wrapper_pushdown_replacer(
+                    subquery_node("?input"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+                subquery_pushdown_holder(
+                    subquery_node(wrapper_pushdown_replacer(
+                        "?input",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    )),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+            ),
+        ]);
         Self::list_pushdown_pullup_rules(
             rules,
             "wrapper-subqueries",

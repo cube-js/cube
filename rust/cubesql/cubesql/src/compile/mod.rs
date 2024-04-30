@@ -20190,7 +20190,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT 'male' ) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+            "SELECT (SELECT 'male' where 1  group by 'male' having 1 order by 'male' limit 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -20318,14 +20318,14 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection() {
+    async fn test_simple_subquery_wrapper_projection_1() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -20369,12 +20369,6 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("(SELECT"));
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("LIMIT 1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }

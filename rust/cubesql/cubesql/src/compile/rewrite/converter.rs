@@ -570,8 +570,26 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::Subquery(node) => {
                 let input =
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
-                let subqueries =
-                    add_plan_list_node!(self, node.subqueries, query_params, SubquerySubqueries);
+                add_plan_list_node!(self, node.subqueries, query_params, SubquerySubqueries);
+
+                let list = node
+                    .subqueries
+                    .iter()
+                    .map(|expr| -> Result<Id, CubeError> {
+                        let plan_id = self.add_logical_plan_replace_params(expr, query_params)?;
+                        let node_id = self.graph.add(LogicalPlanLanguage::SubqueryNode([plan_id]));
+                        Ok(node_id)
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut subqueries = self
+                    .graph
+                    .add(LogicalPlanLanguage::SubquerySubqueries(Vec::new()));
+                for i in list.into_iter().rev() {
+                    subqueries = self
+                        .graph
+                        .add(LogicalPlanLanguage::SubquerySubqueries(vec![i, subqueries]));
+                }
+
                 let types = add_data_node!(self, node.types, SubqueryTypes);
                 self.graph
                     .add(LogicalPlanLanguage::Subquery([input, subqueries, types]))
@@ -1248,6 +1266,7 @@ impl LanguageToLogicalPlanConverter {
                     .subquery(subqueries, types)?
                     .build()?
             }
+            LogicalPlanLanguage::SubqueryNode(params) => self.to_logical_plan(params[0])?,
             LogicalPlanLanguage::TableUDFs(params) => {
                 let expr = match_expr_list_node!(node_by_id, to_expr, params[0], TableUDFsExpr);
                 let input = Arc::new(self.to_logical_plan(params[1])?);
