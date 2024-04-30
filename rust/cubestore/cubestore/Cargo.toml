@@ -112,6 +112,8 @@ sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 pretty_assertions = "0.7.1"
 
 [features]
+default = ["with-rocksdb-jemalloc"]
+with-rocksdb-jemalloc = ["cuberockstore/jemalloc"]
 # When enabled, child processes will die whenever parent process exits.
 # Highly recomended for production, available only on Linux with prctl system call.
 process-cleanup = ["libc"]

@@ -6,12 +6,18 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Cube Rocks Store"
 
+[features]
+jemalloc = []
+
 [dependencies]
 
-[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
+[target.'cfg(all(target_os = "linux", target_env = "gnu", jemalloc))'.dependencies]
 # jemalloc is supported only for gnu linux
 # TODO: Fix issue with cross building for linux musl & jemalloc
 rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy", "jemalloc"] }
+
+[target.'cfg(all(target_os = "linux", target_env = "gnu", not(jemalloc)))'.dependencies]
+rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy"] }
 
 [target.'cfg(all(target_os = "linux", not(target_env = "gnu")))'.dependencies]
 rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy"] }
