@@ -261,20 +261,13 @@ limit
     });
 
     test('date/string measures in view', async () => {
-      const queryCtor = (column: string, from: string) => `SELECT "${column}" AS val FROM ${from} ORDER BY id LIMIT 10`;
-      
-      const testMeasure = async (measureColumn: string) => {
-        const resExpect = await connection.query(queryCtor(measureColumn, 'Orders'));
-        const res = await connection.query(queryCtor(measureColumn, 'OrdersView'));
+      const queryCtor = (column: string) => `SELECT "${column}" AS val FROM "OrdersView" ORDER BY "id" LIMIT 10`;
 
-        expect(resExpect.rows.length).toBeGreaterThan(0);
-        expect(resExpect.rows.every((row) => row.val !== null)).toBe(true);
+      const resStr = await connection.query(queryCtor('countAndTotalAmount'));
+      expect(resStr.rows).toMatchSnapshot(`string case`);
 
-        expect(res.rows).toStrictEqual(resExpect.rows);
-      };
-
-      await testMeasure('countAndTotalAmount');
-      await testMeasure('createdAtMaxProxy');
+      const resDate = await connection.query(queryCtor('createdAtMaxProxy'));
+      expect(resDate.rows).toMatchSnapshot(`date case`);
     });
   });
 });
