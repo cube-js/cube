@@ -207,7 +207,7 @@ class ApiGateway {
      * graphql scope                                                 *
      *************************************************************** */
 
-    app.post(`${this.basePath}/graphql-to-json`, userMiddlewares, async (req: any, res) => {
+    app.post(`${this.basePath}/v1/graphql-to-json`, userMiddlewares, async (req: any, res) => {
       const { query, variables } = req.body;
       const compilerApi = await this.getCompilerApi(req.context);
 
