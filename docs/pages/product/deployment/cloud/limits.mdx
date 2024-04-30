@@ -36,7 +36,6 @@ types][ref-deployment-types] and [pricing tiers][ref-pricing]:
 | Number of Cube Store workers                                    |     2     |    16     |    16     |     16     | [Contact us][cube-contact-us] |
 | Queries per day ([development instance][ref-dev-instance])      |   1,000   |  10,000   | Unlimited | Unlimited  |           Unlimited           |
 | Queries per day ([production cluster][ref-prod-cluster])        |     —     |  50,000   | Unlimited | Unlimited  |           Unlimited           |
-| Queries processed by [Query History][ref-query-history] per day |   1,000   |  50,000   |  100,000  |  200,000   |            300,000            |
 
 ### Number of deployments
 
@@ -59,10 +58,19 @@ When a threshold is hit, further queries will not be processed. In that case,
 consider upgrading a development instance to a production cluster.
 Alternatively, consider upgrading to [another tier][ref-pricing].
 
-### Queries processed by Query History per day
+### Queries processed by Query History
 
-This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
-for all deployments within an account.
+Queries processed volume and their data retention depend on the Query History tier for the deployment.
+Usage is calculated per Cube Cloud deployment.
+Query History processing has the following tiers.
+
+| Tier                      | Data retention period | API requests / day |
+| ------------------------- | --------------------- | ------------------ |
+| XS                        |                 1 day |             50,000 |
+| S                         |                7 days |            100,000 |
+| M                         |               14 days |            250,000 |
+| L                         |               21 days |            500,000 |
+| XL                        |               30 days |           1000,000 |
 
 When a threshold is hit, query processing will be stopped. Please [contact
 support][cube-contact-us] for further assistance.
