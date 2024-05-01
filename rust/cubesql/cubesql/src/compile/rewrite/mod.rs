@@ -734,8 +734,10 @@ type ListMatches = Vec<Subst>;
 #[derive(Clone, PartialEq)]
 pub enum ListType {
     ProjectionExpr,
+    WindowWindowExpr,
     ScalarFunctionExprArgs,
     WrappedSelectProjectionExpr,
+    WrappedSelectWindowExpr,
     CubeScanMembers,
     Converter {
         from: Box<ListType>,
@@ -754,8 +756,10 @@ impl ListType {
     fn empty_list(&self) -> String {
         match self {
             Self::ProjectionExpr => projection_expr_empty(),
+            Self::WindowWindowExpr => window_window_expr_empty(),
             Self::ScalarFunctionExprArgs => fun_expr_args_empty(),
-            Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty_tail(),
+            Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty(),
+            Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty(),
             Self::CubeScanMembers => cube_scan_members_empty_tail(),
             Self::Converter { .. } => panic!("ListType::Converter doesn't support empty_list"),
         }
@@ -766,8 +770,10 @@ impl Display for ListType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let list_type = match self {
             Self::ProjectionExpr => "ProjectionExpr",
+            Self::WindowWindowExpr => "WindowWindowExpr",
             Self::ScalarFunctionExprArgs => "ScalarFunctionExprArgs",
             Self::WrappedSelectProjectionExpr => "WrappedSelectProjectionExpr",
+            Self::WrappedSelectWindowExpr => "WrappedSelectWindowExpr",
             Self::CubeScanMembers => "CubeScanMembers",
             Self::Converter { .. } => panic!("ListType::Converter doesn't support fmt"),
         };
@@ -812,11 +818,17 @@ impl ListNodeSearcher {
             ListType::ProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::ProjectionExpr(_))
             }
+            ListType::WindowWindowExpr => {
+                matches!(node, LogicalPlanLanguage::WindowWindowExpr(_))
+            }
             ListType::ScalarFunctionExprArgs => {
                 matches!(node, LogicalPlanLanguage::ScalarFunctionExprArgs(_))
             }
             ListType::WrappedSelectProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
+            }
+            ListType::WrappedSelectWindowExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectWindowExpr(_))
             }
             ListType::CubeScanMembers => {
                 matches!(node, LogicalPlanLanguage::CubeScanMembers(_))
@@ -916,10 +928,12 @@ impl ListNodeApplierList {
     ) -> LogicalPlanLanguage {
         match list_type {
             ListType::ProjectionExpr => LogicalPlanLanguage::ProjectionExpr(list),
+            ListType::WindowWindowExpr => LogicalPlanLanguage::WindowWindowExpr(list),
             ListType::ScalarFunctionExprArgs => LogicalPlanLanguage::ScalarFunctionExprArgs(list),
             ListType::WrappedSelectProjectionExpr => {
                 LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
             }
+            ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
             ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
             ListType::Converter { to, .. } => self.make_node_by_list_type(list, to),
         }
@@ -1209,6 +1223,14 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
     format!("(Window {} {})", input, window_expr)
 }
 
+fn window_window_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("WindowWindowExpr", exprs)
+}
+
+fn window_window_expr_empty() -> String {
+    window_window_expr(Vec::<String>::new())
+}
+
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,
@@ -1250,13 +1272,12 @@ fn wrapped_select(
     )
 }
 
-#[allow(dead_code)]
-fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectProjectionExpr {} {})", left, right)
+fn wrapped_select_projection_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("WrappedSelectProjectionExpr", exprs)
 }
 
-fn wrapped_select_projection_expr_empty_tail() -> String {
-    "WrappedSelectProjectionExpr".to_string()
+fn wrapped_select_projection_expr_empty() -> String {
+    wrapped_select_projection_expr(Vec::<String>::new())
 }
 
 fn wrapped_select_subqueries_empty_tail() -> String {
@@ -1281,13 +1302,12 @@ fn wrapped_select_aggr_expr_empty_tail() -> String {
     "WrappedSelectAggrExpr".to_string()
 }
 
-#[allow(dead_code)]
-fn wrapped_select_window_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectWindowExpr {} {})", left, right)
+fn wrapped_select_window_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("WrappedSelectWindowExpr", exprs)
 }
 
-fn wrapped_select_window_expr_empty_tail() -> String {
-    "WrappedSelectWindowExpr".to_string()
+fn wrapped_select_window_expr_empty() -> String {
+    wrapped_select_window_expr(Vec::<String>::new())
 }
 
 #[allow(dead_code)]

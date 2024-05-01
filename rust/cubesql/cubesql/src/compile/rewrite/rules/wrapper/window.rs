@@ -1,7 +1,7 @@
 use crate::compile::rewrite::{
     analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules,
-    window, wrapped_select, wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer, LogicalPlanLanguage,
+    window, wrapped_select, wrapped_select_window_expr_empty, wrapper_pullup_replacer,
+    wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -18,7 +18,7 @@ impl WrapperRules {
                             "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
-                            wrapped_select_window_expr_empty_tail(),
+                            wrapped_select_window_expr_empty(),
                             "?cube_scan_input",
                             "?joins",
                             "?filter_expr",
@@ -112,11 +112,11 @@ impl WrapperRules {
             ),
         )]);
 
-        Self::list_pushdown_pullup_rules(
+        Self::list_pushdown_pullup_rules_new(
             rules,
             "wrapper-window-expr",
-            "WindowWindowExpr",
-            "WrappedSelectWindowExpr",
+            ListType::WindowWindowExpr,
+            ListType::WrappedSelectWindowExpr,
         );
     }
 }

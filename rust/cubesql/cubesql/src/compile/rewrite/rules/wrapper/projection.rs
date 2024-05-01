@@ -5,7 +5,7 @@ use crate::{
         wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
         wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
         wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        wrapped_select_window_expr_empty, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         ListType, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
         WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
@@ -67,7 +67,7 @@ impl WrapperRules {
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
-                        wrapped_select_window_expr_empty_tail(),
+                        wrapped_select_window_expr_empty(),
                         "?alias_to_cube",
                         "?ungrouped",
                         "WrapperPullupReplacerInProjection:true",
@@ -180,7 +180,7 @@ impl WrapperRules {
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
-                        wrapped_select_window_expr_empty_tail(),
+                        wrapped_select_window_expr_empty(),
                         "?alias_to_cube",
                         "?ungrouped",
                         "WrapperPullupReplacerInProjection:true",

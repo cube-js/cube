@@ -495,7 +495,7 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::Window(node) => {
                 let input =
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
-                let window_expr = add_expr_list_node!(
+                let window_expr = add_expr_list_node_new!(
                     &mut self.graph,
                     node.window_expr,
                     query_params,
