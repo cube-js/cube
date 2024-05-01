@@ -22859,4 +22859,37 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_long_in_expr() {
+        std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+
+        const N: usize = 50;
+        let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();
+
+        let query = format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})");
+        let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["NumberCube.someNumber".into()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("NumberCube.someNumber".into()),
+                    operator: Some("equals".into()),
+                    values: Some((1..=N).map(|x| x.to_string()).collect()),
+                    or: None,
+                    and: None
+                }]),
+                ungrouped: Some(true),
+            }
+        );
+    }
 }

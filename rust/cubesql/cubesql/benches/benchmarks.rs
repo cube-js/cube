@@ -348,9 +348,20 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
     bench_func!("power_bi_sum_wrap", get_power_bi_sum_wrap(), c);
 }
 
+fn get_long_in_expr() -> String {
+    const N: usize = 50;
+    let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();
+    format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})")
+}
+
+pub fn long_in_expr(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("long_in_expr_x", get_long_in_expr(), c);
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
-    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr
 }
 criterion_main!(benches);
