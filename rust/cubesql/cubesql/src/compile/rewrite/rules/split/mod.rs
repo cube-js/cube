@@ -401,8 +401,8 @@ impl SplitRules {
     fn possible_inner_list_types_new() -> Vec<ListType> {
         vec![
             ListType::ProjectionExpr,
-            //ListType::AggregateGroupExpr,
-            //ListType::AggregateAggrExpr,
+            ListType::AggregateGroupExpr,
+            ListType::AggregateAggrExpr,
         ]
     }
 

@@ -1,6 +1,6 @@
 use crate::{
     compile::rewrite::{
-        aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
+        aggregate, aggregate_aggr_expr_empty, aggregate_group_expr_empty,
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
         analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr_empty,
         projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
@@ -51,12 +51,12 @@ impl SplitRules {
                 ),
                 projection_split_pushdown_replacer(
                     "?group_expr",
-                    aggr_group_expr_empty_tail(),
+                    aggregate_group_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 projection_split_pushdown_replacer(
                     "?aggr_expr",
-                    aggr_aggr_expr_empty_tail(),
+                    aggregate_aggr_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 "AggregateSplit:true",
@@ -88,13 +88,13 @@ impl SplitRules {
                 projection_split_pullup_replacer(
                     "?inner_group_expr",
                     "?outer_group_expr",
-                    aggr_group_expr_empty_tail(),
+                    aggregate_group_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 projection_split_pullup_replacer(
                     "?inner_aggr_expr",
                     "?outer_aggr_expr",
-                    aggr_aggr_expr_empty_tail(),
+                    aggregate_aggr_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 "AggregateSplit:true",
@@ -163,12 +163,12 @@ impl SplitRules {
                 ),
                 aggregate_split_pushdown_replacer(
                     "?group_expr",
-                    aggr_group_expr_empty_tail(),
+                    aggregate_group_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 aggregate_split_pushdown_replacer(
                     "?aggr_expr",
-                    aggr_aggr_expr_empty_tail(),
+                    aggregate_aggr_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 "AggregateSplit:true",
@@ -199,13 +199,13 @@ impl SplitRules {
                 aggregate_split_pullup_replacer(
                     "?inner_group_expr",
                     "?outer_group_expr",
-                    aggr_group_expr_empty_tail(),
+                    aggregate_group_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 aggregate_split_pullup_replacer(
                     "?inner_aggr_expr",
                     "?outer_aggr_expr",
-                    aggr_aggr_expr_empty_tail(),
+                    aggregate_aggr_expr_empty(),
                     "?split_alias_to_cube",
                 ),
                 "AggregateSplit:true",
@@ -332,8 +332,12 @@ impl SplitRules {
             self.transform_projection_projection_ungrouped_pull_up("?projection_alias"),
         ));
 
-        Self::list_pushdown_pullup_rules("aggr-group-expr", "AggregateGroupExpr", rules);
-        Self::list_pushdown_pullup_rules("aggr-aggr-expr", "AggregateAggrExpr", rules);
+        Self::list_pushdown_pullup_rules_new(
+            "aggr-group-expr",
+            ListType::AggregateGroupExpr,
+            rules,
+        );
+        Self::list_pushdown_pullup_rules_new("aggr-aggr-expr", ListType::AggregateAggrExpr, rules);
         Self::list_pushdown_pullup_rules_new("projection-expr", ListType::ProjectionExpr, rules);
     }
 

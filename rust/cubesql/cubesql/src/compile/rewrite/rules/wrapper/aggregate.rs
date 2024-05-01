@@ -10,7 +10,7 @@ use crate::{
         wrapped_select_projection_expr_empty, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
-        LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
     var, var_iter,
@@ -158,18 +158,18 @@ impl WrapperRules {
             },
         );
 
-        Self::list_pushdown_pullup_rules(
+        Self::list_pushdown_pullup_rules_new(
             rules,
             "wrapper-aggregate-aggr-expr",
-            "AggregateAggrExpr",
-            "WrappedSelectAggrExpr",
+            ListType::AggregateAggrExpr,
+            ListType::WrappedSelectAggrExpr,
         );
 
-        Self::list_pushdown_pullup_rules(
+        Self::list_pushdown_pullup_rules_new(
             rules,
             "wrapper-aggregate-group-expr",
-            "AggregateGroupExpr",
-            "WrappedSelectGroupExpr",
+            ListType::AggregateGroupExpr,
+            ListType::WrappedSelectGroupExpr,
         );
     }
 

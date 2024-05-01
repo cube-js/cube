@@ -106,34 +106,6 @@ macro_rules! add_expr_list_node_new {
     }};
 }
 
-macro_rules! add_binary_expr_list_node {
-    ($graph:expr, $value_expr:expr, $query_params:expr, $field_variant:ident) => {{
-        fn to_binary_tree(
-            graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-            list: &[Id],
-        ) -> Id {
-            if list.len() == 0 {
-                graph.add(LogicalPlanLanguage::$field_variant(Vec::new()))
-            } else if list.len() == 1 {
-                let empty = graph.add(LogicalPlanLanguage::$field_variant(Vec::new()));
-                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], empty]))
-            } else if list.len() == 2 {
-                graph.add(LogicalPlanLanguage::$field_variant(vec![list[0], list[1]]))
-            } else {
-                let middle = list.len() / 2;
-                let left = to_binary_tree(graph, &list[..middle]);
-                let right = to_binary_tree(graph, &list[middle..]);
-                graph.add(LogicalPlanLanguage::$field_variant(vec![left, right]))
-            }
-        }
-        let list = $value_expr
-            .iter()
-            .map(|expr| Self::add_expr_replace_params($graph, expr, $query_params))
-            .collect::<Result<Vec<_>, _>>()?;
-        to_binary_tree($graph, &list)
-    }};
-}
-
 macro_rules! add_plan_list_node {
     ($converter:expr, $value_expr:expr, $query_params:expr, $field_variant:ident) => {{
         let list = $value_expr
@@ -507,13 +479,13 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::Aggregate(node) => {
                 let input =
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
-                let group_expr = add_binary_expr_list_node!(
+                let group_expr = add_expr_list_node_new!(
                     &mut self.graph,
                     node.group_expr,
                     query_params,
                     AggregateGroupExpr
                 );
-                let aggr_expr = add_binary_expr_list_node!(
+                let aggr_expr = add_expr_list_node_new!(
                     &mut self.graph,
                     node.aggr_expr,
                     query_params,

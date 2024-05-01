@@ -10,10 +10,7 @@ use crate::{
         measure_expr, member_pushdown_replacer, member_replacer, merged_members_replacer,
         original_expr_name, projection, referenced_columns, rewrite,
         rewriter::RewriteRules,
-        rules::{
-            replacer_push_down_node, replacer_push_down_node_substitute_rules,
-            replacer_push_down_node_substitute_rules_new, utils,
-        },
+        rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules_new, utils},
         segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
         transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root,
         udaf_expr, udf_expr, virtual_field_expr, AggregateFunctionExprDistinct,
@@ -536,16 +533,16 @@ impl MemberRules {
             find_matching_old_member_with_count(name, column_expr, false)
         };
 
-        rules.extend(replacer_push_down_node_substitute_rules(
+        rules.extend(replacer_push_down_node_substitute_rules_new(
             "member-pushdown-replacer-aggregate-group",
-            "AggregateGroupExpr",
-            "CubeScanMembers",
+            ListType::AggregateGroupExpr,
+            ListType::CubeScanMembers,
             member_replacer_fn.clone(),
         ));
-        rules.extend(replacer_push_down_node_substitute_rules(
+        rules.extend(replacer_push_down_node_substitute_rules_new(
             "member-pushdown-replacer-aggregate-aggr",
-            "AggregateAggrExpr",
-            "CubeScanMembers",
+            ListType::AggregateAggrExpr,
+            ListType::CubeScanMembers,
             member_replacer_fn.clone(),
         ));
         rules.extend(replacer_push_down_node_substitute_rules_new(

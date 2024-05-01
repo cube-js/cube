@@ -735,8 +735,12 @@ type ListMatches = Vec<Subst>;
 pub enum ListType {
     ProjectionExpr,
     WindowWindowExpr,
+    AggregateGroupExpr,
+    AggregateAggrExpr,
     ScalarFunctionExprArgs,
     WrappedSelectProjectionExpr,
+    WrappedSelectGroupExpr,
+    WrappedSelectAggrExpr,
     WrappedSelectWindowExpr,
     CubeScanMembers,
     Converter {
@@ -757,8 +761,12 @@ impl ListType {
         match self {
             Self::ProjectionExpr => projection_expr_empty(),
             Self::WindowWindowExpr => window_window_expr_empty(),
+            Self::AggregateGroupExpr => aggregate_group_expr_empty(),
+            Self::AggregateAggrExpr => aggregate_aggr_expr_empty(),
             Self::ScalarFunctionExprArgs => fun_expr_args_empty(),
             Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty(),
+            Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty(),
+            Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty(),
             Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty(),
             Self::CubeScanMembers => cube_scan_members_empty_tail(),
             Self::Converter { .. } => panic!("ListType::Converter doesn't support empty_list"),
@@ -769,13 +777,8 @@ impl ListType {
 impl Display for ListType {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let list_type = match self {
-            Self::ProjectionExpr => "ProjectionExpr",
-            Self::WindowWindowExpr => "WindowWindowExpr",
-            Self::ScalarFunctionExprArgs => "ScalarFunctionExprArgs",
-            Self::WrappedSelectProjectionExpr => "WrappedSelectProjectionExpr",
-            Self::WrappedSelectWindowExpr => "WrappedSelectWindowExpr",
-            Self::CubeScanMembers => "CubeScanMembers",
             Self::Converter { .. } => panic!("ListType::Converter doesn't support fmt"),
+            lt => lt.empty_list(),
         };
         write!(f, "{}", list_type)
     }
@@ -821,11 +824,23 @@ impl ListNodeSearcher {
             ListType::WindowWindowExpr => {
                 matches!(node, LogicalPlanLanguage::WindowWindowExpr(_))
             }
+            ListType::AggregateGroupExpr => {
+                matches!(node, LogicalPlanLanguage::AggregateGroupExpr(_))
+            }
+            ListType::AggregateAggrExpr => {
+                matches!(node, LogicalPlanLanguage::AggregateAggrExpr(_))
+            }
             ListType::ScalarFunctionExprArgs => {
                 matches!(node, LogicalPlanLanguage::ScalarFunctionExprArgs(_))
             }
             ListType::WrappedSelectProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
+            }
+            ListType::WrappedSelectGroupExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectGroupExpr(_))
+            }
+            ListType::WrappedSelectAggrExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectAggrExpr(_))
             }
             ListType::WrappedSelectWindowExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectWindowExpr(_))
@@ -929,10 +944,14 @@ impl ListNodeApplierList {
         match list_type {
             ListType::ProjectionExpr => LogicalPlanLanguage::ProjectionExpr(list),
             ListType::WindowWindowExpr => LogicalPlanLanguage::WindowWindowExpr(list),
+            ListType::AggregateGroupExpr => LogicalPlanLanguage::AggregateGroupExpr(list),
+            ListType::AggregateAggrExpr => LogicalPlanLanguage::AggregateAggrExpr(list),
             ListType::ScalarFunctionExprArgs => LogicalPlanLanguage::ScalarFunctionExprArgs(list),
             ListType::WrappedSelectProjectionExpr => {
                 LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
             }
+            ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
+            ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
             ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
             ListType::Converter { to, .. } => self.make_node_by_list_type(list, to),
@@ -1284,22 +1303,20 @@ fn wrapped_select_subqueries_empty_tail() -> String {
     "WrappedSelectSubqueries".to_string()
 }
 
-#[allow(dead_code)]
-fn wrapped_select_group_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectGroupExpr {} {})", left, right)
+fn wrapped_select_group_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("WrappedSelectGroupExpr", exprs)
 }
 
-fn wrapped_select_group_expr_empty_tail() -> String {
-    "WrappedSelectGroupExpr".to_string()
+fn wrapped_select_group_expr_empty() -> String {
+    wrapped_select_group_expr(Vec::<String>::new())
 }
 
-#[allow(dead_code)]
-fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectAggrExpr {} {})", left, right)
+fn wrapped_select_aggr_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("WrappedSelectAggrExpr", exprs)
 }
 
-fn wrapped_select_aggr_expr_empty_tail() -> String {
-    "WrappedSelectAggrExpr".to_string()
+fn wrapped_select_aggr_expr_empty() -> String {
+    wrapped_select_aggr_expr(Vec::<String>::new())
 }
 
 fn wrapped_select_window_expr(exprs: Vec<impl Display>) -> String {
@@ -1356,8 +1373,20 @@ fn aggregate(
     format!("(Aggregate {} {} {} {})", input, group, aggr, split)
 }
 
-fn aggr_aggr_expr_empty_tail() -> String {
-    format!("AggregateAggrExpr")
+fn aggregate_group_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("AggregateGroupExpr", exprs)
+}
+
+fn aggregate_group_expr_empty() -> String {
+    aggregate_group_expr(Vec::<String>::new())
+}
+
+fn aggregate_aggr_expr(exprs: Vec<impl Display>) -> String {
+    list_expr_new("AggregateAggrExpr", exprs)
+}
+
+fn aggregate_aggr_expr_empty() -> String {
+    aggregate_aggr_expr(Vec::<String>::new())
 }
 
 fn sort_exp(left: impl Display, right: impl Display) -> String {
@@ -1370,10 +1399,6 @@ fn sort_exp_empty_tail() -> String {
 
 fn sort_expr(expr: impl Display, asc: impl Display, nulls_first: impl Display) -> String {
     format!("(SortExpr {} {} {})", expr, asc, nulls_first)
-}
-
-fn aggr_group_expr_empty_tail() -> String {
-    format!("AggregateGroupExpr")
 }
 
 fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
