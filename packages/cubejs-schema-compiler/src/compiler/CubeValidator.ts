@@ -599,7 +599,7 @@ const baseSchema = {
   hierarchies: Joi.array().items(Joi.object().keys({
     name: Joi.string().required(),
     title: Joi.string(),
-    levels: Joi.array().items(Joi.string())
+    levels: Joi.func()
   })),
 };
 

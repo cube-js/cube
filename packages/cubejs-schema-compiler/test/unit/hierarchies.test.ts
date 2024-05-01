@@ -1,7 +1,7 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
-  it('includes cube hierarchies', async () => {
+  it.only('includes cube hierarchies', async () => {
     const { compiler, metaTransformer } = prepareYamlCompiler(`
 cubes:
   - name: orders
@@ -10,13 +10,26 @@ cubes:
       - name: users
         sql: "{CUBE}.order_id = {orders}.id"
         relationship: many_to_one
+    measures:
+      - name: xxx
+        sql: xxx
+        type: number
     dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
       - name: number
         sql: number
         type: number
 
       - name: status
         sql: status
+        type: string
+
+      - name: city
+        sql: city
         type: string
     hierarchies:
       - name: orders_hierarchy
@@ -80,7 +93,8 @@ views:
         name: 'orders_hierarchy',
         levels: [
           'orders.status',
-          'users.state'
+          'users.state',
+          'orders.city',
         ]
       },
       {
