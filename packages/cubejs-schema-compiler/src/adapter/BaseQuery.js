@@ -1106,6 +1106,24 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
+    if (memberDef.timeShiftReferences) {
+      queryContext = {
+        ...queryContext,
+        timeDimensions: queryContext.timeDimensions.map(td => {
+          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
+          if (timeShift) {
+            if (td.shiftInterval) {
+              throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
+            }
+            return {
+              ...td,
+              shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
+            };
+          }
+          return td;
+        })
+      };
+    }
     queryContext = {
       ...queryContext,
       // TODO can't remove filters from OR expression
@@ -2165,6 +2183,9 @@ export class BaseQuery {
           ]);
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          if (symbol.shiftInterval) {
+            res = `(${this.addTimestampInterval(this.timeStampCast(res), symbol.shiftInterval)})`;
+          }
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !memberExpressionType &&
             symbol.type === 'time' &&
@@ -3081,6 +3102,12 @@ export class BaseQuery {
     }
 
     return [duration, intervalMatch[2]];
+  }
+
+  negateInterval(interval) {
+    const [duration, grunularity] = this.parseInterval(interval);
+
+    return `${duration * -1} ${grunularity}`;
   }
 
   parseSecondDuration(interval) {
