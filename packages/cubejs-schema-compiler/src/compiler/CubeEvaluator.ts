@@ -24,6 +24,19 @@ export type DimensionDefinition = {
   ownedByCube: boolean,
   fieldType?: string,
   postAggregate?: boolean,
+  shiftInterval?: string,
+};
+
+export type TimeShiftDefinition = {
+  timeDimension: Function,
+  interval: string,
+  type: 'next' | 'prior',
+};
+
+export type TimeShiftDefinitionReference = {
+  timeDimension: string,
+  interval: string,
+  type: 'next' | 'prior',
 };
 
 export type MeasureDefinition = {
@@ -38,9 +51,11 @@ export type MeasureDefinition = {
   groupBy?: Function,
   reduceBy?: Function,
   addGroupBy?: Function,
+  timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
   addGroupByReferences?: string[],
+  timeShiftReferences?: TimeShiftDefinitionReference[],
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -103,6 +118,10 @@ export class CubeEvaluator extends CubeSymbols {
         }
         if (member.addGroupBy) {
           member.addGroupByReferences = this.evaluateReferences(cubeName, member.addGroupBy);
+        }
+        if (member.timeShift) {
+          member.timeShiftReferences = member.timeShift
+            .map(s => ({ ...s, timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }));
         }
       }
     }

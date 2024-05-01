@@ -480,6 +480,11 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
+      timeShift: Joi.array().items(Joi.object().keys({
+        timeDimension: Joi.func().required(),
+        interval: regexTimeInterval.required(),
+        type: Joi.string().valid('next', 'prior').required(),
+      })),
       // TODO validate for order window functions
       orderBy: Joi.array().items(Joi.object().keys({
         sql: Joi.func().required(),
