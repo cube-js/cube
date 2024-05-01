@@ -20268,6 +20268,14 @@ ORDER BY "source"."str0" ASC
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
+        println!(
+            "!!! log plan {:?}",
+            logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        );
         assert!(logical_plan
             .find_cube_scan_wrapper()
             .wrapped_sql

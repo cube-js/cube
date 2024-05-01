@@ -1140,7 +1140,9 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
+    console.log("!! q before", query);
     query = this.parseQueryParam(query);
+    console.log("!! q after", query);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
@@ -1262,6 +1264,7 @@ class ApiGateway {
   }
 
   private parseMemberExpressionsInQuery(query: Query): Query {
+    console.log("!!!!! q, ", query)
     return {
       ...query,
       measures: (query.measures || []).map(m => (typeof m === 'string' ? this.parseMemberExpression(m) : m)),
@@ -1271,14 +1274,17 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | MemberExpression {
-    const match = memberExpression.match(memberExpressionRegex);
-    if (match) {
-      const args = match[3].split(',');
-      args.push(`return \`${match[4]}\``);
+    const obj = JSON.parse(memberExpression);
+    //const match = memberExpression.match(memberExpressionRegex);
+    console.log("memberExpression ", memberExpression);
+    console.log("memberObj ", obj);
+    if (obj) {
+      const args = obj.cube_params;
+      args.push(`return \`${obj.expr}\``);
       return {
-        cubeName: match[1],
-        name: match[2],
-        expressionName: match[2],
+        cubeName: obj.cube_name,
+        name: obj.alias,
+        expressionName: obj.alias,
         expression: Function.constructor.apply(null, args),
         definition: memberExpression,
       };
