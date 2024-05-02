@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.28](https://github.com/cube-js/cube/compare/v0.35.27...v0.35.28) (2024-05-02)
+
+
+### Bug Fixes
+
+* **schema-compiler:** views sorting ([#8228](https://github.com/cube-js/cube/issues/8228)) ([50b459a](https://github.com/cube-js/cube/commit/50b459a6135cb27bb7e52f04639c3a0ad6c89b97))
+
+
+
+
+
 ## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
