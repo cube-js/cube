@@ -78,12 +78,12 @@ impl MetaStoreCacheCompactionFilter {
         };
 
         let root = reader.as_map();
-        let expire_key_id = match root.index_key(&table_id.get_expire_field()) {
+        let expire_key_id = match root.index_key(&table_id.get_ttl_field()) {
             None => {
                 if cfg!(debug_assertions) {
                     warn!(
                         "There is no {} field in row specified with TTL for {:?}",
-                        table_id.get_expire_field(),
+                        table_id.get_ttl_field(),
                         table_id
                     );
                 }

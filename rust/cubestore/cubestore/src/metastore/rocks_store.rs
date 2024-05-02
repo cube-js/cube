@@ -113,7 +113,7 @@ impl TableId {
     }
 
     #[inline]
-    pub fn get_expire_field(&self) -> &'static str {
+    pub fn get_ttl_field(&self) -> &'static str {
         "expire"
     }
 }
