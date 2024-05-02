@@ -1075,7 +1075,11 @@ impl CacheStore for RocksCacheStore {
                     let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
                     queue_payload_schema.insert_with_pk(
                         queue_item_row.id,
-                        QueueItemPayload::new(payload.value, payload.orphaned),
+                        QueueItemPayload::new(
+                            payload.value,
+                            queue_item_row.row.get_created().clone(),
+                            queue_item_row.row.get_expire().clone(),
+                        ),
                         batch_pipe,
                     )?;
 
