@@ -1097,6 +1097,9 @@ impl CacheStore for RocksCacheStore {
                 let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
                 queue_item_schema.truncate(batch_pipe)?;
 
+                let queue_item_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                queue_item_payload_schema.truncate(batch_pipe)?;
+
                 let queue_result_schema = QueueResultRocksTable::new(db_ref);
                 queue_result_schema.truncate(batch_pipe)?;
 
