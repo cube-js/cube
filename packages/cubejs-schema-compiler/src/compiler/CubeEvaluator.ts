@@ -71,13 +71,14 @@ export class CubeEvaluator extends CubeSymbols {
     super(true);
   }
 
-  public compile(cubes: any, errorReporter: ErrorReporter) {
+  public compile(cubes: any[], errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
-    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
+    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort(a => (a.isView ? 1 : 0));
 
-    Object.values(validCubes).map((cube) => this.prepareCube(cube, errorReporter));
-
-    this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
+    for (const cube of validCubes) {
+      this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
+    }
+    
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -100,6 +101,42 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluatePostAggregateReferences(cube.name, cube.measures);
     this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+
+    this.prepareHierarchies(cube);
+
+    return cube;
+  }
+
+  private prepareHierarchies(cube: any) {
+    if (cube.isView && !cube.hierarchies && (cube.includedMembers || []).length) {
+      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(m => m.split('.')[0]));
+  
+      for (const cubeName of includedCubeNames) {
+        const { hierarchies } = this.evaluatedCubes[cubeName];
+  
+        if (Array.isArray(hierarchies) && hierarchies.length) {
+          const filteredHierarchies = hierarchies.map(it => {
+            const levels = it.levels.filter(level => cube.includedMembers.includes(level));
+  
+            return {
+              ...it,
+              levels
+            };
+          }).filter(it => it.levels.length);
+  
+          cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
+        }
+      }
+    } else if (Array.isArray(cube.hierarchies)) {
+      cube.hierarchies = cube.hierarchies.map(hierarchy => ({
+        ...hierarchy,
+        levels: this.evaluateReferences(
+          cube.name, hierarchy.levels, { originalSorting: true }
+        )
+      }));
+    }
+
+    return [];
   }
 
   private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {

@@ -21,6 +21,7 @@ export const transpiledFieldsPatterns: Array<RegExp> = [
   /^contextMembers$/,
   /^includes$/,
   /^excludes$/,
+  /^hierarchies\.[0-9]+\.levels$/,
   /^cubes\.[0-9]+\.(joinPath|join_path)$/,
 ];
 

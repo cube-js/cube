@@ -95,6 +95,7 @@ export class CubeToMetaTransformer {
           })),
           R.toPairs
         )(cube.segments || {}),
+        hierarchies: cube.hierarchies || []
       },
     };
   }

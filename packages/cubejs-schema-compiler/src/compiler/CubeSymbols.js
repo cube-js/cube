@@ -235,6 +235,11 @@ export class CubeSymbols {
 
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
+
+      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(finalIncludes.map((it) => {
+        const split = it.member.split('.');
+        return [split[split.length - 2], split[split.length - 1]].join('.');
+      })))];
     }
   }
 
