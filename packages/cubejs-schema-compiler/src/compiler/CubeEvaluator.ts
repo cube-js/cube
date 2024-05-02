@@ -73,7 +73,15 @@ export class CubeEvaluator extends CubeSymbols {
 
   public compile(cubes: any[], errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
-    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort(a => (a.isView ? 1 : 0));
+    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
+      if (a.isView) {
+        return 1;
+      } else if (!a.isView && !b.isView) {
+        return 0;
+      } else {
+        return -1;
+      }
+    });
 
     for (const cube of validCubes) {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);

@@ -1,7 +1,7 @@
 import { prepareYamlCompiler } from './PrepareCompiler';
 
 describe('Cube hierarchies', () => {
-  it.only('includes cube hierarchies', async () => {
+  it('includes cube hierarchies', async () => {
     const { compiler, metaTransformer } = prepareYamlCompiler(`
 cubes:
   - name: orders
@@ -116,5 +116,51 @@ views:
 
     const emptyView = metaTransformer.cubes.find(it => it.config.name === 'empty_view');
     expect(emptyView.config.hierarchies.length).toBe(0);
+  });
+
+  it('hierarchies defined on a view only', async () => {
+    const { compiler, metaTransformer } = prepareYamlCompiler(`
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        includes: "*"
+    hierarchies:
+    - name: hello
+      levels:
+        - orders.status
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+      `);
+
+    await compiler.compile();
+
+    const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
+    
+    expect(ordersView.config.hierarchies).toEqual([
+      {
+        name: 'hello',
+        levels: [
+          'orders.status',
+        ]
+      },
+    ]);
   });
 });
