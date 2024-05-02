@@ -2,8 +2,8 @@ use crate::metastore::{
     BaseRocksTable, IndexId, RocksEntity, RocksSecondaryIndex, RocksTable, TableId, TableInfo,
 };
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
-use chrono::serde::{ts_seconds, ts_seconds_option};
-use chrono::{DateTime, Duration, Utc};
+use chrono::serde::ts_seconds;
+use chrono::{DateTime, Utc};
 use cuberockstore::rocksdb::WriteBatch;
 use serde::{Deserialize, Deserializer, Serialize};
 
@@ -11,30 +11,24 @@ use serde::{Deserialize, Deserializer, Serialize};
 pub struct QueueItemPayload {
     // Immutable field
     pub(crate) value: String,
-    #[serde(with = "ts_seconds_option")]
-    orphaned: Option<DateTime<Utc>>,
     #[serde(with = "ts_seconds")]
     created: DateTime<Utc>,
+    #[serde(with = "ts_seconds")]
+    expire: DateTime<Utc>,
 }
 
 impl RocksEntity for QueueItemPayload {
     fn version() -> u32 {
-        1
+        2
     }
 }
 
 impl QueueItemPayload {
-    pub fn new(value: String, orphaned: Option<u32>) -> Self {
-        let created = Utc::now();
-
+    pub fn new(value: String, created: DateTime<Utc>, expire: DateTime<Utc>) -> Self {
         Self {
             value,
-            orphaned: if let Some(orphaned) = orphaned {
-                Some(created + Duration::seconds(orphaned as i64))
-            } else {
-                None
-            },
             created,
+            expire,
         }
     }
 
@@ -114,11 +108,7 @@ impl RocksSecondaryIndex<QueueItemPayload, QueueItemPayloadIndexKey>
     }
 
     fn get_expire(&self, row: &QueueItemPayload) -> Option<DateTime<Utc>> {
-        if let Some(orphaned) = row.orphaned {
-            Some(orphaned.clone() + Duration::hours(1))
-        } else {
-            Some(row.get_created().clone() + Duration::hours(2))
-        }
+        Some(row.expire.clone())
     }
 
     fn get_id(&self) -> IndexId {
