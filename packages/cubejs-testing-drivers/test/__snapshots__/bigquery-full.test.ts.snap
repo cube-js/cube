@@ -606,6 +606,8 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/bigquery-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/bigquery-driver filtering Customers: endsWith filter + dimensions, third 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/bigquery-driver filtering Customers: notEndsWith filter + dimensions, first 1`] = `

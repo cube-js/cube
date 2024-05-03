@@ -1824,6 +1824,8 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/mysql-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/mysql-driver filtering ECommerce: startsWith + dimensions, second 1`] = `
 Array [
   Object {

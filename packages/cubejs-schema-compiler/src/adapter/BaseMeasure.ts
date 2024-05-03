@@ -107,6 +107,9 @@ export class BaseMeasure {
       return false;
     }
     const definition = this.measureDefinition();
+    if (definition.postAggregate) {
+      return false;
+    }
     return definition.type === 'sum' || definition.type === 'count' || definition.type === 'countDistinctApprox' ||
       definition.type === 'min' || definition.type === 'max';
   }

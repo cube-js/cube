@@ -2727,6 +2727,8 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions 1`] = `
 Array [
   Object {

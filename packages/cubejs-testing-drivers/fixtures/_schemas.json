@@ -265,6 +265,17 @@
           "type": "sum"
         },
         {
+          "name": "totalProfitYearAgo",
+          "type": "number",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "time_shift": [{
+            "time_dimension": "orderDate",
+            "interval": "1 year",
+            "type": "prior"
+          }]
+        },
+        {
           "name": "hiddenSum",
           "sql": "profit",
           "type": "sum",

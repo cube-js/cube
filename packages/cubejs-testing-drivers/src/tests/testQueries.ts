@@ -1481,6 +1481,20 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: totalProfitYearAgo', async () => {
+      const response = await client.load({
+        measures: [
+          'BigECommerce.totalProfitYearAgo',
+        ],
+        timeDimensions: [{
+          dimension: 'BigECommerce.orderDate',
+          granularity: 'month',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }

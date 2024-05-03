@@ -1204,7 +1204,8 @@ export class BaseQuery {
       postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
-      postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      postAggregateQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      disableExternalPreAggregations: true,
     });
 
     const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
@@ -1232,6 +1233,7 @@ export class BaseQuery {
         const { type } = this.newMeasure(d).definition();
         return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
       }),
+      disableExternalPreAggregations: true,
     };
     const subQuery = this.newSubQuery(subQueryOptions);
 
@@ -2167,35 +2169,34 @@ export class BaseQuery {
         //     return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
         //   }
         // }
-        let res;
         if (symbol.subQuery) {
           if (this.safeEvaluateSymbolContext().subQueryDimensions) {
             this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
           }
-          res = this.escapeColumnName(this.aliasName(memberPath));
-        } else if (symbol.case) {
-          res = this.renderDimensionCase(symbol, cubeName);
+          return this.escapeColumnName(this.aliasName(memberPath));
+        }
+        if (symbol.case) {
+          return this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'geo') {
-          res = this.concatStringsSql([
+          return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
           ]);
         } else {
-          res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          if (symbol.shiftInterval) {
+            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          }
+          if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+            !memberExpressionType &&
+            symbol.type === 'time' &&
+            this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+          ) {
+            res = this.convertTz(res);
+          }
+          return res;
         }
-        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
-          !memberExpressionType &&
-          symbol.type === 'time' &&
-          // TODO actually should check if it's leaf dimension or subQuery one
-          (this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube || symbol.subQuery)
-        ) {
-          res = this.convertTz(res);
-        }
-        if (symbol.shiftInterval) {
-          res = `(${this.addInterval(res, symbol.shiftInterval)})`;
-        }
-        return res;
       } else if (type === 'segment') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
