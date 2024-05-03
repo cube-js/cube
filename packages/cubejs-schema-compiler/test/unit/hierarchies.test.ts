@@ -87,6 +87,25 @@ views:
 
     await compiler.compile();
 
+    const orders = metaTransformer.cubes.find(it => it.config.name === 'orders');
+    expect(orders.config.hierarchies).toEqual([
+      {
+        name: 'orders_hierarchy',
+        levels: [
+          'orders.status',
+          'users.state',
+          'orders.city'
+        ]
+      },
+      {
+        name: 'Some other hierarchy',
+        levels: [
+          'users.state',
+          'users.city'
+        ]
+      }
+    ]);
+
     const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
     expect(ordersView.config.hierarchies).toEqual([
       {
