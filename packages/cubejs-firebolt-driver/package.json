@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/firebolt-driver",
   "description": "Cube.js Firebolt database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.28",
+  "version": "0.35.29",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -29,14 +29,14 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.26",
-    "@cubejs-backend/schema-compiler": "^0.35.28",
+    "@cubejs-backend/schema-compiler": "^0.35.29",
     "@cubejs-backend/shared": "^0.35.2",
     "firebolt-sdk": "^0.1.14"
   },
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/testing-shared": "^0.35.28",
+    "@cubejs-backend/testing-shared": "^0.35.29",
     "typescript": "~5.2.2"
   },
   "publishConfig": {
