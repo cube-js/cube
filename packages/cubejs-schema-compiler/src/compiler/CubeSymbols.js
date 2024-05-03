@@ -239,7 +239,11 @@ export class CubeSymbols {
 
       cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(finalIncludes.map((it) => {
         const split = it.member.split('.');
-        return [split[split.length - 2], split[split.length - 1]].join('.');
+        const memberPath = this.pathFromArray([split[split.length - 2], split[split.length - 1]]);
+        return {
+          memberPath,
+          name: it.name
+        };
       })))];
     }
   }
