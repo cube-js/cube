@@ -271,7 +271,7 @@
           "post_aggregate": true,
           "time_shift": [{
             "time_dimension": "orderDate",
-            "interval": "1 year",
+            "interval": "366 day",
             "type": "prior"
           }]
         },
