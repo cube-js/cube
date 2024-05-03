@@ -310,6 +310,11 @@ describe('SQL Generation', () => {
           type: 'count'
         },
         
+        id_sum: {
+          sql: 'id',
+          type: 'sum'
+        },
+        
         visitorCheckinsRolling: {
           type: 'count',
           rollingWindow: {
@@ -386,6 +391,16 @@ describe('SQL Generation', () => {
           granularity: 'day'
         }
       }
+    });
+    
+    view('visitors_visitors_checkins_view', {
+      cubes: [{
+        join_path: 'visitors',
+        includes: ['revenue', 'source', 'updated_at', 'visitor_revenue']
+      }, {
+        join_path: 'visitors.visitor_checkins',
+        includes: ['visitor_checkins_count', 'id_sum']
+      }]
     })
 
     cube('visitor_checkins_sources', {
@@ -2676,6 +2691,26 @@ describe('SQL Generation', () => {
       visitors__percentage_of_total: 91,
       visitors__revenue: '1000',
       visitor_checkins__source: null
+    }]
+  ));
+
+  it('multiplied sum and count no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.visitor_checkins_count'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__visitor_checkins_count: '6'
+    }]
+  ));
+
+  it('multiplied sum no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.id_sum'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__id_sum: '21'
     }]
   ));
 

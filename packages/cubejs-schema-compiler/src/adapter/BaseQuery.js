@@ -2352,7 +2352,7 @@ export class BaseQuery {
   }
 
   renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql) {
-    const multiplied = this.multipliedJoinRowResult(cubeName);
+    const multiplied = this.multipliedJoinRowResult(cubeName) || false;
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
