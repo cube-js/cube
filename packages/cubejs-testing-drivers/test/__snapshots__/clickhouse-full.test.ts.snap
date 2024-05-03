@@ -1375,6 +1375,8 @@ Array [
 
 exports[`Queries with the @cubejs-backend/clickhouse-driver filtering Customers: startsWith + dimensions, third 1`] = `Array []`;
 
+exports[`Queries with the @cubejs-backend/clickhouse-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/clickhouse-driver filtering ECommerce: contains dimensions, first 1`] = `
 Array [
   Object {

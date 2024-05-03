@@ -19,7 +19,7 @@
   "cast": {
     "SELECT_PREFIX": "",
     "SELECT_SUFFIX": "",
-    "DATE_PREFIX": "PARSE_DATE('%Y-%m-%d', ",
+    "DATE_PREFIX": "PARSE_TIMESTAMP('%Y-%m-%d', ",
     "DATE_SUFFIX": ")",
     "CREATE_TBL_PREFIX": "CREATE TABLE ",
     "CREATE_TBL_SUFFIX": " AS ",

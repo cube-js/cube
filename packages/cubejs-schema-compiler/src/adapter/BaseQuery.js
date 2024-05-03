@@ -1204,7 +1204,8 @@ export class BaseQuery {
       postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
-      postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      postAggregateQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      disableExternalPreAggregations: true,
     });
 
     const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
@@ -1232,6 +1233,7 @@ export class BaseQuery {
         const { type } = this.newMeasure(d).definition();
         return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
       }),
+      disableExternalPreAggregations: true,
     };
     const subQuery = this.newSubQuery(subQueryOptions);
 
@@ -2184,7 +2186,7 @@ export class BaseQuery {
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
           if (symbol.shiftInterval) {
-            res = `(${this.addTimestampInterval(this.timeStampCast(res), symbol.shiftInterval)})`;
+            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !memberExpressionType &&
