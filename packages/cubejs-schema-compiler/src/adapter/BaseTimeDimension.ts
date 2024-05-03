@@ -110,7 +110,10 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public convertedToTz() {
-    return this.query.convertTz(this.query.dimensionSql(this));
+    // Let dimensionSql to do the conversion as there can be a shift interval in place
+    return this.query.evaluateSymbolSqlWithContext(() => this.query.dimensionSql(this), {
+      convertTzForRawTimeDimension: true
+    });
   }
 
   public filterToWhere() {

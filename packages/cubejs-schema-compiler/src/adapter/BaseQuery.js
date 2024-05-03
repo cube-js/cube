@@ -2167,34 +2167,35 @@ export class BaseQuery {
         //     return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
         //   }
         // }
+        let res;
         if (symbol.subQuery) {
           if (this.safeEvaluateSymbolContext().subQueryDimensions) {
             this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
           }
-          return this.escapeColumnName(this.aliasName(memberPath));
-        }
-        if (symbol.case) {
-          return this.renderDimensionCase(symbol, cubeName);
+          res = this.escapeColumnName(this.aliasName(memberPath));
+        } else if (symbol.case) {
+          res = this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'geo') {
-          return this.concatStringsSql([
+          res = this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
           ]);
         } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
-          if (symbol.shiftInterval) {
-            res = `(${this.addTimestampInterval(this.timeStampCast(res), symbol.shiftInterval)})`;
-          }
-          if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
-            !memberExpressionType &&
-            symbol.type === 'time' &&
-            this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
-          ) {
-            res = this.convertTz(res);
-          }
-          return res;
+          res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
         }
+        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+          !memberExpressionType &&
+          symbol.type === 'time' &&
+          // TODO actually should check if it's leaf dimension or subQuery one
+          (this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube || symbol.subQuery)
+        ) {
+          res = this.convertTz(res);
+        }
+        if (symbol.shiftInterval) {
+          res = `(${this.addInterval(res, symbol.shiftInterval)})`;
+        }
+        return res;
       } else if (type === 'segment') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
