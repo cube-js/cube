@@ -946,7 +946,7 @@ export class BaseQuery {
   }
 
   wrapInParenthesis(select) {
-    return select.trim().match(/^SELECT/ig) ? `(${select})` : select;
+    return select.trim().match(/^[a-zA-Z0-9_\-`".*]+$/i) ? select : `(${select})`;
   }
 
   withQueries(select, withQueries) {

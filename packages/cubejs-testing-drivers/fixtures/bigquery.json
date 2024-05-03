@@ -119,9 +119,6 @@
     "querying BigECommerce: null boolean",
     "--------------------",
     "week granularity is not supported for intervals",
-    "--------------------",
-    "querying BigECommerce: rolling window by 2 day",
-    "querying BigECommerce: rolling window by 2 week",
-    "querying BigECommerce: rolling window by 2 month"
+    "--------------------"
   ]
 }
