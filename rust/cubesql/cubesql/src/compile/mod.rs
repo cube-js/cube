@@ -22862,7 +22862,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
     #[tokio::test]
     async fn test_long_in_expr() {
-        std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
 
         const N: usize = 50;
         let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();

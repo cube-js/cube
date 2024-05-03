@@ -348,20 +348,52 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
     bench_func!("power_bi_sum_wrap", get_power_bi_sum_wrap(), c);
 }
 
-fn get_long_in_expr() -> String {
+fn get_simple_long_in_expr() -> String {
     const N: usize = 50;
     let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();
     format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})")
 }
 
+pub fn long_simple_in_expr(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("long_simple_in_expr", get_simple_long_in_expr(), c);
+}
+
+fn get_long_in_expr() -> String {
+    const N_IN: usize = 50;
+    let set = (1..N_IN).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N_IN.to_string();
+
+    const N_SELECT_COL: usize = 15;
+    let select = (1..=N_SELECT_COL).fold(String::new(), |s, x| {
+        format!(r#"{s}"WideCube"."dim{x}" as "column{x}", "#)
+    }) + &format!(r#"SUM("WideCube"."dim{}") as "some_sum""#, N_SELECT_COL + 1);
+
+    let group_by = (1..N_SELECT_COL)
+        .fold(String::new(), |s, x| format!(r#"{s}"WideCube"."dim{x}", "#))
+        + &format!(r#""WideCube"."dim{}""#, N_SELECT_COL);
+
+    const N_WHERE: usize = N_SELECT_COL - 4;
+    let where_stmt = (1..N_WHERE).fold(String::new(), |s, x| {
+        format!(r#"{s}"WideCube"."dim{x}" = {x} AND "#)
+    }) + &format!(
+        r#"("WideCube"."dim{N_WHERE}" = 42 OR "WideCube"."dim{N_WHERE}" IS NULL) AND "#
+    ) + &format!(
+        r#"("WideCube"."dim{}" IN ({set}) OR "WideCube"."dim{}" IS NULL) AND "#,
+        N_WHERE + 1,
+        N_WHERE + 1
+    ) + &format!(r#""WideCube"."dim{}" = 55"#, N_SELECT_COL + 5);
+
+    format!(r#"SELECT {select} FROM "WideCube" WHERE {where_stmt} GROUP BY {group_by}"#)
+}
+
 pub fn long_in_expr(c: &mut Criterion) {
     std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
-    bench_func!("long_in_expr_x", get_long_in_expr(), c);
+    bench_func!("long_in_expr", get_long_in_expr(), c);
 }
 
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
-    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_expr
 }
 criterion_main!(benches);

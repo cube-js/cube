@@ -735,6 +735,16 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
+fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
+    let mut ret = format!("({list_type}");
+    for i in list {
+        ret.push(' ');
+        ret.push_str(&i.to_string());
+    }
+    ret.push(')');
+    ret
+}
+
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
 }

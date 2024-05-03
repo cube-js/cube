@@ -6,8 +6,8 @@ use crate::{
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit, list_expr,
+        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, flat_list_expr,
+        fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
         literal_bool, literal_expr, literal_int, literal_string, measure_expr,
         member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
@@ -1678,8 +1678,13 @@ impl RewriteRules for FilterRules {
                 "filter-thoughtspot-lower-in-true-false",
                 filter_replacer(
                     inlist_expr(
+                        // TODO:MAYBE: just `?expr` .. we need expr type: `expr IN [TRUE, FALSE]` is incorrect if expr is not BOOLEAN
                         binary_expr(
                             binary_expr(
+                                //TODO:
+                                //  * not only `Lower`
+                                //  * `?column_left` & `?column_right`
+                                //  * `?op_left`(=) & `op_right`(=) & `?op`(OR)
                                 fun_expr("Lower", vec![column_expr("?column")]),
                                 "=",
                                 literal_expr("?left_literal"),
@@ -1691,7 +1696,9 @@ impl RewriteRules for FilterRules {
                                 literal_expr("?right_literal"),
                             ),
                         ),
-                        list_expr(
+                        flat_list_expr(
+                            // TODO: collect info about types : (info subnode ?)
+                            // if vec is `FALSE, TRUE` OR `TRUE, FALSE, NULL` OR ... it's wouldn't work
                             "InListExprList",
                             vec![literal_bool(true), literal_bool(false)],
                         ),

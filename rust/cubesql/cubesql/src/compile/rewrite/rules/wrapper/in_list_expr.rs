@@ -31,7 +31,7 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
-                    wrapper_pushdown_replacer(
+                    wrapper_pullup_replacer(
                         "?list",
                         "?alias_to_cube",
                         "?ungrouped",
@@ -70,8 +70,6 @@ impl WrapperRules {
                 self.transform_in_list_expr("?alias_to_cube"),
             ),
         ]);
-
-        Self::expr_list_pushdown_pullup_rules(rules, "wrapper-in-list-exprs", "InListExprList");
     }
 
     fn transform_in_list_expr(
