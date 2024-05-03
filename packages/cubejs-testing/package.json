@@ -71,7 +71,7 @@
     "smoke:postgres": "jest --verbose -i dist/test/smoke-postgres.test.js",
     "smoke:redshift": "jest --verbose -i dist/test/smoke-redshift.test.js",
     "smoke:redshift:snapshot": "jest --verbose --updateSnapshot -i dist/test/smoke-redshift.test.js",
-    "smoke:cubesql": "jest --verbose --forceExit -i dist/test/smoke-cubesql.test.js",
+    "smoke:cubesql": "TZ=UTC jest --verbose --forceExit -i dist/test/smoke-cubesql.test.js",
     "smoke:cubesql:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-cubesql.test.js",
     "smoke:prestodb": "jest --verbose -i dist/test/smoke-prestodb.test.js",
     "smoke:prestodb:snapshot": "jest --verbose --forceExit --updateSnapshot -i dist/test/smoke-prestodb.test.js",

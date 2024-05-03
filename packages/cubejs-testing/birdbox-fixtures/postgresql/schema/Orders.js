@@ -51,7 +51,19 @@ cube(`Orders`, {
       post_aggregate: true,
       sql: `${amountRankDateMax}`,
       type: `time`,
-    }
+    },
+    countAndTotalAmount: {
+      type: "string",
+      sql: `CONCAT(${count}, ' / ', ${totalAmount})`,
+    },
+    createdAtMax: {
+      type: `max`,
+      sql: `created_at`,
+    },
+    createdAtMaxProxy: {
+      type: "time",
+      sql: `${createdAtMax}`,
+    },
   },
   dimensions: {
     id: {
@@ -71,4 +83,12 @@ cube(`Orders`, {
       type: `time`
     }
   },
+});
+
+view(`OrdersView`, {
+  cubes: [{
+    joinPath: Orders,
+    includes: `*`,
+    excludes: [`toRemove`]
+  }]
 });
