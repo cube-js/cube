@@ -243,6 +243,7 @@ crate::plan_to_language! {
             expr: Box<Expr>,
             list: Vec<Expr>,
             negated: bool,
+            // TODO:MAYBE: ListDataTypes struct: (NodeName contains_true, contains_false, contains_null, ...)
         },
         InSubqueryExpr {
             expr: Box<Expr>,
@@ -399,6 +400,10 @@ crate::plan_to_language! {
         },
         FilterSimplifyReplacer {
             filters: Vec<LogicalPlan>,
+        },
+        FilterIsNullSimplifyReplacer {
+            inner_expr: Vec<LogicalPlan>,
+            negated: bool,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
@@ -735,6 +740,7 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
+#[allow(unused)]
 fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut ret = format!("({list_type}");
     for i in list {
@@ -1260,6 +1266,10 @@ fn filter_replacer(
 
 fn filter_simplify_replacer(members: impl Display) -> String {
     format!("(FilterSimplifyReplacer {})", members)
+}
+
+fn filter_is_null_simplify_replacer(members: impl Display, negated: impl Display) -> String {
+    format!("(FilterIsNullSimplifyReplacer {} {})", members, negated)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {

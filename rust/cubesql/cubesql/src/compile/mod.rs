@@ -22894,4 +22894,108 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         );
     }
+
+    #[tokio::test]
+    async fn test_simple_is_not_null() {
+        let query = format!("SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL");
+        let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["NumberCube.someNumber".into()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("NumberCube.someNumber".into()),
+                    operator: Some("set".into()),
+                    values: None,
+                    or: None,
+                    and: None
+                }]),
+                ungrouped: Some(true),
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_nested_is_null_without_bool_op() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+
+        let logical_plan_req = |is_null| async move {
+            let query = format!(
+                "SELECT dim1 FROM WideCube WHERE ((LOWER(dim2 || '::' || UPPER('qwe' || dim3)) > '12abc') = (dim4 > 3)) IS {}NULL", 
+                if is_null { "" } else { "NOT " }
+            );
+            let query_plan =
+                convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
+            let logical_plan = query_plan.as_logical_plan();
+            logical_plan.find_cube_scan().request
+        };
+
+        let filters = (2..=4)
+            .map(|x| V1LoadRequestQueryFilterItem {
+                member: Some(format!("WideCube.dim{x}")),
+                operator: Some("set".into()),
+                values: None,
+                or: None,
+                and: None,
+            })
+            .collect();
+
+        assert_eq!(
+            logical_plan_req(false).await,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["WideCube.dim1".into()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(filters),
+                ungrouped: Some(true),
+            }
+        );
+
+        let or = (2..=4)
+            .map(|x| {
+                json!(V1LoadRequestQueryFilterItem {
+                    member: Some(format!("WideCube.dim{x}")),
+                    operator: Some("notSet".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                })
+            })
+            .collect();
+
+        assert_eq!(
+            logical_plan_req(true).await,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["WideCube.dim1".into()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(or),
+                    and: None,
+                }]),
+                ungrouped: Some(true),
+            }
+        );
+    }
 }

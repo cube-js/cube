@@ -5,11 +5,11 @@ use crate::{
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-        dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, flat_list_expr,
-        fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
-        literal_bool, literal_expr, literal_int, literal_string, measure_expr,
-        member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        dimension_expr, expr_column_name, filter, filter_is_null_simplify_replacer, filter_member,
+        filter_op, filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
+        filter_simplify_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
+        is_null_expr, like_expr, limit, literal_bool, literal_expr, literal_int, literal_string,
+        measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
         time_dimension_date_range_replacer, time_dimension_expr, transform_original_expr_to_alias,
@@ -486,6 +486,26 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
+            rewrite(
+                "filter-replacer-expr-or-expr-to-expr",
+                filter_replacer(
+                    binary_expr("?expr", "OR", "?expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer("?expr", "?alias_to_cube", "?members", "?filter_aliases"),
+            ),
+            rewrite(
+                "filter-replacer-expr-and-expr-to-expr",
+                filter_replacer(
+                    binary_expr("?expr", "AND", "?expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer("?expr", "?alias_to_cube", "?members", "?filter_aliases"),
+            ),
             transforming_rewrite(
                 "filter-replacer-is-null",
                 filter_replacer(
@@ -526,6 +546,222 @@ impl RewriteRules for FilterRules {
                     false,
                 ),
             ),
+            // [+] filter-is-null-simplify-replacer
+            rewrite(
+                "filter-is-null-simplify-replacer-push-down",
+                filter_replacer(
+                    is_null_expr("?expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    filter_is_null_simplify_replacer("?expr", literal_bool(false)),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-negated-push-down",
+                filter_replacer(
+                    is_not_null_expr("?expr"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    filter_is_null_simplify_replacer("?expr", literal_bool(true)),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-expr-op-expr",
+                filter_is_null_simplify_replacer(binary_expr("?expr", "?op", "?expr"), "?negated"),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+                self.transform_op_preserve_self_null("?op"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-bin-expr",
+                filter_is_null_simplify_replacer(
+                    binary_expr("?left", "?op", "?right"),
+                    literal_bool(false),
+                ),
+                binary_expr(
+                    filter_is_null_simplify_replacer("?left", literal_bool(false)),
+                    "OR",
+                    filter_is_null_simplify_replacer("?right", literal_bool(false)),
+                ),
+                self.transform_op_is_null_push_down("?op"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-bin-expr-negated",
+                filter_is_null_simplify_replacer(
+                    binary_expr("?left", "?op", "?right"),
+                    literal_bool(true),
+                ),
+                binary_expr(
+                    filter_is_null_simplify_replacer("?left", literal_bool(true)),
+                    "AND",
+                    filter_is_null_simplify_replacer("?right", literal_bool(true)),
+                ),
+                self.transform_op_is_null_push_down("?op"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-expr-or-expr-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "OR",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-expr-and-expr-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "AND",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-false-or-case",
+                binary_expr(
+                    literal_expr(literal_bool(false)),
+                    "OR",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-or-false-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "OR",
+                    literal_expr(literal_bool(false)),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-true-or-case",
+                binary_expr(
+                    literal_expr(literal_bool(true)),
+                    "OR",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                literal_expr(literal_bool(true)),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-or-true-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "OR",
+                    literal_expr(literal_bool(true)),
+                ),
+                literal_expr(literal_bool(true)),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-false-and-case",
+                binary_expr(
+                    literal_expr(literal_bool(false)),
+                    "AND",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                literal_expr(literal_bool(false)),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-and-false-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "AND",
+                    literal_expr(literal_bool(false)),
+                ),
+                literal_expr(literal_bool(false)),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-true-and-case",
+                binary_expr(
+                    literal_expr(literal_bool(true)),
+                    "AND",
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-and-true-case",
+                binary_expr(
+                    filter_is_null_simplify_replacer("?expr", "?negated"),
+                    "AND",
+                    literal_expr(literal_bool(true)),
+                ),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-lower",
+                filter_is_null_simplify_replacer(fun_expr("Lower", vec!["?expr"]), "?negated"),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-upper",
+                filter_is_null_simplify_replacer(fun_expr("Upper", vec!["?expr"]), "?negated"),
+                filter_is_null_simplify_replacer("?expr", "?negated"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-bool-bin-expr",
+                filter_is_null_simplify_replacer(
+                    binary_expr("?left", "?op", "?right"),
+                    literal_bool(false),
+                ),
+                literal_expr(literal_bool(false)),
+                self.transform_op_is_always_bool("?op"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-bool-bin-expr-negated",
+                filter_is_null_simplify_replacer(
+                    binary_expr("?left", "?op", "?right"),
+                    literal_bool(true),
+                ),
+                literal_expr(literal_bool(true)),
+                self.transform_op_is_always_bool("?op"),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-column",
+                filter_is_null_simplify_replacer(column_expr("?column"), literal_bool(false)),
+                is_null_expr(column_expr("?column")),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-column-negated",
+                filter_is_null_simplify_replacer(column_expr("?column"), literal_bool(true)),
+                is_not_null_expr(column_expr("?column")),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-literal",
+                filter_is_null_simplify_replacer(literal_expr("?literal"), literal_bool(false)),
+                literal_expr(literal_bool(false)),
+                self.transform_literal_is_not_null("?literal"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-literal-negated",
+                filter_is_null_simplify_replacer(literal_expr("?literal"), literal_bool(true)),
+                literal_expr(literal_bool(true)),
+                self.transform_literal_is_not_null("?literal"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-literal-null",
+                filter_is_null_simplify_replacer(literal_expr("?literal"), literal_bool(false)),
+                literal_expr(literal_bool(true)),
+                self.transform_literal_is_null("?literal"),
+            ),
+            transforming_rewrite(
+                "filter-is-null-simplify-replacer-literal-null-negated",
+                filter_is_null_simplify_replacer(literal_expr("?literal"), literal_bool(true)),
+                literal_expr(literal_bool(false)),
+                self.transform_literal_is_null("?literal"),
+            ),
+            // [-] filter-is-null-simplify-replacer
             transforming_rewrite(
                 "filter-replacer-binary-swap",
                 filter_replacer(
@@ -1674,62 +1910,38 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            rewrite(
-                "filter-thoughtspot-lower-in-true-false",
+            transforming_rewrite(
+                "filter-in-true-false",
                 filter_replacer(
-                    inlist_expr(
-                        // TODO:MAYBE: just `?expr` .. we need expr type: `expr IN [TRUE, FALSE]` is incorrect if expr is not BOOLEAN
-                        binary_expr(
-                            binary_expr(
-                                //TODO:
-                                //  * not only `Lower`
-                                //  * `?column_left` & `?column_right`
-                                //  * `?op_left`(=) & `op_right`(=) & `?op`(OR)
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        flat_list_expr(
-                            // TODO: collect info about types : (info subnode ?)
-                            // if vec is `FALSE, TRUE` OR `TRUE, FALSE, NULL` OR ... it's wouldn't work
-                            "InListExprList",
-                            vec![literal_bool(true), literal_bool(false)],
-                        ),
-                        "InListExprNegated:false",
-                    ),
+                    inlist_expr("?expr", "?list", "InListExprNegated:false"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    binary_expr(
-                        binary_expr(
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        "AND",
-                        is_not_null_expr(column_expr("?column")),
-                    ),
+                    is_not_null_expr("?expr"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
+                self.transform_in_list_true_false("?list"),
+            ),
+            transforming_rewrite(
+                "filter-not-in-true-false",
+                filter_replacer(
+                    inlist_expr("?expr", "?list", "InListExprNegated:true"),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    literal_bool(false),
+                    // binary_expr(literal_bool(false), "=", literal_bool(true)),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_in_list_true_false("?list"),
             ),
             transforming_rewrite(
                 "extract-year-equals",
@@ -2064,6 +2276,11 @@ impl RewriteRules for FilterRules {
                 filter_simplify_replacer(is_not_null_expr("?expr")),
                 is_not_null_expr(filter_simplify_replacer("?expr")),
             ),
+            // rewrite(
+            //     "filter-simplify-is-not-null-push-down",
+            //     filter_simplify_replacer(is_not_null_expr("?expr")),
+            //     is_not_null_expr(filter_simplify_replacer("?expr")),
+            // ),
             rewrite(
                 "filter-simplify-literal-push-down",
                 filter_simplify_replacer(literal_expr("?literal")),
@@ -3685,6 +3902,87 @@ impl FilterRules {
         }
     }
 
+    fn transform_literal_is_null(
+        &self,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if matches!(literal, ScalarValue::Null) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_literal_is_not_null(
+        &self,
+        literal_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let literal_var = var!(literal_var);
+        move |egraph, subst| {
+            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                if !matches!(literal, ScalarValue::Null) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
+
+    fn transform_op_is_null_push_down(
+        &self,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = var!(op_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match op {
+                    Operator::And
+                    | Operator::Or
+                    | Operator::IsDistinctFrom
+                    | Operator::IsNotDistinctFrom => continue,
+                    _ => return true,
+                };
+            }
+            false
+        }
+    }
+
+    fn transform_op_is_always_bool(
+        &self,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = var!(op_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match op {
+                    Operator::IsDistinctFrom | Operator::IsNotDistinctFrom => return true,
+                    _ => continue,
+                };
+            }
+            false
+        }
+    }
+
+    fn transform_op_preserve_self_null(
+        &self,
+        op_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let op_var = var!(op_var);
+        move |egraph, subst| {
+            for op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+                match op {
+                    Operator::IsDistinctFrom | Operator::IsNotDistinctFrom => continue,
+                    _ => return true,
+                };
+            }
+            false
+        }
+    }
+
     fn transform_negate_inlist(
         &self,
         negated_var: &'static str,
@@ -4567,6 +4865,22 @@ impl FilterRules {
             }
 
             false
+        }
+    }
+
+    fn transform_in_list_true_false(
+        &self,
+        list_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let list_var = var!(list_var);
+        move |egraph, subst| {
+            if let Some(constant_in_list) = &egraph[subst[list_var]].data.constant_in_list {
+                let bool_true = constant_in_list.contains(&ScalarValue::Boolean(Some(true)));
+                let bool_false = constant_in_list.contains(&ScalarValue::Boolean(Some(false)));
+                return bool_true && bool_false;
+            } else {
+                false
+            }
         }
     }
 
