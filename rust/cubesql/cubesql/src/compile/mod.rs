@@ -22835,7 +22835,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
     #[tokio::test]
     async fn test_simple_is_not_null() {
-        let query = "SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL".into();
+        let query =
+            "SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL".into();
         let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
         let logical_plan = query_plan.as_logical_plan();
 
