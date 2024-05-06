@@ -20254,7 +20254,7 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection_1() {
+    async fn test_simple_subquery_wrapper_projection() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
@@ -20279,7 +20279,7 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql
-            .contains("\\\"limit\\\":1"));
+            .contains("\\\\\\\"limit\\\\\\\":1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20335,7 +20335,7 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql
-            .contains("\\\"limit\\\":1"));
+            .contains("\\\\\\\"limit\\\\\\\":1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20675,7 +20675,7 @@ ORDER BY "source"."str0" ASC
                 .wrapped_sql
                 .unwrap()
                 .sql
-                .contains("__user:(KibanaSampleDataEcommerce):$"),
+                .contains("\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"__user\\\""),
             "SQL contains __user:(KibanaSampleDataEcommerce):$: {}",
             logical_plan
                 .find_cube_scan_wrapper()
