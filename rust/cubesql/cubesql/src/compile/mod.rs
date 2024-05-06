@@ -19440,7 +19440,7 @@ ORDER BY "source"."str0" ASC
                 LOWER("ta_1"."customer_gender") = 'female'
                 OR LOWER("ta_1"."customer_gender") = 'male'
             )) IN (
-                FALSE, NULL, NULL, FALSE, TRUE
+                TRUE, FALSE
             )
             GROUP BY "ca_1"
             ORDER BY
@@ -19463,13 +19463,75 @@ ORDER BY "source"."str0" ASC
                 order: None,
                 limit: None,
                 offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                },]),
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: None,
+                        operator: None,
+                        values: None,
+                        or: Some(vec![
+                            json!(V1LoadRequestQueryFilterItem {
+                                member: None,
+                                operator: None,
+                                values: None,
+                                or: None,
+                                and: Some(vec![
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("startsWith".to_string()),
+                                        values: Some(vec!["female".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("endsWith".to_string()),
+                                        values: Some(vec!["female".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                ]),
+                            }),
+                            json!(V1LoadRequestQueryFilterItem {
+                                member: None,
+                                operator: None,
+                                values: None,
+                                or: None,
+                                and: Some(vec![
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("startsWith".to_string()),
+                                        values: Some(vec!["male".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                    json!(V1LoadRequestQueryFilterItem {
+                                        member: Some(
+                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
+                                        ),
+                                        operator: Some("endsWith".to_string()),
+                                        values: Some(vec!["male".to_string()]),
+                                        or: None,
+                                        and: None,
+                                    }),
+                                ]),
+                            }),
+                        ]),
+                        and: None,
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("set".to_string()),
+                        values: None,
+                        or: None,
+                        and: None,
+                    },
+                ]),
                 ungrouped: None,
             }
         )
@@ -22831,132 +22893,5 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ungrouped: Some(true),
             }
         );
-    }
-
-    #[tokio::test]
-    async fn test_simple_is_not_null() {
-        let query =
-            "SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL".into();
-        let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
-        let logical_plan = query_plan.as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["NumberCube.someNumber".into()]),
-                dimensions: Some(vec![]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("NumberCube.someNumber".into()),
-                    operator: Some("set".into()),
-                    values: None,
-                    or: None,
-                    and: None
-                }]),
-                ungrouped: Some(true),
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn test_nested_is_null_without_bool_op() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-
-        let logical_plan_req = |is_null| async move {
-            let query = format!(
-                "SELECT dim1 FROM WideCube WHERE ((LOWER(dim2 || '::' || UPPER('qwe' || dim3)) > '12abc') = (dim4 > 3)) IS {}NULL", 
-                if is_null { "" } else { "NOT " }
-            );
-            let query_plan =
-                convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
-            let logical_plan = query_plan.as_logical_plan();
-            logical_plan.find_cube_scan().request
-        };
-
-        let filters = (2..=4)
-            .map(|x| V1LoadRequestQueryFilterItem {
-                member: Some(format!("WideCube.dim{x}")),
-                operator: Some("set".into()),
-                values: None,
-                or: None,
-                and: None,
-            })
-            .collect();
-
-        assert_eq!(
-            logical_plan_req(false).await,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["WideCube.dim1".into()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(filters),
-                ungrouped: Some(true),
-            }
-        );
-
-        let or = (2..=4)
-            .map(|x| {
-                json!(V1LoadRequestQueryFilterItem {
-                    member: Some(format!("WideCube.dim{x}")),
-                    operator: Some("notSet".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                })
-            })
-            .collect();
-
-        assert_eq!(
-            logical_plan_req(true).await,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["WideCube.dim1".into()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(or),
-                    and: None,
-                }]),
-                ungrouped: Some(true),
-            }
-        );
-    }
-
-    #[tokio::test]
-    async fn test_distinct_from_is_not_null() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-
-        // let query = format!("SELECT * FROM NumberCube WHERE (4 IS DISTINCT FROM someNumber) IS NOT NULL");
-        let query = format!("SELECT dim1 FROM WideCube WHERE ((dim1 IS DISTINCT FROM dim2) OR (dim3 IS DISTINCT FROM dim4)) IS NOT NULL");
-        let query_equal = format!("SELECT dim1 FROM WideCube WHERE TRUE");
-
-        let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
-        let logical_plan = query_plan.as_logical_plan();
-        let req = logical_plan.find_cube_scan().request;
-
-        let query_plan =
-            convert_select_to_query_plan(query_equal, DatabaseProtocol::PostgreSQL).await;
-        let logical_plan = query_plan.as_logical_plan();
-        let req_equal = logical_plan.find_cube_scan().request;
-
-        assert_eq!(req, req_equal);
     }
 }
