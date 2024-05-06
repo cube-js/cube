@@ -1140,9 +1140,7 @@ class ApiGateway {
     context: RequestContext,
     persistent = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
-    console.log("!! q before", query);
     query = this.parseQueryParam(query);
-    console.log("!! q after", query);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {

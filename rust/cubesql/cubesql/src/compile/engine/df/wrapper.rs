@@ -1,4 +1,4 @@
-use crate::{
+
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
         rewrite::WrappedSelectType,
@@ -407,7 +407,6 @@ impl CubeScanWrapperNode {
                                 None,
                             )
                             .await?;
-                        println!("DDDDDD {:?}", sql.sql.sql);
                         // TODO Add wrapper for reprojection and literal members handling
                         return Ok(SqlGenerationResult {
                             data_source: Some(data_sources[0].clone()),
@@ -1003,22 +1002,6 @@ impl CubeScanWrapperNode {
         };
         Ok(serde_json::json!(res).to_string())
     }
-
-    /* fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
-        let cube_params = used_cubes.iter().join(",");
-        Ok(format!(
-            "{}.{}:({}):{}",
-            used_cubes.iter().next().ok_or_else(|| {
-                DataFusionError::Internal(format!(
-                    "Can't generate SQL for column without cubes: {:?}",
-                    column
-                ))
-            })?,
-            column.alias,
-            cube_params,
-            column.expr
-        ))
-    } */
 
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
