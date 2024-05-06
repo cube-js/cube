@@ -87,26 +87,45 @@ views:
 
     await compiler.compile();
 
-    const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
-    expect(ordersView.config.hierarchies).toEqual([
+    const orders = metaTransformer.cubes.find(it => it.config.name === 'orders');
+    expect(orders.config.hierarchies).toEqual([
       {
         name: 'orders_hierarchy',
         levels: [
           'orders.status',
           'users.state',
-          'orders.city',
+          'orders.city'
         ]
       },
       {
         name: 'Some other hierarchy',
         levels: [
-          'users.state'
+          'users.state',
+          'users.city'
+        ]
+      }
+    ]);
+
+    const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
+    expect(ordersView.config.hierarchies).toEqual([
+      {
+        name: 'orders_hierarchy',
+        levels: [
+          'orders_view.status',
+          'orders_view.state',
+          'orders_view.city',
+        ]
+      },
+      {
+        name: 'Some other hierarchy',
+        levels: [
+          'orders_view.state'
         ]
       },
       {
         name: 'Users hierarchy',
         levels: [
-          'users.age'
+          'orders_view.age'
         ]
       }
     ]);
@@ -158,7 +177,85 @@ cubes:
       {
         name: 'hello',
         levels: [
-          'orders.status',
+          'orders_view.status',
+        ]
+      },
+    ]);
+  });
+
+  it('views with prefix and aliased members', async () => {
+    const { compiler, metaTransformer } = prepareYamlCompiler(`
+views:
+  - name: orders_view
+    cubes:
+      - join_path: orders
+        prefix: true
+        includes: "*"
+      - join_path: users
+        prefix: false
+        includes:
+          - count
+          - name: gender
+            alias: hello_world
+    hierarchies:
+    - name: hello
+      levels:
+        - users.count
+        - users.gender
+        - orders.count
+        - orders.status
+cubes:
+  - name: orders
+    sql: SELECT * FROM orders
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: status
+        type: string
+
+  - name: users
+    sql: SELECT * FROM users
+    measures:
+      - name: count
+        type: count
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: gender
+        sql: gender
+        type: string
+
+      - name: city
+        sql: city
+        type: string
+
+      - name: status
+        sql: status
+        type: string
+      `);
+
+    await compiler.compile();
+
+    const ordersView = metaTransformer.cubes.find(it => it.config.name === 'orders_view');
+    
+    expect(ordersView.config.hierarchies).toEqual([
+      {
+        name: 'hello',
+        levels: [
+          'orders_view.count',
+          'orders_view.hello_world',
+          'orders_view.orders_count',
+          'orders_view.orders_status'
         ]
       },
     ]);
