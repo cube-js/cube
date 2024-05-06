@@ -5,7 +5,8 @@ use crate::{
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
-        dimension_expr, expr_column_name, filter, filter_is_null_simplify_replacer, filter_member,
+        dimension_expr, expr_column_name, filter, filter_is_null_and_simplify_replacer,
+        filter_is_null_or_simplify_replacer, filter_is_null_simplify_replacer, filter_member,
         filter_op, filter_op_filters, filter_op_filters_empty_tail, filter_replacer,
         filter_simplify_replacer, fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr,
         is_null_expr, like_expr, limit, literal_bool, literal_expr, literal_int, literal_string,
@@ -269,6 +270,16 @@ impl RewriteRules for FilterRules {
                 ),
                 cube_scan_filters_empty_tail(),
                 self.transform_literal_true("?literal_true"),
+            ),
+            rewrite(
+                "filter-truncate-literal-expr-true",
+                filter_replacer(
+                    literal_expr(literal_bool(true)),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                cube_scan_filters_empty_tail(),
             ),
             // We use this rule to transform: (?expr IN (?list..)) = TRUE and ((?expr IN (?list..)) = TRUE) = TRUE
             transforming_rewrite(
@@ -584,7 +595,7 @@ impl RewriteRules for FilterRules {
                 self.transform_op_preserve_self_null("?op"),
             ),
             transforming_rewrite(
-                "filter-is-null-simplify-replacer-bin-expr",
+                "filter-is-null-simplify-replacer-bin-expr-push-down",
                 filter_is_null_simplify_replacer(
                     binary_expr("?left", "?op", "?right"),
                     literal_bool(false),
@@ -597,7 +608,7 @@ impl RewriteRules for FilterRules {
                 self.transform_op_is_null_push_down("?op"),
             ),
             transforming_rewrite(
-                "filter-is-null-simplify-replacer-bin-expr-negated",
+                "filter-is-null-simplify-replacer-bin-expr-negated-push-down",
                 filter_is_null_simplify_replacer(
                     binary_expr("?left", "?op", "?right"),
                     literal_bool(true),
@@ -609,6 +620,43 @@ impl RewriteRules for FilterRules {
                 ),
                 self.transform_op_is_null_push_down("?op"),
             ),
+            // [=] filter-is-null-simplify-replacer
+            // [+] OR / AND
+            //
+            // NOTE:
+            // `(x OR y) IS NULL` != `(x IS NULL) OR (y IS NULL)`:
+            // `(TRUE OR NULL) IS NULL` => FALSE
+            // `(TRUE IS NULL) OR (NULL IS NULL)` => TRUE
+            // because: `TRUE OR NULL` is TRUE
+            // there are similar cases for `IS NOT NULL` and `AND` (`NULL AND FALSE` is FALSE)
+            rewrite(
+                "filter-is-null-simplify-replacer-or-push-down",
+                filter_is_null_simplify_replacer(binary_expr("?left", "OR", "?right"), "?negated"),
+                filter_is_null_or_simplify_replacer(
+                    filter_is_null_simplify_replacer("?left", "?negated"),
+                    filter_is_null_simplify_replacer("?right", "?negated"),
+                ),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-and-push-down",
+                filter_is_null_simplify_replacer(binary_expr("?left", "AND", "?right"), "?negated"),
+                filter_is_null_and_simplify_replacer(
+                    filter_is_null_simplify_replacer("?left", "?negated"),
+                    filter_is_null_simplify_replacer("?right", "?negated"),
+                ),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-or-pull-up",
+                filter_is_null_or_simplify_replacer("?expr", "?expr"),
+                "?expr".into(),
+            ),
+            rewrite(
+                "filter-is-null-simplify-replacer-and-pull-up",
+                filter_is_null_and_simplify_replacer("?expr", "?expr"),
+                "?expr".into(),
+            ),
+            // [-] OR / AND
+            // [=] filter-is-null-simplify-replacer
             rewrite(
                 "filter-is-null-simplify-replacer-expr-or-expr-case",
                 binary_expr(
@@ -1935,8 +1983,7 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    literal_bool(false),
-                    // binary_expr(literal_bool(false), "=", literal_bool(true)),
+                    literal_expr(literal_bool(false)),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -2276,11 +2323,6 @@ impl RewriteRules for FilterRules {
                 filter_simplify_replacer(is_not_null_expr("?expr")),
                 is_not_null_expr(filter_simplify_replacer("?expr")),
             ),
-            // rewrite(
-            //     "filter-simplify-is-not-null-push-down",
-            //     filter_simplify_replacer(is_not_null_expr("?expr")),
-            //     is_not_null_expr(filter_simplify_replacer("?expr")),
-            // ),
             rewrite(
                 "filter-simplify-literal-push-down",
                 filter_simplify_replacer(literal_expr("?literal")),

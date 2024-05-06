@@ -402,8 +402,16 @@ crate::plan_to_language! {
             filters: Vec<LogicalPlan>,
         },
         FilterIsNullSimplifyReplacer {
-            inner_expr: Vec<LogicalPlan>,
+            inner_expr: Box<Expr>,
             negated: bool,
+        },
+        FilterIsNullOrSimplifyReplacer {
+            left: Box<Expr>,
+            right: Box<Expr>,
+        },
+        FilterIsNullAndSimplifyReplacer {
+            left: Box<Expr>,
+            right: Box<Expr>,
         },
         OrderReplacer {
             sort_expr: Vec<LogicalPlan>,
@@ -1268,8 +1276,16 @@ fn filter_simplify_replacer(members: impl Display) -> String {
     format!("(FilterSimplifyReplacer {})", members)
 }
 
-fn filter_is_null_simplify_replacer(members: impl Display, negated: impl Display) -> String {
-    format!("(FilterIsNullSimplifyReplacer {} {})", members, negated)
+fn filter_is_null_simplify_replacer(expr: impl Display, negated: impl Display) -> String {
+    format!("(FilterIsNullSimplifyReplacer {} {})", expr, negated)
+}
+
+fn filter_is_null_or_simplify_replacer(left: impl Display, right: impl Display) -> String {
+    format!("(FilterIsNullOrSimplifyReplacer {} {})", left, right)
+}
+
+fn filter_is_null_and_simplify_replacer(left: impl Display, right: impl Display) -> String {
+    format!("(FilterIsNullAndSimplifyReplacer {} {})", left, right)
 }
 
 fn inner_aggregate_split_replacer(members: impl Display, alias_to_cube: impl Display) -> String {

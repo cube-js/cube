@@ -19440,7 +19440,7 @@ ORDER BY "source"."str0" ASC
                 LOWER("ta_1"."customer_gender") = 'female'
                 OR LOWER("ta_1"."customer_gender") = 'male'
             )) IN (
-                TRUE, FALSE
+                FALSE, NULL, NULL, FALSE, TRUE
             )
             GROUP BY "ca_1"
             ORDER BY
@@ -19463,75 +19463,13 @@ ORDER BY "source"."str0" ASC
                 order: None,
                 limit: None,
                 offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: None,
-                        operator: None,
-                        values: None,
-                        or: Some(vec![
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: None,
-                                operator: None,
-                                values: None,
-                                or: None,
-                                and: Some(vec![
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("startsWith".to_string()),
-                                        values: Some(vec!["female".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("endsWith".to_string()),
-                                        values: Some(vec!["female".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                ]),
-                            }),
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: None,
-                                operator: None,
-                                values: None,
-                                or: None,
-                                and: Some(vec![
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("startsWith".to_string()),
-                                        values: Some(vec!["male".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("endsWith".to_string()),
-                                        values: Some(vec!["male".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                ]),
-                            }),
-                        ]),
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
-                ]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                },]),
                 ungrouped: None,
             }
         )
@@ -22897,7 +22835,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
     #[tokio::test]
     async fn test_simple_is_not_null() {
-        let query = format!("SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL");
+        let query = "SELECT someNumber FROM NumberCube WHERE (someNumber > someNumber) IS NOT NULL".into();
         let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
         let logical_plan = query_plan.as_logical_plan();
 
@@ -22997,5 +22935,27 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ungrouped: Some(true),
             }
         );
+    }
+
+    #[tokio::test]
+    async fn test_distinct_from_is_not_null() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+
+        // let query = format!("SELECT * FROM NumberCube WHERE (4 IS DISTINCT FROM someNumber) IS NOT NULL");
+        let query = format!("SELECT dim1 FROM WideCube WHERE ((dim1 IS DISTINCT FROM dim2) OR (dim3 IS DISTINCT FROM dim4)) IS NOT NULL");
+        let query_equal = format!("SELECT dim1 FROM WideCube WHERE TRUE");
+
+        let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;
+        let logical_plan = query_plan.as_logical_plan();
+        let req = logical_plan.find_cube_scan().request;
+
+        let query_plan =
+            convert_select_to_query_plan(query_equal, DatabaseProtocol::PostgreSQL).await;
+        let logical_plan = query_plan.as_logical_plan();
+        let req_equal = logical_plan.find_cube_scan().request;
+
+        assert_eq!(req, req_equal);
     }
 }
