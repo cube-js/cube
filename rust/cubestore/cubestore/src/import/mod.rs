@@ -44,7 +44,7 @@ use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
-use cubedatasketch::HLLDataSketch;
+use cubedatasketches::HLLDataSketch;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use tokio::time::{sleep, Duration};
 

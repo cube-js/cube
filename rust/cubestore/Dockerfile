@@ -26,6 +26,7 @@ COPY Cargo.lock .
 COPY cuberockstore cuberockstore
 COPY cubehll cubehll
 COPY cubezetasketch cubezetasketch
+COPY cubedatasketches cubedatasketches
 COPY cuberpc cuberpc
 COPY cubestore-sql-tests cubestore-sql-tests
 COPY cubestore/Cargo.toml cubestore/Cargo.toml

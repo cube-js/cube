@@ -88,7 +88,7 @@ use crate::cachestore::{
     CacheItem, QueueItem, QueueItemPayload, QueueItemStatus, QueueResult, QueueResultAckEvent,
 };
 use crate::remotefs::LocalDirRemoteFs;
-use cubedatasketch::HLLDataSketch;
+use cubedatasketches::HLLDataSketch;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
 use std::time::{Duration, SystemTime};

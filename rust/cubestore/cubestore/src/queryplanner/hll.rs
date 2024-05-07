@@ -1,5 +1,5 @@
 use crate::CubeError;
-use cubedatasketch::{HLLDataSketch, HLLUnionDataSketch};
+use cubedatasketches::{HLLDataSketch, HLLUnionDataSketch};
 use cubehll::HllSketch;
 use cubezetasketch::HyperLogLogPlusPlus;
 

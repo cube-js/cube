@@ -1027,7 +1027,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "cubedatasketch"
+name = "cubedatasketches"
 version = "0.1.0"
 dependencies = [
  "dsrs",
@@ -1089,7 +1089,7 @@ dependencies = [
  "cloud-storage",
  "csv",
  "ctor",
- "cubedatasketch",
+ "cubedatasketches",
  "cubehll",
  "cuberockstore",
  "cuberpc",

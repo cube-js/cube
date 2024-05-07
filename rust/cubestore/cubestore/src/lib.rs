@@ -443,8 +443,8 @@ impl From<HllError> for CubeError {
     }
 }
 
-impl From<cubedatasketch::DataSketchesError> for CubeError {
-    fn from(v: cubedatasketch::DataSketchesError) -> Self {
+impl From<cubedatasketches::DataSketchesError> for CubeError {
+    fn from(v: cubedatasketches::DataSketchesError) -> Self {
         return CubeError::from_error(v);
     }
 }

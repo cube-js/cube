@@ -1,10 +1,10 @@
 [package]
-name = "cubedatasketch"
+name = "cubedatasketches"
 version = "0.1.0"
 authors = ["Cube Dev, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
-description = "HyperLogLog++ implementation ported from ZetaSketch"
+description = "Implementation of HLL from Apache DataSketches"
 
 [dependencies]
 dsrs = { git = "https://github.com/cube-js/datasketches-rs.git", branch = "cubestore" }
