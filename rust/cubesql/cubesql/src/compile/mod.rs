@@ -19422,6 +19422,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_thoughtspot_where_binary_in_true_false() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -19453,26 +19456,17 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                    operator: Some("set".to_string()),
-                    values: None,
-                    or: None,
-                    and: None,
-                }]),
-                ungrouped: None,
-            }
-        )
+        // check if contains `(LOWER(..) = .. OR ..LOWER(..) = ..) IN (TRUE, FALSE)`
+        let re = Regex::new(r"\(LOWER ?\(.+\) = .+ OR .+LOWER ?\(.+\) = .+\) IN \(TRUE, FALSE\)")
+            .unwrap();
+
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]

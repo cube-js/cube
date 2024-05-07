@@ -1675,38 +1675,6 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "filter-thoughtspot-lower-in-true-false",
-                filter_replacer(
-                    inlist_expr(
-                        binary_expr(
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        "?list",
-                        "InListExprNegated:false",
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    is_not_null_expr(column_expr("?column")),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                self.transform_in_true_false("?left_literal", "?right_literal", "?list"),
-            ),
-            transforming_rewrite(
                 "extract-year-equals",
                 filter_replacer(
                     binary_expr(
@@ -4539,38 +4507,6 @@ impl FilterRules {
                     );
                     return true;
                 }
-            }
-
-            false
-        }
-    }
-
-    fn transform_in_true_false(
-        &self,
-        left_literal_var: &'static str,
-        right_literal_var: &'static str,
-        list_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let left_literal_var = var!(left_literal_var);
-        let right_literal_var = var!(right_literal_var);
-        let list_var = var!(list_var);
-        move |egraph, subst| {
-            if var_iter!(egraph[subst[left_literal_var]], LiteralExprValue)
-                .all(|literal| matches!(literal, ScalarValue::Null))
-            {
-                return false;
-            }
-
-            if var_iter!(egraph[subst[right_literal_var]], LiteralExprValue)
-                .all(|literal| matches!(literal, ScalarValue::Null))
-            {
-                return false;
-            }
-
-            if let Some(constant_in_list) = &egraph[subst[list_var]].data.constant_in_list {
-                let bool_true = constant_in_list.contains(&ScalarValue::Boolean(Some(true)));
-                let bool_false = constant_in_list.contains(&ScalarValue::Boolean(Some(false)));
-                return bool_true && bool_false;
             }
 
             false
