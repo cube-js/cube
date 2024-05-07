@@ -340,6 +340,8 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
                     ("functions/LEFT".to_string(), "LEFT({{ args_concat }})".to_string()),
                     ("functions/RIGHT".to_string(), "RIGHT({{ args_concat }})".to_string()),
+                    ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
+                    ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
