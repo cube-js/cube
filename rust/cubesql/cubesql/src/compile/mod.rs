@@ -19463,75 +19463,13 @@ ORDER BY "source"."str0" ASC
                 order: None,
                 limit: None,
                 offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: None,
-                        operator: None,
-                        values: None,
-                        or: Some(vec![
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: None,
-                                operator: None,
-                                values: None,
-                                or: None,
-                                and: Some(vec![
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("startsWith".to_string()),
-                                        values: Some(vec!["female".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("endsWith".to_string()),
-                                        values: Some(vec!["female".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                ]),
-                            }),
-                            json!(V1LoadRequestQueryFilterItem {
-                                member: None,
-                                operator: None,
-                                values: None,
-                                or: None,
-                                and: Some(vec![
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("startsWith".to_string()),
-                                        values: Some(vec!["male".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                    json!(V1LoadRequestQueryFilterItem {
-                                        member: Some(
-                                            "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                        ),
-                                        operator: Some("endsWith".to_string()),
-                                        values: Some(vec!["male".to_string()]),
-                                        or: None,
-                                        and: None,
-                                    }),
-                                ]),
-                            }),
-                        ]),
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
-                ]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                    operator: Some("set".to_string()),
+                    values: None,
+                    or: None,
+                    and: None,
+                }]),
                 ungrouped: None,
             }
         )

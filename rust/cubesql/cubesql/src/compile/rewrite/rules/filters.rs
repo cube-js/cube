@@ -6,8 +6,8 @@ use crate::{
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
-        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, flat_list_expr,
-        fun_expr, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
+        filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
+        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
         literal_bool, literal_expr, literal_int, literal_string, measure_expr,
         member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
@@ -1674,17 +1674,12 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "filter-thoughtspot-lower-in-true-false",
                 filter_replacer(
                     inlist_expr(
-                        // TODO:MAYBE: just `?expr` .. we need expr type: `expr IN [TRUE, FALSE]` is incorrect if expr is not BOOLEAN
                         binary_expr(
                             binary_expr(
-                                //TODO:
-                                //  * not only `Lower`
-                                //  * `?column_left` & `?column_right`
-                                //  * `?op_left`(=) & `op_right`(=) & `?op`(OR)
                                 fun_expr("Lower", vec![column_expr("?column")]),
                                 "=",
                                 literal_expr("?left_literal"),
@@ -1696,12 +1691,7 @@ impl RewriteRules for FilterRules {
                                 literal_expr("?right_literal"),
                             ),
                         ),
-                        flat_list_expr(
-                            // TODO: collect info about types : (info subnode ?)
-                            // if vec is `FALSE, TRUE` OR `TRUE, FALSE, NULL` OR ... it's wouldn't work
-                            "InListExprList",
-                            vec![literal_bool(true), literal_bool(false)],
-                        ),
+                        "?list",
                         "InListExprNegated:false",
                     ),
                     "?alias_to_cube",
@@ -1709,27 +1699,12 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    binary_expr(
-                        binary_expr(
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        "AND",
-                        is_not_null_expr(column_expr("?column")),
-                    ),
+                    is_not_null_expr(column_expr("?column")),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
+                self.transform_in_true_false("?left_literal", "?right_literal", "?list"),
             ),
             transforming_rewrite(
                 "extract-year-equals",
@@ -4564,6 +4539,38 @@ impl FilterRules {
                     );
                     return true;
                 }
+            }
+
+            false
+        }
+    }
+
+    fn transform_in_true_false(
+        &self,
+        left_literal_var: &'static str,
+        right_literal_var: &'static str,
+        list_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let left_literal_var = var!(left_literal_var);
+        let right_literal_var = var!(right_literal_var);
+        let list_var = var!(list_var);
+        move |egraph, subst| {
+            if var_iter!(egraph[subst[left_literal_var]], LiteralExprValue)
+                .all(|literal| matches!(literal, ScalarValue::Null))
+            {
+                return false;
+            }
+
+            if var_iter!(egraph[subst[right_literal_var]], LiteralExprValue)
+                .all(|literal| matches!(literal, ScalarValue::Null))
+            {
+                return false;
+            }
+
+            if let Some(constant_in_list) = &egraph[subst[list_var]].data.constant_in_list {
+                let bool_true = constant_in_list.contains(&ScalarValue::Boolean(Some(true)));
+                let bool_false = constant_in_list.contains(&ScalarValue::Boolean(Some(false)));
+                return bool_true && bool_false;
             }
 
             false

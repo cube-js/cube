@@ -735,6 +735,7 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
+#[allow(unused)]
 fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut ret = format!("({list_type}");
     for i in list {
