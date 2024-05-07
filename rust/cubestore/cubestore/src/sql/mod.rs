@@ -1263,6 +1263,11 @@ fn parse_hyper_log_log<'a>(
             is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
         }
+        HllFlavour::DataSketches => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
+            Ok(bytes)
+        }
     }
 }
 

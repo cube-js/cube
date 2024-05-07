@@ -576,6 +576,7 @@ pub fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, Cub
                         "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
                         "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
                         "hll_postgres" => ColumnType::HyperLogLog(HllFlavour::Postgres),
+                        "hll_datasketches" => ColumnType::HyperLogLog(HllFlavour::DataSketches),
                         _ => {
                             return Err(CubeError::user(format!(
                                 "Custom type '{}' is not supported",
