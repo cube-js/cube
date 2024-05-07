@@ -3,6 +3,172 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - wrong credentials ([1313cdd](https://github.com/cube-js/cube/commit/1313cdd6d3882a7c4644e9d397df7745116246bb))
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **cubestore:** MINIORemoteFs - use only simple auth from S3 client ([#8170](https://github.com/cube-js/cube/issues/8170)) ([66403ad](https://github.com/cube-js/cube/commit/66403ad1be6ec34d8b68444553c40dbc1543f3e5))
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix wrong optimization in total count queries ([#7964](https://github.com/cube-js/cube/issues/7964)) ([7a8ddf0](https://github.com/cube-js/cube/commit/7a8ddf056a075c9224657d1497e2679502acc515))
+
+
+### Features
+
+* **cubestore:** Upgrade rust-s3 0.26.3 -> 0.32.3 ([#6019](https://github.com/cube-js/cube/issues/6019)) ([4b8d4d3](https://github.com/cube-js/cube/commit/4b8d4d3c3445dcd817945e3a71a70d0084644d4c))
+* **cubestore:** Use S3 client in async way ([#8158](https://github.com/cube-js/cube/issues/8158)) ([7f286fe](https://github.com/cube-js/cube/commit/7f286fee90897048f8a2735a2a9e171d40e47da4))
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+
+### Features
+
+* **cubestore:** Enable jemalloc allocator for RocksDB on linux GNU ([#8104](https://github.com/cube-js/cube/issues/8104)) ([ee7bcee](https://github.com/cube-js/cube/commit/ee7bceeee43c45e0a183272b16b3932288146370))
+
+
+
+
+
+## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.9](https://github.com/cube-js/cube/compare/v0.35.8...v0.35.9) (2024-04-08)
+
+
+### Features
+
+* **cubestore:** Upgrade rust to 1.77.0-nightly (635124704 2024-01-27) ([#7640](https://github.com/cube-js/cube/issues/7640)) ([5aa5abb](https://github.com/cube-js/cube/commit/5aa5abb6bba28b7d981c569982e80641673fd5b7))
+
+
+
+
+
+## [0.35.8](https://github.com/cube-js/cube/compare/v0.35.7...v0.35.8) (2024-04-05)
+
+
+### Features
+
+* **cubestore:** Queue - optimize list/pending operations ([#7998](https://github.com/cube-js/cube/issues/7998)) ([815be2f](https://github.com/cube-js/cube/commit/815be2fb90bf84d095f2ab6b208167b8cc8433e7))
+
+
+
+
+
+## [0.35.7](https://github.com/cube-js/cube/compare/v0.35.6...v0.35.7) (2024-04-03)
+
+
+### Features
+
+* **cross:** Upgrade LLVM from 14 to 18 (02042024) ([#8064](https://github.com/cube-js/cube/issues/8064)) ([9b30eac](https://github.com/cube-js/cube/commit/9b30eac57442af586d146bbb947b9dcba634cd60))
+* **cubestore:** Upgrade LLVM from 14 to 18 ([#8068](https://github.com/cube-js/cube/issues/8068)) ([d1f0cbc](https://github.com/cube-js/cube/commit/d1f0cbc3c76ee5025aa26919a2563f85964a20a8))
+
+
+
+
+
+## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - migrate table by truncate (unknown tables) ([#8053](https://github.com/cube-js/cube/issues/8053)) ([509d895](https://github.com/cube-js/cube/commit/509d89561eb23283fb0bda14ec03ca4d4a0a7aab))
+
+
+### Features
+
+* **cubestore:** CacheStore - allow to disable logs ([#8027](https://github.com/cube-js/cube/issues/8027)) ([ce6303c](https://github.com/cube-js/cube/commit/ce6303c5944f7ab0ac6c8411af26d396b0d3d7a8))
+
+
+
+
+
+## [0.35.5](https://github.com/cube-js/cube.js/compare/v0.35.4...v0.35.5) (2024-03-28)
+
+
+### Bug Fixes
+
+* **cubestore:** RocksStore - improve panic safety on migration ([#8031](https://github.com/cube-js/cube.js/issues/8031)) ([f81e2cb](https://github.com/cube-js/cube.js/commit/f81e2cb1bbcb5f37d01b85bfbeef4b4634fe8332))
+
+
+
+
+
+## [0.35.4](https://github.com/cube-js/cube.js/compare/v0.35.3...v0.35.4) (2024-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
+
+
+### Features
+
+* **cubestore:** Queue - reduce memory usage ([#7975](https://github.com/cube-js/cube/issues/7975)) ([e9848e8](https://github.com/cube-js/cube/commit/e9848e8d6140333dd029be4270b9450e1ca10450))
+* **cubestore:** Reduce memory usage while writting WALs ([#7967](https://github.com/cube-js/cube/issues/7967)) ([ee9fa71](https://github.com/cube-js/cube/commit/ee9fa7162be6aa53593c316046a9f60d41ecbd28))
+
+
+
+
+
+## [0.35.1](https://github.com/cube-js/cube/compare/v0.35.0...v0.35.1) (2024-03-18)
+
+
+### Bug Fixes
+
+* **cubestore:** Wrong calculation of default compaction trigger size (too often compaction) ([#7960](https://github.com/cube-js/cube/issues/7960)) ([2f4b75b](https://github.com/cube-js/cube/commit/2f4b75b3440f307e33699d4d26e90da9a880bf0a))
+
+
+
+
+
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
 ## [0.34.60](https://github.com/cube-js/cube.js/compare/v0.34.59...v0.34.60) (2024-03-02)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

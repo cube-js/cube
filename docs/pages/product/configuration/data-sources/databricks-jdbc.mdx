@@ -3,7 +3,9 @@ redirect_from:
   - /config/databases/databricks/jdbc
 ---
 
-# Databricks (JDBC)
+# Databricks
+
+[Databricks](https://www.databricks.com) is a unified data intelligence platform.
 
 ## Prerequisites
 
@@ -44,8 +46,8 @@ RUN npm install
 You can then build and run the image using the following commands:
 
 ```bash{promptUser: user}
-docker build -t cubejs-jdk .
-docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
+docker build -t cube-jdk .
+docker run -it -p 4000:4000 --env-file=.env cube-jdk
 ```
 
 ## Environment Variables
@@ -56,6 +58,7 @@ docker run -it -p 4000:4000 --env-file=.env cubejs-jdk
 | `CUBEJS_DB_DATABRICKS_URL`           | The URL for a JDBC connection                                                                   | A valid JDBC URL      |    ✅    |
 | `CUBEJS_DB_DATABRICKS_ACCEPT_POLICY` | Whether or not to accept the license terms for the Databricks JDBC driver                       | `true`, `false`       |    ✅    |
 | `CUBEJS_DB_DATABRICKS_TOKEN`         | The [personal access token][databricks-docs-pat] used to authenticate the Databricks connection | A valid token         |    ✅    |
+| `CUBEJS_DB_DATABRICKS_CATALOG`       | The name of the [Databricks catalog][databricks-catalog] to connect to                                                | A valid catalog name  |    ❌    |
 | `CUBEJS_DB_EXPORT_BUCKET_MOUNT_DIR`  | The path for the [Databricks DBFS mount][databricks-docs-dbfs]                                  | A valid mount path    |    ❌    |
 | `CUBEJS_CONCURRENCY`                 | The number of concurrent connections each queue has to the database. Default is `2`             | A valid number        |    ❌    |
 | `CUBEJS_DB_MAX_POOL`                 | The maximum number of concurrent database connections to pool. Default is `8`                   | A valid number        |    ❌    |
@@ -155,6 +158,7 @@ bucket][self-preaggs-export-bucket] **must be** configured.
   https://docs.databricks.com/integrations/bi/jdbc-odbc-bi.html#get-server-hostname-port-http-path-and-jdbc-url
 [databricks-docs-pat]:
   https://docs.databricks.com/dev-tools/api/latest/authentication.html#token-management
+[databricks-catalog]: (https://docs.databricks.com/en/data-governance/unity-catalog/create-catalogs.html)
 [gh-cubejs-jdbc-install]:
   https://github.com/cube-js/cube/blob/master/packages/cubejs-jdbc-driver/README.md#java-installation
 [ref-caching-large-preaggs]:

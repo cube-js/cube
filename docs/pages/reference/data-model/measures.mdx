@@ -13,7 +13,7 @@ Any measure should have the following properties: `name`, `sql` and `type`.
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a measure. It must be unique
 among all measures, dimensions, and segments within a cube and follow the
@@ -56,7 +56,7 @@ cubes:
 
 </CodeTabs>
 
-### description
+### `description`
 
 You can add details to a measure’s definition via the `description` parameter:
 
@@ -90,7 +90,7 @@ cubes:
 
 </CodeTabs>
 
-### drill_members
+### `drill_members`
 
 Using the `drill_members` parameter, you can define a set of [drill
 down][ref-drilldowns] fields for the measure. `drill_members` is defined as an
@@ -134,7 +134,7 @@ cubes:
 
 </CodeTabs>
 
-### filters
+### `filters`
 
 If you want to add some conditions for a metric's calculation, you should use
 the `filters` parameter. The syntax looks like the following:
@@ -170,7 +170,7 @@ cubes:
 
 </CodeTabs>
 
-### format
+### `format`
 
 `format` is an optional parameter. It is used to format the output of measures
 in different ways, for example, as currency for `revenue`. Please refer to the
@@ -207,7 +207,7 @@ cubes:
 
 </CodeTabs>
 
-### meta
+### `meta`
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -244,7 +244,7 @@ cubes:
 
 </CodeTabs>
 
-### rolling_window
+### `rolling_window`
 
 If you want to calculate some metric within a window, for example a week or a
 month, you should use a `rolling_window` parameter. The `trailing` and `leading`
@@ -335,7 +335,7 @@ cubes:
 
 </CodeTabs>
 
-### public
+### `public`
 
 <InfoBox>
 
@@ -377,12 +377,12 @@ cubes:
 
 </CodeTabs>
 
-### sql
+### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
 the `type` of the measure. Please refer to the [Measure Types
 Guide][ref-schema-ref-types-formats-measures-types] for detailed information on
-the corresponding sql parameter.
+the corresponding `sql` parameter.
 
 <CodeTabs>
 
@@ -412,7 +412,15 @@ cubes:
 
 </CodeTabs>
 
-### title
+Depending on the measure [type](#type), the `sql` parameter would either:
+* Be skipped (in case of the `count` type).
+* Contain an aggregate function, e.g., `STRING_AGG(string_dimension, ',')`
+(in case of `string`, `time`, `boolean`, and `number` types).
+* Contain a non-aggregated expression that Cube would wrap into an aggregate
+function according to the measure type (in case of the `avg`, `count_distinct`,
+`count_distinct_approx`, `min`, `max`, and `sum` types).
+
+### `title`
 
 You can use the `title` parameter to change a measure’s displayed name. By
 default, Cube will humanize your measure key to create a display name. In order
@@ -448,7 +456,7 @@ cubes:
 
 </CodeTabs>
 
-### type
+### `type`
 
 `type` is a required parameter. There are various types that can be assigned to
 a measure. Please refer to the [Measure

@@ -1,28 +1,29 @@
 FROM rust:1-bullseye as builder
 
 RUN rustup update && \
-    rustup default nightly-2022-06-22 && \
-    rustup component add --toolchain nightly-2022-06-22 rustfmt;
+    rustup default nightly-2024-01-10 && \
+    rustup component add --toolchain nightly-2024-01-10 rustfmt;
 
 RUN apt update \
 	&& apt upgrade -y \
 	&& DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
 	&& wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-	&& add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-15 main"  \
+	&& add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main"  \
 	&& apt update \
-	&& apt install -y git llvm-15 clang-15 libclang-15-dev clang-15 cmake \
+	&& apt install -y git llvm-18 clang-18 libclang-18-dev clang-18 cmake \
 	&& rm -rf /var/lib/apt/lists/*;
 
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-15 100
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-15 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100
 
 WORKDIR /usr/src
 
 WORKDIR /build/cubestore
 COPY Cargo.toml .
 COPY Cargo.lock .
+COPY cuberockstore cuberockstore
 COPY cubehll cubehll
 COPY cubezetasketch cubezetasketch
 COPY cuberpc cuberpc

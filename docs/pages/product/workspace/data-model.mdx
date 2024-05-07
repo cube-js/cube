@@ -120,16 +120,34 @@ want to delete, then open the switcher and click <Btn>Remove Branch</Btn>:
   alt="Delete a branch"
 />
 
-## Generating models
+## Generating data model files
 
-Cube Cloud supports generating models from a data source after the initial
-deployment creation. The <Btn>Generate Data Model</Btn> on the <Btn>Data
-Model</Btn> page will let you re-generate models from your source database, or
-alternatively add rollups to existing data models:
+You can generate data model files when [creating a new
+deployment][ref-creating-deployment] or at later moment. To open the data model
+wizard, click on the <Btn>...</Btn> button on the right and select <Btn>Generate
+data model</Btn>:
 
 <Screenshot
-  src="https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/"
-  alt="Generate rollups or data model modal"
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
+/>
+
+It is safe to generate data model files for tables that already have matching cubes.
+In that case, existing files will be renamed by appending `.backup` to their names.
+You would also be able to review changes to files on the <Btn>Changes</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/a8d53348-8441-41f3-969c-df46d41d78b6/" />
+
+
+## Creating pre-aggregations
+
+If you'd like to use the UI to create a pre-aggregation, you can click on the
+<Btn>...</Btn> button on the right and select <Btn>Add rollup</Btn> to open
+[Rollup Designer][ref-rollup-designer]:
+
+<Screenshot
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
 />
 
 [ref-data-modeling]: /product/data-modeling/overview
@@ -137,3 +155,5 @@ alternatively add rollups to existing data models:
 [ref-joins]: /reference/data-model/joins
 [ref-join-types]: /reference/data-model/joins#relationship
 [wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
+[ref-rollup-designer]: /product/workspace/rollup-designer
+[ref-creating-deployment]: /product/deployment/cloud/deployments#creating-a-new-deployment

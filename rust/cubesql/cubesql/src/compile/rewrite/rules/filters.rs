@@ -3769,7 +3769,7 @@ impl FilterRules {
         for alias_to_cube in var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
         {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                let alias_name = expr_column_name(Expr::Column(column.clone()), &None);
+                let alias_name = expr_column_name(&Expr::Column(column.clone()), &None);
 
                 let member_name = aliases
                     .iter()
@@ -4117,7 +4117,7 @@ impl FilterRules {
             }
 
             fn increment_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_add_signed(Duration::milliseconds(1)).unwrap(),
@@ -4128,7 +4128,7 @@ impl FilterRules {
             }
 
             fn decrement_iso_timestamp_time(date_var: &String) -> String {
-                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S.%fZ");
+                let timestamp = NaiveDateTime::parse_from_str(date_var, "%Y-%m-%dT%H:%M:%S%.fZ");
                 let value = match timestamp {
                     Ok(val) => format_iso_timestamp(
                         val.checked_sub_signed(Duration::milliseconds(1)).unwrap(),

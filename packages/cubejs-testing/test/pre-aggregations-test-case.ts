@@ -1,5 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
-import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import fetch from 'node-fetch';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
@@ -141,8 +141,8 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
-    let httpClient: CubejsApi;
-    let _wsClient: CubejsApi;
+    let httpClient: CubeApi;
+    let _wsClient: CubeApi;
     let wsTransport: WebSocketTransport;
 
     // eslint-disable-next-line consistent-return

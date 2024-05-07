@@ -11,12 +11,7 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import {
-  FROM_PARTITION_RANGE,
-  MAX_SOURCE_ROW_LIMIT,
-  inDbTimeZone,
-  QueryAlias,
-} from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
@@ -118,6 +113,20 @@ export class BaseQuery {
     return allFilters;
   }
 
+  keepFilters(filters = [], fn) {
+    return filters.map(f => {
+      if (f.and) {
+        return { and: this.keepFilters(f.and, fn) };
+      } else if (f.or) {
+        return { or: this.keepFilters(f.or, fn) };
+      } else if (!f.member && !f.dimension) {
+        throw new UserError(`member attribute is required for filter ${JSON.stringify(f)}`);
+      } else {
+        return fn(f.member || f.dimension || f.measure) ? f : null;
+      }
+    }).filter(f => !!f);
+  }
+
   extractFiltersAsTree(filters = []) {
     if (!filters) {
       return [];
@@ -208,13 +217,21 @@ export class BaseQuery {
       memberToAlias: this.options.memberToAlias,
       expressionParams: this.options.expressionParams,
       convertTzForRawTimeDimension: this.options.convertTzForRawTimeDimension,
+      from: this.options.from,
+      postAggregateQuery: this.options.postAggregateQuery,
+      postAggregateDimensions: this.options.postAggregateDimensions,
+      postAggregateTimeDimensions: this.options.postAggregateTimeDimensions,
     });
+    this.from = this.options.from;
+    this.postAggregateQuery = this.options.postAggregateQuery;
     this.timezone = this.options.timezone;
     this.rowLimit = this.options.rowLimit;
     this.offset = this.options.offset;
     this.preAggregations = this.newPreAggregations();
     this.measures = (this.options.measures || []).map(this.newMeasure.bind(this));
     this.dimensions = (this.options.dimensions || []).map(this.newDimension.bind(this));
+    this.postAggregateDimensions = (this.options.postAggregateDimensions || []).map(this.newDimension.bind(this));
+    this.postAggregateTimeDimensions = (this.options.postAggregateTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
     this.order = this.options.order || [];
     const filters = this.extractFiltersAsTree(this.options.filters || []);
@@ -463,7 +480,11 @@ export class BaseQuery {
   buildParamAnnotatedSql() {
     let sql;
     let preAggForQuery;
-    if (!this.options.preAggregationQuery && !this.ungrouped) {
+    // TODO Most probably should be called later than here but avoids errors during pre-aggregation match for now
+    if (this.from) {
+      return this.simpleQuery();
+    }
+    if (!this.options.preAggregationQuery) {
       preAggForQuery =
         this.preAggregations.findPreAggregationForQuery();
       if (this.options.disableExternalPreAggregations && preAggForQuery && preAggForQuery.preAggregation.external) {
@@ -475,6 +496,8 @@ export class BaseQuery {
         multipliedMeasures,
         regularMeasures,
         cumulativeMeasures,
+        withQueries,
+        postAggregateMembers,
       } = this.fullKeyQueryAggregateMeasures();
 
       if (cumulativeMeasures.length === 0) {
@@ -539,7 +562,7 @@ export class BaseQuery {
   }
 
   externalPreAggregationQuery() {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       const preAggregationForQuery = this.preAggregations.findPreAggregationForQuery();
       if (preAggregationForQuery && preAggregationForQuery.preAggregation.external) {
         return true;
@@ -558,7 +581,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && !this.ungrouped && this.externalQueryClass) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
@@ -690,6 +713,9 @@ export class BaseQuery {
     // eslint-disable-next-line prefer-template
     const inlineWhereConditions = [];
     const commonQuery = this.rewriteInlineWhere(() => this.commonQuery(), inlineWhereConditions);
+    if (this.postAggregateQuery) {
+      return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}`;
+    }
     return `${commonQuery} ${this.baseWhere(this.allFilters.concat(inlineWhereConditions))}` +
       this.groupByClause() +
       this.baseHaving(this.measureFilters) +
@@ -702,15 +728,22 @@ export class BaseQuery {
    * @returns {string}
    */
   fullKeyQueryAggregate() {
+    if (this.from) {
+      return this.simpleQuery();
+    }
     const {
       multipliedMeasures,
       regularMeasures,
       cumulativeMeasures,
+      withQueries,
+      postAggregateMembers,
     } = this.fullKeyQueryAggregateMeasures();
 
-    if (!multipliedMeasures.length && !cumulativeMeasures.length) {
+    if (!multipliedMeasures.length && !cumulativeMeasures.length && !postAggregateMembers.length) {
       return this.simpleQuery();
     }
+
+    const renderedWithQueries = withQueries.map(q => this.renderWithQuery(q));
 
     let toJoin;
 
@@ -789,7 +822,8 @@ export class BaseQuery {
                 ),
               )
             )(cumulativeMeasures)
-          );
+          // TODO SELECT *
+          ).concat(postAggregateMembers.map(m => `SELECT * FROM ${m.alias}`));
     }
 
     // Move regular measures to multiplied ones if there're same
@@ -832,12 +866,16 @@ export class BaseQuery {
         )(measuresList);
       }
     }
-    return this.joinFullKeyQueryAggregate(
-      multipliedMeasures,
+
+    const postAggregateMeasures = R.flatten(postAggregateMembers.map(m => m.measures)).map(m => this.newMeasure(m));
+
+    return this.withQueries(this.joinFullKeyQueryAggregate(
+      // TODO separate param?
+      multipliedMeasures.concat(postAggregateMeasures),
       regularMeasures,
       cumulativeMeasures,
       toJoin,
-    );
+    ), renderedWithQueries);
   }
 
   joinFullKeyQueryAggregate(
@@ -846,28 +884,36 @@ export class BaseQuery {
     cumulativeMeasures,
     toJoin,
   ) {
+    return this.outerMeasuresJoinFullKeyQueryAggregate(
+      multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure)),
+      this.measures,
+      toJoin
+    );
+  }
+
+  outerMeasuresJoinFullKeyQueryAggregate(innerMembers, outerMembers, toJoin) {
     const renderedReferenceContext = {
       renderedReference: R.pipe(
-        R.map(m => [m.measure, m.aliasName()]),
+        R.map(m => [m.measure || m.dimension, m.aliasName()]),
         R.fromPairs,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      )(multipliedMeasures.concat(regularMeasures).concat(cumulativeMeasures.map(([multiplied, measure]) => measure))),
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      )(innerMembers),
     };
 
     const join = R.drop(1, toJoin)
       .map(
         (q, i) => (this.dimensionAliasNames().length ?
-          `INNER JOIN (${q}) as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
-          `, (${q}) as q_${i + 1}`),
+          `INNER JOIN ${this.wrapInParenthesis((q))} as q_${i + 1} ON ${this.dimensionsJoinCondition(`q_${i}`, `q_${i + 1}`)}` :
+          `, ${this.wrapInParenthesis(q)} as q_${i + 1}`),
       ).join('\n');
 
     const columnsToSelect = this.evaluateSymbolSqlWithContext(
-      () => this.dimensionColumns('q_0').concat(this.measures.map(m => m.selectColumns())).join(', '),
+      () => this.dimensionColumns('q_0').concat(outerMembers.map(m => m.selectColumns())).join(', '),
       renderedReferenceContext,
     );
 
     const queryHasNoRemapping = this.evaluateSymbolSqlWithContext(
-      () => this.dimensionsForSelect().concat(this.measures).every(r => r.hasNoRemapping()),
+      () => this.dimensionsForSelect().concat(outerMembers).every(r => r.hasNoRemapping()),
       renderedReferenceContext,
     );
 
@@ -881,23 +927,44 @@ export class BaseQuery {
     if (
       toJoin.length === 1 &&
       this.measureFilters.length === 0 &&
-      this.measures.filter(m => m.expression).length === 0 &&
+      outerMembers.filter(m => m.expression).length === 0 &&
       queryHasNoRemapping
     ) {
       return `${toJoin[0].replace(/^SELECT/, `SELECT ${this.topLimit()}`)} ${this.orderBy()}${this.groupByDimensionLimit()}`;
     }
 
-    return `SELECT ${this.topLimit()}${columnsToSelect} FROM (${toJoin[0]}) as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
+    return `SELECT ${this.topLimit()}${columnsToSelect} FROM ${this.wrapInParenthesis(toJoin[0])} as q_0 ${join}${havingFilters}${this.orderBy()}${this.groupByDimensionLimit()}`;
   }
 
-  fullKeyQueryAggregateMeasures() {
-    const measureToHierarchy = this.collectRootMeasureToHieararchy();
+  wrapInParenthesis(select) {
+    return select.trim().match(/^SELECT/ig) ? `(${select})` : select;
+  }
+
+  withQueries(select, withQueries) {
+    if (!withQueries || !withQueries.length) {
+      return select;
+    }
+    // TODO escape alias
+    return `WITH\n${withQueries.map(q => `${q.alias} AS (${q.query})`).join(',\n')}\n${select}`;
+  }
+
+  fullKeyQueryAggregateMeasures(context) {
+    const measureToHierarchy = this.collectRootMeasureToHieararchy(context);
+    const allMemberChildren = this.collectAllMemberChildren(context);
+    const memberToIsPostAggregate = this.collectAllPostAggregateMembers(allMemberChildren);
+
+    const hasPostAggregateMembers = (m) => {
+      if (memberToIsPostAggregate[m]) {
+        return true;
+      }
+      return allMemberChildren[m]?.some(c => hasPostAggregateMembers(c)) || false;
+    };
 
     const measuresToRender = (multiplied, cumulative) => R.pipe(
       R.values,
       R.flatten,
       R.filter(
-        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative
+        m => m.multiplied === multiplied && this.newMeasure(m.measure).isCumulative() === cumulative && !hasPostAggregateMembers(m.measure)
       ),
       R.map(m => m.measure),
       R.uniq,
@@ -911,7 +978,251 @@ export class BaseQuery {
         R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),
         R.unnest
       )([false, true]);
-    return { multipliedMeasures, regularMeasures, cumulativeMeasures };
+    const withQueries = [];
+    const postAggregateMembers = R.uniq(
+      this.allMembersConcat(false)
+        // TODO boolean logic filter support
+        .filter(m => m.expressionPath && hasPostAggregateMembers(m.expressionPath()))
+        .map(m => m.expressionPath())
+    ).map(m => this.postAggregateWithQueries(
+      m,
+      {
+        dimensions: this.dimensions.map(d => d.dimension),
+        postAggregateDimensions: this.dimensions.map(d => d.dimension),
+        // TODO accessing timeDimensions directly from options might miss some processing logic
+        timeDimensions: this.options.timeDimensions || [],
+        postAggregateTimeDimensions: (this.options.timeDimensions || []).filter(td => !!td.granularity),
+        // TODO accessing filters directly from options might miss some processing logic
+        filters: this.options.filters || []
+      },
+      allMemberChildren,
+      withQueries
+    ));
+    const usedWithQueries = {};
+    postAggregateMembers.forEach(m => this.collectUsedWithQueries(usedWithQueries, m));
+
+    return {
+      multipliedMeasures,
+      regularMeasures,
+      cumulativeMeasures,
+      postAggregateMembers,
+      withQueries: withQueries.filter(q => usedWithQueries[q.alias])
+    };
+  }
+
+  collectAllMemberChildren(context) {
+    return this.collectFromMembers(
+      false,
+      (fn) => {
+        const memberChildren = {};
+        this.evaluateSymbolSqlWithContext(
+          fn,
+          { ...context, memberChildren },
+        );
+        return memberChildren;
+      },
+      context ? ['collectAllMemberChildren', JSON.stringify(context)] : 'collectAllMemberChildren',
+    ).reduce((a, b) => ({ ...a, ...b }), {});
+  }
+
+  collectAllPostAggregateMembers(allMemberChildren) {
+    const allMembers = R.uniq(R.flatten(Object.keys(allMemberChildren).map(k => [k].concat(allMemberChildren[k]))));
+    return R.fromPairs(allMembers.map(m => ([m, this.memberInstanceByPath(m).isPostAggregate()])));
+  }
+
+  memberInstanceByPath(m) {
+    let member;
+    if (!member && this.cubeEvaluator.isMeasure(m)) {
+      member = this.newMeasure(m);
+    }
+    if (!member && this.cubeEvaluator.isDimension(m)) {
+      member = this.newDimension(m);
+    }
+    if (!member && this.cubeEvaluator.isSegment(m)) {
+      member = this.newSegment(m);
+    }
+    if (!member) {
+      throw new Error(`Can't resolve '${m}'`);
+    }
+    return member;
+  }
+
+  postAggregateWithQueries(member, queryContext, memberChildren, withQueries) {
+    // TODO calculate based on remove_filter in future
+    const wouldNodeApplyFilters = !memberChildren[member];
+    let memberFrom = memberChildren[member]
+      ?.map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, queryContext, wouldNodeApplyFilters), memberChildren, withQueries));
+    const unionFromDimensions = memberFrom ? R.uniq(R.flatten(memberFrom.map(f => f.dimensions))) : queryContext.dimensions;
+    const unionDimensionsContext = { ...queryContext, dimensions: unionFromDimensions.filter(d => !this.newDimension(d).isPostAggregate()) };
+    // TODO is calling postAggregateWithQueries twice optimal?
+    memberFrom = memberChildren[member] &&
+      R.uniqBy(
+        f => f.alias,
+        memberChildren[member].map(child => this.postAggregateWithQueries(child, this.childrenPostAggregateContext(member, unionDimensionsContext, wouldNodeApplyFilters), memberChildren, withQueries))
+      );
+    const selfContext = this.selfPostAggregateContext(member, queryContext, wouldNodeApplyFilters);
+    const subQuery = {
+      ...selfContext,
+      ...(this.cubeEvaluator.isMeasure(member) ? { measures: [member] } : { measures: [], dimensions: R.uniq(selfContext.dimensions.concat(member)) }),
+      memberFrom,
+    };
+
+    const foundWith = withQueries.find(({ alias, ...q }) => R.equals(subQuery, q));
+
+    if (foundWith) {
+      return foundWith;
+    }
+
+    subQuery.alias = `cte_${withQueries.length}`;
+
+    withQueries.push(subQuery);
+
+    return subQuery;
+  }
+
+  collectUsedWithQueries(usedQueries, member) {
+    usedQueries[member.alias] = true;
+    member.memberFrom?.forEach(m => this.collectUsedWithQueries(usedQueries, m));
+  }
+
+  childrenPostAggregateContext(memberPath, queryContext, wouldNodeApplyFilters) {
+    let member;
+    if (this.cubeEvaluator.isMeasure(memberPath)) {
+      member = this.newMeasure(memberPath);
+    } else if (this.cubeEvaluator.isDimension(memberPath)) {
+      member = this.newDimension(memberPath);
+    }
+    const memberDef = member.definition();
+    // TODO can addGroupBy replaced by something else?
+    if (memberDef.addGroupByReferences) {
+      queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
+    }
+    queryContext = {
+      ...queryContext,
+      // TODO can't remove filters from OR expression
+      filters: this.keepFilters(queryContext.filters, filterMember => filterMember !== memberPath),
+    };
+    return queryContext;
+  }
+
+  selfPostAggregateContext(memberPath, queryContext, wouldNodeApplyFilters) {
+    let member;
+    if (this.cubeEvaluator.isMeasure(memberPath)) {
+      member = this.newMeasure(memberPath);
+    } else if (this.cubeEvaluator.isDimension(memberPath)) {
+      member = this.newDimension(memberPath);
+      // TODO is it right place to replace context?
+      // if (member.definition().type === 'rank') {
+      //   queryContext = unionDimensionsContext;
+      // }
+    }
+    const memberDef = member.definition();
+    if (memberDef.reduceByReferences) {
+      queryContext = {
+        ...queryContext,
+        postAggregateDimensions: R.difference(queryContext.postAggregateDimensions, memberDef.reduceByReferences),
+        postAggregateTimeDimensions: queryContext.postAggregateTimeDimensions.filter(td => memberDef.reduceByReferences.indexOf(td.dimension) === -1),
+        // dimensions: R.uniq(queryContext.dimensions.concat(memberDef.reduceByReferences))
+      };
+    }
+    if (memberDef.groupByReferences) {
+      queryContext = {
+        ...queryContext,
+        postAggregateDimensions: R.intersection(queryContext.postAggregateDimensions, memberDef.groupByReferences),
+        postAggregateTimeDimensions: queryContext.postAggregateTimeDimensions.filter(td => memberDef.groupByReferences.indexOf(td.dimension) !== -1),
+      };
+    }
+    if (!wouldNodeApplyFilters) {
+      queryContext = {
+        ...queryContext,
+        // TODO make it same way as keepFilters
+        timeDimensions: queryContext.timeDimensions.map(td => ({ ...td, dateRange: undefined })),
+        filters: this.keepFilters(queryContext.filters, filterMember => filterMember === memberPath),
+      };
+    } else {
+      queryContext = {
+        ...queryContext,
+        filters: this.keepFilters(queryContext.filters, filterMember => !this.memberInstanceByPath(filterMember).isPostAggregate()),
+      };
+    }
+    return queryContext;
+  }
+
+  renderWithQuery(withQuery) {
+    const fromMeasures = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => f.measures)));
+    // TODO get rid of this postAggregate filter
+    const fromDimensions = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => f.dimensions)));
+    const fromTimeDimensions = withQuery.memberFrom && R.uniq(R.flatten(withQuery.memberFrom.map(f => (f.timeDimensions || []).map(td => ({ ...td, dateRange: undefined })))));
+    const renderedReferenceContext = {
+      renderedReference: withQuery.memberFrom && R.fromPairs(
+        R.unnest(withQuery.memberFrom.map(from => from.measures.map(m => {
+          const measure = this.newMeasure(m);
+          return [m, measure.aliasName()];
+        }).concat(from.dimensions.map(m => {
+          const member = this.newDimension(m);
+          return [m, member.aliasName()];
+        })).concat(from.timeDimensions.map(m => {
+          const member = this.newTimeDimension(m);
+          return member.granularity ? [`${member.dimension}.${member.granularity}`, member.aliasName()] : [];
+        }))))
+      )
+    };
+
+    const fromSubQuery = fromMeasures && this.newSubQuery({
+      measures: fromMeasures,
+      // TODO get rid of this postAggregate filter
+      dimensions: fromDimensions, // .filter(d => !this.newDimension(d).isPostAggregate()),
+      timeDimensions: fromTimeDimensions,
+      postAggregateDimensions: withQuery.postAggregateDimensions,
+      postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
+      filters: withQuery.filters,
+      // TODO do we need it?
+      postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+    });
+
+    const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
+    // TODO get rid of this postAggregate filter
+    const postAggregateDimensions = fromSubQuery && fromDimensions.map(m => fromSubQuery.newDimension(m)).filter(d => d.isPostAggregate());
+    const postAggregateTimeDimensions = fromSubQuery && fromTimeDimensions.map(m => fromSubQuery.newTimeDimension(m)).filter(d => d.isPostAggregate());
+    // TODO not working yet
+    const membersToSelect = measures?.concat(postAggregateDimensions).concat(postAggregateTimeDimensions);
+    const select = fromSubQuery && fromSubQuery.outerMeasuresJoinFullKeyQueryAggregate(membersToSelect, membersToSelect, withQuery.memberFrom.map(f => f.alias));
+    const fromSql = select && this.wrapInParenthesis(select);
+
+    const subQueryOptions = {
+      measures: withQuery.measures,
+      dimensions: withQuery.dimensions,
+      timeDimensions: withQuery.timeDimensions,
+      postAggregateDimensions: withQuery.postAggregateDimensions,
+      postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
+      filters: withQuery.filters,
+      from: fromSql && {
+        sql: fromSql,
+        alias: `${withQuery.alias}_join`,
+      },
+      // TODO condition should something else instead of rank
+      postAggregateQuery: !!withQuery.measures.find(d => {
+        const { type } = this.newMeasure(d).definition();
+        return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
+      }),
+    };
+    const subQuery = this.newSubQuery(subQueryOptions);
+
+    if (!subQuery.from) {
+      const allSubQueryMembers = R.flatten(subQuery.collectFromMembers(false, subQuery.collectMemberNamesFor.bind(subQuery), 'collectMemberNamesFor'));
+      const postAggregateMember = allSubQueryMembers.find(m => this.memberInstanceByPath(m).isPostAggregate());
+      if (postAggregateMember) {
+        throw new Error(`Post aggregate member '${postAggregateMember}' lacks FROM clause in sub query: ${JSON.stringify(subQueryOptions)}`);
+      }
+    }
+
+    return {
+      query: subQuery.evaluateSymbolSqlWithContext(
+        () => subQuery.buildParamAnnotatedSql(),
+        renderedReferenceContext,
+      ),
+      alias: withQuery.alias
+    };
   }
 
   dimensionsJoinCondition(leftAlias, rightAlias) {
@@ -1108,15 +1419,15 @@ export class BaseQuery {
       ${this.query()}`;
   }
 
-  collectRootMeasureToHieararchy() {
+  collectRootMeasureToHieararchy(context) {
     const notAddedMeasureFilters = R.flatten(this.measureFilters.map(f => f.getMembers()))
       .filter(f => R.none(m => m.measure === f.measure, this.measures));
 
     return R.fromPairs(this.measures.concat(notAddedMeasureFilters).map(m => {
       const collectedMeasures = this.collectFrom(
         [m],
-        this.collectMultipliedMeasures.bind(this),
-        'collectMultipliedMeasures',
+        this.collectMultipliedMeasures(context),
+        context ? ['collectMultipliedMeasures', JSON.stringify(context)] : 'collectMultipliedMeasures',
         this.queryCache
       );
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
@@ -1127,7 +1438,7 @@ export class BaseQuery {
   }
 
   query() {
-    return this.joinQuery(this.join, this.collectFromMembers(
+    return this.from && this.joinSql([this.from]) || this.joinQuery(this.join, this.collectFromMembers(
       false,
       this.collectSubQueryDimensionsFor.bind(this),
       'collectSubQueryDimensionsFor'
@@ -1478,12 +1789,7 @@ export class BaseQuery {
   }
 
   collectFromMembers(excludeTimeDimensions, fn, methodName) {
-    const membersToCollectFrom = this.measures
-      .concat(this.dimensions)
-      .concat(this.segments)
-      .concat(this.filters)
-      .concat(this.measureFilters)
-      .concat(excludeTimeDimensions ? [] : this.timeDimensions)
+    const membersToCollectFrom = this.allMembersConcat(excludeTimeDimensions)
       .concat(this.join ? this.join.joins.map(j => ({
         getMembers: () => [{
           path: () => null,
@@ -1494,13 +1800,23 @@ export class BaseQuery {
     return this.collectFrom(membersToCollectFrom, fn, methodName);
   }
 
+  allMembersConcat(excludeTimeDimensions) {
+    return this.measures
+      .concat(this.dimensions)
+      .concat(this.segments)
+      .concat(this.filters)
+      .concat(this.measureFilters)
+      .concat(excludeTimeDimensions ? [] : this.timeDimensions);
+  }
+
   collectFrom(membersToCollectFrom, fn, methodName, cache) {
+    const methodCacheKey = Array.isArray(methodName) ? methodName : [methodName];
     return R.pipe(
       R.map(f => f.getMembers()),
       R.flatten,
       R.map(s => (
         (cache || this.compilerCache).cache(
-          ['collectFrom', methodName].concat(
+          ['collectFrom'].concat(methodCacheKey).concat(
             s.path() ? [s.path().join('.')] : [s.cube().name, s.expression?.toString() || s.expressionName || s.definition().sql]
           ),
           () => fn(() => this.traverseSymbol(s))
@@ -1748,92 +2064,117 @@ export class BaseQuery {
     if (!type && this.cubeEvaluator.isSegment(memberPathArray)) {
       type = 'segment';
     }
-    if (type === 'measure') {
-      let parentMeasure;
-      if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
-        this.safeEvaluateSymbolContext().leafMeasures) {
-        parentMeasure = this.safeEvaluateSymbolContext().currentMeasure;
-        if (this.safeEvaluateSymbolContext().compositeCubeMeasures) {
-          if (parentMeasure && !memberExpressionType &&
-            (
-              this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
-              this.newMeasure(this.cubeEvaluator.pathFromArray(memberPathArray)).isCumulative()
-            )
-          ) {
-            this.safeEvaluateSymbolContext().compositeCubeMeasures[parentMeasure] = true;
-          }
-        }
-        this.safeEvaluateSymbolContext().currentMeasure = this.cubeEvaluator.pathFromArray(memberPathArray);
-        if (this.safeEvaluateSymbolContext().leafMeasures) {
-          if (parentMeasure) {
-            this.safeEvaluateSymbolContext().leafMeasures[parentMeasure] = false;
-          }
-          this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
-        }
+    const parentMember = this.safeEvaluateSymbolContext().currentMember;
+    if (this.safeEvaluateSymbolContext().memberChildren && parentMember) {
+      this.safeEvaluateSymbolContext().memberChildren[parentMember] = this.safeEvaluateSymbolContext().memberChildren[parentMember] || [];
+      if (this.safeEvaluateSymbolContext().memberChildren[parentMember].indexOf(memberPath) === -1) {
+        this.safeEvaluateSymbolContext().memberChildren[parentMember].push(memberPath);
       }
-      const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
-      const result = this.renderSqlMeasure(
-        name,
-        this.applyMeasureFilters(
-          this.autoPrefixWithCubeName(
-            cubeName,
-            symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
+    }
+    this.safeEvaluateSymbolContext().currentMember = memberPath;
+    try {
+      if (type === 'measure') {
+        let parentMeasure;
+        if (this.safeEvaluateSymbolContext().compositeCubeMeasures ||
+          this.safeEvaluateSymbolContext().leafMeasures) {
+          parentMeasure = this.safeEvaluateSymbolContext().currentMeasure;
+          if (this.safeEvaluateSymbolContext().compositeCubeMeasures) {
+            if (parentMeasure && !memberExpressionType &&
+              (
+                this.cubeEvaluator.cubeNameFromPath(parentMeasure) !== cubeName ||
+                this.newMeasure(memberPath).isCumulative()
+              )
+            ) {
+              this.safeEvaluateSymbolContext().compositeCubeMeasures[parentMeasure] = true;
+            }
+          }
+          this.safeEvaluateSymbolContext().currentMeasure = memberPath;
+          if (this.safeEvaluateSymbolContext().leafMeasures) {
+            if (parentMeasure) {
+              this.safeEvaluateSymbolContext().leafMeasures[parentMeasure] = false;
+            }
+            this.safeEvaluateSymbolContext().leafMeasures[this.safeEvaluateSymbolContext().currentMeasure] = true;
+          }
+        }
+        const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
+        const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        let sql;
+        if (symbol.type !== 'rank') {
+          sql = symbol.sql && this.evaluateSql(cubeName, symbol.sql) ||
             primaryKeys.length && (
               primaryKeys.length > 1 ?
                 this.concatStringsSql(primaryKeys.map((pk) => this.castToString(this.primaryKeySql(pk, cubeName))))
                 : this.primaryKeySql(primaryKeys[0], cubeName)
-            ) || '*'
+            ) || '*';
+        }
+        const result = this.renderSqlMeasure(
+          name,
+          sql && this.applyMeasureFilters(
+            this.autoPrefixWithCubeName(
+              cubeName,
+              sql
+            ),
+            symbol,
+            cubeName
           ),
           symbol,
-          cubeName
-        ),
-        symbol,
-        cubeName,
-        parentMeasure
-      );
-      if (
-        this.safeEvaluateSymbolContext().compositeCubeMeasures ||
-        this.safeEvaluateSymbolContext().leafMeasures
-      ) {
-        this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
-      }
-      return result;
-    } else if (type === 'dimension') {
-      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
-        return this.evaluateSymbolContext.renderedReference[memberPath];
-      }
-      if (symbol.subQuery) {
-        if (this.safeEvaluateSymbolContext().subQueryDimensions) {
-          this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
-        }
-        return this.escapeColumnName(this.aliasName(memberPath));
-      }
-      if (symbol.case) {
-        return this.renderDimensionCase(symbol, cubeName);
-      } else if (symbol.type === 'geo') {
-        return this.concatStringsSql([
-          this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
-          '\',\'',
-          this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
-        ]);
-      } else {
-        let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
-        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
-          !memberExpressionType &&
-          symbol.type === 'time' &&
-          this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+          cubeName,
+          parentMeasure,
+          orderBySql,
+        );
+        if (
+          this.safeEvaluateSymbolContext().compositeCubeMeasures ||
+          this.safeEvaluateSymbolContext().leafMeasures
         ) {
-          res = this.convertTz(res);
+          this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
         }
-        return res;
+        return result;
+      } else if (type === 'dimension') {
+        if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+          return this.evaluateSymbolContext.renderedReference[memberPath];
+        }
+        // if (symbol.postAggregate) {
+        //   const orderBySql = (symbol.orderBy || []).map(o => ({ sql: this.evaluateSql(cubeName, o.sql), dir: o.dir }));
+        //   const partitionBy = this.postAggregateDimensions.length ? `PARTITION BY ${this.postAggregateDimensions.map(d => d.dimensionSql()).join(', ')} ` : '';
+        //   if (symbol.type === 'rank') {
+        //     return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
+        //   }
+        // }
+        if (symbol.subQuery) {
+          if (this.safeEvaluateSymbolContext().subQueryDimensions) {
+            this.safeEvaluateSymbolContext().subQueryDimensions.push(memberPath);
+          }
+          return this.escapeColumnName(this.aliasName(memberPath));
+        }
+        if (symbol.case) {
+          return this.renderDimensionCase(symbol, cubeName);
+        } else if (symbol.type === 'geo') {
+          return this.concatStringsSql([
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
+            '\',\'',
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
+          ]);
+        } else {
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+            !memberExpressionType &&
+            symbol.type === 'time' &&
+            this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+          ) {
+            res = this.convertTz(res);
+          }
+          return res;
+        }
+      } else if (type === 'segment') {
+        if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
+          return this.evaluateSymbolContext.renderedReference[memberPath];
+        }
+        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
       }
-    } else if (type === 'segment') {
-      if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
-        return this.evaluateSymbolContext.renderedReference[memberPath];
-      }
-      return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
+      return this.evaluateSql(cubeName, symbol.sql);
+    } finally {
+      this.safeEvaluateSymbolContext().currentMember = parentMember;
     }
-    return this.evaluateSql(cubeName, symbol.sql);
   }
 
   autoPrefixAndEvaluateSql(cubeName, sql) {
@@ -1847,7 +2188,7 @@ export class BaseQuery {
   primaryKeyNames(cubeName) {
     const primaryKeys = this.cubeEvaluator.primaryKeys[cubeName];
     if (!primaryKeys || !primaryKeys.length) {
-      throw new UserError(`One or more Primary key is required for '${cubeName}`);
+      throw new UserError(`One or more Primary key is required for '${cubeName}' cube`);
     }
     return primaryKeys.map((pk) => this.primaryKeyName(cubeName, pk));
   }
@@ -1932,23 +2273,25 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
-  collectMultipliedMeasures(fn) {
-    const foundCompositeCubeMeasures = {};
-    this.evaluateSymbolSqlWithContext(
-      fn,
-      { compositeCubeMeasures: foundCompositeCubeMeasures }
-    );
+  collectMultipliedMeasures(context) {
+    return (fn) => {
+      const foundCompositeCubeMeasures = {};
+      this.evaluateSymbolSqlWithContext(
+        fn,
+        { ...context, compositeCubeMeasures: foundCompositeCubeMeasures }
+      );
 
-    const renderContext = {
-      measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {}, rootMeasure: {}
+      const renderContext = {
+        ...context, measuresToRender: [], foundCompositeCubeMeasures, compositeCubeMeasures: {}, rootMeasure: {}
+      };
+      this.evaluateSymbolSqlWithContext(
+        fn,
+        renderContext
+      );
+      return renderContext.measuresToRender.length ?
+        R.uniq(renderContext.measuresToRender) :
+        [renderContext.rootMeasure.value];
     };
-    this.evaluateSymbolSqlWithContext(
-      fn,
-      renderContext
-    );
-    return renderContext.measuresToRender.length ?
-      R.uniq(renderContext.measuresToRender) :
-      [renderContext.rootMeasure.value];
   }
 
   collectLeafMeasures(fn) {
@@ -1976,25 +2319,27 @@ export class BaseQuery {
     }
   }
 
-  renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure) {
+  renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql) {
     const multiplied = this.multipliedJoinRowResult(cubeName);
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
-      symbol.type === 'number' && evaluateSql === 'count(*)' ||
       symbol.type === 'countDistinct' ||
-      symbol.type === 'count' && !symbol.sql)
-    ) {
+      !this.safeEvaluateSymbolContext().hasMultipliedForPreAggregation && (
+        symbol.type === 'number' && evaluateSql === 'count(*)' ||
+        symbol.type === 'count' && !symbol.sql
+      )
+    )) {
       resultMultiplied = false;
     }
     if (parentMeasure &&
       (this.safeEvaluateSymbolContext().foundCompositeCubeMeasures || {})[parentMeasure] &&
       !(this.safeEvaluateSymbolContext().foundCompositeCubeMeasures || {})[measurePath]
     ) {
-      this.safeEvaluateSymbolContext().measuresToRender.push({ multiplied: resultMultiplied, measure: measurePath });
+      this.safeEvaluateSymbolContext().measuresToRender.push({ multiplied: resultMultiplied, measure: measurePath, postAggregate: symbol.postAggregate });
     }
     if (this.safeEvaluateSymbolContext().foundCompositeCubeMeasures && !parentMeasure) {
-      this.safeEvaluateSymbolContext().rootMeasure.value = { multiplied: resultMultiplied, measure: measurePath };
+      this.safeEvaluateSymbolContext().rootMeasure.value = { multiplied: resultMultiplied, measure: measurePath, postAggregate: symbol.postAggregate };
     }
     if (((this.evaluateSymbolContext || {}).renderedReference || {})[measurePath]) {
       return this.evaluateSymbolContext.renderedReference[measurePath];
@@ -2007,7 +2352,7 @@ export class BaseQuery {
     }
     if (this.ungrouped) {
       if (symbol.type === 'count' || symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox') {
-        const sql = symbol.type === 'countDistinct' || symbol.type === 'countDistinctApprox' ? evaluateSql : this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: `1` }]);
+        const sql = this.caseWhenStatement([{ sql: `(${evaluateSql}) IS NOT NULL`, label: '1' }]);
         return evaluateSql === '*' ? '1' : sql;
       } else {
         return evaluateSql;
@@ -2024,6 +2369,33 @@ export class BaseQuery {
       );
       if (onGroupedColumn) {
         return onGroupedColumn;
+      }
+    }
+    if (symbol.postAggregate) {
+      const partitionBy = (this.postAggregateDimensions.length || this.postAggregateTimeDimensions.length) ?
+        `PARTITION BY ${this.postAggregateDimensions.concat(this.postAggregateTimeDimensions).map(d => d.dimensionSql()).join(', ')} ` : '';
+      if (symbol.type === 'rank') {
+        return `${symbol.type}() OVER (${partitionBy}ORDER BY ${orderBySql.map(o => `${o.sql} ${o.dir}`).join(', ')})`;
+      }
+      if (!(
+        R.equals(this.postAggregateDimensions.map(d => d.expressionPath()), this.dimensions.map(d => d.expressionPath())) &&
+        R.equals(this.postAggregateTimeDimensions.map(d => d.expressionPath()), this.timeDimensions.map(d => d.expressionPath()))
+      )) {
+        let funDef;
+        if (symbol.type === 'countDistinctApprox') {
+          funDef = this.countDistinctApprox(evaluateSql);
+        } else if (symbol.type === 'countDistinct' || symbol.type === 'count' && !symbol.sql && multiplied) {
+          funDef = `count(distinct ${evaluateSql})`;
+        } else if (BaseQuery.isCalculatedMeasureType(symbol.type)) {
+          // TODO calculated measure type will be ungrouped
+          // if (this.postAggregateDimensions.length !== this.dimensions.length) {
+          //   throw new UserError(`Calculated measure '${measurePath}' uses group_by or reduce_by context modifiers while it isn't allowed`);
+          // }
+          return evaluateSql;
+        } else {
+          funDef = `${symbol.type}(${symbol.type}(${evaluateSql}))`;
+        }
+        return `${funDef} OVER(${partitionBy})`;
       }
     }
     if (symbol.type === 'countDistinctApprox') {
@@ -2501,7 +2873,8 @@ export class BaseQuery {
         DATE: 'DATE({{ args_concat }})',
       },
       statements: {
-        select: 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+        select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
           ') AS {{ from_alias }}' +
@@ -2513,7 +2886,7 @@ export class BaseQuery {
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
-        case: 'CASE{% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
+        case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',

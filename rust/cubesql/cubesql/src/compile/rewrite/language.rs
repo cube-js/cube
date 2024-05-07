@@ -406,6 +406,7 @@ macro_rules! variant_field_struct {
                 Operator::Multiply => "*",
                 Operator::Divide => "/",
                 Operator::Modulo => "%",
+                Operator::Exponentiate => "^",
                 Operator::And => "AND",
                 Operator::Or => "OR",
                 Operator::Like => "LIKE",
@@ -695,6 +696,8 @@ macro_rules! __plan_to_language {
         $($type_decl)*
 
         impl egg::Language for $name {
+            type Discriminant = std::mem::Discriminant<Self>;
+
             #[inline(always)]
             fn matches(&self, other: &Self) -> bool {
                 ::std::mem::discriminant(self) == ::std::mem::discriminant(other) &&
@@ -703,6 +706,7 @@ macro_rules! __plan_to_language {
 
             fn children(&self) -> &[egg::Id] { match self $children }
             fn children_mut(&mut self) -> &mut [egg::Id] { match self $children_mut }
+            fn discriminant(&self) -> Self::Discriminant { std::mem::discriminant(self) }
         }
 
         impl ::std::fmt::Display for $name {

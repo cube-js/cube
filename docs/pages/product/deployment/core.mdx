@@ -14,6 +14,18 @@ can vary significantly depending on desired performance and scale.
 
 </WarningBox>
 
+<InfoBox>
+
+If you'd like to deploy Cube to [Kubernetes](https://kubernetes.io), please
+refer to the following resources with Helm charts:
+[`gadsme/charts`](https://github.com/gadsme/charts) or
+[`OpstimizeIcarus/cubejs-helm-charts-kubernetes`](https://github.com/OpstimizeIcarus/cubejs-helm-charts-kubernetes/tree/release-v0.1).
+
+These resources are community-maintained, and they are not maintained by the
+Cube team. Please direct questions related to these resources to their authors.
+
+</InfoBox>
+
 ## Prerequisites
 
 - [Docker Desktop][link-docker-app]
@@ -55,7 +67,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -73,7 +85,7 @@ services:
     image: cubejs/cube:latest
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -208,7 +220,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -273,7 +285,7 @@ services:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router

@@ -83,7 +83,7 @@ export interface OrchestratorInitedOptions {
 
 export interface RequestContext {
   // @deprecated Renamed to securityContext, please use securityContext.
-  authInfo: any;
+  authInfo?: any;
   securityContext: any;
   requestId: string;
 }
@@ -214,7 +214,7 @@ export interface CreateOptions {
   // Internal flag, that we use to detect serverless env
   serverless?: boolean;
   allowNodeRequire?: boolean;
-  semanticLayerSync?: () => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
+  semanticLayerSync?: (context: RequestContext) => Promise<BiToolSyncConfig[]> | BiToolSyncConfig[];
 }
 
 export interface DriverDecoratedOptions extends CreateOptions {
@@ -230,6 +230,7 @@ export type ServerCoreInitializedOptions = Required<
   'telemetry' |
   'dashboardAppPath' |
   'dashboardAppPort' |
+  'schemaPath' |
   'driverFactory' |
   'dialectFactory' |
   'externalDriverFactory' |

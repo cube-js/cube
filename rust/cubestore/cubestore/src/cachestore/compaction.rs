@@ -4,14 +4,15 @@ use crate::metastore::{
 use crate::TableId;
 
 use chrono::{DateTime, Utc};
-use log::trace;
-use rocksdb::compaction_filter::CompactionFilter;
-use rocksdb::compaction_filter_factory::{CompactionFilterContext, CompactionFilterFactory};
-use rocksdb::CompactionDecision;
+use cuberockstore::rocksdb::compaction_filter::CompactionFilter;
+use cuberockstore::rocksdb::compaction_filter_factory::{
+    CompactionFilterContext, CompactionFilterFactory,
+};
+use cuberockstore::rocksdb::CompactionDecision;
+use log::{error, trace, warn};
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
 use std::sync::{Arc, Mutex};
-use tracing::{error, warn};
 
 pub struct MetaStoreCacheCompactionFilter {
     name: CString,
@@ -249,7 +250,7 @@ mod tests {
     use crate::metastore::{BaseRocksSecondaryIndex, RocksTable};
     use crate::TableId;
     use chrono::Duration;
-    use rocksdb::compaction_filter::Decision;
+    use cuberockstore::rocksdb::compaction_filter::Decision;
     use serde::Serialize;
 
     fn get_test_filter_context() -> CompactionFilterContext {

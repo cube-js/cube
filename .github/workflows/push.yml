@@ -7,9 +7,7 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/cubestore/js-wrapper/**'
-      - 'rust/cubestore/tsconfig.json'
-      - 'rust/cubestore/package.json'
+      - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
@@ -24,9 +22,7 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/cubestore/js-wrapper/**'
-      - 'rust/cubestore/tsconfig.json'
-      - 'rust/cubestore/package.json'
+      - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
@@ -44,7 +40,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x, 18.x]
+        node-version: [18.x, 20.x]
       fail-fast: false
 
     steps:
@@ -97,7 +93,7 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
       - uses: codecov/codecov-action@v1
-        if: (matrix.node-version == '16.x')
+        if: (matrix.node-version == '18.x')
         with:
           files: ./packages/*/coverage/clover.xml
           flags: cube-backend
@@ -118,10 +114,10 @@ jobs:
           toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
@@ -165,10 +161,10 @@ jobs:
           toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
@@ -225,23 +221,16 @@ jobs:
           df -h
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
           # Separate path for release key to protect cache bloating
           shared-key: cubestore-release
           key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4 --release
+      - name: Build Cube Store
+        run: |
+          cd rust/cubestore
+          cargo build --release -j 4
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
         uses: actions/upload-artifact@v3
         with:
@@ -257,7 +246,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [18.x]
       fail-fast: false
 
     steps:
@@ -330,7 +319,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [16.x]
+        node-version: [18.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi'
@@ -387,7 +376,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 16.x ]
+        node-version: [ 18.x ]
       fail-fast: false
 
     steps:
@@ -547,10 +536,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 16.x
+      - name: Use Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT

@@ -38,7 +38,6 @@ import {
   PreAggsSelector,
   PreAggJob,
   PreAggJobStatusItem,
-  PreAggJobStatusObject,
   PreAggJobStatusResponse,
   SqlApiRequest, MetaResponseResultFn,
 } from './types/request';
@@ -904,105 +903,98 @@ class ApiGateway {
     tokens: string[],
     resType = 'array',
   ): Promise<PreAggJobStatusResponse> {
-    const objResponse: PreAggJobStatusObject = {};
-    const selector: PreAggJob[] = await this
+    const jobs: { job: PreAggJob | null, token: string }[] = await this
       .refreshScheduler()
       .getCachedBuildJobs(context, tokens);
+
     const metaCache: Map<string, any> = new Map();
-    const promise: Promise<(PreAggJobStatusItem | undefined)[]> = Promise.all(
-      selector.map(async (selected, i) => {
-        const ctx = { ...context, ...selected.context };
+
+    const response: PreAggJobStatusItem[] = await Promise.all(
+      jobs.map(async ({ job, token }) => {
+        if (!job) {
+          return {
+            token,
+            status: 'not_found',
+          };
+        }
+
+        const ctx = { ...context, ...job.context };
         const orchestrator = await this.getAdapterApi(ctx);
         const compiler = await this.getCompilerApi(ctx);
-        const sel: PreAggsSelector = {
-          cubes: [selected.preagg.split('.')[0]],
-          preAggregations: [selected.preagg],
-          contexts: [selected.context],
-          timezones: [selected.timezone],
-          dataSources: [selected.dataSource],
+        const selector: PreAggsSelector = {
+          cubes: [job.preagg.split('.')[0]],
+          preAggregations: [job.preagg],
+          contexts: [job.context],
+          timezones: [job.timezone],
+          dataSources: [job.dataSource],
         };
         if (
-          selected.status.indexOf('done') === 0 ||
-          selected.status.indexOf('failure') === 0
+          job.status.indexOf('done') === 0 ||
+          job.status.indexOf('failure') === 0
         ) {
           // returning from the cache
-          if (resType === 'object') {
-            objResponse[tokens[i]] = {
-              table: selected.target,
-              status: selected.status,
-              selector: sel,
-            };
-          } else {
-            return {
-              token: tokens[i],
-              table: selected.target,
-              status: selected.status,
-              selector: sel,
-            };
-          }
+          return {
+            token,
+            table: job.target,
+            status: job.status,
+            selector,
+          };
         } else {
           // checking the queue
           const status = await this.getPreAggJobQueueStatus(
             orchestrator,
-            selected,
+            job,
           );
           if (status) {
             // returning queued status
-            if (resType === 'object') {
-              objResponse[tokens[i]] = {
-                table: selected.target,
-                status,
-                selector: sel,
-              };
-            } else {
-              return {
-                token: tokens[i],
-                table: selected.target,
-                status,
-                selector: sel,
-              };
-            }
+            return {
+              token,
+              table: job.target,
+              status,
+              selector,
+            };
           } else {
-            const key = JSON.stringify(ctx);
-            if (!metaCache.has(key)) {
-              metaCache.set(key, await compiler.metaConfigExtended(ctx));
+            const metaCacheKey = JSON.stringify(ctx);
+            if (!metaCache.has(metaCacheKey)) {
+              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(ctx));
             }
+
             // checking and fetching result status
             const s = await this.getPreAggJobResultStatus(
               ctx.requestId,
               orchestrator,
               compiler,
-              metaCache.get(key),
-              selected,
-              tokens[i],
+              metaCache.get(metaCacheKey),
+              job,
+              token,
             );
-            if (resType === 'object') {
-              objResponse[tokens[i]] = {
-                table: selected.target,
-                status: s,
-                selector: sel,
-              };
-            } else {
-              return {
-                token: tokens[i],
-                table: selected.target,
-                status: s,
-                selector: sel,
-              };
-            }
+
+            return {
+              token,
+              table: job.target,
+              status: s,
+              selector,
+            };
           }
         }
-        return undefined;
       })
     );
-    const arrResponse: (PreAggJobStatusItem | undefined)[] = await promise;
-    return resType === 'object'
-      ? objResponse
-      : <PreAggJobStatusItem[]>arrResponse;
+
+    if (resType === 'object') {
+      return response.reduce(
+        (prev, current) => ({
+          [current.token]: { ...current, token: undefined },
+          ...prev
+        }),
+        {}
+      );
+    }
+
+    return response;
   }
 
   /**
-   * Returns PreAggJob status if it still in queue, false otherwose.
+   * Returns PreAggJob status if it still in queue, false otherwise.
    */
   private async getPreAggJobQueueStatus(
     orchestrator: any,
@@ -1051,19 +1043,24 @@ class ApiGateway {
     token: string,
   ): Promise<string> {
     const preaggs = await compiler.preAggregations();
-    const preagg = preaggs.filter(pa => pa.id === job.preagg)[0];
-    const cube = metadata.cubeDefinitions[preagg.cube];
-    const [, status]: [boolean, string] =
-      await orchestrator.isPartitionExist(
-        requestId,
-        preagg.preAggregation.external,
-        cube.dataSource,
-        compiler.preAggregationsSchema,
-        job.target,
-        job.key,
-        token,
-      );
-    return status;
+    const preagg = preaggs.find(pa => pa.id === job.preagg);
+    if (preagg) {
+      const cube = metadata.cubeDefinitions[preagg.cube];
+      const [, status]: [boolean, string] =
+        await orchestrator.isPartitionExist(
+          requestId,
+          preagg.preAggregation.external,
+          cube.dataSource,
+          compiler.preAggregationsSchema,
+          job.target,
+          job.key,
+          token,
+        );
+
+      return status;
+    }
+
+    return 'pre_agg_not_found';
   }
 
   public async getPreAggregationsInQueue(

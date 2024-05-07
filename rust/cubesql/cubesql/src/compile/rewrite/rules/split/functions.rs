@@ -1,6 +1,6 @@
 use crate::compile::rewrite::{
     analysis::LogicalPlanAnalysis, cast_expr, fun_expr, is_not_null_expr, is_null_expr,
-    literal_expr, rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
+    literal_expr, negative_expr, rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -121,6 +121,7 @@ impl SplitRules {
             true,
             rules,
         );
+        self.single_arg_pass_through_rules("negative", |expr| negative_expr(expr), true, rules);
         self.single_arg_split_point_rules(
             "literal",
             || literal_expr("?value".to_string()),

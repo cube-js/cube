@@ -7,7 +7,7 @@ use crate::cachestore::queue_item::{
     QueueResultAckEvent, QueueResultAckEventResult, QueueRetrieveResponse,
 };
 use crate::cachestore::queue_result::{QueueResultRocksIndex, QueueResultRocksTable};
-use crate::cachestore::{compaction, QueueResult};
+use crate::cachestore::{compaction, QueueItemPayload, QueueResult};
 use crate::config::injection::DIService;
 use crate::config::{Config, ConfigObj};
 use std::collections::HashMap;
@@ -22,18 +22,20 @@ use crate::util::WorkerLoop;
 use crate::{app_metrics, CubeError};
 use async_trait::async_trait;
 
+use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Options, DB};
 use futures_timer::Delay;
-use rocksdb::{BlockBasedOptions, Cache, Options, DB};
 
 use crate::cachestore::cache_eviction_manager::{CacheEvictionManager, EvictionResult};
 use crate::cachestore::compaction::CompactionPreloadedState;
 use crate::cachestore::listener::RocksCacheStoreListener;
+use crate::cachestore::queue_item_payload::QueueItemPayloadRocksTable;
 use crate::table::{Row, TableValue};
 use chrono::{DateTime, Utc};
+use cuberockstore::rocksdb;
 use datafusion::cube_ext;
 use deepsize::DeepSizeOf;
 use itertools::Itertools;
-use log::{trace, warn};
+use log::{error, trace, warn};
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -41,9 +43,17 @@ use std::time::Duration;
 use tokio::sync::broadcast::Sender;
 use tokio::task::JoinHandle;
 
-pub(crate) struct RocksCacheStoreDetails {}
+pub(crate) struct RocksCacheStoreDetails {
+    log_enabled: bool,
+}
 
 impl RocksCacheStoreDetails {
+    pub fn new(config: &Arc<dyn ConfigObj>) -> Self {
+        Self {
+            log_enabled: config.cachestore_log_enabled(),
+        }
+    }
+
     pub fn get_compaction_state() -> CompactionPreloadedState {
         let mut indexes = HashMap::new();
 
@@ -78,7 +88,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
         opts.set_compaction_filter_factory(compaction::MetaStoreCacheCompactionFactory::new(
             compaction_state,
         ));
@@ -116,7 +128,9 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         let rocksdb_config = config.cachestore_rocksdb_config();
 
         let mut opts = Options::default();
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
@@ -146,6 +160,7 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
         CacheItemRocksTable::new(table_ref.clone()).migrate()?;
         QueueItemRocksTable::new(table_ref.clone()).migrate()?;
         QueueResultRocksTable::new(table_ref.clone()).migrate()?;
+        QueueItemPayloadRocksTable::new(table_ref.clone()).migrate()?;
 
         table_ref
             .db
@@ -156,6 +171,10 @@ impl RocksStoreDetails for RocksCacheStoreDetails {
 
     fn get_name(&self) -> &'static str {
         &"cachestore"
+    }
+
+    fn log_enabled(&self) -> bool {
+        self.log_enabled
     }
 }
 
@@ -184,12 +203,13 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
         Self::new_from_store(RocksStore::with_listener(
             path,
             vec![],
             metastore_fs,
             config,
-            Arc::new(RocksCacheStoreDetails {}),
+            details,
         )?)
     }
 
@@ -210,14 +230,10 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
-        let store = RocksStore::load_from_dump(
-            path,
-            dump_path,
-            metastore_fs,
-            config,
-            Arc::new(RocksCacheStoreDetails {}),
-        )
-        .await?;
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
+
+        let store =
+            RocksStore::load_from_dump(path, dump_path, metastore_fs, config, details).await?;
 
         Self::new_from_store(store)
     }
@@ -227,8 +243,9 @@ impl RocksCacheStore {
         metastore_fs: Arc<dyn MetaStoreFs>,
         config: Arc<dyn ConfigObj>,
     ) -> Result<Arc<Self>, CubeError> {
+        let details = Arc::new(RocksCacheStoreDetails::new(&config));
         let store = metastore_fs
-            .load_from_remote(&path, config, Arc::new(RocksCacheStoreDetails {}))
+            .load_from_remote(&path, config, details)
             .await?;
 
         Self::new_from_store(store)
@@ -246,7 +263,7 @@ impl RocksCacheStore {
         let mut loops = vec![];
 
         if self.store.config.upload_to_remote() {
-            let upload_interval = self.store.config.meta_store_log_upload_interval();
+            let upload_interval = self.store.config.cachestore_log_upload_interval();
             let cachestore = self.clone();
             loops.push(cube_ext::spawn(async move {
                 cachestore
@@ -430,12 +447,13 @@ impl RocksCacheStore {
 
         let _ = std::fs::remove_dir_all(remote_store_path.clone());
 
-        let details = Arc::new(RocksCacheStoreDetails {});
+        let config_obj = config.config_obj();
+        let details = Arc::new(RocksCacheStoreDetails::new(&config_obj));
         let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
         let store = RocksStore::new(
             store_path.clone().join(details.get_name()).as_path(),
-            BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config.config_obj()),
-            config.config_obj(),
+            BaseRocksStoreFs::new_for_cachestore(remote_fs.clone(), config_obj.clone()),
+            config_obj,
             details,
         )
         .unwrap();
@@ -621,6 +639,35 @@ pub struct QueueAddResponse {
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueAddPayload {
+    pub path: String,
+    pub value: String,
+    pub priority: i64,
+    pub orphaned: Option<u32>,
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueCancelResponse {
+    pub extra: Option<String>,
+    pub value: String,
+}
+
+impl QueueCancelResponse {
+    pub fn into_queue_cancel_row(self) -> Row {
+        let res = vec![
+            TableValue::String(self.value),
+            if let Some(extra) = self.extra {
+                TableValue::String(extra)
+            } else {
+                TableValue::Null
+            },
+        ];
+
+        Row::new(res)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
 pub enum QueueResultResponse {
     Success { value: Option<String> },
 }
@@ -640,6 +687,68 @@ impl QueueResultResponse {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub enum QueueListItem {
+    ItemOnly(IdRow<QueueItem>),
+    WithPayload(IdRow<QueueItem>, String),
+}
+
+impl QueueListItem {
+    pub fn into_queue_list_row(self) -> Row {
+        let (id_row, payload) = match self {
+            QueueListItem::ItemOnly(id_row) => (id_row, None),
+            QueueListItem::WithPayload(id_row, payload) => (id_row, Some(payload)),
+        };
+
+        let row_id = id_row.get_id();
+        let row = id_row.into_row();
+
+        let mut res = vec![
+            TableValue::String(row.key),
+            TableValue::String(row_id.to_string()),
+            TableValue::String(row.status.to_string()),
+            if let Some(extra) = row.extra {
+                TableValue::String(extra)
+            } else {
+                TableValue::Null
+            },
+        ];
+
+        if let Some(payload) = payload {
+            res.push(TableValue::String(payload));
+        };
+
+        Row::new(res)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueGetResponse {
+    extra: Option<String>,
+    payload: String,
+}
+
+impl QueueGetResponse {
+    pub fn into_queue_get_row(self) -> Row {
+        let res = vec![
+            TableValue::String(self.payload),
+            if let Some(extra) = self.extra {
+                TableValue::String(extra)
+            } else {
+                TableValue::Null
+            },
+        ];
+
+        Row::new(res)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
+pub struct QueueAllItem {
+    pub item: IdRow<QueueItem>,
+    pub payload: Option<String>,
+}
+
 #[cuberpc::service]
 pub trait CacheStore: DIService + Send + Sync {
     // cache
@@ -656,13 +765,13 @@ pub trait CacheStore: DIService + Send + Sync {
     async fn cache_incr(&self, key: String) -> Result<IdRow<CacheItem>, CubeError>;
 
     // queue
-    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError>;
     async fn queue_results_all(
         &self,
         limit: Option<usize>,
     ) -> Result<Vec<IdRow<QueueResult>>, CubeError>;
     async fn queue_results_multi_delete(&self, ids: Vec<u64>) -> Result<(), CubeError>;
-    async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError>;
+    async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError>;
     async fn queue_truncate(&self) -> Result<(), CubeError>;
     async fn queue_to_cancel(
         &self,
@@ -675,10 +784,11 @@ pub trait CacheStore: DIService + Send + Sync {
         prefix: String,
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
-    ) -> Result<Vec<IdRow<QueueItem>>, CubeError>;
+        with_payload: bool,
+    ) -> Result<Vec<QueueListItem>, CubeError>;
     // API with Path
-    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
-    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError>;
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError>;
+    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError>;
     async fn queue_heartbeat(&self, key: QueueKey) -> Result<(), CubeError>;
     async fn queue_retrieve_by_path(
         &self,
@@ -880,9 +990,32 @@ impl CacheStore for RocksCacheStore {
         Ok(item)
     }
 
-    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError> {
         self.store
-            .read_operation(move |db_ref| Ok(QueueItemRocksTable::new(db_ref).scan_rows(limit)?))
+            .read_operation(move |db_ref| {
+                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+
+                let mut res = Vec::new();
+
+                for item in queue_schema.scan_rows(limit)? {
+                    let payload =
+                        if let Some(payload) = queue_payload_schema.get_row(item.get_id())? {
+                            Some(payload.into_row().value)
+                        } else {
+                            error!(
+                                "Unable to find payload for queue item, id = {}",
+                                item.get_id()
+                            );
+
+                            None
+                        };
+
+                    res.push(QueueAllItem { item, payload })
+                }
+
+                Ok(res)
+            })
             .await
     }
 
@@ -909,27 +1042,43 @@ impl CacheStore for RocksCacheStore {
             .await
     }
 
-    async fn queue_add(&self, item: QueueItem) -> Result<QueueAddResponse, CubeError> {
+    async fn queue_add(&self, payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
                 let pending = queue_schema.count_rows_by_index(
                     &QueueItemIndexKey::ByPrefixAndStatus(
-                        item.get_prefix().clone().unwrap_or("".to_string()),
+                        QueueItem::extract_prefix(payload.path.clone()).unwrap_or("".to_string()),
                         QueueItemStatus::Pending,
                     ),
                     &QueueItemRocksIndex::ByPrefixAndStatus,
                 )?;
 
-                let index_key = QueueItemIndexKey::ByPath(item.get_path());
+                let index_key = QueueItemIndexKey::ByPath(payload.path.clone());
                 let id_row_opt = queue_schema
                     .get_single_opt_row_by_index(&index_key, &QueueItemRocksIndex::ByPath)?;
 
                 let (id, added) = if let Some(row) = id_row_opt {
                     (row.id, false)
                 } else {
-                    let row = queue_schema.insert(item, batch_pipe)?;
-                    (row.id, true)
+                    let queue_item_row = queue_schema.insert(
+                        QueueItem::new(
+                            payload.path,
+                            QueueItem::status_default(),
+                            payload.priority,
+                            payload.orphaned.clone(),
+                        ),
+                        batch_pipe,
+                    )?;
+
+                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                    queue_payload_schema.insert_with_pk(
+                        queue_item_row.id,
+                        QueueItemPayload::new(payload.value, payload.orphaned),
+                        batch_pipe,
+                    )?;
+
+                    (queue_item_row.id, true)
                 };
 
                 Ok(QueueAddResponse {
@@ -985,7 +1134,8 @@ impl CacheStore for RocksCacheStore {
         prefix: String,
         status_filter: Option<QueueItemStatus>,
         priority_sort: bool,
-    ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+        with_payload: bool,
+    ) -> Result<Vec<QueueListItem>, CubeError> {
         self.store
             .read_operation(move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
@@ -999,35 +1149,91 @@ impl CacheStore for RocksCacheStore {
                     queue_schema.get_rows_by_index(&index_key, &QueueItemRocksIndex::ByPrefix)?
                 };
 
-                if priority_sort {
-                    Ok(items
+                let items = if priority_sort {
+                    items
                         .into_iter()
                         .sorted_by(|a, b| b.row.cmp(&a.row))
-                        .collect())
+                        .collect()
                 } else {
-                    Ok(items)
+                    items
+                };
+
+                if with_payload {
+                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                    let mut res = Vec::with_capacity(items.len());
+
+                    for item in items {
+                        if let Some(payload_row) = queue_payload_schema.get_row(item.get_id())? {
+                            res.push(QueueListItem::WithPayload(
+                                item,
+                                payload_row.into_row().value,
+                            ));
+                        } else {
+                            res.push(QueueListItem::ItemOnly(item));
+                        }
+                    }
+
+                    Ok(res)
+                } else {
+                    Ok(items
+                        .into_iter()
+                        .map(|item| QueueListItem::ItemOnly(item))
+                        .collect())
                 }
             })
             .await
     }
 
-    async fn queue_get(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
         self.store
             .read_operation(move |db_ref| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                queue_schema.get_row_by_key(key)
+
+                if let Some(item_row) = queue_schema.get_row_by_key(key)? {
+                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+
+                    if let Some(payload_row) = queue_payload_schema.get_row(item_row.get_id())? {
+                        Ok(Some(QueueGetResponse {
+                            extra: item_row.into_row().extra,
+                            payload: payload_row.into_row().value,
+                        }))
+                    } else {
+                        error!(
+                            "Unable to find payload for queue item, id = {}",
+                            item_row.get_id()
+                        );
+
+                        Ok(None)
+                    }
+                } else {
+                    Ok(None)
+                }
             })
             .await
     }
 
-    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_cancel(&self, key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_schema = QueueItemRocksTable::new(db_ref.clone());
-                let id_row_opt = queue_schema.get_row_by_key(key)?;
+                let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                if let Some(id_row) = id_row_opt {
-                    Ok(Some(queue_schema.delete_row(id_row, batch_pipe)?))
+                if let Some(id_row) = queue_schema.get_row_by_key(key)? {
+                    let row_id = id_row.get_id();
+                    let queue_item = queue_schema.delete_row(id_row, batch_pipe)?;
+
+                    if let Some(queue_payload) =
+                        queue_payload_schema.try_delete(row_id, batch_pipe)?
+                    {
+                        Ok(Some(QueueCancelResponse {
+                            extra: queue_item.into_row().extra,
+                            value: queue_payload.into_row().value,
+                        }))
+                    } else {
+                        error!("Unable to find payload for queue item, id = {}", row_id);
+
+                        Ok(None)
+                    }
                 } else {
                     Ok(None)
                 }
@@ -1102,14 +1308,29 @@ impl CacheStore for RocksCacheStore {
                     // without that created datetime will be used for orphaned filtering
                     new.update_heartbeat();
 
+                    let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+
                     let res =
                         queue_schema.update(id_row.get_id(), new, id_row.get_row(), batch_pipe)?;
+                    let payload = if let Some(r) = queue_payload_schema.get_row(res.get_id())? {
+                        r.into_row().value
+                    } else {
+                        error!(
+                            "Unable to find payload for queue item, id = {}",
+                            res.get_id()
+                        );
+
+                        queue_schema.delete_row(res, batch_pipe)?;
+
+                        return Ok(QueueRetrieveResponse::NotFound { pending, active });
+                    };
 
                     active.push(res.get_row().get_key().clone());
                     pending -= 1;
 
                     Ok(QueueRetrieveResponse::Success {
                         id: id_row.get_id(),
+                        payload,
                         item: res.into_row(),
                         pending,
                         active,
@@ -1144,7 +1365,7 @@ impl CacheStore for RocksCacheStore {
                             id,
                             path,
                             result: QueueResultAckEventResult::WithResult {
-                                result: result_row.into_row().value,
+                                result: Arc::new(result_row.into_row().value),
                             },
                         }));
                     } else {
@@ -1209,7 +1430,7 @@ impl CacheStore for RocksCacheStore {
                         }
 
                         Ok(Some(QueueResultResponse::Success {
-                            value: Some(result),
+                            value: Some(result.to_string()),
                         }))
                     }
                 },
@@ -1342,7 +1563,7 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! cache_incr was used.")
     }
 
-    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+    async fn queue_all(&self, _limit: Option<usize>) -> Result<Vec<QueueAllItem>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_all was used.")
     }
 
@@ -1357,7 +1578,7 @@ impl CacheStore for ClusterCacheStoreClient {
         panic!("CacheStore cannot be used on the worker node! queue_results_multi_delete was used.")
     }
 
-    async fn queue_add(&self, _item: QueueItem) -> Result<QueueAddResponse, CubeError> {
+    async fn queue_add(&self, _payload: QueueAddPayload) -> Result<QueueAddResponse, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_add was used.")
     }
 
@@ -1379,15 +1600,16 @@ impl CacheStore for ClusterCacheStoreClient {
         _prefix: String,
         _status_filter: Option<QueueItemStatus>,
         _priority_sort: bool,
-    ) -> Result<Vec<IdRow<QueueItem>>, CubeError> {
+        _with_payload: bool,
+    ) -> Result<Vec<QueueListItem>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_list was used.")
     }
 
-    async fn queue_get(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_get(&self, _key: QueueKey) -> Result<Option<QueueGetResponse>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_get was used.")
     }
 
-    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<IdRow<QueueItem>>, CubeError> {
+    async fn queue_cancel(&self, _key: QueueKey) -> Result<Option<QueueCancelResponse>, CubeError> {
         panic!("CacheStore cannot be used on the worker node! queue_cancel was used.")
     }
 
@@ -1821,43 +2043,19 @@ mod tests {
         let now = Utc::now();
         let item_pending_custom_orphaned = IdRow::new(
             1,
-            QueueItem::new(
-                "1".to_string(),
-                "1".to_string(),
-                QueueItemStatus::Pending,
-                1,
-                Some(10),
-            ),
+            QueueItem::new("1".to_string(), QueueItemStatus::Pending, 1, Some(10)),
         );
         let item_pending_custom_orphaned_expired = IdRow::new(
             2,
-            QueueItem::new(
-                "2".to_string(),
-                "2".to_string(),
-                QueueItemStatus::Pending,
-                1,
-                Some(1),
-            ),
+            QueueItem::new("2".to_string(), QueueItemStatus::Pending, 1, Some(1)),
         );
         let item_active_custom_orphaned = IdRow::new(
             3,
-            QueueItem::new(
-                "3".to_string(),
-                "3".to_string(),
-                QueueItemStatus::Active,
-                1,
-                Some(10),
-            ),
+            QueueItem::new("3".to_string(), QueueItemStatus::Active, 1, Some(10)),
         );
         let mut item_active_custom_orphaned_expired = IdRow::new(
             4,
-            QueueItem::new(
-                "4".to_string(),
-                "4".to_string(),
-                QueueItemStatus::Active,
-                1,
-                Some(1),
-            ),
+            QueueItem::new("4".to_string(), QueueItemStatus::Active, 1, Some(1)),
         );
 
         assert_eq!(

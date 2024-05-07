@@ -1,7 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use cuberockstore::rocksdb;
 use cubestore_sql_tests::cubestore_benches;
-use rocksdb::{Options, DB};
 use std::fs;
+use std::time::Duration;
 use tokio::runtime::Builder;
 
 fn in_process_bench(criterion: &mut Criterion) {
@@ -36,10 +37,12 @@ fn in_process_bench(criterion: &mut Criterion) {
             runtime.block_on(async {
                 services.stop_processing_loops().await.unwrap();
             });
+            // TODO: Drop runtime after test, stop_processing_loops doesn't stop all
+            runtime.shutdown_timeout(Duration::from_secs(2));
         }
 
-        let _ = DB::destroy(&Options::default(), config.meta_store_path());
-        let _ = DB::destroy(&Options::default(), config.cache_store_path());
+        let _ = rocksdb::DB::destroy(&rocksdb::Options::default(), config.meta_store_path());
+        let _ = rocksdb::DB::destroy(&rocksdb::Options::default(), config.cache_store_path());
         let _ = fs::remove_dir_all(config.local_dir().clone());
     }
 }

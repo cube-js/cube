@@ -9,10 +9,12 @@ use async_trait::async_trait;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use datafusion::cube_ext;
 
+use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
+use cuberockstore::rocksdb::checkpoint::Checkpoint;
+use cuberockstore::rocksdb::{
+    DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB,
+};
 use log::{info, trace};
-use rocksdb::backup::{BackupEngine, BackupEngineOptions, RestoreOptions};
-use rocksdb::checkpoint::Checkpoint;
-use rocksdb::{DBCompressionType, Env, Snapshot, WriteBatch, WriteBatchIterator, DB};
 use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::collections::HashMap;
@@ -21,6 +23,7 @@ use std::io::{Cursor, Write};
 
 use crate::metastore::snapshot_info::SnapshotInfo;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, Utc};
+use cuberockstore::rocksdb;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
@@ -32,12 +35,16 @@ use tokio::sync::{oneshot, Mutex as AsyncMutex, Notify, RwLock};
 
 macro_rules! enum_from_primitive_impl {
     ($name:ident, $( $variant:ident )*) => {
-        impl From<u32> for $name {
-            fn from(n: u32) -> Self {
+        impl TryFrom<u32> for $name {
+            type Error = crate::CubeError;
+
+            fn try_from(n: u32) -> Result<Self, Self::Error> {
                 $( if n == $name::$variant as u32 {
-                    $name::$variant
+                    Ok($name::$variant)
                 } else )* {
-                    panic!("Unknown {}: {}", stringify!($name), n);
+                    Err(crate::CubeError::internal(
+                        format!("Unknown {}: {}", stringify!($name), n)
+                    ))
                 }
             }
         }
@@ -76,7 +83,8 @@ enum_from_primitive! {
         CacheItems = 0x0C00,
         QueueItems = 0x0D00,
         QueueResults = 0x0E00,
-        TraceObjects = 0x0F00
+        TraceObjects = 0x0F00,
+        QueueItemPayload = 0x1000
 
     }
 }
@@ -99,6 +107,7 @@ impl TableId {
             TableId::QueueItems => true,
             TableId::QueueResults => true,
             TableId::TraceObjects => false,
+            TableId::QueueItemPayload => true,
         }
     }
 }
@@ -394,16 +403,16 @@ impl RowKey {
         let mut reader = Cursor::new(bytes);
         match reader.read_u8()? {
             1 => Ok(RowKey::Table(
-                TableId::from(reader.read_u32::<BigEndian>()?),
+                TableId::try_from(reader.read_u32::<BigEndian>()?)?,
                 {
                     // skip zero for fixed key padding
                     reader.read_u64::<BigEndian>()?;
                     reader.read_u64::<BigEndian>()?
                 },
             )),
-            2 => Ok(RowKey::Sequence(TableId::from(
+            2 => Ok(RowKey::Sequence(TableId::try_from(
                 reader.read_u32::<BigEndian>()?,
-            ))),
+            )?)),
             3 => {
                 let table_id = IndexId::from(reader.read_u32::<BigEndian>()?);
                 let mut secondary_key: SecondaryKey = SecondaryKey::new();
@@ -421,7 +430,7 @@ impl RowKey {
                 Ok(RowKey::SecondaryIndexInfo { index_id })
             }
             5 => {
-                let table_id = TableId::from(reader.read_u32::<BigEndian>()?);
+                let table_id = TableId::try_from(reader.read_u32::<BigEndian>()?)?;
 
                 Ok(RowKey::TableInfo { table_id })
             }
@@ -433,7 +442,7 @@ impl RowKey {
         RowKey::try_from_bytes(bytes).unwrap()
     }
 
-    pub fn to_iterate_range(&self) -> impl rocksdb::IterateBounds {
+    pub fn to_iterate_range(&self) -> std::ops::Range<Vec<u8>> {
         let mut min = Vec::with_capacity(5);
         let mut max = Vec::with_capacity(5);
 
@@ -556,11 +565,11 @@ impl WriteBatchContainer {
         batch
     }
 
-    pub async fn write_to_file(&self, file_name: &str) -> Result<(), CubeError> {
-        let mut ser = flexbuffers::FlexbufferSerializer::new();
-        self.serialize(&mut ser)?;
+    pub async fn write_to_file(self, file_name: &str) -> Result<(), CubeError> {
+        let serialized = flexbuffers::to_vec(self)?;
+
         let mut file = File::create(file_name).await?;
-        Ok(tokio::io::AsyncWriteExt::write_all(&mut file, ser.view()).await?)
+        Ok(tokio::io::AsyncWriteExt::write_all(&mut file, &serialized).await?)
     }
 
     pub async fn read_from_file(file_name: &str) -> Result<Self, CubeError> {
@@ -785,6 +794,8 @@ pub trait RocksStoreDetails: Send + Sync {
     fn migrate(&self, table_ref: DbTableRef) -> Result<(), CubeError>;
 
     fn get_name(&self) -> &'static str;
+
+    fn log_enabled(&self) -> bool;
 }
 
 #[derive(Clone)]
@@ -927,6 +938,11 @@ impl RocksStore {
         let meta_store_to_move = meta_store.clone();
 
         cube_ext::spawn_blocking(move || {
+            trace!(
+                "Migration for {}: started",
+                meta_store_to_move.details.get_name()
+            );
+
             let table_ref = DbTableRef {
                 db: &meta_store_to_move.db,
                 snapshot: &meta_store_to_move.db.snapshot(),
@@ -939,6 +955,11 @@ impl RocksStore {
                     "Error during {} migration: {}",
                     meta_store_to_move.details.get_name(),
                     e
+                );
+            } else {
+                trace!(
+                    "Migration for {}: done",
+                    meta_store_to_move.details.get_name()
                 );
             }
         })
@@ -1041,52 +1062,53 @@ impl RocksStore {
 
     pub async fn run_upload(&self) -> Result<(), CubeError> {
         let time = SystemTime::now();
-        trace!("Persisting {} snapshot", self.details.get_name());
+        trace!("Persisting {}", self.details.get_name());
 
         let last_check_seq = self.last_check_seq().await;
         let last_db_seq = self.db.latest_sequence_number();
         if last_check_seq == last_db_seq {
-            trace!(
-                "Persisting {} snapshot: nothing to update",
-                self.details.get_name()
-            );
+            trace!("Persisting {}: nothing to update", self.details.get_name());
             return Ok(());
         }
 
-        let last_upload_seq = self.last_upload_seq().await;
-        let (serializer, min, max) = {
-            let updates = self.db.get_updates_since(last_upload_seq)?;
-            let mut serializer = WriteBatchContainer::new();
+        if self.details.log_enabled() {
+            let last_upload_seq = self.last_upload_seq().await;
+            let (serializer, min, max) = {
+                let updates = self.db.get_updates_since(last_upload_seq)?;
+                let mut serializer = WriteBatchContainer::new();
 
-            let mut seq_numbers = Vec::new();
-            let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
-            for update in updates.into_iter() {
-                let (n, write_batch) = update?;
-                seq_numbers.push(n);
-                write_batch.iterate(&mut serializer);
-                if serializer.size() > size_limit {
-                    break;
+                let mut seq_numbers = Vec::new();
+                let size_limit = self.config.meta_store_log_upload_size_limit() as usize;
+                for update in updates.into_iter() {
+                    let (n, write_batch) = update?;
+                    seq_numbers.push(n);
+                    write_batch.iterate(&mut serializer);
+                    if serializer.size() > size_limit {
+                        break;
+                    }
                 }
-            }
 
-            (
-                serializer,
-                seq_numbers.iter().min().map(|v| *v),
-                seq_numbers.iter().max().map(|v| *v),
-            )
-        };
-        if max.is_some() {
-            let snapshot_uploaded = self.snapshot_uploaded.read().await;
-            if *snapshot_uploaded {
-                let checkpoint_time = self.last_checkpoint_time.read().await;
-                let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
-                self.metastore_fs
-                    .upload_log(&dir_name, min.unwrap(), &serializer)
-                    .await?;
+                (
+                    serializer,
+                    seq_numbers.iter().min().map(|v| *v),
+                    seq_numbers.iter().max().map(|v| *v),
+                )
+            };
+            if max.is_some() {
+                let snapshot_uploaded = self.snapshot_uploaded.read().await;
+                if *snapshot_uploaded {
+                    let checkpoint_time = self.last_checkpoint_time.read().await;
+                    let dir_name = format!("{}-logs", self.get_store_path(&checkpoint_time));
+                    self.metastore_fs
+                        .upload_log(&dir_name, min.unwrap(), serializer)
+                        .await?;
+                }
+                let mut seq = self.last_upload_seq.write().await;
+                *seq = max.unwrap();
+                self.write_completed_notify.notify_waiters();
             }
-            let mut seq = self.last_upload_seq.write().await;
-            *seq = max.unwrap();
-            self.write_completed_notify.notify_waiters();
+        } else {
+            trace!("Persisting {}: logs are disabled", self.details.get_name());
         }
 
         let last_checkpoint_time: SystemTime = self.last_checkpoint_time.read().await.clone();
@@ -1577,6 +1599,21 @@ mod tests {
             .await
             .unwrap();
     }
+
+    #[test]
+    fn test_row_key_to_iterate_range() -> Result<(), CubeError> {
+        {
+            let row_key = RowKey::Table(TableId::CacheItems, 0);
+            let range = row_key.to_iterate_range();
+
+            assert_eq!(range.start, vec![1, 0, 0, 12, 0]);
+
+            assert_eq!(range.end, vec![1, 0, 0, 12, 1]);
+        }
+
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_snapshot_uploads() -> Result<(), CubeError> {
         let config = Config::test("test_snapshots_uploads").update_config(|mut c| {

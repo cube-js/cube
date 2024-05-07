@@ -1,14 +1,11 @@
 #![feature(test)]
-#![feature(backtrace)]
 #![feature(async_closure)]
-#![feature(drain_filter)]
 #![feature(box_patterns)]
-#![feature(slice_internals)]
 #![feature(vec_into_raw_parts)]
 #![feature(hash_set_entry)]
-#![feature(map_first_last)]
 #![feature(is_sorted)]
 #![feature(result_flattening)]
+#![feature(extract_if)]
 // #![feature(trace_macros)]
 
 // trace_macros!(true);
@@ -200,8 +197,8 @@ impl From<flexbuffers::DeserializationError> for CubeError {
     }
 }
 
-impl From<rocksdb::Error> for CubeError {
-    fn from(v: rocksdb::Error) -> Self {
+impl From<cuberockstore::rocksdb::Error> for CubeError {
+    fn from(v: cuberockstore::rocksdb::Error) -> Self {
         CubeError::from_error(v.into_string())
     }
 }
@@ -325,29 +322,11 @@ impl From<flexbuffers::SerializationError> for CubeError {
     }
 }
 
-impl From<s3::S3Error> for CubeError {
-    fn from(v: s3::S3Error) -> Self {
-        let mut m = format!("AWS S3 error: {}", v);
-        if let Some(data) = v.data {
-            m += ": ";
-            m += &data
-        }
-        CubeError::internal(m)
+impl From<s3::error::S3Error> for CubeError {
+    fn from(v: s3::error::S3Error) -> Self {
+        CubeError::internal(format!("AWS S3 error: {}", v.to_string()))
     }
 }
-
-impl From<awscreds::AwsCredsError> for CubeError {
-    fn from(v: awscreds::AwsCredsError) -> Self {
-        CubeError::user(v.to_string())
-    }
-}
-
-impl From<awsregion::AwsRegionError> for CubeError {
-    fn from(v: awsregion::AwsRegionError) -> Self {
-        CubeError::user(v.to_string())
-    }
-}
-
 impl From<chrono::ParseError> for CubeError {
     fn from(v: chrono::ParseError) -> Self {
         CubeError::from_error(v)

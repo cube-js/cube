@@ -1,0 +1,50 @@
+# Integration with Amazon S3
+
+[Amazon S3](https://aws.amazon.com/s3/) is a popular object storage system.
+This guide demonstrates how to set up Cube Cloud to export logs to Amazon S3.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube
+Cloud.
+
+### Exporting logs
+
+To export logs to Amazon S3, start by creating an S3 bucket for Cube Cloud logs.
+
+Then, configure the [`aws_s3`](https://vector.dev/docs/reference/configuration/sinks/aws_s3/)
+sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+
+Example configuration:
+
+```toml
+[sinks.aws_s3]
+type = "aws_s3"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+bucket = "your-s3-bucket-name"
+region = "us-east-1"
+compression = "gzip"
+
+[sinks.aws_s3.auth]
+access_key_id = "$CUBE_CLOUD_MONITORING_AWS_ACCESS_KEY_ID"
+secret_access_key = "$CUBE_CLOUD_MONITORING_AWS_SECRET_ACCESS_KEY"
+
+[sinks.aws_s3.encoding]
+codec = "json"
+
+[sinks.aws_s3.healthcheck]
+enabled = false
+```
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to your S3 bucket and watch the logs coming.
+
+
+[ref-monitoring-integrations]: /product/monitoring/integrations
+[ref-monitoring-integrations-conf]: /product/monitoring/integrations#configuration

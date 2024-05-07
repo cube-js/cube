@@ -1,4 +1,5 @@
 module.exports = {
+  "publicity": "Publicity",
   "code-reusability-extending-cubes": "Extending cubes",
   "polymorphic-cubes": "Polymorphic cubes",
   "data-blending": "Data blending",

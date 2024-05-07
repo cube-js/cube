@@ -10,6 +10,8 @@ on:
       - 'packages/cubejs-testing-drivers/**'
       - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-server-core/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
@@ -20,6 +22,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
   pull_request:
     paths:
       - '.github/workflows/drivers-tests.yml'
@@ -27,6 +33,8 @@ on:
       - 'packages/cubejs-testing-drivers/**'
       - 'packages/cubejs-testing-shared/**'
       - 'packages/cubejs-query-orchestrator/src/**'
+      - 'packages/cubejs-backend-shared/**'
+      - 'packages/cubejs-server-core/**'
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
 
@@ -37,6 +45,10 @@ on:
       - 'packages/cubejs-mysql-driver/**'
       - 'packages/cubejs-postgres-driver/**'
       - 'packages/cubejs-snowflake-driver/**'
+
+      # To test SQL API Push down
+      - 'packages/cubejs-backend-native/**'
+      - 'rust/cubesql/**'
 
 jobs:
   latest-tag-sha:
@@ -68,12 +80,12 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 16 ]
+        node-version: [ 18 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-30052023
+      image: cubejs/rust-cross:${{ matrix.target }}-02042024
 
     steps:
       - name: Checkout
@@ -186,7 +198,7 @@ jobs:
     strategy:
       matrix:
         node: 
-          - 16.x
+          - 18.x
         database:
           - athena
           - bigquery
@@ -203,17 +215,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
-
-      - name: Install Node.js 16.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19

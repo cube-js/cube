@@ -126,7 +126,7 @@ interface SnowflakeDriverExportGCS {
   bucketType: 'gcs',
   integrationName: string,
   bucketName: string,
-  credentials: object,
+  credentials: any,
 }
 
 export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS;
@@ -579,6 +579,9 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async getCsvFiles(tableName: string): Promise<string[]> {
     const { bucketType, bucketName } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
+    const { credentials } = (
+      <SnowflakeDriverExportGCS> this.config.exportBucket
+    );
     switch (bucketType) {
       case 's3':
         return this.extractUnloadedFilesFromS3(
@@ -601,9 +604,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       case 'gcs':
         return this.extractFilesFromGCS(
           new Storage({
-            credentials: (
-              <SnowflakeDriverExportGCS> this.config.exportBucket
-            ).credentials,
+            credentials,
+            projectId: credentials.project_id
           }),
           bucketName,
           tableName,

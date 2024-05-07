@@ -40,6 +40,10 @@ describe('SQL Generation', () => {
           sql: \`count(*)\`,
           aliases: ['users count']
         },
+        revenue: {
+          type: 'sum',
+          sql: 'amount',
+        },
         visitor_revenue: {
           type: 'sum',
           sql: 'amount',
@@ -99,10 +103,89 @@ describe('SQL Generation', () => {
           sql: \`CASE WHEN \${visitor_count} > 1 THEN 'More than 1' ELSE (\${visitor_revenue})::text END\`,
           type: \`string\`
         },
-        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b })))
+        unique_sources: {
+          type: 'countDistinct',
+          sql: \`source\`
+        },
+        ...(['foo', 'bar'].map(m => ({ [m]: { type: 'count' } })).reduce((a, b) => ({ ...a, ...b }))),
+        second_rank_sum: {
+          post_aggregate: true,
+          sql: \`\${visitor_revenue}\`,
+          filters: [{
+            sql: \`\${revenue_rank} = 1\`
+          }],
+          type: 'sum',
+        },
+        adjusted_rank_sum: {
+          post_aggregate: true,
+          sql: \`\${adjusted_revenue}\`,
+          filters: [{
+            sql: \`\${adjusted_revenue_rank} = 1\`
+          }],
+          type: 'sum',
+          add_group_by: [visitors.created_at],
+        },
+        revenue_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${visitor_revenue}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.source],
+        },
+        date_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${visitors.created_at}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.created_at]
+        },
+        adjusted_revenue_rank: {
+          post_aggregate: true,
+          type: \`rank\`,
+          order_by: [{
+            sql: \`\${adjusted_revenue}\`,
+            dir: 'asc'
+          }],
+          reduce_by: [visitors.created_at]
+        },
+        visitors_revenue_total: {
+          post_aggregate: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: []
+        },
+        percentage_of_total: {
+          post_aggregate: true,
+          sql: \`(100 * \${revenue} / NULLIF(\${visitors_revenue_total}, 0))::int\`,
+          type: 'number'
+        },
+        adjusted_revenue: {
+          post_aggregate: true,
+          sql: \`\${visitor_revenue} + 0.1 * \${date_rank}\`,
+          type: 'number',
+          filters: [{
+            sql: \`\${date_rank} <= 3\`
+          }]
+        },
+        customer_revenue: {
+          post_aggregate: true,
+          sql: \`\${revenue}\`,
+          type: 'sum',
+          group_by: [id]
+        }
       },
 
       dimensions: {
+        revenue_bucket: {
+          post_aggregate: true,
+          sql: \`CASE WHEN \${revenue} < 100 THEN 1 WHEN \${revenue} >= 100 THEN 2 END\`,
+          type: 'number',
+          add_group_by: [id]
+        },
         id: {
           type: 'number',
           sql: 'id',
@@ -115,6 +198,10 @@ describe('SQL Generation', () => {
         created_at: {
           type: 'time',
           sql: 'created_at'
+        },
+        updated_at: {
+          type: 'time',
+          sql: 'updated_at'
         },
         
         createdAtSqlUtils: {
@@ -171,6 +258,13 @@ describe('SQL Generation', () => {
           type: \`string\`
         }
       }
+    });
+    
+    view('visitors_post_aggregate', {
+      cubes: [{
+        join_path: 'visitors',
+        includes: ['adjusted_rank_sum', 'source', 'updated_at', 'visitor_revenue']
+      }]
     })
 
     cube('visitor_checkins', {
@@ -218,6 +312,10 @@ describe('SQL Generation', () => {
           filters: [{
             sql: \`\${visitors}.source = 'google'\`
           }]
+        },
+        unique_sources_per_checking: {
+          sql: \`\${visitors.unique_sources} / \${visitor_checkins_count}\`,
+          type: 'number'
         },
         minDate: {
           type: 'min',
@@ -1199,6 +1297,7 @@ describe('SQL Generation', () => {
   ]).then(() => {
     throw new Error();
   }).catch((error) => {
+    console.log('Error: ', error);
     expect(error).toBeInstanceOf(UserError);
   }));
 
@@ -1487,7 +1586,31 @@ describe('SQL Generation', () => {
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
     { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: null },
-    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 6 },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_google_sourced_checkins: 1 },
+  ]));
+
+  it('ungrouped ratio measure', () => runQueryTest({
+    measures: [
+      'visitor_checkins.unique_sources_per_checking',
+    ],
+    timezone: 'America/Los_Angeles',
+    order: [{
+      id: 'visitor_checkins.created_at',
+    }],
+    timeDimensions: [{
+      dimension: 'visitor_checkins.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-03-30'],
+    }],
+    ungrouped: true,
+    allowUngroupedWithoutPrimaryKey: true,
+  }, [
+    { visitor_checkins__created_at_day: '2017-01-02T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-03T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-04T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
+    { visitor_checkins__created_at_day: '2017-01-05T00:00:00.000Z', visitor_checkins__unique_sources_per_checking: 1 },
   ]));
 
   it('builds geo dimension', () => runQueryTest({
@@ -2146,6 +2269,375 @@ describe('SQL Generation', () => {
       { compound__rank_avg: '7.5000000000000000', visitors__created_at_day: '2017-01-04T00:00:00.000Z' },
     ]
   ));
+
+  it('rank measure', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_rank'],
+    },
+    [{ visitors__revenue_rank: '1' }]
+  ));
+
+  it('rank measure with dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue_rank'],
+      dimensions: ['visitors.source'],
+    },
+    [{
+      visitors__revenue_rank: '2',
+      visitors__source: null
+    }, {
+      visitors__revenue_rank: '2',
+      visitors__source: 'google'
+    }, {
+      visitors__revenue_rank: '1',
+      visitors__source: 'some'
+    }]
+  ));
+
+  it('post aggregate measure with multiple dependencies', async () => runQueryTest(
+    {
+      measures: ['visitors.second_rank_sum', 'visitors.visitor_revenue', 'visitors.revenue_rank'],
+      dimensions: ['visitors.source'],
+    },
+    [{
+      visitors__revenue_rank: '2',
+      visitors__second_rank_sum: null,
+      visitors__source: null,
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__revenue_rank: '2',
+      visitors__second_rank_sum: null,
+      visitors__source: 'google',
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__revenue_rank: '1',
+      visitors__second_rank_sum: '300',
+      visitors__source: 'some',
+      visitors__visitor_revenue: '300',
+    }]
+  ));
+
+  it('post aggregate complex graph', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+    },
+    [{
+      visitors__source: 'google',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null,
+    }, {
+      visitors__source: 'some',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '300'
+    }, {
+      visitors__source: null,
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null,
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          granularity: 'day',
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__updated_at_day: '2017-01-20T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at_day: '2017-01-15T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '200.1',
+      visitors__visitor_revenue: '200'
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at_day: '2017-01-30T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '100'
+    }, {
+      visitors__source: null,
+      visitors__updated_at_day: '2016-09-07T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: null,
+      visitors__updated_at_day: '2017-01-25T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension no granularity', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '300'
+    }, {
+      visitors__source: null,
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension no granularity raw dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.adjusted_rank_sum', 'visitors.visitor_revenue'],
+      dimensions: ['visitors.source', 'visitors.updated_at'],
+      timeDimensions: [
+        {
+          dimension: 'visitors.updated_at',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      order: [{
+        id: 'visitors.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors__source: 'google',
+      visitors__updated_at: '2017-01-20T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at: '2017-01-15T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '200.1',
+      visitors__visitor_revenue: '200'
+    }, {
+      visitors__source: 'some',
+      visitors__updated_at: '2017-01-30T00:00:00.000Z',
+      visitors__adjusted_rank_sum: '100.1',
+      visitors__visitor_revenue: '100'
+    }, {
+      visitors__source: null,
+      visitors__updated_at: '2017-01-25T00:00:00.000Z',
+      visitors__adjusted_rank_sum: null,
+      visitors__visitor_revenue: null
+    }]
+  ));
+
+  it('post aggregate complex graph with time dimension through view', async () => runQueryTest(
+    {
+      measures: ['visitors_post_aggregate.adjusted_rank_sum', 'visitors_post_aggregate.visitor_revenue'],
+      dimensions: ['visitors_post_aggregate.source'],
+      timeDimensions: [
+        {
+          dimension: 'visitors_post_aggregate.updated_at',
+          granularity: 'day',
+        },
+      ],
+      order: [{
+        id: 'visitors_post_aggregate.source'
+      }],
+      timezone: 'UTC',
+    },
+    [{
+      visitors_post_aggregate__source: 'google',
+      visitors_post_aggregate__updated_at_day: '2017-01-20T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
+    }, {
+      visitors_post_aggregate__source: 'some',
+      visitors_post_aggregate__updated_at_day: '2017-01-15T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: '200.1',
+      visitors_post_aggregate__visitor_revenue: '200'
+    }, {
+      visitors_post_aggregate__source: 'some',
+      visitors_post_aggregate__updated_at_day: '2017-01-30T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: '100.1',
+      visitors_post_aggregate__visitor_revenue: '100'
+    }, {
+      visitors_post_aggregate__source: null,
+      visitors_post_aggregate__updated_at_day: '2016-09-07T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
+    }, {
+      visitors_post_aggregate__source: null,
+      visitors_post_aggregate__updated_at_day: '2017-01-25T00:00:00.000Z',
+      visitors_post_aggregate__adjusted_rank_sum: null,
+      visitors_post_aggregate__visitor_revenue: null
+    }]
+  ));
+
+  it('post aggregate percentage of total', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 15,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__percentage_of_total: 15,
+      visitors__revenue: '300',
+      visitors__source: 'some'
+    }, {
+      visitors__percentage_of_total: 70,
+      visitors__revenue: '1400',
+      visitors__source: null
+    }]
+  ));
+
+  it('post aggregate percentage of total filtered', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'some'
+    }, {
+      visitors__percentage_of_total: 40,
+      visitors__revenue: '400',
+      visitors__source: null
+    }]
+  ));
+
+  it('post aggregate percentage of total filtered with time dimension', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source'
+      }, {
+        id: 'visitors.created_at'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+      timeDimensions: [
+        {
+          dimension: 'visitors.created_at',
+          granularity: 'day',
+          dateRange: ['2017-01-01', '2017-01-30'],
+        },
+      ],
+      timezone: 'America/Los_Angeles',
+    },
+    [{
+      visitors__created_at_day: '2017-01-05T00:00:00.000Z',
+      visitors__percentage_of_total: 30,
+      visitors__revenue: '300',
+      visitors__source: 'google'
+    }, {
+      visitors__created_at_day: '2017-01-02T00:00:00.000Z',
+      visitors__percentage_of_total: 10,
+      visitors__revenue: '100',
+      visitors__source: 'some'
+    }, {
+      visitors__created_at_day: '2017-01-04T00:00:00.000Z',
+      visitors__percentage_of_total: 20,
+      visitors__revenue: '200',
+      visitors__source: 'some'
+    }, {
+      visitors__created_at_day: '2017-01-06T00:00:00.000Z',
+      visitors__percentage_of_total: 40,
+      visitors__revenue: '400',
+      visitors__source: null
+    }]
+  ));
+
+  it('post aggregate percentage of total filtered and joined', async () => runQueryTest(
+    {
+      measures: ['visitors.revenue', 'visitors.percentage_of_total'],
+      dimensions: ['visitor_checkins.source'],
+      order: [{
+        id: 'visitor_checkins.source'
+      }],
+      filters: [{
+        dimension: 'visitors.id',
+        operator: 'equals',
+        values: ['1', '2', '3', '4']
+      }],
+    },
+    [{
+      visitors__percentage_of_total: 9,
+      visitors__revenue: '100',
+      visitor_checkins__source: 'google'
+    }, {
+      visitors__percentage_of_total: 91,
+      visitors__revenue: '1000',
+      visitor_checkins__source: null
+    }]
+  ));
+
+  // TODO not implemented
+  // it('post aggregate bucketing', async () => runQueryTest(
+  //   {
+  //     measures: ['visitors.revenue'],
+  //     dimensions: ['visitors.revenue_bucket'],
+  //     order: [{
+  //       id: 'visitors.revenue_bucket'
+  //     }],
+  //   },
+  //   [{
+  //     visitors__percentage_of_total: 15,
+  //     visitors__revenue: '300',
+  //     visitors__source: 'google'
+  //   }, {
+  //     visitors__percentage_of_total: 15,
+  //     visitors__revenue: '300',
+  //     visitors__source: 'some'
+  //   }, {
+  //     visitors__percentage_of_total: 70,
+  //     visitors__revenue: '1400',
+  //     visitors__source: null
+  //   }]
+  // ));
 
   it('columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());

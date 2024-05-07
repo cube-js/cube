@@ -21,12 +21,44 @@ cube(`Orders`, {
     toRemove: {
       type: `count`,
     },
+    numberTotal: {
+      sql: `${totalAmount}`,
+      type: `number`
+    },
+    amountRank: {
+      post_aggregate: true,
+      type: `rank`,
+      order_by: [{
+        sql: `${totalAmount}`,
+        dir: 'asc'
+      }],
+      reduce_by: [status],
+    },
+    amountRankView: {
+      post_aggregate: true,
+      type: `number`,
+      sql: `${amountRank}`,
+    },
+    amountRankDateMax: {
+      post_aggregate: true,
+      sql: `${createdAt}`,
+      type: `max`,
+      filters: [{
+        sql: `${amountRank} = 1`
+      }]
+    },
+    amountRankDate: {
+      post_aggregate: true,
+      sql: `${amountRankDateMax}`,
+      type: `time`,
+    }
   },
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primaryKey: true,
+      public: true,
     },
 
     status: {

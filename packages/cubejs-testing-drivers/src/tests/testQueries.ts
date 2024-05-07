@@ -2,7 +2,7 @@ import { jest, expect, beforeAll, afterAll } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { Client as PgClient } from 'pg';
 import { BaseDriver } from '@cubejs-backend/base-driver';
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 import { sign } from 'jsonwebtoken';
 import { Environment } from '../types/Environment';
 import {
@@ -19,7 +19,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     jest.setTimeout(60 * 5 * 1000);
 
     const fixtures = getFixtures(type, extendedEnv);
-    let client: CubejsApi;
+    let client: CubeApi;
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
@@ -1521,6 +1521,18 @@ from
   ) "rows" 
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
+    });
+
+    executePg('SQL API: ungrouped pre-agg', async () => {
+      const res = await connection.query(`
+    select
+      "productName",
+      "totalSales" 
+    from 
+      "public"."BigECommerce" "$Table" 
+    order by 2 desc, 1 asc
+  `);
+      expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
   });
 }

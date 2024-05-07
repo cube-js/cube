@@ -22,8 +22,8 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
+use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
-use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -61,6 +61,7 @@ use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::fmt;
 use cubehll::HllSketch;
+use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions};
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
 use futures_timer::Delay;
@@ -72,7 +73,6 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
-use rocksdb::backup::{BackupEngine, BackupEngineOptions};
 
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -84,7 +84,9 @@ use std::mem::take;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
+use crate::cachestore::{
+    CacheItem, QueueItem, QueueItemPayload, QueueItemStatus, QueueResult, QueueResultAckEvent,
+};
 use crate::remotefs::LocalDirRemoteFs;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
@@ -1231,6 +1233,9 @@ pub enum MetaStoreEvent {
 
     UpdateQueueResult(IdRow<QueueResult>, IdRow<QueueResult>),
     DeleteQueueResult(IdRow<QueueResult>),
+
+    UpdateQueueItemPayload(IdRow<QueueItemPayload>, IdRow<QueueItemPayload>),
+    DeleteQueueItemPayload(IdRow<QueueItemPayload>),
 }
 
 fn meta_store_merge(
@@ -1258,7 +1263,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
         // TODO(ovr): Decrease after additional fix for get_updates_since
         opts.set_wal_ttl_seconds(
@@ -1291,7 +1298,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
@@ -1334,6 +1343,10 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
 
     fn get_name(&self) -> &'static str {
         &"metastore"
+    }
+
+    fn log_enabled(&self) -> bool {
+        true
     }
 }
 
@@ -1620,7 +1633,7 @@ impl RocksMetaStore {
                 }
 
                 taken[i] = true;
-                index_columns.push(c.clone().replace_index(index_columns.len()));
+                index_columns.push(c.replace_index(index_columns.len()));
             }
 
             let seq_column = table_id.get_row().seq_column().ok_or_else(|| {
@@ -4870,10 +4883,10 @@ fn swap_active_partitions_impl(
 mod tests {
     use super::table::AggregateColumn;
     use super::*;
-    use crate::config::Config;
+    use crate::config::{init_test_logger, Config};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use cuberockstore::rocksdb::IteratorMode;
     use futures_timer::Delay;
-    use rocksdb::IteratorMode;
     use std::thread::sleep;
     use std::time::Duration;
     use std::{env, fs};
@@ -5212,6 +5225,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_test");
         let store_path = env::current_dir().unwrap().join("test-table-local");
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
@@ -5322,6 +5337,8 @@ mod tests {
     }
     #[tokio::test]
     async fn default_index_field_positions_test() {
+        init_test_logger().await;
+
         let config = Config::test("default_index_field_positions_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5413,6 +5430,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_with_aggregate_index_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_with_aggregate_index_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5603,6 +5622,8 @@ mod tests {
 
     #[tokio::test]
     async fn cold_start_test() {
+        init_test_logger().await;
+
         {
             let config = Config::test("cold_start_test");
 
@@ -5649,7 +5670,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5672,6 +5693,7 @@ mod tests {
                 .get_schema("bar".to_string())
                 .await
                 .unwrap();
+
             fs::remove_dir_all(config.local_dir()).unwrap();
             fs::remove_dir_all(config.remote_dir()).unwrap();
         }
@@ -5764,7 +5786,7 @@ mod tests {
             assert!(snapshots[2].current);
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5789,6 +5811,8 @@ mod tests {
     }
     #[tokio::test]
     async fn set_current_snapshot() {
+        init_test_logger().await;
+
         {
             let config = Config::test("set_current_snapshot");
 
@@ -5862,7 +5886,7 @@ mod tests {
 
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5901,7 +5925,7 @@ mod tests {
                 .set_current_snapshot(snapshots[2].id)
                 .await;
             assert!(res.is_ok());
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6022,6 +6046,8 @@ mod tests {
 
     #[tokio::test]
     async fn log_replay_ordering() {
+        init_test_logger().await;
+
         {
             let config = Config::test("log_replay_ordering");
 
@@ -6106,8 +6132,7 @@ mod tests {
                     .unwrap();
             }
             services.stop_processing_loops().await.unwrap();
-
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await;
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6204,7 +6229,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),

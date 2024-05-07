@@ -27,6 +27,12 @@ export type TableName = string | [string, string];
 
 type JoinRelationship = 'hasOne' | 'hasMany' | 'belongsTo';
 
+type ColumnsToJoin = {
+  cubeToJoin: string;
+  columnToJoin: string;
+  tableName: string;
+};
+
 export type CubeDescriptorMember = {
   name: string;
   title: string;
@@ -82,7 +88,29 @@ const MEASURE_DICTIONARY = [
 
 const idRegex = '_id$|id$';
 
-export type DatabaseSchema = Record<string, Record<string, any>>;
+type ForeignKey = {
+  // eslint-disable-next-line camelcase
+  target_table: string;
+  // eslint-disable-next-line camelcase
+  target_column: string;
+};
+
+type ColumnData = {
+  name: string,
+  type: string,
+  attributes: string[],
+  // eslint-disable-next-line camelcase
+  foreign_keys?: ForeignKey[],
+};
+
+export type DatabaseSchema = Record<string, { [key: string]: ColumnData[] }>;
+
+type TableData = {
+  schema: string,
+  table: string,
+  tableName: string;
+  tableDefinition: ColumnData[],
+};
 
 type ScaffoldingSchemaOptions = {
   includeNonDictionaryMeasures?: boolean;
@@ -90,7 +118,7 @@ type ScaffoldingSchemaOptions = {
 };
 
 export class ScaffoldingSchema {
-  private tableNamesToTables: any;
+  private tableNamesToTables: { [key: string]: TableData[] } = {};
 
   public constructor(
     private readonly dbSchema: DatabaseSchema,
@@ -175,7 +203,7 @@ export class ScaffoldingSchema {
         const names = R.uniq([table, tableizeName].concat(tableNamesFromParts));
         return names.map(n => [n, definition]);
       })
-    );
+    ) as any;
   }
 
   public resolveTableDefinition(tableName: TableName) {
@@ -234,7 +262,7 @@ export class ScaffoldingSchema {
     });
   }
 
-  protected numberMeasures(tableDefinition) {
+  protected numberMeasures(tableDefinition: ColumnData[]) {
     return tableDefinition.filter(
       column => (!column.name.startsWith('_') &&
         (this.columnType(column) === 'number') &&
@@ -278,35 +306,55 @@ export class ScaffoldingSchema {
     return value.toLocaleLowerCase();
   }
 
-  protected joins(tableName: TableName, tableDefinition) {
+  protected joins(tableName: TableName, tableDefinition: ColumnData[]) {
+    const cubeName = (name: string) => (this.options.snakeCase ? toSnakeCase(name) : inflection.camelize(name));
+    
     return R.unnest(tableDefinition
-      .filter(column => (column.name.match(new RegExp(idRegex, 'i')) && this.fixCase(column.name) !== 'id'))
       .map(column => {
-        const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
-        const tablesToJoin = this.tableNamesToTables[withoutId] ||
+        let columnsToJoin: ColumnsToJoin[] = [];
+
+        if (column.foreign_keys?.length) {
+          column.foreign_keys.forEach(fk => {
+            const targetTableDefinition = this.tableNamesToTables[fk.target_table]?.find(t => t.table === fk.target_table);
+            if (targetTableDefinition) {
+              columnsToJoin.push({
+                cubeToJoin: cubeName(fk.target_table),
+                columnToJoin: fk.target_column,
+                tableName: targetTableDefinition.tableName
+              });
+            }
+          });
+        } else if ((column.name.match(new RegExp(idRegex, 'i')) && this.fixCase(column.name) !== 'id')) {
+          const withoutId = column.name.replace(new RegExp(idRegex, 'i'), '');
+          const tablesToJoin = this.tableNamesToTables[withoutId] ||
           this.tableNamesToTables[inflection.tableize(withoutId)] ||
           this.tableNamesToTables[this.fixCase(withoutId)] ||
           this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
           
-        if (!tablesToJoin) {
-          return null;
+          if (!tablesToJoin) {
+            return null;
+          }
+
+          columnsToJoin = tablesToJoin.map<any>(definition => {
+            if (tableName === definition.tableName) {
+              return null;
+            }
+            let columnForJoin = definition.tableDefinition.find(c => this.fixCase(c.name) === this.fixCase(column.name));
+            columnForJoin = columnForJoin || definition.tableDefinition.find(c => this.fixCase(c.name) === 'id');
+            if (!columnForJoin) {
+              return null;
+            }
+            return {
+              cubeToJoin: cubeName(definition.table),
+              columnToJoin: columnForJoin.name,
+              tableName: definition.tableName
+            };
+          }).filter(R.identity);
         }
 
-        const columnsToJoin = tablesToJoin.map(definition => {
-          if (tableName === definition.tableName) {
-            return null;
-          }
-          let columnForJoin = definition.tableDefinition.find(c => this.fixCase(c.name) === this.fixCase(column.name));
-          columnForJoin = columnForJoin || definition.tableDefinition.find(c => this.fixCase(c.name) === 'id');
-          if (!columnForJoin) {
-            return null;
-          }
-          return {
-            cubeToJoin: this.options.snakeCase ? toSnakeCase(definition.table) : inflection.camelize(definition.table),
-            columnToJoin: columnForJoin.name,
-            tableName: definition.tableName
-          };
-        }).filter(R.identity);
+        if (!columnsToJoin.length) {
+          return null;
+        }
 
         return columnsToJoin.map(columnToJoin => ({
           thisTableColumn: column.name,
@@ -316,7 +364,7 @@ export class ScaffoldingSchema {
           relationship: 'belongsTo'
         }));
       })
-      .filter(R.identity));
+      .filter(R.identity)) as Join[];
   }
 
   protected timeColumnIndex(column): number {

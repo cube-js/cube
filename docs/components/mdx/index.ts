@@ -6,6 +6,7 @@ import {
   InfoBox,
   SuccessBox,
   WarningBox,
+  ReferenceBox
 } from "@/components/mdx/AlertBox/AlertBox";
 import { GitHubCodeBlock } from "@/components/mdx/GitHubCodeBlock";
 import { GitHubFolderLink } from "@/components/mdx/GitHubFolderLink";
@@ -38,6 +39,7 @@ export const components = {
   InfoBox,
   SuccessBox,
   WarningBox,
+  ReferenceBox,
   LoomVideo,
   Grid,
   GridItem,

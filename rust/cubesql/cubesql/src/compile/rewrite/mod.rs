@@ -14,7 +14,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
-        ExprRewriter, JoinConstraint, JoinType, Operator,
+        ExprRewriter, JoinConstraint, JoinType, Operator, RewriteRecursion,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -31,6 +31,8 @@ use std::{
     slice::Iter,
     str::FromStr,
 };
+
+use self::analysis::{LogicalPlanData, MemberNameToExpr};
 
 // trace_macros!(true);
 
@@ -267,6 +269,7 @@ crate::plan_to_language! {
             offset: Option<usize>,
             order_expr: Vec<Expr>,
             alias: Option<String>,
+            distinct: bool,
             ungrouped: bool,
             ungrouped_scan: bool,
         },
@@ -452,6 +455,12 @@ crate::plan_to_language! {
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
+        FlattenPushdownReplacer {
+            expr: Arc<Expr>,
+            inner_expr: Vec<Expr>,
+            inner_alias: Option<String>,
+            top_level: bool,
+        },
         // NOTE: converting this to a list might provide rewrite improvements
         CaseExprReplacer {
             members: Vec<LogicalPlan>,
@@ -503,7 +512,7 @@ impl ExprRewriter for WithColumnRelation {
     fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
         match expr {
             Expr::Column(c) => Ok(Expr::Column(Column {
-                name: c.name.to_string(),
+                name: c.name,
                 relation: if let Some(rel) = self.0.as_ref() {
                     c.relation.or_else(|| Some(rel.to_string()))
                 } else {
@@ -513,38 +522,48 @@ impl ExprRewriter for WithColumnRelation {
             e => Ok(e),
         }
     }
+
+    // As a rewriter, it seems we only care about the top-level of the expression,
+    // this function defn tells the rewriter to not recurse into the children of the expression
+    fn pre_visit(&mut self, _expr: &Expr) -> datafusion::error::Result<RewriteRecursion> {
+        Ok(RewriteRecursion::Mutate)
+    }
 }
 
+// TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
     member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
-        .map(|(member, _, expr)| {
-            vec![
-                (expr_column_name(expr.clone(), &None), member.clone()),
-                (expr_column_name_with_relation(expr, &mut relation), member),
+        .flat_map(|(member, _, expr)| {
+            [
+                (expr_column_name(&expr, &None), member.clone()),
+                (expr_column_name_with_relation(&expr, &mut relation), member),
             ]
         })
-        .flatten()
         .collect::<Vec<_>>()
 }
 
-pub fn column_name_to_member_def_vec(
-    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
-) -> Vec<(String, Member)> {
-    let mut relation = WithColumnRelation(None);
-    member_name_to_expr
-        .into_iter()
-        .map(|(_, member, expr)| {
-            vec![
-                (expr_column_name(expr.clone(), &None), member.clone()),
-                (expr_column_name_with_relation(expr, &mut relation), member),
-            ]
-        })
-        .flatten()
-        .collect::<Vec<_>>()
+impl LogicalPlanData {
+    fn find_member(
+        &self,
+        f: impl Fn(&MemberNameToExpr, &str) -> bool,
+    ) -> Option<(&MemberNameToExpr, String)> {
+        let mut relation = WithColumnRelation(None);
+        for tuple @ (_, _member, expr) in self.member_name_to_expr.as_ref()?.iter() {
+            let column_name = expr_column_name(&expr, &None);
+            if f(tuple, &column_name) {
+                return Some((tuple, column_name));
+            }
+            let column_name = expr_column_name_with_relation(&expr, &mut relation);
+            if f(tuple, &column_name) {
+                return Some((tuple, column_name));
+            }
+        }
+        None
+    }
 }
 
 fn column_name_to_member_to_aliases(
@@ -562,33 +581,29 @@ fn member_name_by_alias(
     id: Id,
     alias: &str,
 ) -> Option<String> {
-    if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
-        let column_name_to_member = column_name_to_member_vec(member_name_to_expr.clone());
-        column_name_to_member
-            .into_iter()
-            .find(|(cn, _)| cn == alias)
-            .map(|(_, member)| member)
-            .flatten()
-    } else {
-        None
-    }
+    egraph
+        .index(id)
+        .data
+        .find_member(|_, a| a == alias)
+        .and_then(|(m, _a)| m.0.clone())
 }
 
-fn referenced_columns(referenced_expr: Vec<Expr>) -> Vec<String> {
+fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
     referenced_expr
-        .into_iter()
+        .iter()
         .map(|expr| expr_column_name(expr, &None))
         .collect::<Vec<_>>()
 }
 
-fn expr_column_name_with_relation(expr: Expr, relation: &mut WithColumnRelation) -> String {
-    expr.rewrite(relation)
+fn expr_column_name_with_relation(expr: &Expr, relation: &mut WithColumnRelation) -> String {
+    expr.clone() // TODO(mwillsey) remove clone somehow
+        .rewrite(relation)
         .unwrap()
         .name(&DFSchema::empty())
         .unwrap()
 }
 
-fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
+fn expr_column_name(expr: &Expr, cube: &Option<String>) -> String {
     if let Some(cube) = cube.as_ref() {
         expr_column_name_with_relation(expr, &mut WithColumnRelation(Some(cube.to_string())))
     } else {
@@ -676,6 +691,33 @@ where
         TransformingPattern::new(applier.as_str(), move |egraph, _, subst| {
             transform_fn(egraph, subst)
         }),
+    )
+    .unwrap()
+}
+
+pub fn transforming_chain_rewrite_with_root<T>(
+    name: &str,
+    main_searcher: String,
+    chain: Vec<(&str, String)>,
+    applier: String,
+    transform_fn: T,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+where
+    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
+        + Sync
+        + Send
+        + 'static,
+{
+    Rewrite::new(
+        name.to_string(),
+        ChainSearcher {
+            main: main_searcher.parse().unwrap(),
+            chain: chain
+                .into_iter()
+                .map(|(var, pattern)| (var.parse().unwrap(), pattern.parse().unwrap()))
+                .collect(),
+        },
+        TransformingPattern::new(applier.as_str(), transform_fn),
     )
     .unwrap()
 }
@@ -788,11 +830,12 @@ fn wrapped_select(
     offset: impl Display,
     order_expr: impl Display,
     alias: impl Display,
+    distinct: impl Display,
     ungrouped: impl Display,
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
         group_expr,
@@ -806,6 +849,7 @@ fn wrapped_select(
         offset,
         order_expr,
         alias,
+        distinct,
         ungrouped,
         ungrouped_scan
     )
@@ -1297,6 +1341,18 @@ fn wrapper_pullup_replacer(
     )
 }
 
+fn flatten_pushdown_replacer(
+    expr: impl Display,
+    inner_expr: impl Display,
+    inner_alias: impl Display,
+    top_level: impl Display,
+) -> String {
+    format!(
+        "(FlattenPushdownReplacer {} {} {} {})",
+        expr, inner_expr, inner_alias, top_level,
+    )
+}
+
 fn event_notification(name: impl Display, members: impl Display, meta: impl Display) -> String {
     format!("(EventNotification {} {} {})", name, members, meta)
 }
@@ -1437,6 +1493,10 @@ fn cube_scan_wrapper(input: impl Display, finalized: impl Display) -> String {
     format!("(CubeScanWrapper {} {})", input, finalized)
 }
 
+fn distinct(input: impl Display) -> String {
+    format!("(Distinct {})", input)
+}
+
 pub fn original_expr_name(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
@@ -1533,12 +1593,13 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         result
     }
 
-    fn search_eclass(
+    fn search_eclass_with_limit(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         eclass: Id,
+        limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        if let Some(m) = self.main.search_eclass(egraph, eclass) {
+        if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
             self.search_match_chained(egraph, m, self.chain.iter())
         } else {
             None

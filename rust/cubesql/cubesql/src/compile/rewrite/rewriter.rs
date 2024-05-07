@@ -8,8 +8,8 @@ use crate::{
             cost::BestCubePlan,
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
-                members::MemberRules, old_split::OldSplitRules, order::OrderRules,
-                split::SplitRules, wrapper::WrapperRules,
+                flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
+                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -219,6 +219,7 @@ impl Rewriter {
                 .map(|v| v.parse::<u64>().unwrap())
                 .unwrap_or(30),
         ))
+        .with_scheduler(egg::SimpleScheduler)
         .with_egraph(egraph)
     }
 
@@ -524,6 +525,7 @@ impl Rewriter {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
+            rewrites.extend(FlattenRules::new().rewrite_rules());
         }
         if config_obj.push_down_pull_up_split() {
             rewrites

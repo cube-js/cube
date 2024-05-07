@@ -2,13 +2,13 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
-        binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_def_vec,
-        column_name_to_member_to_aliases, column_name_to_member_vec, cross_join, cube_scan,
-        cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
-        cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
-        limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
-        literal_member, measure_expr, member_pushdown_replacer, member_replacer,
-        merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
+        binary_expr, cast_expr, change_user_expr, column_expr, column_name_to_member_to_aliases,
+        column_name_to_member_vec, cross_join, cube_scan, cube_scan_filters_empty_tail,
+        cube_scan_members, cube_scan_members_empty_tail, cube_scan_order_empty_tail,
+        dimension_expr, expr_column_name, fun_expr, join, like_expr, limit,
+        list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr, literal_member,
+        measure_expr, member_pushdown_replacer, member_replacer, merged_members_replacer,
+        original_expr_name, projection, referenced_columns, rewrite,
         rewriter::RewriteRules,
         rules::{replacer_push_down_node, replacer_push_down_node_substitute_rules, utils},
         segment_expr, table_scan, time_dimension_expr, transform_original_expr_to_alias,
@@ -250,25 +250,6 @@ impl RewriteRules for MemberRules {
                     "?ungrouped",
                 ),
                 self.push_down_limit("?skip", "?fetch", "?new_skip", "?new_fetch"),
-            ),
-            // Binary expression associative properties
-            transforming_rewrite_with_root(
-                "binary-expr-addition-assoc",
-                binary_expr(binary_expr("?a", "+", "?b"), "+", "?c"),
-                alias_expr(
-                    binary_expr("?a", "+", binary_expr("?b", "+", "?c")),
-                    "?alias",
-                ),
-                transform_original_expr_to_alias("?alias"),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-multi-assoc",
-                binary_expr(binary_expr("?a", "*", "?b"), "*", "?c"),
-                alias_expr(
-                    binary_expr("?a", "*", binary_expr("?b", "*", "?c")),
-                    "?alias",
-                ),
-                transform_original_expr_to_alias("?alias"),
             ),
             // MOD function to binary expr
             transforming_rewrite_with_root(
@@ -1338,7 +1319,7 @@ impl MemberRules {
                             var_iter!(egraph[subst[alias_var]], ProjectionAlias).cloned()
                         {
                             let mut columns = HashSet::new();
-                            columns.extend(referenced_columns(referenced_expr.clone()).into_iter());
+                            columns.extend(referenced_columns(referenced_expr).into_iter());
                             if columns.iter().all(|c| {
                                 column_name_to_member_name
                                     .iter()
@@ -1465,12 +1446,10 @@ impl MemberRules {
                                     column_name_to_member_vec(member_name_to_expr);
 
                                 let mut columns = HashSet::new();
-                                columns.extend(
-                                    referenced_columns(referenced_group_expr.clone()).into_iter(),
-                                );
-                                columns.extend(
-                                    referenced_columns(referenced_aggr_expr.clone()).into_iter(),
-                                );
+                                columns
+                                    .extend(referenced_columns(referenced_group_expr).into_iter());
+                                columns
+                                    .extend(referenced_columns(referenced_aggr_expr).into_iter());
                                 // TODO default count member is not in the columns set but it should be there
 
                                 if columns.iter().all(|c| {
@@ -1763,55 +1742,46 @@ impl MemberRules {
                         .collect()
                 };
                 for alias_column in column_iter {
-                    let alias_name = expr_column_name(Expr::Column(alias_column), &None);
+                    let alias_name = expr_column_name(&Expr::Column(alias_column), &None);
 
-                    if let Some(left_member_name_to_expr) = egraph
+                    if let Some((member, member_alias)) = &egraph
                         .index(subst[old_members_var])
                         .data
-                        .member_name_to_expr
-                        .clone()
+                        .find_member(|_, member_alias| member_alias == &alias_name)
                     {
-                        let column_name_to_member =
-                            column_name_to_member_def_vec(left_member_name_to_expr);
+                        let cube_to_filter = if let Some(cube) = member.1.cube() {
+                            Some(cube)
+                        } else {
+                            alias_to_cube
+                                .iter()
+                                .find(|((alias, _), _)| alias == member_alias)
+                                .map(|(_, cube)| cube.to_string())
+                        };
+                        let filtered_alias_to_cube = if cube_to_filter.is_some() {
+                            alias_to_cube
+                                .clone()
+                                .into_iter()
+                                .filter(|(_, cube)| cube == cube_to_filter.as_ref().unwrap())
+                                .collect()
+                        } else {
+                            alias_to_cube.clone()
+                        };
 
-                        if let Some(member) = column_name_to_member
-                            .iter()
-                            .find(|(member_alias, _)| member_alias == &alias_name)
-                        {
-                            let cube_to_filter = if let Some(cube) = member.1.cube() {
-                                Some(cube)
-                            } else {
-                                alias_to_cube
-                                    .iter()
-                                    .find(|((alias, _), _)| alias == &member.0)
-                                    .map(|(_, cube)| cube.to_string())
-                            };
-                            let filtered_alias_to_cube = if cube_to_filter.is_some() {
-                                alias_to_cube
-                                    .clone()
-                                    .into_iter()
-                                    .filter(|(_, cube)| cube == cube_to_filter.as_ref().unwrap())
-                                    .collect()
-                            } else {
-                                alias_to_cube.clone()
-                            };
+                        // TODO remove unwrap
+                        let old_member = member.1.clone().add_to_egraph(egraph).unwrap();
+                        subst.insert(terminal_member, old_member);
 
-                            // TODO remove unwrap
-                            let old_member = member.1.add_to_egraph(egraph).unwrap();
-                            subst.insert(terminal_member, old_member);
+                        let filtered_member_pushdown_replacer_alias_to_cube =
+                            egraph.add(LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
+                                MemberPushdownReplacerAliasToCube(filtered_alias_to_cube),
+                            ));
 
-                            let filtered_member_pushdown_replacer_alias_to_cube =
-                                egraph.add(LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
-                                    MemberPushdownReplacerAliasToCube(filtered_alias_to_cube),
-                                ));
+                        subst.insert(
+                            filtered_member_pushdown_replacer_alias_to_cube_var,
+                            filtered_member_pushdown_replacer_alias_to_cube,
+                        );
 
-                            subst.insert(
-                                filtered_member_pushdown_replacer_alias_to_cube_var,
-                                filtered_member_pushdown_replacer_alias_to_cube,
-                            );
-
-                            return true;
-                        }
+                        return true;
                     }
                 }
             }

@@ -10,6 +10,33 @@ configuration options to consider. Please make sure to also check [the
 Pre-Aggregations reference in the data modeling
 section][ref-schema-ref-preaggs].
 
+## Matching queries
+
+When executing a query, Cube will try to [match and fulfill it with a
+pre-aggregation][ref-matching-preaggs] in the first place.
+
+If there's no matching pre-aggregation, Cube will query the upstream data
+source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
+
+## Rollup-only mode
+
+In the rollup-only mode, Cube will **only** fulfill queries using
+pre-aggregations. To enable the rollup-only mode, use the
+`CUBEJS_ROLLUP_ONLY` environment variable.
+
+It can be useful to prevent queries from your end users from ever hitting the
+upstream data source, e.g., if you prefer to use your data warehouse only to
+build and refresh pre-aggregations and keep it suspended the rest of the time.
+
+<WarningBox>
+
+When the rollup-only mode is used with a single-node deployment (where the API
+instance also serves as a [refresh worker][ref-deploy-refresh-wrkr]), queries
+that can't be fulfilled with pre-aggregations will result in an error.
+Scheduled refreshes will continue to work in the background.
+
+</WarningBox>
+
 ## Refresh strategy
 
 Refresh strategy can be customized by setting the
@@ -143,22 +170,6 @@ cube(`orders`, {
 When `every` and `sql` are used together, Cube will run the query from the `sql`
 property on an interval defined by the `every` property. If the query returns
 new results, then the pre-aggregation will be refreshed.
-
-## Rollup-only mode
-
-To make Cube _only_ serve requests from pre-aggregations, the
-[`CUBEJS_ROLLUP_ONLY`][ref-config-env-rolluponly] environment variable can be
-set to `true` on an API instance. This will prevent serving data on API requests
-from the source database.
-
-<WarningBox>
-
-When using this configuration in a single node deployment (where the API
-instance and [Refresh Worker][ref-deploy-refresh-wrkr] are configured on the
-same host), requests made to the API that cannot be satisfied by a rollup throw
-an error. Scheduled refreshes will continue to work in the background.
-
-</WarningBox>
 
 ## Partitioning
 
@@ -961,8 +972,6 @@ streaming engine.
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
-[ref-config-env-rolluponly]:
-  /reference/configuration/environment-variables#cubejs-rollup-only
 [ref-config-extdriverfactory]:
   /reference/configuration/config#externaldriverfactory
 [ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
@@ -994,3 +1003,4 @@ streaming engine.
 [ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
 [ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
 [ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations

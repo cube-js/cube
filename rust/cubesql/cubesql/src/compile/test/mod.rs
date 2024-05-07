@@ -301,6 +301,7 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
             ),
             ("Logs".to_string(), "default".to_string()),
             ("NumberCube".to_string(), "default".to_string()),
+            ("WideCube".to_string(), "default".to_string()),
         ]
         .into_iter()
         .collect(),
@@ -342,7 +343,8 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
-                        r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
+                        r#"SELECT {% if distinct %}DISTINCT {% endif %}
+  {{ select_concat | map(attribute='aliased') | join(', ') }} 
 FROM (
   {{ from | indent(2) }}
 ) AS {{ from_alias }}{% if filter %}
@@ -358,7 +360,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),
                     ("expressions/binary".to_string(), "({{ left }} {{ op }} {{ right }})".to_string()),
                     ("expressions/is_null".to_string(), "{{ expr }} IS {% if negate %}NOT {% endif %}NULL".to_string()),
-                    ("expressions/case".to_string(), "CASE{% if expr %}{{ expr }} {% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
+                    ("expressions/case".to_string(), "CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END".to_string()),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
                     ("expressions/cast".to_string(), "CAST({{ expr }} AS {{ data_type }})".to_string()),
                     ("expressions/interval".to_string(), "INTERVAL '{{ interval }}'".to_string()),

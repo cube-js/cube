@@ -192,5 +192,72 @@ from
   `);
       expect(res.rows).toMatchSnapshot('no limit for non matching count push down');
     });
+
+    test('metabase max number', async () => {
+      const res = await connection.query(`
+SELECT
+  "source"."id" AS "id",
+  "source"."status" AS "status",
+  "source"."pivot-grouping" AS "pivot-grouping",
+  MAX("source"."numberTotal") AS "numberTotal"
+FROM
+  (
+    SELECT
+      "public"."Orders"."numberTotal" AS "numberTotal",
+      "public"."Orders"."id" AS "id",
+      "public"."Orders"."status" AS "status",
+      ABS(0) AS "pivot-grouping"
+    FROM
+      "public"."Orders"
+    WHERE
+      "public"."Orders"."status" = 'new'
+  ) AS "source"
+GROUP BY
+  "source"."id",
+  "source"."status",
+  "source"."pivot-grouping"
+ORDER BY
+  "source"."id" DESC,
+  "source"."status" ASC,
+  "source"."pivot-grouping" ASC
+  `);
+      expect(res.rows).toMatchSnapshot('metabase max number');
+    });
+
+    test('power bi post aggregate measure wrap', async () => {
+      const res = await connection.query(`
+select 
+  "_"."createdAt", 
+  "_"."a0",
+  "_"."a1"
+from 
+  ( 
+    select 
+      "rows"."createdAt" as "createdAt", 
+      sum(cast("rows"."amountRankView" as decimal)) as "a0",
+      max("rows"."amountRankDate") as "a1" 
+    from 
+      ( 
+        select 
+          "_"."status", 
+          "_"."createdAt", 
+          "_"."amountRankView",
+          "_"."amountRankDate"
+        from 
+          "public"."Orders" "_" 
+        where 
+          "_"."status" = 'shipped'
+      ) "rows" 
+    group by 
+      "createdAt" 
+  ) "_" 
+where 
+  not "_"."a0" is null or
+  not "_"."a1" is null
+limit 
+  1000001
+  `);
+      expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
+    });
   });
 });

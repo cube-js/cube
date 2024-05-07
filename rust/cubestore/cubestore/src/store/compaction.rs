@@ -1398,8 +1398,8 @@ mod tests {
     use arrow::array::{Int64Array, StringArray};
     use arrow::datatypes::Schema;
     use arrow::record_batch::RecordBatch;
+    use cuberockstore::rocksdb::{Options, DB};
     use datafusion::physical_plan::collect;
-    use rocksdb::{Options, DB};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1776,7 +1776,7 @@ mod tests {
         assert_eq!(9, chunks_row_count);
 
         let rows = (0..9)
-            .map(|i| Row::new(TableValue::from_columns(&batch.columns().clone(), i)))
+            .map(|i| Row::new(TableValue::from_columns(&batch.columns(), i)))
             .collect::<Vec<_>>();
 
         let expected = vec![

@@ -60,14 +60,14 @@ documentation][ref-cloud-conf-vpc] to learn how to get started.
 <SuccessBox>
 
 VPC connectivity is available in Cube Cloud on
-[Premium](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
+[Enterprise](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
 details.
 
 </SuccessBox>
 
 [cube-pricing]: https://cube.dev/pricing/
 [cube-contact]: https://cube.dev/contact/
-[ref-cloud-conf-vpc]: /product/configuration/vpc
+[ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
 
 ## Environment Variables
 
@@ -110,8 +110,10 @@ pre-aggregations.
 
 ### Batching
 
-Cube requires the Redshift user to have ownership of a schema in Redshift to support pre-aggregations.  
-By default this schema is named `prod_pre_aggregations` but it can be customized using the `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable.
+Cube requires the Redshift user to have ownership of a schema in Redshift to
+support pre-aggregations. By default, the schema name is `prod_pre_aggregations`.
+It can be set using the [`pre_aggregations_schema` configration
+option][ref-conf-preaggs-schema].
 
 No extra configuration is required to configure batching for AWS Redshift.
 
@@ -165,3 +167,4 @@ Database][ref-recipe-enable-ssl].
   /guides/recipes/data-sources/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
+[ref-conf-preaggs-schema]: /reference/configuration/config#pre_aggregations_schema

@@ -17,6 +17,7 @@ export class BaseMeasure {
     if (measure.expression) {
       this.expression = measure.expression;
       this.expressionCubeName = measure.cubeName;
+      // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = measure.expressionName || `${measure.cubeName}.${measure.name}`;
       this.isMemberExpression = !!measure.definition;
     }
@@ -65,7 +66,7 @@ export class BaseMeasure {
     return this.query.cubeEvaluator.measureByPath(this.measure);
   }
 
-  public definition() {
+  public definition(): any {
     if (this.expression) {
       return {
         sql: this.expression,
@@ -92,6 +93,13 @@ export class BaseMeasure {
       return false;
     }
     return BaseMeasure.isCumulative(this.measureDefinition());
+  }
+
+  public isPostAggregate() {
+    if (this.expression) { // TODO
+      return false;
+    }
+    return this.definition().postAggregate;
   }
 
   public isAdditive() {

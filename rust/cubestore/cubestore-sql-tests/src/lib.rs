@@ -49,11 +49,19 @@ pub fn run_sql_tests(
                     ignore: false,
                     should_panic: ShouldPanic::No,
                     ignore_message: None,
+                    source_file: "",
+                    start_line: 0,
+                    start_col: 0,
+                    end_line: 0,
                     compile_fail: false,
                     no_run: false,
                     test_type: TestType::IntegrationTest,
+                    end_col: 0,
                 },
-                testfn: DynTestFn(Box::new(move || runner(name, test_fn))),
+                testfn: DynTestFn(Box::new(move || {
+                    runner(name, test_fn);
+                    Ok(())
+                })),
             }
         })
         .collect();

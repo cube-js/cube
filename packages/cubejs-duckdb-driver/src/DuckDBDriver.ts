@@ -23,7 +23,6 @@ export type DuckDBDriverConfiguration = {
 };
 
 type InitPromise = {
-  defaultConnection: Connection,
   db: Database;
 };
 
@@ -70,42 +69,25 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     }
 
     let dbOptions;
+    let DUCKDB_NODEJS_READONLY = 1;
     if (token) {
-      dbOptions = { custom_user_agent: `Cube/${version}` };
+      dbOptions = {
+        custom_user_agent: `Cube/${version}`,
+      };
     }
 
     // Create a new Database instance with the determined URL and custom user agent
-    const db = new Database(dbUrl, dbOptions);
+    const db = new Database(dbUrl, DUCKDB_NODEJS_READONLY);
 
+    return {
+      db
+    };
+  }
+
+  protected async createConnection(initPromise: InitPromise): Promise<Connection> {
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
-    const defaultConnection = db.connect();
-    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
-
-    try {
-      await execAsync('INSTALL httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
-    try {
-      await execAsync('LOAD httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on loading httpfs', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
+    const connection = initPromise.db.connect();
+    const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(connection.exec).bind(connection) as any;
 
     const configuration = [
       {
@@ -145,7 +127,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         value: getEnv('duckdbS3SessionToken', this.config),
       }
     ];
-    
+
     for (const { key, value } of configuration) {
       if (value) {
         try {
@@ -171,11 +153,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         }
       }
     }
-    
-    return {
-      defaultConnection,
-      db
-    };
+    return connection;
   }
 
   public override informationSchemaQuery(): string {
@@ -198,17 +176,12 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     return super.getSchemasQuery();
   }
 
-  protected async getInitiatedState(): Promise<InitPromise> {
-    if (!this.initPromise) {
-      this.initPromise = this.init();
-    }
-
+  protected async getConnection(): Promise<Connection> {
+    let init = await this.init();
     try {
-      return await this.initPromise;
-    } catch (e) {
-      this.initPromise = null;
-
-      throw e;
+      return this.createConnection(await this.init());
+    } finally {
+      init.db.close();
     }
   }
 
@@ -217,15 +190,27 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
   }
 
   public async query<R = unknown>(query: string, values: unknown[] = [], _options?: QueryOptions): Promise<R[]> {
-    const { defaultConnection } = await this.getInitiatedState();
-    const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(defaultConnection.all).bind(defaultConnection) as any;
+    const startTime = performance.now(); // Start time in milliseconds
+    const connection = await this.getConnection();
+    const endTime = performance.now(); // End time in milliseconds
+    console.log(`getConnection time: ${endTime - startTime} milliseconds`);
+    try {
 
-    const result = await fetchAsync(query, ...values);
-    return result.map((item) => {
-      transformRow(item);
+      const fetchAsync: (sql: string, ...params: any[]) => Promise<R[]> = promisify(connection.all).bind(connection) as any;
 
-      return item;
-    });
+      const startTime = performance.now(); // Start time in milliseconds
+      const result = await fetchAsync(query, ...values);
+      const endTime = performance.now(); // End time in milliseconds
+      console.log(`fetchAsync time: ${endTime - startTime} milliseconds`);
+      connection.close();
+      return result.map((item) => {
+        transformRow(item);
+
+        return item;
+      });
+    } finally {
+      connection.close();
+    }
   }
 
   public async stream(
@@ -233,13 +218,14 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableData> {
-    const { db } = await this.getInitiatedState();
+    const { db } = await this.init();
 
     // new connection, because stream can break with
     // Attempting to execute an unsuccessful or closed pending query result
     // PreAggregation queue has a concurrency limit, it's why pool is not needed here
     const connection = db.connect();
     const closeAsync = promisify(connection.close).bind(connection);
+    const closeDbAsync = promisify(db.close).bind(db);
 
     try {
       const asyncIterator = connection.stream(query, ...(values || []));
@@ -249,6 +235,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         rowStream,
         release: async () => {
           await closeAsync();
+          await closeDbAsync();
         }
       };
     } catch (e) {
