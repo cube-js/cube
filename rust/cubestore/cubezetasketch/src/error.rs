@@ -46,7 +46,7 @@ impl From<std::io::Error> for ZetaError {
 
 impl From<ProtobufError> for ZetaError {
     fn from(err: ProtobufError) -> Self {
-        return ZetaError::new(err);
+        return ZetaError::new(format!("Protobuf: {}", err));
     }
 }
 
