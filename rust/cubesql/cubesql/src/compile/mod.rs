@@ -2206,8 +2206,8 @@ mod tests {
             .unwrap()
             .sql;
 
-        assert!(sql.contains("LOWER"));
-        assert!(sql.contains("IN"));
+        assert!(sql.contains("LOWER("));
+        assert!(sql.contains(" IN ("));
 
         let logical_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) IN ('female', 'male')".to_string(),
@@ -2221,8 +2221,8 @@ mod tests {
             .unwrap()
             .sql;
 
-        assert!(sql.contains("LOWER"));
-        assert!(sql.contains("IN"));
+        assert!(sql.contains("LOWER("));
+        assert!(sql.contains(" IN ("));
     }
 
     #[tokio::test]
@@ -2244,7 +2244,7 @@ mod tests {
             .unwrap()
             .sql;
 
-        assert!(sql.contains("LOWER"));
+        assert!(sql.contains("LOWER("));
     }
 
     #[tokio::test]
@@ -18608,9 +18608,9 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql;
 
-        assert!(sql.contains("LOWER"));
-        assert!(sql.contains("GROUP BY"));
-        assert!(sql.contains("ORDER BY"));
+        assert!(sql.contains("LOWER("));
+        assert!(sql.contains("GROUP BY "));
+        assert!(sql.contains("ORDER BY "));
     }
 
     #[tokio::test]
