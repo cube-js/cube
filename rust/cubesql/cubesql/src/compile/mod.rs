@@ -2926,6 +2926,9 @@ mod tests {
 
     #[tokio::test]
     async fn sum_to_count_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4686,6 +4689,9 @@ limit
 
     #[tokio::test]
     async fn powerbi_push_down_aggregate() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -4965,6 +4971,9 @@ limit
 
     #[tokio::test]
     async fn test_sixteen_char_trunc() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan_with_meta(
@@ -18217,6 +18226,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_thoughtspot_lower() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -19892,6 +19904,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_where_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
@@ -22458,6 +22473,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
     #[tokio::test]
     async fn test_time_dimensions_filter_twice() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
