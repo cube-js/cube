@@ -78,9 +78,14 @@ Microsoft SQL Server does not support export buckets.
 ## SSL
 
 To enable SSL-encrypted connections between Cube and Microsoft SQL Server, set
-the `CUBEJS_DB_SSL` environment variable to `true`. For more information on how
-to configure custom certificates, please check out [Enable SSL Connections to
-the Database][ref-recipe-enable-ssl].
+the `CUBEJS_DB_SSL` environment variable to `true`.
+
+To use a custom (or self-signed) certificate chain, set the `NODE_EXTRA_CA_CERTS`
+environment variable to `/path/to/certificate/bundle.cert`.
+
+Please note that the configuration settings on the 
+[Enable SSL Connections to the Database][ref-recipe-enable-ssl] page are not
+supported by the Microsoft SQL Server driver.
 
 ## Additional Configuration
 
