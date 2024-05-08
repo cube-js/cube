@@ -45,6 +45,10 @@ impl HLLDataSketch {
         return self.instance.estimate().round() as u64;
     }
 
+    pub fn get_lg_config_k(&self) -> u8 {
+        return self.instance.get_lg_config_k();
+    }
+
     pub fn write(&self) -> Vec<u8> {
         // TODO(ovr): Better way?
         self.instance.serialize().as_ref().iter().copied().collect()
@@ -78,8 +82,7 @@ impl HLLUnionDataSketch {
     }
 
     pub fn merge_with(&mut self, other: HLLDataSketch) -> Result<()> {
-        let mut union = HLLUnion::new(12);
-        union.merge(other.instance);
+        self.instance.merge(other.instance);
 
         Ok(())
     }

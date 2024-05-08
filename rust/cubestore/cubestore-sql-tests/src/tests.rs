@@ -2830,8 +2830,8 @@ async fn aggregate_index_hll_databricks(service: Box<dyn SqlClient>) {
     assert_eq!(
         to_rows(&res),
         [
-            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(0)],
-            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(0)],
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(4)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(4)],
         ]
     );
 
@@ -2839,7 +2839,7 @@ async fn aggregate_index_hll_databricks(service: Box<dyn SqlClient>) {
         .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
         .await
         .unwrap();
-    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(0)],]);
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(4)],]);
 
     let res = service
         .exec_query(
@@ -2847,7 +2847,7 @@ async fn aggregate_index_hll_databricks(service: Box<dyn SqlClient>) {
         )
         .await
         .unwrap();
-    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(0)],]);
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(4)],]);
 }
 
 async fn physical_plan_flags(service: Box<dyn SqlClient>) {
