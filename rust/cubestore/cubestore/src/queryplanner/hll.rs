@@ -88,7 +88,9 @@ impl HllUnion {
         match (self, other) {
             (Self::Airlift(l), Hll::Airlift(r)) => l.index_bit_len() == r.index_bit_len(),
             (Self::ZetaSketch(l), Hll::ZetaSketch(r)) => l.is_compatible(r),
-            (Self::DataSketches(_), Hll::DataSketches(_)) => true,
+            (Self::DataSketches(l), Hll::DataSketches(r)) => {
+                l.get_lg_config_k() == r.get_lg_config_k()
+            }
             _ => return false,
         }
     }

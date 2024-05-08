@@ -30,7 +30,10 @@ unsafe impl Sync for HLLDataSketch {}
 
 impl Debug for HLLDataSketch {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        f.debug_struct("HLLDataSketch")
+            .field("instance", &"<hidden>");
+
+        Ok(())
     }
 }
 
@@ -61,7 +64,10 @@ pub struct HLLUnionDataSketch {
 
 impl Debug for HLLUnionDataSketch {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        f.debug_struct("HLLUnionDataSketch")
+            .field("instance", &"<hidden>");
+
+        Ok(())
     }
 }
 
@@ -73,6 +79,10 @@ impl HLLUnionDataSketch {
         Self {
             instance: HLLUnion::new(lg_max_k),
         }
+    }
+
+    pub fn get_lg_config_k(&self) -> u8 {
+        return self.instance.get_lg_config_k();
     }
 
     pub fn write(&self) -> Vec<u8> {
