@@ -26,43 +26,13 @@ The AI API currently requires [views](/reference/data-model/view) in order to ge
 1. Views let you create carefully-curated datasets, resulting in better outputs from LLMs. That is, you can choose exactly what is "ready" for the AI to see and what is not.
 2. Views define deterministic joins between Cubes, so the LLM does not have to "guess" at join ordering
 
-To use the AI API, set up one or more views (for example the following):
+To use the AI API, set up one or more views before getting started.
 
-```yaml
-views:
-  - name: orders_view
-    description: "Data about orders, amount, count and breakdown by status, users and products dimension."
-
-    cubes:
-      - join_path: orders
-        includes:
-          - status
-          - created_at
-          - id
-
-          - completed_count
-          - count
-          - total_amount
-          - average_order_value
-          - completed_percentage
-
-      - join_path: orders.users
-        prefix: true
-        includes:
-          - id
-          - city
-          - age
-          - gender
-          - last_name
-          - count
-          - west_coast_users
-
-      - join_path: orders.line_items.products
-        prefix: true
-        includes:
-          - product_category
-          - count
-```
+<InfoBox>
+  By default, the AI API syncs data model changes hourly. To manually trigger a
+  sync, go to "Settings" in the Cube Cloud sidebar, then "Data Catalog
+  Services", then hit "Sync" on the Cube connection.
+</InfoBox>
 
 ### Authentication
 
