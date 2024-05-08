@@ -2188,173 +2188,63 @@ mod tests {
 
     #[tokio::test]
     async fn test_lower_in_thoughtspot() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
-        let query_plan = convert_select_to_query_plan(
+        let logical_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) IN ('female')"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-            .await;
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+            .await.as_logical_plan();
 
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("startsWith".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("endsWith".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        );
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
 
-        let query_plan = convert_select_to_query_plan(
+        assert!(sql.contains("LOWER"));
+        assert!(sql.contains("IN"));
+
+        let logical_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) IN ('female', 'male')".to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-            .await;
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+            .await.as_logical_plan();
 
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("startsWith".to_string()),
-                                    values: Some(vec!["female".to_string()]),
-                                    or: None,
-                                    and: None
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("endsWith".to_string()),
-                                    values: Some(vec!["female".to_string()]),
-                                    or: None,
-                                    and: None
-                                }),
-                            ])
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("startsWith".to_string()),
-                                    values: Some(vec!["male".to_string()]),
-                                    or: None,
-                                    and: None
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("endsWith".to_string()),
-                                    values: Some(vec!["male".to_string()]),
-                                    or: None,
-                                    and: None
-                                }),
-                            ])
-                        }),
-                    ]),
-                    and: None,
-                }]),
-                ungrouped: None,
-            }
-        );
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        assert!(sql.contains("LOWER"));
+        assert!(sql.contains("IN"));
     }
 
     #[tokio::test]
     async fn test_lower_equals_thoughtspot() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
-        let query_plan = convert_select_to_query_plan(
+        let logical_plan = convert_select_to_query_plan(
             "SELECT COUNT(*) as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) = 'female'"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
-        )
-            .await;
+        ).await.as_logical_plan();
 
-        let cube_scan = query_plan.as_logical_plan().find_cube_scan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
 
-        assert_eq!(
-            cube_scan.request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
-                segments: Some(vec![]),
-                dimensions: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("startsWith".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("endsWith".to_string()),
-                        values: Some(vec!["female".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
+        assert!(sql.contains("LOWER"));
     }
 
     #[tokio::test]
@@ -17970,6 +17860,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_thoughtspot_exclude_single_filter() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -17989,64 +17882,22 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: Some(1000),
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: None,
-                            operator: None,
-                            values: None,
-                            or: None,
-                            and: Some(vec![
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("notStartsWith".to_string()),
-                                    values: Some(vec!["male".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                                json!(V1LoadRequestQueryFilterItem {
-                                    member: Some(
-                                        "KibanaSampleDataEcommerce.customer_gender".to_string()
-                                    ),
-                                    operator: Some("notEndsWith".to_string()),
-                                    values: Some(vec!["male".to_string()]),
-                                    or: None,
-                                    and: None,
-                                }),
-                            ])
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        // check wrapping for `LOWER(..) <> .. OR .. IS NULL`
+        let re = Regex::new(r"LOWER ?\(.+\) != .+ OR .+ IS NULL").unwrap();
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]
     async fn test_thoughtspot_exclude_multiple_filter() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -18068,41 +17919,15 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: Some(1000),
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notEquals".to_string()),
-                            values: Some(vec!["male".to_string(), "female".to_string()]),
-                            or: None,
-                            and: None,
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None,
-                        }),
-                    ]),
-                    and: None,
-                }]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        // check wrapping for `NOT(LOWER(..) IN (..))`
+        let re = Regex::new(r"NOT.+LOWER ?\(.+\).* IN ").unwrap();
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]
@@ -18416,41 +18241,15 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.notes".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![V1LoadRequestQueryFilterItem {
-                    member: None,
-                    operator: None,
-                    values: None,
-                    or: Some(vec![
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notEquals".to_string()),
-                            values: Some(vec!["f".to_string(), "m".to_string()]),
-                            or: None,
-                            and: None
-                        }),
-                        json!(V1LoadRequestQueryFilterItem {
-                            member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                            operator: Some("notSet".to_string()),
-                            values: None,
-                            or: None,
-                            and: None
-                        }),
-                    ]),
-                    and: None
-                }]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        // check wrapping for `NOT(LOWER(..) IN (..)) OR NOT(.. IS NOT NULL)`
+        let re = Regex::new(r"NOT.+LOWER ?\(.+\) IN .+\) OR NOT.+ IS NOT NULL").unwrap();
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]
@@ -18768,6 +18567,10 @@ ORDER BY "source"."str0" ASC
             }
         );
 
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT ((
@@ -18787,35 +18590,15 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.content".to_string()),
-                        operator: Some("startsWith".to_string()),
-                        values: Some(vec!["test".to_string()]),
-                        or: None,
-                        and: None
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("Logs.content".to_string()),
-                        operator: Some("endsWith".to_string()),
-                        values: Some(vec!["test".to_string()]),
-                        or: None,
-                        and: None
-                    }
-                ]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        assert!(sql.contains("LOWER"));
+        assert!(sql.contains("GROUP BY"));
+        assert!(sql.contains("ORDER BY"));
     }
 
     #[tokio::test]
@@ -19367,6 +19150,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_thoughtspot_where_not_or() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -19389,35 +19175,15 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec![]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("set".to_string()),
-                        values: None,
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("notEquals".to_string()),
-                        values: Some(vec!["unknown".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                ]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        // check wrapping for `NOT(.. IS NULL OR LOWER(..) IN)`
+        let re = Regex::new(r"NOT \(.+ IS NULL OR .*LOWER\(.+ IN ").unwrap();
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]
@@ -21002,6 +20768,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn test_thoughtspot_pg_date_trunc_year() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
@@ -21025,53 +20794,18 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
-                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                    granularity: Some("year".to_string()),
-                    date_range: None,
-                }]),
-                order: None,
-                limit: None,
-                offset: None,
-                filters: Some(vec![
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("startsWith".to_string()),
-                        values: Some(vec!["none".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
-                        operator: Some("endsWith".to_string()),
-                        values: Some(vec!["none".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                        operator: Some("startsWith".to_string()),
-                        values: Some(vec!["".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                    V1LoadRequestQueryFilterItem {
-                        member: Some("KibanaSampleDataEcommerce.notes".to_string()),
-                        operator: Some("endsWith".to_string()),
-                        values: Some(vec!["".to_string()]),
-                        or: None,
-                        and: None,
-                    },
-                ]),
-                ungrouped: None,
-            }
-        )
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+
+        // check if contains `CAST(EXTRACT(YEAR FROM ..) || .. || .. || ..)`
+        let re = Regex::new(r"CAST.+EXTRACT.+YEAR FROM(.+ \|\|){3}").unwrap();
+        assert!(re.is_match(&sql));
+        // check if contains `LOWER(..) = .. AND LOWER(..) = ..`
+        let re = Regex::new(r"LOWER ?\(.+\) = .+ AND .+LOWER ?\(.+\) = .+").unwrap();
+        assert!(re.is_match(&sql));
     }
 
     #[tokio::test]
