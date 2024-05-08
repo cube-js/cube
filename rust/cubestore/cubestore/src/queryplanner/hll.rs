@@ -27,7 +27,9 @@ impl Hll {
         //  - must larger than 3 due to how protos are encoded in ZetaSketch.
         //  - represents the data format version and is <= 3 in AirLift.
         // -  checking first 3 bytes for figure out HLL from Apache DataSketches
-        if (data[0] == DS_LIST_PREINTS || data[0] == DS_HASH_SET_PREINTS || data[0] == DS_HLL_PREINTS)
+        if (data[0] == DS_LIST_PREINTS
+            || data[0] == DS_HASH_SET_PREINTS
+            || data[0] == DS_HLL_PREINTS)
             && data[1] == DS_SER_VER
             && data[2] == DS_FAMILY_ID
         {
