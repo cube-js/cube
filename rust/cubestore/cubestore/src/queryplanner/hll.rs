@@ -10,6 +10,11 @@ pub enum Hll {
     DataSketches(HLLDataSketch),     // Compatible with DataBricks
 }
 
+const DS_LIST_PREINTS: u8 = 2;
+const DS_HASH_SET_PREINTS: u8 = 3;
+const DS_SER_VER: u8 = 1;
+const DS_FAMILY_ID: u8 = 7;
+
 impl Hll {
     pub fn read(data: &[u8]) -> Result<Hll, CubeError> {
         if data.is_empty() {
@@ -18,14 +23,9 @@ impl Hll {
             ));
         }
 
-        const DS_LIST_PREINTS: u8 = 2;
-        const DS_HASH_SET_PREINTSS: u8 = 3;
-        const DS_SER_VER: u8 = 1;
-        const DS_FAMILY_ID: u8 = 7;
-
         //  - must larger than 3 due to how protos are encoded in ZetaSketch.
         //  - represents the data format version and is <= 3 in AirLift.
-        if (data[0] == DS_LIST_PREINTS || data[0] == DS_HASH_SET_PREINTSS)
+        if (data[0] == DS_LIST_PREINTS || data[0] == DS_HASH_SET_PREINTS)
             && data[1] == DS_SER_VER
             && data[2] == DS_FAMILY_ID
         {
