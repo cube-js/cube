@@ -3,8 +3,8 @@ use crate::{
         aggregate,
         analysis::LogicalPlanAnalysis,
         cube_scan, flatten_pushdown_replacer, projection,
-        rules::{flatten::FlattenRules, replacer_push_down_node},
-        transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias,
+        rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
+        transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
         LogicalPlanLanguage, ProjectionAlias,
     },
     var, var_iter,
@@ -157,9 +157,27 @@ impl FlattenRules {
             ),
         )]);
 
-        Self::list_pushdown_rules("flatten-projection-expr", "ProjectionExpr", rules);
-        Self::list_pushdown_rules("flatten-aggregate-expr", "AggregateAggrExpr", rules);
-        Self::list_pushdown_rules("flatten-group-expr", "AggregateGroupExpr", rules);
+        if self.config_obj.push_down_pull_up_split() {
+            Self::flat_list_pushdown_rules(
+                "flatten-projection-expr",
+                ListType::ProjectionExpr,
+                rules,
+            );
+            Self::flat_list_pushdown_rules(
+                "flatten-aggregate-expr",
+                ListType::AggregateAggrExpr,
+                rules,
+            );
+            Self::flat_list_pushdown_rules(
+                "flatten-group-expr",
+                ListType::AggregateGroupExpr,
+                rules,
+            );
+        } else {
+            Self::list_pushdown_rules("flatten-projection-expr", "ProjectionExpr", rules);
+            Self::list_pushdown_rules("flatten-aggregate-expr", "AggregateAggrExpr", rules);
+            Self::list_pushdown_rules("flatten-group-expr", "AggregateGroupExpr", rules);
+        }
     }
 
     pub fn flatten_projection(
@@ -278,6 +296,19 @@ impl FlattenRules {
         rules.extend(replacer_push_down_node(
             name,
             list_node,
+            |node| flatten_pushdown_replacer(node, "?inner_expr", "?inner_alias", "?top_level"),
+            true,
+        ));
+    }
+
+    fn flat_list_pushdown_rules(
+        name: &str,
+        list_type: ListType,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        rules.extend(replacer_flat_push_down_node(
+            name,
+            list_type,
             |node| flatten_pushdown_replacer(node, "?inner_expr", "?inner_alias", "?top_level"),
             true,
         ));

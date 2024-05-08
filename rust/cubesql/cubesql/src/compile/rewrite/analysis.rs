@@ -100,27 +100,28 @@ impl Member {
     pub fn add_to_egraph(
         &self,
         egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        flat_list: bool,
     ) -> Result<Id, CubeError> {
         match self {
             Member::Dimension { name, expr } => {
                 let dimension_name = egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Dimension([dimension_name, expr])))
             }
             Member::Measure { name, expr } => {
                 let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Measure([measure_name, expr])))
             }
             Member::Segment { name, expr } => {
                 let segment_name = egraph.add(LogicalPlanLanguage::SegmentName(SegmentName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Segment([segment_name, expr])))
             }
             Member::TimeDimension {
@@ -140,7 +141,7 @@ impl Member {
                     egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
                         TimeDimensionDateRange(date_range.clone()),
                     ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::TimeDimension([
                     time_dimension_name,
                     time_dimension_granularity,
@@ -152,7 +153,7 @@ impl Member {
                 let change_user_cube = egraph.add(LogicalPlanLanguage::ChangeUserCube(
                     ChangeUserCube(cube.to_string()),
                 ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::ChangeUser([change_user_cube, expr])))
             }
             Member::LiteralMember {
@@ -167,7 +168,7 @@ impl Member {
                     egraph.add(LogicalPlanLanguage::LiteralMemberRelation(
                         LiteralMemberRelation(relation.clone()),
                     ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::LiteralMember([
                     literal_member_value,
                     expr,
@@ -181,7 +182,7 @@ impl Member {
                 let virtual_field_cube = egraph.add(LogicalPlanLanguage::VirtualFieldCube(
                     VirtualFieldCube(cube.to_string()),
                 ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::VirtualField([
                     virtual_field_name,
                     virtual_field_cube,

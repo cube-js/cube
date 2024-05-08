@@ -511,11 +511,12 @@ impl Rewriter {
             )),
             Box::new(FilterRules::new(
                 meta_context.clone(),
+                config_obj.clone(),
                 eval_stable_functions,
             )),
-            Box::new(DateRules::new()),
+            Box::new(DateRules::new(config_obj.clone())),
             Box::new(OrderRules::new()),
-            Box::new(CommonRules::new()),
+            Box::new(CommonRules::new(config_obj.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
@@ -525,7 +526,7 @@ impl Rewriter {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
-            rewrites.extend(FlattenRules::new().rewrite_rules());
+            rewrites.extend(FlattenRules::new(config_obj.clone()).rewrite_rules());
         }
         if config_obj.push_down_pull_up_split() {
             rewrites
