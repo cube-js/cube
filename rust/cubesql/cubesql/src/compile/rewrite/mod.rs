@@ -737,13 +737,9 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
 
 #[allow(unused)]
 fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
-    let mut ret = format!("({list_type}");
-    for i in list {
-        ret.push(' ');
-        ret.push_str(&i.to_string());
-    }
-    ret.push(')');
-    ret
+    use itertools::Itertools;
+    let list = list.iter().join(" ");
+    format!("({list_type} {list})")
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {

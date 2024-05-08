@@ -22799,7 +22799,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         }
 
         const N: usize = 50;
-        let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();
+        let set = (1..=N).join(", ");
 
         let query = format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})");
         let query_plan = convert_select_to_query_plan(query, DatabaseProtocol::PostgreSQL).await;

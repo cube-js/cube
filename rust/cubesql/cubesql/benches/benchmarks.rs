@@ -2,6 +2,7 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use cubesql::compile::test::rewrite_engine::{
     cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
 };
+use itertools::Itertools;
 use std::sync::Arc;
 
 macro_rules! bench_func {
@@ -350,7 +351,7 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
 
 fn get_simple_long_in_expr() -> String {
     const N: usize = 50;
-    let set = (1..N).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N.to_string();
+    let set = (1..=N).join(", ");
     format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})")
 }
 
@@ -360,30 +361,61 @@ pub fn long_simple_in_expr(c: &mut Criterion) {
 }
 
 fn get_long_in_expr() -> String {
-    const N_IN: usize = 50;
-    let set = (1..N_IN).fold(String::new(), |s, x| format!("{s}{x}, ")) + &N_IN.to_string();
-
-    const N_SELECT_COL: usize = 15;
-    let select = (1..=N_SELECT_COL).fold(String::new(), |s, x| {
-        format!(r#"{s}"WideCube"."dim{x}" as "column{x}", "#)
-    }) + &format!(r#"SUM("WideCube"."dim{}") as "some_sum""#, N_SELECT_COL + 1);
-
-    let group_by = (1..N_SELECT_COL)
-        .fold(String::new(), |s, x| format!(r#"{s}"WideCube"."dim{x}", "#))
-        + &format!(r#""WideCube"."dim{}""#, N_SELECT_COL);
-
-    const N_WHERE: usize = N_SELECT_COL - 4;
-    let where_stmt = (1..N_WHERE).fold(String::new(), |s, x| {
-        format!(r#"{s}"WideCube"."dim{x}" = {x} AND "#)
-    }) + &format!(
-        r#"("WideCube"."dim{N_WHERE}" = 42 OR "WideCube"."dim{N_WHERE}" IS NULL) AND "#
-    ) + &format!(
-        r#"("WideCube"."dim{}" IN ({set}) OR "WideCube"."dim{}" IS NULL) AND "#,
-        N_WHERE + 1,
-        N_WHERE + 1
-    ) + &format!(r#""WideCube"."dim{}" = 55"#, N_SELECT_COL + 5);
-
-    format!(r#"SELECT {select} FROM "WideCube" WHERE {where_stmt} GROUP BY {group_by}"#)
+    r#"
+    SELECT 
+        "WideCube"."dim1" as "column1", 
+        "WideCube"."dim2" as "column2", 
+        "WideCube"."dim3" as "column3", 
+        "WideCube"."dim4" as "column4", 
+        "WideCube"."dim5" as "column5", 
+        "WideCube"."dim6" as "column6", 
+        "WideCube"."dim7" as "column7", 
+        "WideCube"."dim8" as "column8", 
+        "WideCube"."dim9" as "column9", 
+        "WideCube"."dim10" as "column10", 
+        "WideCube"."dim11" as "column11", 
+        "WideCube"."dim12" as "column12", 
+        "WideCube"."dim13" as "column13", 
+        "WideCube"."dim14" as "column14", 
+        "WideCube"."dim15" as "column15", 
+        SUM("WideCube"."dim16") as "some_sum" 
+    FROM 
+        "WideCube" 
+    WHERE 
+        "WideCube"."dim1" = 1 
+        AND "WideCube"."dim2" = 2 
+        AND "WideCube"."dim3" = 3 
+        AND "WideCube"."dim4" = 4 
+        AND "WideCube"."dim5" = 5 
+        AND "WideCube"."dim6" = 6 
+        AND "WideCube"."dim7" = 7 
+        AND "WideCube"."dim8" = 8 
+        AND "WideCube"."dim9" = 9 
+        AND "WideCube"."dim10" = 10 
+        AND ("WideCube"."dim11" = 42 OR "WideCube"."dim11" IS NULL) 
+        AND (
+            "WideCube"."dim12" IN (
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 
+                27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+            ) OR "WideCube"."dim12" IS NULL
+        ) AND "WideCube"."dim20" = 55 
+    GROUP BY 
+        "WideCube"."dim1", 
+        "WideCube"."dim2", 
+        "WideCube"."dim3", 
+        "WideCube"."dim4", 
+        "WideCube"."dim5", 
+        "WideCube"."dim6", 
+        "WideCube"."dim7", 
+        "WideCube"."dim8", 
+        "WideCube"."dim9", 
+        "WideCube"."dim10", 
+        "WideCube"."dim11", 
+        "WideCube"."dim12", 
+        "WideCube"."dim13", 
+        "WideCube"."dim14", 
+        "WideCube"."dim15"
+  "#.into()
 }
 
 pub fn long_in_expr(c: &mut Criterion) {
