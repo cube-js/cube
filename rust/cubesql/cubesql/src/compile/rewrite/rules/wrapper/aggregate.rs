@@ -10,7 +10,7 @@ use crate::{
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
-        LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
     var, var_iter,
@@ -158,19 +158,35 @@ impl WrapperRules {
             },
         );
 
-        Self::list_pushdown_pullup_rules(
-            rules,
-            "wrapper-aggregate-aggr-expr",
-            "AggregateAggrExpr",
-            "WrappedSelectAggrExpr",
-        );
+        if self.config_obj.push_down_pull_up_split() {
+            Self::flat_list_pushdown_pullup_rules(
+                rules,
+                "wrapper-aggregate-aggr-expr",
+                ListType::AggregateAggrExpr,
+                ListType::WrappedSelectAggrExpr,
+            );
 
-        Self::list_pushdown_pullup_rules(
-            rules,
-            "wrapper-aggregate-group-expr",
-            "AggregateGroupExpr",
-            "WrappedSelectGroupExpr",
-        );
+            Self::flat_list_pushdown_pullup_rules(
+                rules,
+                "wrapper-aggregate-group-expr",
+                ListType::AggregateGroupExpr,
+                ListType::WrappedSelectGroupExpr,
+            );
+        } else {
+            Self::list_pushdown_pullup_rules(
+                rules,
+                "wrapper-aggregate-aggr-expr",
+                "AggregateAggrExpr",
+                "WrappedSelectAggrExpr",
+            );
+
+            Self::list_pushdown_pullup_rules(
+                rules,
+                "wrapper-aggregate-group-expr",
+                "AggregateGroupExpr",
+                "WrappedSelectGroupExpr",
+            );
+        }
     }
 
     pub fn aggregate_rules_subquery(

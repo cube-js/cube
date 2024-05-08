@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        column_expr, fun_expr, literal_expr,
+        column_expr, literal_expr,
         rules::{members::min_granularity, split::SplitRules, utils::parse_granularity_string},
         LiteralExprValue, LogicalPlanLanguage,
     },
@@ -16,19 +16,19 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-part",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec!["?granularity".to_string(), column_expr("?column")],
                 )
             },
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_expr("?output_granularity"), column_expr("?column")],
                 )
             },
             |alias_column| {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![literal_expr("?output_granularity"), alias_column],
                 )
@@ -40,11 +40,11 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-trunc-within-date-part",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![
                         "?outer_granularity".to_string(),
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec!["?inner_granularity".to_string(), column_expr("?column")],
                         ),
@@ -52,13 +52,13 @@ impl SplitRules {
                 )
             },
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_expr("?output_granularity"), column_expr("?column")],
                 )
             },
             |alias_column| {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![literal_expr("?output_granularity"), alias_column],
                 )
@@ -74,13 +74,13 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-trunc",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_expr("?granularity"), column_expr("?column")],
                 )
             },
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_expr("?granularity"), column_expr("?column")],
                 )
@@ -92,13 +92,13 @@ impl SplitRules {
         );
         self.single_arg_pass_through_rules(
             "date-trunc-pass-through",
-            |expr| fun_expr("DateTrunc", vec![literal_expr("?granularity"), expr]),
+            |expr| self.fun_expr("DateTrunc", vec![literal_expr("?granularity"), expr]),
             false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "date-part-pass-through",
-            |expr| fun_expr("DatePart", vec![literal_expr("?granularity"), expr]),
+            |expr| self.fun_expr("DatePart", vec![literal_expr("?granularity"), expr]),
             false,
             rules,
         );
