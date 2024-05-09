@@ -1,10 +1,10 @@
 use crate::{
     compile::{
         rewrite::{
-            analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite,
-            rules::wrapper::WrapperRules, subquery_node, subquery_pushdown_holder,
-            transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-            LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+            analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation,
+            rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+            wrapper_pushdown_replacer, EmptyRelationSourceName, LogicalPlanLanguage,
+            WrapperPullupReplacerAliasToCube,
         },
         MetaContext,
     },
@@ -21,8 +21,8 @@ impl WrapperRules {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-subqueries-wrapped-scan-to-pull",
-                subquery_pushdown_holder(
-                    subquery_node(cube_scan_wrapper(
+                wrapper_pushdown_replacer(
+                    cube_scan_wrapper(
                         wrapper_pullup_replacer(
                             "?cube_scan_input",
                             "?inner_alias_to_cube",
@@ -31,14 +31,14 @@ impl WrapperRules {
                             "?inner_cube_members",
                         ),
                         "CubeScanWrapperFinalized:false",
-                    )),
+                    ),
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
                 wrapper_pullup_replacer(
-                    subquery_node("?cube_scan_input"),
+                    "?cube_scan_input",
                     "?alias_to_cube",
                     "?ungrouped",
                     "?in_projection",
@@ -47,60 +47,27 @@ impl WrapperRules {
                 self.transform_check_subquery_wrapped("?cube_scan_input"),
             ),
             transforming_rewrite(
-                "wrapper-subqueries-wrapped-scan-to-pull-upkskip-pushdown", //Non EmptyRalation case
-                subquery_pushdown_holder(
-                    subquery_node(wrapper_pushdown_replacer(
-                        cube_scan_wrapper(
-                            wrapper_pullup_replacer(
-                                "?cube_scan_input",
-                                "?inner_alias_to_cube",
-                                "?nner_ungrouped",
-                                "?inner_in_projection",
-                                "?inner_cube_members",
-                            ),
-                            "CubeScanWrapperFinalized:false",
+                "wrapper-subqueries-wrap-empty-rel",
+                empty_relation(
+                    "?produce_one_row",
+                    "?source_name",
+                    "EmptyRelationIsWrappable:true",
+                ),
+                cube_scan_wrapper(
+                    wrapper_pullup_replacer(
+                        empty_relation(
+                            "?produce_one_row",
+                            "?source_name",
+                            "EmptyRelationIsWrappable:true",
                         ),
                         "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    )),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                        "WrapperPullupReplacerUngrouped:false",
+                        "WrapperPullupReplacerInProjection:true",
+                        "CubeScanMembers",
+                    ),
+                    "CubeScanWrapperFinalized:false",
                 ),
-                wrapper_pullup_replacer(
-                    subquery_node("?cube_scan_input"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                self.transform_check_subquery_wrapped("?cube_scan_input"),
-            ),
-            rewrite(
-                "wrapper-subqueries-add-input-pushdown",
-                wrapper_pushdown_replacer(
-                    subquery_node("?input"),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
-                subquery_pushdown_holder(
-                    subquery_node(wrapper_pushdown_replacer(
-                        "?input",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
-                    )),
-                    "?alias_to_cube",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
-                ),
+                self.transform_wrap_empty_rel("?source_name", "?alias_to_cube"),
             ),
         ]);
         Self::list_pushdown_pullup_rules(
@@ -109,6 +76,39 @@ impl WrapperRules {
             "SubquerySubqueries",
             "WrappedSelectSubqueries",
         );
+    }
+    pub fn transform_wrap_empty_rel(
+        &self,
+        source_name_var: &'static str,
+        alias_to_cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let source_name_var = var!(source_name_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            for name in var_iter!(egraph[subst[source_name_var]], EmptyRelationSourceName) {
+                if let Some(name) = name {
+                    if let Some(cube) = meta_context
+                        .cubes
+                        .iter()
+                        .find(|c| c.name.eq_ignore_ascii_case(name))
+                    {
+                        subst.insert(
+                            alias_to_cube_var,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
+                                WrapperPullupReplacerAliasToCube(vec![(
+                                    "".to_string(),
+                                    cube.name.to_string(),
+                                )]),
+                            )),
+                        );
+                        return true;
+                    }
+                }
+            }
+
+            false
+        }
     }
 
     pub fn transform_check_subquery_allowed(

@@ -21,7 +21,6 @@ mod projection;
 mod scalar_function;
 mod sort_expr;
 mod subquery;
-mod subquery_empty_source;
 mod udf_function;
 mod window;
 mod window_function;
@@ -60,7 +59,6 @@ impl RewriteRules for WrapperRules {
         self.filter_rules(&mut rules);
         self.filter_rules_subquery(&mut rules);
         self.subquery_rules(&mut rules);
-        self.subquery_empty_source_rules(&mut rules);
         self.order_rules(&mut rules);
         self.window_rules(&mut rules);
         self.aggregate_function_rules(&mut rules);

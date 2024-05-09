@@ -45,7 +45,7 @@ use self::{
     },
     parser::parse_sql_to_statement,
     qtrace::Qtrace,
-    rewrite::converter::LogicalPlanToLanguageConverter,
+    rewrite::converter::{LogicalPlanToLanguageContext, LogicalPlanToLanguageConverter},
 };
 use crate::{
     sql::{
@@ -1313,7 +1313,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx.clone());
         let mut query_params = Some(HashMap::new());
         let root = converter
-            .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
+            .add_logical_plan_replace_params(
+                &optimized_plan,
+                &mut query_params,
+                &mut LogicalPlanToLanguageContext::default(),
+            )
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
         let mut finalized_graph = self
