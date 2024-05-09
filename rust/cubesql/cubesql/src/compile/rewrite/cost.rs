@@ -39,6 +39,7 @@ pub struct CubePlanCost {
     table_scans: i64,
     empty_wrappers: i64,
     non_detected_cube_scans: i64,
+    unwrapped_subqueries: usize,
     member_errors: i64,
     // TODO if pre-aggregation can be used for window functions, then it'd be suboptimal
     non_pushed_down_window: i64,
@@ -147,6 +148,7 @@ impl CubePlanCost {
             ast_size: self.ast_size + other.ast_size,
             ast_size_inside_wrapper: self.ast_size_inside_wrapper + other.ast_size_inside_wrapper,
             ungrouped_nodes: self.ungrouped_nodes + other.ungrouped_nodes,
+            unwrapped_subqueries: self.unwrapped_subqueries + other.unwrapped_subqueries,
         }
     }
 
@@ -199,6 +201,7 @@ impl CubePlanCost {
                 }
                 CubePlanState::Wrapper => 0,
             } + self.ungrouped_aggregates,
+            unwrapped_subqueries: self.unwrapped_subqueries,
             wrapper_nodes: self.wrapper_nodes,
             wrapped_select_ungrouped_scan: self.wrapped_select_ungrouped_scan,
             cube_scan_nodes: self.cube_scan_nodes,
@@ -378,6 +381,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
             _ => 0,
         };
 
+        let unwrapped_subqueries = match enode {
+            LogicalPlanLanguage::Subquery(_) => 1,
+            _ => 0,
+        };
+
         let initial_cost = CubePlanCostAndState {
             cost: CubePlanCost {
                 replacers: this_replacers,
@@ -402,6 +410,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 ast_size_without_alias,
                 ast_size: 1,
                 ungrouped_nodes,
+                unwrapped_subqueries,
             },
             state: match enode {
                 LogicalPlanLanguage::CubeScanWrapped(CubeScanWrapped(true)) => {

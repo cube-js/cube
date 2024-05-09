@@ -31,15 +31,15 @@ parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube", featur
 arrow = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube", features = ["default_nulls_last"] }
 csv = "1.1.3"
-bytes = "0.5.4"
+bytes = "1.6.0"
 serde_json = "1.0.56"
 futures = "0.3.26"
 smallvec = "1.11.0"
 flexbuffers = { version = "0.2.2", features = ["deserialize_human_readable", "serialize_human_readable"]}
 byteorder = "1.3.4"
-log = "0.4.20"
-simple_logger = "1.7.0"
-async-trait = "0.1.79"
+log = "0.4.21"
+simple_logger = { version = "2.3.0"}
+async-trait = "0.1.80"
 actix-rt = "2.7.0"
 regex = "1.3.9"
 uuid = { version = "0.8", features = ["serde", "v4"] }
@@ -54,9 +54,10 @@ mockall = "0.8.1"
 async-std = "0.99"
 itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
-rust-s3 = "0.26.3"
-aws-creds = "0.24.1"
-aws-region = "0.22.1"
+# Right now, it's not possible to use the 0.33 release because it has bugs
+# At the same time, 0.34-rc has a problem with large files uploading because it doesn't control number of parallels put(s)
+# Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", branch = "cubestore-0.32.3-backport", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
 reqwest = { version = "0.12.3", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
@@ -69,7 +70,7 @@ futures-timer = "3.0.2"
 tokio-stream = { version = "0.1.15", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
-tempfile = "3.2.0"
+tempfile = "3.10.1"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
@@ -77,7 +78,7 @@ memchr = "2"
 flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
-tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
+tracing-futures = { version = "0.2.5" }
 lru = "0.6.5"
 moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
@@ -92,6 +93,8 @@ rdkafka = { version = "0.29.0" }
 parse-size = "1.0.0"
 humansize = "2.1.3"
 deepsize = "0.2.0"
+anyhow = "1.0"
+arc-swap = "1.7.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }

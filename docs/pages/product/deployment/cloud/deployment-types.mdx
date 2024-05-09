@@ -39,6 +39,9 @@ Development instances are designed for development use cases only. This makes it
 easy to get started with Cube Cloud quickly, and also allows you to build and
 query pre-aggregations on-demand.
 
+Development instances don't have dedicated [refresh workers][ref-refresh-worker]
+and, consequently, they do not refresh pre-aggregations on schedule.
+
 Development instances do not provide high-availability nor do they guarantee
 fast response times. Development instances also [auto-suspend][ref-auto-sus]
 after 30 minutes of inactivity, which can cause the first request after the instance
@@ -180,3 +183,4 @@ and select from the available options:
 [ref-scalability]: /product/deployment/cloud/scalability
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-auto-sus]: /product/deployment/cloud/auto-suspension
+[ref-refresh-worker]: /product/deployment#refresh-worker

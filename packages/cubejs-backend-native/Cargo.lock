@@ -635,7 +635,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "arrow",
  "chrono",
@@ -743,7 +743,7 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -776,7 +776,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -787,7 +787,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "async-trait",
  "chrono",
@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -811,7 +811,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=9ba81506496262494ee9fdf68fcc3fac533f22aa#9ba81506496262494ee9fdf68fcc3fac533f22aa"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=554dac236d586bda9e39ea9a82f4411787f51032#554dac236d586bda9e39ea9a82f4411787f51032"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -857,17 +857,20 @@ checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 
 [[package]]
 name = "egg"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a9f1058c150e258252353a8f8e6d41036ced7d266390114d121abf2ace6e1b6b"
+version = "0.9.5"
+source = "git+https://github.com/egraphs-good/egg.git?rev=7e60716cc757448bd672f2dc28ef9a0d074dce71#7e60716cc757448bd672f2dc28ef9a0d074dce71"
 dependencies = [
+ "env_logger",
  "fxhash",
- "hashbrown 0.11.2",
+ "hashbrown 0.12.3",
  "indexmap 1.9.3",
  "instant",
  "log",
- "once_cell",
+ "num-bigint",
+ "num-traits",
+ "saturating",
  "smallvec",
+ "symbol_table",
  "symbolic_expressions",
  "thiserror",
 ]
@@ -885,6 +888,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7268b386296a025e474d5140678f75d6de9493ae55a5d709eeb9dd08149945e1"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
+dependencies = [
+ "log",
 ]
 
 [[package]]
@@ -1199,12 +1211,6 @@ name = "half"
 version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
-
-[[package]]
-name = "hashbrown"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
 
 [[package]]
 name = "hashbrown"
@@ -1593,12 +1599,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.11"
+version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
-dependencies = [
- "cfg-if 0.1.10",
-]
+checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
 
 [[package]]
 name = "log-reroute"
@@ -2763,6 +2766,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "saturating"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ece8e78b2f38ec51c51f5d475df0a7187ba5111b2a28bdc761ee05b075d40a71"
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3015,6 +3024,16 @@ name = "subtle"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81cdd64d312baedb58e21336b31bc043b77e01cc99033ce76ef539f78e965ebc"
+
+[[package]]
+name = "symbol_table"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32bf088d1d7df2b2b6711b06da3471bc86677383c57b27251e18c56df8deac14"
+dependencies = [
+ "ahash 0.7.7",
+ "hashbrown 0.12.3",
+]
 
 [[package]]
 name = "symbolic_expressions"

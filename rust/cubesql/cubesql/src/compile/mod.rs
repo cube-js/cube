@@ -7,7 +7,7 @@ use datafusion::{
         SessionContext as DFSessionContext,
     },
     logical_plan::{
-        plan::{Analyze, Explain, Extension, Projection, ToStringifiedPlan},
+        plan::{Analyze, Explain, Extension, ToStringifiedPlan},
         DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     optimizer::{
@@ -26,56 +26,28 @@ use log::warn;
 use serde::Serialize;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
-    backtrace::Backtrace, collections::HashMap, env, fmt::Formatter, future::Future, pin::Pin,
+    backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
     sync::Arc, time::SystemTime,
 };
 
 use self::{
     builder::*,
-    context::*,
     engine::{
         context::VariablesProvider,
         df::{
             optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
-            scan::{CubeScanNode, MemberField},
+            scan::CubeScanNode,
         },
         information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
-        udf::{
-            create_array_lower_udf, create_array_to_string_udf, create_array_upper_udf,
-            create_charindex_udf, create_connection_id_udf, create_convert_tz_udf,
-            create_cube_regclass_cast_udf, create_current_schema_udf, create_current_schemas_udf,
-            create_current_setting_udf, create_current_timestamp_udf, create_current_user_udf,
-            create_date_add_udf, create_date_sub_udf, create_date_to_timestamp_udf,
-            create_date_udf, create_dateadd_udf, create_datediff_udf, create_dayofmonth_udf,
-            create_dayofweek_udf, create_dayofyear_udf, create_db_udf, create_ends_with_udf,
-            create_format_type_udf, create_generate_series_udtf, create_generate_subscripts_udtf,
-            create_has_schema_privilege_udf, create_has_table_privilege_udf, create_hour_udf,
-            create_if_udf, create_inet_server_addr_udf, create_instr_udf, create_isnull_udf,
-            create_json_build_object_udf, create_least_udf, create_locate_udf, create_makedate_udf,
-            create_measure_udaf, create_minute_udf, create_pg_backend_pid_udf,
-            create_pg_datetime_precision_udf, create_pg_encoding_to_char_udf,
-            create_pg_expandarray_udtf, create_pg_get_constraintdef_udf, create_pg_get_expr_udf,
-            create_pg_get_indexdef_udf, create_pg_get_serial_sequence_udf,
-            create_pg_get_userbyid_udf, create_pg_is_other_temp_schema, create_pg_my_temp_schema,
-            create_pg_numeric_precision_udf, create_pg_numeric_scale_udf,
-            create_pg_table_is_visible_udf, create_pg_total_relation_size_udf,
-            create_pg_truetypid_udf, create_pg_truetypmod_udf, create_pg_type_is_visible_udf,
-            create_position_udf, create_quarter_udf, create_quote_ident_udf,
-            create_regexp_substr_udf, create_second_udf, create_session_user_udf, create_sha1_udf,
-            create_str_to_date_udf, create_time_format_udf, create_timediff_udf,
-            create_to_char_udf, create_to_date_udf, create_to_regtype_udf, create_ucase_udf,
-            create_unnest_udtf, create_user_udf, create_version_udf, create_year_udf,
-            register_fun_stubs,
-        },
+        udf::*,
     },
     parser::parse_sql_to_statement,
     qtrace::Qtrace,
     rewrite::converter::LogicalPlanToLanguageConverter,
 };
 use crate::{
-    compile::engine::df::scan::CubeScanOptions,
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
@@ -96,7 +68,6 @@ pub mod builder;
 pub mod context;
 pub mod engine;
 pub mod error;
-mod legacy_compiler;
 pub mod parser;
 pub mod qtrace;
 pub mod rewrite;
@@ -140,293 +111,53 @@ impl QueryPlanner {
     async fn select_to_plan(
         &self,
         stmt: &ast::Statement,
-        q: &Box<ast::Query>,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        // TODO move CUBESQL_REWRITE_ENGINE env to config
-        let rewrite_engine = env::var("CUBESQL_REWRITE_ENGINE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(true);
-        if rewrite_engine {
-            let planning_start = SystemTime::now();
-            if let Some(span_id) = span_id.as_ref() {
-                if let Some(auth_context) = self.state.auth_context() {
-                    self.session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.state.get_load_request_meta(),
-                            "SQL API Query Planning".to_string(),
-                            serde_json::json!({
-                                "query": span_id.query_key.clone(),
-                            }),
-                        )
-                        .await
-                        .map_err(|e| CompilationError::internal(e.to_string()))?;
-                }
+        let planning_start = SystemTime::now();
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = self.state.auth_context() {
+                self.session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        self.state.get_load_request_meta(),
+                        "SQL API Query Planning".to_string(),
+                        serde_json::json!({
+                            "query": span_id.query_key.clone(),
+                        }),
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
             }
-            let result = self
-                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                .await?;
+        }
+        let result = self
+            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
+            .await?;
 
-            if let Some(span_id) = span_id.as_ref() {
-                if let Some(auth_context) = self.state.auth_context() {
-                    self.session_manager
-                        .server
-                        .transport
-                        .log_load_state(
-                            Some(span_id.clone()),
-                            auth_context,
-                            self.state.get_load_request_meta(),
-                            "SQL API Query Planning Success".to_string(),
-                            serde_json::json!({
-                                "query": span_id.query_key.clone(),
-                                "duration": planning_start.elapsed().unwrap().as_millis() as u64,
-                            }),
-                        )
-                        .await
-                        .map_err(|e| CompilationError::internal(e.to_string()))?;
-                }
+        if let Some(span_id) = span_id.as_ref() {
+            if let Some(auth_context) = self.state.auth_context() {
+                self.session_manager
+                    .server
+                    .transport
+                    .log_load_state(
+                        Some(span_id.clone()),
+                        auth_context,
+                        self.state.get_load_request_meta(),
+                        "SQL API Query Planning Success".to_string(),
+                        serde_json::json!({
+                            "query": span_id.query_key.clone(),
+                            "duration": planning_start.elapsed().unwrap().as_millis() as u64,
+                        }),
+                    )
+                    .await
+                    .map_err(|e| CompilationError::internal(e.to_string()))?;
             }
-
-            return Ok(result);
         }
 
-        let select = match &q.body {
-            sqlparser::ast::SetExpr::Select(select) => select,
-            _ => {
-                return Err(CompilationError::unsupported(
-                    "Unsupported Query".to_string(),
-                ));
-            }
-        };
-
-        if select.into.is_some() {
-            return Err(CompilationError::unsupported(
-                "Unsupported query type: SELECT INTO".to_string(),
-            ));
-        }
-
-        let from_table = if select.from.len() == 1 {
-            &select.from[0]
-        } else {
-            return self
-                .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                .await;
-        };
-
-        let (db_name, schema_name, table_name) = match &from_table.relation {
-            ast::TableFactor::Table { name, .. } => match name {
-                ast::ObjectName(identifiers) => {
-                    match identifiers.len() {
-                        // db.`KibanaSampleDataEcommerce`
-                        2 => match self.state.protocol {
-                            DatabaseProtocol::MySQL => (
-                                identifiers[0].value.clone(),
-                                "public".to_string(),
-                                identifiers[1].value.clone(),
-                            ),
-                            DatabaseProtocol::PostgreSQL => (
-                                "db".to_string(),
-                                identifiers[0].value.clone(),
-                                identifiers[1].value.clone(),
-                            ),
-                        },
-                        // `KibanaSampleDataEcommerce`
-                        1 => match self.state.protocol {
-                            DatabaseProtocol::MySQL => (
-                                "db".to_string(),
-                                "public".to_string(),
-                                identifiers[0].value.clone(),
-                            ),
-                            DatabaseProtocol::PostgreSQL => (
-                                "db".to_string(),
-                                "public".to_string(),
-                                identifiers[0].value.clone(),
-                            ),
-                        },
-                        _ => {
-                            return Err(CompilationError::unsupported(format!(
-                                "Table identifier: {:?}",
-                                identifiers
-                            )));
-                        }
-                    }
-                }
-            },
-            factor => {
-                return Err(CompilationError::unsupported(format!(
-                    "table factor: {:?}",
-                    factor
-                )));
-            }
-        };
-
-        match self.state.protocol {
-            DatabaseProtocol::MySQL => {
-                if db_name.to_lowercase() == "information_schema"
-                    || db_name.to_lowercase() == "performance_schema"
-                {
-                    return self
-                        .create_df_logical_plan(stmt.clone(), &mut None, span_id.clone())
-                        .await;
-                }
-            }
-            DatabaseProtocol::PostgreSQL => {
-                if schema_name.to_lowercase() == "information_schema"
-                    || schema_name.to_lowercase() == "performance_schema"
-                    || schema_name.to_lowercase() == "pg_catalog"
-                    || schema_name.to_lowercase() == "pg_temp_3"
-                {
-                    return self
-                        .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
-                        .await;
-                }
-            }
-        };
-
-        if db_name.to_lowercase() != "db" {
-            return Err(CompilationError::unsupported(format!(
-                "Unable to access database {}",
-                db_name
-            )));
-        }
-
-        if !select.from[0].joins.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with JOIN instruction(s)".to_string(),
-            ));
-        }
-
-        if q.with.is_some() {
-            return Err(CompilationError::unsupported(
-                "Query with CTE instruction(s)".to_string(),
-            ));
-        }
-
-        if !select.cluster_by.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with CLUSTER BY instruction(s)".to_string(),
-            ));
-        }
-
-        if !select.distribute_by.is_empty() {
-            return Err(CompilationError::unsupported(
-                "Query with DISTRIBUTE BY instruction(s)".to_string(),
-            ));
-        }
-
-        if select.having.is_some() {
-            return Err(CompilationError::unsupported(
-                "Query with HAVING instruction(s)".to_string(),
-            ));
-        }
-
-        // @todo Better solution?
-        // Metabase
-        if q.to_string()
-            == format!(
-                "SELECT true AS `_` FROM `{}` WHERE 1 <> 1 LIMIT 0",
-                table_name
-            )
-        {
-            return Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![dataframe::Column::new(
-                        "_".to_string(),
-                        ColumnType::Int8,
-                        ColumnFlags::empty(),
-                    )],
-                    vec![],
-                )),
-            ));
-        };
-
-        if let Some(cube) = self.meta.find_cube_with_name(&table_name) {
-            let mut ctx = QueryContext::new(&cube);
-            let mut builder = legacy_compiler::compile_select(select, &mut ctx)?;
-
-            if let Some(limit_expr) = &q.limit {
-                let limit = limit_expr.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::unsupported(format!(
-                        "Unable to parse limit: {}",
-                        e.to_string()
-                    ))
-                })?;
-
-                builder.with_limit(limit);
-            }
-
-            if let Some(offset_expr) = &q.offset {
-                let offset = offset_expr.value.to_string().parse::<i32>().map_err(|e| {
-                    CompilationError::unsupported(format!(
-                        "Unable to parse offset: {}",
-                        e.to_string()
-                    ))
-                })?;
-
-                builder.with_offset(offset);
-            }
-
-            legacy_compiler::compile_group(&select.group_by, &ctx, &mut builder)?;
-            legacy_compiler::compile_order(&q.order_by, &ctx, &mut builder)?;
-
-            if let Some(selection) = &select.selection {
-                legacy_compiler::compile_where(selection, &ctx, &mut builder)?;
-            }
-
-            let query = builder.build();
-            let schema = query.meta_as_df_schema();
-
-            let projection_expr = query.meta_as_df_projection_expr();
-            let projection_schema = query.meta_as_df_projection_schema();
-
-            self.reauthenticate_if_needed().await?;
-
-            let scan_node = LogicalPlan::Extension(Extension {
-                node: Arc::new(CubeScanNode::new(
-                    schema.clone(),
-                    schema
-                        .fields()
-                        .iter()
-                        .map(|f| MemberField::Member(f.name().to_string()))
-                        .collect(),
-                    query.request,
-                    // @todo Remove after split!
-                    self.state.auth_context().unwrap(),
-                    CubeScanOptions {
-                        change_user: None,
-                        max_records: None,
-                    },
-                    // Empty as it's not used in the legacy compiler
-                    Vec::new(),
-                    span_id.clone(),
-                )),
-            });
-            let logical_plan = LogicalPlan::Projection(Projection {
-                expr: projection_expr,
-                input: Arc::new(scan_node),
-                schema: projection_schema,
-                alias: None,
-            });
-
-            let ctx = self.create_execution_ctx();
-            Ok(QueryPlan::DataFusionSelect(
-                StatusFlags::empty(),
-                logical_plan,
-                ctx,
-            ))
-        } else {
-            Err(CompilationError::user(format!(
-                "Unknown cube '{}'. Please ensure your schema files are valid.",
-                table_name,
-            )))
-        }
+        return Ok(result);
     }
 
     pub async fn plan(
@@ -443,7 +174,7 @@ impl QueryPlanner {
                     }
                 }
 
-                self.select_to_plan(stmt, q, qtrace, span_id.clone()).await
+                self.select_to_plan(stmt, qtrace, span_id.clone()).await
             }
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -1265,12 +996,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
-        let ast::Statement::Query(query) = stmt else {
-            return Err(CompilationError::internal(
-                "statement is unexpectedly not a Query".to_string(),
-            ));
-        };
-        let plan = self.select_to_plan(stmt, query, qtrace, span_id).await?;
+        let plan = self.select_to_plan(stmt, qtrace, span_id).await?;
         let QueryPlan::DataFusionSelect(flags, plan, ctx) = plan else {
             return Err(CompilationError::internal(
                 "unable to build DataFusion plan from Query".to_string(),
@@ -1450,6 +1176,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_pg_is_other_temp_schema());
         ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
         ctx.register_udf(create_has_table_privilege_udf(self.state.clone()));
+        ctx.register_udf(create_has_any_column_privilege_udf(self.state.clone()));
         ctx.register_udf(create_pg_total_relation_size_udf());
         ctx.register_udf(create_cube_regclass_cast_udf());
         ctx.register_udf(create_pg_get_serial_sequence_udf());
@@ -2011,6 +1738,7 @@ mod tests {
     use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
     use pretty_assertions::assert_eq;
     use regex::Regex;
+    use std::env;
 
     use super::{
         test::{get_test_session, get_test_tenant_ctx},
@@ -2018,6 +1746,7 @@ mod tests {
     };
     use crate::{
         compile::{
+            engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
             test::{
                 get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
@@ -9954,11 +9683,55 @@ ORDER BY
 
         insta::assert_snapshot!(
             "has_table_privilege_default_user",
+            // + testing priveleges in lowercase
             execute_query(
                 "SELECT
                     relname,
-                    has_table_privilege(relname, 'SELECT') \"select\",
-                    has_table_privilege(relname, 'INSERT') \"insert\"
+                    has_table_privilege(relname, 'select') \"select\",
+                    has_table_privilege(relname, 'insert') \"insert\",
+                    has_table_privilege(relname, 'delete') \"delete\"
+                FROM pg_class
+                ORDER BY relname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "has_any_column_privilege",
+            execute_query(
+                "SELECT
+                    relname,
+                    has_any_column_privilege('ovr', relname, 'SELECT') \"select\",
+                    has_any_column_privilege('ovr', relname, 'INSERT') \"insert\",
+                    has_any_column_privilege('ovr', relname, 'DELETE') \"delete\",
+                    has_any_column_privilege('ovr', relname, 'UPDATE') \"update\"
+                FROM pg_class
+                ORDER BY relname ASC
+                "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "has_any_column_privilege_default_user",
+            // + testing priveleges in lowercase
+            execute_query(
+                "SELECT
+                    relname,
+                    has_any_column_privilege(relname, 'select') \"select\",
+                    has_any_column_privilege(relname, 'insert') \"insert\",
+                    has_any_column_privilege(relname, 'delete') \"delete\",
+                    has_any_column_privilege(relname, 'update') \"update\"
                 FROM pg_class
                 ORDER BY relname ASC
                 "
@@ -15893,7 +15666,7 @@ ORDER BY "source"."str0" ASC
                     granularity: Some("day".to_string()),
                     date_range: Some(json!(vec![
                         "2020-01-01T00:00:00.000Z".to_string(),
-                        format!("{}T00:00:00.000Z", end_date),
+                        format!("{}T23:59:59.999Z", end_date),
                     ]))
                 }]),
                 order: Some(vec![vec![
@@ -19920,27 +19693,27 @@ ORDER BY "source"."str0" ASC
                 "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
+            ("<=", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
+            ("<=", "2020-04-01", "beforeDate", "2020-05-01T00:00:00.000Z"),
+            ("<=", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
             (
-                "<=",
+                ">",
                 "2020-03-25",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-04-01T00:00:00.000Z",
             ),
             (
-                "<=",
+                ">",
                 "2020-04-01",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
             (
-                "<=",
+                ">",
                 "2020-04-10",
-                "beforeOrOnDate",
+                "afterOrOnDate",
                 "2020-05-01T00:00:00.000Z",
             ),
-            (">", "2020-03-25", "afterDate", "2020-04-01T00:00:00.000Z"),
-            (">", "2020-04-01", "afterDate", "2020-05-01T00:00:00.000Z"),
-            (">", "2020-04-10", "afterDate", "2020-05-01T00:00:00.000Z"),
             ("<", "2020-03-25", "beforeDate", "2020-04-01T00:00:00.000Z"),
             ("<", "2020-04-01", "beforeDate", "2020-04-01T00:00:00.000Z"),
             ("<", "2020-04-10", "beforeDate", "2020-05-01T00:00:00.000Z"),
@@ -20406,11 +20179,151 @@ ORDER BY "source"."str0" ASC
             .sql
             .contains("COALESCE"));
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_projection() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("\\\"limit\\\":1"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_projection_aggregate() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("LIMIT 1"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_equal() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender = (select customer_gender from KibanaSampleDataEcommerce limit 1)"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("(SELECT"));
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("\\\"limit\\\":1"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_in() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select customer_gender from KibanaSampleDataEcommerce)"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("IN (SELECT"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_and_projection() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (select customer_gender from KibanaSampleDataEcommerce limit 1), avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select customer_gender from KibanaSampleDataEcommerce)"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("IN (SELECT"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
 
     #[tokio::test]
@@ -21463,7 +21376,7 @@ ORDER BY "source"."str0" ASC
                 offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
-                    operator: Some("afterDate".to_string()),
+                    operator: Some("afterOrOnDate".to_string()),
                     values: Some(vec!["2020-01-02T00:00:00.000Z".to_string()]),
                     or: None,
                     and: None,
@@ -22686,6 +22599,44 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
     }
 
     #[tokio::test]
+    async fn test_metabase_table_privilege_query_v2() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "metabase_table_privilege_query_v2",
+            execute_query(
+                r#"
+                with table_privileges as (
+	 select
+	   NULL as role,
+	   t.schemaname as schema,
+	   t.objectname as table,
+	   pg_catalog.has_any_column_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'update') as update,
+	   pg_catalog.has_any_column_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'select') as select,
+	   pg_catalog.has_any_column_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'insert') as insert,
+	   pg_catalog.has_table_privilege(current_user, '"' || t.schemaname || '"' || '.' || '"' || t.objectname || '"',  'delete') as delete
+	 from (
+	   select schemaname, tablename as objectname from pg_catalog.pg_tables
+	   union
+	   select schemaname, viewname as objectname from pg_catalog.pg_views
+	   union
+	   select schemaname, matviewname as objectname from pg_catalog.pg_matviews
+	 ) t
+	 where t.schemaname !~ '^pg_'
+	   and t.schemaname <> 'information_schema'
+	   and pg_catalog.has_schema_privilege(current_user, t.schemaname, 'usage')
+	)
+	select t.*
+	from table_privileges t
+    order by t.schema, t.table
+                "#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
     async fn test_string_unicode_escapes() {
         init_logger();
 
@@ -22859,6 +22810,90 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             .unwrap()
             .sql
             .contains("SELECT DISTINCT "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_no_cycle_applier() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT "customer_gender" AS "customer_gender"
+            FROM (
+                SELECT "customer_gender" AS "customer_gender"
+                FROM "KibanaSampleDataEcommerce"
+                GROUP BY "customer_gender"
+                ORDER BY "customer_gender" ASC
+            ) AS "KibanaSampleDataEcommerce"
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    "asc".to_string(),
+                ]]),
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_push_down_window_frame() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                customer_gender,
+                taxful_total_price,
+                CASE
+                    WHEN customer_gender IS NOT NULL THEN avg(taxful_total_price) OVER (
+                        PARTITION BY customer_gender
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    )
+                    ELSE 0
+                END AS "avg"
+            FROM KibanaSampleDataEcommerce k
+            GROUP BY 1, 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert!(logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql
+            .contains("ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"));
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
         println!(

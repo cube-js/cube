@@ -73,6 +73,7 @@ impl RocksCacheStoreDetails {
 
         populate_indexes!(CacheItemRocksTable);
         populate_indexes!(QueueItemRocksTable);
+        populate_indexes!(QueueItemPayloadRocksTable);
         populate_indexes!(QueueResultRocksTable);
 
         CompactionPreloadedState::new(indexes)
@@ -1074,7 +1075,11 @@ impl CacheStore for RocksCacheStore {
                     let queue_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
                     queue_payload_schema.insert_with_pk(
                         queue_item_row.id,
-                        QueueItemPayload::new(payload.value, payload.orphaned),
+                        QueueItemPayload::new(
+                            payload.value,
+                            queue_item_row.row.get_created().clone(),
+                            queue_item_row.row.get_expire().clone(),
+                        ),
                         batch_pipe,
                     )?;
 
@@ -1095,6 +1100,9 @@ impl CacheStore for RocksCacheStore {
             .write_operation(move |db_ref, batch_pipe| {
                 let queue_item_schema = QueueItemRocksTable::new(db_ref.clone());
                 queue_item_schema.truncate(batch_pipe)?;
+
+                let queue_item_payload_schema = QueueItemPayloadRocksTable::new(db_ref.clone());
+                queue_item_payload_schema.truncate(batch_pipe)?;
 
                 let queue_result_schema = QueueResultRocksTable::new(db_ref);
                 queue_result_schema.truncate(batch_pipe)?;
@@ -1345,14 +1353,16 @@ impl CacheStore for RocksCacheStore {
     async fn queue_ack(&self, key: QueueKey, result: Option<String>) -> Result<bool, CubeError> {
         self.store
             .write_operation(move |db_ref, batch_pipe| {
-                let queue_schema = QueueItemRocksTable::new(db_ref.clone());
+                let queue_item_tbl = QueueItemRocksTable::new(db_ref.clone());
+                let queue_item_payload_tbl = QueueItemPayloadRocksTable::new(db_ref.clone());
 
-                let item_row = queue_schema.get_row_by_key(key.clone())?;
+                let item_row = queue_item_tbl.get_row_by_key(key.clone())?;
                 if let Some(item_row) = item_row {
                     let path = item_row.get_row().get_path();
                     let id = item_row.get_id();
 
-                    queue_schema.delete_row(item_row, batch_pipe)?;
+                    queue_item_tbl.delete_row(item_row, batch_pipe)?;
+                    queue_item_payload_tbl.try_delete(id, batch_pipe)?;
 
                     if let Some(result) = result {
                         let queue_result = QueueResult::new(path.clone(), result);

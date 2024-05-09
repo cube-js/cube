@@ -3,6 +3,170 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.29](https://github.com/cube-js/cube/compare/v0.35.28...v0.35.29) (2024-05-03)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.28](https://github.com/cube-js/cube/compare/v0.35.27...v0.35.28) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* primary and foreign keys driver queries ([#8115](https://github.com/cube-js/cube/issues/8115)) ([35bb1d4](https://github.com/cube-js/cube/commit/35bb1d435a75f53f704e9c5e33382093cbc4e115))
+
+
+
+
+
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.20](https://github.com/cube-js/cube/compare/v0.35.19...v0.35.20) (2024-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.18](https://github.com/cube-js/cube/compare/v0.35.17...v0.35.18) (2024-04-17)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.16](https://github.com/cube-js/cube/compare/v0.35.15...v0.35.16) (2024-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.15](https://github.com/cube-js/cube/compare/v0.35.14...v0.35.15) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+
+### Bug Fixes
+
+* **server-core:** Handle schemaPath default value correctly everywhere (refix) ([#8152](https://github.com/cube-js/cube/issues/8152)) ([678f17f](https://github.com/cube-js/cube/commit/678f17f2ef5a2cf38b28e3c095a721f1cd38fb56))
+
+
+
+
+
+## [0.35.13](https://github.com/cube-js/cube/compare/v0.35.12...v0.35.13) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
+## [0.35.12](https://github.com/cube-js/cube/compare/v0.35.11...v0.35.12) (2024-04-12)
+
+
+### Reverts
+
+* Revert "fix(server-core): Handle schemaPath default value correctly everywhere (#8131)" ([22a6f8b](https://github.com/cube-js/cube/commit/22a6f8b5e959db02f8eab89e2a9e873ef0a8ce87)), closes [#8131](https://github.com/cube-js/cube/issues/8131)
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+
+### Bug Fixes
+
+* **server-core:** Handle schemaPath default value correctly everywhere ([#8131](https://github.com/cube-js/cube/issues/8131)) ([23bd621](https://github.com/cube-js/cube/commit/23bd621541c1646ff6430deef9e0d7fc5f149f2f))
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

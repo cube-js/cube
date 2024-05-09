@@ -95,7 +95,7 @@ impl OrderRules {
                     .clone()
                 {
                     let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
-                    let referenced_columns = referenced_columns(referenced_expr.clone());
+                    let referenced_columns = referenced_columns(referenced_expr);
                     if referenced_columns
                         .iter()
                         .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
@@ -131,7 +131,7 @@ impl OrderRules {
             if let Some(OriginalExpr::Expr(expr)) =
                 egraph[subst[expr_var]].data.original_expr.clone()
             {
-                let column_name = expr_column_name(expr.clone(), &None);
+                let column_name = expr_column_name(&expr, &None);
                 for asc in var_iter!(egraph[subst[asc_var]], SortExprAsc) {
                     let asc = *asc;
                     for column_name_to_member in var_iter!(

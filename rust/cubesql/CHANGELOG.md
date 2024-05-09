@@ -3,6 +3,69 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubesql:** Disallow ematching cycles ([4902c6d](https://github.com/cube-js/cube.js/commit/4902c6d3f882a0ee27f62d63d8b0fcda3669a0b1))
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix `date_trunc` over column offset in filters ([1a602be](https://github.com/cube-js/cube/commit/1a602bea8fc17cc258c6d125ea8e7904b33454ff))
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* **cubesql:** In subquery rewrite ([#8162](https://github.com/cube-js/cube/issues/8162)) ([d17c2a7](https://github.com/cube-js/cube/commit/d17c2a7d58beada203009c5d624974d3a68c6af8))
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube.js/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+
+### Features
+
+* **cubesql:** Update egg and remove some clones ([#8164](https://github.com/cube-js/cube.js/issues/8164)) ([fe20d35](https://github.com/cube-js/cube.js/commit/fe20d3575abc7105f827b979266e147299553aee))
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Support latest Metabase, fix [#8105](https://github.com/cube-js/cube/issues/8105) ([#8130](https://github.com/cube-js/cube/issues/8130)) ([c82bb10](https://github.com/cube-js/cube/commit/c82bb10ed383f9c0cec04def8ac7dc53283f7254))
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 

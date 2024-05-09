@@ -14,7 +14,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
-        ExprRewriter, JoinConstraint, JoinType, Operator,
+        ExprRewriter, JoinConstraint, JoinType, Operator, RewriteRecursion,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -31,6 +31,8 @@ use std::{
     slice::Iter,
     str::FromStr,
 };
+
+use self::analysis::{LogicalPlanData, MemberNameToExpr};
 
 // trace_macros!(true);
 
@@ -242,7 +244,7 @@ crate::plan_to_language! {
             list: Vec<Expr>,
             negated: bool,
         },
-        InSubquery {
+        InSubqueryExpr {
             expr: Box<Expr>,
             subquery: Box<Expr>,
             negated: bool,
@@ -256,6 +258,7 @@ crate::plan_to_language! {
         WrappedSelect {
             select_type: WrappedSelectType,
             projection_expr: Vec<Expr>,
+            subqueries: Vec<LogicalPlan>,
             group_expr: Vec<Expr>,
             aggr_expr: Vec<Expr>,
             window_expr: Vec<Expr>,
@@ -275,6 +278,10 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             expr: Arc<Expr>,
             join_type: JoinType,
+        },
+        WrappedSubquery {
+            input: Arc<LogicalPlan>,
+            subqueries: Vec<LogicalPlan>,
         },
 
         CubeScan {
@@ -510,7 +517,7 @@ impl ExprRewriter for WithColumnRelation {
     fn mutate(&mut self, expr: Expr) -> Result<Expr, DataFusionError> {
         match expr {
             Expr::Column(c) => Ok(Expr::Column(Column {
-                name: c.name.to_string(),
+                name: c.name,
                 relation: if let Some(rel) = self.0.as_ref() {
                     c.relation.or_else(|| Some(rel.to_string()))
                 } else {
@@ -520,38 +527,48 @@ impl ExprRewriter for WithColumnRelation {
             e => Ok(e),
         }
     }
+
+    // As a rewriter, it seems we only care about the top-level of the expression,
+    // this function defn tells the rewriter to not recurse into the children of the expression
+    fn pre_visit(&mut self, _expr: &Expr) -> datafusion::error::Result<RewriteRecursion> {
+        Ok(RewriteRecursion::Mutate)
+    }
 }
 
+// TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
     member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
     member_name_to_expr
         .into_iter()
-        .map(|(member, _, expr)| {
-            vec![
-                (expr_column_name(expr.clone(), &None), member.clone()),
-                (expr_column_name_with_relation(expr, &mut relation), member),
+        .flat_map(|(member, _, expr)| {
+            [
+                (expr_column_name(&expr, &None), member.clone()),
+                (expr_column_name_with_relation(&expr, &mut relation), member),
             ]
         })
-        .flatten()
         .collect::<Vec<_>>()
 }
 
-pub fn column_name_to_member_def_vec(
-    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
-) -> Vec<(String, Member)> {
-    let mut relation = WithColumnRelation(None);
-    member_name_to_expr
-        .into_iter()
-        .map(|(_, member, expr)| {
-            vec![
-                (expr_column_name(expr.clone(), &None), member.clone()),
-                (expr_column_name_with_relation(expr, &mut relation), member),
-            ]
-        })
-        .flatten()
-        .collect::<Vec<_>>()
+impl LogicalPlanData {
+    fn find_member(
+        &self,
+        f: impl Fn(&MemberNameToExpr, &str) -> bool,
+    ) -> Option<(&MemberNameToExpr, String)> {
+        let mut relation = WithColumnRelation(None);
+        for tuple @ (_, _member, expr) in self.member_name_to_expr.as_ref()?.iter() {
+            let column_name = expr_column_name(&expr, &None);
+            if f(tuple, &column_name) {
+                return Some((tuple, column_name));
+            }
+            let column_name = expr_column_name_with_relation(&expr, &mut relation);
+            if f(tuple, &column_name) {
+                return Some((tuple, column_name));
+            }
+        }
+        None
+    }
 }
 
 fn column_name_to_member_to_aliases(
@@ -569,33 +586,29 @@ fn member_name_by_alias(
     id: Id,
     alias: &str,
 ) -> Option<String> {
-    if let Some(member_name_to_expr) = egraph.index(id).data.member_name_to_expr.as_ref() {
-        let column_name_to_member = column_name_to_member_vec(member_name_to_expr.clone());
-        column_name_to_member
-            .into_iter()
-            .find(|(cn, _)| cn == alias)
-            .map(|(_, member)| member)
-            .flatten()
-    } else {
-        None
-    }
+    egraph
+        .index(id)
+        .data
+        .find_member(|_, a| a == alias)
+        .and_then(|(m, _a)| m.0.clone())
 }
 
-fn referenced_columns(referenced_expr: Vec<Expr>) -> Vec<String> {
+fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
     referenced_expr
-        .into_iter()
+        .iter()
         .map(|expr| expr_column_name(expr, &None))
         .collect::<Vec<_>>()
 }
 
-fn expr_column_name_with_relation(expr: Expr, relation: &mut WithColumnRelation) -> String {
-    expr.rewrite(relation)
+fn expr_column_name_with_relation(expr: &Expr, relation: &mut WithColumnRelation) -> String {
+    expr.clone() // TODO(mwillsey) remove clone somehow
+        .rewrite(relation)
         .unwrap()
         .name(&DFSchema::empty())
         .unwrap()
 }
 
-fn expr_column_name(expr: Expr, cube: &Option<String>) -> String {
+fn expr_column_name(expr: &Expr, cube: &Option<String>) -> String {
     if let Some(cube) = cube.as_ref() {
         expr_column_name_with_relation(expr, &mut WithColumnRelation(Some(cube.to_string())))
     } else {
@@ -811,6 +824,7 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
 fn wrapped_select(
     select_type: impl Display,
     projection_expr: impl Display,
+    subqueries: impl Display,
     group_expr: impl Display,
     aggr_expr: impl Display,
     window_expr: impl Display,
@@ -827,9 +841,10 @@ fn wrapped_select(
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
-        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
+        "(WrappedSelect {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {} {})",
         select_type,
         projection_expr,
+        subqueries,
         group_expr,
         aggr_expr,
         window_expr,
@@ -854,6 +869,10 @@ fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> St
 
 fn wrapped_select_projection_expr_empty_tail() -> String {
     "WrappedSelectProjectionExpr".to_string()
+}
+
+fn wrapped_select_subqueries_empty_tail() -> String {
+    "WrappedSelectSubqueries".to_string()
 }
 
 #[allow(dead_code)]
@@ -980,6 +999,10 @@ fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> Str
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
     format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {
+    format!("(InSubqueryExpr {} {} {})", expr, subquery, negated)
 }
 
 fn between_expr(
@@ -1126,6 +1149,10 @@ fn sort(expr: impl Display, input: impl Display) -> String {
 
 fn filter(expr: impl Display, input: impl Display) -> String {
     format!("(Filter {} {})", expr, input)
+}
+
+fn subquery(input: impl Display, subqueries: impl Display, types: impl Display) -> String {
+    format!("(Subquery {} {} {})", input, subqueries, types)
 }
 
 fn join(
@@ -1585,12 +1612,13 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         result
     }
 
-    fn search_eclass(
+    fn search_eclass_with_limit(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         eclass: Id,
+        limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        if let Some(m) = self.main.search_eclass(egraph, eclass) {
+        if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
             self.search_match_chained(egraph, m, self.chain.iter())
         } else {
             None

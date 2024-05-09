@@ -223,5 +223,51 @@ ORDER BY
   `);
       expect(res.rows).toMatchSnapshot('metabase max number');
     });
+
+    test('power bi post aggregate measure wrap', async () => {
+      const res = await connection.query(`
+select 
+  "_"."createdAt", 
+  "_"."a0",
+  "_"."a1"
+from 
+  ( 
+    select 
+      "rows"."createdAt" as "createdAt", 
+      sum(cast("rows"."amountRankView" as decimal)) as "a0",
+      max("rows"."amountRankDate") as "a1" 
+    from 
+      ( 
+        select 
+          "_"."status", 
+          "_"."createdAt", 
+          "_"."amountRankView",
+          "_"."amountRankDate"
+        from 
+          "public"."Orders" "_" 
+        where 
+          "_"."status" = 'shipped'
+      ) "rows" 
+    group by 
+      "createdAt" 
+  ) "_" 
+where 
+  not "_"."a0" is null or
+  not "_"."a1" is null
+limit 
+  1000001
+  `);
+      expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
+    });
+
+    test('date/string measures in view', async () => {
+      const queryCtor = (column: string) => `SELECT "${column}" AS val FROM "OrdersView" ORDER BY "id" LIMIT 10`;
+
+      const resStr = await connection.query(queryCtor('countAndTotalAmount'));
+      expect(resStr.rows).toMatchSnapshot('string case');
+
+      const resDate = await connection.query(queryCtor('createdAtMaxProxy'));
+      expect(resDate.rows).toMatchSnapshot('date case');
+    });
   });
 });

@@ -3,6 +3,269 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.29](https://github.com/cube-js/cube/compare/v0.35.28...v0.35.29) (2024-05-03)
+
+
+### Bug Fixes
+
+* Apply time shift after timezone conversions to avoid double casts ([#8229](https://github.com/cube-js/cube/issues/8229)) ([651b9e0](https://github.com/cube-js/cube/commit/651b9e029d8b0a685883d5151a0538f2f6429da2))
+* **schema-compiler:** support string measures in views ([#8194](https://github.com/cube-js/cube/issues/8194)) ([fadfd1f](https://github.com/cube-js/cube/commit/fadfd1f557a16bc7f4e6c8c0daeca7c6ac1bf237))
+
+
+
+
+
+## [0.35.28](https://github.com/cube-js/cube/compare/v0.35.27...v0.35.28) (2024-05-02)
+
+
+### Bug Fixes
+
+* **schema-compiler:** views sorting ([#8228](https://github.com/cube-js/cube/issues/8228)) ([50b459a](https://github.com/cube-js/cube/commit/50b459a6135cb27bb7e52f04639c3a0ad6c89b97))
+
+
+
+
+
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+
+### Bug Fixes
+
+* **cubestore:** Queue - remove queue item payload on ack (reduce compaction) ([#8225](https://github.com/cube-js/cube/issues/8225)) ([ac58583](https://github.com/cube-js/cube/commit/ac5858384e26b9b9077e9ffeb42d64da874d1f62))
+* **cubestore:** Queue - truncate unused queue rows via TTL ([#8227](https://github.com/cube-js/cube/issues/8227)) ([70ecbef](https://github.com/cube-js/cube/commit/70ecbefadc00eb857362ae647f136873a708bb80))
+
+
+### Features
+
+* **cubestore:** Allow to truncate queue item payloads via system command ([#8226](https://github.com/cube-js/cube/issues/8226)) ([75d4eac](https://github.com/cube-js/cube/commit/75d4eac3b48acfc02c8affacdf28f1f0897087b0))
+
+
+
+
+
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+
+### Bug Fixes
+
+* **gateway:** Don't process meta with `onlyCompilerId` flag set ([76ae23e](https://github.com/cube-js/cube/commit/76ae23edbe0adc101c788f671b2f9760dd7c032d))
+* **gateway:** missed v1 graphql-to-json endpoint ([a24d69b](https://github.com/cube-js/cube/commit/a24d69bd1db5da3b2773ad2f1a512cd72192c031))
+* **gateway:** Optimize `filterVisibleItemsInMeta` performance ([b0fdbd3](https://github.com/cube-js/cube/commit/b0fdbd30d327c0a681a594fbf4ef063ef7a91f58))
+* **schema-compiler:** foreign keys assignment ([#8208](https://github.com/cube-js/cube/issues/8208)) ([74affc4](https://github.com/cube-js/cube/commit/74affc40a70a4b6bb19f9ee438d6f4d0e4bd27fa))
+
+
+### Features
+
+* **schema-compiler:** hierarchies ([#8102](https://github.com/cube-js/cube/issues/8102)) ([c98683f](https://github.com/cube-js/cube/commit/c98683f07a286c6f4cf71c656e3e336295a0cc78))
+* **schema-compiler:** Upgrade cron-parser to 4.9, fix [#8203](https://github.com/cube-js/cube/issues/8203) ([#8214](https://github.com/cube-js/cube/issues/8214)) ([f643c4b](https://github.com/cube-js/cube/commit/f643c4ba55e5f69c161dd687c79d7ce359fcf8e5))
+* Support post-aggregate time shifts for prior period lookup support ([#8215](https://github.com/cube-js/cube/issues/8215)) ([a9f55d8](https://github.com/cube-js/cube/commit/a9f55d80ee36be6a197cdfed6e1d202a52c1a39d))
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubesql:** Disallow ematching cycles ([4902c6d](https://github.com/cube-js/cube/commit/4902c6d3f882a0ee27f62d63d8b0fcda3669a0b1))
+* **cubestore:** Error in optimization for nested boolean expressions ([#7891](https://github.com/cube-js/cube/issues/7891)) ([e5d20d2](https://github.com/cube-js/cube/commit/e5d20d228ac07849dbcd4df2f713ea01fc74f0fe))
+
+
+### Features
+
+* Rolling YTD, QTD and MTD measure support ([#8196](https://github.com/cube-js/cube/issues/8196)) ([bfc0708](https://github.com/cube-js/cube/commit/bfc0708502f78902e481608b4f83c2eee6182636))
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix `date_trunc` over column offset in filters ([1a602be](https://github.com/cube-js/cube/commit/1a602bea8fc17cc258c6d125ea8e7904b33454ff))
+* **cubestore:** S3 - STS credentials (backport fix for 0.32.3) ([#8195](https://github.com/cube-js/cube/issues/8195)) ([9d9cb4a](https://github.com/cube-js/cube/commit/9d9cb4a025931da24d560220878b7450f81de22c))
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Bug Fixes
+
+* **client-core:** castNumerics option for CubeApi ([#8186](https://github.com/cube-js/cube/issues/8186)) ([6ff2208](https://github.com/cube-js/cube/commit/6ff22088ede88521c6c5a5e8cb1a77c819301ad4))
+
+
+### Features
+
+* **api-gateway:** graphql json query conversion ([#8189](https://github.com/cube-js/cube/issues/8189)) ([55ea7c8](https://github.com/cube-js/cube/commit/55ea7c86f49163b6c65fb277966a0e8b572a5fd5))
+* **cubesql:** In subquery rewrite ([#8162](https://github.com/cube-js/cube/issues/8162)) ([d17c2a7](https://github.com/cube-js/cube/commit/d17c2a7d58beada203009c5d624974d3a68c6af8))
+* primary and foreign keys driver queries ([#8115](https://github.com/cube-js/cube/issues/8115)) ([35bb1d4](https://github.com/cube-js/cube/commit/35bb1d435a75f53f704e9c5e33382093cbc4e115))
+
+
+
+
+
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - wrong credentials ([1313cdd](https://github.com/cube-js/cube/commit/1313cdd6d3882a7c4644e9d397df7745116246bb))
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **cubestore:** MINIORemoteFs - use only simple auth from S3 client ([#8170](https://github.com/cube-js/cube/issues/8170)) ([66403ad](https://github.com/cube-js/cube/commit/66403ad1be6ec34d8b68444553c40dbc1543f3e5))
+* Logical boolean measure filter for post aggregate measures support ([92cee95](https://github.com/cube-js/cube/commit/92cee954b1252b0234e3008fb74d88d7b1c3c47f))
+* **native:** Better error message on unexpected values while streaming ([#8172](https://github.com/cube-js/cube/issues/8172)) ([bcf3438](https://github.com/cube-js/cube/commit/bcf3438682951d7b917866870fc029af3efe2362))
+
+
+
+
+
+## [0.35.20](https://github.com/cube-js/cube/compare/v0.35.19...v0.35.20) (2024-04-18)
+
+
+### Features
+
+* Allow all calculated measure types in post aggregate measures ([66f3acc](https://github.com/cube-js/cube/commit/66f3accd2f4b84ccdc41ece68da5c0c73998df29))
+* Post aggregate raw dimension with date range support ([23411cf](https://github.com/cube-js/cube/commit/23411cfe8152687b6a8ed02c073b151217c60e6a))
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+
+### Features
+
+* **cubesql:** Update egg and remove some clones ([#8164](https://github.com/cube-js/cube/issues/8164)) ([fe20d35](https://github.com/cube-js/cube/commit/fe20d3575abc7105f827b979266e147299553aee))
+* Post aggregate measure filter support ([120f22b](https://github.com/cube-js/cube/commit/120f22b4a52e5328ebfeea60e90b2b1aa1839feb))
+
+
+
+
+
+## [0.35.18](https://github.com/cube-js/cube/compare/v0.35.17...v0.35.18) (2024-04-17)
+
+
+### Features
+
+* Post aggregate no granularity time dimension support ([f7a99f6](https://github.com/cube-js/cube/commit/f7a99f6e3f61b766e1581f2af574dc5d81f58101))
+* Post aggregate view support ([#8161](https://github.com/cube-js/cube/issues/8161)) ([acb507d](https://github.com/cube-js/cube/commit/acb507d21d29b25592050bcf49c09fb9d88a7d93))
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix wrong optimization in total count queries ([#7964](https://github.com/cube-js/cube/issues/7964)) ([7a8ddf0](https://github.com/cube-js/cube/commit/7a8ddf056a075c9224657d1497e2679502acc515))
+* ungrouped not getting applied for MSSQL ([#7997](https://github.com/cube-js/cube/issues/7997)) Thanks @UsmanYasin ! ([3fac97c](https://github.com/cube-js/cube/commit/3fac97cc4c72dc78b8016014cfa536f54c1be9d8))
+
+
+### Features
+
+* **cubestore:** Upgrade rust-s3 0.26.3 -> 0.32.3 ([#6019](https://github.com/cube-js/cube/issues/6019)) ([4b8d4d3](https://github.com/cube-js/cube/commit/4b8d4d3c3445dcd817945e3a71a70d0084644d4c))
+* **cubestore:** Use S3 client in async way ([#8158](https://github.com/cube-js/cube/issues/8158)) ([7f286fe](https://github.com/cube-js/cube/commit/7f286fee90897048f8a2735a2a9e171d40e47da4))
+
+
+
+
+
+## [0.35.16](https://github.com/cube-js/cube/compare/v0.35.15...v0.35.16) (2024-04-16)
+
+
+### Features
+
+* Post aggregate time dimensions support ([4071e8a](https://github.com/cube-js/cube/commit/4071e8a112823150e98703a2face4ccb98fd9e86))
+
+
+
+
+
+## [0.35.15](https://github.com/cube-js/cube/compare/v0.35.14...v0.35.15) (2024-04-15)
+
+
+### Features
+
+* Post aggregate filter support ([49131ea](https://github.com/cube-js/cube/commit/49131ea8adb025b974ce6a4a596d6637df47bdea))
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+
+### Bug Fixes
+
+* **server-core:** Handle schemaPath default value correctly everywhere (refix) ([#8152](https://github.com/cube-js/cube/issues/8152)) ([678f17f](https://github.com/cube-js/cube/commit/678f17f2ef5a2cf38b28e3c095a721f1cd38fb56))
+
+
+
+
+
+## [0.35.13](https://github.com/cube-js/cube/compare/v0.35.12...v0.35.13) (2024-04-15)
+
+
+### Features
+
+* Post aggregate measure support ([#8145](https://github.com/cube-js/cube/issues/8145)) ([2648a26](https://github.com/cube-js/cube/commit/2648a26a6149c31615d5df105575e5c30117be6f))
+
+
+
+
+
+## [0.35.12](https://github.com/cube-js/cube/compare/v0.35.11...v0.35.12) (2024-04-12)
+
+
+### Bug Fixes
+
+* **snowflake-driver:** Unable to detect a Project Id in the current environment for GCS export bucket ([03ca8fa](https://github.com/cube-js/cube/commit/03ca8fa9b7222ddaf0d52c1ead221ac26827c054))
+
+
+### Reverts
+
+* Revert "fix(server-core): Handle schemaPath default value correctly everywhere (#8131)" ([22a6f8b](https://github.com/cube-js/cube/commit/22a6f8b5e959db02f8eab89e2a9e873ef0a8ce87)), closes [#8131](https://github.com/cube-js/cube/issues/8131)
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+
+### Bug Fixes
+
+* **cubesql:** Support latest Metabase, fix [#8105](https://github.com/cube-js/cube/issues/8105) ([#8130](https://github.com/cube-js/cube/issues/8130)) ([c82bb10](https://github.com/cube-js/cube/commit/c82bb10ed383f9c0cec04def8ac7dc53283f7254))
+* **server-core:** Handle schemaPath default value correctly everywhere ([#8131](https://github.com/cube-js/cube/issues/8131)) ([23bd621](https://github.com/cube-js/cube/commit/23bd621541c1646ff6430deef9e0d7fc5f149f2f))
+
+
+### Features
+
+* **cubestore:** Enable jemalloc allocator for RocksDB on linux GNU ([#8104](https://github.com/cube-js/cube/issues/8104)) ([ee7bcee](https://github.com/cube-js/cube/commit/ee7bceeee43c45e0a183272b16b3932288146370))
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 

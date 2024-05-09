@@ -14,7 +14,7 @@ use crate::{
             ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
             CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, InListExprNegated, InSubqueryNegated, JoinJoinConstraint, JoinJoinType,
+            FilterOpOp, InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType,
             JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
             LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
             LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
@@ -432,9 +432,11 @@ impl LogicalPlanToLanguageConverter {
             } => {
                 let expr = Self::add_expr_replace_params(graph, expr, query_params)?;
                 let subquery = Self::add_expr_replace_params(graph, subquery, query_params)?;
-                let negated = add_expr_data_node!(graph, negated, InSubqueryNegated);
+                let negated = add_expr_data_node!(graph, negated, InSubqueryExprNegated);
 
-                graph.add(LogicalPlanLanguage::InSubquery([expr, subquery, negated]))
+                graph.add(LogicalPlanLanguage::InSubqueryExpr([
+                    expr, subquery, negated,
+                ]))
             }
             Expr::Wildcard => graph.add(LogicalPlanLanguage::WildcardExpr([])),
             Expr::GetIndexedField { expr, key } => {
@@ -1035,10 +1037,10 @@ pub fn node_to_expr(
                 "QueryParam can't be evaluated as an Expr node".to_string(),
             ));
         }
-        LogicalPlanLanguage::InSubquery(params) => {
+        LogicalPlanLanguage::InSubqueryExpr(params) => {
             let expr = Box::new(to_expr(params[0].clone())?);
             let subquery = Box::new(to_expr(params[1].clone())?);
-            let negated = match_data_node!(node_by_id, params[2], InSubqueryNegated);
+            let negated = match_data_node!(node_by_id, params[2], InSubqueryExprNegated);
             Expr::InSubquery {
                 expr,
                 subquery,
@@ -1889,14 +1891,22 @@ impl LanguageToLogicalPlanConverter {
                     params[1],
                     WrappedSelectProjectionExpr
                 );
+                let subqueries =
+                    match_list_node_ids!(node_by_id, params[2], WrappedSelectSubqueries)
+                        .into_iter()
+                        .map(|j| {
+                            let input = Arc::new(self.to_logical_plan(j)?);
+                            Ok(input)
+                        })
+                        .collect::<Result<Vec<_>, CubeError>>()?;
                 let group_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[2], WrappedSelectGroupExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectGroupExpr);
                 let aggr_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[3], WrappedSelectAggrExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectAggrExpr);
                 let window_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[4], WrappedSelectWindowExpr);
-                let from = Arc::new(self.to_logical_plan(params[5])?);
-                let joins = match_list_node!(node_by_id, params[6], WrappedSelectJoins)
+                    match_expr_list_node!(node_by_id, to_expr, params[5], WrappedSelectWindowExpr);
+                let from = Arc::new(self.to_logical_plan(params[6])?);
+                let joins = match_list_node!(node_by_id, params[7], WrappedSelectJoins)
                     .into_iter()
                     .map(|j| {
                         if let LogicalPlanLanguage::WrappedSelectJoin(params) = j {
@@ -1912,16 +1922,16 @@ impl LanguageToLogicalPlanConverter {
                     .collect::<Result<Vec<_>, _>>()?;
 
                 let filter_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[7], WrappedSelectFilterExpr);
+                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectFilterExpr);
                 let having_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[8], WrappedSelectHavingExpr);
-                let limit = match_data_node!(node_by_id, params[9], WrappedSelectLimit);
-                let offset = match_data_node!(node_by_id, params[10], WrappedSelectOffset);
+                    match_expr_list_node!(node_by_id, to_expr, params[9], WrappedSelectHavingExpr);
+                let limit = match_data_node!(node_by_id, params[10], WrappedSelectLimit);
+                let offset = match_data_node!(node_by_id, params[11], WrappedSelectOffset);
                 let order_expr =
-                    match_expr_list_node!(node_by_id, to_expr, params[11], WrappedSelectOrderExpr);
-                let alias = match_data_node!(node_by_id, params[12], WrappedSelectAlias);
-                let distinct = match_data_node!(node_by_id, params[13], WrappedSelectDistinct);
-                let ungrouped = match_data_node!(node_by_id, params[14], WrappedSelectUngrouped);
+                    match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
+                let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
+                let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
+                let ungrouped = match_data_node!(node_by_id, params[15], WrappedSelectUngrouped);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
@@ -1981,8 +1991,15 @@ impl LanguageToLogicalPlanConverter {
                 } else {
                     all_expr_without_window
                 };
+
+                let mut subqueries_schema = DFSchema::empty();
+                for subquery in subqueries.iter() {
+                    subqueries_schema.merge(subquery.schema());
+                }
+                let schema_with_subqueries = from.schema().join(&subqueries_schema)?;
+
                 let without_window_fields =
-                    exprlist_to_fields(all_expr_without_window.iter(), from.schema())?;
+                    exprlist_to_fields(all_expr_without_window.iter(), &schema_with_subqueries)?;
                 let replace_map = all_expr_without_window
                     .iter()
                     .zip(without_window_fields.iter())
@@ -2019,7 +2036,14 @@ impl LanguageToLogicalPlanConverter {
                     true,
                 )?
                 .iter()
-                .map(|e| replace_col_to_expr(e.clone(), &replace_map))
+                .map(|e| {
+                    let original_expr_name = e.name(&without_window_fields_schema)?;
+                    let new_expr = match replace_col_to_expr(e.clone(), &replace_map)? {
+                        Expr::Alias(expr, _) => Expr::Alias(expr, original_expr_name),
+                        expr => Expr::Alias(Box::new(expr), original_expr_name),
+                    };
+                    Ok::<_, DataFusionError>(new_expr)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
                 let order_expr_rebased = replace_qualified_col_with_flat_name_if_missing(
                     order_expr,
@@ -2034,8 +2058,11 @@ impl LanguageToLogicalPlanConverter {
                     without_window_fields
                         .into_iter()
                         .chain(
-                            exprlist_to_fields(window_expr_rebased.iter(), from.schema())?
-                                .into_iter(),
+                            exprlist_to_fields(
+                                window_expr_rebased.iter(),
+                                &schema_with_subqueries,
+                            )?
+                            .into_iter(),
                         )
                         .collect(),
                     HashMap::new(),
@@ -2051,6 +2078,7 @@ impl LanguageToLogicalPlanConverter {
                         Arc::new(schema),
                         select_type,
                         projection_expr,
+                        subqueries,
                         group_expr,
                         aggr_expr,
                         window_expr_rebased,

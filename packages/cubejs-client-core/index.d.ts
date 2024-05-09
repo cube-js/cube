@@ -80,6 +80,7 @@ declare module '@cubejs-client/core' {
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
     resType?: 'default' | 'compact';
+    castNumerics?: boolean;
   };
 
   export type LoadMethodOptions = {

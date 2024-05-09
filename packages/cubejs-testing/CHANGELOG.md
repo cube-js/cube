@@ -3,6 +3,162 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.29](https://github.com/cube-js/cube.js/compare/v0.35.28...v0.35.29) (2024-05-03)
+
+
+### Bug Fixes
+
+* **schema-compiler:** support string measures in views ([#8194](https://github.com/cube-js/cube.js/issues/8194)) ([fadfd1f](https://github.com/cube-js/cube.js/commit/fadfd1f557a16bc7f4e6c8c0daeca7c6ac1bf237))
+
+
+
+
+
+## [0.35.28](https://github.com/cube-js/cube/compare/v0.35.27...v0.35.28) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* Logical boolean measure filter for post aggregate measures support ([92cee95](https://github.com/cube-js/cube/commit/92cee954b1252b0234e3008fb74d88d7b1c3c47f))
+
+
+
+
+
+## [0.35.20](https://github.com/cube-js/cube.js/compare/v0.35.19...v0.35.20) (2024-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube.js/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+
+### Features
+
+* Post aggregate measure filter support ([120f22b](https://github.com/cube-js/cube.js/commit/120f22b4a52e5328ebfeea60e90b2b1aa1839feb))
+
+
+
+
+
+## [0.35.18](https://github.com/cube-js/cube.js/compare/v0.35.17...v0.35.18) (2024-04-17)
+
+
+### Features
+
+* Post aggregate view support ([#8161](https://github.com/cube-js/cube.js/issues/8161)) ([acb507d](https://github.com/cube-js/cube.js/commit/acb507d21d29b25592050bcf49c09fb9d88a7d93))
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.16](https://github.com/cube-js/cube.js/compare/v0.35.15...v0.35.16) (2024-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.15](https://github.com/cube-js/cube.js/compare/v0.35.14...v0.35.15) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.13](https://github.com/cube-js/cube.js/compare/v0.35.12...v0.35.13) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/testing

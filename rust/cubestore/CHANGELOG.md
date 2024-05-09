@@ -3,6 +3,95 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+
+### Bug Fixes
+
+* **cubestore:** Queue - remove queue item payload on ack (reduce compaction) ([#8225](https://github.com/cube-js/cube/issues/8225)) ([ac58583](https://github.com/cube-js/cube/commit/ac5858384e26b9b9077e9ffeb42d64da874d1f62))
+* **cubestore:** Queue - truncate unused queue rows via TTL ([#8227](https://github.com/cube-js/cube/issues/8227)) ([70ecbef](https://github.com/cube-js/cube/commit/70ecbefadc00eb857362ae647f136873a708bb80))
+
+
+### Features
+
+* **cubestore:** Allow to truncate queue item payloads via system command ([#8226](https://github.com/cube-js/cube/issues/8226)) ([75d4eac](https://github.com/cube-js/cube/commit/75d4eac3b48acfc02c8affacdf28f1f0897087b0))
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Error in optimization for nested boolean expressions ([#7891](https://github.com/cube-js/cube.js/issues/7891)) ([e5d20d2](https://github.com/cube-js/cube.js/commit/e5d20d228ac07849dbcd4df2f713ea01fc74f0fe))
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - STS credentials (backport fix for 0.32.3) ([#8195](https://github.com/cube-js/cube/issues/8195)) ([9d9cb4a](https://github.com/cube-js/cube/commit/9d9cb4a025931da24d560220878b7450f81de22c))
+
+
+
+
+
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - wrong credentials ([1313cdd](https://github.com/cube-js/cube/commit/1313cdd6d3882a7c4644e9d397df7745116246bb))
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **cubestore:** MINIORemoteFs - use only simple auth from S3 client ([#8170](https://github.com/cube-js/cube/issues/8170)) ([66403ad](https://github.com/cube-js/cube/commit/66403ad1be6ec34d8b68444553c40dbc1543f3e5))
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+
+### Bug Fixes
+
+* **cubestore:** Fix wrong optimization in total count queries ([#7964](https://github.com/cube-js/cube/issues/7964)) ([7a8ddf0](https://github.com/cube-js/cube/commit/7a8ddf056a075c9224657d1497e2679502acc515))
+
+
+### Features
+
+* **cubestore:** Upgrade rust-s3 0.26.3 -> 0.32.3 ([#6019](https://github.com/cube-js/cube/issues/6019)) ([4b8d4d3](https://github.com/cube-js/cube/commit/4b8d4d3c3445dcd817945e3a71a70d0084644d4c))
+* **cubestore:** Use S3 client in async way ([#8158](https://github.com/cube-js/cube/issues/8158)) ([7f286fe](https://github.com/cube-js/cube/commit/7f286fee90897048f8a2735a2a9e171d40e47da4))
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+
+### Features
+
+* **cubestore:** Enable jemalloc allocator for RocksDB on linux GNU ([#8104](https://github.com/cube-js/cube/issues/8104)) ([ee7bcee](https://github.com/cube-js/cube/commit/ee7bceeee43c45e0a183272b16b3932288146370))
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

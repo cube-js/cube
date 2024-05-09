@@ -96,7 +96,8 @@ export class SQLServer {
                   resolve(message);
                 }
               },
-              includeCompilerId: true
+              includeCompilerId: true,
+              onlyCompilerId
             });
           } catch (e) {
             reject(e);

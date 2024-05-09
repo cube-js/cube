@@ -3,6 +3,78 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+
+### Bug Fixes
+
+* **gateway:** Don't process meta with `onlyCompilerId` flag set ([76ae23e](https://github.com/cube-js/cube/commit/76ae23edbe0adc101c788f671b2f9760dd7c032d))
+* **gateway:** missed v1 graphql-to-json endpoint ([a24d69b](https://github.com/cube-js/cube/commit/a24d69bd1db5da3b2773ad2f1a512cd72192c031))
+* **gateway:** Optimize `filterVisibleItemsInMeta` performance ([b0fdbd3](https://github.com/cube-js/cube/commit/b0fdbd30d327c0a681a594fbf4ef063ef7a91f58))
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* **api-gateway:** graphql json query conversion ([#8189](https://github.com/cube-js/cube/issues/8189)) ([55ea7c8](https://github.com/cube-js/cube/commit/55ea7c86f49163b6c65fb277966a0e8b572a5fd5))
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

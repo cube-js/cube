@@ -3,6 +3,71 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubesql:** Disallow ematching cycles ([4902c6d](https://github.com/cube-js/cube/commit/4902c6d3f882a0ee27f62d63d8b0fcda3669a0b1))
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+
+### Bug Fixes
+
+* **native:** Better error message on unexpected values while streaming ([#8172](https://github.com/cube-js/cube/issues/8172)) ([bcf3438](https://github.com/cube-js/cube/commit/bcf3438682951d7b917866870fc029af3efe2362))
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+
+### Features
+
+* **cubesql:** Update egg and remove some clones ([#8164](https://github.com/cube-js/cube/issues/8164)) ([fe20d35](https://github.com/cube-js/cube/commit/fe20d3575abc7105f827b979266e147299553aee))
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/native
+
+
+
+
+
 ## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
 
 **Note:** Version bump only for package @cubejs-backend/native

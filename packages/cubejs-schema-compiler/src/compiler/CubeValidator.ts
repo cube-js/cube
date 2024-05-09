@@ -101,13 +101,32 @@ const BaseDimensionWithoutSubQuery = {
       label: Joi.string().required()
     })
   ]),
-  meta: Joi.any()
+  meta: Joi.any(),
 };
 
 const BaseDimension = Object.assign({
   subQuery: Joi.boolean().strict(),
   propagateFiltersToSubQuery: Joi.boolean().strict()
 }, BaseDimensionWithoutSubQuery);
+
+const FixedRollingWindow = {
+  type: Joi.string().valid('fixed'),
+  trailing: timeInterval,
+  leading: timeInterval,
+  offset: Joi.any().valid('start', 'end')
+};
+
+const YearToDate = {
+  type: Joi.string().valid('year_to_date'),
+};
+
+const QuarterToDate = {
+  type: Joi.string().valid('quarter_to_date'),
+};
+
+const MonthToDate = {
+  type: Joi.string().valid('month_to_date'),
+};
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
@@ -125,11 +144,17 @@ const BaseMeasure = {
   ),
   title: Joi.string(),
   description: Joi.string(),
-  rollingWindow: Joi.object().keys({
-    trailing: timeInterval,
-    leading: timeInterval,
-    offset: Joi.any().valid('start', 'end')
-  }),
+  rollingWindow: Joi.alternatives().conditional(
+    Joi.ref('.type'), [
+      { is: 'year_to_date', then: YearToDate },
+      { is: 'quarter_to_date', then: QuarterToDate },
+      { is: 'month_to_date', then: MonthToDate },
+      { is: 'fixed',
+        then: FixedRollingWindow,
+        otherwise: FixedRollingWindow
+      }
+    ]
+  ),
   drillMemberReferences: Joi.func(),
   drillMembers: Joi.func(),
   drillFilters: Joi.array().items(
@@ -440,7 +465,34 @@ const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
 );
 
-const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(
+const postAggregateMeasureType = Joi.string().valid(
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
+  'rank'
+);
+
+const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.postAggregate'), [
+  {
+    is: true,
+    then: inherit(BaseMeasure, {
+      postAggregate: Joi.boolean().strict(),
+      type: postAggregateMeasureType.required(),
+      sql: Joi.func(), // TODO .required(),
+      groupBy: Joi.func(),
+      reduceBy: Joi.func(),
+      addGroupBy: Joi.func(),
+      timeShift: Joi.array().items(Joi.object().keys({
+        timeDimension: Joi.func().required(),
+        interval: regexTimeInterval.required(),
+        type: Joi.string().valid('next', 'prior').required(),
+      })),
+      // TODO validate for order window functions
+      orderBy: Joi.array().items(Joi.object().keys({
+        sql: Joi.func().required(),
+        dir: Joi.string().valid('asc', 'desc')
+      })),
+    })
+  }
+]).conditional(
   Joi.ref('.type'), [
     {
       is: 'count',
@@ -534,10 +586,21 @@ const baseSchema = {
     }),
     inherit(BaseDimension, {
       sql: Joi.func().required()
+    }),
+    inherit(BaseDimension, {
+      postAggregate: Joi.boolean().valid(true),
+      type: Joi.any().valid('number').required(),
+      sql: Joi.func().required(),
+      addGroupBy: Joi.func(),
     })
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
+  hierarchies: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    title: Joi.string(),
+    levels: Joi.func()
+  })),
 };
 
 const cubeSchema = inherit(baseSchema, {

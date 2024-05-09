@@ -15,7 +15,7 @@
     "ports" : ["4000"]
   },
   "data": {
-    "image": "mysql:8",
+    "image": "mysql:8.0.22",
     "environment": {
       "MYSQL_DATABASE": "test",
       "MYSQL_ROOT_PASSWORD": "123-Strong-Password-321"
