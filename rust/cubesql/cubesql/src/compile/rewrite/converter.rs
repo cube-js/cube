@@ -459,7 +459,7 @@ impl LogicalPlanToLanguageConverter {
         self.add_logical_plan_replace_params(
             plan,
             &mut None,
-            &mut LogicalPlanToLanguageContext::default(),
+            &LogicalPlanToLanguageContext::default(),
         )
     }
 
@@ -467,7 +467,7 @@ impl LogicalPlanToLanguageConverter {
         &mut self,
         plan: &LogicalPlan,
         query_params: &mut Option<HashMap<usize, ScalarValue>>,
-        ctx: &mut LogicalPlanToLanguageContext,
+        ctx: &LogicalPlanToLanguageContext,
     ) -> Result<Id, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => {
@@ -583,12 +583,13 @@ impl LogicalPlanToLanguageConverter {
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 let subquery_source_table_name =
                     self.find_source_table_name(node.input.as_ref())?;
-                ctx.subquery_source_table_name = subquery_source_table_name;
+                let mut sub_ctx = ctx.clone();
+                sub_ctx.subquery_source_table_name = subquery_source_table_name;
                 let subqueries = add_plan_list_node!(
                     self,
                     node.subqueries,
                     query_params,
-                    &mut ctx.clone(),
+                    &sub_ctx.clone(),
                     SubquerySubqueries
                 );
 
