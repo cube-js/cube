@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.30](https://github.com/cube-js/cube/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+
+### Features
+
+* **cubesql:** Support window frame SQL push down ([5469dbc](https://github.com/cube-js/cube/commit/5469dbc14c4ae15d9e1047fca90ab5cc4268f047))
+
+
+
+
+
 ## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
 
 

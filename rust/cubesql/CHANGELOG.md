@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.30](https://github.com/cube-js/cube.js/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+
+### Bug Fixes
+
+* **cubesql:** Add alias to rebased window expressions ([990a767](https://github.com/cube-js/cube.js/commit/990a767e3b2f32c0846907b1dfcff232227b4cbc))
+* **cubesql:** Reuse query params in push down ([b849f34](https://github.com/cube-js/cube.js/commit/b849f34c001b9a94ac5aed1edacce906fd02f33c))
+
+
+### Features
+
+* **cubesql:** Support window frame SQL push down ([5469dbc](https://github.com/cube-js/cube.js/commit/5469dbc14c4ae15d9e1047fca90ab5cc4268f047))
+
+
+
+
+
 ## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
 
 

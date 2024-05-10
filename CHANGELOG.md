@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.30](https://github.com/cube-js/cube/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+
+### Bug Fixes
+
+* **cubesql:** Add alias to rebased window expressions ([990a767](https://github.com/cube-js/cube/commit/990a767e3b2f32c0846907b1dfcff232227b4cbc))
+* **cubesql:** Reuse query params in push down ([b849f34](https://github.com/cube-js/cube/commit/b849f34c001b9a94ac5aed1edacce906fd02f33c))
+* **schema-compiler:** Convert timezone for time dimensions in measures ([0bea221](https://github.com/cube-js/cube/commit/0bea221e5fafdf8c7ca3c8cb3cfa6a233e5fc8a0))
+* **schema-compiler:** respect view prefix and member alias in hierarc… ([#8231](https://github.com/cube-js/cube/issues/8231)) ([59fddea](https://github.com/cube-js/cube/commit/59fddea82e29d5651a5bade751b76afbca9d52da))
+* Unexpected keyword WITH for rolling window measures in BigQuery ([9468f90](https://github.com/cube-js/cube/commit/9468f90fefdc08280e7b81b0f8e289fa041cd37d)), closes [#8193](https://github.com/cube-js/cube/issues/8193)
+* Unrecognized name when regular measures are selected with multiplied ones ([617fd11](https://github.com/cube-js/cube/commit/617fd11a527a0be619450698f868858306e1daf8)), closes [#8206](https://github.com/cube-js/cube/issues/8206)
+
+
+### Features
+
+* **cubesql:** Support window frame SQL push down ([5469dbc](https://github.com/cube-js/cube/commit/5469dbc14c4ae15d9e1047fca90ab5cc4268f047))
+
+
+
+
+
 ## [0.35.29](https://github.com/cube-js/cube/compare/v0.35.28...v0.35.29) (2024-05-03)
 
 

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.30](https://github.com/cube-js/cube.js/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+
+### Bug Fixes
+
+* Unexpected keyword WITH for rolling window measures in BigQuery ([9468f90](https://github.com/cube-js/cube.js/commit/9468f90fefdc08280e7b81b0f8e289fa041cd37d)), closes [#8193](https://github.com/cube-js/cube.js/issues/8193)
+
+
+
+
+
 ## [0.35.29](https://github.com/cube-js/cube.js/compare/v0.35.28...v0.35.29) (2024-05-03)
 
 
