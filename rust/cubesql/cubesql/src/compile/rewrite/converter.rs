@@ -13,21 +13,22 @@ use crate::{
             AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
             ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
             CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
-            EmptyRelationIsWrappable, EmptyRelationProduceOneRow, EmptyRelationSourceName,
-            FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp, InListExprNegated,
-            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn,
-            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
-            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
-            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
-            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
-            SubqueryTypes, TableScanFetch, TableScanProjection, TableScanSourceTableName,
-            TableScanTableName, TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, TryCastExprDataType, UnionAlias, WindowFunctionExprFun,
-            WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
-            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
+            EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
+            EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+            FilterOpOp, InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType,
+            JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
+            LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
+            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
+            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
+            ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
+            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
+            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
+            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
+            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
+            WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
+            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
+            WrappedSelectOffset, WrappedSelectSelectType, WrappedSelectType,
+            WrappedSelectUngrouped,
         },
     },
     sql::AuthContextRef,
@@ -162,7 +163,7 @@ pub struct LogicalPlanToLanguageConverter {
     cube_context: Arc<CubeContext>,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct LogicalPlanToLanguageContext {
     subquery_source_table_name: Option<String>,
 }
@@ -582,12 +583,12 @@ impl LogicalPlanToLanguageConverter {
                     self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 let subquery_source_table_name =
                     self.find_source_table_name(node.input.as_ref())?;
-                ctx.subquery_source_table_name = Some(subquery_source_table_name);
+                ctx.subquery_source_table_name = subquery_source_table_name;
                 let subqueries = add_plan_list_node!(
                     self,
                     node.subqueries,
                     query_params,
-                    ctx,
+                    &mut ctx.clone(),
                     SubquerySubqueries
                 );
 
@@ -631,10 +632,10 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::EmptyRelation(rel) => {
                 let produce_one_row =
                     add_data_node!(self, rel.produce_one_row, EmptyRelationProduceOneRow);
-                let source_name = add_data_node!(
+                let derived_source_table_name = add_data_node!(
                     self,
                     ctx.subquery_source_table_name,
-                    EmptyRelationSourceName
+                    EmptyRelationDerivedSourceTableName
                 );
                 let is_wrappable = add_data_node!(
                     self,
@@ -644,7 +645,7 @@ impl LogicalPlanToLanguageConverter {
 
                 self.graph.add(LogicalPlanLanguage::EmptyRelation([
                     produce_one_row,
-                    source_name,
+                    derived_source_table_name,
                     is_wrappable,
                 ]))
             }
@@ -689,7 +690,7 @@ impl LogicalPlanToLanguageConverter {
             _ => unimplemented!("Unsupported node type: {:?}", plan),
         })
     }
-    fn find_source_table_name(&self, plan: &LogicalPlan) -> Result<String, CubeError> {
+    fn find_source_table_name(&self, plan: &LogicalPlan) -> Result<Option<String>, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => self.find_source_table_name(node.input.as_ref())?,
             LogicalPlan::Filter(node) => self.find_source_table_name(node.input.as_ref())?,
@@ -703,12 +704,13 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::Union(node) => self.find_source_table_name(&node.inputs[0])?,
             LogicalPlan::Subquery(node) => self.find_source_table_name(node.input.as_ref())?,
             LogicalPlan::TableUDFs(node) => self.find_source_table_name(node.input.as_ref())?,
-            LogicalPlan::TableScan(node) => self
-                .cube_context
-                .table_name_by_table_provider(node.source.clone())?,
+            LogicalPlan::TableScan(node) => Some(
+                self.cube_context
+                    .table_name_by_table_provider(node.source.clone())?,
+            ),
             LogicalPlan::Limit(node) => self.find_source_table_name(node.input.as_ref())?,
             LogicalPlan::Distinct(node) => self.find_source_table_name(node.input.as_ref())?,
-            _ => "".to_string(),
+            _ => None,
         })
     }
 

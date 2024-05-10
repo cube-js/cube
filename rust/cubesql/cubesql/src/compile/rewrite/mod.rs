@@ -127,7 +127,7 @@ crate::plan_to_language! {
         },
         EmptyRelation {
             produce_one_row: bool,
-            source_name: Option<String>,
+            derived_source_table_name: Option<String>,
             is_wrappable: bool,
             schema: DFSchemaRef,
         },
@@ -821,12 +821,12 @@ fn window(input: impl Display, window_expr: impl Display) -> String {
 
 fn empty_relation(
     produce_one_row: impl Display,
-    source_name: impl Display,
+    derived_source_table_name: impl Display,
     is_wrappable: impl Display,
 ) -> String {
     format!(
         "(EmptyRelation {} {} {})",
-        produce_one_row, source_name, is_wrappable,
+        produce_one_row, derived_source_table_name, is_wrappable,
     )
 }
 

@@ -3,7 +3,7 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation,
             rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-            wrapper_pushdown_replacer, EmptyRelationSourceName, LogicalPlanLanguage,
+            wrapper_pushdown_replacer, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
             WrapperPullupReplacerAliasToCube,
         },
         MetaContext,
@@ -50,14 +50,14 @@ impl WrapperRules {
                 "wrapper-subqueries-wrap-empty-rel",
                 empty_relation(
                     "?produce_one_row",
-                    "?source_name",
+                    "?derived_source_table_name",
                     "EmptyRelationIsWrappable:true",
                 ),
                 cube_scan_wrapper(
                     wrapper_pullup_replacer(
                         empty_relation(
                             "?produce_one_row",
-                            "?source_name",
+                            "?derived_source_table_name",
                             "EmptyRelationIsWrappable:true",
                         ),
                         "?alias_to_cube",
@@ -67,7 +67,7 @@ impl WrapperRules {
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                self.transform_wrap_empty_rel("?source_name", "?alias_to_cube"),
+                self.transform_wrap_empty_rel("?derived_source_table_name", "?alias_to_cube"),
             ),
         ]);
         Self::list_pushdown_pullup_rules(
@@ -79,14 +79,17 @@ impl WrapperRules {
     }
     pub fn transform_wrap_empty_rel(
         &self,
-        source_name_var: &'static str,
+        source_table_name_var: &'static str,
         alias_to_cube_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let source_name_var = var!(source_name_var);
+        let source_table_name_var = var!(source_table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for name in var_iter!(egraph[subst[source_name_var]], EmptyRelationSourceName) {
+            for name in var_iter!(
+                egraph[subst[source_table_name_var]],
+                EmptyRelationDerivedSourceTableName
+            ) {
                 if let Some(name) = name {
                     if let Some(cube) = meta_context
                         .cubes
