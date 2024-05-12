@@ -103,7 +103,7 @@ impl JinjaEngine {
         trace!("JinjaEngine.render_template");
 
         let this = cx
-            .this()
+            .this::<JsValue>()?
             .downcast_or_throw::<BoxedJinjaEngine, _>(&mut cx)?;
 
         let template_name = cx.argument::<JsString>(0)?;
@@ -142,7 +142,7 @@ impl JinjaEngine {
         trace!("JinjaEngine.load_template");
 
         let this = cx
-            .this()
+            .this::<JsValue>()?
             .downcast_or_throw::<BoxedJinjaEngine, _>(&mut cx)?;
 
         let template_name = cx.argument::<JsString>(0)?;

@@ -50,7 +50,7 @@ use self::{
 use crate::{
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
-        dataframe,
+        dataframe::{self, batch_to_dataframe},
         session::DatabaseProtocol,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
@@ -1739,6 +1739,27 @@ pub async fn convert_sql_to_cube_query(
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone(), &mut None)?;
     convert_statement_to_cube_query(&stmt, meta, session, &mut None, None).await
+}
+
+pub async fn get_df_batches(plan: &QueryPlan) -> Result<Vec<String>, CubeError> {
+    let mut output = Vec::new();
+    match plan {
+        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+            let df = DataFrame::new(ctx.state.clone(), &plan);
+            let batches = df.collect().await?;
+            let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+            batches
+                .into_iter()
+                .for_each(|b| println!("batch @@@ {:?}", b));
+
+            output.push(frame.print());
+            // output_flags = flags;
+        }
+        _ => unimplemented!(),
+    };
+
+    Ok(output)
 }
 
 pub fn find_cube_scans_deep_search(

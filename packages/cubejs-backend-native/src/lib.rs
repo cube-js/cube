@@ -17,11 +17,17 @@ mod template;
 mod transport;
 mod utils;
 
+use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::compile::parser::parse_sql_to_statement;
+use cubesql::sql::{
+    self, AuthContext, DatabaseProtocol, HttpAuthContext, PostgresServer, SessionManager,
+};
+use cubesql::transport::TransportService;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
 use crate::cross::CLRepr;
-use auth::NodeBridgeAuthService;
+use auth::{NativeAuthContext, NodeBridgeAuthService};
 use config::NodeConfig;
 use cubesql::telemetry::LocalReporter;
 use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
@@ -219,6 +225,56 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
+fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let native_auth_ctx = Arc::new(NativeAuthContext {
+        user: Some(String::from("cube")),
+        superuser: false,
+        security_context: Some(serde_json::json!({})),
+    });
+
+    let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+
+    let services = interface.services.clone();
+    let runtime = tokio_runtime_node(&mut cx)?;
+
+    let sql_query = String::from("SELECT status from orders;");
+
+    std::thread::spawn(move || {
+        runtime.block_on(async move {
+            let session_manager = services
+                .injector
+                .get_service_typed::<SessionManager>()
+                .await;
+            let session = session_manager
+                .create_session(
+                    DatabaseProtocol::PostgreSQL,
+                    String::from("127.0.0.1"),
+                    15432,
+                )
+                .await;
+
+            session.state.set_auth_context(Some(native_auth_ctx.clone()));
+
+            let transport_service = services
+                .injector
+                .get_service_typed::<dyn TransportService>()
+                .await;
+
+            // todo: can we use compiler_cache?
+            let meta_context = transport_service.meta(native_auth_ctx).await.unwrap();
+            let query_plan = convert_sql_to_cube_query(&sql_query, meta_context, session).await.unwrap();
+
+            let output = get_df_batches(&query_plan).await.unwrap();
+
+            eprintln!("res: {:?}", output);
+        });
+    });
+    // deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
+
+    // Ok(promise)
+    Ok(JsUndefined::new(&mut cx).upcast::<JsValue>())
+}
+
 fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
     #[cfg(feature = "python")]
     {
@@ -236,8 +292,23 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
+// async fn async_task<'a>(mut cx: FunctionContext<'a>) -> JsResult<JsString> {
+//     // Your async logic here
+//     let result = "Async task completed".to_string();
+//     Ok(cx.string(result))
+// }
+
+// fn export_async_function(mut cx: FunctionContext) -> JsResult<JsFunction> {
+//     // Wrap the async function with neon::task::spawn
+//     let task = neon::task::spawn(async_task);
+
+//     // Convert the async task into a JavaScript function
+//     Ok(cx.function(task))
+// }
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
+    println!("Hello, world!!!!!!");
     // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
     log_reroute::init().unwrap();
 
@@ -253,6 +324,7 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
+    cx.export_function("execSql", exec_sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
 

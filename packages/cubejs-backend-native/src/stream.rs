@@ -174,7 +174,7 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.push_chunk");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let chunk_array = cx.argument::<JsArray>(0)?;
     let callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
@@ -200,7 +200,7 @@ fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.start");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     this.start();
 
@@ -212,7 +212,7 @@ fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.end");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let future = this.end();
     let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
@@ -226,7 +226,7 @@ fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.reject");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let result = cx.argument::<JsString>(0)?;
     this.reject(result.value(&mut cx));

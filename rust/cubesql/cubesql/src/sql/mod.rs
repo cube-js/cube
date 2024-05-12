@@ -18,6 +18,6 @@ pub use auth_service::{
 pub use postgres::*;
 pub use server_manager::ServerManager;
 pub use service::*;
-pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
+pub use session::{Session, SessionProcessList, SessionProperties, SessionState, DatabaseProtocol};
 pub use session_manager::SessionManager;
 pub use types::{ColumnFlags, ColumnType, StatusFlags};

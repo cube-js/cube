@@ -36,7 +36,9 @@ type BoxedChannel = JsBox<RefCell<JsAsyncChannel>>;
 impl Finalize for JsAsyncChannel {}
 
 fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
+    let this = cx
+        .this::<BoxedChannel>()?
+        .downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
     #[cfg(debug_assertions)]
     trace!("JsAsyncChannel.resolved {}", this.borrow()._id);
@@ -53,7 +55,9 @@ fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_async_channel_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
+    let this = cx
+        .this::<BoxedChannel>()?
+        .downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
     #[cfg(debug_assertions)]
     trace!("JsAsyncChannel.reject {}", this.borrow()._id);

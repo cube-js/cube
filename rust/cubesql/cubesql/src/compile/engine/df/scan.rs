@@ -596,14 +596,15 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         // TODO: move envs to config
-        let stream_mode = self.config_obj.stream_mode();
+        // let stream_mode = self.config_obj.stream_mode();
+        let stream_mode = true; // self.config_obj.stream_mode();
         let query_limit = self.config_obj.non_streaming_query_max_row_limit();
 
-        let stream_mode = match (stream_mode, self.request.limit) {
-            (true, None) => true,
-            (true, Some(limit)) if limit > query_limit => true,
-            (_, _) => false,
-        };
+        // let stream_mode = match (stream_mode, self.request.limit) {
+        //     (true, None) => true,
+        //     (true, Some(limit)) if limit > query_limit => true,
+        //     (_, _) => false,
+        // };
 
         let mut request = self.request.clone();
         if request.limit.unwrap_or_default() > query_limit || request.limit.is_none() {

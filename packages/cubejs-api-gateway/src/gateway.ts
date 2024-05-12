@@ -348,6 +348,18 @@ class ApiGateway {
       })
     );
 
+    app.get(
+      `${this.basePath}/v1/cubesql`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const server = this.initSQLServer();
+        // console.log('>>>', server);
+        const result = await server.execSql();
+
+        res.status(200).json({ ok: true });
+      })
+    );
+
     // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
@@ -471,8 +483,14 @@ class ApiGateway {
     app.use(this.handleErrorMiddleware);
   }
 
+  protected _sqlServer: SQLServer | undefined;
+
   public initSQLServer() {
-    return new SQLServer(this);
+    if (!this._sqlServer) {
+      this._sqlServer = new SQLServer(this);
+    }
+
+    return this._sqlServer;
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {

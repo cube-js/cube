@@ -35,9 +35,9 @@ pyo3 = { version = "0.20.0", features = [], optional = true }
 pyo3-asyncio = { version = "0.20.0", features = ["tokio-runtime", "attributes"], optional = true }
 
 [dependencies.neon]
-version = "=0.10.1"
+version = "=1"
 default-features = false
-features = ["napi-1", "napi-4", "napi-6", "channel-api", "promise-api", "task-api", "proc-macros"]
+features = ["napi-1", "napi-4", "napi-6", "futures"]
 
 [features]
 default = []
