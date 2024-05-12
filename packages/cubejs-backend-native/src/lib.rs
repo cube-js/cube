@@ -292,23 +292,8 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
-// async fn async_task<'a>(mut cx: FunctionContext<'a>) -> JsResult<JsString> {
-//     // Your async logic here
-//     let result = "Async task completed".to_string();
-//     Ok(cx.string(result))
-// }
-
-// fn export_async_function(mut cx: FunctionContext) -> JsResult<JsFunction> {
-//     // Wrap the async function with neon::task::spawn
-//     let task = neon::task::spawn(async_task);
-
-//     // Convert the async task into a JavaScript function
-//     Ok(cx.function(task))
-// }
-
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
-    println!("Hello, world!!!!!!");
     // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
     log_reroute::init().unwrap();
 

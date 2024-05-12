@@ -10,7 +10,6 @@ use std::env;
 use tokio::runtime::Builder;
 
 fn main() {
-    eprintln!("HELLO FROM CUBESQL ????");
     let log_level = match env::var("CUBESQL_LOG_LEVEL")
         .unwrap_or("info".to_string())
         .to_lowercase()
