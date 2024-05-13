@@ -269,5 +269,11 @@ limit
       const resDate = await connection.query(queryCtor('createdAtMaxProxy'));
       expect(resDate.rows).toMatchSnapshot('date case');
     });
+
+    test('zero limited dimension aggregated queries', async () => {
+      const query = 'SELECT MAX(createdAt) FROM Orders LIMIT 0';
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([]);
+    });
   });
 });
