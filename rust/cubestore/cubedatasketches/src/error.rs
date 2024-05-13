@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Cube Dev, Inc.
+ * Copyright 2024 Cube Dev, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,45 +13,38 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-use protobuf::ProtobufError;
 use std::fmt::{Display, Formatter};
-use std::num::TryFromIntError;
 
-pub type Result<T> = std::result::Result<T, ZetaError>;
+pub type Result<T> = std::result::Result<T, DataSketchesError>;
 
 #[derive(Debug)]
-pub struct ZetaError {
+pub struct DataSketchesError {
     pub message: String,
 }
 
-impl Display for ZetaError {
+impl Display for DataSketchesError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "ZetaError: {}", self.message)
+        write!(f, "DataSketchesError: {}", self.message)
     }
 }
 
-impl ZetaError {
-    pub fn new<Str: ToString>(message: Str) -> ZetaError {
-        return ZetaError {
+impl DataSketchesError {
+    pub fn new<Str: ToString>(message: Str) -> Self {
+        return Self {
             message: message.to_string(),
         };
     }
 }
 
-impl From<std::io::Error> for ZetaError {
+impl From<std::io::Error> for DataSketchesError {
     fn from(err: std::io::Error) -> Self {
-        return ZetaError::new(err);
+        return DataSketchesError::new(err);
     }
 }
 
-impl From<ProtobufError> for ZetaError {
-    fn from(err: ProtobufError) -> Self {
-        return ZetaError::new(format!("Protobuf: {}", err));
-    }
-}
-
-impl From<TryFromIntError> for ZetaError {
-    fn from(err: TryFromIntError) -> Self {
-        return ZetaError::new(err);
+#[cfg(not(target_os = "windows"))]
+impl From<dsrs::DataSketchesError> for DataSketchesError {
+    fn from(err: dsrs::DataSketchesError) -> Self {
+        return DataSketchesError::new(err);
     }
 }

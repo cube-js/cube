@@ -443,6 +443,12 @@ impl From<HllError> for CubeError {
     }
 }
 
+impl From<cubedatasketches::DataSketchesError> for CubeError {
+    fn from(v: cubedatasketches::DataSketchesError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
 impl From<ZetaError> for CubeError {
     fn from(v: ZetaError) -> Self {
         return CubeError::from_error(v);
