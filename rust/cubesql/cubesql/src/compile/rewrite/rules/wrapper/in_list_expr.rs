@@ -4,7 +4,7 @@ use crate::{
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
-    var, var_iter, var_list_iter,
+    var, var_iter,
 };
 use egg::{EGraph, Rewrite, Subst};
 
@@ -135,15 +135,8 @@ impl WrapperRules {
         list_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let list_var = var!(list_var);
-        move |egraph, subst| {
-            if let Some(constant_in_list) = &egraph[subst[list_var]].data.constant_in_list {
-                for list in var_list_iter!(egraph[subst[list_var]], InListExprList) {
-                    if list.len() == constant_in_list.len() {
-                        return true;
-                    }
-                }
-            }
-            false
+        move |egraph: &mut EGraph<_, LogicalPlanAnalysis>, subst| {
+            return egraph[subst[list_var]].data.constant_in_list.is_some();
         }
     }
 }
