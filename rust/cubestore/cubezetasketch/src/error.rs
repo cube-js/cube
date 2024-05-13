@@ -26,7 +26,7 @@ pub struct ZetaError {
 
 impl Display for ZetaError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "ZetaError: {}", self.message)
     }
 }
 

@@ -24,7 +24,7 @@ pub struct DataSketchesError {
 
 impl Display for DataSketchesError {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.message)
+        write!(f, "DataSketchesError: {}", self.message)
     }
 }
 
