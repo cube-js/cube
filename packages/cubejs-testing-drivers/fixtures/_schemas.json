@@ -133,6 +133,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "totalQuantity",
           "sql": "quantity",
           "type": "sum"

@@ -932,6 +932,44 @@ export const queryingECommerceCountByCitiesOrder = driverTest({
   schemas: commonSchemas
 });
 
+export const queryingECommerceCountApproxByCustomerByMonth = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over product by month',
+  query: {
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month'
+    }],
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomer = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over product',
+  query: {
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
 export const queryingECommerceTotalQuantityAvgDiscountTotalSales = driverTest({
   name: 'querying ECommerce: total quantity, avg discount, total sales, ' +
     'total profit by product + order + total -- rounding in athena',

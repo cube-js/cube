@@ -1216,6 +1216,1404 @@ exports[`databricks-jdbc driver tests filtering Customers: endsWith filter + dim
 
 exports[`databricks-jdbc driver tests filtering Customers: endsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
 
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `Array []`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notEndsWith filter + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, second_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests filtering Customers: notStartsWith + dimensions, third_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "AH-10465",
+    "Customers.customerName": "Customer 1",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "AS-10225",
+    "Customers.customerName": "Customer 3",
+  },
+  Object {
+    "Customers.customerId": "AW-10840",
+    "Customers.customerName": "Customer 4",
+  },
+  Object {
+    "Customers.customerId": "BB-11545",
+    "Customers.customerName": "Customer 5",
+  },
+  Object {
+    "Customers.customerId": "BF-11020",
+    "Customers.customerName": "Customer 6",
+  },
+  Object {
+    "Customers.customerId": "BF-11170",
+    "Customers.customerName": "Customer 7",
+  },
+  Object {
+    "Customers.customerId": "BM-11650",
+    "Customers.customerName": "Customer 8",
+  },
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+  Object {
+    "Customers.customerId": "BS-11755",
+    "Customers.customerName": "Customer 10",
+  },
+  Object {
+    "Customers.customerId": "CA-12775",
+    "Customers.customerName": "Customer 11",
+  },
+  Object {
+    "Customers.customerId": "CC-12475",
+    "Customers.customerName": "Customer 12",
+  },
+  Object {
+    "Customers.customerId": "CD-12280",
+    "Customers.customerName": "Customer 13",
+  },
+  Object {
+    "Customers.customerId": "CS-12355",
+    "Customers.customerName": "Customer 14",
+  },
+  Object {
+    "Customers.customerId": "DB-13405",
+    "Customers.customerName": "Customer 15",
+  },
+  Object {
+    "Customers.customerId": "DG-13300",
+    "Customers.customerName": "Customer 16",
+  },
+  Object {
+    "Customers.customerId": "DW-13480",
+    "Customers.customerName": "Customer 17",
+  },
+  Object {
+    "Customers.customerId": "EM-14140",
+    "Customers.customerName": "Customer 18",
+  },
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+  Object {
+    "Customers.customerId": "KN-16705",
+    "Customers.customerName": "Customer 28",
+  },
+  Object {
+    "Customers.customerId": "LC-17050",
+    "Customers.customerName": "Customer 29",
+  },
+  Object {
+    "Customers.customerId": "LR-16915",
+    "Customers.customerName": "Customer 30",
+  },
+  Object {
+    "Customers.customerId": "MC-17605",
+    "Customers.customerName": "Customer 31",
+  },
+  Object {
+    "Customers.customerId": "MG-17650",
+    "Customers.customerName": "Customer 32",
+  },
+  Object {
+    "Customers.customerId": "ML-17755",
+    "Customers.customerName": "Customer 33",
+  },
+  Object {
+    "Customers.customerId": "MM-18280",
+    "Customers.customerName": "Customer 34",
+  },
+  Object {
+    "Customers.customerId": "NP-18670",
+    "Customers.customerName": "Customer 35",
+  },
+  Object {
+    "Customers.customerId": "PF-19165",
+    "Customers.customerName": "Customer 36",
+  },
+  Object {
+    "Customers.customerId": "SB-20185",
+    "Customers.customerName": "Customer 37",
+  },
+  Object {
+    "Customers.customerId": "SS-20140",
+    "Customers.customerName": "Customer 38",
+  },
+  Object {
+    "Customers.customerId": "TB-21175",
+    "Customers.customerName": "Customer 39",
+  },
+  Object {
+    "Customers.customerId": "TS-21205",
+    "Customers.customerName": "Customer 40",
+  },
+  Object {
+    "Customers.customerId": "WB-21850",
+    "Customers.customerName": "Customer 41",
+  },
+]
+`;
+
 exports[`databricks-jdbc driver tests filtering Customers: startsWith + dimensions, first_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [
   Object {
@@ -3564,6 +4962,96 @@ Array [
 ]
 `;
 
+exports[`databricks-jdbc driver tests querying Customers: dimentions + order + limit + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying Customers: dimentions + order + limit + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "GA-14725",
+    "Customers.customerName": "Customer 19",
+  },
+  Object {
+    "Customers.customerId": "AJ-10780",
+    "Customers.customerName": "Customer 2",
+  },
+  Object {
+    "Customers.customerId": "GZ-14470",
+    "Customers.customerName": "Customer 20",
+  },
+  Object {
+    "Customers.customerId": "HH-15010",
+    "Customers.customerName": "Customer 21",
+  },
+  Object {
+    "Customers.customerId": "HK-14890",
+    "Customers.customerName": "Customer 22",
+  },
+  Object {
+    "Customers.customerId": "JH-15430",
+    "Customers.customerName": "Customer 23",
+  },
+  Object {
+    "Customers.customerId": "JO-15550",
+    "Customers.customerName": "Customer 24",
+  },
+  Object {
+    "Customers.customerId": "JS-16030",
+    "Customers.customerName": "Customer 25",
+  },
+  Object {
+    "Customers.customerId": "JW-15220",
+    "Customers.customerName": "Customer 26",
+  },
+  Object {
+    "Customers.customerId": "KL-16555",
+    "Customers.customerName": "Customer 27",
+  },
+]
+`;
+
 exports[`databricks-jdbc driver tests querying Customers: dimentions + order + limit + total_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [
   Object {
@@ -3650,6 +5138,24 @@ Array [
   Object {
     "Customers.customerId": "EM-14140",
     "Customers.customerName": "Customer 18",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying Customers: dimentions + order + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying Customers: dimentions + order + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "Customers.customerId": "BS-11380",
+    "Customers.customerName": "Customer 9",
   },
 ]
 `;
@@ -4544,6 +6050,754 @@ Array [
   Object {
     "ECommerce.city": "Vancouver",
     "ECommerce.count": "1",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: count distinct approx by customer over product by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: count distinct approx by customer over product by month_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: count distinct approx by customer over product_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": "4",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: count distinct approx by customer over product_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.countApproxByCustomer": "4",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "3",
+    "ECommerce.productName": "Vinyl Coated Wire Paper Clips in Organizer Box, 800/Box",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Canon PC1080F Personal Copier",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Global Adaptabilites Bookcase, Cherry/Storm Gray Finish",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Lexmark 20R1285 X6650 Wireless All-in-One Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Magna Visual Magnetic Picture Hangers",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "2",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Balt Solid Wood Rectangular Table",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "DMI Eclipse Executive Suite Bookcases",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 5",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 6",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Google Nexus 7",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "HTC One",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Hewlett Packard 610 Color Digital Copier / Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.0",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.1",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Kingston Digital DataTraveler 16GB USB 2.2",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Okidata C610n Printer",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Project Tote Personal File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Tyvek Side-Opening Peel & Seel Expanding Envelopes",
+  },
+  Object {
+    "ECommerce.countApproxByCustomer": "1",
+    "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
   },
 ]
 `;
@@ -6188,6 +8442,316 @@ Array [
 ]
 `;
 
+exports[`databricks-jdbc driver tests querying ECommerce: dimentions + order + limit + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Glendale",
+    "ECommerce.customerId": "EM-14140",
+    "ECommerce.customerName": "Customer 18",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-12T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-134915",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.profit": 9.9652,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 2952,
+    "ECommerce.sales": 113.888,
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.profit": 10.3904,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3059,
+    "ECommerce.sales": 30.56,
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.profit": -3.3506,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3060,
+    "ECommerce.sales": 24.368,
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Louisville",
+    "ECommerce.customerId": "DW-13480",
+    "ECommerce.customerName": "Customer 17",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-27T00:00:00.000",
+    "ECommerce.orderId": "US-2017-132297",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.profit": 134.9925,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 3083,
+    "ECommerce.sales": 539.97,
+    "ECommerce.subCategory": "Phones",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Auburn",
+    "ECommerce.customerId": "KN-16705",
+    "ECommerce.customerName": "Customer 28",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-06-11T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-102554",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": 1.0904,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3448,
+    "ECommerce.sales": 3.76,
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Omaha",
+    "ECommerce.customerId": "JO-15550",
+    "ECommerce.customerName": "Customer 24",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-29T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-144568",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.profit": 1.1775,
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3717,
+    "ECommerce.sales": 23.55,
+    "ECommerce.subCategory": "Fasteners",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.customerId": "AW-10840",
+    "ECommerce.customerName": "Customer 4",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123001",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": 2.726,
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3934,
+    "ECommerce.sales": 9.4,
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.customerId": "CC-12475",
+    "ECommerce.customerName": "Customer 12",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-100811",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.profit": 3.9296,
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4012,
+    "ECommerce.sales": 39.296,
+    "ECommerce.subCategory": "Storage",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Lafayette",
+    "ECommerce.customerId": "CS-12355",
+    "ECommerce.customerName": "Customer 14",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-12-24T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-124296",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.profit": 60.5488,
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4031,
+    "ECommerce.sales": 232.88,
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "New York City",
+    "ECommerce.customerId": "AH-10465",
+    "ECommerce.customerName": "Customer 1",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-115546",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.profit": 134.9925,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 4161,
+    "ECommerce.sales": 539.97,
+    "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: dimentions + order + limit + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Glendale",
+    "ECommerce.customerId": "EM-14140",
+    "ECommerce.customerName": "Customer 18",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-12T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-134915",
+    "ECommerce.productName": "Harbour Creations 67200 Series Stacking Chairs",
+    "ECommerce.profit": 9.9652,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 2952,
+    "ECommerce.sales": 113.888,
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Linden 10 Round Wall Clock, Black",
+    "ECommerce.profit": 10.3904,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3059,
+    "ECommerce.sales": 30.56,
+    "ECommerce.subCategory": "Furnishings",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "San Francisco",
+    "ECommerce.customerId": "HH-15010",
+    "ECommerce.customerName": "Customer 21",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-10-19T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-131492",
+    "ECommerce.productName": "Anderson Hickey Conga Table Tops & Accessories",
+    "ECommerce.profit": -3.3506,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3060,
+    "ECommerce.sales": 24.368,
+    "ECommerce.subCategory": "Tables",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "Louisville",
+    "ECommerce.customerId": "DW-13480",
+    "ECommerce.customerName": "Customer 17",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-27T00:00:00.000",
+    "ECommerce.orderId": "US-2017-132297",
+    "ECommerce.productName": "Google Nexus 6",
+    "ECommerce.profit": 134.9925,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 3083,
+    "ECommerce.sales": 539.97,
+    "ECommerce.subCategory": "Phones",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Auburn",
+    "ECommerce.customerId": "KN-16705",
+    "ECommerce.customerName": "Customer 28",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-06-11T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-102554",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": 1.0904,
+    "ECommerce.quantity": 2,
+    "ECommerce.rowId": 3448,
+    "ECommerce.sales": 3.76,
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Omaha",
+    "ECommerce.customerId": "JO-15550",
+    "ECommerce.customerName": "Customer 24",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-29T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-144568",
+    "ECommerce.productName": "Plymouth Boxed Rubber Bands by Plymouth",
+    "ECommerce.profit": 1.1775,
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3717,
+    "ECommerce.sales": 23.55,
+    "ECommerce.subCategory": "Fasteners",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bakersfield",
+    "ECommerce.customerId": "AW-10840",
+    "ECommerce.customerName": "Customer 4",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-09-02T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-123001",
+    "ECommerce.productName": "OIC #2 Pencils, Medium Soft",
+    "ECommerce.profit": 2.726,
+    "ECommerce.quantity": 5,
+    "ECommerce.rowId": 3934,
+    "ECommerce.sales": 9.4,
+    "ECommerce.subCategory": "Art",
+  },
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Philadelphia",
+    "ECommerce.customerId": "CC-12475",
+    "ECommerce.customerName": "Customer 12",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-21T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-100811",
+    "ECommerce.productName": "Recycled Eldon Regeneration Jumbo File",
+    "ECommerce.profit": 3.9296,
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4012,
+    "ECommerce.sales": 39.296,
+    "ECommerce.subCategory": "Storage",
+  },
+  Object {
+    "ECommerce.category": "Furniture",
+    "ECommerce.city": "Lafayette",
+    "ECommerce.customerId": "CS-12355",
+    "ECommerce.customerName": "Customer 14",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-12-24T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-124296",
+    "ECommerce.productName": "Iceberg Nesting Folding Chair, 19w x 6d x 43h",
+    "ECommerce.profit": 60.5488,
+    "ECommerce.quantity": 4,
+    "ECommerce.rowId": 4031,
+    "ECommerce.sales": 232.88,
+    "ECommerce.subCategory": "Chairs",
+  },
+  Object {
+    "ECommerce.category": "Technology",
+    "ECommerce.city": "New York City",
+    "ECommerce.customerId": "AH-10465",
+    "ECommerce.customerName": "Customer 1",
+    "ECommerce.discount": 0,
+    "ECommerce.orderDate": "2020-05-14T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-115546",
+    "ECommerce.productName": "Google Nexus 7",
+    "ECommerce.profit": 134.9925,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 4161,
+    "ECommerce.sales": 539.97,
+    "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
 exports[`databricks-jdbc driver tests querying ECommerce: dimentions + order + limit + total_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
 Array [
   Object {
@@ -6494,6 +9058,46 @@ Array [
     "ECommerce.rowId": 2661,
     "ECommerce.sales": 1979.89,
     "ECommerce.subCategory": "Phones",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: dimentions + order + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"false","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bowling",
+    "ECommerce.customerId": "BS-11380",
+    "ECommerce.customerName": "Customer 9",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-160633",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.profit": 5.397,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 9619,
+    "ECommerce.sales": 86.352,
+    "ECommerce.subCategory": "Art",
+  },
+]
+`;
+
+exports[`databricks-jdbc driver tests querying ECommerce: dimentions + order + total + offset_{"CUBEJS_DEV_MODE":"true","CUBEJS_WEB_SOCKETS":"true","CUBEJS_EXTERNAL_DEFAULT":"true","CUBEJS_SCHEDULED_REFRESH_DEFAULT":"true","CUBEJS_REFRESH_WORKER":"true","CUBEJS_ROLLUP_ONLY":"false"}: query 1`] = `
+Array [
+  Object {
+    "ECommerce.category": "Office Supplies",
+    "ECommerce.city": "Bowling",
+    "ECommerce.customerId": "BS-11380",
+    "ECommerce.customerName": "Customer 9",
+    "ECommerce.discount": 0.2,
+    "ECommerce.orderDate": "2020-11-16T00:00:00.000",
+    "ECommerce.orderId": "CA-2017-160633",
+    "ECommerce.productName": "Panasonic KP-380BK Classic Electric Pencil Sharpener",
+    "ECommerce.profit": 5.397,
+    "ECommerce.quantity": 3,
+    "ECommerce.rowId": 9619,
+    "ECommerce.sales": 86.352,
+    "ECommerce.subCategory": "Art",
   },
 ]
 `;

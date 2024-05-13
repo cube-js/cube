@@ -54,7 +54,13 @@ import {
   filteringECommerceEndsWithDimensionsFirst,
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
-  queryingEcommerceTotalQuantifyAvgDiscountTotal, hiddenMember, hiddenCube, viewMetaExposed, preAggsCustomersRunningTotal,
+  queryingEcommerceTotalQuantifyAvgDiscountTotal,
+  queryingECommerceCountApproxByCustomer,
+  queryingECommerceCountApproxByCustomerByMonth,
+  hiddenMember,
+  hiddenCube,
+  viewMetaExposed,
+  preAggsCustomersRunningTotal,
 } from './tests';
 import { testSet } from './driverTest';
 
@@ -63,6 +69,11 @@ const skippedTestSet = testSet([
   queryingProductDimensions,
   queryingECommerceTotalQuantityAvgDiscountTotalSales,
   queryingECommerceTotalSalesTotalProfitByMonthAndOrder
+]);
+
+const hyperloglogTestSet = testSet([
+  queryingECommerceCountApproxByCustomerByMonth,
+  queryingECommerceCountApproxByCustomer,
 ]);
 
 const withOrderingTestSet = testSet([
@@ -129,6 +140,7 @@ const withoutOrderingTestSet = testSet([
 
 export const mainTestSet = testSet([
   ...skippedTestSet,
+  ...hyperloglogTestSet,
   ...withOrderingTestSet,
   ...withoutOrderingTestSet,
   viewMetaExposed
