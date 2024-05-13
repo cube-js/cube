@@ -35,7 +35,7 @@ services:
 
   db:
     container_name: birdbox-db
-    image: hbontempo/postgres-hll:16-bookworm-latest
+    image: hbontempo/postgres-hll:16-v2.18
     environment:
       - POSTGRES_PASSWORD=test
       - POSTGRES_USER=test
