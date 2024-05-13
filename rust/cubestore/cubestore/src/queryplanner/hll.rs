@@ -71,7 +71,7 @@ impl HllUnion {
             Hll::Airlift(h) => Ok(Self::Airlift(h)),
             Hll::ZetaSketch(h) => Ok(Self::ZetaSketch(h)),
             Hll::DataSketches(h) => {
-                let mut union = HLLUnionDataSketch::new(h.get_lg_config_k());
+                let mut union = HLLUnionDataSketch::new(h.get_lg_config_k())?;
                 union.merge_with(h)?;
 
                 Ok(Self::DataSketches(union))
