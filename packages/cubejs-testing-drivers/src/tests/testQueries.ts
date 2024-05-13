@@ -14,7 +14,13 @@ import {
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv }: { includeIncrementalSchemaSuite?: boolean, extendedEnv?: string } = {}): void {
+type TestQueriesOptions = {
+  includeIncrementalSchemaSuite?: boolean,
+  includeHLLSuite?: boolean,
+  extendedEnv?: string
+};
+
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -148,11 +154,13 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
-      // await buildPreaggs(env.cube.port, apiToken, {
-      //   timezones: ['UTC'],
-      //   preAggregations: ['BigECommerce.CountByProductExternal'],
-      //   contexts: [{ securityContext: { tenant: 't1' } }],
-      // });
+      if (includeHLLSuite) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.CountByProductExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
