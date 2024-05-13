@@ -147,6 +147,12 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         preAggregations: ['BigECommerce.TAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
+
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['BigECommerce.CountByProductExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
     });
 
     execute('must not fetch a hidden cube', async () => {
