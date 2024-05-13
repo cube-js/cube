@@ -932,8 +932,8 @@ export const queryingECommerceCountByCitiesOrder = driverTest({
   schemas: commonSchemas
 });
 
-export const queryingECommerceCountApproxByCustomerByMonth = driverTest({
-  name: 'querying ECommerce: count distinct approx by customer over product by month',
+export const queryingECommerceCountApproxByCustomerOverProductNameByMonth = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName by month',
   query: {
     timeDimensions: [{
       dimension: 'ECommerce.orderDate',
@@ -953,8 +953,8 @@ export const queryingECommerceCountApproxByCustomerByMonth = driverTest({
   schemas: commonSchemas
 });
 
-export const queryingECommerceCountApproxByCustomer = driverTest({
-  name: 'querying ECommerce: count distinct approx by customer over product',
+export const queryingECommerceCountApproxByCustomerOverProductName = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName',
   query: {
     dimensions: [
       'ECommerce.productName'
@@ -966,6 +966,16 @@ export const queryingECommerceCountApproxByCustomer = driverTest({
       'ECommerce.countApproxByCustomer': 'desc',
       'ECommerce.productName': 'asc',
     },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomer = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer',
+  query: {
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
   },
   schemas: commonSchemas
 });

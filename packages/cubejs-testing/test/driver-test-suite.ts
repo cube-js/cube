@@ -36,8 +36,10 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
     CUBEJS_ROLLUP_ONLY: 'false',
     ...config,
   };
+
   describe(`${type} driver tests`, () => {
     jest.setTimeout(60 * 5 * 1000);
+
     let box: BirdBox;
     let client: CubeApi;
     let transport: WebSocketTransport;

@@ -55,8 +55,9 @@ import {
   filteringECommerceEndsWithDimensionsSecond,
   filteringECommerceEndsWithDimensionsThird,
   queryingEcommerceTotalQuantifyAvgDiscountTotal,
+  queryingECommerceCountApproxByCustomerOverProductName,
+  queryingECommerceCountApproxByCustomerOverProductNameByMonth,
   queryingECommerceCountApproxByCustomer,
-  queryingECommerceCountApproxByCustomerByMonth,
   hiddenMember,
   hiddenCube,
   viewMetaExposed,
@@ -72,7 +73,8 @@ const skippedTestSet = testSet([
 ]);
 
 const hyperloglogTestSet = testSet([
-  queryingECommerceCountApproxByCustomerByMonth,
+  queryingECommerceCountApproxByCustomerOverProductNameByMonth,
+  queryingECommerceCountApproxByCustomerOverProductName,
   queryingECommerceCountApproxByCustomer,
 ]);
 
