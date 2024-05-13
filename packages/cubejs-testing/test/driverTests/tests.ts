@@ -946,6 +946,7 @@ export const queryingECommerceCountApproxByCustomerOverProductNameByMonth = driv
       'ECommerce.countApproxByCustomer'
     ],
     order: {
+      'ECommerce.orderDate': 'desc',
       'ECommerce.countApproxByCustomer': 'desc',
       'ECommerce.productName': 'asc',
     },
