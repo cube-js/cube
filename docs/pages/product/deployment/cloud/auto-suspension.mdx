@@ -58,6 +58,8 @@ When a deployment is auto-suspended:
 API instances are de-provisioned.
 - [Refresh worker][ref-refresh-worker] is suspended, which stops pre-aggregation
 builds and prevents the pre-aggregations from being kept up-to-date.
+- [Semantic Layer Sync][ref-sls] is suspended, which prevents scheduled syncs
+from running.
 - [Monitoring integrations][ref-monitoring] are also suspended, which prevents
 the export of metrics and logs.
 
@@ -126,3 +128,4 @@ response times to be significantly longer than usual.
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [self-effects]: #effects-on-experience
 [ref-refresh-worker]: /product/deployment#refresh-worker
+[ref-sls]: /product/workspace/semantic-layer-sync#on-schedule
