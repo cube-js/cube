@@ -42,6 +42,7 @@ impl From<std::io::Error> for DataSketchesError {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 impl From<dsrs::DataSketchesError> for DataSketchesError {
     fn from(err: dsrs::DataSketchesError) -> Self {
         return DataSketchesError::new(err);
