@@ -2743,6 +2743,8 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket querying Customers: dimensions 1`] = `
 Array [
   Object {

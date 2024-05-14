@@ -506,8 +506,9 @@ class ApiGateway {
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
+    const isDevMode = getEnv('devMode');
     function visibilityFilter(item) {
-      return getEnv('devMode') || context.signedWithPlaygroundAuthSecret || item.isVisible;
+      return isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible;
     }
 
     return cubes
@@ -521,10 +522,11 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId }: {
+  public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
     context: RequestContext,
     res: MetaResponseResultFn,
-    includeCompilerId?: boolean
+    includeCompilerId?: boolean,
+    onlyCompilerId?: boolean
   }) {
     const requestStarted = new Date();
 
@@ -533,8 +535,16 @@ class ApiGateway {
       const compilerApi = await this.getCompilerApi(context);
       const metaConfig = await compilerApi.metaConfig({
         requestId: context.requestId,
-        includeCompilerId
+        includeCompilerId: includeCompilerId || onlyCompilerId
       });
+      if (onlyCompilerId) {
+        const response: { cubes: any[], compilerId?: string } = {
+          cubes: [],
+          compilerId: metaConfig.compilerId
+        };
+        res(response);
+        return;
+      }
       const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
       const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
       const response: { cubes: any[], compilerId?: string } = { cubes };

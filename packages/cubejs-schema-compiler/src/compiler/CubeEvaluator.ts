@@ -24,6 +24,19 @@ export type DimensionDefinition = {
   ownedByCube: boolean,
   fieldType?: string,
   postAggregate?: boolean,
+  shiftInterval?: string,
+};
+
+export type TimeShiftDefinition = {
+  timeDimension: Function,
+  interval: string,
+  type: 'next' | 'prior',
+};
+
+export type TimeShiftDefinitionReference = {
+  timeDimension: string,
+  interval: string,
+  type: 'next' | 'prior',
 };
 
 export type MeasureDefinition = {
@@ -38,9 +51,11 @@ export type MeasureDefinition = {
   groupBy?: Function,
   reduceBy?: Function,
   addGroupBy?: Function,
+  timeShift?: TimeShiftDefinition[],
   groupByReferences?: string[],
   reduceByReferences?: string[],
   addGroupByReferences?: string[],
+  timeShiftReferences?: TimeShiftDefinitionReference[],
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -56,13 +71,22 @@ export class CubeEvaluator extends CubeSymbols {
     super(true);
   }
 
-  public compile(cubes: any, errorReporter: ErrorReporter) {
+  public compile(cubes: any[], errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
-    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
+    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
+      if (a.isView) {
+        return 1;
+      } else if (!a.isView && !b.isView) {
+        return 0;
+      } else {
+        return -1;
+      }
+    });
 
-    Object.values(validCubes).map((cube) => this.prepareCube(cube, errorReporter));
-
-    this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
+    for (const cube of validCubes) {
+      this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
+    }
+    
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -85,6 +109,60 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.evaluatePostAggregateReferences(cube.name, cube.measures);
     this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+
+    this.prepareHierarchies(cube);
+
+    return cube;
+  }
+
+  private prepareHierarchies(cube: any) {
+    if (Array.isArray(cube.hierarchies)) {
+      cube.hierarchies = cube.hierarchies.map(hierarchy => ({
+        ...hierarchy,
+        levels: this.evaluateReferences(
+          cube.name, hierarchy.levels, { originalSorting: true }
+        )
+      }));
+    }
+
+    if (cube.isView && (cube.includedMembers || []).length) {
+      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
+      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+      
+      if (!cube.hierarchies) {
+        for (const cubeName of includedCubeNames) {
+          const { hierarchies } = this.evaluatedCubes[cubeName] || {};
+  
+          if (Array.isArray(hierarchies) && hierarchies.length) {
+            const filteredHierarchies = hierarchies.map(it => {
+              const levels = it.levels.filter(level => includedMemberPaths.includes(level));
+  
+              return {
+                ...it,
+                levels
+              };
+            }).filter(it => it.levels.length);
+  
+            cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
+          }
+        }
+      }
+
+      cube.hierarchies = (cube.hierarchies || []).map((hierarchy) => ({
+        ...hierarchy,
+        levels: hierarchy.levels.map((level) => {
+          const member = cube.includedMembers.find(m => m.memberPath === level);
+
+          if (!member) {
+            return null;
+          }
+
+          return [cube.name, member.name].join('.');
+        }).filter(Boolean)
+      }));
+    }
+
+    return [];
   }
 
   private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
@@ -103,6 +181,10 @@ export class CubeEvaluator extends CubeSymbols {
         }
         if (member.addGroupBy) {
           member.addGroupByReferences = this.evaluateReferences(cubeName, member.addGroupBy);
+        }
+        if (member.timeShift) {
+          member.timeShiftReferences = member.timeShift
+            .map(s => ({ ...s, timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }));
         }
       }
     }

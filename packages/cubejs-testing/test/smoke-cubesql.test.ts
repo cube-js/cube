@@ -259,5 +259,21 @@ limit
   `);
       expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
+
+    test('date/string measures in view', async () => {
+      const queryCtor = (column: string) => `SELECT "${column}" AS val FROM "OrdersView" ORDER BY "id" LIMIT 10`;
+
+      const resStr = await connection.query(queryCtor('countAndTotalAmount'));
+      expect(resStr.rows).toMatchSnapshot('string case');
+
+      const resDate = await connection.query(queryCtor('createdAtMaxProxy'));
+      expect(resDate.rows).toMatchSnapshot('date case');
+    });
+
+    test('zero limited dimension aggregated queries', async () => {
+      const query = 'SELECT MAX(createdAt) FROM Orders LIMIT 0';
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([]);
+    });
   });
 });

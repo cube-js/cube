@@ -50,9 +50,20 @@ export class BaseMeasure {
 
   public measureSql() {
     if (this.expression) {
-      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure');
+      return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure'));
     }
     return this.query.measureSql(this);
+  }
+
+  // We need this for measures however we don't for filters for performance reasons
+  public convertTzForRawTimeDimensionIfNeeded(sql) {
+    if (this.query.options.convertTzForRawTimeDimension) {
+      return this.query.evaluateSymbolSqlWithContext(sql, {
+        convertTzForRawTimeDimension: true
+      });
+    } else {
+      return sql();
+    }
   }
 
   public cube() {
@@ -107,6 +118,9 @@ export class BaseMeasure {
       return false;
     }
     const definition = this.measureDefinition();
+    if (definition.postAggregate) {
+      return false;
+    }
     return definition.type === 'sum' || definition.type === 'count' || definition.type === 'countDistinctApprox' ||
       definition.type === 'min' || definition.type === 'max';
   }

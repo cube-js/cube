@@ -42,6 +42,9 @@ impl SqlQuery {
     }
 
     pub fn add_value(&mut self, value: Option<String>) -> usize {
+        if let Some(index) = self.values.iter().position(|v| v == &value) {
+            return index;
+        }
         let index = self.values.len();
         self.values.push(value);
         index
@@ -59,30 +62,39 @@ impl SqlQuery {
         &self,
         sql_templates: Arc<SqlTemplates>,
         param_index: Option<&str>,
+        rendered_params: &HashMap<usize, String>,
         new_param_index: usize,
-    ) -> Result<(usize, String)> {
+    ) -> Result<(usize, String, bool)> {
         let param = param_index
             .ok_or_else(|| DataFusionError::Execution("Missing param match".to_string()))?
             .parse::<usize>()
             .map_err(|e| DataFusionError::Execution(format!("Can't parse param index: {}", e)))?;
+        if let Some(rendered_param) = rendered_params.get(&param) {
+            return Ok((param, rendered_param.clone(), false));
+        }
         Ok((
             param,
             sql_templates
                 .param(new_param_index)
                 .map_err(|e| DataFusionError::Execution(format!("Can't render param: {}", e)))?,
+            true,
         ))
     }
 
     pub fn finalize_query(&mut self, sql_templates: Arc<SqlTemplates>) -> Result<()> {
         let mut params = Vec::new();
+        let mut rendered_params = HashMap::new();
         let regex = Regex::new(r"\$(\d+)\$")
             .map_err(|e| DataFusionError::Execution(format!("Can't parse regex: {}", e)))?;
         let mut res = Ok(());
         let replaced_sql = regex.replace_all(self.sql.as_str(), |c: &Captures<'_>| {
             let param = c.get(1).map(|x| x.as_str());
-            match self.render_param(sql_templates.clone(), param, params.len()) {
-                Ok((param_index, param)) => {
-                    params.push(self.values[param_index].clone());
+            match self.render_param(sql_templates.clone(), param, &rendered_params, params.len()) {
+                Ok((param_index, param, push_param)) => {
+                    if push_param {
+                        params.push(self.values[param_index].clone());
+                        rendered_params.insert(param_index, param.clone());
+                    }
                     param
                 }
                 Err(e) => {

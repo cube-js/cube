@@ -480,6 +480,11 @@ const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
       addGroupBy: Joi.func(),
+      timeShift: Joi.array().items(Joi.object().keys({
+        timeDimension: Joi.func().required(),
+        interval: regexTimeInterval.required(),
+        type: Joi.string().valid('next', 'prior').required(),
+      })),
       // TODO validate for order window functions
       orderBy: Joi.array().items(Joi.object().keys({
         sql: Joi.func().required(),
@@ -591,6 +596,11 @@ const baseSchema = {
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
+  hierarchies: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    title: Joi.string(),
+    levels: Joi.func()
+  })),
 };
 
 const cubeSchema = inherit(baseSchema, {

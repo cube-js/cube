@@ -2,6 +2,7 @@ module.exports = {
   "sql-api": "SQL API",
   "rest-api": "REST API",
   "graphql-api": "GraphQL API",
+  "ai-api": "AI API",
   "javascript-sdk": "JavaScript SDK",
-  "orchestration-api": "Orchestration API"
-}
+  "orchestration-api": "Orchestration API",
+};

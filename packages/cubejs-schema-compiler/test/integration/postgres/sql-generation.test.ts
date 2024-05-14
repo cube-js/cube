@@ -86,6 +86,21 @@ describe('SQL Generation', () => {
             type: 'quarter_to_date'
           }
         },
+        revenue_day_ago: {
+          post_aggregate: true,
+          type: 'sum',
+          sql: \`\${revenue}\`,
+          time_shift: [{
+            time_dimension: created_at,
+            interval: '1 day',
+            type: 'prior',
+          }]
+        },
+        cagr_1d: {
+          post_aggregate: true,
+          sql: \`ROUND(100 * \${revenue} / NULLIF(\${revenue_day_ago}, 0))\`,
+          type: 'number',
+        },
         countDistinctApproxRolling: {
           type: 'countDistinctApprox',
           sql: 'id',
@@ -295,6 +310,11 @@ describe('SQL Generation', () => {
           type: 'count'
         },
         
+        id_sum: {
+          sql: 'id',
+          type: 'sum'
+        },
+        
         visitorCheckinsRolling: {
           type: 'count',
           rollingWindow: {
@@ -371,6 +391,16 @@ describe('SQL Generation', () => {
           granularity: 'day'
         }
       }
+    });
+    
+    view('visitors_visitors_checkins_view', {
+      cubes: [{
+        join_path: 'visitors',
+        includes: ['revenue', 'source', 'updated_at', 'visitor_revenue']
+      }, {
+        join_path: 'visitors.visitor_checkins',
+        includes: ['visitor_checkins_count', 'id_sum']
+      }]
     })
 
     cube('visitor_checkins_sources', {
@@ -802,6 +832,26 @@ describe('SQL Generation', () => {
     { visitors__created_at_day: '2017-01-08T00:00:00.000Z', visitors__revenue_qtd: '1500' },
     { visitors__created_at_day: '2017-01-09T00:00:00.000Z', visitors__revenue_qtd: '1500' },
     { visitors__created_at_day: '2017-01-10T00:00:00.000Z', visitors__revenue_qtd: '1500' }
+  ]));
+
+  it('CAGR', async () => runQueryTest({
+    measures: [
+      'visitors.revenue',
+      'visitors.revenue_day_ago',
+      'visitors.cagr_1d'
+    ],
+    timeDimensions: [{
+      dimension: 'visitors.created_at',
+      granularity: 'day',
+      dateRange: ['2016-12-01', '2017-01-31']
+    }],
+    order: [{
+      id: 'visitors.created_at'
+    }],
+    timezone: 'America/Los_Angeles'
+  }, [
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_1d: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_1d: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
   ]));
 
   it('sql utils', async () => runQueryTest({
@@ -2641,6 +2691,26 @@ describe('SQL Generation', () => {
       visitors__percentage_of_total: 91,
       visitors__revenue: '1000',
       visitor_checkins__source: null
+    }]
+  ));
+
+  it('multiplied sum and count no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.visitor_checkins_count'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__visitor_checkins_count: '6'
+    }]
+  ));
+
+  it('multiplied sum no dimensions through view', async () => runQueryTest(
+    {
+      measures: ['visitors_visitors_checkins_view.revenue', 'visitors_visitors_checkins_view.id_sum'],
+    },
+    [{
+      visitors_visitors_checkins_view__revenue: '2000',
+      visitors_visitors_checkins_view__id_sum: '21'
     }]
   ));
 

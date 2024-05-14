@@ -593,11 +593,16 @@ export class BaseQuery {
         ['buildSqlAndParams', exportAnnotatedSql],
         () => this.paramAllocator.buildSqlAndParams(
           this.buildParamAnnotatedSql(),
-          exportAnnotatedSql
+          exportAnnotatedSql,
+          this.shouldReuseParams
         ),
         { cache: this.queryCache }
       )
     );
+  }
+
+  get shouldReuseParams() {
+    return false;
   }
 
   /**
@@ -946,7 +951,7 @@ export class BaseQuery {
   }
 
   wrapInParenthesis(select) {
-    return select.trim().match(/^SELECT/ig) ? `(${select})` : select;
+    return select.trim().match(/^[a-zA-Z0-9_\-`".*]+$/i) ? select : `(${select})`;
   }
 
   withQueries(select, withQueries) {
@@ -1106,6 +1111,24 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
+    if (memberDef.timeShiftReferences) {
+      queryContext = {
+        ...queryContext,
+        timeDimensions: queryContext.timeDimensions.map(td => {
+          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
+          if (timeShift) {
+            if (td.shiftInterval) {
+              throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
+            }
+            return {
+              ...td,
+              shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
+            };
+          }
+          return td;
+        })
+      };
+    }
     queryContext = {
       ...queryContext,
       // TODO can't remove filters from OR expression
@@ -1186,7 +1209,8 @@ export class BaseQuery {
       postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
-      postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      postAggregateQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      disableExternalPreAggregations: true,
     });
 
     const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
@@ -1214,6 +1238,7 @@ export class BaseQuery {
         const { type } = this.newMeasure(d).definition();
         return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
       }),
+      disableExternalPreAggregations: true,
     };
     const subQuery = this.newSubQuery(subQueryOptions);
 
@@ -2165,6 +2190,9 @@ export class BaseQuery {
           ]);
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          if (symbol.shiftInterval) {
+            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          }
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !memberExpressionType &&
             symbol.type === 'time' &&
@@ -2329,7 +2357,7 @@ export class BaseQuery {
   }
 
   renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql) {
-    const multiplied = this.multipliedJoinRowResult(cubeName);
+    const multiplied = this.multipliedJoinRowResult(cubeName) || false;
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
@@ -2429,6 +2457,13 @@ export class BaseQuery {
 
   static isCalculatedMeasureType(type) {
     return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
+  }
+
+  /**
+   TODO: support type qualifiers on min and max
+  */
+  static toMemberDataType(type) {
+    return this.isCalculatedMeasureType(type) ? type : 'number';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
@@ -2900,7 +2935,8 @@ export class BaseQuery {
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
-        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
+        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
+        window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         subquery: '({{ expr }})',
         in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
@@ -2915,7 +2951,16 @@ export class BaseQuery {
       },
       params: {
         param: '?'
-      }
+      },
+      window_frame_types: {
+        rows: 'ROWS',
+        range: 'RANGE',
+      },
+      window_frame_bounds: {
+        preceding: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} PRECEDING',
+        current_row: 'CURRENT ROW',
+        following: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} FOLLOWING',
+      },
     };
   }
 
@@ -3081,6 +3126,12 @@ export class BaseQuery {
     }
 
     return [duration, intervalMatch[2]];
+  }
+
+  negateInterval(interval) {
+    const [duration, grunularity] = this.parseInterval(interval);
+
+    return `${duration * -1} ${grunularity}`;
   }
 
   parseSecondDuration(interval) {
