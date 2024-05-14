@@ -29,14 +29,14 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
-    let connection: PgClient;
 
     let connectionId = 0;
 
     async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
       if (!pgPort) {
-        return <any>undefined;
+        throw new Error('port must be defined');
       }
+
       connectionId++;
       const currentConnId = connectionId;
 
@@ -45,16 +45,16 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       const conn = new PgClient({
         database: 'db',
         port: pgPort,
-        host: 'localhost',
+        host: '127.0.0.1',
         user,
         password,
         ssl: false,
       });
       conn.on('error', (err) => {
-        console.log(err);
+        console.log(`[pg] #${currentConnId}`, err);
       });
       conn.on('end', () => {
-        console.debug(`[pg] end ${currentConnId}`);
+        console.debug(`[pg] #${currentConnId} end`);
       });
 
       await conn.connect();
@@ -112,7 +112,6 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         console.log('Error creating fixtures', e.stack);
         throw e;
       }
-      connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
     });
   
     afterAll(async () => {
@@ -1514,6 +1513,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     executePg('SQL API: powerbi min max push down', async () => {
+      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
       const res = await connection.query(`
       select
   max("rows"."orderDate") as "a0",
@@ -1530,6 +1530,7 @@ from
     });
 
     executePg('SQL API: powerbi min max ungrouped flag', async () => {
+      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
       const res = await connection.query(`
       select 
   count(distinct("rows"."totalSales")) + max( 
@@ -1552,6 +1553,7 @@ from
     });
 
     executePg('SQL API: ungrouped pre-agg', async () => {
+      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
       const res = await connection.query(`
     select
       "productName",
