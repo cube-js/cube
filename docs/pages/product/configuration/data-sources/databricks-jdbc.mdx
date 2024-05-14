@@ -69,7 +69,9 @@ docker run -it -p 4000:4000 --env-file=.env cube-jdk
 
 Measures of type
 [`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
-not be used in pre-aggregations when using Databricks as a data source.
+be used in pre-aggregations when using Databricks as a source database. To learn
+more about Databricks's support for approximate aggregate functions, [click
+here][databricks-docs-approx-agg-fns].
 
 ## Pre-Aggregation Build Strategies
 
@@ -166,5 +168,6 @@ bucket][self-preaggs-export-bucket] **must be** configured.
 [ref-caching-using-preaggs-build-strats]:
   /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[databricks-docs-approx-agg-fns]: https://docs.databricks.com/en/sql/language-manual/functions/approx_count_distinct.html
 [self-preaggs-simple]: #simple
 [self-preaggs-export-bucket]: #export-bucket
