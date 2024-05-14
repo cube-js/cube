@@ -1272,16 +1272,20 @@ class ApiGateway {
 
   private parseMemberExpression(memberExpression: string): string | MemberExpression {
     try {
-      const obj = JSON.parse(memberExpression);
-      const args = obj.cube_params;
-      args.push(`return \`${obj.expr}\``);
-      return {
-        cubeName: obj.cube_name,
-        name: obj.alias,
-        expressionName: obj.alias,
-        expression: Function.constructor.apply(null, args),
-        definition: memberExpression,
-      };
+      if (memberExpression.startsWith('{')) {
+        const obj = JSON.parse(memberExpression);
+        const args = obj.cube_params;
+        args.push(`return \`${obj.expr}\``);
+        return {
+          cubeName: obj.cube_name,
+          name: obj.alias,
+          expressionName: obj.alias,
+          expression: Function.constructor.apply(null, args),
+          definition: memberExpression,
+        };
+      } else {
+        return memberExpression;
+      }
     } catch {
       return memberExpression;
     }
