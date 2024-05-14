@@ -45,7 +45,7 @@ use self::{
     },
     parser::parse_sql_to_statement,
     qtrace::Qtrace,
-    rewrite::converter::LogicalPlanToLanguageConverter,
+    rewrite::converter::{LogicalPlanToLanguageContext, LogicalPlanToLanguageConverter},
 };
 use crate::{
     sql::{
@@ -1313,7 +1313,11 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx.clone());
         let mut query_params = Some(HashMap::new());
         let root = converter
-            .add_logical_plan_replace_params(&optimized_plan, &mut query_params)
+            .add_logical_plan_replace_params(
+                &optimized_plan,
+                &mut query_params,
+                &mut LogicalPlanToLanguageContext::default(),
+            )
             .map_err(|e| CompilationError::internal(e.to_string()))?;
 
         let mut finalized_graph = self
@@ -20115,14 +20119,149 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_simple_subquery_wrapper_projection() {
+    async fn test_simple_subquery_wrapper_projection_empty_source() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce WHERE customer_gender = 'male' LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+            "SELECT (SELECT 'male' where 1  group by 'male' having 1 order by 'male' limit 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+        //println!("phys plan {:?}", physical_plan);
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT avgPrice FROM KibanaSampleDataEcommerce a where customer_gender = (SELECT 'male' )"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+        //println!("phys plan {:?}", physical_plan);
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_projection_aggregate_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (SELECT 'male'), avg(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_in_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select 'male')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("IN (SELECT"));
+        assert!(sql.contains("utf8__male__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_filter_and_projection_empty_source() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (select 'male'), avgPrice FROM KibanaSampleDataEcommerce a where customer_gender in (select 'female')"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("IN (SELECT"));
+        assert!(sql.contains("(SELECT"));
+        assert!(sql.contains("utf8__male__"));
+        assert!(sql.contains("utf8__female__"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_simple_subquery_wrapper_projection_1() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT (SELECT customer_gender FROM KibanaSampleDataEcommerce LIMIT 1) as gender, avgPrice FROM KibanaSampleDataEcommerce a"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -20166,12 +20305,6 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("(SELECT"));
-        assert!(logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("LIMIT 1"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }

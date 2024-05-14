@@ -2918,10 +2918,10 @@ export class BaseQuery {
       },
       statements: {
         select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
-          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
-          ') AS {{ from_alias }}' +
+          ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +

@@ -13,6 +13,7 @@ use crate::{
             AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
             ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
             CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
+            EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType,
             JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
@@ -135,10 +136,10 @@ macro_rules! add_binary_expr_list_node {
 }
 
 macro_rules! add_plan_list_node {
-    ($converter:expr, $value_expr:expr, $query_params:expr, $field_variant:ident) => {{
+    ($converter:expr, $value_expr:expr, $query_params:expr, $ctx:expr, $field_variant:ident) => {{
         let list = $value_expr
             .iter()
-            .map(|expr| $converter.add_logical_plan_replace_params(expr, $query_params))
+            .map(|expr| $converter.add_logical_plan_replace_params(expr, $query_params, $ctx))
             .collect::<Result<Vec<_>, _>>()?;
         let mut current = $converter
             .graph
@@ -170,6 +171,11 @@ lazy_static! {
 pub struct LogicalPlanToLanguageConverter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     cube_context: Arc<CubeContext>,
+}
+
+#[derive(Default, Clone)]
+pub struct LogicalPlanToLanguageContext {
+    subquery_source_table_name: Option<String>,
 }
 
 impl LogicalPlanToLanguageConverter {
@@ -460,13 +466,18 @@ impl LogicalPlanToLanguageConverter {
     }
 
     pub fn add_logical_plan(&mut self, plan: &LogicalPlan) -> Result<Id, CubeError> {
-        self.add_logical_plan_replace_params(plan, &mut None)
+        self.add_logical_plan_replace_params(
+            plan,
+            &mut None,
+            &LogicalPlanToLanguageContext::default(),
+        )
     }
 
     pub fn add_logical_plan_replace_params(
         &mut self,
         plan: &LogicalPlan,
         query_params: &mut Option<HashMap<usize, ScalarValue>>,
+        ctx: &LogicalPlanToLanguageContext,
     ) -> Result<Id, CubeError> {
         Ok(match plan {
             LogicalPlan::Projection(node) => {
@@ -477,7 +488,7 @@ impl LogicalPlanToLanguageConverter {
                     ProjectionExpr
                 );
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 let alias = add_data_node!(self, node.alias, ProjectionAlias);
                 let split = add_data_node!(self, false, ProjectionSplit);
                 self.graph
@@ -487,13 +498,13 @@ impl LogicalPlanToLanguageConverter {
                 let predicate =
                     Self::add_expr_replace_params(&mut self.graph, &node.predicate, query_params)?;
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 self.graph
                     .add(LogicalPlanLanguage::Filter([predicate, input]))
             }
             LogicalPlan::Window(node) => {
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 let window_expr = add_expr_list_node!(
                     &mut self.graph,
                     node.window_expr,
@@ -505,7 +516,7 @@ impl LogicalPlanToLanguageConverter {
             }
             LogicalPlan::Aggregate(node) => {
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 let group_expr = add_binary_expr_list_node!(
                     &mut self.graph,
                     node.group_expr,
@@ -526,14 +537,14 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::Sort(node) => {
                 let expr = add_expr_list_node!(&mut self.graph, node.expr, query_params, SortExp);
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 self.graph.add(LogicalPlanLanguage::Sort([expr, input]))
             }
             LogicalPlan::Join(node) => {
                 let left =
-                    self.add_logical_plan_replace_params(node.left.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.left.as_ref(), query_params, ctx)?;
                 let right =
-                    self.add_logical_plan_replace_params(node.right.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.right.as_ref(), query_params, ctx)?;
                 let left_on = node
                     .on
                     .iter()
@@ -560,28 +571,38 @@ impl LogicalPlanToLanguageConverter {
             }
             LogicalPlan::CrossJoin(node) => {
                 let left =
-                    self.add_logical_plan_replace_params(node.left.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.left.as_ref(), query_params, ctx)?;
                 let right =
-                    self.add_logical_plan_replace_params(node.right.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.right.as_ref(), query_params, ctx)?;
                 self.graph
                     .add(LogicalPlanLanguage::CrossJoin([left, right]))
             }
             // TODO
             LogicalPlan::Repartition(node) => {
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 self.graph.add(LogicalPlanLanguage::Repartition([input]))
             }
             LogicalPlan::Union(node) => {
-                let inputs = add_plan_list_node!(self, node.inputs, query_params, UnionInputs);
+                let inputs = add_plan_list_node!(self, node.inputs, query_params, ctx, UnionInputs);
                 let alias = add_data_node!(self, node.alias, UnionAlias);
                 self.graph.add(LogicalPlanLanguage::Union([inputs, alias]))
             }
             LogicalPlan::Subquery(node) => {
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
-                let subqueries =
-                    add_plan_list_node!(self, node.subqueries, query_params, SubquerySubqueries);
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
+                let subquery_source_table_name =
+                    self.find_source_table_name(node.input.as_ref())?;
+                let mut sub_ctx = ctx.clone();
+                sub_ctx.subquery_source_table_name = subquery_source_table_name;
+                let subqueries = add_plan_list_node!(
+                    self,
+                    node.subqueries,
+                    query_params,
+                    &sub_ctx.clone(),
+                    SubquerySubqueries
+                );
+
                 let types = add_data_node!(self, node.types, SubqueryTypes);
                 self.graph
                     .add(LogicalPlanLanguage::Subquery([input, subqueries, types]))
@@ -590,7 +611,7 @@ impl LogicalPlanToLanguageConverter {
                 let expr =
                     add_expr_list_node!(&mut self.graph, node.expr, query_params, TableUDFsExpr);
                 let input =
-                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(node.input.as_ref(), query_params, ctx)?;
                 self.graph
                     .add(LogicalPlanLanguage::TableUDFs([expr, input]))
             }
@@ -622,14 +643,28 @@ impl LogicalPlanToLanguageConverter {
             LogicalPlan::EmptyRelation(rel) => {
                 let produce_one_row =
                     add_data_node!(self, rel.produce_one_row, EmptyRelationProduceOneRow);
-                self.graph
-                    .add(LogicalPlanLanguage::EmptyRelation([produce_one_row]))
+                let derived_source_table_name = add_data_node!(
+                    self,
+                    ctx.subquery_source_table_name,
+                    EmptyRelationDerivedSourceTableName
+                );
+                let is_wrappable = add_data_node!(
+                    self,
+                    ctx.subquery_source_table_name.is_some(),
+                    EmptyRelationIsWrappable
+                );
+
+                self.graph.add(LogicalPlanLanguage::EmptyRelation([
+                    produce_one_row,
+                    derived_source_table_name,
+                    is_wrappable,
+                ]))
             }
             LogicalPlan::Limit(limit) => {
                 let skip = add_data_node!(self, limit.skip, LimitSkip);
                 let fetch = add_data_node!(self, limit.fetch, LimitFetch);
                 let input =
-                    self.add_logical_plan_replace_params(limit.input.as_ref(), query_params)?;
+                    self.add_logical_plan_replace_params(limit.input.as_ref(), query_params, ctx)?;
                 self.graph
                     .add(LogicalPlanLanguage::Limit([skip, fetch, input]))
             }
@@ -655,12 +690,38 @@ impl LogicalPlanToLanguageConverter {
                 }
             }
             LogicalPlan::Distinct(distinct) => {
-                let input =
-                    self.add_logical_plan_replace_params(distinct.input.as_ref(), query_params)?;
+                let input = self.add_logical_plan_replace_params(
+                    distinct.input.as_ref(),
+                    query_params,
+                    ctx,
+                )?;
                 self.graph.add(LogicalPlanLanguage::Distinct([input]))
             }
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", plan),
+        })
+    }
+    fn find_source_table_name(&self, plan: &LogicalPlan) -> Result<Option<String>, CubeError> {
+        Ok(match plan {
+            LogicalPlan::Projection(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Filter(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Window(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Aggregate(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Sort(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Join(node) => self.find_source_table_name(node.left.as_ref())?,
+            LogicalPlan::CrossJoin(node) => self.find_source_table_name(node.left.as_ref())?,
+            // TODO
+            LogicalPlan::Repartition(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Union(node) => self.find_source_table_name(&node.inputs[0])?,
+            LogicalPlan::Subquery(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::TableUDFs(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::TableScan(node) => Some(
+                self.cube_context
+                    .table_name_by_table_provider(node.source.clone())?,
+            ),
+            LogicalPlan::Limit(node) => self.find_source_table_name(node.input.as_ref())?,
+            LogicalPlan::Distinct(node) => self.find_source_table_name(node.input.as_ref())?,
+            _ => None,
         })
     }
 
