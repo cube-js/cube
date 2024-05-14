@@ -17,15 +17,19 @@ mod template;
 mod transport;
 mod utils;
 
-use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
-use cubesql::compile::parser::parse_sql_to_statement;
+use channel::call_raw_js_with_channel_as_callback;
+use cubesql::compile::{convert_sql_to_cube_query, get_df_batches, print_df_stream};
 use cubesql::sql::{
-    self, AuthContext, DatabaseProtocol, HttpAuthContext, PostgresServer, SessionManager,
+    self, dataframe, AuthContext, DatabaseProtocol, HttpAuthContext, PostgresServer, SessionManager,
 };
 use cubesql::transport::TransportService;
+use futures::StreamExt;
 use once_cell::sync::OnceCell;
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
+use crate::channel::call_sync_js_fn;
 use crate::cross::CLRepr;
 use auth::{NativeAuthContext, NodeBridgeAuthService};
 use config::NodeConfig;
@@ -233,45 +237,122 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     });
 
     let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let node_stream = cx
+        .argument::<JsObject>(2)?
+        .downcast_or_throw::<JsObject, _>(&mut cx)?;
+    let node_stream_root = cx
+        .argument::<JsObject>(2)?
+        .downcast_or_throw::<JsObject, _>(&mut cx)?
+        .root(&mut cx);
 
     let services = interface.services.clone();
     let runtime = tokio_runtime_node(&mut cx)?;
 
-    let sql_query = String::from("SELECT status from orders;");
+    eprintln!("from query {:?}", sql_query);
 
-    std::thread::spawn(move || {
-        runtime.block_on(async move {
-            let session_manager = services
-                .injector
-                .get_service_typed::<SessionManager>()
-                .await;
-            let session = session_manager
-                .create_session(
-                    DatabaseProtocol::PostgreSQL,
-                    String::from("127.0.0.1"),
-                    15432,
-                )
-                .await;
+    let js_push = Arc::new(
+        node_stream
+            .get::<JsFunction, _, _>(&mut cx, "push")?
+            .root(&mut cx),
+    );
 
-            session.state.set_auth_context(Some(native_auth_ctx.clone()));
+    let channel = Arc::new(cx.channel());
+    let node_stream_arc = Arc::new(node_stream_root);
 
-            let transport_service = services
-                .injector
-                .get_service_typed::<dyn TransportService>()
-                .await;
+    // runtime.spawn(async move {
+    //     for i in 0..10 {
+    //         eprintln!("Iteration {:?}", i);
+    //         let argument = String::from(format!("hello_{}", i));
+    //         call_sync_js_fn(
+    //             channel.clone(),
+    //             js_push.clone(),
+    //             if i != 9 { Some(argument.clone()) } else { None },
+    //             node_stream_arc.clone(),
+    //         )
+    //         .unwrap();
 
-            // todo: can we use compiler_cache?
-            let meta_context = transport_service.meta(native_auth_ctx).await.unwrap();
-            let query_plan = convert_sql_to_cube_query(&sql_query, meta_context, session).await.unwrap();
+    //         tokio::time::sleep(Duration::from_secs(1)).await;
+    //     }
+    // });
 
-            let output = get_df_batches(&query_plan).await.unwrap();
+    runtime.spawn(async move {
+        let session_manager = services
+            .injector
+            .get_service_typed::<SessionManager>()
+            .await;
+        let session = session_manager
+            .create_session(
+                DatabaseProtocol::PostgreSQL,
+                String::from("127.0.0.1"),
+                15432,
+            )
+            .await;
 
-            eprintln!("res: {:?}", output);
-        });
+        session
+            .state
+            .set_auth_context(Some(native_auth_ctx.clone()));
+
+        let transport_service = services
+            .injector
+            .get_service_typed::<dyn TransportService>()
+            .await;
+
+        // todo: can we use compiler_cache?
+        let meta_context = transport_service.meta(native_auth_ctx).await.unwrap();
+        let query_plan = convert_sql_to_cube_query(&sql_query, meta_context, session)
+            .await
+            .unwrap();
+
+        let mut stream = get_df_batches(&query_plan).await.unwrap();
+        // let mut rows: Vec<HashMap<String, String>> = vec![];
+        while let Some(batch) = stream.next().await {
+            match batch {
+                Ok(batch) => {
+                    let schema = batch.schema();
+                    let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch]).unwrap();
+
+                    eprintln!("@batch columns ----> {:?}", data_frame.get_columns());
+                    let rows = data_frame
+                        .get_rows()
+                        .iter()
+                        .map(|it| {
+                            let data = it
+                                .values()
+                                .iter()
+                                .map(|it| it.to_string())
+                                .collect::<Vec<String>>();
+
+                            let json_data = serde_json::to_value(&data).unwrap();
+
+                            call_sync_js_fn(
+                                channel.clone(),
+                                js_push.clone(),
+                                Some(json_data.to_string()),
+                                node_stream_arc.clone(),
+                            )
+                            .unwrap();
+
+                            data
+                        })
+                        .collect::<Vec<Vec<String>>>();
+
+                    eprintln!("@batch rows ----> {:?}", rows);
+                }
+                _ => todo!(),
+            }
+        }
+
+        call_sync_js_fn(channel.clone(), js_push.clone(), None, node_stream_arc).unwrap();
+        // print_df_stream(&query_plan).await.unwrap();
+
+        // while Some(batch) = stream.next().await {
+        //     let batch = batch.unwrap();
+        //     let output = sql::serialize_batch(&batch).unwrap();
+        // }
     });
-    // deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
 
-    // Ok(promise)
+    // Ok(promise.upcast::<JsValue>())
     Ok(JsUndefined::new(&mut cx).upcast::<JsValue>())
 }
 

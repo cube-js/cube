@@ -670,6 +670,7 @@ dependencies = [
  "cubeclient",
  "cubesql",
  "findshlibs",
+ "futures",
  "libc",
  "log",
  "log-reroute",

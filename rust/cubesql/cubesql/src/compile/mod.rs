@@ -15,12 +15,13 @@ use datafusion::{
         projection_drop_out::ProjectionDropOut,
         utils::from_plan,
     },
-    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan},
+    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan, RecordBatchStream},
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
 };
+use futures::{FutureExt, StreamExt};
 use itertools::Itertools;
 use log::warn;
 use serde::Serialize;
@@ -1741,25 +1742,65 @@ pub async fn convert_sql_to_cube_query(
     convert_statement_to_cube_query(&stmt, meta, session, &mut None, None).await
 }
 
-pub async fn get_df_batches(plan: &QueryPlan) -> Result<Vec<String>, CubeError> {
-    let mut output = Vec::new();
+pub async fn get_df_batches(
+    plan: &QueryPlan,
+) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, CubeError> {
     match plan {
         QueryPlan::DataFusionSelect(_, plan, ctx) => {
             let df = DataFrame::new(ctx.state.clone(), &plan);
-            let batches = df.collect().await?;
-            let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+            let safe_stream = async move {
+                std::panic::AssertUnwindSafe(df.execute_stream())
+                    .catch_unwind()
+                    .await
+            };
+            match safe_stream.await {
+                Ok(sendable_batch) => {
+                    match sendable_batch {
+                        Ok(stream) => {
+                            return Ok(stream);
+                        }
+                        Err(err) => return Err(CubeError::panic(Box::new(err)).into()),
+                    };
+                }
+                Err(err) => return Err(CubeError::panic(err).into()),
+            }
+        }
+        _ => unimplemented!(),
+    };
+}
 
-            batches
-                .into_iter()
-                .for_each(|b| println!("batch @@@ {:?}", b));
-
-            output.push(frame.print());
-            // output_flags = flags;
+pub async fn print_df_stream(plan: &QueryPlan) -> Result<(), CubeError> {
+    match plan {
+        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+            let df = DataFrame::new(ctx.state.clone(), &plan);
+            let safe_stream = async move {
+                std::panic::AssertUnwindSafe(df.execute_stream())
+                    .catch_unwind()
+                    .await
+            };
+            match safe_stream.await {
+                Ok(sendable_batch) => {
+                    match sendable_batch {
+                        Ok(mut stream) => {
+                            while let Some(batch) = stream.next().await {
+                                match batch {
+                                    Ok(batch) => {
+                                        eprintln!("@batch {:?}", batch);
+                                    }
+                                    _ => todo!(),
+                                }
+                            }
+                        }
+                        Err(err) => return Err(CubeError::panic(Box::new(err)).into()),
+                    };
+                }
+                Err(err) => return Err(CubeError::panic(err).into()),
+            }
         }
         _ => unimplemented!(),
     };
 
-    Ok(output)
+    Ok(())
 }
 
 pub fn find_cube_scans_deep_search(

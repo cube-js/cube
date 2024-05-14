@@ -5,6 +5,7 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
+import { Readable } from 'stream';
 import {
   getEnv,
   getRealType,
@@ -353,10 +354,21 @@ class ApiGateway {
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
         const server = this.initSQLServer();
-        // console.log('>>>', server);
-        const result = await server.execSql();
+        
+        const _stream = new Readable({
+          read(v) {
+            console.log('>>>', 'READ', v);
+          }
+        });
 
-        res.status(200).json({ ok: true });
+        await server.execSql(req.body.query, _stream);
+
+        _stream.pipe(res);
+
+        _stream.on('error', (err) => {
+          console.error('Stream error:', err);
+          res.status(500).end();
+        });
       })
     );
 
