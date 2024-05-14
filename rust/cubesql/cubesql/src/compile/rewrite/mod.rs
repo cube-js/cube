@@ -735,6 +735,13 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
+#[allow(unused)]
+fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
+    use itertools::Itertools;
+    let list = list.iter().join(" ");
+    format!("({list_type} {list})")
+}
+
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
 }
