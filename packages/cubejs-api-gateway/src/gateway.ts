@@ -1687,6 +1687,7 @@ class ApiGateway {
           queriesWithData:
             results.filter((r: any) => r.data?.length).length,
           dbType: results.map(r => r.dbType),
+          rowsCount: results.reduce((sum: number, r: any) => sum + r.data?.length || 0, 0),
         },
         context,
       );
