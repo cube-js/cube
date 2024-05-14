@@ -1,6 +1,4 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { Readable } from 'stream';
-import { getEnv } from '@cubejs-backend/shared';
 
 export type Row = {
   [field: string]: boolean | number | string
@@ -25,6 +23,18 @@ export class QueryStream extends Readable {
     this.next = nextFn;
   }
 
+  protected transformRow(row: any) {
+    // eslint-disable-next-line no-restricted-syntax
+    for (const [name, field] of Object.entries(row)) {
+      // console.log({ name, field });
+      if (field instanceof Int8Array) {
+        row[name] = Buffer.from(field).toString('base64');
+      }
+    }
+
+    return row;
+  }
+
   /**
    * @override
    */
@@ -34,7 +44,7 @@ export class QueryStream extends Readable {
         if (this.next) {
           const row = this.next();
           if (row.value) {
-            this.push(row.value);
+            this.push(this.transformRow(row.value));
           }
           if (row.done) {
             this.push(null);

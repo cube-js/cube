@@ -1,3 +1,6 @@
 import { testQueries } from '../src/tests/testQueries';
 
-testQueries('bigquery', { includeIncrementalSchemaSuite: true });
+testQueries('bigquery', {
+  includeIncrementalSchemaSuite: true,
+  includeHLLSuite: true,
+});

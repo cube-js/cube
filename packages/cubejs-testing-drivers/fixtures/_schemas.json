@@ -49,6 +49,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "runningTotal",
           "type": "count",
           "rolling_window": {
@@ -125,6 +130,11 @@
         {
           "name": "count",
           "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
           "sql": "customer_id"
         },
         {
@@ -242,6 +252,11 @@
         {
           "name": "count",
           "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
           "sql": "customer_id"
         },
         {

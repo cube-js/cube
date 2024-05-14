@@ -208,9 +208,9 @@ export const BigECommerce = {
       select 7293 as row_id, 'CA-2017-109183' as order_id, ${DATE_PREFIX}'2020-12-04'${DATE_SUFFIX} as order_date, 'LR-16915' as customer_id, 'Columbus' as city, 'Technology' as category, 'Machines' as sub_category, 'Okidata C610n Printer' as product_name, 649.00000 as sales, 2 as quantity, 0.50000 as discount, -272.58000 as profit, ${falseLiteral} as is_returning
     `;
     if (!GENERATE_BIG_SERIES) {
-      return `SELECT row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit, is_returning from (${data}) d`;
+      return `SELECT row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, customer_id, sales, quantity, discount, profit, is_returning from (${data}) d`;
     }
-    return `select value * 10000 + row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, sales, quantity, discount, profit, is_returning from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
+    return `select value * 10000 + row_id as id, row_id, order_id, order_date, city, category, sub_category, product_name, customer_id, sales, quantity, discount, profit, is_returning from ${GENERATE_BIG_SERIES} CROSS JOIN (${data}) d`;
   },
   create: (cast: Cast, name: string, suf?: string) => create(name, BigECommerce.select(cast), cast, suf),
 };
