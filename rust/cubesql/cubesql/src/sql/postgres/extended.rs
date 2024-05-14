@@ -391,8 +391,12 @@ impl Portal {
         };
 
         let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
+        // batch_to_dataframe doesn't move variable, dataframe_to_writer will copy data to BatchWriter (will be x3), let's reduce memory usage peak to x2
+        drop(batch_for_write);
 
-        Ok((unused, self.dataframe_to_writer(frame)?))
+        let left = self.dataframe_to_writer(frame)?;
+
+        Ok((unused, left))
     }
 
     fn hand_execution_stream_state<'a>(
