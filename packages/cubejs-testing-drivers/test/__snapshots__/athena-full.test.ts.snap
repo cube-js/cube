@@ -3,7 +3,7 @@
 exports[`Queries with the @cubejs-backend/athena-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
 Array [
   Object {
-    "SUM(BigECommerce.percentageOfTotalForStatus)": 0.9999999999999999,
+    "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
   },
 ]
 `;

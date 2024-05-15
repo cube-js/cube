@@ -1,5 +1,13 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+Array [
+  Object {
+    "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: powerbi min max push down: powerbi_min_max_push_down 1`] = `
 Array [
   Object {

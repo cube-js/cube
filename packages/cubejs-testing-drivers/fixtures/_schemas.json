@@ -300,7 +300,7 @@
         {
           "name": "percentageOfTotalForStatus",
           "type": "number",
-          "sql": "{totalProfit} / NULLIF({totalProfitForStatus}, 0)",
+          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
           "post_aggregate": true
         },
         {
