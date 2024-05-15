@@ -923,7 +923,10 @@ impl CubeScanWrapperNode {
 
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
-                let mut truncated_alias = non_id_regex.replace_all(&alias, "_").to_lowercase();
+                let mut truncated_alias = non_id_regex
+                    .replace_all(&alias, "_")
+                    .trim_start_matches("_")
+                    .to_lowercase();
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {

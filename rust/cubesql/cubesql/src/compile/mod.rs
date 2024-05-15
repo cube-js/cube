@@ -20456,8 +20456,8 @@ ORDER BY "source"."str0" ASC
                 .wrapped_sql
                 .unwrap()
                 .sql
-                .contains("\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"__user\\\""),
-            r#"SQL contains `\"cube_name\":\"KibanaSampleDataEcommerce\",\"alias\":\"__user\"` {}"#,
+                .contains("\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""),
+            r#"SQL contains `\"cube_name\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
             logical_plan
                 .find_cube_scan_wrapper()
                 .wrapped_sql
