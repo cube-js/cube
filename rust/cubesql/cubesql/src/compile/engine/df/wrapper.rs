@@ -441,7 +441,7 @@ impl CubeScanWrapperNode {
                                     Some(Arc::new(cube_scan_node.clone()))
                                 } else {
                                     return Err(CubeError::internal(format!(
-                                        "Expected ubeScan node but found: {:?}",
+                                        "Expected CubeScan node but found: {:?}",
                                         plan
                                     )));
                                 }
@@ -1436,8 +1436,12 @@ impl CubeScanWrapperNode {
                             sql_query,
                         ),
                         ScalarValue::Utf8(x) => {
-                            let param_index = sql_query.add_value(x);
-                            (format!("${}$", param_index), sql_query)
+                            if x.is_some() {
+                                let param_index = sql_query.add_value(x);
+                                (format!("${}$", param_index), sql_query)
+                            } else {
+                                ("NULL".into(), sql_query)
+                            }
                         }
                         // ScalarValue::LargeUtf8(_) => {}
                         // ScalarValue::Binary(_) => {}

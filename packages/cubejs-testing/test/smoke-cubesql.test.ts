@@ -285,5 +285,11 @@ from
       const res = await connection.query(query);
       expect(res.rows).toEqual([]);
     });
+
+    test('select dimension agg where false', async () => {
+      const query = 'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([{ max: null }]);
+    });
   });
 });
