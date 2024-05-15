@@ -32,7 +32,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
 
     let connectionId = 0;
 
-    async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
+    async function createPostgresClient(user: string = 'admin', password: string = 'admin_password', pgPort: number | undefined = env.cube.pgPort) {
       if (!pgPort) {
         throw new Error('port must be defined');
       }
@@ -1513,7 +1513,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     executePg('SQL API: powerbi min max push down', async () => {
-      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
+      const connection = await createPostgresClient();
       const res = await connection.query(`
       select
   max("rows"."orderDate") as "a0",
@@ -1530,7 +1530,7 @@ from
     });
 
     executePg('SQL API: powerbi min max ungrouped flag', async () => {
-      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
+      const connection = await createPostgresClient();
       const res = await connection.query(`
       select 
   count(distinct("rows"."totalSales")) + max( 
@@ -1553,7 +1553,7 @@ from
     });
 
     executePg('SQL API: ungrouped pre-agg', async () => {
-      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
+      const connection = await createPostgresClient();
       const res = await connection.query(`
     select
       "productName",
@@ -1566,7 +1566,7 @@ from
     });
 
     executePg('SQL API: post-aggregate percentage of total', async () => {
-      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
+      const connection = await createPostgresClient();
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
