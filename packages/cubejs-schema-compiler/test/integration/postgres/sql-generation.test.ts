@@ -957,6 +957,7 @@ describe('SQL Generation', () => {
       }],
       timezone: 'America/Los_Angeles',
       offset: 5,
+      rowLimit: 5,
     });
 
     console.log(query.buildSqlAndParams());
