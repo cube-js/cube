@@ -1564,5 +1564,15 @@ from
   `);
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
+
+    executePg('SQL API: post-aggregate percentage of total', async () => {
+      const res = await connection.query(`
+    select
+      sum("BigECommerce"."percentageOfTotalForStatus")
+    from 
+      "public"."BigECommerce" "BigECommerce"
+  `);
+      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
+    });
   });
 }

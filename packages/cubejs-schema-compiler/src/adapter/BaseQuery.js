@@ -1981,15 +1981,27 @@ export class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    let limitClause = '';
+    let limit = null;
     if (this.rowLimit !== null) {
       if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
-        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+        limit = this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT);
       } else if (typeof this.rowLimit === 'number') {
-        limitClause = ` LIMIT ${this.rowLimit}`;
+        limit = this.rowLimit;
       }
     }
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
+    const offset = this.offset ? parseInt(this.offset, 10) : null;
+    return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @param limit
+   * @param offset
+   * @returns {string}
+   */
+  limitOffsetClause(limit, offset) {
+    const limitClause = limit != null ? ` LIMIT ${limit}` : '';
+    const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${limitClause}${offsetClause}`;
   }
 

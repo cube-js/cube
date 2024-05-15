@@ -291,6 +291,19 @@
           }]
         },
         {
+          "name": "totalProfitForStatus",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "reduce_by": ["category"]
+        },
+        {
+          "name": "percentageOfTotalForStatus",
+          "type": "number",
+          "sql": "{totalProfit} / NULLIF({totalProfitForStatus}, 0)",
+          "post_aggregate": true
+        },
+        {
           "name": "hiddenSum",
           "sql": "profit",
           "type": "sum",

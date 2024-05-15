@@ -78,6 +78,7 @@ export class MssqlQuery extends BaseQuery {
     return new MssqlParamAllocator(expressionParams);
   }
 
+  // TODO replace with limitOffsetClause override
   public groupByDimensionLimit() {
     if (this.rowLimit) {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';

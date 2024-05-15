@@ -285,7 +285,7 @@ describe('SQL Generation', () => {
     view('visitors_post_aggregate', {
       cubes: [{
         join_path: 'visitors',
-        includes: ['adjusted_rank_sum', 'source', 'updated_at', 'visitor_revenue']
+        includes: '*'
       }]
     })
 
@@ -2593,6 +2593,32 @@ describe('SQL Generation', () => {
       visitors__percentage_of_total: 70,
       visitors__revenue: '1400',
       visitors__source: null
+    }]
+  ));
+
+  it('post aggregate percentage of total with limit', async () => runQueryTest(
+    {
+      measures: ['visitors_post_aggregate.percentage_of_total'],
+      dimensions: ['visitors_post_aggregate.source'],
+      order: [{
+        id: 'visitors_post_aggregate.source'
+      }],
+      rowLimit: 1,
+      limit: 1
+    },
+    [{
+      visitors_post_aggregate__percentage_of_total: 15,
+      visitors_post_aggregate__source: 'google'
+    }]
+  ));
+
+  it('post aggregate percentage of total with limit totals', async () => runQueryTest(
+    {
+      measures: ['visitors_post_aggregate.percentage_of_total'],
+      rowLimit: 1
+    },
+    [{
+      visitors_post_aggregate__percentage_of_total: 100
     }]
   ));
 
