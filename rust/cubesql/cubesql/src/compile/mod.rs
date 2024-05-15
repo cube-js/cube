@@ -20675,8 +20675,8 @@ ORDER BY "source"."str0" ASC
                 .wrapped_sql
                 .unwrap()
                 .sql
-                .contains("__user:(KibanaSampleDataEcommerce):$"),
-            "SQL contains __user:(KibanaSampleDataEcommerce):$: {}",
+                .contains("__user:(KibanaSampleDataEcommerce):NULL"),
+            "SQL contains __user:(KibanaSampleDataEcommerce):NULL {}",
             logical_plan
                 .find_cube_scan_wrapper()
                 .wrapped_sql
