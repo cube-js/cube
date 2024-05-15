@@ -775,25 +775,6 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            rewrite(
-                "filter-replacer-lower-in-list-unwrap",
-                filter_replacer(
-                    not_expr(inlist_expr(
-                        fun_expr("Lower", vec!["?expr"]),
-                        "?list",
-                        "?new_negated",
-                    )),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    not_expr(inlist_expr("?expr", "?list", "?new_negated")),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
             // Unwrap upper for case-insensitive operators
             transforming_rewrite(
                 "filter-replacer-upper-unwrap",
@@ -836,68 +817,6 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
-            // Lower(?column) = 'literal'
-            // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-            rewrite(
-                "filter-replacer-lower-equal-workaround",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
-                        "=",
-                        literal_expr("?str"),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        fun_expr(
-                            "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        ),
-                        "AND",
-                        udf_expr(
-                            "ends_with",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
-            // Lower(?column) = 'literal'
-            // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-            rewrite(
-                "filter-replacer-lower-not-equal-workaround",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
-                        "!=",
-                        literal_expr("?str"),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        not_expr(fun_expr(
-                            "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        )),
-                        "AND",
-                        not_expr(udf_expr(
-                            "ends_with",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        )),
-                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",

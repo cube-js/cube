@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.34](https://github.com/cube-js/cube/compare/v0.35.33...v0.35.34) (2024-05-15)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - STS credentials (align aws-creds to 0.36 in fork) ([#8264](https://github.com/cube-js/cube/issues/8264)) ([1a5b27d](https://github.com/cube-js/cube/commit/1a5b27d1775691456a90d34130841ee03b5edef6))
+
+
+
+
+
 ## [0.35.33](https://github.com/cube-js/cube.js/compare/v0.35.32...v0.35.33) (2024-05-15)
 
 **Note:** Version bump only for package @cubejs-backend/cubestore

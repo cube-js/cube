@@ -36,6 +36,14 @@ pub struct SqlQuery {
     pub values: Vec<Option<String>>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct UngrouppedMemberDef {
+    cube_name: String,
+    alias: String,
+    cube_params: Vec<String>,
+    expr: String,
+}
+
 impl SqlQuery {
     pub fn new(sql: String, values: Vec<Option<String>>) -> Self {
         Self { sql, values }
@@ -980,19 +988,22 @@ impl CubeScanWrapperNode {
     }
 
     fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
-        let cube_params = used_cubes.iter().join(",");
-        Ok(format!(
-            "{}.{}:({}):{}",
-            used_cubes.iter().next().ok_or_else(|| {
-                DataFusionError::Internal(format!(
-                    "Can't generate SQL for column without cubes: {:?}",
-                    column
-                ))
-            })?,
-            column.alias,
-            cube_params,
-            column.expr
-        ))
+        let res = UngrouppedMemberDef {
+            cube_name: used_cubes
+                .iter()
+                .next()
+                .ok_or_else(|| {
+                    DataFusionError::Internal(format!(
+                        "Can't generate SQL for column without cubes: {:?}",
+                        column
+                    ))
+                })?
+                .to_string(),
+            alias: column.alias.clone(),
+            cube_params: used_cubes.clone(),
+            expr: column.expr.clone(),
+        };
+        Ok(serde_json::json!(res).to_string())
     }
 
     pub fn generate_sql_for_expr(
