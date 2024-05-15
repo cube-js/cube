@@ -2046,8 +2046,8 @@ export class BaseQuery {
     return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
   }
 
-  autoPrefixWithCubeName(cubeName, sql) {
-    if (sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
+  autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
+    if (!isMemberExpr && sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
       return `${this.cubeAlias(cubeName)}.${sql}`;
     }
     return sql;
@@ -2095,6 +2095,7 @@ export class BaseQuery {
   }
 
   evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+    const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
@@ -2158,7 +2159,8 @@ export class BaseQuery {
           sql && this.applyMeasureFilters(
             this.autoPrefixWithCubeName(
               cubeName,
-              sql
+              sql,
+              isMemberExpr,
             ),
             symbol,
             cubeName
@@ -2196,12 +2198,12 @@ export class BaseQuery {
           return this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
         } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
           if (symbol.shiftInterval) {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
@@ -2218,7 +2220,7 @@ export class BaseQuery {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
         }
-        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
+        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql), isMemberExpr);
       }
       return this.evaluateSql(cubeName, symbol.sql);
     } finally {
@@ -2226,8 +2228,8 @@ export class BaseQuery {
     }
   }
 
-  autoPrefixAndEvaluateSql(cubeName, sql) {
-    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql));
+  autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
+    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql), isMemberExpr);
   }
 
   concatStringsSql(strings) {
