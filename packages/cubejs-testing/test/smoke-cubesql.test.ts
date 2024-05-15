@@ -260,6 +260,16 @@ limit
       expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
 
+    test('percentage of total sum', async () => {
+      const res = await connection.query(`
+select 
+  sum("OrdersView"."statusPercentageOfTotal") as "m0" 
+from 
+  "OrdersView" as "OrdersView" 
+  `);
+      expect(res.rows).toMatchSnapshot('percentage of total sum');
+    });
+
     test('date/string measures in view', async () => {
       const queryCtor = (column: string) => `SELECT "${column}" AS val FROM "OrdersView" ORDER BY "id" LIMIT 10`;
 

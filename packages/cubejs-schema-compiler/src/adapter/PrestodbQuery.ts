@@ -102,10 +102,9 @@ export class PrestodbQuery extends BaseQuery {
     return `approx_distinct(${sql})`;
   }
 
-  public groupByDimensionLimit() {
-    const limitClause = this.rowLimit === null ? '' : ` LIMIT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000}`;
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
-
+  protected limitOffsetClause(limit, offset) {
+    const limitClause = limit != null ? ` LIMIT ${limit}` : '';
+    const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${offsetClause}${limitClause}`;
   }
 

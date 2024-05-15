@@ -11,9 +11,13 @@
       "CUBEJS_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
       "CUBEJS_AWS_REGION": "us-east-1",
       "CUBEJS_AWS_ATHENA_WORKGROUP": "primary",
-      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://athena-drivers-tests-preaggs/output"
+      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://athena-drivers-tests-preaggs/output",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "cast": {
     "SELECT_PREFIX": "",
