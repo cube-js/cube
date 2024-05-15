@@ -1128,6 +1128,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Firebolt account name.
+   */
+  fireboltAccount: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_FIREBOLT_ACCOUNT', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * Hive Driver                                                     *
    ***************************************************************** */
