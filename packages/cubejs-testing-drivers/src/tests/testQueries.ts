@@ -1566,6 +1566,7 @@ from
     });
 
     executePg('SQL API: post-aggregate percentage of total', async () => {
+      const connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
