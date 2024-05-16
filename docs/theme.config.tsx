@@ -6,6 +6,11 @@ import { SearchIcon, SearchTrigger } from '@cube-dev/marketing-ui';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { LogoWithVersion } from '@/components/common/LogoWithVersion/LogoWithVersion';
 
+// Copied from https://cube.dev/blog source code to match its style.
+// For .Button--size-s class, font-size was reduced from 16px to 15px because,
+// unlike in the docs, Cera Pro font is used in https://cube.dev/blog
+import { Button as BlogButton } from '@/components/common/BlogButton/Button';
+
 const repo = "https://github.com/cube-js/cube";
 const branch = "master";
 const path = "/docs/";
@@ -71,6 +76,19 @@ const config: DocsThemeConfig = {
     defaultTheme: "light",
     forcedTheme: "light",
   },
+  navbar: {
+    extraContent: (
+      <div style={{ marginLeft: '24px' }}>
+        <BlogButton
+          color="pink"
+          size="s"
+          href="https://cubecloud.dev/auth/signup"
+        >
+          Try Cube for Free
+        </BlogButton>
+      </div>
+    )
+  }
 };
 
 export default config;
