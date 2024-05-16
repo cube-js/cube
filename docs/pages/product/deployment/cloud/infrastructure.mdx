@@ -1,0 +1,94 @@
+# Infrastructure Options
+
+Cube Cloud provides four infrastructure options to host your Cube deployments:
+
+* [Shared infrastructure](#shared-infrastructure) - your
+deployments are sharing compute resources and network with other customers.
+Data in-motion and data at-rest are both on the Cube Cloud side.
+* [Dedicated infrastructure](#dedicated-infrastructure) - your
+deployments reside in a dedicated VPC inside a Cube Cloud account and do not
+share resources with anyone else. Data in-motion and data at-rest are both on
+the Cube Cloud side.
+* [Dedicated infrastructure with CSPS](#dedicated-infrastructure-with-csps) -
+same as dedicated infrastructure, but data at-rest is stored in a customer-supplied
+object store.
+* [Bring Your Own Cloud (BYOC)](#byoc) - Cube Cloud data plane is fully hosted
+in your cloud account.
+
+
+## Shared infrastructure
+
+This is the most common deployment option that is the easiest to get started with.
+In this scenario, everything is deployed on the Cube Cloud infrastructure in
+one of our **Shared** VPCs. Cube Cloud Control Plane takes care of creating,
+scaling, and monitoring your Cube Deployments, as well as managing Cube Store
+and persisting pre-aggregated data. This option requires the least effort to
+set up and is available on all pricing plans.
+
+Please note that some Enterprise features, such as VPC peering or PrivateLink are
+not available on the shared infrastructure. There's also a possibility of resource
+contention ("noisy neighbor") problem.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (shared)"
+    src="https://ucarecdn.com/e4ea270f-08f6-4ff9-97eb-e92c6b6a2e7e/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## Dedicated infrastructure
+
+It is similar to the previous option, but each customer gets a
+[Dedicated][ref-dedicated-vpc] VPC within one of Cube Cloud's own cloud
+accounts that hosts only that customer's deployments. This option is great for
+most of the typical Enterprise use-cases as it provides a higher level of
+performance, as well as additional security and isolation. It is is available on
+the [Enterprise](https://cube.dev/pricing) plan and above.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (dedicated)"
+    src="https://ucarecdn.com/c30caaf9-91ae-4671-9d20-98d76c7bf3e9/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## Dedicated infrastructure with CSPS
+
+On the [Enterprise Premier](https://cube.dev/pricing) plan, Cube Cloud offers
+a **Customer-supplied pre-aggregation storage (CSPS)** that allows moving all data at rest to the customer
+infrastructure. In this scenario, all Cube components reside on the Cube Cloud
+side. However, Cube Store uses a customer-provided object store for reading and
+persisting pre-aggregated data. This provides additional peace of mind when
+processing highly critical business or personal information.
+
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level diagram explaining the CSPS option"
+    src="https://ucarecdn.com/229d4a50-34af-43f2-b29d-5c64ccbed674/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+## BYOC
+
+
+With [Bring Your Own Cloud](/product/deployment/cloud/byoc) (BYOC) all the components interacting with private data are deployed on the customer infrastructure 
+on a platform of choice (AWS/Azure/GCP) and managed by the Cube Cloud Control Plane via the Cube Cloud Operator. It is is available on the [Enterprise Premier](https://cube.dev/pricing) plan.
+
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="High-level architecture diagram of the Cube Cloud BYOC deployment option"
+    src="https://ucarecdn.com/3196c035-c496-4c09-bd00-d83c0bbf4d23/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+[ref-dedicated-vpc]: /product/deployment/cloud/vpc

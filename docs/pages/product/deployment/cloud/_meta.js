@@ -1,13 +1,10 @@
 module.exports = {
   "providers": "Cloud providers",
   "vpc": "VPC",
-  "aws": {
-    title: "AWS",
-    display: "hidden",
-    hidden: true
-  },
+  "byoc": "BYOC",
   "deployments": "Deployments",
   "deployment-types": "Deployment types",
+  "infrastructure": "Infrastructure Options",
   "continuous-deployment": "Continuous deployment",
   "custom-domains": "Custom domains",
   "warm-up": "Deployment warm-up",
