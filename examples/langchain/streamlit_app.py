@@ -2,14 +2,13 @@ import streamlit as st
 import pandas as pd
 import os
 import re
-import pickle
 import jwt
 
 from dotenv import load_dotenv
-from langchain import OpenAI
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.document_loaders import CubeSemanticLoader
+from langchain_openai import OpenAI
+from langchain_openai.embeddings import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain_community.document_loaders import CubeSemanticLoader
 from pathlib import Path
 
 from utils import (
@@ -31,14 +30,12 @@ def ingest_cube_meta():
 
     embeddings = OpenAIEmbeddings()
     vectorstore = FAISS.from_documents(documents, embeddings)
-
     # Save vectorstore
-    with open("vectorstore.pkl", "wb") as f:
-        pickle.dump(vectorstore, f)
-        
+    vectorstore.save_local("vectorstore.pkl")
+
 if not Path("vectorstore.pkl").exists():
     with st.spinner('Loading context from Cube API...'):
-        ingest_cube_meta();
+        ingest_cube_meta()
 
 llm = OpenAI(
     temperature=0, openai_api_key=os.environ.get("OPENAI_API_KEY"), verbose=True
@@ -65,8 +62,7 @@ if st.button("Submit", type="primary"):
     check_input(question)
     if not Path("vectorstore.pkl").exists():
         st.warning("vectorstore.pkl does not exist.")
-    with open("vectorstore.pkl", "rb") as f:
-        vectorstore = pickle.load(f)
+    vectorstore = FAISS.load_local("vectorstore.pkl", OpenAIEmbeddings(), allow_dangerous_deserialization=True)
 
     # log("Quering vectorstore and building the prompt...")
 
@@ -102,7 +98,7 @@ if st.button("Submit", type="primary"):
 
     # Call LLM API to get the SQL query
     log("Calling LLM API to generate SQL query...")
-    llm_answer = llm(prompt)
+    llm_answer = llm.invoke(prompt)
     bare_llm_answer = re.sub(r"(?i)Answer:\s*", "", llm_answer)
 
     if llm_answer.strip() == _NO_ANSWER_TEXT:
