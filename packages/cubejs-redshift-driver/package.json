@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/redshift-driver",
   "description": "Cube.js Redshift database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.35",
+  "version": "0.35.36",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -28,7 +28,7 @@
     "@aws-sdk/client-s3": "^3.17.0",
     "@aws-sdk/s3-request-presigner": "^3.17.0",
     "@cubejs-backend/base-driver": "^0.35.33",
-    "@cubejs-backend/postgres-driver": "^0.35.35",
+    "@cubejs-backend/postgres-driver": "^0.35.36",
     "@cubejs-backend/shared": "^0.35.33"
   },
   "license": "Apache-2.0",
