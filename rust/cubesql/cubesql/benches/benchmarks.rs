@@ -349,15 +349,51 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
     bench_func!("power_bi_sum_wrap", get_power_bi_sum_wrap(), c);
 }
 
-fn get_simple_long_in_expr() -> String {
-    const N: usize = 50;
-    let set = (1..=N).join(", ");
+fn get_simple_long_in_number_expr(set_size: usize) -> String {
+    let set = (1..=set_size).join(", ");
+
     format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})")
 }
 
-pub fn long_simple_in_expr(c: &mut Criterion) {
+fn get_simple_long_in_str_expr(set_size: usize) -> String {
+    let mut set = Vec::with_capacity(set_size);
+
+    for i in 1..set_size {
+        set.push(format!(
+            "'SUPER LARGE RANDOM STRING TO TEST MEMORY CLONES ${i}'"
+        ))
+    }
+
+    let set = set.join(", ");
+
+    format!("SELECT * FROM KibanaSampleDataEcommerce WHERE customer_gender IN ({set})")
+}
+
+pub fn long_simple_in_number_expr_1k(c: &mut Criterion) {
     std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
-    bench_func!("long_simple_in_expr", get_simple_long_in_expr(), c);
+    bench_func!(
+        "long_simple_in_number_expr_1k",
+        get_simple_long_in_number_expr(1000),
+        c
+    );
+}
+
+pub fn long_simple_in_str_expr_50(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!(
+        "long_simple_in_str_expr_50",
+        get_simple_long_in_str_expr(50),
+        c
+    );
+}
+
+pub fn long_simple_in_str_expr_1k(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!(
+        "long_simple_in_str_expr_1k",
+        get_simple_long_in_str_expr(1000),
+        c
+    );
 }
 
 fn get_long_in_expr() -> String {
@@ -426,6 +462,6 @@ pub fn long_in_expr(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
-    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_expr
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k
 }
 criterion_main!(benches);

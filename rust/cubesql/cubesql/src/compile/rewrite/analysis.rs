@@ -1207,21 +1207,18 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn merge_option_field<T: Clone + Debug>(
-        &mut self,
-        a: &mut LogicalPlanData,
-        mut b: LogicalPlanData,
-        field: fn(&mut LogicalPlanData) -> &mut Option<T>,
-    ) -> (DidMerge, LogicalPlanData) {
-        let res = if field(a).is_none() && field(&mut b).is_some() {
-            *field(a) = field(&mut b).clone();
+    #[inline]
+    fn merge_option_field<T>(&mut self, field_a: &mut Option<T>, field_b: Option<T>) -> DidMerge {
+        let res = if field_a.is_none() && field_b.is_some() {
+            *field_a = field_b;
             DidMerge(true, false)
-        } else if field(a).is_some() {
+        } else if field_a.is_some() {
             DidMerge(false, true)
         } else {
             DidMerge(false, false)
         };
-        (res, b)
+
+        res
     }
 }
 
@@ -1248,18 +1245,19 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
     }
 
     fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        let (original_expr, b) = self.merge_option_field(a, b, |d| &mut d.original_expr);
-        let (member_name_to_expr, b) =
-            self.merge_option_field(a, b, |d| &mut d.member_name_to_expr);
-        let (trivial_push_down, b) = self.merge_option_field(a, b, |d| &mut d.trivial_push_down);
-        let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
-        let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
-        let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
-        let (constant, b) = self.merge_option_field(a, b, |d| &mut d.constant);
-        let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
-        let (is_empty_list, b) = self.merge_option_field(a, b, |d| &mut d.is_empty_list);
-        let (filter_operators, b) = self.merge_option_field(a, b, |d| &mut d.filter_operators);
-        let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
+        let original_expr = self.merge_option_field(&mut a.original_expr, b.original_expr);
+        let member_name_to_expr =
+            self.merge_option_field(&mut a.member_name_to_expr, b.member_name_to_expr);
+        let trivial_push_down =
+            self.merge_option_field(&mut a.trivial_push_down, b.trivial_push_down);
+        let column_name_to_alias = self.merge_option_field(&mut a.expr_to_alias, b.expr_to_alias);
+        let referenced_columns = self.merge_option_field(&mut a.referenced_expr, b.referenced_expr);
+        let constant_in_list = self.merge_option_field(&mut a.constant_in_list, b.constant_in_list);
+        let constant = self.merge_option_field(&mut a.constant, b.constant);
+        let cube_reference = self.merge_option_field(&mut a.cube_reference, b.cube_reference);
+        let is_empty_list = self.merge_option_field(&mut a.is_empty_list, b.is_empty_list);
+        let filter_operators = self.merge_option_field(&mut a.filter_operators, b.filter_operators);
+        let column_name = self.merge_option_field(&mut a.column, b.column);
         original_expr
             | member_name_to_expr
             | trivial_push_down
