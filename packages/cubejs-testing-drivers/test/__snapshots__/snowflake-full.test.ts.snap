@@ -31,7 +31,7 @@ exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: reuse params
 Array [
   Object {
     "c0": 2020-01-01T00:00:00.000Z,
-    "m0": 17371.904,
+    "m0": 17372,
   },
 ]
 `;
