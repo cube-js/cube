@@ -81,8 +81,10 @@ impl SqlQuery {
             .ok_or_else(|| DataFusionError::Execution("Missing param match".to_string()))?
             .parse::<usize>()
             .map_err(|e| DataFusionError::Execution(format!("Can't parse param index: {}", e)))?;
-        if let Some(rendered_param) = rendered_params.get(&param) {
-            return Ok((param, rendered_param.clone(), false));
+        if sql_templates.reuse_params {
+            if let Some(rendered_param) = rendered_params.get(&param) {
+                return Ok((param, rendered_param.clone(), false));
+            }
         }
         Ok((
             param,
