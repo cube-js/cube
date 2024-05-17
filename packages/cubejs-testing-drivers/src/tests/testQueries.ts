@@ -1575,5 +1575,27 @@ from
   `);
       expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
     });
+
+    executePg('SQL API: reuse params', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select
+      date_trunc('year', "orderDate") as "c0",
+      sum("ECommerce"."totalSales") as "m0"
+    from
+      "ECommerce" as "ECommerce"
+    where
+      date_trunc('year', "orderDate") in (
+        CAST('2019-01-01 00:00:00.0' AS timestamp),
+        CAST('2020-01-01 00:00:00.0' AS timestamp),
+        CAST('2021-01-01 00:00:00.0' AS timestamp),
+        CAST('2022-01-01 00:00:00.0' AS timestamp),
+        CAST('2023-01-01 00:00:00.0' AS timestamp)
+      )
+    group by
+      date_trunc('year', "orderDate")
+  `);
+      expect(res.rows).toMatchSnapshot('reuse_params');
+    });
   });
 }

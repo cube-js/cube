@@ -389,6 +389,7 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                 ]
                     .into_iter().chain(custom_templates.into_iter())
                     .collect(),
+                    false,
             )
                 .unwrap(),
         ),

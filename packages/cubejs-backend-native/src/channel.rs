@@ -268,6 +268,10 @@ fn get_sql_templates(
     sql_generator: Arc<Root<JsObject>>,
 ) -> Result<SqlTemplates, CubeError> {
     let sql_generator = sql_generator.to_inner(cx);
+    let reuse_params = sql_generator
+        .get::<JsBoolean, _, _>(cx, "shouldReuseParams")
+        .map_cube_err("Can't get shouldReuseParams")?
+        .value(cx);
     let sql_templates = sql_generator
         .get::<JsFunction, _, _>(cx, "sqlTemplates")
         .map_cube_err("Can't get sqlTemplates")?;
@@ -309,7 +313,7 @@ fn get_sql_templates(
         }
     }
 
-    SqlTemplates::new(templates_map)
+    SqlTemplates::new(templates_map, reuse_params)
 }
 
 // TODO impl drop for SqlGenerator
