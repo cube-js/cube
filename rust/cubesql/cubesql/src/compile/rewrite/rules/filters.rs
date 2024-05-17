@@ -3300,8 +3300,8 @@ impl FilterRules {
 
         move |egraph, subst| {
             let expr_id = subst[expr_val];
-            let (list, scalar) = match &egraph[subst[list_var]].data.constant_in_list {
-                Some(list) if list.len() > 0 => (list.clone(), list[0].clone()),
+            let scalar = match &egraph[subst[list_var]].data.constant_in_list {
+                Some(list) if list.len() == 1 => list[0].clone(),
                 _ => return false,
             };
 
@@ -3319,34 +3319,11 @@ impl FilterRules {
                 ));
                 let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
 
-                let mut return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                let return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
                     expr_id,
                     operator,
                     literal_expr,
                 ]));
-
-                for scalar in list.into_iter().skip(1) {
-                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                        LiteralExprValue(scalar),
-                    ));
-                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
-
-                    let right_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                        expr_id,
-                        operator,
-                        literal_expr,
-                    ]));
-
-                    let or = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(
-                        Operator::Or,
-                    )));
-
-                    return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                        return_binary_expr,
-                        or,
-                        right_binary_expr,
-                    ]));
-                }
 
                 subst.insert(return_binary_expr_var, return_binary_expr);
 
