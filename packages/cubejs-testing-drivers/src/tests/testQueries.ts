@@ -1581,7 +1581,7 @@ from
       const res = await connection.query(`
     select
       date_trunc('year', "orderDate") as "c0",
-      sum("ECommerce"."totalSales") as "m0"
+      round(sum("ECommerce"."totalSales")) as "m0"
     from
       "ECommerce" as "ECommerce"
     where
