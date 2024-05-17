@@ -22753,4 +22753,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         );
     }
+
+    #[tokio::test]
+    async fn test_pull_up_explosion() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                date_part('year', order_date) "c0",
+                date_part('quarter', order_date) "c1",
+                date_part('month', order_date) "c2",
+                date_part('week', order_date) "c3",
+                date_part('day', order_date) "c4",
+                date_part('hour', order_date) "c5",
+                date_part('minute', order_date) "c6",
+                date_part('second', order_date) "c7"
+            FROM KibanaSampleDataEcommerce k
+            GROUP BY 1, 2, 3, 4, 5, 6, 7, 8
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+        let logical_plan = query_plan.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".into()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        );
+    }
 }
