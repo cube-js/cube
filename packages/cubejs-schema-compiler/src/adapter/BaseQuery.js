@@ -2655,9 +2655,14 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    return this.options.queryFactory
-      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
-      : this.newSubQuery(options);
+    if (this.options.queryFactory) {
+      // For rollup joins we need to ensure we pass the proper allocator for the appropriate cube
+      // Oracle, postgres, mysql, druid etc... have different param allocator symbols which break the query if rollup joins
+      // across different cubes with different allocators
+      const paramAllocator = this.options.queryFactory.paramAllocatorForCube(cube) || this.paramAllocator;
+      return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator });
+    }
+
   }
 
   subQueryOptions(options) {
