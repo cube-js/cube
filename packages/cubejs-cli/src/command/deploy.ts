@@ -1,3 +1,4 @@
+import FormData from 'form-data';
 import fs from 'fs-extra';
 import path from 'path';
 import cliProgress from 'cli-progress';
@@ -6,6 +7,17 @@ import { CommanderStatic } from 'commander';
 import { DeployDirectory } from '../deploy';
 import { logStage, displayError, event } from '../utils';
 import { Config } from '../config';
+
+interface Hashes {
+  [key: string]: {
+    hash: string;
+  };
+}
+
+interface CloudReqResult {
+  transaction: string;
+  deploymentName: string;
+}
 
 const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   if (!(await fs.pathExists(path.join(process.cwd(), 'node_modules', '@cubejs-backend/server-core')))) {
@@ -36,13 +48,13 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
   const deployDir = new DeployDirectory({ directory });
   const fileHashes: any = await deployDir.fileHashes();
 
-  const upstreamHashes = await config.cloudReq({
+  const upstreamHashes: Hashes = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/files`,
     method: 'GET',
     auth
   });
 
-  const { transaction, deploymentName } = await config.cloudReq({
+  const { transaction, deploymentName }: CloudReqResult = await config.cloudReq({
     url: (deploymentId: string) => `build/deploy/${deploymentId}/start-upload`,
     method: 'POST',
     auth
@@ -53,9 +65,9 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     await config.cloudReq({
       url: (deploymentId) => `build/deploy/${deploymentId}/set-env`,
       method: 'POST',
-      body: {
-        envVariables: JSON.stringify(envVariables),
-      },
+      body: JSON.stringify({
+        envVariables,
+      }),
       auth
     });
   }
@@ -78,21 +90,20 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
       fileHashesPosix[filePosix] = fileHashes[file];
 
       if (!upstreamHashes[filePosix] || upstreamHashes[filePosix].hash !== fileHashes[file].hash) {
+        const formData = new FormData();
+        formData.append('transaction', JSON.stringify(transaction));
+        formData.append('fileName', filePosix);
+        formData.append('file', fs.createReadStream(path.join(directory, file)), {
+          filename: path.basename(file),
+          contentType: 'application/octet-stream'
+        });
+
         await config.cloudReq({
           url: (deploymentId: string) => `build/deploy/${deploymentId}/upload-file`,
           method: 'POST',
-          formData: {
-            transaction: JSON.stringify(transaction),
-            fileName: filePosix,
-            file: {
-              value: fs.createReadStream(path.join(directory, file)),
-              options: {
-                filename: path.basename(file),
-                contentType: 'application/octet-stream'
-              }
-            }
-          },
-          auth
+          body: formData,
+          auth,
+          headers: formData.getHeaders()
         });
       }
     }
@@ -100,10 +111,10 @@ const deploy = async ({ directory, auth, uploadEnv, token }: any) => {
     await config.cloudReq({
       url: (deploymentId: string) => `build/deploy/${deploymentId}/finish-upload`,
       method: 'POST',
-      body: {
+      body: JSON.stringify({
         transaction,
         files: fileHashesPosix
-      },
+      }),
       auth
     });
   } finally {

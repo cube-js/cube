@@ -7,10 +7,10 @@ describe('AsyncModule', () => {
 
   it('gutter', async () => {
     const { joinGraph, cubeEvaluator, compiler } = prepareCompiler(`
-    const rp = require('request-promise');
+    const fetch = require('node-fetch');
     
     asyncModule(async () => {
-      await rp('http://www.google.com');
+      await fetch('http://www.google.com');
       
       cube('visitors', {
         sql: \`
