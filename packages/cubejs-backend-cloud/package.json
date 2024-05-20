@@ -28,7 +28,6 @@
     "@cubejs-backend/linter": "^0.35.0",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
-    "babel-jest": "^29.7.0",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
@@ -58,9 +57,6 @@
     ],
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
-    ],
-    "transform": {
-      "^.+\\.ts$": "babel-jest"
-    }
+    ]
   }
 }
