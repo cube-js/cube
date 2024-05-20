@@ -1770,6 +1770,70 @@ impl CubeScanWrapperNode {
                         sql_query,
                     ))
                 }
+                Expr::GroupingSet(grouping_set) => match grouping_set {
+                    datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .rollup_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::Cube(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .cube_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::GroupingSets(_) => {
+                        Err(DataFusionError::Internal(format!(
+                            "SQL generation for GroupingSet is not supported"
+                        )))
+                    }
+                },
+
                 Expr::WindowFunction {
                     fun,
                     args,

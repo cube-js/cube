@@ -698,6 +698,26 @@ impl SqlTemplates {
         )
     }
 
+    pub fn rollup_expr(&self, exprs: Vec<String>) -> Result<String, CubeError> {
+        let exprs_concat = exprs.join(", ");
+        self.render_template(
+            "expressions/rollup",
+            context! {
+                exprs_concat => exprs_concat,
+            },
+        )
+    }
+
+    pub fn cube_expr(&self, exprs: Vec<String>) -> Result<String, CubeError> {
+        let exprs_concat = exprs.join(", ");
+        self.render_template(
+            "expressions/cube",
+            context! {
+                exprs_concat => exprs_concat,
+            },
+        )
+    }
+
     pub fn subquery_expr(&self, subquery_expr: String) -> Result<String, CubeError> {
         self.render_template(
             "expressions/subquery",

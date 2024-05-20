@@ -2954,6 +2954,8 @@ export class BaseQuery {
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         subquery: '({{ expr }})',
         in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
+        rollup: 'ROLLUP({{ exprs_concat }})',
+        cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
         true: 'TRUE',

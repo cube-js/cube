@@ -62,6 +62,12 @@ pub enum WrappedSelectType {
     Aggregate,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum GroupingSetType {
+    Rollup,
+    Cube,
+}
+
 crate::plan_to_language! {
     pub enum LogicalPlanLanguage {
         Projection {
@@ -475,6 +481,10 @@ crate::plan_to_language! {
             name: String,
             members: Vec<LogicalPlan>,
             meta: Option<Vec<(String, String)>>,
+        },
+        GroupingSetExpr {
+            members: Vec<Expr>,
+            type: GroupingSetType,
         },
         QueryParam {
             index: usize,
@@ -1396,6 +1406,10 @@ fn aggr_aggr_expr(exprs: Vec<impl Display>) -> String {
 
 fn aggr_aggr_expr_empty_tail() -> String {
     aggr_aggr_expr(Vec::<String>::new())
+}
+
+fn grouping_set_expr(members: impl Display, expr_type: impl Display) -> String {
+    format!("(GroupingSetExpr {} {})", members, expr_type)
 }
 
 fn aggr_aggr_expr_legacy(left: impl Display, right: impl Display) -> String {
