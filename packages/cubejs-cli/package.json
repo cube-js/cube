@@ -37,12 +37,12 @@
     "cli-progress": "^3.10",
     "commander": "^2.19.0",
     "cross-spawn": "^7.0.1",
+    "form-data": "^4.0.0",
     "fs-extra": "^8.1.0",
     "inquirer": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5",
     "semver": "^7.6.3",
+    "node-fetch": "2",
     "source-map-support": "^0.5.19"
   },
   "resolutions": {
@@ -59,7 +59,6 @@
     "@types/jest": "^27",
     "@types/jsonwebtoken": "^9.0.2",
     "@types/node": "^18",
-    "@types/request-promise": "^4.1.46",
     "@types/semver": "^7.5.8",
     "husky": "^4.2.3",
     "jest": "^27",
