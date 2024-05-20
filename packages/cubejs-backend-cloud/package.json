@@ -39,7 +39,8 @@
     "env-var": "^6.3.0",
     "form-data": "^4.0.0",
     "fs-extra": "^9.1.0",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "node-fetch": "^2.7.0"
   },
   "publishConfig": {
     "access": "public"
