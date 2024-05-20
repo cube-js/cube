@@ -99,6 +99,9 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ],
-    "globalSetup": "<rootDir>/dist/test/global-setup.js"
+    "globalSetup": "<rootDir>/dist/test/global-setup.js",
+    "transformIgnorePatterns": [
+      "/node_modules/(?!node-fetch).+\\.js$"
+    ]
   }
 }
