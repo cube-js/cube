@@ -2663,6 +2663,7 @@ export class BaseQuery {
       return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator });
     }
 
+    return this.newSubQuery(options);
   }
 
   subQueryOptions(options) {
