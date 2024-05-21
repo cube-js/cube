@@ -11,10 +11,15 @@
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
 
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
       "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
     },
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "cast": {
     "SELECT_PREFIX": "",
