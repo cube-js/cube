@@ -14,7 +14,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
-        ExprRewriter, JoinConstraint, JoinType, Operator, RewriteRecursion,
+        ExprRewriter, GroupingSet, JoinConstraint, JoinType, Operator, RewriteRecursion,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -2165,4 +2165,21 @@ pub fn add_root_original_expr_alias(
     } else {
         false
     }
+}
+
+pub fn extract_exprlist_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Expr> {
+    let mut result = Vec::new();
+    for expr in exprs {
+        match expr {
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::Cube(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::GroupingSets(sets) => {
+                    result.extend(sets.iter().flat_map(|s| s.iter().cloned()))
+                }
+            },
+            _ => result.push(expr.clone()),
+        }
+    }
+    result
 }

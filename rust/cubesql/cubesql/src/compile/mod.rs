@@ -1491,6 +1491,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         load_request_meta: Arc<LoadRequestMeta>,
         plan: LogicalPlan,
     ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
+        println!("!!!!!!!!!!!! ^^^^^^^^^ !!!!!!!!!!!!!!!!!!");
         Box::pin(async move {
             if let LogicalPlan::Extension(Extension { node }) = &plan {
                 // .cloned() is to avoid borrowing Any to comply with Send + Sync
@@ -19941,14 +19942,14 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_wrapper_group_by_rollup() {
+    async fn test_wrapper_group_by_rollup_1() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT customer_gender, notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY ROLLUP(customer_gender, notes)"
+            "SELECT customer_gender, notes, AVG(avgPrice) mp FROM KibanaSampleDataEcommerce a GROUP BY 1, ROLLUP(2)"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -19960,7 +19961,8 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql;
-        assert!(sql.contains("ROLLUP"));
+        println!("!!! sql {}", sql);
+        assert!(sql.contains("Rollup"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }

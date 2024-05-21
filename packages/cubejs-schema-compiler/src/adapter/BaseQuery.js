@@ -1887,6 +1887,7 @@ export class BaseQuery {
    * @returns {string}
    */
   aggregateSubQueryGroupByClause() {
+    const dimensionColumns = this.dimensionColumns();
     return this.groupByClause();
   }
 
@@ -1899,6 +1900,14 @@ export class BaseQuery {
       return '';
     }
     const dimensionColumns = this.dimensionColumns();
+    if !dimensionColumns.length {
+      return '';
+    }
+
+    const groupDimension = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d));
+
+
+    console.log("!!! grrrrrr", groupTypes);
     return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
   }
 

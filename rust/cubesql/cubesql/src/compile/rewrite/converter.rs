@@ -8,12 +8,12 @@ use crate::{
             provider::CubeContext,
         },
         rewrite::{
-            analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
-            AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
-            EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
+            analysis::LogicalPlanAnalysis, extract_exprlist_from_groupping_set, rewriter::Rewriter,
+            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
+            AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
+            BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
+            CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped,
+            DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
             FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
             InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn,
@@ -2351,23 +2351,6 @@ pub fn expr_relation(expr: &Expr) -> Option<&str> {
         Expr::Column(c) => c.relation.as_ref().map(|s| s.as_str()),
         _ => None,
     }
-}
-
-fn extract_exprlist_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Expr> {
-    let mut result = Vec::new();
-    for expr in exprs {
-        match expr {
-            Expr::GroupingSet(groupping_set) => match groupping_set {
-                GroupingSet::Rollup(exprs) => result.extend(exprs.iter().cloned()),
-                GroupingSet::Cube(exprs) => result.extend(exprs.iter().cloned()),
-                GroupingSet::GroupingSets(sets) => {
-                    result.extend(sets.iter().flat_map(|s| s.iter().cloned()))
-                }
-            },
-            _ => result.push(expr.clone()),
-        }
-    }
-    result
 }
 
 /// This function replaces fully qualified names with flat names in case of it is missing in the input from schema.

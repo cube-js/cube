@@ -45,6 +45,7 @@ type MemberExpression = {
   name: string;
   expressionName: string;
   definition: string;
+  groupType?: string
 };
 
 /**

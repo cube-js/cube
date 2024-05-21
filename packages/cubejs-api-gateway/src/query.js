@@ -47,6 +47,7 @@ const memberExpression = Joi.object().keys({
   name: Joi.string().required(),
   expressionName: Joi.string(),
   definition: Joi.string(),
+  groupType: Joi.valid('Rollup', 'Cube', null),
 });
 
 const operators = [

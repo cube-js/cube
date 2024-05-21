@@ -1241,6 +1241,7 @@ class ApiGateway {
         order: R.fromPairs(sqlQuery.order.map(({ id: key, desc }) => [key, desc ? 'desc' : 'asc']))
       });
 
+
       res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
@@ -1274,12 +1275,14 @@ class ApiGateway {
         const obj = JSON.parse(memberExpression);
         const args = obj.cube_params;
         args.push(`return \`${obj.expr}\``);
+        console.log("!!! gr_type", obj.group_type)
         return {
           cubeName: obj.cube_name,
           name: obj.alias,
           expressionName: obj.alias,
           expression: Function.constructor.apply(null, args),
           definition: memberExpression,
+          groupType: obj.group_type,
         };
       } else {
         return memberExpression;
@@ -1729,6 +1732,8 @@ class ApiGateway {
       apiType = 'sql',
     } = request;
     const requestStarted = new Date();
+    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!");
+    console.log("request", request);
 
     try {
       await this.assertApiScope('data', context.securityContext);
