@@ -8,11 +8,15 @@
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
       "CUBEJS_DB_USER": "test",
-      "CUBEJS_DB_PASS": "test"
+      "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
     "image": "clickhouse/clickhouse-server:23.10",
@@ -131,6 +135,10 @@
     "--------------------",
     "querying BigECommerce: rolling window by 2 day",
     "querying BigECommerce: rolling window by 2 week",
-    "querying BigECommerce: rolling window by 2 month"
+    "querying BigECommerce: rolling window by 2 month",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params"
   ]
 }

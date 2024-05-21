@@ -7,11 +7,15 @@
       "CUBEJS_DB_TYPE": "mssql",
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_USER": "sa",
-      "CUBEJS_DB_PASS": "123-Strong-Password-321"
+      "CUBEJS_DB_PASS": "123-Strong-Password-321",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
     "image": "mcr.microsoft.com/mssql/server:2022-latest",
@@ -110,6 +114,13 @@
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params",
+    "SQL API: post-aggregate percentage of total",
+    "SQL API: powerbi min max ungrouped flag",
+    "SQL API: powerbi min max push down"
   ]
 }

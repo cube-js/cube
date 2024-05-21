@@ -8,11 +8,15 @@
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
       "CUBEJS_DB_USER": "root",
-      "CUBEJS_DB_PASS": "123-Strong-Password-321"
+      "CUBEJS_DB_PASS": "123-Strong-Password-321",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
     "image": "mysql:8.0.22",
@@ -103,6 +107,10 @@
     "querying ECommerce: partitioned pre-agg higher granularity",
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params"
   ]
 }
