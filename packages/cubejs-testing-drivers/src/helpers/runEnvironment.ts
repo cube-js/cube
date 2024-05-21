@@ -95,6 +95,7 @@ export async function runEnvironment(
   getSchemaPath(type, suf);
   getCubeJsPath(type);
   getPackageJsonPath(type);
+
   const { mode } = yargs(process.argv.slice(2))
     .exitProcess(false)
     .options({
@@ -130,9 +131,15 @@ export async function runEnvironment(
   Object.keys(fixtures.cube.environment).forEach((key) => {
     const val = fixtures.cube.environment[key];
     const { length } = val;
+
     if (val.indexOf('${') === 0 && val.indexOf('}') === length - 1) {
       const name = val.slice(2, length - 1).trim();
-      process.env[key] = process.env[name];
+      const value = process.env[name];
+      if (value) {
+        process.env[key] = process.env[name];
+      } else {
+        throw new Error(`Env variable ${name} must be defined, because it's used as ${key}`);
+      }
     }
 
     if (process.env[key]) {
@@ -141,6 +148,7 @@ export async function runEnvironment(
       process.env[key] = fixtures.cube.environment[key];
     }
   });
+
   // TODO extract as a config
   if (type === 'mssql') {
     compose.withWaitStrategy('data', Wait.forLogMessage('SQL Server is now ready for client connections'));

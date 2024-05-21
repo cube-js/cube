@@ -5,10 +5,11 @@ import path from 'path';
  * Recreate the `./temp` and the `./.data` folders.
  */
 export function getTempPath(): void {
-  const _temp = path.resolve(process.cwd(), './.temp');
-  if (fs.pathExistsSync(_temp)) {
-    fs.rmdirSync(_temp, { recursive: true });
+  const temp = path.resolve(process.cwd(), './.temp');
+  if (fs.pathExistsSync(temp)) {
+    fs.rmSync(temp, { recursive: true });
   }
-  fs.mkdirSync(_temp);
-  fs.mkdirSync(path.resolve(_temp, './model'));
+
+  fs.mkdirSync(temp);
+  fs.mkdirSync(path.resolve(temp, './model'));
 }
