@@ -246,6 +246,10 @@ export class ClickHouseQuery extends BaseQuery {
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
+    // https://github.com/ClickHouse/ClickHouse/issues/19351
+    templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     return templates;

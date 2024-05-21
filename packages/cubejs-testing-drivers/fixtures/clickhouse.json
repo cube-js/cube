@@ -135,10 +135,6 @@
     "--------------------",
     "querying BigECommerce: rolling window by 2 day",
     "querying BigECommerce: rolling window by 2 week",
-    "querying BigECommerce: rolling window by 2 month",
-
-    "SKIPPED SQL API (Need work)",
-    "---------------------------------------",
-    "SQL API: reuse params"
+    "querying BigECommerce: rolling window by 2 month"
   ]
 }
