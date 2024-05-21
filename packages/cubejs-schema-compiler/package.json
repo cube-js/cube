@@ -76,8 +76,9 @@
     "jest": "^27",
     "mssql": "^10.0.2",
     "mysql": "^2.18.1",
-    "node-fetch": "^3.3.2",
     "pg-promise": "^10.5.2",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
     "testcontainers": "^8.12",
@@ -99,9 +100,6 @@
     "coveragePathIgnorePatterns": [
       ".*\\.d\\.ts"
     ],
-    "globalSetup": "<rootDir>/dist/test/global-setup.js",
-    "transformIgnorePatterns": [
-      "/node_modules/(?!node-fetch).+\\.js$"
-    ]
+    "globalSetup": "<rootDir>/dist/test/global-setup.js"
   }
 }
