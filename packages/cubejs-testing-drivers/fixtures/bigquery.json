@@ -144,6 +144,10 @@
     "querying BigECommerce: null boolean",
     "--------------------",
     "week granularity is not supported for intervals",
-    "--------------------"
+    "--------------------",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params"
   ]
 }
