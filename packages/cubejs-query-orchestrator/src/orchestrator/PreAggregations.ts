@@ -591,6 +591,7 @@ export class PreAggregationLoader {
       const structureVersion = getStructureVersion(this.preAggregation);
       const getVersionsStarted = new Date();
       const { byStructure } = await this.loadCache.getVersionEntries(this.preAggregation);
+      console.trace();
       this.logger('Load PreAggregations Tables', {
         preAggregation: this.preAggregation,
         requestId: this.requestId,
@@ -1688,6 +1689,7 @@ export class PreAggregationPartitionRangeLoader {
       };
 
       // eslint-disable-next-line prefer-const
+      console.info("INCOMING PRE_AGG LOAD", this);
       let loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges());
       if (this.options.externalRefresh && loadResultAndLoaders.loadResults.length === 0) {
         loadResultAndLoaders = await loadPreAggregationsByPartitionRanges(await this.partitionRanges(true));

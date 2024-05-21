@@ -14,15 +14,4 @@ export class QueryFactory {
     }
     return new QueryClass(compilers, queryOptions);
   }
-
-  public paramAllocatorForCube(cube: string) {
-    if (!(cube in this.cubeToQueryClass)) {
-      throw new Error(`Undefined cube '${cube}'`);
-    }
-    const QueryClass = this.cubeToQueryClass[cube];
-    if (!QueryClass) {
-      throw new Error(`Undefined dbType or dialectClass for '${cube}'`);
-    }
-    return QueryClass.paramAllocator;
-  }
 }
