@@ -1271,18 +1271,22 @@ class ApiGateway {
   }
 
   private parseMemberExpression(memberExpression: string): string | MemberExpression {
-    const match = memberExpression.match(memberExpressionRegex);
-    if (match) {
-      const args = match[3].split(',');
-      args.push(`return \`${match[4]}\``);
-      return {
-        cubeName: match[1],
-        name: match[2],
-        expressionName: match[2],
-        expression: Function.constructor.apply(null, args),
-        definition: memberExpression,
-      };
-    } else {
+    try {
+      if (memberExpression.startsWith('{')) {
+        const obj = JSON.parse(memberExpression);
+        const args = obj.cube_params;
+        args.push(`return \`${obj.expr}\``);
+        return {
+          cubeName: obj.cube_name,
+          name: obj.alias,
+          expressionName: obj.alias,
+          expression: Function.constructor.apply(null, args),
+          definition: memberExpression,
+        };
+      } else {
+        return memberExpression;
+      }
+    } catch {
       return memberExpression;
     }
   }

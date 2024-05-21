@@ -1,5 +1,13 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
+Array [
+  Object {
+    "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: powerbi min max push down: powerbi_min_max_push_down 1`] = `
 Array [
   Object {
@@ -15,6 +23,15 @@ Array [
     "a0": "39",
     "a1": 3.76,
     "a2": 2399.96,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/snowflake-driver SQL API: reuse params: reuse_params 1`] = `
+Array [
+  Object {
+    "c0": 2020-01-01T00:00:00.000Z,
+    "m0": 17372,
   },
 ]
 `;

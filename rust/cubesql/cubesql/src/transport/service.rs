@@ -6,7 +6,7 @@ use cubeclient::{
 
 use datafusion::{
     arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-    logical_plan::window_frames::WindowFrame,
+    logical_plan::window_frames::{WindowFrame, WindowFrameBound, WindowFrameUnits},
     physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
@@ -331,6 +331,7 @@ impl TransportService for HttpTransport {
 #[derive(Debug)]
 pub struct SqlTemplates {
     pub templates: HashMap<String, String>,
+    pub reuse_params: bool,
     jinja: Environment<'static>,
 }
 
@@ -349,7 +350,7 @@ pub struct TemplateColumn {
 }
 
 impl SqlTemplates {
-    pub fn new(templates: HashMap<String, String>) -> Result<Self, CubeError> {
+    pub fn new(templates: HashMap<String, String>, reuse_params: bool) -> Result<Self, CubeError> {
         let mut jinja = Environment::new();
         for (name, template) in templates.iter() {
             jinja
@@ -362,7 +363,11 @@ impl SqlTemplates {
                 })?;
         }
 
-        Ok(Self { templates, jinja })
+        Ok(Self {
+            templates,
+            jinja,
+            reuse_params,
+        })
     }
 
     pub fn aggregate_function_name(
@@ -531,18 +536,60 @@ impl SqlTemplates {
         )
     }
 
+    pub fn window_frame(&self, window_frame: Option<WindowFrame>) -> Result<String, CubeError> {
+        let Some(window_frame) = window_frame else {
+            return Ok("".to_string());
+        };
+
+        let type_template = match window_frame.units {
+            WindowFrameUnits::Rows => "rows",
+            WindowFrameUnits::Range => "range",
+            WindowFrameUnits::Groups => "groups",
+        };
+        let frame_type = self.render_template(
+            &format!("window_frame_types/{}", type_template),
+            context! {},
+        )?;
+
+        let frame_start = self.window_frame_bound(&window_frame.start_bound)?;
+        let frame_end = self.window_frame_bound(&window_frame.end_bound)?;
+
+        self.render_template(
+            "expressions/window_frame_bounds",
+            context! {
+                frame_type => frame_type,
+                frame_start => frame_start,
+                frame_end => frame_end
+            },
+        )
+    }
+
+    pub fn window_frame_bound(&self, frame_bound: &WindowFrameBound) -> Result<String, CubeError> {
+        match frame_bound {
+            WindowFrameBound::Preceding(n) => {
+                self.render_template("window_frame_bounds/preceding", context! { n => n })
+            }
+            WindowFrameBound::CurrentRow => {
+                self.render_template("window_frame_bounds/current_row", context! {})
+            }
+            WindowFrameBound::Following(n) => {
+                self.render_template("window_frame_bounds/following", context! { n => n })
+            }
+        }
+    }
+
     pub fn window_function_expr(
         &self,
         window_function: WindowFunction,
         args: Vec<String>,
         partition_by: Vec<String>,
         order_by: Vec<String>,
-        _window_frame: Option<WindowFrame>,
+        window_frame: Option<WindowFrame>,
     ) -> Result<String, CubeError> {
         let fun_call = self.window_function(window_function, args)?;
         let partition_by_concat = partition_by.join(", ");
         let order_by_concat = order_by.join(", ");
-        // TODO window_frame
+        let window_frame = self.window_frame(window_frame)?;
         self.render_template(
             "expressions/window_function",
             context! {
@@ -550,7 +597,8 @@ impl SqlTemplates {
                 partition_by => partition_by,
                 partition_by_concat => partition_by_concat,
                 order_by => order_by,
-                order_by_concat => order_by_concat
+                order_by_concat => order_by_concat,
+                window_frame => window_frame
             },
         )
     }

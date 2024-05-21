@@ -127,6 +127,8 @@ crate::plan_to_language! {
         },
         EmptyRelation {
             produce_one_row: bool,
+            derived_source_table_name: Option<String>,
+            is_wrappable: bool,
             schema: DFSchemaRef,
         },
         Limit {
@@ -278,10 +280,6 @@ crate::plan_to_language! {
             input: Arc<LogicalPlan>,
             expr: Arc<Expr>,
             join_type: JoinType,
-        },
-        WrappedSubquery {
-            input: Arc<LogicalPlan>,
-            subqueries: Vec<LogicalPlan>,
         },
 
         CubeScan {
@@ -735,6 +733,13 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
+#[allow(unused)]
+fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
+    use itertools::Itertools;
+    let list = list.iter().join(" ");
+    format!("({list_type} {list})")
+}
+
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
     udf_expr_var_arg(fun_name, list_expr("ScalarUDFExprArgs", args))
 }
@@ -819,6 +824,17 @@ fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String
 
 fn window(input: impl Display, window_expr: impl Display) -> String {
     format!("(Window {} {})", input, window_expr)
+}
+
+fn empty_relation(
+    produce_one_row: impl Display,
+    derived_source_table_name: impl Display,
+    is_wrappable: impl Display,
+) -> String {
+    format!(
+        "(EmptyRelation {} {} {})",
+        produce_one_row, derived_source_table_name, is_wrappable,
+    )
 }
 
 fn wrapped_select(

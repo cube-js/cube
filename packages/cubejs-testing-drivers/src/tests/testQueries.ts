@@ -14,7 +14,13 @@ import {
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv }: { includeIncrementalSchemaSuite?: boolean, extendedEnv?: string } = {}): void {
+type TestQueriesOptions = {
+  includeIncrementalSchemaSuite?: boolean,
+  includeHLLSuite?: boolean,
+  extendedEnv?: string
+};
+
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -23,14 +29,14 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     let driver: BaseDriver;
     let queries: string[];
     let env: Environment;
-    let connection: PgClient;
 
     let connectionId = 0;
 
-    async function createPostgresClient(user: string, password: string, pgPort: number | undefined) {
+    async function createPostgresClient(user: string = 'admin', password: string = 'admin_password', pgPort: number | undefined = env.cube.pgPort) {
       if (!pgPort) {
-        return <any>undefined;
+        throw new Error('port must be defined');
       }
+
       connectionId++;
       const currentConnId = connectionId;
 
@@ -39,16 +45,16 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       const conn = new PgClient({
         database: 'db',
         port: pgPort,
-        host: 'localhost',
+        host: '127.0.0.1',
         user,
         password,
         ssl: false,
       });
       conn.on('error', (err) => {
-        console.log(err);
+        console.log(`[pg] #${currentConnId}`, err);
       });
       conn.on('end', () => {
-        console.debug(`[pg] end ${currentConnId}`);
+        console.debug(`[pg] #${currentConnId} end`);
       });
 
       await conn.connect();
@@ -106,7 +112,6 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         console.log('Error creating fixtures', e.stack);
         throw e;
       }
-      connection = await createPostgresClient('admin', 'admin_password', env.cube.pgPort);
     });
   
     afterAll(async () => {
@@ -147,6 +152,14 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         preAggregations: ['BigECommerce.TAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
+
+      if (includeHLLSuite) {
+        await buildPreaggs(env.cube.port, apiToken, {
+          timezones: ['UTC'],
+          preAggregations: ['BigECommerce.CountByProductExternal'],
+          contexts: [{ securityContext: { tenant: 't1' } }],
+        });
+      }
     });
 
     execute('must not fetch a hidden cube', async () => {
@@ -1500,6 +1513,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     }
 
     executePg('SQL API: powerbi min max push down', async () => {
+      const connection = await createPostgresClient();
       const res = await connection.query(`
       select
   max("rows"."orderDate") as "a0",
@@ -1516,6 +1530,7 @@ from
     });
 
     executePg('SQL API: powerbi min max ungrouped flag', async () => {
+      const connection = await createPostgresClient();
       const res = await connection.query(`
       select 
   count(distinct("rows"."totalSales")) + max( 
@@ -1538,6 +1553,7 @@ from
     });
 
     executePg('SQL API: ungrouped pre-agg', async () => {
+      const connection = await createPostgresClient();
       const res = await connection.query(`
     select
       "productName",
@@ -1547,6 +1563,39 @@ from
     order by 2 desc, 1 asc
   `);
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
+    });
+
+    executePg('SQL API: post-aggregate percentage of total', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select
+      sum("BigECommerce"."percentageOfTotalForStatus")
+    from 
+      "public"."BigECommerce" "BigECommerce"
+  `);
+      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
+    });
+
+    executePg('SQL API: reuse params', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select
+      date_trunc('year', "orderDate") as "c0",
+      round(sum("ECommerce"."totalSales")) as "m0"
+    from
+      "ECommerce" as "ECommerce"
+    where
+      date_trunc('year', "orderDate") in (
+        CAST('2019-01-01 00:00:00.0' AS timestamp),
+        CAST('2020-01-01 00:00:00.0' AS timestamp),
+        CAST('2021-01-01 00:00:00.0' AS timestamp),
+        CAST('2022-01-01 00:00:00.0' AS timestamp),
+        CAST('2023-01-01 00:00:00.0' AS timestamp)
+      )
+    group by
+      date_trunc('year', "orderDate")
+  `);
+      expect(res.rows).toMatchSnapshot('reuse_params');
     });
   });
 }

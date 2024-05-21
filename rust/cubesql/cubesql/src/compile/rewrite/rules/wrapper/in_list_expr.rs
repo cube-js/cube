@@ -14,6 +14,34 @@ impl WrapperRules {
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
         rules.extend(vec![
+            transforming_rewrite(
+                "wrapper-in-list-only-consts-push-down",
+                wrapper_pushdown_replacer(
+                    inlist_expr("?expr", "?list", "?negated"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "?in_projection",
+                    "?cube_members",
+                ),
+                inlist_expr(
+                    wrapper_pushdown_replacer(
+                        "?expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?list",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    "?negated",
+                ),
+                self.transform_in_list_only_consts("?list"),
+            ),
             rewrite(
                 "wrapper-in-list-push-down",
                 wrapper_pushdown_replacer(
@@ -71,6 +99,7 @@ impl WrapperRules {
             ),
         ]);
 
+        // TODO: support for flatten list
         Self::expr_list_pushdown_pullup_rules(rules, "wrapper-in-list-exprs", "InListExprList");
     }
 
@@ -98,6 +127,16 @@ impl WrapperRules {
                 }
             }
             false
+        }
+    }
+
+    fn transform_in_list_only_consts(
+        &self,
+        list_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let list_var = var!(list_var);
+        move |egraph: &mut EGraph<_, LogicalPlanAnalysis>, subst| {
+            return egraph[subst[list_var]].data.constant_in_list.is_some();
         }
     }
 }

@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.33](https://github.com/cube-js/cube/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.35.32](https://github.com/cube-js/cube/compare/v0.35.31...v0.35.32) (2024-05-14)
+
+
+### Features
+
+* **databricks-jdbc-driver:** Support HLL ([#8257](https://github.com/cube-js/cube/issues/8257)) ([da231ed](https://github.com/cube-js/cube/commit/da231ed48ae8386f1726710e80c3a943204f6895))
+
+
+
+
+
 ## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

@@ -43,6 +43,7 @@ use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 use crate::util::maybe_owned::MaybeOwnedStr;
 use crate::CubeError;
+use cubedatasketches::HLLDataSketch;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use tokio::time::{sleep, Duration};
 
@@ -209,6 +210,11 @@ impl ImportFormat {
                 let data = parse_binary_data(value)?;
                 is_valid_plain_binary_hll(&data, *f)?;
                 TableValue::Bytes(data)
+            }
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => {
+                let data = parse_binary_data(value)?;
+                let hll = HLLDataSketch::read(&data)?;
+                TableValue::Bytes(hll.write())
             }
             ColumnType::Timestamp => TableValue::Timestamp(timestamp_from_string(value)?),
             ColumnType::Float => TableValue::Float(OrdF64(value.parse::<f64>()?)),

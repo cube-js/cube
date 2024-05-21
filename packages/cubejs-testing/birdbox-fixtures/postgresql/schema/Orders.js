@@ -34,6 +34,17 @@ cube(`Orders`, {
       }],
       reduce_by: [status],
     },
+    amountReducedByStatus: {
+      post_aggregate: true,
+      type: `sum`,
+      sql: `${totalAmount}`,
+      reduce_by: [status],
+    },
+    statusPercentageOfTotal: {
+      post_aggregate: true,
+      sql: `${totalAmount} / NULLIF(${amountReducedByStatus}, 0)`,
+      type: `number`,
+    },
     amountRankView: {
       post_aggregate: true,
       type: `number`,

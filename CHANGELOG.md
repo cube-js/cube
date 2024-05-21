@@ -3,6 +3,120 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.37](https://github.com/cube-js/cube/compare/v0.35.36...v0.35.37) (2024-05-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Make param render respect dialect's reuse params flag ([9c91af2](https://github.com/cube-js/cube/commit/9c91af2e03c84d903ac153337cda9f53682aacf1))
+
+
+
+
+
+## [0.35.36](https://github.com/cube-js/cube/compare/v0.35.35...v0.35.36) (2024-05-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Do not generate large graphs for large `IN` filters ([f29c9e4](https://github.com/cube-js/cube/commit/f29c9e481ffa65361a804f6ff1e5bf685cb8d0d5))
+
+
+
+
+
+## [0.35.35](https://github.com/cube-js/cube/compare/v0.35.34...v0.35.35) (2024-05-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Remove incorrect LOWER match rules and fallback to SQL pushdown ([#8246](https://github.com/cube-js/cube/issues/8246)) ([6c39f37](https://github.com/cube-js/cube/commit/6c39f376a649eeb7d9c171f1805033b020ef58a7))
+* **cubesql:** Remove prefix underscore from aliases ([#8266](https://github.com/cube-js/cube/issues/8266)) ([24e8977](https://github.com/cube-js/cube/commit/24e89779fc4833a8c6b14dc1496d95271c18ebdc))
+* **schema-compiler:** Fix failing of `WHERE FALSE` queries  ([#8265](https://github.com/cube-js/cube/issues/8265)) ([e63b4ab](https://github.com/cube-js/cube/commit/e63b4ab701cf44162d5e51d65b8d38e812f9085e))
+
+
+### Features
+
+* **cubesql:** Send expressions as objects ([#8216](https://github.com/cube-js/cube/issues/8216)) ([4deee84](https://github.com/cube-js/cube/commit/4deee845a51e3999f3a75b121e14b570a124ad3a))
+
+
+
+
+
+## [0.35.34](https://github.com/cube-js/cube/compare/v0.35.33...v0.35.34) (2024-05-15)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - STS credentials (align aws-creds to 0.36 in fork) ([#8264](https://github.com/cube-js/cube/issues/8264)) ([1a5b27d](https://github.com/cube-js/cube/commit/1a5b27d1775691456a90d34130841ee03b5edef6))
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix Databricks identifier quotes ([a20f4b2](https://github.com/cube-js/cube/commit/a20f4b2d55c8d0235d327fc0d0cc0c2f587bcd02))
+* Mismatched input '10000'. Expecting: '?', 'ALL', <integer> for post-aggregate members in Athena ([#8262](https://github.com/cube-js/cube/issues/8262)) ([59834e7](https://github.com/cube-js/cube/commit/59834e7157bf060804470104e0a713194b811f39))
+
+
+### Features
+
+* **cubesql:** Rewrites  for pushdown of subqueries with empty source ([#8188](https://github.com/cube-js/cube/issues/8188)) ([86a58a5](https://github.com/cube-js/cube/commit/86a58a5f3368a509debfb3f2ba4c83001377127c))
+* **firebolt:** Switch to the new auth method ([#8182](https://github.com/cube-js/cube/issues/8182)) ([e559114](https://github.com/cube-js/cube/commit/e55911478d0b3ba916d44f1fa4c04697d7ca7dfb))
+
+
+
+
+
+## [0.35.32](https://github.com/cube-js/cube/compare/v0.35.31...v0.35.32) (2024-05-14)
+
+
+### Features
+
+* **cubesql:** Flatten IN lists expressions to improve performance ([#8235](https://github.com/cube-js/cube/issues/8235)) ([66aa01d](https://github.com/cube-js/cube/commit/66aa01d4f8f888993e68a0967e664b9dcfcc51e7))
+* **databricks-jdbc-driver:** Support HLL ([#8257](https://github.com/cube-js/cube/issues/8257)) ([da231ed](https://github.com/cube-js/cube/commit/da231ed48ae8386f1726710e80c3a943204f6895))
+
+
+
+
+
+## [0.35.31](https://github.com/cube-js/cube/compare/v0.35.30...v0.35.31) (2024-05-13)
+
+
+### Features
+
+* **cubestore:** Support HLL from Apache DataSketches (for DataBricks) ([#8241](https://github.com/cube-js/cube/issues/8241)) ([baf2667](https://github.com/cube-js/cube/commit/baf26677a0ceb50102516d3a7cce7543be4a57a2))
+* Support probing `LIMIT 0` queries ([117f332](https://github.com/cube-js/cube/commit/117f3324a4db75c596d6e4b0a1cafffc76aab068))
+
+
+
+
+
+## [0.35.30](https://github.com/cube-js/cube/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+
+### Bug Fixes
+
+* **cubesql:** Add alias to rebased window expressions ([990a767](https://github.com/cube-js/cube/commit/990a767e3b2f32c0846907b1dfcff232227b4cbc))
+* **cubesql:** Reuse query params in push down ([b849f34](https://github.com/cube-js/cube/commit/b849f34c001b9a94ac5aed1edacce906fd02f33c))
+* **schema-compiler:** Convert timezone for time dimensions in measures ([0bea221](https://github.com/cube-js/cube/commit/0bea221e5fafdf8c7ca3c8cb3cfa6a233e5fc8a0))
+* **schema-compiler:** respect view prefix and member alias in hierarc… ([#8231](https://github.com/cube-js/cube/issues/8231)) ([59fddea](https://github.com/cube-js/cube/commit/59fddea82e29d5651a5bade751b76afbca9d52da))
+* Unexpected keyword WITH for rolling window measures in BigQuery ([9468f90](https://github.com/cube-js/cube/commit/9468f90fefdc08280e7b81b0f8e289fa041cd37d)), closes [#8193](https://github.com/cube-js/cube/issues/8193)
+* Unrecognized name when regular measures are selected with multiplied ones ([617fd11](https://github.com/cube-js/cube/commit/617fd11a527a0be619450698f868858306e1daf8)), closes [#8206](https://github.com/cube-js/cube/issues/8206)
+
+
+### Features
+
+* **cubesql:** Support window frame SQL push down ([5469dbc](https://github.com/cube-js/cube/commit/5469dbc14c4ae15d9e1047fca90ab5cc4268f047))
+
+
+
+
+
 ## [0.35.29](https://github.com/cube-js/cube/compare/v0.35.28...v0.35.29) (2024-05-03)
 
 

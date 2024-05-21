@@ -7,7 +7,7 @@ use crate::{
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit, list_expr,
+        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
         literal_bool, literal_expr, literal_int, literal_string, measure_expr,
         member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
@@ -775,25 +775,6 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            rewrite(
-                "filter-replacer-lower-in-list-unwrap",
-                filter_replacer(
-                    not_expr(inlist_expr(
-                        fun_expr("Lower", vec!["?expr"]),
-                        "?list",
-                        "?new_negated",
-                    )),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    not_expr(inlist_expr("?expr", "?list", "?new_negated")),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
             // Unwrap upper for case-insensitive operators
             transforming_rewrite(
                 "filter-replacer-upper-unwrap",
@@ -836,68 +817,6 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     is_not_null_expr("?expr"),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
-            // Lower(?column) = 'literal'
-            // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-            rewrite(
-                "filter-replacer-lower-equal-workaround",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
-                        "=",
-                        literal_expr("?str"),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        fun_expr(
-                            "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        ),
-                        "AND",
-                        udf_expr(
-                            "ends_with",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
-            // Lower(?column) = 'literal'
-            // TODO: Migrate to equalsLower operator, when it will be available in Cube?
-            rewrite(
-                "filter-replacer-lower-not-equal-workaround",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
-                        "!=",
-                        literal_expr("?str"),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        not_expr(fun_expr(
-                            "StartsWith",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        )),
-                        "AND",
-                        not_expr(udf_expr(
-                            "ends_with",
-                            vec![column_expr("?column"), literal_expr("?str")],
-                        )),
-                    ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -1668,56 +1587,6 @@ impl RewriteRules for FilterRules {
                                 negative_expr("?interval"),
                             ],
                         ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-            ),
-            rewrite(
-                "filter-thoughtspot-lower-in-true-false",
-                filter_replacer(
-                    inlist_expr(
-                        binary_expr(
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        list_expr(
-                            "InListExprList",
-                            vec![literal_bool(true), literal_bool(false)],
-                        ),
-                        "InListExprNegated:false",
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        binary_expr(
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?left_literal"),
-                            ),
-                            "OR",
-                            binary_expr(
-                                fun_expr("Lower", vec![column_expr("?column")]),
-                                "=",
-                                literal_expr("?right_literal"),
-                            ),
-                        ),
-                        "AND",
-                        is_not_null_expr(column_expr("?column")),
                     ),
                     "?alias_to_cube",
                     "?members",
@@ -3431,8 +3300,8 @@ impl FilterRules {
 
         move |egraph, subst| {
             let expr_id = subst[expr_val];
-            let (list, scalar) = match &egraph[subst[list_var]].data.constant_in_list {
-                Some(list) if list.len() > 0 => (list.clone(), list[0].clone()),
+            let scalar = match &egraph[subst[list_var]].data.constant_in_list {
+                Some(list) if list.len() == 1 => list[0].clone(),
                 _ => return false,
             };
 
@@ -3450,34 +3319,11 @@ impl FilterRules {
                 ));
                 let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
 
-                let mut return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
+                let return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
                     expr_id,
                     operator,
                     literal_expr,
                 ]));
-
-                for scalar in list.into_iter().skip(1) {
-                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                        LiteralExprValue(scalar),
-                    ));
-                    let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
-
-                    let right_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                        expr_id,
-                        operator,
-                        literal_expr,
-                    ]));
-
-                    let or = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(
-                        Operator::Or,
-                    )));
-
-                    return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                        return_binary_expr,
-                        or,
-                        right_binary_expr,
-                    ]));
-                }
 
                 subst.insert(return_binary_expr_var, return_binary_expr);
 

@@ -4,7 +4,7 @@ use crate::{
         column_expr, rewrite,
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ColumnExprColumn,
-        LogicalPlanLanguage,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -67,22 +67,47 @@ impl WrapperRules {
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.pushdown_dimension("?name", "?cube_members", "?dimension"),
+                self.pushdown_dimension("?alias_to_cube", "?name", "?cube_members", "?dimension"),
             ),
         ]);
     }
 
     fn pushdown_dimension(
         &self,
+        alias_to_cube_var: &'static str,
         column_name_var: &'static str,
         members_var: &'static str,
         dimension_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    WrapperPullupReplacerAliasToCube
+                )
+                .cloned()
+                {
+                    //FIXME We always add subquery column as dimension. I'm not 100% sure that this is the correct solution
+                    if let Some(col_relation) = &column.relation {
+                        if &alias_to_cube[0].0 != col_relation
+                            && col_relation.starts_with("__subquery")
+                        {
+                            let column_expr_column =
+                                egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                                    ColumnExprColumn(column.clone()),
+                                ));
+
+                            let column_expr =
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+                            subst.insert(dimension_var, column_expr);
+                            return true;
+                        }
+                    }
+                }
                 if let Some((member, _)) = &egraph[subst[members_var]]
                     .data
                     .find_member(|_, cn| cn == &column.name)

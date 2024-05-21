@@ -294,6 +294,7 @@ export class JDBCDriver extends BaseDriver {
               reject(err);
               return;
             }
+
             const rowStream = new QueryStream(res.rows.next, highWaterMark);
             resolve({
               rowStream,
@@ -322,6 +323,7 @@ export class JDBCDriver extends BaseDriver {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }
+
     return super.downloadQueryResults(query, values, options);
   }
 

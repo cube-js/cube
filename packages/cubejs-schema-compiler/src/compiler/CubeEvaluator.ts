@@ -116,31 +116,49 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   private prepareHierarchies(cube: any) {
-    if (cube.isView && !cube.hierarchies && (cube.includedMembers || []).length) {
-      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(m => m.split('.')[0]));
-  
-      for (const cubeName of includedCubeNames) {
-        const { hierarchies } = this.evaluatedCubes[cubeName];
-  
-        if (Array.isArray(hierarchies) && hierarchies.length) {
-          const filteredHierarchies = hierarchies.map(it => {
-            const levels = it.levels.filter(level => cube.includedMembers.includes(level));
-  
-            return {
-              ...it,
-              levels
-            };
-          }).filter(it => it.levels.length);
-  
-          cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
-        }
-      }
-    } else if (Array.isArray(cube.hierarchies)) {
+    if (Array.isArray(cube.hierarchies)) {
       cube.hierarchies = cube.hierarchies.map(hierarchy => ({
         ...hierarchy,
         levels: this.evaluateReferences(
           cube.name, hierarchy.levels, { originalSorting: true }
         )
+      }));
+    }
+
+    if (cube.isView && (cube.includedMembers || []).length) {
+      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
+      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+      
+      if (!cube.hierarchies) {
+        for (const cubeName of includedCubeNames) {
+          const { hierarchies } = this.evaluatedCubes[cubeName] || {};
+  
+          if (Array.isArray(hierarchies) && hierarchies.length) {
+            const filteredHierarchies = hierarchies.map(it => {
+              const levels = it.levels.filter(level => includedMemberPaths.includes(level));
+  
+              return {
+                ...it,
+                levels
+              };
+            }).filter(it => it.levels.length);
+  
+            cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
+          }
+        }
+      }
+
+      cube.hierarchies = (cube.hierarchies || []).map((hierarchy) => ({
+        ...hierarchy,
+        levels: hierarchy.levels.map((level) => {
+          const member = cube.includedMembers.find(m => m.memberPath === level);
+
+          if (!member) {
+            return null;
+          }
+
+          return [cube.name, member.name].join('.');
+        }).filter(Boolean)
       }));
     }
 

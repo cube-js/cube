@@ -593,11 +593,16 @@ export class BaseQuery {
         ['buildSqlAndParams', exportAnnotatedSql],
         () => this.paramAllocator.buildSqlAndParams(
           this.buildParamAnnotatedSql(),
-          exportAnnotatedSql
+          exportAnnotatedSql,
+          this.shouldReuseParams
         ),
         { cache: this.queryCache }
       )
     );
+  }
+
+  get shouldReuseParams() {
+    return false;
   }
 
   /**
@@ -1976,15 +1981,27 @@ export class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    let limitClause = '';
+    let limit = null;
     if (this.rowLimit !== null) {
       if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
-        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+        limit = this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT);
       } else if (typeof this.rowLimit === 'number') {
-        limitClause = ` LIMIT ${this.rowLimit}`;
+        limit = this.rowLimit;
       }
     }
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
+    const offset = this.offset ? parseInt(this.offset, 10) : null;
+    return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @param limit
+   * @param offset
+   * @returns {string}
+   */
+  limitOffsetClause(limit, offset) {
+    const limitClause = limit != null ? ` LIMIT ${limit}` : '';
+    const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${limitClause}${offsetClause}`;
   }
 
@@ -2029,8 +2046,8 @@ export class BaseQuery {
     return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
   }
 
-  autoPrefixWithCubeName(cubeName, sql) {
-    if (sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
+  autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
+    if (!isMemberExpr && sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
       return `${this.cubeAlias(cubeName)}.${sql}`;
     }
     return sql;
@@ -2078,6 +2095,7 @@ export class BaseQuery {
   }
 
   evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+    const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
@@ -2141,7 +2159,8 @@ export class BaseQuery {
           sql && this.applyMeasureFilters(
             this.autoPrefixWithCubeName(
               cubeName,
-              sql
+              sql,
+              isMemberExpr,
             ),
             symbol,
             cubeName
@@ -2179,12 +2198,12 @@ export class BaseQuery {
           return this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
         } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
           if (symbol.shiftInterval) {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
@@ -2201,7 +2220,7 @@ export class BaseQuery {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
         }
-        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
+        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql), isMemberExpr);
       }
       return this.evaluateSql(cubeName, symbol.sql);
     } finally {
@@ -2209,8 +2228,8 @@ export class BaseQuery {
     }
   }
 
-  autoPrefixAndEvaluateSql(cubeName, sql) {
-    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql));
+  autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
+    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql), isMemberExpr);
   }
 
   concatStringsSql(strings) {
@@ -2913,10 +2932,10 @@ export class BaseQuery {
       },
       statements: {
         select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
-          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
-          ') AS {{ from_alias }}' +
+          ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
@@ -2930,7 +2949,8 @@ export class BaseQuery {
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
-        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
+        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
+        window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         subquery: '({{ expr }})',
         in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
@@ -2945,7 +2965,16 @@ export class BaseQuery {
       },
       params: {
         param: '?'
-      }
+      },
+      window_frame_types: {
+        rows: 'ROWS',
+        range: 'RANGE',
+      },
+      window_frame_bounds: {
+        preceding: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} PRECEDING',
+        current_row: 'CURRENT ROW',
+        following: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} FOLLOWING',
+      },
     };
   }
 

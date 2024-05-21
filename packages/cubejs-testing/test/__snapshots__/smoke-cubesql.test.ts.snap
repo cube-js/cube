@@ -84,6 +84,14 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) percentage of total sum: percentage of total sum 1`] = `
+Array [
+  Object {
+    "m0": 1,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) power bi post aggregate measure wrap: power bi post aggregate measure wrap 1`] = `
 Array [
   Object {

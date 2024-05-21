@@ -25,6 +25,18 @@ export class DatabricksQuery extends BaseQuery {
     return new DatabricksFilter(this, filter);
   }
 
+  public hllInit(sql: string) {
+    return `hll_sketch_agg(${sql})`;
+  }
+
+  public hllMerge(sql: string) {
+    return `hll_union_agg(${sql})`;
+  }
+
+  public countDistinctApprox(sql: string) {
+    return `approx_count_distinct(${sql})`;
+  }
+
   public convertTz(field: string) {
     return `from_utc_timestamp(${field}, '${this.timezone}')`;
   }
@@ -105,6 +117,8 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '``';
     return templates;
   }
 }

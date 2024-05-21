@@ -326,6 +326,7 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                         "functions/COUNT_DISTINCT".to_string(),
                         "COUNT(DISTINCT {{ args_concat }})".to_string(),
                     ),
+                    ("functions/AVG".to_string(), "AVG({{ args_concat }})".to_string()),
                     ("functions/APPROXDISTINCT".to_string(), "COUNTDISTINCTAPPROX({{ args_concat }})".to_string()),
                     ("functions/DATETRUNC".to_string(), "DATE_TRUNC({{ args_concat }})".to_string()),
                     ("functions/DATEPART".to_string(), "DATE_PART({{ args_concat }})".to_string()),
@@ -340,14 +341,17 @@ fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerato
                     ("functions/DATE".to_string(), "DATE({{ args_concat }})".to_string()),
                     ("functions/LEFT".to_string(), "LEFT({{ args_concat }})".to_string()),
                     ("functions/RIGHT".to_string(), "RIGHT({{ args_concat }})".to_string()),
+                    ("functions/LOWER".to_string(), "LOWER({{ args_concat }})".to_string()),
+                    ("functions/UPPER".to_string(), "UPPER({{ args_concat }})".to_string()),
                     ("expressions/extract".to_string(), "EXTRACT({{ date_part }} FROM {{ expr }})".to_string()),
                     (
                         "statements/select".to_string(),
                         r#"SELECT {% if distinct %}DISTINCT {% endif %}
   {{ select_concat | map(attribute='aliased') | join(', ') }} 
+  {% if from %} 
 FROM (
   {{ from | indent(2) }}
-) AS {{ from_alias }}{% if filter %}
+) AS {{ from_alias }} {% endif %} {% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}{% if order_by %}
 ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
@@ -364,7 +368,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/sort".to_string(), "{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST {% endif %}".to_string()),
                     ("expressions/cast".to_string(), "CAST({{ expr }} AS {{ data_type }})".to_string()),
                     ("expressions/interval".to_string(), "INTERVAL '{{ interval }}'".to_string()),
-                    ("expressions/window_function".to_string(), "{{ fun_call }} OVER ({% if partition_by %}PARTITION BY {{ partition_by }}{% if order_by %} {% endif %}{% endif %}{% if order_by %}ORDER BY {{ order_by }}{% endif %})".to_string()),
+                    ("expressions/window_function".to_string(), "{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})".to_string()),
+                    ("expressions/window_frame_bounds".to_string(), "{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}".to_string()),
                     ("expressions/in_list".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})".to_string()),
                     ("expressions/subquery".to_string(), "({{ expr }})".to_string()),
                     ("expressions/in_subquery".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}".to_string()),
@@ -375,10 +380,16 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/timestamp_literal".to_string(), "timestamptz '{{ value }}'".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
-                    ("params/param".to_string(), "${{ param_index + 1 }}".to_string())
+                    ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
+                    ("window_frame_types/rows".to_string(), "ROWS".to_string()),
+                    ("window_frame_types/range".to_string(), "RANGE".to_string()),
+                    ("window_frame_bounds/preceding".to_string(), "{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} PRECEDING".to_string()),
+                    ("window_frame_bounds/current_row".to_string(), "CURRENT ROW".to_string()),
+                    ("window_frame_bounds/following".to_string(), "{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} FOLLOWING".to_string()),
                 ]
                     .into_iter().chain(custom_templates.into_iter())
                     .collect(),
+                    false,
             )
                 .unwrap(),
         ),
