@@ -1769,40 +1769,6 @@ pub async fn get_df_batches(
     };
 }
 
-pub async fn print_df_stream(plan: &QueryPlan) -> Result<(), CubeError> {
-    match plan {
-        QueryPlan::DataFusionSelect(_, plan, ctx) => {
-            let df = DataFrame::new(ctx.state.clone(), &plan);
-            let safe_stream = async move {
-                std::panic::AssertUnwindSafe(df.execute_stream())
-                    .catch_unwind()
-                    .await
-            };
-            match safe_stream.await {
-                Ok(sendable_batch) => {
-                    match sendable_batch {
-                        Ok(mut stream) => {
-                            while let Some(batch) = stream.next().await {
-                                match batch {
-                                    Ok(batch) => {
-                                        eprintln!("@batch {:?}", batch);
-                                    }
-                                    _ => todo!(),
-                                }
-                            }
-                        }
-                        Err(err) => return Err(CubeError::panic(Box::new(err)).into()),
-                    };
-                }
-                Err(err) => return Err(CubeError::panic(err).into()),
-            }
-        }
-        _ => unimplemented!(),
-    };
-
-    Ok(())
-}
-
 pub fn find_cube_scans_deep_search(
     parent: Arc<LogicalPlan>,
     panic_if_empty: bool,
