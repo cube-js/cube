@@ -335,14 +335,39 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
         drain_handler.handle(js_stream_on_fn).await;
 
+        let mut is_first_batch = true;
         while let Some(batch) = pauseable_stream.next().await {
-            let data = match batch {
+            let (columns, data) = match batch {
                 Ok(batch) => batch_to_rows(batch),
                 Err(e) => {
                     eprintln!("Error: {:?}", e);
                     continue;
                 }
             };
+
+            if is_first_batch {
+                let columns = serde_json::to_string(&columns).unwrap();
+                is_first_batch = false;
+
+                call_js_fn(
+                    channel.clone(),
+                    js_stream_write_fn.clone(),
+                    Box::new(|cx| {
+                        let arg = cx
+                            .string(columns)
+                            .upcast::<JsValue>();
+
+                        Ok(vec![arg.upcast::<JsValue>()])
+                    }),
+                    Box::new(|cx, v| {
+                        Ok(v.downcast_or_throw::<JsBoolean, _>(cx).unwrap().value(cx))
+                    }),
+                    node_stream_arc.clone(),
+                )
+                .await
+                .unwrap();
+            }
+
             let data = serde_json::to_string(&data).unwrap();
             eprintln!("data row @@@{:?}", data);
 

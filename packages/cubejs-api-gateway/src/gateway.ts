@@ -358,7 +358,7 @@ class ApiGateway {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Transfer-Encoding', 'chunked');
 
-        res.write('{ "data": [');
+        res.write('{ "columns": ');
 
         // class MyStream {
         //   public events: any = {};
@@ -375,18 +375,25 @@ class ApiGateway {
 
         // const _stream = new MyStream();
 
+        let isFirstChunk = true;
         const _stream = new Writable({
           write(chunk, encoding, callback) {
-            const s = chunk.toString('utf-8');
-            res.write(s.substring(1, s.length - 1));
-            res.write(',');
+            if (isFirstChunk) {
+              isFirstChunk = false;
+              res.write(chunk.toString('utf-8'));
+              res.write(',"data": [');
+            } else {
+              const s = chunk.toString('utf-8');
+              res.write(s.substring(1, s.length - 1));
+              res.write(',');
+            }
 
             callback();
           },
         });
 
         _stream.on('finish', () => {
-          console.log('>>>', 'js on finish!!!');
+          console.log('>>>', 'js on finish!!!???');
           res.write(']}');
           res.end();
         });

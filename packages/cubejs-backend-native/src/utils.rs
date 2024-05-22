@@ -25,18 +25,16 @@ pub fn bind_method<'a>(
     call_method(cx, fn_value, "bind", [this])
 }
 
-pub fn batch_to_rows(batch: RecordBatch) -> Vec<Value> {
+pub fn batch_to_rows(batch: RecordBatch) -> (Value, Vec<Value>) {
     let schema = batch.schema();
     let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch]).unwrap();
 
     let columns = serde_json::to_value(&data_frame.get_columns()).unwrap();
-
-    eprintln!("ser cols ---> @@@ {:?}", columns.to_string());
-
     let rows = data_frame
         .get_rows()
         .iter()
         .map(|it| serde_json::to_value(it.values()).unwrap())
         .collect::<Vec<Value>>();
-    rows
+
+    (columns, rows)
 }
