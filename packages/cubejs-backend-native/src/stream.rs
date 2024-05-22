@@ -1,10 +1,8 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, FieldValue, MemberField, RecordBatch,
-    RecordBatchStream, SchemaRef, ValueObject,
+    transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
 
-
-use futures::{Stream, StreamExt};
+use futures::Stream;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -14,13 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
 use std::vec;
 
-
-
-
-
-use crate::channel::{call_js_fn};
-
-
+use crate::channel::call_js_fn;
 
 use cubesql::CubeError;
 
@@ -32,7 +24,7 @@ use log::trace;
 
 use neon::types::JsDate;
 
-use crate::utils::{bind_method};
+use crate::utils::bind_method;
 
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
 

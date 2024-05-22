@@ -300,47 +300,6 @@ pub async fn call_js_fn<R: Send + 'static>(
     rx.await?
 }
 
-pub fn call_sync_js_fn(
-    channel: Arc<Channel>,
-    js_fn: Arc<Root<JsFunction>>,
-    value: Option<String>,
-    this: Arc<Root<JsObject>>,
-) -> Result<(), CubeError> {
-    channel
-        .try_send(move |mut cx| {
-            // https://github.com/neon-bindings/neon/issues/672
-            let method = match Arc::try_unwrap(js_fn) {
-                Ok(v) => v.into_inner(&mut cx),
-                Err(v) => v.as_ref().to_inner(&mut cx),
-            };
-            let this = match Arc::try_unwrap(this) {
-                Ok(v) => v.into_inner(&mut cx),
-                Err(v) => v.as_ref().to_inner(&mut cx),
-            };
-
-            let args: Vec<Handle<JsValue>> = vec![if let Some(value) = value {
-                cx.string(value).upcast::<JsValue>()
-            } else {
-                cx.null().upcast::<JsValue>()
-            }];
-
-            match method.call(&mut cx, this, args) {
-                Ok(v) => v,
-                Err(err) => {
-                    println!("Unable to call js function: {}", err);
-                    return Ok(());
-                }
-            };
-
-            Ok(())
-        })
-        .map_err(|err| {
-            CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
-        })?;
-
-    Ok(())
-}
-
 #[derive(Debug)]
 pub struct NodeSqlGenerator {
     channel: Arc<Channel>,
