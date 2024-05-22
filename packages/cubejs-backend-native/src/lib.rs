@@ -17,20 +17,20 @@ mod template;
 mod transport;
 mod utils;
 
-use channel::call_raw_js_with_channel_as_callback;
-use cubesql::compile::engine::df::scan::RecordBatchStream;
-use cubesql::compile::{convert_sql_to_cube_query, get_df_batches, print_df_stream};
+
+
+use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::sql::{
-    self, dataframe, AuthContext, DatabaseProtocol, HttpAuthContext, PostgresServer, SessionManager,
+    DatabaseProtocol, SessionManager,
 };
 use cubesql::transport::TransportService;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, RwLock};
-use std::time::Duration;
 
-use crate::channel::{call_js_fn, call_sync_js_fn};
+use std::sync::{Arc, Mutex};
+
+
+use crate::channel::{call_js_fn};
 use crate::cross::CLRepr;
 use crate::stream::{OnDrainHandler, PauseableStream, ProcessingState};
 use crate::utils::batch_to_rows;

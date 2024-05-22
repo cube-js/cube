@@ -1,40 +1,38 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, ArrowError, ArrowResult, FieldValue, MemberField, RecordBatch,
+    transform_response, FieldValue, MemberField, RecordBatch,
     RecordBatchStream, SchemaRef, ValueObject,
 };
-use cubesql::compile::rewrite::rewriter::CubeRunner;
-use futures::channel::mpsc;
+
+
 use futures::{Stream, StreamExt};
-use neon::types::buffer::RefMut;
+
 use std::cell::RefCell;
 use std::future::Future;
-use std::marker::PhantomData;
+
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Poll, Waker};
 use std::vec;
 
-use std::collections::HashMap;
-use std::convert::TryInto;
-#[cfg(debug_assertions)]
-use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::channel::{call_js_fn, call_raw_js_with_channel_as_callback};
-use crate::transport::MapCubeErrExt;
-use async_trait::async_trait;
-use cubesql::transport::{SqlGenerator, SqlTemplates};
+
+
+
+use crate::channel::{call_js_fn};
+
+
+
 use cubesql::CubeError;
-#[cfg(debug_assertions)]
-use log::trace;
+
 use neon::prelude::*;
 use tokio::sync::oneshot;
 
 #[cfg(build = "debug")]
 use log::trace;
-use neon::prelude::*;
+
 use neon::types::JsDate;
 
-use crate::utils::{batch_to_rows, bind_method};
+use crate::utils::{bind_method};
 
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
 
@@ -154,7 +152,7 @@ impl OnDrainHandler {
         //     Err(v) => v.as_ref().to_inner(&mut cx),
         // };
 
-        let _ = call_js_fn(
+        call_js_fn(
             self.channel.clone(),
             js_stream_on_fn,
             Box::new(|cx| {
