@@ -31,8 +31,8 @@
     "@cubejs-backend/base-driver": "^0.35.33",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/shared": "^0.35.33",
-    "@google-cloud/bigquery": "^5.6.0",
-    "@google-cloud/storage": "^5.7.2",
+    "@google-cloud/bigquery": "^7.7.0",
+    "@google-cloud/storage": "^7.11.1",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
