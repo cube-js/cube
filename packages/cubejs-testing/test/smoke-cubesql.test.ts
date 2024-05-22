@@ -297,5 +297,21 @@ from
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
     });
+
+    test('pg_index.indoption indexing', async () => {
+      const query = `
+      SELECT
+        tmp.I_INDOPTION [tmp.ORDINAL_POSITION - 1] & 1 :: smallint AS "test"
+      FROM (
+        SELECT
+          (information_schema._pg_expandarray(i.indkey)).n AS ORDINAL_POSITION,
+          i.indoption AS I_INDOPTION
+        FROM
+          pg_catalog.pg_class ct
+          JOIN pg_catalog.pg_index i ON (ct.oid = i.indrelid)
+        ) AS tmp`;
+      const res = await connection.query(query);
+      expect(res.rows).not.toBeNull();
+    });
   });
 });

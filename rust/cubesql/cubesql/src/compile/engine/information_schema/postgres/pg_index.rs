@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int64Builder, ListBuilder, StringBuilder,
-            UInt16Builder, UInt32Builder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, Int64Builder, ListBuilder,
+            StringBuilder, UInt16Builder, UInt32Builder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
         record_batch::RecordBatch,
@@ -34,7 +34,7 @@ struct PgCatalogIndexBuilder {
     indkey: ListBuilder<Int64Builder>,
     indcollation: StringBuilder,
     indclass: StringBuilder,
-    indoption: StringBuilder,
+    indoption: ListBuilder<Int16Builder>,
     indexprs: StringBuilder,
     indpred: StringBuilder,
 }
@@ -61,7 +61,7 @@ impl PgCatalogIndexBuilder {
             indkey: ListBuilder::new(Int64Builder::new(capacity)),
             indcollation: StringBuilder::new(capacity),
             indclass: StringBuilder::new(capacity),
-            indoption: StringBuilder::new(capacity),
+            indoption: ListBuilder::new(Int16Builder::new(capacity)),
             indexprs: StringBuilder::new(capacity),
             indpred: StringBuilder::new(capacity),
         }
@@ -141,7 +141,11 @@ impl TableProvider for PgCatalogIndexProvider {
             ),
             Field::new("indcollation", DataType::Utf8, false),
             Field::new("indclass", DataType::Utf8, false),
-            Field::new("indoption", DataType::Utf8, false),
+            Field::new(
+                "indoption",
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                false,
+            ),
             Field::new("indexprs", DataType::Utf8, true),
             Field::new("indpred", DataType::Utf8, true),
         ]))
