@@ -23,9 +23,7 @@
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.35.0",
-    "mocha": "^8.0.1",
-    "should": "^13.2.3"
+    "@cubejs-backend/linter": "^0.35.0"
   },
   "publishConfig": {
     "access": "public"
