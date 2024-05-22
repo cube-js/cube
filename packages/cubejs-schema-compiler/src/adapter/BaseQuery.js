@@ -1912,7 +1912,6 @@ export class BaseQuery {
 
     dimensionColumns.forEach((c, i) => {
         const groupType = groupTypes[i];
-        console.log("grrr type ", groupType);
         const comma = i > 0 ? ', ' : '';
         if (inGroupingSet === false && groupType != null) {
             if (groupType === 'Rollup') {
