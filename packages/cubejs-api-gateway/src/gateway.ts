@@ -380,10 +380,10 @@ class ApiGateway {
           write(chunk, encoding, callback) {
             if (isFirstChunk) {
               isFirstChunk = false;
-              res.write(chunk.toString('utf-8'));
+              res.write(chunk.toString(encoding));
               res.write(',"data": [');
             } else {
-              const s = chunk.toString('utf-8');
+              const s = chunk.toString(encoding);
               res.write(s.substring(1, s.length - 1));
               res.write(',');
             }
@@ -409,7 +409,12 @@ class ApiGateway {
         //   _stream.end();
         // }, 400);
 
-        await server.execSql(req.body.query, _stream);
+        try {
+          await server.execSql(req.body.query, _stream);
+        } catch (error) {
+          console.log('>>>', 'catch error', error);
+          _stream.end();
+        }
 
         // setTimeout(() => {
         //   console.log('>>>', typeof _stream.events.drain, _stream.events);

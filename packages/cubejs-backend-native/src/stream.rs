@@ -134,16 +134,6 @@ impl OnDrainHandler {
         let js_stream_obj = self.js_stream.clone();
         let this = RefCell::new(self.clone());
 
-        // let (sender, rx) = mpsc_channel::<Result<(), CubeError>>(1024);
-        // let sender = Arc::new(sender);
-        // let tx_clone = tx.clone();
-        // let this = RefCell::new(self.clone());
-
-        // let js_stream = match Arc::try_unwrap(js_stream_obj) {
-        //     Ok(v) => v.into_inner(&mut cx),
-        //     Err(v) => v.as_ref().to_inner(&mut cx),
-        // };
-
         call_js_fn(
             self.channel.clone(),
             js_stream_on_fn,
@@ -162,61 +152,6 @@ impl OnDrainHandler {
         )
         .await
         .unwrap();
-        eprintln!("BINDING DONE");
-
-        // self.channel
-        //     .try_send(move |mut cx| {
-        //         let js_stream = match Arc::try_unwrap(js_stream_obj) {
-        //             Ok(v) => v.into_inner(&mut cx),
-        //             Err(v) => v.as_ref().to_inner(&mut cx),
-        //         };
-
-        //         let js_stream_on_fn = js_stream.get::<JsFunction, _, _>(&mut cx, "on")?;
-        //         let on_drain_fn = JsFunction::new(&mut cx, handle_on_drain)?;
-
-        //         let this = cx.boxed(this).upcast::<JsValue>();
-        //         let on_drain_fn = bind_method(&mut cx, on_drain_fn, this).unwrap();
-
-        //         let event_arg = cx.string("drain").upcast::<JsValue>();
-        //         js_stream_on_fn.call(
-        //             &mut cx,
-        //             js_stream,
-        //             vec![event_arg, on_drain_fn.upcast::<JsValue>()],
-        //         )?;
-
-        //         eprintln!("BINDING DONE");
-
-        //         Ok(())
-        //     })
-        //     .unwrap();
-        // eprintln!("after send");
-
-        // let mut pauseable_stream = self.pauseable_stream.lock().unwrap();
-        // while let Some(batch) = pauseable_stream.lock().unwrap().next().await {
-        //     let data = match batch {
-        //         Ok(batch) => batch_to_rows(batch),
-        //         Err(e) => {
-        //             eprintln!("Error: {:?}", e);
-        //             continue;
-        //         }
-        //     };
-        //     let data = serde_json::to_string(&data).unwrap();
-        //     eprintln!("data row @@@{:?}", data);
-
-        //     let should_pause = call_raw_js_with_channel_as_callback(
-        //         self.channel.clone(),
-        //         js_stream_write_fn.clone(),
-        //         data,
-        //         Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
-        //         Box::new(move |cx, v| Ok(v.downcast::<JsBoolean, _>(cx).unwrap().value(cx))),
-        //     )
-        //     .await
-        //     .unwrap();
-
-        //     // if should_pause {
-        //     //     pauseable_stream.pause();
-        //     // }
-        // }
     }
 
     fn on_drain(&self) {

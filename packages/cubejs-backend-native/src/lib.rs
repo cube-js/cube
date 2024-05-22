@@ -20,7 +20,7 @@ mod utils;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
-use futures::StreamExt;
+use futures::{StreamExt, TryFutureExt};
 use once_cell::sync::OnceCell;
 
 use std::sync::{Arc, Mutex};
@@ -369,8 +369,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             }
 
             let data = serde_json::to_string(&data).unwrap();
-            eprintln!("data row @@@{:?}", data);
-
             let js_stream_write_fn = js_stream_write_fn.clone();
             let node_stream_arc = node_stream_arc.clone();
             let state_mutex = state_mutex.clone();
