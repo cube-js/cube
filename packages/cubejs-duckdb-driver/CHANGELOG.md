@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.38](https://github.com/cube-js/cube/compare/v0.35.37...v0.35.38) (2024-05-22)
+
+
+### Features
+
+* **duckdb-driver:** Upgrade DuckDB to 0.10.2 ([#8284](https://github.com/cube-js/cube/issues/8284)) ([b057bca](https://github.com/cube-js/cube/commit/b057bca8c77eebc7dcb358efe27ad08703afd966))
+
+
+
+
+
 ## [0.35.37](https://github.com/cube-js/cube/compare/v0.35.36...v0.35.37) (2024-05-20)
 
 **Note:** Version bump only for package @cubejs-backend/duckdb-driver

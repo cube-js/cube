@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.38](https://github.com/cube-js/cube/compare/v0.35.37...v0.35.38) (2024-05-22)
+
+
+### Features
+
+* **clickhouse-driver:** SQL API PUSH down - support datetrunc, timestamp_literal ([45bc230](https://github.com/cube-js/cube/commit/45bc2306eb01e2b2cc5c204b64bfa0411ae0144b))
+* **clickhouse-driver:** Support countDistinctApprox ([4d36279](https://github.com/cube-js/cube/commit/4d3627996e8cdaa9d77711f9ea21edabc5d3b8d0))
+
+
+
+
+
 ## [0.35.37](https://github.com/cube-js/cube/compare/v0.35.36...v0.35.37) (2024-05-20)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
