@@ -1911,25 +1911,25 @@ export class BaseQuery {
     let result = ' GROUP BY ';
 
     dimensionColumns.forEach((c, i) => {
-        const groupType = groupTypes[i];
-        const comma = i > 0 ? ', ' : '';
-        if (inGroupingSet === false && groupType != null) {
-            if (groupType === 'Rollup') {
-                result += `${comma}ROLLUP(`
-            } else if (groupType === 'Cube' ) {
-                result += `${comma}CUBE(`
-            }
-            inGroupingSet = true;
-        } else if (inGroupingSet === true && groupType == null) {
-            result += `)${comma}`;
-            inGroupingSet = false;
-        } else {
-            result += `${comma}`;
+      const groupType = groupTypes[i];
+      const comma = i > 0 ? ', ' : '';
+      if (inGroupingSet === false && groupType != null) {
+        if (groupType === 'Rollup') {
+          result += `${comma}ROLLUP(`;
+        } else if (groupType === 'Cube') {
+          result += `${comma}CUBE(`;
         }
-        result += `${i+1}`
+        inGroupingSet = true;
+      } else if (inGroupingSet === true && groupType == null) {
+        result += `)${comma}`;
+        inGroupingSet = false;
+      } else {
+        result += `${comma}`;
+      }
+      result += `${i + 1}`;
     });
     if (inGroupingSet === true) {
-        result += ')';
+      result += ')';
     }
 
     return result;
