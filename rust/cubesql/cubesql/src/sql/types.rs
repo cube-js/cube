@@ -1,8 +1,9 @@
 use bitflags::bitflags;
 use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use pg_srv::{protocol::CommandComplete, PgTypeId};
+use serde::Serialize;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum ColumnType {
     String,
     VarStr,

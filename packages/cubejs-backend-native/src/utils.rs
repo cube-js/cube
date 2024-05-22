@@ -1,5 +1,6 @@
 use cubesql::{compile::engine::df::scan::RecordBatch, sql::dataframe};
 use neon::prelude::*;
+use serde_json::Value;
 
 #[inline(always)]
 pub fn call_method<'a, AS>(
@@ -24,24 +25,18 @@ pub fn bind_method<'a>(
     call_method(cx, fn_value, "bind", [this])
 }
 
-pub fn batch_to_rows(batch: RecordBatch) -> Vec<Vec<String>> {
+pub fn batch_to_rows(batch: RecordBatch) -> Vec<Value> {
     let schema = batch.schema();
     let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch]).unwrap();
 
-    // let columns = serde_json::to_value(&data_frame.get_columns()).unwrap();
+    let columns = serde_json::to_value(&data_frame.get_columns()).unwrap();
+
+    eprintln!("ser cols ---> @@@ {:?}", columns.to_string());
 
     let rows = data_frame
         .get_rows()
         .iter()
-        .map(|it| {
-            let data = it
-                .values()
-                .iter()
-                .map(|it| it.to_string())
-                .collect::<Vec<String>>();
-
-            data
-        })
-        .collect::<Vec<Vec<String>>>();
+        .map(|it| serde_json::to_value(it.values()).unwrap())
+        .collect::<Vec<Value>>();
     rows
 }

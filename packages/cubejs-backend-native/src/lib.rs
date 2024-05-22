@@ -17,20 +17,15 @@ mod template;
 mod transport;
 mod utils;
 
-
-
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
-use cubesql::sql::{
-    DatabaseProtocol, SessionManager,
-};
+use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 
 use std::sync::{Arc, Mutex};
 
-
-use crate::channel::{call_js_fn};
+use crate::channel::call_js_fn;
 use crate::cross::CLRepr;
 use crate::stream::{OnDrainHandler, PauseableStream, ProcessingState};
 use crate::utils::batch_to_rows;
@@ -330,7 +325,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
         let state_mutex = Arc::new(Mutex::new(ProcessingState::new()));
         // // let rows_stream = record_batch_stream.flat_map(|batch| batch_to_rows(batch));
-        // let mut pauseable_stream = PauseableStream::new(x, state_mutex.clone());
         let mut pauseable_stream = PauseableStream::new(stream, state_mutex.clone());
 
         let drain_handler = OnDrainHandler::new(
@@ -340,10 +334,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         );
 
         drain_handler.handle(js_stream_on_fn).await;
-
-        // js_stream_writer
-        //     .start(Arc::new(Mutex::new(pauseable_stream)))
-        //     .await;
 
         while let Some(batch) = pauseable_stream.next().await {
             let data = match batch {

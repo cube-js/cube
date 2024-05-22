@@ -22,6 +22,7 @@ use datafusion::arrow::{
 };
 use pg_srv::IntervalValue;
 use rust_decimal::prelude::*;
+use serde::{Serialize, Serializer};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -30,10 +31,11 @@ use std::{
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Column {
     name: String,
     column_type: ColumnType,
+    #[serde(skip_serializing)]
     column_flags: ColumnFlags,
 }
 
@@ -59,7 +61,7 @@ impl Column {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -101,6 +103,29 @@ pub enum TableValue {
     Date(NaiveDate),
     Timestamp(TimestampValue),
     Interval(IntervalValue),
+}
+
+impl Serialize for TableValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            TableValue::Null => serializer.serialize_none(),
+            TableValue::Boolean(val) => serializer.serialize_bool(val),
+            TableValue::String(ref val) => serializer.serialize_str(val),
+            TableValue::Int16(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Timestamp(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Interval(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Date(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::List(ref val) => serializer.serialize_str(val.to_string().as_str()),
+        }
+    }
 }
 
 impl ToString for TableValue {
