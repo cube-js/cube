@@ -225,6 +225,11 @@ export class CubeEvaluator extends CubeSymbols {
           delete preAggregation.timeDimension;
         }
 
+        if (preAggregation.timeDimensions) {
+          preAggregation.timeDimensionReferences = preAggregation.timeDimensions;
+          delete preAggregation.timeDimensions;
+        }
+
         if (preAggregation.dimensions) {
           preAggregation.dimensionReferences = preAggregation.dimensions;
           delete preAggregation.dimensions;
@@ -543,10 +548,23 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   protected evaluatePreAggregationReferences(cube, aggregation) {
-    const timeDimensions = aggregation.timeDimensionReference ? [{
-      dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
-      granularity: aggregation.granularity
-    }] : [];
+    const timeDimensions: any = [];
+
+    if (aggregation.timeDimensionReference) {
+      timeDimensions.push({
+        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+        granularity: aggregation.granularity
+      });
+    } else if (aggregation.timeDimensionReferences) {
+      // eslint-disable-next-line guard-for-in
+      for (const timeDimensionReference of aggregation.timeDimensionReferences) {
+        timeDimensions.push({
+          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
+          granularity: timeDimensionReference.granularity
+        });
+      }
+    }
+
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:
