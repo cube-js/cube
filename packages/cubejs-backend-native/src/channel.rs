@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryInto;
 #[cfg(debug_assertions)]
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -242,6 +241,61 @@ where
 
         Ok(())
     });
+
+    rx.await?
+}
+
+pub async fn call_js_fn<R: Send + 'static>(
+    channel: Arc<Channel>,
+    js_fn: Arc<Root<JsFunction>>,
+    args_callback: Box<
+        dyn for<'a> FnOnce(&mut TaskContext<'a>) -> NeonResult<Vec<Handle<'a, JsValue>>> + Send,
+    >,
+    result_from_js_value: Box<
+        dyn for<'a> FnOnce(&mut TaskContext<'a>, Handle<JsValue>) -> Result<R, CubeError> + Send,
+    >,
+    this: Arc<Root<JsObject>>,
+) -> Result<R, CubeError> {
+    let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
+
+    channel
+        .try_send(move |mut cx| {
+            // https://github.com/neon-bindings/neon/issues/672
+            let method = match Arc::try_unwrap(js_fn) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+            let this = match Arc::try_unwrap(this) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+
+            let args: Vec<Handle<JsValue>> = args_callback(&mut cx)?;
+
+            let result = match method.call(&mut cx, this, args) {
+                Ok(v) => v,
+                Err(err) => {
+                    println!("Unable to call js function: {}", err);
+                    return Ok(());
+                }
+            };
+
+            eprintln!("RESULT ON RECEIVED");
+
+            tx.send(result_from_js_value(&mut cx, result))
+                .map_err(|_| {
+                    CubeError::internal(
+                        "AsyncChannel: Unable to send result from JS back to Rust, channel closed"
+                            .to_string(),
+                    )
+                })
+                .unwrap();
+
+            Ok(())
+        })
+        .map_err(|err| {
+            CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
+        })?;
 
     rx.await?
 }

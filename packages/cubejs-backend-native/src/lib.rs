@@ -18,6 +18,7 @@ mod transport;
 mod utils;
 
 use channel::call_raw_js_with_channel_as_callback;
+use cubesql::compile::engine::df::scan::RecordBatchStream;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches, print_df_stream};
 use cubesql::sql::{
     self, dataframe, AuthContext, DatabaseProtocol, HttpAuthContext, PostgresServer, SessionManager,
@@ -26,11 +27,13 @@ use cubesql::transport::TransportService;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
-use crate::channel::call_sync_js_fn;
+use crate::channel::{call_js_fn, call_sync_js_fn};
 use crate::cross::CLRepr;
+use crate::stream::{OnDrainHandler, PauseableStream, ProcessingState};
+use crate::utils::batch_to_rows;
 use auth::{NativeAuthContext, NodeBridgeAuthService};
 use config::NodeConfig;
 use cubesql::telemetry::LocalReporter;
@@ -237,10 +240,29 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     });
 
     let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
-    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
+    let sql_query = match cx.argument::<JsString>(1) {
+        Ok(v) => v.value(&mut cx),
+        // todo: remove this after testing
+        Err(_) => String::from("SELECT status, created_at FROM orders limit 5;"),
+    };
     let node_stream = cx
         .argument::<JsObject>(2)?
         .downcast_or_throw::<JsObject, _>(&mut cx)?;
+    let js_stream_on_fn = Arc::new(
+        node_stream
+            .get::<JsFunction, _, _>(&mut cx, "on")?
+            .root(&mut cx),
+    );
+    let js_stream_write_fn = Arc::new(
+        node_stream
+            .get::<JsFunction, _, _>(&mut cx, "write")?
+            .root(&mut cx),
+    );
+    let js_stream_end_fn = Arc::new(
+        node_stream
+            .get::<JsFunction, _, _>(&mut cx, "end")?
+            .root(&mut cx),
+    );
     let node_stream_root = cx
         .argument::<JsObject>(2)?
         .downcast_or_throw::<JsObject, _>(&mut cx)?
@@ -251,28 +273,22 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     eprintln!("from query {:?}", sql_query);
 
-    let js_push = Arc::new(
-        node_stream
-            .get::<JsFunction, _, _>(&mut cx, "push")?
-            .root(&mut cx),
-    );
-
     let channel = Arc::new(cx.channel());
     let node_stream_arc = Arc::new(node_stream_root);
 
     // runtime.spawn(async move {
-    //     for i in 0..10 {
+    //     for i in 0..100 {
     //         eprintln!("Iteration {:?}", i);
-    //         let argument = String::from(format!("hello_{}", i));
+    //         let argument = String::from(format!("hello@{}", i));
     //         call_sync_js_fn(
     //             channel.clone(),
     //             js_push.clone(),
-    //             if i != 9 { Some(argument.clone()) } else { None },
+    //             if i != 99 { Some(argument.clone()) } else { None },
     //             node_stream_arc.clone(),
     //         )
     //         .unwrap();
 
-    //         tokio::time::sleep(Duration::from_secs(1)).await;
+    //         // tokio::time::sleep(Duration::from_secs(1)).await;
     //     }
     // });
 
@@ -304,52 +320,81 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             .await
             .unwrap();
 
-        let mut stream = get_df_batches(&query_plan).await.unwrap();
-        // let mut rows: Vec<HashMap<String, String>> = vec![];
-        while let Some(batch) = stream.next().await {
-            match batch {
-                Ok(batch) => {
-                    let schema = batch.schema();
-                    let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch]).unwrap();
+        let stream = get_df_batches(&query_plan).await.unwrap();
+        // let x = stream
+        //     .map(|batch| {
+        //         let rows = batch_to_rows(batch.unwrap());
+        //         rows
+        //     })
+        //     .flatten();
 
-                    eprintln!("@batch columns ----> {:?}", data_frame.get_columns());
-                    let rows = data_frame
-                        .get_rows()
-                        .iter()
-                        .map(|it| {
-                            let data = it
-                                .values()
-                                .iter()
-                                .map(|it| it.to_string())
-                                .collect::<Vec<String>>();
+        let state_mutex = Arc::new(Mutex::new(ProcessingState::new()));
+        // // let rows_stream = record_batch_stream.flat_map(|batch| batch_to_rows(batch));
+        // let mut pauseable_stream = PauseableStream::new(x, state_mutex.clone());
+        let mut pauseable_stream = PauseableStream::new(stream, state_mutex.clone());
 
-                            let json_data = serde_json::to_value(&data).unwrap();
+        let drain_handler = OnDrainHandler::new(
+            channel.clone(),
+            node_stream_arc.clone(),
+            state_mutex.clone(),
+        );
 
-                            call_sync_js_fn(
-                                channel.clone(),
-                                js_push.clone(),
-                                Some(json_data.to_string()),
-                                node_stream_arc.clone(),
-                            )
-                            .unwrap();
+        drain_handler.handle(js_stream_on_fn).await;
 
-                            data
-                        })
-                        .collect::<Vec<Vec<String>>>();
+        // js_stream_writer
+        //     .start(Arc::new(Mutex::new(pauseable_stream)))
+        //     .await;
 
-                    eprintln!("@batch rows ----> {:?}", rows);
+        while let Some(batch) = pauseable_stream.next().await {
+            let data = match batch {
+                Ok(batch) => batch_to_rows(batch),
+                Err(e) => {
+                    eprintln!("Error: {:?}", e);
+                    continue;
                 }
-                _ => todo!(),
+            };
+            let data = serde_json::to_string(&data).unwrap();
+            eprintln!("data row @@@{:?}", data);
+
+            let js_stream_write_fn = js_stream_write_fn.clone();
+            let node_stream_arc = node_stream_arc.clone();
+            let state_mutex = state_mutex.clone();
+
+            let should_pause = !call_js_fn(
+                channel.clone(),
+                js_stream_write_fn,
+                Box::new(|cx| {
+                    let arg = cx.string(data).upcast::<JsValue>();
+
+                    Ok(vec![arg.upcast::<JsValue>()])
+                }),
+                Box::new(|cx, v| Ok(v.downcast_or_throw::<JsBoolean, _>(cx).unwrap().value(cx))),
+                node_stream_arc,
+            )
+            .await
+            .unwrap();
+
+            if should_pause {
+                state_mutex.lock().unwrap().pause();
             }
+
+            eprintln!("PAUSE??? {:?}", should_pause);
         }
 
-        call_sync_js_fn(channel.clone(), js_push.clone(), None, node_stream_arc).unwrap();
-        // print_df_stream(&query_plan).await.unwrap();
+        let _ = channel.try_send(move |mut cx| {
+            let method = match Arc::try_unwrap(js_stream_end_fn) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+            let this = match Arc::try_unwrap(node_stream_arc) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
 
-        // while Some(batch) = stream.next().await {
-        //     let batch = batch.unwrap();
-        //     let output = sql::serialize_batch(&batch).unwrap();
-        // }
+            method.call(&mut cx, this, vec![])?;
+
+            Ok(())
+        });
     });
 
     // Ok(promise.upcast::<JsValue>())

@@ -5,7 +5,7 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
-import { Readable } from 'stream';
+import { Readable, Writable } from 'stream';
 import {
   getEnv,
   getRealType,
@@ -355,20 +355,71 @@ class ApiGateway {
       userAsyncHandler(async (req, res) => {
         const server = this.initSQLServer();
         
-        const _stream = new Readable({
-          read(v) {
-            console.log('>>>', 'READ', v);
-          }
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        res.write('{ "data": [');
+
+        // class MyStream {
+        //   public events: any = {};
+
+        //   public write(chunk) {
+        //     console.log('>>>', 'write', chunk);
+        //   }
+
+        //   public on(event, cb) {
+        //     this.events[event] = cb;
+        //     // console.log('>>>', 'on', event, cb);
+        //   }
+        // }
+
+        // const _stream = new MyStream();
+
+        const _stream = new Writable({
+          write(chunk, encoding, callback) {
+            const s = chunk.toString('utf-8');
+            res.write(s.substring(1, s.length - 1));
+            res.write(',');
+
+            callback();
+          },
         });
+
+        _stream.on('finish', () => {
+          console.log('>>>', 'js on finish!!!');
+          res.write(']}');
+          res.end();
+        });
+
+        _stream.on('error', (err) => {
+          console.log('>>>', 'get error', err);
+        });
+
+        // setTimeout(() => {
+        //   _stream.write('[["hello", 1],["world", 2]]', (e) => {
+        //     console.log('>>>', 'write cb', e);
+        //   });
+        //   _stream.end();
+        // }, 400);
 
         await server.execSql(req.body.query, _stream);
 
-        _stream.pipe(res);
+        // setTimeout(() => {
+        //   console.log('>>>', typeof _stream.events.drain, _stream.events);
+        //   console.log('>>> res', _stream.events.drain());
+        //   console.log('>>> res', _stream.events.drain());
+        //   setTimeout(() => {
+        //     console.log('>>> res', _stream.events.drain());
+        //   }, 500);
+        // }, 1000);
 
-        _stream.on('error', (err) => {
-          console.error('Stream error:', err);
-          res.status(500).end();
-        });
+        // res.json({ hello: true });
+        // _stream.pipe(res);
+
+        // _stream.on('error', (err) => {
+        //   console.error('Stream error:', err);
+        //   res.status(500).end();
+        // });
       })
     );
 

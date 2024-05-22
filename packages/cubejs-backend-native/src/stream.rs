@@ -1,21 +1,239 @@
 use cubesql::compile::engine::df::scan::{
-    transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
+    transform_response, ArrowError, ArrowResult, FieldValue, MemberField, RecordBatch,
+    RecordBatchStream, SchemaRef, ValueObject,
 };
+use cubesql::compile::rewrite::rewriter::CubeRunner;
+use futures::channel::mpsc;
+use futures::{Stream, StreamExt};
+use neon::types::buffer::RefMut;
+use std::cell::RefCell;
 use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
 use std::sync::{Arc, Mutex};
+use std::task::{Poll, Waker};
+use std::vec;
 
+use std::collections::HashMap;
+use std::convert::TryInto;
+#[cfg(debug_assertions)]
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use crate::channel::{call_js_fn, call_raw_js_with_channel_as_callback};
+use crate::transport::MapCubeErrExt;
+use async_trait::async_trait;
+use cubesql::transport::{SqlGenerator, SqlTemplates};
 use cubesql::CubeError;
+#[cfg(debug_assertions)]
+use log::trace;
+use neon::prelude::*;
+use tokio::sync::oneshot;
+
 #[cfg(build = "debug")]
 use log::trace;
 use neon::prelude::*;
 use neon::types::JsDate;
 
-use crate::utils::bind_method;
+use crate::utils::{batch_to_rows, bind_method};
 
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
-use tokio::sync::oneshot;
 
 type Chunk = Option<Result<RecordBatch, CubeError>>;
+
+fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let this = cx
+        .this::<JsBox<RefCell<OnDrainHandler>>>()?
+        .downcast_or_throw::<JsBox<RefCell<OnDrainHandler>>, _>(&mut cx)?;
+    this.borrow().on_drain();
+
+    Ok(cx.undefined())
+}
+
+pub struct ProcessingState {
+    processing: bool,
+    waker: Option<Waker>,
+}
+
+impl ProcessingState {
+    pub fn new() -> Self {
+        Self {
+            processing: true,
+            waker: None,
+        }
+    }
+
+    pub fn resume(&mut self) {
+        self.processing = true;
+        println!("ProcessingState @start");
+        if let Some(waker) = self.waker.take() {
+            println!("wake up called");
+            waker.wake();
+        }
+    }
+
+    pub fn pause(&mut self) {
+        self.processing = false;
+    }
+}
+
+pub struct PauseableStream<T: Send> {
+    inner: Pin<Box<dyn Stream<Item = T> + Send>>,
+    state: Arc<Mutex<ProcessingState>>,
+}
+
+impl<T: Send> PauseableStream<T> {
+    pub fn new(
+        inner: impl Stream<Item = T> + Send + 'static,
+        state: Arc<Mutex<ProcessingState>>,
+    ) -> Self {
+        Self {
+            inner: Box::pin(inner),
+            state,
+        }
+    }
+}
+
+unsafe impl<T: Send> Send for PauseableStream<T> {}
+
+impl<T: Send> Stream for PauseableStream<T> {
+    type Item = T;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        let mut state = self.state.lock().unwrap();
+        println!("state: {:?}", state.processing);
+
+        if !state.processing {
+            state.waker = Some(cx.waker().clone());
+            // drop(state);
+            return Poll::Pending;
+        }
+
+        drop(state);
+        self.inner.as_mut().poll_next(cx)
+    }
+}
+
+#[derive(Clone)]
+pub struct OnDrainHandler {
+    channel: Arc<Channel>,
+    js_stream: Arc<Root<JsObject>>,
+    state: Arc<Mutex<ProcessingState>>,
+}
+
+unsafe impl Sync for OnDrainHandler {}
+
+impl Finalize for OnDrainHandler {}
+
+impl OnDrainHandler {
+    pub fn new(
+        channel: Arc<Channel>,
+        js_stream: Arc<Root<JsObject>>,
+        state: Arc<Mutex<ProcessingState>>,
+    ) -> Self {
+        Self {
+            channel,
+            js_stream,
+            state,
+        }
+    }
+
+    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) {
+        let js_stream_obj = self.js_stream.clone();
+        let this = RefCell::new(self.clone());
+
+        // let (sender, rx) = mpsc_channel::<Result<(), CubeError>>(1024);
+        // let sender = Arc::new(sender);
+        // let tx_clone = tx.clone();
+        // let this = RefCell::new(self.clone());
+
+        // let js_stream = match Arc::try_unwrap(js_stream_obj) {
+        //     Ok(v) => v.into_inner(&mut cx),
+        //     Err(v) => v.as_ref().to_inner(&mut cx),
+        // };
+
+        let _ = call_js_fn(
+            self.channel.clone(),
+            js_stream_on_fn,
+            Box::new(|cx| {
+                let on_drain_fn = JsFunction::new(cx, handle_on_drain)?;
+
+                let this = cx.boxed(this).upcast::<JsValue>();
+                let on_drain_fn = bind_method(cx, on_drain_fn, this).unwrap();
+
+                let event_arg = cx.string("drain").upcast::<JsValue>();
+
+                Ok(vec![event_arg, on_drain_fn.upcast::<JsValue>()])
+            }),
+            Box::new(|_, _| Ok(())),
+            js_stream_obj,
+        )
+        .await
+        .unwrap();
+        eprintln!("BINDING DONE");
+
+        // self.channel
+        //     .try_send(move |mut cx| {
+        //         let js_stream = match Arc::try_unwrap(js_stream_obj) {
+        //             Ok(v) => v.into_inner(&mut cx),
+        //             Err(v) => v.as_ref().to_inner(&mut cx),
+        //         };
+
+        //         let js_stream_on_fn = js_stream.get::<JsFunction, _, _>(&mut cx, "on")?;
+        //         let on_drain_fn = JsFunction::new(&mut cx, handle_on_drain)?;
+
+        //         let this = cx.boxed(this).upcast::<JsValue>();
+        //         let on_drain_fn = bind_method(&mut cx, on_drain_fn, this).unwrap();
+
+        //         let event_arg = cx.string("drain").upcast::<JsValue>();
+        //         js_stream_on_fn.call(
+        //             &mut cx,
+        //             js_stream,
+        //             vec![event_arg, on_drain_fn.upcast::<JsValue>()],
+        //         )?;
+
+        //         eprintln!("BINDING DONE");
+
+        //         Ok(())
+        //     })
+        //     .unwrap();
+        // eprintln!("after send");
+
+        // let mut pauseable_stream = self.pauseable_stream.lock().unwrap();
+        // while let Some(batch) = pauseable_stream.lock().unwrap().next().await {
+        //     let data = match batch {
+        //         Ok(batch) => batch_to_rows(batch),
+        //         Err(e) => {
+        //             eprintln!("Error: {:?}", e);
+        //             continue;
+        //         }
+        //     };
+        //     let data = serde_json::to_string(&data).unwrap();
+        //     eprintln!("data row @@@{:?}", data);
+
+        //     let should_pause = call_raw_js_with_channel_as_callback(
+        //         self.channel.clone(),
+        //         js_stream_write_fn.clone(),
+        //         data,
+        //         Box::new(|cx, v| Ok(cx.string(v).as_value(cx))),
+        //         Box::new(move |cx, v| Ok(v.downcast::<JsBoolean, _>(cx).unwrap().value(cx))),
+        //     )
+        //     .await
+        //     .unwrap();
+
+        //     // if should_pause {
+        //     //     pauseable_stream.pause();
+        //     // }
+        // }
+    }
+
+    fn on_drain(&self) {
+        eprintln!("fn@[on_drain] resume...");
+        self.state.lock().unwrap().resume();
+    }
+}
 
 pub struct JsWriteStream {
     sender: Sender<Chunk>,
