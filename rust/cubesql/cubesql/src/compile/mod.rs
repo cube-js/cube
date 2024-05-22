@@ -1491,7 +1491,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         load_request_meta: Arc<LoadRequestMeta>,
         plan: LogicalPlan,
     ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
-        println!("!!!!!!!!!!!! ^^^^^^^^^ !!!!!!!!!!!!!!!!!!");
         Box::pin(async move {
             if let LogicalPlan::Extension(Extension { node }) = &plan {
                 // .cloned() is to avoid borrowing Any to comply with Send + Sync
@@ -19942,7 +19941,7 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
-    async fn test_wrapper_group_by_rollup_1() {
+    async fn test_wrapper_group_by_rollup() {
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
@@ -19961,7 +19960,6 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql;
-        println!("!!! sql {}", sql);
         assert!(sql.contains("Rollup"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -19987,7 +19985,7 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql;
-        assert!(sql.contains("ROLLUP"));
+        assert!(sql.contains("Rollup"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20012,7 +20010,7 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql;
-        assert!(sql.contains("CUBE"));
+        assert!(sql.contains("Cube"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }
@@ -20037,7 +20035,7 @@ ORDER BY "source"."str0" ASC
             .wrapped_sql
             .unwrap()
             .sql;
-        assert!(sql.contains("ROLLUP"));
+        assert!(sql.contains("Rollup"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }

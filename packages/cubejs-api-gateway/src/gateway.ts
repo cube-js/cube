@@ -1275,7 +1275,6 @@ class ApiGateway {
         const obj = JSON.parse(memberExpression);
         const args = obj.cube_params;
         args.push(`return \`${obj.expr}\``);
-        console.log("!!! gr_type", obj.group_type)
         return {
           cubeName: obj.cube_name,
           name: obj.alias,
@@ -1732,8 +1731,6 @@ class ApiGateway {
       apiType = 'sql',
     } = request;
     const requestStarted = new Date();
-    console.log("!!!!!!!!!!!!!!!!!!!!!!!!!");
-    console.log("request", request);
 
     try {
       await this.assertApiScope('data', context.securityContext);

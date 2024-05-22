@@ -1900,15 +1900,40 @@ export class BaseQuery {
       return '';
     }
     const dimensionColumns = this.dimensionColumns();
-    if !dimensionColumns.length {
+    if (!dimensionColumns.length) {
       return '';
     }
 
-    const groupDimension = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d));
+    const groupTypes = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupType);
 
+    let inGroupingSet = false;
 
-    console.log("!!! grrrrrr", groupTypes);
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
+    let result = ' GROUP BY ';
+
+    dimensionColumns.forEach((c, i) => {
+        const groupType = groupTypes[i];
+        console.log("grrr type ", groupType);
+        const comma = i > 0 ? ', ' : '';
+        if (inGroupingSet === false && groupType != null) {
+            if (groupType === 'Rollup') {
+                result += `${comma}ROLLUP(`
+            } else if (groupType === 'Cube' ) {
+                result += `${comma}CUBE(`
+            }
+            inGroupingSet = true;
+        } else if (inGroupingSet === true && groupType == null) {
+            result += `)${comma}`;
+            inGroupingSet = false;
+        } else {
+            result += `${comma}`;
+        }
+        result += `${i+1}`
+    });
+    if (inGroupingSet === true) {
+        result += ')';
+    }
+
+    return result;
   }
 
   getFieldIndex(id) {

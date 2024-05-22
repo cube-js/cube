@@ -11,7 +11,8 @@ use crate::{
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
-        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
     var, var_iter,
@@ -119,7 +120,7 @@ impl WrapperRules {
                     "?select_ungrouped",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "wrapper-groupping-set-push-down",
                 wrapper_pushdown_replacer(
                     grouping_set_expr("?rollout_members", "?type"),
@@ -138,6 +139,7 @@ impl WrapperRules {
                     ),
                     "?type",
                 ),
+                self.check_rollup_allowed("?alias_to_cube"),
             ),
             rewrite(
                 "wrapper-groupping-set-pull-up",
@@ -433,6 +435,33 @@ impl WrapperRules {
             return true;
         }
         false
+    }
+
+    fn check_rollup_allowed(
+        &self,
+        alias_to_cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta = self.meta_context.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                WrapperPullupReplacerAliasToCube
+            )
+            .cloned()
+            {
+                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
+                    if sql_generator
+                        .get_sql_templates()
+                        .templates
+                        .contains_key("expressions/rollup")
+                    {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
     }
 
     fn pushdown_measure(

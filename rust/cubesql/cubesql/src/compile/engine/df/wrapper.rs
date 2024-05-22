@@ -671,8 +671,6 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
-                            println!("!!!! aggregate {:?}", aggregate);
-                            println!("!!!! group {:?}", group_by);
                             if let Some(ungrouped_scan_node) = ungrouped_scan_node.clone() {
                                 let mut load_request = ungrouped_scan_node.request.clone();
                                 load_request.measures = Some(

@@ -493,7 +493,6 @@ impl Portal {
                             return;
                         }
                         QueryPlan::DataFusionSelect(_, plan, ctx) => {
-                            println!("!!!!!!! ############ !!!!!!!!!!");
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let safe_stream = async move {
                                 std::panic::AssertUnwindSafe(df.execute_stream())
