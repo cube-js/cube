@@ -29,7 +29,7 @@ pub fn batch_to_rows(batch: RecordBatch) -> (Value, Vec<Value>) {
     let schema = batch.schema();
     let data_frame = dataframe::batch_to_dataframe(&schema, &vec![batch]).unwrap();
 
-    let columns = serde_json::to_value(&data_frame.get_columns()).unwrap();
+    let columns = serde_json::to_value(data_frame.get_columns()).unwrap();
     let rows = data_frame
         .get_rows()
         .iter()

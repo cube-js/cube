@@ -20,11 +20,11 @@ mod utils;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
-use futures::{Stream, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt};
 use once_cell::sync::OnceCell;
 use tokio::sync::watch;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 
 use crate::channel::call_js_fn;
 use crate::cross::CLRepr;
@@ -316,7 +316,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             let (columns, data) = match batch {
                 Ok(batch) => batch_to_rows(batch),
                 Err(e) => {
-                    panic!(e);
+                    std::panic::panic_any(e);
                 }
             };
 

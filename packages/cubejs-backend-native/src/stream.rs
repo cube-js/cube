@@ -2,14 +2,14 @@ use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
 
-use futures::Stream;
+
 
 use std::cell::RefCell;
 use std::future::Future;
 
-use std::pin::Pin;
+
 use std::sync::{Arc, Mutex};
-use std::task::{Poll, Waker};
+
 use std::vec;
 
 use crate::channel::call_js_fn;
