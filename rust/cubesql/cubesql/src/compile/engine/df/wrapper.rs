@@ -2,7 +2,12 @@ use crate::{
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
         rewrite::{
-            extract_exprlist_from_groupping_set, rules::filters::Decimal, WrappedSelectType,
+            extract_exprlist_from_groupping_set,
+            rules::{
+                filters::Decimal,
+                utils::{DecomposedDayTime, DecomposedMonthDayNano},
+            },
+            WrappedSelectType,
         },
     },
     config::ConfigObj,
@@ -1660,7 +1665,7 @@ impl CubeScanWrapperNode {
                                 (
                                     sql_generator
                                         .get_sql_templates()
-                                        .interval_expr(interval, num.into(), date_part.to_string())
+                                        .interval_any_expr(interval, num.into(), date_part)
                                         .map_err(|e| {
                                             DataFusionError::Internal(format!(
                                                 "Can't generate SQL for interval: {}",
@@ -1675,37 +1680,24 @@ impl CubeScanWrapperNode {
                         }
                         ScalarValue::IntervalDayTime(x) => {
                             if let Some(x) = x {
-                                let days = x >> 32;
-                                let millis = x & 0xFFFFFFFF;
-                                if days > 0 && millis > 0 {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for interval: mixed intervals aren't supported: {} days {} millis encoded as {}",
-                                        days, millis, x
-                                    )));
-                                }
-                                let (num, date_part) = if days > 0 {
-                                    (days, "DAY")
-                                } else {
-                                    (millis, "MILLISECOND")
-                                };
-                                let interval = format!("{} {}", num, date_part);
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .interval_expr(interval, num, date_part.to_string())
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for interval: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedDayTime::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
                             } else {
                                 ("NULL".to_string(), sql_query)
                             }
                         }
-                        // ScalarValue::IntervalMonthDayNano(_) => {}
+                        ScalarValue::IntervalMonthDayNano(x) => {
+                            if let Some(x) = x {
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedMonthDayNano::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::Struct(_, _) => {}
                         ScalarValue::Null => ("NULL".to_string(), sql_query),
                         x => {
