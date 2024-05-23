@@ -1765,7 +1765,10 @@ pub async fn get_df_batches(
                 Err(err) => return Err(CubeError::panic(err).into()),
             }
         }
-        _ => Err(CubeError::user("Only SELECT queries are supported for Cube SQL over HTTP".to_string()).into()),
+        _ => Err(CubeError::user(
+            "Only SELECT queries are supported for Cube SQL over HTTP".to_string(),
+        )
+        .into()),
     }
 }
 
