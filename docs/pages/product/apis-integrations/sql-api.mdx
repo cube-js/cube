@@ -130,6 +130,13 @@ practical considerations that you should keep in mind while querying, though.
 In the SQL API, each cube is represented as a table. Measures, dimensions, and
 segments in this table are columns. We call these tables *cube tables*.
 
+Cube supports two querying models with and without SQL Pushdown.
+Whenever SQL Pushdown is disabled only Standard Route is active.
+Whenever SQL Pushdown is enabled SQL Pushdown Route is active in addition to Standard Route.
+Below is detailed explanation of how those two querying models behave.
+
+### Standard Route
+
 Consider the `orders` cube in your data model, the following query is performing
 a `SELECT` from the `orders` cube.
 
@@ -173,10 +180,10 @@ expression in measure.
 -- This query won't work because of the Cube query rewrite
 SELECT
   city,
-  CASE
-    WHEN status = 'shipped' THEN 'done'
-    ELSE 'in-progress'
-  END real_status,
+  MAX(CASE
+    WHEN status = 'shipped' THEN '2-done'
+    ELSE '1-in-progress'
+  END) real_status,
   SUM(number)
 FROM orders
   CROSS JOIN Users
@@ -194,10 +201,10 @@ follows, making sure to wrap the original `SELECT` statement:
 --- You can also use CTEs to achieve the same result
 SELECT
   city,
-  CASE
-    WHEN status = 'shipped' THEN 'done'
-    ELSE 'in-progress'
-  END real_status,
+  MAX(CASE
+    WHEN status = 'shipped' THEN '2-done'
+    ELSE '1-in-progress'
+  END) real_status,
   SUM(amount) AS total
 FROM (
   SELECT
@@ -223,6 +230,124 @@ query rewrite and pushdown. Please refer to the reference to see whether
 specific functions, operators or expressions are supported in Cube query
 rewrite.
 
+### SQL Pushdown Route
+
+<WarningBox heading={`🐣  Preview`}>
+
+  SQL Pushdown is currently in Preview, and the API and behavior may
+  change in a future version.
+  SQL Pushdown is disabled by default and is controlled by
+  `CUBESQL_SQL_PUSH_DOWN` environment variable.
+  In future versions, `CUBESQL_SQL_PUSH_DOWN` will be enabled by default.
+
+</WarningBox>
+
+SQL Pushdown provides a safe net for queries that can't be rewritten
+into combination of
+[Cube's internal query format](/product/apis-integrations/rest-api/query-format)
+and post-processing by
+[Datafusion](https://arrow.apache.org/datafusion/).
+Such queries SQL would be transpiled to target database query leveraging
+all target database capabilities for data processing.
+Even when SQL Pushdown is enabled, it has secondary priority to
+Standard Route as it provides better cache utilization.
+
+During the rewrite process, Cube validates that the target database would support transpired SQL queries.
+If direct conversion is not possible, different SQL transformation rewrite rules can be applied to achieve successful translation.
+Please refer to [SQL API reference](/reference/sql-api) for the list of supported SQL functions and clauses.
+Support varies based on the target database.
+
+### Top-down vs bottom-up evaluation
+
+Fundamentally, every SQL operation results in a tabular data set.
+This is usually referred to as SQL operational closure or bottom-up SQL evaluation.
+However, for OLAP queries, most of the time, top-down evaluation is required.
+Top-down evaluation is whenever the outermost sub-query operation decides on how measures would be actually evaluated as opposed to
+innermost sub-query in case of standard SQL behavior.
+
+To balance between SQL guarantees and OLAP requirements, Cube
+- uses top-down evaluation from the innermost aggregation operation down to all ungrouped sub-queries,
+- uses bottom-up evaluation from the innermost aggregation tabular result set up to the outermost sub-query.
+
+<WarningBox>
+
+  This behavior is enabled whenever SQL Pushdown is enabled.
+  In future versions it'd become default behavior.
+
+</WarningBox>
+
+To drill-down on how this works, let's consider following example date model
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ECOM.ORDERS
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: STATUS
+        type: string
+        description: The status of the order (completed etc)
+
+      - name: created_at
+        sql: "{CUBE}.CREATED_AT"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.STATUS = 'completed'"
+
+      - name: completed_percentage
+        type: number
+        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        format: percent
+```
+
+And the query to the SQL API:
+
+```sql
+SELECT id, status, created_at, completed_percentage FROM orders
+```
+
+Such a query is considered an ungrouped query and would result in the following result set:
+
+| id       | status    | created_at |  completed_percentage |
+| -------- | --------- | ---------- | --------------------- |
+| 1        | shipped   | 2024-01-01 | 0.0                   |
+| 2        | completed | 2024-01-01 | 100.0                 |
+| 3        | completed | 2024-01-02 | 100.0                 |
+
+On the other hand, a typical query that various BI tools generate
+
+```sql
+SELECT date_trunc('day', created_at), MEASURE(completed_percentage)
+FROM (
+  SELECT id, status, created_at, completed_percentage FROM orders
+) inner_query
+GROUP BY 1
+```
+
+would still yield correct results
+
+| date_trunc('day', created_at) |  completed_percentage |
+| ----------------------------- | --------------------- |
+| 2024-01-01                    | 50.0                  |
+| 2024-01-02                    | 100.0                 |
+
+For this particular query, `inner_query` won't be evaluated as a table.
+Instead, Cube would postpone its execution until wrapping `GROUP BY` and would use only `date_trunc('day', created_at)` as a dimension to evaluate `completed_percentage` measure instead of full set of `inner_query` columns `id`,`status` and `created_at`.
+To make it possible, Cube keeps track of ungrouped queries and evaluates them only on the first occurrence of a `GROUP BY` query in case there's one.
+
 ### Aggregated and non-aggregated queries
 
 SQL API supports two types of queries against *cube tables*: aggregated
@@ -230,9 +355,10 @@ SQL API supports two types of queries against *cube tables*: aggregated
 
 <InfoBox>
 
-Queries that Cube runs against to your database will always be aggregated,
+Without SQL Pushdown, Queries that Cube runs against to your database will always be aggregated,
 regardless of whether you use aggregated (with `GROUP BY`) or non-aggregated
-queries with the SQL API.
+queries with the SQL API unless SQL Pushdown is enabled.
+Whenever you enable SQL Pushdown, queries which do not contain `GROUP BY` clause will be executed as ungrouped queries.
 
 </InfoBox>
 
@@ -245,7 +371,25 @@ SELECT
 FROM orders
 ```
 
-An equivalent aggregated query must aggregate all measure columns and group by
+With SQL Pushdown disabled Cube will still use `GROUP BY` to execute such a query.
+
+<WarningBox>
+
+  In future versions automatic use of `GROUP BY` for every query would be deprecated and disabled by default.
+
+</WarningBox>
+
+Whenever SQL Pushdown is enabled such query would run as ungrouped query.
+As with REST API such queries do not use `GROUP BY` and render measures as if those would be grouped by primary key of a cube.
+
+<WarningBox>
+
+  If SQL Pushdown is enabled calculated `number`, `string` or `time` measures queried by SQL API can't use aggregation function definitions with it's `sql` paremeter.
+  Such measures can still reference other aggregate type measures though.
+
+</WarningBox>
+
+Aggregated query must aggregate all measure columns and group by
 all dimension columns. You can use the special `MEASURE` aggregate function
 for measures of [any type][ref-measure-types]. This is quite convenient, especially
 in case you're manually writing ad-hoc queries:
@@ -301,7 +445,7 @@ will be thrown: `Measure aggregation type doesn't match`.
 
 </WarningBox>
 
-### Filtering
+### Standard Route Filtering
 
 Cube supports most simple equality operators like `=`, `<>`, `<`, `<=`, `>`,
 `>=` as well as `IN` and `LIKE` operators. Cube tries to push down all filters
@@ -309,7 +453,7 @@ into Cube query. In some cases, SQL filters aren't available in Cube and can be
 done in a post-processing phase. Time dimension filters will be converted to
 time dimension date ranges whenever it's possible.
 
-### Ordering
+### Standard Route Ordering
 
 Cube tries to push down all `ORDER BY` statements into Cube Query.
 
@@ -349,7 +493,7 @@ possibility of a wrong result if there are more than 50,000 rows. Given that
 queries to Cube are usually aggregated, it is rare that they may return more
 than 50,000 rows, but keep that limitation in mind when designing your queries.
 
-### Limit
+### Standard Route Limit
 
 Limit push down is supported by Cube however, a limit over 50,000 can't be
 overridden. In future versions, paging and streaming would be used to avoid this
@@ -451,7 +595,7 @@ Querying dimensions is straightforward, simply add any required fields to the
 `SELECT` clause.
 
 ```sql
-cube=> SELECT status FROM orders;
+cube=> SELECT status FROM orders GROUP BY 1;
    status
 ------------
  completed
@@ -464,12 +608,8 @@ cube=> SELECT status FROM orders;
 
 Measures can similarly be queried through Cube SQL.
 
-Because measures are already aggregated in Cube there is no need to apply
-aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
-in query.
-
 ```sql
-cube=> SELECT count FROM orders;
+cube=> SELECT MEASURE(count) FROM orders;
  count
 -------
  43994
@@ -566,25 +706,10 @@ As we can see, we have a mix of measure types in the above data model. To query
 them, we could use the following SQL statements:
 
 ```sql
---- Both the following statements are equivalent
-SELECT count FROM orders
 SELECT COUNT(*) FROM orders
-
---- Count distinct, and count distinct approx
---- Both the following statements are equivalent
-SELECT distinct_count FROM orders
 SELECT COUNT(DISTINCT distinct_count) FROM orders
-
---- Both the following statements are equivalent
-SELECT approx_distinct_count FROM orders
 SELECT COUNT(DISTINCT approx_distinct_count) FROM orders
-
---- Both the following statements are equivalent
-SELECT min_value FROM orders
 SELECT MIN(min_value) FROM orders
-
---- Both the following statements are equivalent
-SELECT max_value FROM orders
 SELECT MAX(max_value) FROM orders
 ```
 
