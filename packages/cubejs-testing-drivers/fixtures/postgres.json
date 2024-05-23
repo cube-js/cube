@@ -131,7 +131,7 @@
           }
         ],
         "partition_granularity": "month",
-        "dimensions": ["CUBE.productName"],
+        "dimensions": [],
         "measures": [
           "CUBE.count"
         ]

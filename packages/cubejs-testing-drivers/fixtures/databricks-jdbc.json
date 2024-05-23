@@ -79,24 +79,6 @@
         ]
       },
       {
-        "name": "MultiTimeDimForCount",
-        "time_dimensions": [
-          {
-            "dimension": "CUBE.completedDate",
-            "granularity": "day"
-          },
-          {
-            "dimension": "CUBE.orderDate",
-            "granularity": "day"
-          }
-        ],
-        "partition_granularity": "month",
-        "dimensions": ["CUBE.productName"],
-        "measures": [
-          "CUBE.count"
-        ]
-      },
-      {
         "name": "CountByProduct",
         "time_dimension": "CUBE.orderDate",
         "granularity": "month",
