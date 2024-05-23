@@ -245,15 +245,17 @@ where
     rx.await?
 }
 
+type ArgsCallback =
+    Box<dyn for<'a> FnOnce(&mut TaskContext<'a>) -> NeonResult<Vec<Handle<'a, JsValue>>> + Send>;
+
+type ResultFromJsValue<R> =
+    Box<dyn for<'a> FnOnce(&mut TaskContext<'a>, Handle<JsValue>) -> Result<R, CubeError> + Send>;
+
 pub async fn call_js_fn<R: Send + 'static>(
     channel: Arc<Channel>,
     js_fn: Arc<Root<JsFunction>>,
-    args_callback: Box<
-        dyn for<'a> FnOnce(&mut TaskContext<'a>) -> NeonResult<Vec<Handle<'a, JsValue>>> + Send,
-    >,
-    result_from_js_value: Box<
-        dyn for<'a> FnOnce(&mut TaskContext<'a>, Handle<JsValue>) -> Result<R, CubeError> + Send,
-    >,
+    args_callback: ArgsCallback,
+    result_from_js_value: ResultFromJsValue<R>,
     this: Arc<Root<JsObject>>,
 ) -> Result<R, CubeError> {
     let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
@@ -394,7 +396,7 @@ impl Drop for NodeSqlGenerator {
     fn drop(&mut self) {
         let channel = self.channel.clone();
         let sql_generator_obj = self.sql_generator_obj.take().unwrap();
-        let _ = channel.send(move |mut cx| {
+        channel.send(move |mut cx| {
             let _ = match Arc::try_unwrap(sql_generator_obj) {
                 Ok(v) => v.into_inner(&mut cx),
                 Err(_) => {

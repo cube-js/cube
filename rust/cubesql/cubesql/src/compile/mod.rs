@@ -21,7 +21,7 @@ use datafusion::{
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
 };
-use futures::{FutureExt, StreamExt};
+use futures::FutureExt;
 use itertools::Itertools;
 use log::warn;
 use serde::Serialize;
@@ -51,7 +51,7 @@ use self::{
 use crate::{
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
-        dataframe::{self, batch_to_dataframe},
+        dataframe::{self},
         session::DatabaseProtocol,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
@@ -1765,8 +1765,8 @@ pub async fn get_df_batches(
                 Err(err) => return Err(CubeError::panic(err).into()),
             }
         }
-        _ => unimplemented!(),
-    };
+        _ => Err(CubeError::user("Only SELECT queries are supported for Cube SQL over HTTP".to_string()).into()),
+    }
 }
 
 pub fn find_cube_scans_deep_search(
