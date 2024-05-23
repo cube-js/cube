@@ -2,11 +2,8 @@ use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
 
-
-
 use std::cell::RefCell;
 use std::future::Future;
-
 
 use std::sync::{Arc, Mutex};
 
@@ -88,7 +85,6 @@ impl OnDrainHandler {
     }
 
     fn on_drain(&self) {
-        eprintln!("fn@[on_drain] resume...");
         self.paused_tx.send(false).unwrap();
     }
 }

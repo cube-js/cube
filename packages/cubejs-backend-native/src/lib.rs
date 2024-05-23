@@ -20,11 +20,11 @@ mod utils;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
-use futures::{StreamExt, TryFutureExt};
+use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use tokio::sync::watch;
 
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use crate::channel::call_js_fn;
 use crate::cross::CLRepr;
@@ -303,7 +303,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             OnDrainHandler::new(channel.clone(), node_stream_arc.clone(), paused_tx.clone());
 
         drain_handler.handle(js_stream_on_fn).await;
-
 
         let mut is_first_batch = true;
         while let Some(batch) = stream.next().await {
