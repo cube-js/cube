@@ -1586,11 +1586,11 @@ from
       "ECommerce" as "ECommerce"
     where
       date_trunc('year', "orderDate") in (
-        CAST('2019-01-01 00:00:00.0' AS timestamp),
-        CAST('2020-01-01 00:00:00.0' AS timestamp),
-        CAST('2021-01-01 00:00:00.0' AS timestamp),
-        CAST('2022-01-01 00:00:00.0' AS timestamp),
-        CAST('2023-01-01 00:00:00.0' AS timestamp)
+        '2019-01-01 00:00:00.0',
+        '2020-01-01 00:00:00.0',
+        '2021-01-01 00:00:00.0',
+        '2022-01-01 00:00:00.0',
+        '2023-01-01 00:00:00.0'
       )
     group by
       date_trunc('year', "orderDate")
