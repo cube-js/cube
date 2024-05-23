@@ -5,7 +5,7 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
-import { Readable, Writable } from 'stream';
+import { Writable } from 'stream';
 import {
   getEnv,
   getRealType,
@@ -360,30 +360,15 @@ class ApiGateway {
 
         res.write('{ "columns": ');
 
-        // class MyStream {
-        //   public events: any = {};
-
-        //   public write(chunk) {
-        //     console.log('>>>', 'write', chunk);
-        //   }
-
-        //   public on(event, cb) {
-        //     this.events[event] = cb;
-        //     // console.log('>>>', 'on', event, cb);
-        //   }
-        // }
-
-        // const _stream = new MyStream();
-
         let isFirstChunk = true;
-        const _stream = new Writable({
-          write(chunk, encoding, callback) {
+        const dataStream = new Writable({
+          write(chunk, _, callback) {
             if (isFirstChunk) {
               isFirstChunk = false;
-              res.write(chunk.toString(encoding));
+              res.write(chunk.toString('utf8'));
               res.write(',"data": [');
             } else {
-              const s = chunk.toString(encoding);
+              const s = chunk.toString('utf8');
               res.write(s.substring(1, s.length - 1));
               res.write(',');
             }
@@ -392,46 +377,16 @@ class ApiGateway {
           },
         });
 
-        _stream.on('finish', () => {
-          console.log('>>>', 'js on finish!!!???');
+        dataStream.on('finish', () => {
           res.write(']}');
           res.end();
         });
 
-        _stream.on('error', (err) => {
-          console.log('>>>', 'get error', err);
-        });
-
-        // setTimeout(() => {
-        //   _stream.write('[["hello", 1],["world", 2]]', (e) => {
-        //     console.log('>>>', 'write cb', e);
-        //   });
-        //   _stream.end();
-        // }, 400);
-
         try {
-          await server.execSql(req.body.query, _stream);
+          await server.execSql(req.body.query, dataStream);
         } catch (error) {
-          console.log('>>>', 'catch error', error);
-          _stream.end();
+          res.status(500).end();
         }
-
-        // setTimeout(() => {
-        //   console.log('>>>', typeof _stream.events.drain, _stream.events);
-        //   console.log('>>> res', _stream.events.drain());
-        //   console.log('>>> res', _stream.events.drain());
-        //   setTimeout(() => {
-        //     console.log('>>> res', _stream.events.drain());
-        //   }, 500);
-        // }, 1000);
-
-        // res.json({ hello: true });
-        // _stream.pipe(res);
-
-        // _stream.on('error', (err) => {
-        //   console.error('Stream error:', err);
-        //   res.status(500).end();
-        // });
       })
     );
 

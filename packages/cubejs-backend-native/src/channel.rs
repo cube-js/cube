@@ -280,8 +280,6 @@ pub async fn call_js_fn<R: Send + 'static>(
                 }
             };
 
-            eprintln!("RESULT ON RECEIVED");
-
             tx.send(result_from_js_value(&mut cx, result))
                 .map_err(|_| {
                     CubeError::internal(

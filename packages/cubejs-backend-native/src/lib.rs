@@ -20,14 +20,15 @@ mod utils;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
-use futures::{StreamExt, TryFutureExt};
+use futures::{Stream, StreamExt, TryFutureExt};
 use once_cell::sync::OnceCell;
+use tokio::sync::watch;
 
 use std::sync::{Arc, Mutex};
 
 use crate::channel::call_js_fn;
 use crate::cross::CLRepr;
-use crate::stream::{OnDrainHandler, PauseableStream, ProcessingState};
+use crate::stream::OnDrainHandler;
 use crate::utils::batch_to_rows;
 use auth::{NativeAuthContext, NodeBridgeAuthService};
 use config::NodeConfig;
@@ -235,11 +236,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     });
 
     let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
-    let sql_query = match cx.argument::<JsString>(1) {
-        Ok(v) => v.value(&mut cx),
-        // todo: remove this after testing
-        Err(_) => String::from("SELECT status, created_at FROM orders limit 5;"),
-    };
+    let sql_query = cx.argument::<JsString>(1)?.value(&mut cx);
     let node_stream = cx
         .argument::<JsObject>(2)?
         .downcast_or_throw::<JsObject, _>(&mut cx)?;
@@ -266,26 +263,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let services = interface.services.clone();
     let runtime = tokio_runtime_node(&mut cx)?;
 
-    eprintln!("from query {:?}", sql_query);
-
     let channel = Arc::new(cx.channel());
     let node_stream_arc = Arc::new(node_stream_root);
-
-    // runtime.spawn(async move {
-    //     for i in 0..100 {
-    //         eprintln!("Iteration {:?}", i);
-    //         let argument = String::from(format!("hello@{}", i));
-    //         call_sync_js_fn(
-    //             channel.clone(),
-    //             js_push.clone(),
-    //             if i != 99 { Some(argument.clone()) } else { None },
-    //             node_stream_arc.clone(),
-    //         )
-    //         .unwrap();
-
-    //         // tokio::time::sleep(Duration::from_secs(1)).await;
-    //     }
-    // });
 
     runtime.spawn(async move {
         let session_manager = services
@@ -315,33 +294,29 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             .await
             .unwrap();
 
-        let stream = get_df_batches(&query_plan).await.unwrap();
-        // let x = stream
-        //     .map(|batch| {
-        //         let rows = batch_to_rows(batch.unwrap());
-        //         rows
-        //     })
-        //     .flatten();
+        let mut stream = get_df_batches(&query_plan).await.unwrap();
 
-        let state_mutex = Arc::new(Mutex::new(ProcessingState::new()));
+        let (paused_tx, mut paused_rx) = watch::channel(false);
         // // let rows_stream = record_batch_stream.flat_map(|batch| batch_to_rows(batch));
-        let mut pauseable_stream = PauseableStream::new(stream, state_mutex.clone());
 
-        let drain_handler = OnDrainHandler::new(
-            channel.clone(),
-            node_stream_arc.clone(),
-            state_mutex.clone(),
-        );
+        let paused_tx = Arc::new(paused_tx);
+        let drain_handler =
+            OnDrainHandler::new(channel.clone(), node_stream_arc.clone(), paused_tx.clone());
 
         drain_handler.handle(js_stream_on_fn).await;
 
+        // let mut stream_of_numbers = futures::stream::iter(0..5);
+
         let mut is_first_batch = true;
-        while let Some(batch) = pauseable_stream.next().await {
+        while let Some(batch) = stream.next().await {
+            while *paused_rx.borrow() {
+                paused_rx.changed().await.unwrap();
+            }
+
             let (columns, data) = match batch {
                 Ok(batch) => batch_to_rows(batch),
                 Err(e) => {
-                    eprintln!("Error: {:?}", e);
-                    continue;
+                    panic!(e);
                 }
             };
 
@@ -353,9 +328,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     channel.clone(),
                     js_stream_write_fn.clone(),
                     Box::new(|cx| {
-                        let arg = cx
-                            .string(columns)
-                            .upcast::<JsValue>();
+                        let arg = cx.string(columns).upcast::<JsValue>();
 
                         Ok(vec![arg.upcast::<JsValue>()])
                     }),
@@ -371,7 +344,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             let data = serde_json::to_string(&data).unwrap();
             let js_stream_write_fn = js_stream_write_fn.clone();
             let node_stream_arc = node_stream_arc.clone();
-            let state_mutex = state_mutex.clone();
 
             let should_pause = !call_js_fn(
                 channel.clone(),
@@ -388,10 +360,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             .unwrap();
 
             if should_pause {
-                state_mutex.lock().unwrap().pause();
+                paused_tx.clone().send(should_pause).unwrap();
             }
-
-            eprintln!("PAUSE??? {:?}", should_pause);
         }
 
         let _ = channel.try_send(move |mut cx| {

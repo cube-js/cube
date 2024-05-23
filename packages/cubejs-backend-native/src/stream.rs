@@ -17,7 +17,7 @@ use crate::channel::call_js_fn;
 use cubesql::CubeError;
 
 use neon::prelude::*;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 
 #[cfg(build = "debug")]
 use log::trace;
@@ -39,78 +39,11 @@ fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
-pub struct ProcessingState {
-    processing: bool,
-    waker: Option<Waker>,
-}
-
-impl ProcessingState {
-    pub fn new() -> Self {
-        Self {
-            processing: true,
-            waker: None,
-        }
-    }
-
-    pub fn resume(&mut self) {
-        self.processing = true;
-        println!("ProcessingState @start");
-        if let Some(waker) = self.waker.take() {
-            println!("wake up called");
-            waker.wake();
-        }
-    }
-
-    pub fn pause(&mut self) {
-        self.processing = false;
-    }
-}
-
-pub struct PauseableStream<T: Send> {
-    inner: Pin<Box<dyn Stream<Item = T> + Send>>,
-    state: Arc<Mutex<ProcessingState>>,
-}
-
-impl<T: Send> PauseableStream<T> {
-    pub fn new(
-        inner: impl Stream<Item = T> + Send + 'static,
-        state: Arc<Mutex<ProcessingState>>,
-    ) -> Self {
-        Self {
-            inner: Box::pin(inner),
-            state,
-        }
-    }
-}
-
-unsafe impl<T: Send> Send for PauseableStream<T> {}
-
-impl<T: Send> Stream for PauseableStream<T> {
-    type Item = T;
-
-    fn poll_next(
-        mut self: Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> Poll<Option<Self::Item>> {
-        let mut state = self.state.lock().unwrap();
-        println!("state: {:?}", state.processing);
-
-        if !state.processing {
-            state.waker = Some(cx.waker().clone());
-            // drop(state);
-            return Poll::Pending;
-        }
-
-        drop(state);
-        self.inner.as_mut().poll_next(cx)
-    }
-}
-
 #[derive(Clone)]
 pub struct OnDrainHandler {
     channel: Arc<Channel>,
     js_stream: Arc<Root<JsObject>>,
-    state: Arc<Mutex<ProcessingState>>,
+    paused_tx: Arc<watch::Sender<bool>>,
 }
 
 unsafe impl Sync for OnDrainHandler {}
@@ -121,12 +54,12 @@ impl OnDrainHandler {
     pub fn new(
         channel: Arc<Channel>,
         js_stream: Arc<Root<JsObject>>,
-        state: Arc<Mutex<ProcessingState>>,
+        paused_tx: Arc<watch::Sender<bool>>,
     ) -> Self {
         Self {
             channel,
             js_stream,
-            state,
+            paused_tx,
         }
     }
 
@@ -156,7 +89,7 @@ impl OnDrainHandler {
 
     fn on_drain(&self) {
         eprintln!("fn@[on_drain] resume...");
-        self.state.lock().unwrap().resume();
+        self.paused_tx.send(false).unwrap();
     }
 }
 

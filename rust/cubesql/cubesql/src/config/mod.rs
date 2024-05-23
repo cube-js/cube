@@ -166,7 +166,7 @@ impl ConfigObjImpl {
             enable_rewrite_cache: env_optparse("CUBESQL_REWRITE_CACHE").unwrap_or(sql_push_down),
             push_down_pull_up_split: env_optparse("CUBESQL_PUSH_DOWN_PULL_UP_SPLIT")
                 .unwrap_or(sql_push_down),
-            stream_mode: env_parse("CUBESQL_STREAM_MODE", true),
+            stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
         }
     }
