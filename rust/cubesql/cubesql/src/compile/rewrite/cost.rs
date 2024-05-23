@@ -2,8 +2,8 @@ use crate::{
     compile::{
         rewrite::{
             rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
-            DimensionName, LogicalPlanLanguage, MemberErrorPriority,
-            ScalarUDFExprFun, TimeDimensionGranularity, WrappedSelectUngroupedScan,
+            DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
+            TimeDimensionGranularity, WrappedSelectUngroupedScan,
         },
         MetaContext,
     },
