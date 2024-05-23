@@ -42,8 +42,11 @@ use crate::{
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
-        array::{TimestampMillisecondBuilder, TimestampNanosecondBuilder},
-        datatypes::TimeUnit,
+        array::{
+            IntervalDayTimeBuilder, IntervalYearMonthBuilder, TimestampMillisecondBuilder,
+            TimestampNanosecondBuilder,
+        },
+        datatypes::{IntervalUnit, TimeUnit},
     },
     execution::context::TaskContext,
     logical_plan::JoinType,
@@ -1230,6 +1233,30 @@ pub fn transform_response<V: ValueObject>(
                                 builder.append_null()?;
                             }
                         },
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    IntervalYearMonthBuilder,
+                    response,
+                    field_name,
+                    { },
+                    {
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::DayTime),
+                    IntervalDayTimeBuilder,
+                    response,
+                    field_name,
+                    { },
+                    {
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }

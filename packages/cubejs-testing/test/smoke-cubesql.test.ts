@@ -297,5 +297,20 @@ from
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
     });
+
+    test('query with intervals', async () => {
+      const query = `
+      SELECT 
+        "orders"."createdAt" AS "timestamp",
+        "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
+        "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
+        "orders"."createdAt" + 11 * INTERVAL '321 DAYS' AS "c2",
+        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3"
+      FROM
+        "public"."Orders" AS "orders" `;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('timestamps');
+    });
   });
 });
