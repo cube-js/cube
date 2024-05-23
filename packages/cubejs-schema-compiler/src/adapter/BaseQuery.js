@@ -2651,7 +2651,7 @@ export class BaseQuery {
 
   newSubQuery(options) {
     const QueryClass = this.constructor;
-    return new QueryClass(this.compilers, this.subQueryOptions({...options, paramAllocator: undefined }));
+    return new QueryClass(this.compilers, { ...this.subQueryOptions(options), paramAllocator: undefined });
   }
 
   newSubQueryForCube(cube, options) {
