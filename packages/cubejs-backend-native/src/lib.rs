@@ -297,7 +297,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         let mut stream = get_df_batches(&query_plan).await.unwrap();
 
         let (paused_tx, mut paused_rx) = watch::channel(false);
-        // // let rows_stream = record_batch_stream.flat_map(|batch| batch_to_rows(batch));
 
         let paused_tx = Arc::new(paused_tx);
         let drain_handler =
@@ -305,7 +304,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
         drain_handler.handle(js_stream_on_fn).await;
 
-        // let mut stream_of_numbers = futures::stream::iter(0..5);
 
         let mut is_first_batch = true;
         while let Some(batch) = stream.next().await {
@@ -380,7 +378,6 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         });
     });
 
-    // Ok(promise.upcast::<JsValue>())
     Ok(JsUndefined::new(&mut cx).upcast::<JsValue>())
 }
 

@@ -338,7 +338,7 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
 export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any): Promise<void> => {
   const native = loadNative();
 
-  await native.execSql(instance, sqlQuery, stream); //
+  await native.execSql(instance, sqlQuery, stream);
 };
 
 export interface PyConfiguration {

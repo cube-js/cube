@@ -214,8 +214,6 @@ export class SQLServer {
       stream: async ({ request, session, query }) => {
         const context = await contextByRequest(request, session);
 
-        console.log('>>>', 'STREAM', query);
-
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
           try {
