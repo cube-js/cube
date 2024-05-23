@@ -153,6 +153,12 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['BigECommerce.MultiTimeDimForCountExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
       if (includeHLLSuite) {
         await buildPreaggs(env.cube.port, apiToken, {
           timezones: ['UTC'],
@@ -1399,6 +1405,31 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
           'ECommerce.productName': 'asc'
         },
         total: true
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying BigECommerce: partitioned pre-agg with multi time dimension', async () => {
+      const response = await client.load({
+        dimensions: [],
+        measures: [
+          'BigECommerce.count',
+        ],
+        timeDimensions: [
+          {
+            dimension: 'BigECommerce.completedDate',
+            granularity: 'day'
+          },
+          {
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'day'
+          }
+        ],
+        order: {
+          'BigECommerce.completedDate': 'asc',
+          'BigECommerce.orderDate': 'asc',
+          'BigECommerce.count': 'asc'
+        }
       });
       expect(response.rawData()).toMatchSnapshot();
     });

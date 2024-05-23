@@ -91,6 +91,11 @@
           "type": "time"
         },
         {
+          "name": "completedDate",
+          "sql": "completed_date",
+          "type": "time"
+        },
+        {
           "name": "customerId",
           "sql": "customer_id",
           "type": "string"
@@ -205,6 +210,11 @@
         {
           "name": "orderDate",
           "sql": "order_date",
+          "type": "time"
+        },
+        {
+          "name": "completedDate",
+          "sql": "completed_date",
           "type": "time"
         },
         {
