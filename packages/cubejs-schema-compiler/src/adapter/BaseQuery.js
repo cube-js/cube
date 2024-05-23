@@ -1896,43 +1896,7 @@ export class BaseQuery {
    * @returns {string}
    */
   groupByClause() {
-    if (this.ungrouped) {
-      return '';
-    }
-    const dimensionColumns = this.dimensionColumns();
-    if (!dimensionColumns.length) {
-      return '';
-    }
-
-    const groupTypes = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupType);
-
-    let inGroupingSet = false;
-
-    let result = ' GROUP BY ';
-
-    dimensionColumns.forEach((c, i) => {
-      const groupType = groupTypes[i];
-      const comma = i > 0 ? ', ' : '';
-      if (inGroupingSet === false && groupType != null) {
-        if (groupType === 'Rollup') {
-          result += `${comma}ROLLUP(`;
-        } else if (groupType === 'Cube') {
-          result += `${comma}CUBE(`;
-        }
-        inGroupingSet = true;
-      } else if (inGroupingSet === true && groupType == null) {
-        result += `)${comma}`;
-        inGroupingSet = false;
-      } else {
-        result += `${comma}`;
-      }
-      result += `${i + 1}`;
-    });
-    if (inGroupingSet === true) {
-      result += ')';
-    }
-
-    return result;
+    return this.rolloutGroupByClause();
   }
 
   getFieldIndex(id) {
@@ -2024,6 +1988,54 @@ export class BaseQuery {
     }
     const offset = this.offset ? parseInt(this.offset, 10) : null;
     return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @returns {string}
+   */
+  rolloutGroupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
+    const dimensionColumns = this.dimensionColumns();
+    if (!dimensionColumns.length) {
+      return '';
+    }
+
+    const groupDescs = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupDesc);
+
+    const inGroupingSet = false;
+
+    let result = ' GROUP BY ';
+
+    dimensionColumns.forEach((c, i) => {
+      const groupDesc = groupDescs[i];
+      const comma = i > 0 ? ', ' : '';
+      const prevId = i > 0 ? (groupDescs[i - 1] || { id: null }).id : null;
+      const currId = (groupDesc || { id: null }).id;
+
+      if (prevId !== null && currId !== prevId) {
+        result += ')';
+      }
+
+      if ((prevId === null || currId !== prevId) && groupDesc != null) {
+        if (groupDesc.groupType === 'Rollup') {
+          result += `${comma}ROLLUP(`;
+        } else if (groupDesc.groupType === 'Cube') {
+          result += `${comma}CUBE(`;
+        }
+      } else {
+        result += `${comma}`;
+      }
+
+      result += `${i + 1}`;
+    });
+    if (groupDescs[groupDescs.length - 1] != null) {
+      result += ')';
+    }
+
+    return result;
   }
 
   /**
@@ -2970,10 +2982,11 @@ export class BaseQuery {
           '{{ from | indent(2, true) }}\n' +
           ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
-          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
+        group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',

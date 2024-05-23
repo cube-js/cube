@@ -1274,13 +1274,20 @@ class ApiGateway {
         const obj = JSON.parse(memberExpression);
         const args = obj.cube_params;
         args.push(`return \`${obj.expr}\``);
+
+        const groupDesc = obj.group_desc ? {
+          groupType: obj.group_desc.group_type,
+          id: obj.group_desc.id,
+          subId: obj.group_desc.sub_id ? obj.group_desc.sub_id : undefined
+        } : undefined;
+
         return {
           cubeName: obj.cube_name,
           name: obj.alias,
           expressionName: obj.alias,
           expression: Function.constructor.apply(null, args),
           definition: memberExpression,
-          groupType: obj.group_type,
+          groupDesc,
         };
       } else {
         return memberExpression;

@@ -42,25 +42,51 @@ struct UngrouppedMemberDef {
     alias: String,
     cube_params: Vec<String>,
     expr: String,
-    group_type: Option<GroupingExprType>,
+    group_desc: Option<GroupingExprDesc>,
 }
 
-#[derive(Clone, Serialize, Debug)]
-enum GroupingExprType {
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub enum GroupingExprType {
     Rollup,
     Cube,
 }
 
-fn extract_group_type_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Option<GroupingExprType>> {
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub struct GroupingExprDesc {
+    pub group_type: GroupingExprType,
+    pub id: u64,
+    pub sub_id: Option<u64>,
+}
+
+impl GroupingExprDesc {
+    pub fn new(group_type: GroupingExprType, id: u64) -> Self {
+        Self {
+            group_type,
+            id,
+            sub_id: None,
+        }
+    }
+}
+
+fn extract_group_type_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Option<GroupingExprDesc>> {
     let mut result = Vec::new();
+    let mut id = 0;
     for expr in exprs {
         match expr {
             Expr::GroupingSet(groupping_set) => match groupping_set {
                 GroupingSet::Rollup(exprs) => {
-                    result.extend(iter::repeat(Some(GroupingExprType::Rollup)).take(exprs.len()))
+                    result.extend(
+                        iter::repeat(Some(GroupingExprDesc::new(GroupingExprType::Rollup, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
                 }
                 GroupingSet::Cube(exprs) => {
-                    result.extend(iter::repeat(Some(GroupingExprType::Cube)).take(exprs.len()))
+                    result.extend(
+                        iter::repeat(Some(GroupingExprDesc::new(GroupingExprType::Cube, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
                 }
                 GroupingSet::GroupingSets(_) => {
                     unimplemented!()
@@ -611,7 +637,7 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
-                            let group_types = extract_group_type_from_groupping_set(&group_expr);
+                            let group_descs = extract_group_type_from_groupping_set(&group_expr);
                             let (aggregate, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
@@ -702,7 +728,7 @@ impl CubeScanWrapperNode {
                                 load_request.dimensions = Some(
                                     group_by
                                         .iter()
-                                        .zip(group_types.iter())
+                                        .zip(group_descs.iter())
                                         .map(|(m, t)| {
                                             Self::dimension_member_def(
                                                 m,
@@ -823,6 +849,7 @@ impl CubeScanWrapperNode {
                                         sql.sql.to_string(),
                                         projection,
                                         group_by,
+                                        group_descs,
                                         aggregate,
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
@@ -1038,7 +1065,7 @@ impl CubeScanWrapperNode {
             alias: column.alias.clone(),
             cube_params: used_cubes.clone(),
             expr: column.expr.clone(),
-            group_type: None,
+            group_desc: None,
         };
         Ok(res)
     }
@@ -1051,10 +1078,10 @@ impl CubeScanWrapperNode {
     fn dimension_member_def(
         column: &AliasedColumn,
         used_cubes: &Vec<String>,
-        grouping_type: &Option<GroupingExprType>,
+        grouping_type: &Option<GroupingExprDesc>,
     ) -> Result<String> {
         let mut res = Self::make_member_def(column, used_cubes)?;
-        res.group_type = grouping_type.clone();
+        res.group_desc = grouping_type.clone();
         Ok(serde_json::json!(res).to_string())
     }
 
