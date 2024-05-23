@@ -116,6 +116,28 @@
           "name": "category_index",
           "columns": ["CUBE.productName"]
         }]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "dimensions": ["CUBE.productName"],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ],
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ]
   },
