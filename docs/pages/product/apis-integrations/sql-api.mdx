@@ -10,32 +10,15 @@ protocol][postgres-protocol] to certain kinds of data applications, including
 but not limited to the following ones:
 
 - [Business intelligence (BI) and data exploration][ref-bi] tools, e.g.,
-  [Superset][ref-superset] or [Tableau][ref-tableau]
-- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter] or
-  [Hex][ref-hex]
+  [Tableau][ref-tableau], [Power BI][ref-powerbi], [Thoughtspot][ref-thoughtspot],
+  [Sigma][ref-sigma], [Looker Studio][ref-looker-studio], [Superset /
+  Preset][ref-superset], and [Metabase][ref-metabase]
+- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
+  or [Deepnote][ref-deepnote]
 - Reverse ETL tools, e.g., Census or Hightouch
-- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
-- Automated jobs
 
 Often, the SQL API is used to enable internal or self-serve [business
-intelligence][cube-issbi] use cases.
-
-SQL API has been tested with the following tools:
-
-- psql CLI
-- Apache Superset
-- Tableau Cloud
-- Tableau Desktop with JDBC driver
-- Power BI
-- Metabase
-- Google Looker Studio
-- Excel through Devart plugin
-- Deepnote
-- Hex
-- Observable
-- Streamlit
-- Jupyter notebook
-- Hightouch
+intelligence][cube-bi-use-case] use cases.
 
 <InfoBox>
 
@@ -112,9 +95,19 @@ PGPASSWORD=pass psql -h localhost -p 15432 -U user cube
 **SQL API is enabled by default.** You can find credentials for the SQL API on
 the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
 
-You can also customize `CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and
-`CUBEJS_SQL_PASSWORD` environment variables by navigating to <Btn>Settings →
-Configration</Btn>.
+By default, the SQL API is enabled on port 5432, the user name is `cube`, and
+a random  string is generated for the password. You can customize these with
+`CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and `CUBEJS_SQL_PASSWORD` environment
+variables by navigating to <Btn>Settings → Configration</Btn>.
+
+You can use the [`psql` utility][link-psql] to test the connection:
+
+```bash
+PGPASSWORD=pass \
+  psql -h awesome-ecom.sql.gcp-us-central1.cubecloudapp.dev \
+  -p 5432 \
+  -U cube awesome-ecom
+```
 
 ## Querying Fundamentals
 
@@ -141,7 +134,7 @@ Consider the `orders` cube in your data model, the following query is performing
 a `SELECT` from the `orders` cube.
 
 ```sql
-SELECt
+SELECT
   city,
   SUM(amount)
 FROM orders
@@ -758,14 +751,17 @@ WHERE is_completed = true
 [ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
 [ref-superset]: /product/configuration/visualization-tools/superset
 [ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-thoughtspot]: /product/configuration/visualization-tools/thoughtspot
+[ref-sigma]: /product/configuration/visualization-tools/sigma
+[ref-looker-studio]: /product/configuration/visualization-tools/looker-studio
+[ref-metabase]: /product/configuration/visualization-tools/metabase
 [ref-notebooks]: /product/configuration/visualization-tools#notebooks
 [ref-jupyter]: /product/configuration/visualization-tools/jupyter
 [ref-hex]: /product/configuration/visualization-tools/hex
-[ref-low-code]:
-  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
-[ref-retool]: /product/configuration/visualization-tools/retool
+[ref-deepnote]: /product/configuration/visualization-tools/deepnote
 [postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
-[cube-issbi]: https://cube.dev/use-cases/semantic-layer
+[cube-bi-use-case]: https://cube.dev/use-cases/connected-bi
 [ref-ref-sql-api]: /reference/sql-api
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types
 [link-psql]: https://www.postgresql.org/docs/current/app-psql.html
