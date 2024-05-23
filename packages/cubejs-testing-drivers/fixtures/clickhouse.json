@@ -129,10 +129,15 @@
             "granularity": "day"
           }
         ],
+        "dimensions": ["CUBE.productName"],
         "partition_granularity": "month",
         "measures": [
           "CUBE.count"
-        ]
+        ],
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ]
   },
