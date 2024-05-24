@@ -39,7 +39,7 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
-type GroupDesc = {
+type GroupingSet = {
     groupType: string,
     id: number,
     subId?: null | number
@@ -51,7 +51,7 @@ type MemberExpression = {
   name: string;
   expressionName: string;
   definition: string;
-  groupDesc?: GroupDesc
+  groupingSet?: GroupingSet
 };
 
 /**

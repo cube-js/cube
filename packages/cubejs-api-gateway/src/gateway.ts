@@ -1275,7 +1275,7 @@ class ApiGateway {
         const args = obj.cube_params;
         args.push(`return \`${obj.expr}\``);
 
-        const groupDesc = obj.group_desc ? {
+        const groupingSet = obj.grouping_set ? {
           groupType: obj.group_desc.group_type,
           id: obj.group_desc.id,
           subId: obj.group_desc.sub_id ? obj.group_desc.sub_id : undefined
@@ -1287,7 +1287,7 @@ class ApiGateway {
           expressionName: obj.alias,
           expression: Function.constructor.apply(null, args),
           definition: memberExpression,
-          groupDesc,
+          groupingSet,
         };
       } else {
         return memberExpression;

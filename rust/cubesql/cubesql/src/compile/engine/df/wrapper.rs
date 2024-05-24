@@ -42,7 +42,7 @@ struct UngrouppedMemberDef {
     alias: String,
     cube_params: Vec<String>,
     expr: String,
-    group_desc: Option<GroupingExprDesc>,
+    grouping_set: Option<GroupingExprDesc>,
 }
 
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
@@ -68,7 +68,9 @@ impl GroupingExprDesc {
     }
 }
 
-fn extract_group_type_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Option<GroupingExprDesc>> {
+fn extract_group_type_from_groupping_set(
+    exprs: &Vec<Expr>,
+) -> Result<Vec<Option<GroupingExprDesc>>> {
     let mut result = Vec::new();
     let mut id = 0;
     for expr in exprs {
@@ -89,13 +91,15 @@ fn extract_group_type_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Option<Groupi
                     id += 1;
                 }
                 GroupingSet::GroupingSets(_) => {
-                    unimplemented!()
+                    return Err(DataFusionError::Internal(format!(
+                        "SQL generation for GroupingSet is not supported"
+                    )))
                 }
             },
             _ => result.push(None),
         }
     }
-    result
+    Ok(result)
 }
 
 impl SqlQuery {
@@ -637,7 +641,7 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
-                            let group_descs = extract_group_type_from_groupping_set(&group_expr);
+                            let group_descs = extract_group_type_from_groupping_set(&group_expr)?;
                             let (aggregate, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
@@ -1065,7 +1069,7 @@ impl CubeScanWrapperNode {
             alias: column.alias.clone(),
             cube_params: used_cubes.clone(),
             expr: column.expr.clone(),
-            group_desc: None,
+            grouping_set: None,
         };
         Ok(res)
     }
@@ -1081,7 +1085,7 @@ impl CubeScanWrapperNode {
         grouping_type: &Option<GroupingExprDesc>,
     ) -> Result<String> {
         let mut res = Self::make_member_def(column, used_cubes)?;
-        res.group_desc = grouping_type.clone();
+        res.grouping_set = grouping_type.clone();
         Ok(serde_json::json!(res).to_string())
     }
 

@@ -1896,7 +1896,7 @@ export class BaseQuery {
    * @returns {string}
    */
   groupByClause() {
-    return this.rolloutGroupByClause();
+    return this.rollupGroupByClause();
   }
 
   getFieldIndex(id) {
@@ -1994,7 +1994,7 @@ export class BaseQuery {
    * @protected
    * @returns {string}
    */
-  rolloutGroupByClause() {
+  rollupGroupByClause() {
     if (this.ungrouped) {
       return '';
     }
@@ -2003,26 +2003,24 @@ export class BaseQuery {
       return '';
     }
 
-    const groupDescs = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupDesc);
-
-    const inGroupingSet = false;
+    const groupingSets = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupingSet);
 
     let result = ' GROUP BY ';
 
     dimensionColumns.forEach((c, i) => {
-      const groupDesc = groupDescs[i];
+      const groupingSet = groupingSets[i];
       const comma = i > 0 ? ', ' : '';
-      const prevId = i > 0 ? (groupDescs[i - 1] || { id: null }).id : null;
-      const currId = (groupDesc || { id: null }).id;
+      const prevId = i > 0 ? (groupingSets[i - 1] || { id: null }).id : null;
+      const currId = (groupingSet || { id: null }).id;
 
       if (prevId !== null && currId !== prevId) {
         result += ')';
       }
 
-      if ((prevId === null || currId !== prevId) && groupDesc != null) {
-        if (groupDesc.groupType === 'Rollup') {
+      if ((prevId === null || currId !== prevId) && groupingSet != null) {
+        if (groupingSet.groupType === 'Rollup') {
           result += `${comma}ROLLUP(`;
-        } else if (groupDesc.groupType === 'Cube') {
+        } else if (groupingSet.groupType === 'Cube') {
           result += `${comma}CUBE(`;
         }
       } else {
@@ -2031,7 +2029,7 @@ export class BaseQuery {
 
       result += `${i + 1}`;
     });
-    if (groupDescs[groupDescs.length - 1] != null) {
+    if (groupingSets[groupingSets.length - 1] != null) {
       result += ')';
     }
 
