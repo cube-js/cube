@@ -5,7 +5,6 @@ import R from 'ramda';
 import bodyParser from 'body-parser';
 import { graphqlHTTP } from 'express-graphql';
 import structuredClone from '@ungap/structured-clone';
-import { Writable } from 'stream';
 import {
   getEnv,
   getRealType,
@@ -358,34 +357,10 @@ class ApiGateway {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Transfer-Encoding', 'chunked');
 
-        res.write('{ "columns": ');
-
-        let isFirstChunk = true;
-        const dataStream = new Writable({
-          write(chunk, _, callback) {
-            if (isFirstChunk) {
-              isFirstChunk = false;
-              res.write(chunk.toString('utf8'));
-              res.write(',"data": [');
-            } else {
-              const s = chunk.toString('utf8');
-              res.write(s.substring(1, s.length - 1));
-              res.write(',');
-            }
-
-            callback();
-          },
-        });
-
-        dataStream.on('finish', () => {
-          res.write(']}');
-          res.end();
-        });
-
         try {
-          await server.execSql(req.body.query, dataStream);
-        } catch (error) {
-          res.status(500).end();
+          await server.execSql(req.body.query, res);
+        } catch (error: any) {
+          res.status(500).send(error);
         }
       })
     );

@@ -1,13 +1,11 @@
 import {
   setupLogger,
   registerInterface,
-  // @ts-ignore
   execSql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
 } from '@cubejs-backend/native';
-import { Readable } from 'stream';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
@@ -37,8 +35,8 @@ export class SQLServer {
     );
   }
 
-  public async execSql(sqlQuery: string, stream: any) {
-    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream);
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
   }
 
   public async init(options: SQLServerOptions): Promise<void> {
