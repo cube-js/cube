@@ -305,7 +305,8 @@ from
         "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
         "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
         "orders"."createdAt" + 11 * INTERVAL '321 DAYS' AS "c2",
-        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3"
+        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3",
+        "orders"."createdAt" + 11 * INTERVAL '1 MON 12345 MS' + 10 * INTERVAL '1 MON 12345 MS' AS "c4"
       FROM
         "public"."Orders" AS "orders" `;
 

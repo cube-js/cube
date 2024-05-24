@@ -43,8 +43,8 @@ use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
         array::{
-            IntervalDayTimeBuilder, IntervalYearMonthBuilder, TimestampMillisecondBuilder,
-            TimestampNanosecondBuilder,
+            IntervalDayTimeBuilder, IntervalMonthDayNanoBuilder, IntervalYearMonthBuilder,
+            TimestampMillisecondBuilder, TimestampNanosecondBuilder,
         },
         datatypes::{IntervalUnit, TimeUnit},
     },
@@ -1257,6 +1257,18 @@ pub fn transform_response<V: ValueObject>(
                     { },
                     {
                         (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNanoBuilder,
+                    response,
+                    field_name,
+                    { },
+                    {
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }
