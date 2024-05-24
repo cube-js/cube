@@ -1628,5 +1628,54 @@ from
   `);
       expect(res.rows).toMatchSnapshot('reuse_params');
     });
+
+    executePg('SQL API: Simple Rollup', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select
+        rowId, orderId, orderDate, sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('simple_rollup');
+    });
+
+    executePg('SQL API: Complex Rollup', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select
+        rowId, orderId, orderDate, city, sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2), 3, ROLLUP(4) 
+    order by 1, 2, 3, 4
+
+  `);
+      expect(res.rows).toMatchSnapshot('complex_rollup');
+    });
+    executePg('SQL API: Nested Rollup', async () => {
+      const connection = await createPostgresClient();
+      const res = await connection.query(`
+    select rowId, orderId, orderDate, sum(cnt)
+    from (
+        select
+            rowId, orderId, orderDate, sum(count) as cnt
+        from
+        "ECommerce" as "ECommerce"
+        group by 1, 2, 3
+
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup');
+    });
   });
 }
