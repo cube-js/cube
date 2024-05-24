@@ -297,19 +297,6 @@ impl TransportService for NodeBridgeTransport {
         )
         .await?;
 
-        if let Some(error) = response.get("error").and_then(|e| e.as_str()) {
-            if let Some(stack) = response.get("stack").and_then(|e| e.as_str()) {
-                return Err(CubeError::user(format!(
-                    "Error during SQL generation: {}\n{}",
-                    error, stack
-                )));
-            }
-            return Err(CubeError::user(format!(
-                "Error during SQL generation: {}",
-                error
-            )));
-        }
-
         let sql = response
             .get("sql")
             .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?
