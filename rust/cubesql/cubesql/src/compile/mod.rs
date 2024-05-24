@@ -22794,4 +22794,72 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         );
     }
+
+    #[tokio::test]
+    async fn test_time_dimension_range_filter_chain_or() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                "customer_gender",
+                date_trunc('day', "order_date") AS "order_date"
+            FROM "KibanaSampleDataEcommerce"
+            WHERE
+                ("order_date" >= '2019-01-01 00:00:00.0' AND "order_date" < '2020-01-01 00:00:00.0')
+                OR ("order_date" >= '2021-01-01 00:00:00.0' AND "order_date" < '2022-01-01 00:00:00.0')
+            GROUP BY 1, 2
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_owned(),
+                    granularity: Some("day".to_owned()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2019-01-01 00:00:00.0".to_string(),
+                                "2020-01-01 00:00:00.0".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2021-01-01 00:00:00.0".to_string(),
+                                "2022-01-01 00:00:00.0".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None
+                }]),
+                ungrouped: None,
+            }
+        )
+    }
 }
