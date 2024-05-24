@@ -53,7 +53,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Development
 
 1. After cloning Cube repository run `yarn install` to install dependencies.
-2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
+2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` in `packages/cubejs-docker` to build stable development image.
 
 ### Cube Client
 
@@ -96,7 +96,8 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 7. Run `yarn install` in `packages/cubejs-<pkg>` to install dependencies for drivers and dependent packages.
 8. Run `yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
 9. Run `yarn link` in `packages/cubejs-server-core`.
-10. Create or choose an existing project for testing.
+10. Create or choose an existing project for testing. You can generate a new one with 
+    [cubejs-cli](https://cube.dev/docs/reference/cli) tool.
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
 
