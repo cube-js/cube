@@ -27,7 +27,7 @@ use crate::{
     compile::{
         engine::df::{
             scan::MemberField,
-            wrapper::{GroupingExprDesc, GroupingExprType, SqlQuery},
+            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
         },
         MetaContext,
     },
@@ -389,7 +389,7 @@ impl SqlTemplates {
         from: String,
         projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
-        group_descs: Vec<Option<GroupingExprDesc>>,
+        group_descs: Vec<Option<GroupingSetDesc>>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
         filter: Option<String>,
@@ -440,7 +440,7 @@ impl SqlTemplates {
     fn group_by_with_grouping_sets(
         &self,
         group_by: &Vec<TemplateColumn>,
-        group_descs: &Vec<Option<GroupingExprDesc>>,
+        group_descs: &Vec<Option<GroupingSetDesc>>,
     ) -> Result<String, CubeError> {
         let mut parts = Vec::new();
         let mut curr_set = Vec::new();
@@ -449,8 +449,8 @@ impl SqlTemplates {
             if desc != &curr_set_desc {
                 if let Some(curr_desc) = &curr_set_desc {
                     let part_expr = match curr_desc.group_type {
-                        GroupingExprType::Rollup => self.rollup_expr(curr_set)?,
-                        GroupingExprType::Cube => self.cube_expr(curr_set)?,
+                        GroupingSetType::Rollup => self.rollup_expr(curr_set)?,
+                        GroupingSetType::Cube => self.cube_expr(curr_set)?,
                     };
                     parts.push(part_expr);
                 }
@@ -465,8 +465,8 @@ impl SqlTemplates {
         }
         if let Some(curr_desc) = &curr_set_desc {
             let part_expr = match curr_desc.group_type {
-                GroupingExprType::Rollup => self.rollup_expr(curr_set)?,
-                GroupingExprType::Cube => self.cube_expr(curr_set)?,
+                GroupingSetType::Rollup => self.rollup_expr(curr_set)?,
+                GroupingSetType::Cube => self.cube_expr(curr_set)?,
             };
             parts.push(part_expr);
         }

@@ -42,24 +42,24 @@ struct UngrouppedMemberDef {
     alias: String,
     cube_params: Vec<String>,
     expr: String,
-    grouping_set: Option<GroupingExprDesc>,
+    grouping_set: Option<GroupingSetDesc>,
 }
 
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
-pub enum GroupingExprType {
+pub enum GroupingSetType {
     Rollup,
     Cube,
 }
 
 #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
-pub struct GroupingExprDesc {
-    pub group_type: GroupingExprType,
+pub struct GroupingSetDesc {
+    pub group_type: GroupingSetType,
     pub id: u64,
     pub sub_id: Option<u64>,
 }
 
-impl GroupingExprDesc {
-    pub fn new(group_type: GroupingExprType, id: u64) -> Self {
+impl GroupingSetDesc {
+    pub fn new(group_type: GroupingSetType, id: u64) -> Self {
         Self {
             group_type,
             id,
@@ -70,7 +70,7 @@ impl GroupingExprDesc {
 
 fn extract_group_type_from_groupping_set(
     exprs: &Vec<Expr>,
-) -> Result<Vec<Option<GroupingExprDesc>>> {
+) -> Result<Vec<Option<GroupingSetDesc>>> {
     let mut result = Vec::new();
     let mut id = 0;
     for expr in exprs {
@@ -78,14 +78,14 @@ fn extract_group_type_from_groupping_set(
             Expr::GroupingSet(groupping_set) => match groupping_set {
                 GroupingSet::Rollup(exprs) => {
                     result.extend(
-                        iter::repeat(Some(GroupingExprDesc::new(GroupingExprType::Rollup, id)))
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)))
                             .take(exprs.len()),
                     );
                     id += 1;
                 }
                 GroupingSet::Cube(exprs) => {
                     result.extend(
-                        iter::repeat(Some(GroupingExprDesc::new(GroupingExprType::Cube, id)))
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Cube, id)))
                             .take(exprs.len()),
                     );
                     id += 1;
@@ -1082,7 +1082,7 @@ impl CubeScanWrapperNode {
     fn dimension_member_def(
         column: &AliasedColumn,
         used_cubes: &Vec<String>,
-        grouping_type: &Option<GroupingExprDesc>,
+        grouping_type: &Option<GroupingSetDesc>,
     ) -> Result<String> {
         let mut res = Self::make_member_def(column, used_cubes)?;
         res.grouping_set = grouping_type.clone();
