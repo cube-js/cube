@@ -60,7 +60,7 @@ impl OnDrainHandler {
         }
     }
 
-    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) {
+    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) -> Result<(), CubeError>{
         let js_stream_obj = self.js_stream.clone();
         let this = RefCell::new(self.clone());
 
@@ -81,7 +81,6 @@ impl OnDrainHandler {
             js_stream_obj,
         )
         .await
-        .unwrap();
     }
 
     fn on_drain(&self) {

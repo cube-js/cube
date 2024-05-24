@@ -279,7 +279,7 @@ async fn handle_sql_query(
         paused_tx.clone(),
     );
 
-    drain_handler.handle(stream_methods.on.clone()).await;
+    drain_handler.handle(stream_methods.on.clone()).await?;
 
     let mut is_first_batch = true;
     while let Some(batch) = stream.next().await {
@@ -336,21 +336,6 @@ async fn handle_sql_query(
         }
     }
 
-    let _ = channel.try_send(move |mut cx| {
-        let method = match Arc::try_unwrap(stream_methods.end) {
-            Ok(v) => v.into_inner(&mut cx),
-            Err(v) => v.as_ref().to_inner(&mut cx),
-        };
-        let this = match Arc::try_unwrap(stream_methods.stream) {
-            Ok(v) => v.into_inner(&mut cx),
-            Err(v) => v.as_ref().to_inner(&mut cx),
-        };
-
-        method.call(&mut cx, this, vec![])?;
-
-        Ok(())
-    });
-
     Ok(())
 }
 
@@ -358,7 +343,6 @@ struct WritableStreamMethods {
     stream: Arc<Root<JsObject>>,
     on: Arc<Root<JsFunction>>,
     write: Arc<Root<JsFunction>>,
-    end: Arc<Root<JsFunction>>,
 }
 
 fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
@@ -412,10 +396,9 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
 
     runtime.spawn(async move {
         let stream_methods = WritableStreamMethods {
-            stream: node_stream_arc,
+            stream: node_stream_arc.clone(),
             on: js_stream_on_fn,
             write: js_stream_write_fn,
-            end: js_stream_end_fn,
         };
 
         let result = handle_sql_query(
@@ -427,10 +410,29 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         )
         .await;
 
-        deferred.settle_with(&channel, move |mut cx| match result {
-            Ok(_) => Ok(cx.undefined()),
-            Err(err) => cx.throw_error(err.to_string()),
+        let _ = channel.try_send(move |mut cx| {
+            let method = match Arc::try_unwrap(js_stream_end_fn) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+            let this = match Arc::try_unwrap(node_stream_arc) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+
+            let args = match result {
+                Ok(_) => vec![],
+                Err(err) => {
+                    let arg = cx.string(err.to_string()).upcast::<JsValue>();
+                    vec![arg]
+                },
+            };
+            method.call(&mut cx, this, args)?;
+
+            Ok(())
         });
+
+        deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
     });
 
     Ok(promise.upcast::<JsValue>())
