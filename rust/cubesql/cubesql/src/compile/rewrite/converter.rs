@@ -529,7 +529,8 @@ impl LogicalPlanToLanguageConverter {
                         graph,
                         members,
                         query_params,
-                        GroupingSetExprMembers
+                        GroupingSetExprMembers,
+                        false
                     );
                     let expr_type =
                         add_expr_data_node!(graph, GroupingSetType::Rollup, GroupingSetExprType);
@@ -540,7 +541,8 @@ impl LogicalPlanToLanguageConverter {
                         graph,
                         members,
                         query_params,
-                        GroupingSetExprMembers
+                        GroupingSetExprMembers,
+                        false
                     );
                     let expr_type =
                         add_expr_data_node!(graph, GroupingSetType::Cube, GroupingSetExprType);
