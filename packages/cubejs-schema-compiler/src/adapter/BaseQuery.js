@@ -1896,7 +1896,6 @@ export class BaseQuery {
    * @returns {string}
    */
   groupByClause() {
-
     if (this.ungrouped) {
       return '';
     }
