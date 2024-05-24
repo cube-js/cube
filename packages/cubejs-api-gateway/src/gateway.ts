@@ -1276,9 +1276,9 @@ class ApiGateway {
         args.push(`return \`${obj.expr}\``);
 
         const groupingSet = obj.grouping_set ? {
-          groupType: obj.group_desc.group_type,
-          id: obj.group_desc.id,
-          subId: obj.group_desc.sub_id ? obj.group_desc.sub_id : undefined
+          groupType: obj.grouping_set.group_type,
+          id: obj.grouping_set.id,
+          subId: obj.grouping_set.sub_id ? obj.grouping_set.sub_id : undefined
         } : undefined;
 
         return {

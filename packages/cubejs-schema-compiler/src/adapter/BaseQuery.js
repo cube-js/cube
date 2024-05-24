@@ -1896,7 +1896,16 @@ export class BaseQuery {
    * @returns {string}
    */
   groupByClause() {
-    return this.rollupGroupByClause();
+
+    if (this.ungrouped) {
+      return '';
+    }
+    const dimensionColumns = this.dimensionColumns();
+    if (!dimensionColumns.length) {
+      return '';
+    }
+    const dimensionNames = dimensionColumns.map((c, i) => `${i + 1}`);
+    return this.rollupGroupByClause(dimensionNames);
   }
 
   getFieldIndex(id) {
@@ -1992,9 +2001,10 @@ export class BaseQuery {
 
   /**
    * @protected
+   * @param {Array<string>} dimensionNames
    * @returns {string}
    */
-  rollupGroupByClause() {
+  rollupGroupByClause(dimensionNames) {
     if (this.ungrouped) {
       return '';
     }
@@ -2027,7 +2037,7 @@ export class BaseQuery {
         result += `${comma}`;
       }
 
-      result += `${i + 1}`;
+      result += dimensionNames[i];
     });
     if (groupingSets[groupingSets.length - 1] != null) {
       result += ')';
