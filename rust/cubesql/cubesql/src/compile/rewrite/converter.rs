@@ -1735,6 +1735,7 @@ impl LanguageToLogicalPlanConverter {
                             query_time_dimensions: &mut Vec<V1LoadRequestQueryTimeDimension>,
                             filters: Vec<LogicalPlanLanguage>,
                             node_by_id: &impl Index<Id, Output = LogicalPlanLanguage>,
+                            is_in_and_or: bool,
                         ) -> Result<
                             (
                                 Vec<V1LoadRequestQueryFilterItem>,
@@ -1757,8 +1758,12 @@ impl LanguageToLogicalPlanConverter {
                                         );
                                         let op =
                                             match_data_node!(node_by_id, params[1], FilterOpOp);
-                                        let (filters, segments, change_user) =
-                                            to_filter(query_time_dimensions, filters, node_by_id)?;
+                                        let (filters, segments, change_user) = to_filter(
+                                            query_time_dimensions,
+                                            filters,
+                                            node_by_id,
+                                            true,
+                                        )?;
                                         match op.as_str() {
                                             "and" => {
                                                 result.push(V1LoadRequestQueryFilterItem {
@@ -1822,7 +1827,7 @@ impl LanguageToLogicalPlanConverter {
                                             params[2],
                                             FilterMemberValues
                                         );
-                                        if op == "inDateRange" {
+                                        if !is_in_and_or && op == "inDateRange" {
                                             let existing_time_dimension =
                                                 query_time_dimensions.iter_mut().find_map(|td| {
                                                     if td.dimension == member
@@ -1886,7 +1891,7 @@ impl LanguageToLogicalPlanConverter {
                         }
 
                         let (filters, segments, change_user) =
-                            to_filter(&mut query_time_dimensions, filters, node_by_id)?;
+                            to_filter(&mut query_time_dimensions, filters, node_by_id, false)?;
 
                         query.filters = if filters.len() > 0 {
                             Some(filters)
