@@ -16,7 +16,7 @@ use crate::{
         transforming_rewrite, transforming_rewrite_with_root, udf_expr, udf_expr_var_arg,
         udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp,
         CastExprDataType, ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube,
-        CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+        CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp,
         FilterReplacerAliasToCube, FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar,
         LikeExprNegated, LimitFetch, LimitSkip, ListPattern, ListType, LiteralExprValue,
         LogicalPlanLanguage, SegmentMemberMember, TimeDimensionDateRange,
@@ -34,7 +34,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    Duration, NaiveDateTime,
+    Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -46,7 +46,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Rewrite, Subst, Var};
-use std::{fmt::Display, ops::Index, sync::Arc};
+use std::{collections::HashSet, fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
     meta_context: Arc<MetaContext>,
@@ -406,6 +406,33 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
+            ),
+            transforming_rewrite(
+                "filter-in-list-datetrunc",
+                filter_replacer(
+                    inlist_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec!["?granularity".to_string(), column_expr("?column")],
+                        ),
+                        "?list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                "?new_filter".to_string(),
+                self.transform_filter_in_list_datetrunc(
+                    "?granularity",
+                    "?column",
+                    "?list",
+                    "?negated",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?new_filter",
+                ),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
@@ -4436,6 +4463,252 @@ impl FilterRules {
 
             false
         }
+    }
+
+    fn transform_filter_in_list_datetrunc(
+        &self,
+        granularity_var: &'static str,
+        column_var: &'static str,
+        list_var: &'static str,
+        negated_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+        new_filter_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let column_var = var!(column_var);
+        let list_var = var!(list_var);
+        let negated_var = var!(negated_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let new_filter_var = var!(new_filter_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let Some(list) = &egraph[subst[list_var]].data.constant_in_list else {
+                return false;
+            };
+            let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
+                &egraph[subst[granularity_var]].data.constant
+            else {
+                return false;
+            };
+
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) else {
+                    continue;
+                };
+
+                if !cube.contains_member(&member_name) {
+                    continue;
+                }
+
+                for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
+                    let Some(values) = list
+                        .into_iter()
+                        .map(|literal| Self::scalar_utf8_dt_to_naive_datetime(literal))
+                        .collect::<Option<HashSet<_>>>()
+                        .map(|values| {
+                            let mut values = values.into_iter().collect::<Vec<_>>();
+                            values.sort();
+                            values
+                        })
+                    else {
+                        continue;
+                    };
+
+                    let values = values.into_iter().filter_map(|value| {
+                        let Some(value) = value else {
+                            // TODO: NULL values are skipped for now as if they're not there
+                            return None;
+                        };
+                        Self::naive_datetime_to_range_by_granularity(value, granularity)
+                    });
+
+                    let mut dts: Vec<(NaiveDateTime, NaiveDateTime)> = vec![];
+                    let mut last_value: Option<(NaiveDateTime, NaiveDateTime)> = None;
+                    for (next_value_from, next_value_to) in values {
+                        let Some((last_value_from, last_value_to)) = last_value else {
+                            last_value = Some((next_value_from, next_value_to));
+                            continue;
+                        };
+                        if last_value_to == next_value_from {
+                            last_value = Some((last_value_from, next_value_to));
+                            continue;
+                        }
+                        dts.push((last_value_from, last_value_to));
+                        last_value = Some((next_value_from, next_value_to));
+                    }
+                    if let Some(last_value) = last_value {
+                        dts.push(last_value);
+                    }
+
+                    let format = "%Y-%m-%d %H:%M:%S%.3f";
+                    let dts = dts
+                        .into_iter()
+                        .map(|(dt, new_dt)| {
+                            let new_dt = new_dt
+                                .checked_sub_signed(Duration::milliseconds(1))
+                                .unwrap();
+                            (
+                                dt.format(format).to_string(),
+                                new_dt.format(format).to_string(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let len = dts.len();
+                    if len < 1 {
+                        continue;
+                    }
+
+                    let member_op = if *negated {
+                        "notInDateRange"
+                    } else {
+                        "inDateRange"
+                    };
+
+                    let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                        FilterMemberMember(member_name.to_string()),
+                    ));
+                    let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(FilterMemberOp(
+                        member_op.to_string(),
+                    )));
+                    if len == 1 {
+                        for (from, to) in dts.into_iter() {
+                            let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![from, to]),
+                            ));
+                            let filter_member =
+                                egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                            subst.insert(new_filter_var, filter_member);
+                        }
+                        return true;
+                    }
+
+                    let mut filters = egraph.add(LogicalPlanLanguage::FilterOpFilters(vec![]));
+                    for (from, to) in dts.into_iter().rev() {
+                        let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                            FilterMemberValues(vec![from, to]),
+                        ));
+                        let filter_member =
+                            egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                        filters = egraph.add(LogicalPlanLanguage::FilterOpFilters(vec![
+                            filter_member,
+                            filters,
+                        ]));
+                    }
+
+                    let op = egraph.add(LogicalPlanLanguage::FilterOpOp(FilterOpOp(
+                        "or".to_string(),
+                    )));
+
+                    subst.insert(
+                        new_filter_var,
+                        egraph.add(LogicalPlanLanguage::FilterOp([filters, op])),
+                    );
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    // The outer Option's purpose is to signal when the type is incorrect
+    // or parsing couldn't interpret the value as a NativeDateTime.
+    // The inner Option is None when the ScalarValue is None.
+    fn scalar_utf8_dt_to_naive_datetime(literal: &ScalarValue) -> Option<Option<NaiveDateTime>> {
+        let ScalarValue::Utf8(str) = literal else {
+            return None;
+        };
+        let Some(str) = str else {
+            return Some(None);
+        };
+        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
+            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(str, "%Y-%m-%d")
+                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
+            });
+        let Ok(dt) = dt else {
+            return None;
+        };
+        Some(Some(dt))
+    }
+
+    fn naive_datetime_to_range_by_granularity(
+        dt: NaiveDateTime,
+        granularity: &String,
+    ) -> Option<(NaiveDateTime, NaiveDateTime)> {
+        let granularity = granularity.to_lowercase();
+
+        // Validate that `dt` is indeed the earliest time of a granularity unit.
+        // If it's not, it will never match in `IN` with `DATE_TRUNC` as expr.
+        let is_earliest = match granularity.as_str() {
+            "year" => {
+                dt.month() == 1
+                    && dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "quarter" | "qtr" => {
+                matches!(dt.month(), 1 | 4 | 7 | 10)
+                    && dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "month" => {
+                dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "week" => {
+                dt.weekday() == Weekday::Mon
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "day" => dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0,
+            "hour" => dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0,
+            "minute" => dt.second() == 0 && dt.nanosecond() == 0,
+            "second" => dt.nanosecond() == 0,
+            _ => return None,
+        };
+        if !is_earliest {
+            return None;
+        }
+
+        let new_dt = dt.clone();
+        let new_dt = match granularity.as_str() {
+            "year" => new_dt.checked_add_months(Months::new(12)),
+            "quarter" | "qtr" => new_dt.checked_add_months(Months::new(3)),
+            "month" => new_dt.checked_add_months(Months::new(1)),
+            "week" => new_dt.checked_add_days(Days::new(7)),
+            "day" => new_dt.checked_add_days(Days::new(1)),
+            "hour" => new_dt.checked_add_signed(Duration::hours(1)),
+            "minute" => new_dt.checked_add_signed(Duration::minutes(1)),
+            "second" => new_dt.checked_add_signed(Duration::seconds(1)),
+            _ => return None,
+        }
+        .expect("Unable to add specified duration to new_dt");
+
+        Some((dt, new_dt))
     }
 
     fn rotate_filter_and_date_range(
