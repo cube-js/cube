@@ -89,11 +89,19 @@ export class SQLServer {
           try {
             await this.apiGateway.meta({
               context,
-              res: (message) => {
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
                 if (onlyCompilerId) {
-                  resolve({ compilerId: message.compilerId });
+                  resolve({ compilerId: response.compilerId });
                 } else {
-                  resolve(message);
+                  resolve(response);
                 }
               },
               includeCompilerId: true,
@@ -114,8 +122,16 @@ export class SQLServer {
               query,
               queryType: 'multi',
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -136,8 +152,16 @@ export class SQLServer {
               sqlQuery,
               streaming,
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -162,8 +186,16 @@ export class SQLServer {
               queryType: 'multi',
               disableLimitEnforcing: true,
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -202,8 +234,16 @@ export class SQLServer {
           try {
             await this.apiGateway.sqlGenerators({
               context,
-              res: (queries) => {
-                resolve(queries);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
             });
           } catch (e) {
