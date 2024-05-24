@@ -22862,4 +22862,160 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_filter_datetrunc_in_date_range_merged() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select
+                DATE_TRUNC('year', order_date) as "c0",
+                sum("KibanaSampleDataEcommerce"."sumPrice") as "m0"
+            from
+                "KibanaSampleDataEcommerce" as "KibanaSampleDataEcommerce"
+            where
+                DATE_TRUNC('year', order_date) in (
+                    '2019-01-01 00:00:00.0',
+                    '2020-01-01 00:00:00.0',
+                    '2021-01-01 00:00:00.0',
+                    '2022-01-01 00:00:00.0',
+                    '2023-01-01 00:00:00.0'
+                )
+            group by
+                DATE_TRUNC('year', order_date)
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("year".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01 00:00:00.000".to_string(),
+                        "2023-12-31 23:59:59.999".to_string()
+                    ])),
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_filter_datetrunc_in_date_range_separate() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select
+                DATE_TRUNC('quarter', order_date) as "c0",
+                sum("KibanaSampleDataEcommerce"."sumPrice") as "m0"
+            from
+                "KibanaSampleDataEcommerce" as "KibanaSampleDataEcommerce"
+            where
+                DATE_TRUNC('quarter', order_date) in (
+                    '2019-01-01 00:00:00.0',
+                    '2020-01-01 00:00:00.0',
+                    '2021-01-01 00:00:00.0',
+                    '2022-01-01 00:00:00.0',
+                    '2023-01-01 00:00:00.0'
+                )
+            group by
+                DATE_TRUNC('quarter', order_date)
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: None
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: None,
+                    operator: None,
+                    values: None,
+                    or: Some(vec![
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2019-01-01 00:00:00.000".to_string(),
+                                "2019-03-31 23:59:59.999".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2020-01-01 00:00:00.000".to_string(),
+                                "2020-03-31 23:59:59.999".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2021-01-01 00:00:00.000".to_string(),
+                                "2021-03-31 23:59:59.999".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2022-01-01 00:00:00.000".to_string(),
+                                "2022-03-31 23:59:59.999".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                        json!(V1LoadRequestQueryFilterItem {
+                            member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
+                            operator: Some("inDateRange".to_string()),
+                            values: Some(vec![
+                                "2023-01-01 00:00:00.000".to_string(),
+                                "2023-03-31 23:59:59.999".to_string(),
+                            ]),
+                            or: None,
+                            and: None,
+                        }),
+                    ]),
+                    and: None
+                }]),
+                ungrouped: None,
+            }
+        )
+    }
 }
