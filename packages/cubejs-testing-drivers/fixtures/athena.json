@@ -150,6 +150,7 @@
 
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
+    "SQL API: reuse params",
     "SQL API: Simple Rollup",
     "SQL API: Complex Rollup",
     "SQL API: Nested Rollup"
