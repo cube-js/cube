@@ -159,6 +159,7 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
+    "SQL API: Complex Rollup -- The GROUP BY clause only supports ROLLUP when there are no other grouping elements at",
     "--------------------",
     "week granularity is not supported for intervals",
     "--------------------",
