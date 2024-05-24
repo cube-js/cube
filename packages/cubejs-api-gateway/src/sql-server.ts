@@ -91,7 +91,9 @@ export class SQLServer {
               context,
               res: (response) => {
                 if ('error' in response) {
-                  reject(response.error);
+                  reject({
+                    message: response.error
+                  });
 
                   return;
                 }
@@ -122,7 +124,9 @@ export class SQLServer {
               context,
               res: (response) => {
                 if ('error' in response) {
-                  reject(response.error);
+                  reject({
+                    message: response.error
+                  });
 
                   return;
                 }
@@ -150,7 +154,9 @@ export class SQLServer {
               context,
               res: (response) => {
                 if ('error' in response) {
-                  reject(response.error);
+                  reject({
+                    message: response.error
+                  });
 
                   return;
                 }
@@ -182,7 +188,9 @@ export class SQLServer {
               context,
               res: (response) => {
                 if ('error' in response) {
-                  reject(response.error);
+                  reject({
+                    message: response.error
+                  });
 
                   return;
                 }
@@ -228,7 +236,9 @@ export class SQLServer {
               context,
               res: (response) => {
                 if ('error' in response) {
-                  reject(response.error);
+                  reject({
+                    message: response.error
+                  });
 
                   return;
                 }
