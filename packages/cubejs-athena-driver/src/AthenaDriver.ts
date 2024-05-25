@@ -268,6 +268,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     _options?: QueryOptions,
   ): Promise<R[]> {
+    console.log("!!!! ==== athena query", query);
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const rows: R[] = [];
