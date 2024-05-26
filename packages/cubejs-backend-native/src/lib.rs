@@ -313,7 +313,14 @@ async fn handle_sql_query(
 
                     Ok(vec![arg.upcast::<JsValue>()])
                 }),
-                Box::new(|cx, v| Ok(v.downcast_or_throw::<JsBoolean, _>(cx).unwrap().value(cx))),
+                Box::new(|cx, v| {
+                    match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                        Ok(v) => Ok(v.value(cx)),
+                        Err(_) => Err(CubeError::internal(
+                            "Failed to downcast write response".to_string()
+                        ))
+                    }
+                }),
                 stream_methods.stream.clone(),
             )
             .await?;
@@ -333,7 +340,14 @@ async fn handle_sql_query(
 
                 Ok(vec![arg.upcast::<JsValue>()])
             }),
-            Box::new(|cx, v| Ok(v.downcast_or_throw::<JsBoolean, _>(cx).unwrap().value(cx))),
+            Box::new(|cx, v| {
+                match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                    Ok(v) => Ok(v.value(cx)),
+                    Err(_) => Err(CubeError::internal(
+                        "Failed to downcast write response".to_string()
+                    ))
+                }
+            }),
             stream_methods.stream.clone(),
         )
         .await?;
@@ -394,7 +408,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let node_stream_arc = Arc::new(node_stream_root);
 
     let native_auth_ctx = Arc::new(NativeAuthContext {
-        user: Some(String::from("allowed_user")),
+        user: Some(String::from("unknown")),
         superuser: false,
         security_context,
     });

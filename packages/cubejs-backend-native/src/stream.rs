@@ -27,7 +27,7 @@ use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
 
 type Chunk = Option<Result<RecordBatch, CubeError>>;
 
-fn handle_on_drain<'a>(mut cx: FunctionContext<'_>) -> JsResult<JsUndefined> {
+fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx
         .this::<JsBox<RefCell<OnDrainHandler>>>()?
         .downcast_or_throw::<JsBox<RefCell<OnDrainHandler>>, _>(&mut cx)?;
@@ -77,7 +77,7 @@ impl OnDrainHandler {
                 let on_drain_fn = JsFunction::new(cx, handle_on_drain)?;
 
                 let this = cx.boxed(this).upcast::<JsValue>();
-                let on_drain_fn = bind_method(cx, on_drain_fn, this).unwrap();
+                let on_drain_fn = bind_method(cx, on_drain_fn, this)?;
 
                 let event_arg = cx.string("drain").upcast::<JsValue>();
 
