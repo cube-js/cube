@@ -14,7 +14,7 @@ use crate::channel::call_js_fn;
 use cubesql::CubeError;
 
 use neon::prelude::*;
-use tokio::sync::{oneshot, watch};
+use tokio::sync::{oneshot, watch, Semaphore};
 
 #[cfg(build = "debug")]
 use log::trace;
@@ -27,11 +27,11 @@ use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
 
 type Chunk = Option<Result<RecordBatch, CubeError>>;
 
-fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+fn handle_on_drain<'a>(mut cx: FunctionContext<'_>) -> JsResult<JsUndefined> {
     let this = cx
         .this::<JsBox<RefCell<OnDrainHandler>>>()?
         .downcast_or_throw::<JsBox<RefCell<OnDrainHandler>>, _>(&mut cx)?;
-    this.borrow().on_drain();
+    let _ = this.borrow().on_drain();
 
     Ok(cx.undefined())
 }
@@ -41,6 +41,8 @@ pub struct OnDrainHandler {
     channel: Arc<Channel>,
     js_stream: Arc<Root<JsObject>>,
     paused_tx: Arc<watch::Sender<bool>>,
+    semaphore: Arc<Semaphore>,
+    tokio_handle: Arc<tokio::runtime::Handle>,
 }
 
 unsafe impl Sync for OnDrainHandler {}
@@ -52,15 +54,19 @@ impl OnDrainHandler {
         channel: Arc<Channel>,
         js_stream: Arc<Root<JsObject>>,
         paused_tx: Arc<watch::Sender<bool>>,
+        semaphore: Arc<Semaphore>,
+        tokio_handle: Arc<tokio::runtime::Handle>,
     ) -> Self {
         Self {
             channel,
             js_stream,
             paused_tx,
+            semaphore,
+            tokio_handle,
         }
     }
 
-    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) -> Result<(), CubeError>{
+    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) -> Result<(), CubeError> {
         let js_stream_obj = self.js_stream.clone();
         let this = RefCell::new(self.clone());
 
@@ -84,7 +90,18 @@ impl OnDrainHandler {
     }
 
     fn on_drain(&self) {
-        self.paused_tx.send(false).unwrap();
+        let sem = self.semaphore.clone();
+        let paused_tx = self.paused_tx.clone();
+
+        self.tokio_handle.spawn(async move {
+            let _permit = sem.acquire().await;
+            match paused_tx.send(false) {
+                Ok(_) => {}
+                Err(e) => {
+                    log::error!("Failed to resume stream: {}", e)
+                }
+            }
+        });
     }
 }
 

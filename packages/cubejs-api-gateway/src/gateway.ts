@@ -360,7 +360,7 @@ class ApiGateway {
         try {
           await server.execSql(req.body.query, res);
         } catch (error: any) {
-          res.end(JSON.stringify(error));
+          res.status(500).end(JSON.stringify(error));
         }
       })
     );

@@ -23,7 +23,7 @@ use cubesql::transport::TransportService;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use serde_json::Map;
-use tokio::sync::watch;
+use tokio::sync::{watch, Semaphore};
 
 use std::sync::Arc;
 
@@ -229,9 +229,10 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-const CHUNK_DELIM: &'static str = "\n🚀\n";
+const CHUNK_DELIM: &'static str = "\n";
 
 async fn handle_sql_query(
+    tokio_handle: Arc<tokio::runtime::Handle>,
     services: Arc<CubeServices>,
     native_auth_ctx: Arc<NativeAuthContext>,
     channel: Arc<Channel>,
@@ -259,7 +260,7 @@ async fn handle_sql_query(
         .get_service_typed::<dyn TransportService>()
         .await;
 
-    // // todo: can we use compiler_cache?
+    // todo: can we use compiler_cache?
     let meta_context = transport_service
         .meta(native_auth_ctx)
         .await
@@ -272,11 +273,15 @@ async fn handle_sql_query(
 
     let (paused_tx, mut paused_rx) = watch::channel(false);
 
+    let semaphore = Arc::new(Semaphore::new(1));
+
     let paused_tx = Arc::new(paused_tx);
     let drain_handler = OnDrainHandler::new(
         channel.clone(),
         stream_methods.stream.clone(),
         paused_tx.clone(),
+        Arc::new(Semaphore::new(1)),
+        tokio_handle,
     );
 
     drain_handler.handle(stream_methods.on.clone()).await?;
@@ -287,7 +292,7 @@ async fn handle_sql_query(
             paused_rx.changed().await?;
         }
 
-        let (columns, data) = batch_to_rows(batch?);
+        let (columns, data) = batch_to_rows(batch?)?;
 
         if is_first_batch {
             let mut schema = Map::new();
@@ -299,6 +304,7 @@ async fn handle_sql_query(
             );
             is_first_batch = false;
 
+            let _ = semaphore.acquire().await;
             call_js_fn(
                 channel.clone(),
                 stream_methods.write.clone(),
@@ -318,6 +324,7 @@ async fn handle_sql_query(
         let data = format!("{}{}", serde_json::to_string(&rows)?, CHUNK_DELIM);
         let js_stream_write_fn = stream_methods.write.clone();
 
+        let _ = semaphore.acquire().await;
         let should_pause = !call_js_fn(
             channel.clone(),
             js_stream_write_fn,
@@ -387,7 +394,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let node_stream_arc = Arc::new(node_stream_root);
 
     let native_auth_ctx = Arc::new(NativeAuthContext {
-        user: Some(String::from("unknown")),
+        user: Some(String::from("allowed_user")),
         superuser: false,
         security_context,
     });
@@ -395,6 +402,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
     let (deferred, promise) = cx.promise();
 
     runtime.spawn(async move {
+        let handle = Arc::new(tokio::runtime::Handle::current());
         let stream_methods = WritableStreamMethods {
             stream: node_stream_arc.clone(),
             on: js_stream_on_fn,
@@ -402,6 +410,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
         };
 
         let result = handle_sql_query(
+            handle,
             services,
             native_auth_ctx,
             channel.clone(),
@@ -423,9 +432,16 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             let args = match result {
                 Ok(_) => vec![],
                 Err(err) => {
-                    let arg = cx.string(err.to_string()).upcast::<JsValue>();
+                    let mut error_response = Map::new();
+                    error_response.insert("error".into(), err.to_string().into());
+                    let error_response = format!(
+                        "{}{}",
+                        serde_json::to_string(&serde_json::Value::Object(error_response)).unwrap(),
+                        CHUNK_DELIM
+                    );
+                    let arg = cx.string(error_response).upcast::<JsValue>();
                     vec![arg]
-                },
+                }
             };
             method.call(&mut cx, this, args)?;
 

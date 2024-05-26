@@ -251,7 +251,7 @@ type ArgsCallback =
 type ResultFromJsValue<R> =
     Box<dyn for<'a> FnOnce(&mut TaskContext<'a>, Handle<JsValue>) -> Result<R, CubeError> + Send>;
 
-pub async fn call_js_fn<R: Send + 'static>(
+pub async fn call_js_fn<R: Sized + Send + 'static>(
     channel: Arc<Channel>,
     js_fn: Arc<Root<JsFunction>>,
     args_callback: ArgsCallback,
