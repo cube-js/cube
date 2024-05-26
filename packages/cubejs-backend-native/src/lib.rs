@@ -229,7 +229,7 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     Ok(promise)
 }
 
-const CHUNK_DELIM: &'static str = "\n";
+const CHUNK_DELIM: &str = "\n";
 
 async fn handle_sql_query(
     tokio_handle: Arc<tokio::runtime::Handle>,
@@ -264,9 +264,7 @@ async fn handle_sql_query(
     let meta_context = transport_service
         .meta(native_auth_ctx)
         .await
-        .map_err(|err| {
-            CubeError::internal(format!("Failed to get meta context: {}", err.to_string()))
-        })?;
+        .map_err(|err| CubeError::internal(format!("Failed to get meta context: {}", err)))?;
     let query_plan = convert_sql_to_cube_query(sql_query, meta_context, session).await?;
 
     let mut stream = get_df_batches(&query_plan).await?;
@@ -313,13 +311,11 @@ async fn handle_sql_query(
 
                     Ok(vec![arg.upcast::<JsValue>()])
                 }),
-                Box::new(|cx, v| {
-                    match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                        Ok(v) => Ok(v.value(cx)),
-                        Err(_) => Err(CubeError::internal(
-                            "Failed to downcast write response".to_string()
-                        ))
-                    }
+                Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                    Ok(v) => Ok(v.value(cx)),
+                    Err(_) => Err(CubeError::internal(
+                        "Failed to downcast write response".to_string(),
+                    )),
                 }),
                 stream_methods.stream.clone(),
             )
@@ -340,13 +336,11 @@ async fn handle_sql_query(
 
                 Ok(vec![arg.upcast::<JsValue>()])
             }),
-            Box::new(|cx, v| {
-                match v.downcast_or_throw::<JsBoolean, _>(cx) {
-                    Ok(v) => Ok(v.value(cx)),
-                    Err(_) => Err(CubeError::internal(
-                        "Failed to downcast write response".to_string()
-                    ))
-                }
+            Box::new(|cx, v| match v.downcast_or_throw::<JsBoolean, _>(cx) {
+                Ok(v) => Ok(v.value(cx)),
+                Err(_) => Err(CubeError::internal(
+                    "Failed to downcast write response".to_string(),
+                )),
             }),
             stream_methods.stream.clone(),
         )

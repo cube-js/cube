@@ -31,7 +31,7 @@ fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     let this = cx
         .this::<JsBox<RefCell<OnDrainHandler>>>()?
         .downcast_or_throw::<JsBox<RefCell<OnDrainHandler>>, _>(&mut cx)?;
-    let _ = this.borrow().on_drain();
+    this.borrow().on_drain();
 
     Ok(cx.undefined())
 }
