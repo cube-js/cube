@@ -18,6 +18,7 @@ mod transport;
 mod utils;
 
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::config::ConfigObj;
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
 use futures::StreamExt;
@@ -25,6 +26,8 @@ use once_cell::sync::OnceCell;
 use serde_json::Map;
 use tokio::sync::{watch, Semaphore};
 
+use std::net::SocketAddr;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::channel::call_js_fn;
@@ -239,26 +242,34 @@ async fn handle_sql_query(
     stream_methods: WritableStreamMethods,
     sql_query: &String,
 ) -> Result<(), CubeError> {
+    let config = services.injector.get_service_typed::<dyn ConfigObj>().await;
+    let transport_service = services
+        .injector
+        .get_service_typed::<dyn TransportService>()
+        .await;
     let session_manager = services
         .injector
         .get_service_typed::<SessionManager>()
         .await;
+
+    let (host, port) = match SocketAddr::from_str(&config.postgres_bind_address().clone().unwrap_or("127.0.0.1:15432".into())) {
+        Ok(addr) => {
+            (addr.ip().to_string(), addr.port())
+        }
+        Err(e) => return Err(CubeError::internal(format!("Failed to parse postgres_bind_address: {}", e)))
+    };
+
     let session = session_manager
         .create_session(
             DatabaseProtocol::PostgreSQL,
-            String::from("127.0.0.1"),
-            15432,
+            host,
+            port
         )
         .await;
 
     session
         .state
         .set_auth_context(Some(native_auth_ctx.clone()));
-
-    let transport_service = services
-        .injector
-        .get_service_typed::<dyn TransportService>()
-        .await;
 
     // todo: can we use compiler_cache?
     let meta_context = transport_service
@@ -444,7 +455,8 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     error_response.insert("error".into(), err.to_string().into());
                     let error_response = format!(
                         "{}{}",
-                        serde_json::to_string(&serde_json::Value::Object(error_response)).unwrap(),
+                        serde_json::to_string(&serde_json::Value::Object(error_response))
+                            .expect("Failed to serialize error response to JSON"),
                         CHUNK_DELIM
                     );
                     let arg = cx.string(error_response).upcast::<JsValue>();

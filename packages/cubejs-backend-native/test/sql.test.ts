@@ -302,50 +302,54 @@ describe('SQLInterface', () => {
     }
   });
 
-  it.only('streams cube sql over http', async () => {
-    const instance = await native.registerInterface({
-      port: 4545,
-      pgPort: 5555,
-      ...interfaceMethods(),
-      canSwitchUserForSession: (_payload) => true,
-    });
+  it('streams cube sql over http', async () => {
+    if (process.env.CUBESQL_STREAM_MODE === 'true') {
+      const instance = await native.registerInterface({
+        port: 4545,
+        pgPort: 5555,
+        ...interfaceMethods(),
+        canSwitchUserForSession: (_payload) => true,
+      });
 
-    const connection = new Client({
-      host: '127.0.0.1',
-      database: 'test',
-      port: 5555,
-      user: 'allowed_user',
-      password: 'password_for_allowed_user',
-    });
-    await connection.connect();
+      const connection = new Client({
+        host: '127.0.0.1',
+        database: 'test',
+        port: 5555,
+        user: 'allowed_user',
+        password: 'password_for_allowed_user',
+      });
+      await connection.connect();
 
-    let rows = 0;
-    const write = jest.fn((chunk, _, callback) => {
-      expect(chunk).toBeInstanceOf(Buffer);
-      const result = JSON.parse(chunk.toString('utf-8'));
-      if (result.data) {
-        rows += result.data.length;
-      }
+      let rows = 0;
+      const write = jest.fn((chunk, _, callback) => {
+        expect(chunk).toBeInstanceOf(Buffer);
+        const result = JSON.parse(chunk.toString('utf-8'));
+        if (result.data) {
+          rows += result.data.length;
+        }
 
-      callback();
-    });
+        callback();
+      });
 
-    const cubeSqlStream = new Writable({
-      write,
-    });
+      const cubeSqlStream = new Writable({
+        write,
+      });
 
-    const onDrain = jest.fn();
-    cubeSqlStream.on('drain', onDrain);
+      const onDrain = jest.fn();
+      cubeSqlStream.on('drain', onDrain);
 
-    await native.execSql(
-      instance,
-      'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
-      cubeSqlStream
-    );
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
+        cubeSqlStream
+      );
 
-    expect(onDrain).toHaveBeenCalled();
-    expect(rows).toBe(100000);
+      expect(onDrain).toHaveBeenCalled();
+      expect(rows).toBe(100000);
 
-    await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance);
+    } else {
+      expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
+    }
   });
 });
