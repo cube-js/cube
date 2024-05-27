@@ -4,10 +4,11 @@ import { Client as PgClient } from 'pg';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import type { StartedTestContainer } from 'testcontainers';
 
+import fetch from 'node-fetch';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG, JEST_AFTER_ALL_DEFAULT_TIMEOUT, JEST_BEFORE_ALL_DEFAULT_TIMEOUT } from './smoke-tests';
 
-describe('SQL API', () => {
+describe.only('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
 
   let connection: PgClient;
@@ -76,6 +77,42 @@ describe('SQL API', () => {
     await birdbox.stop();
     await db.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  describe.only('Cube SQL over HTTP', () => {
+    it('streams data', async () => {
+      const response = await (await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: 'SELECT orderDate FROM ECommerce LIMIT 50000;'
+        }),
+      }));
+
+      const reader = response.body;
+      let isFirstChunk = true;
+
+      let rows = 0;
+      const onData = jest.fn((chunk: Buffer) => {
+        if (isFirstChunk) {
+          isFirstChunk = false;
+          console.log('>>>', chunk.toString());
+          expect(JSON.parse(chunk.toString()).schema).toBeTruthy();
+        } else {
+          rows += JSON.parse(chunk.toString()).data.length;
+        }
+      });
+      reader.on('data', onData);
+
+      const onEnd = jest.fn(() => {
+        expect(rows).toBe(50000);
+      });
+      reader.on('end', onEnd);
+
+      const onError = jest.fn();
+      reader.on('error', onError);
+      expect(onError).not.toHaveBeenCalled();
+    });
+  });
 
   describe('Postgres (Auth)', () => {
     test('Success Admin', async () => {

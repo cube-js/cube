@@ -348,7 +348,7 @@ class ApiGateway {
       })
     );
 
-    app.get(
+    app.post(
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {

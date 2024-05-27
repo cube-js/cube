@@ -243,6 +243,13 @@ async fn handle_sql_query(
     sql_query: &String,
 ) -> Result<(), CubeError> {
     let config = services.injector.get_service_typed::<dyn ConfigObj>().await;
+
+    if !config.stream_mode() {
+        return Err(CubeError::internal(
+            "Stream mode is required for this operation. Please set CUBESQL_STREAM_MODE environment variable".to_string(),
+        ));
+    }
+
     let transport_service = services
         .injector
         .get_service_typed::<dyn TransportService>()
@@ -252,19 +259,23 @@ async fn handle_sql_query(
         .get_service_typed::<SessionManager>()
         .await;
 
-    let (host, port) = match SocketAddr::from_str(&config.postgres_bind_address().clone().unwrap_or("127.0.0.1:15432".into())) {
-        Ok(addr) => {
-            (addr.ip().to_string(), addr.port())
+    let (host, port) = match SocketAddr::from_str(
+        &config
+            .postgres_bind_address()
+            .clone()
+            .unwrap_or("127.0.0.1:15432".into()),
+    ) {
+        Ok(addr) => (addr.ip().to_string(), addr.port()),
+        Err(e) => {
+            return Err(CubeError::internal(format!(
+                "Failed to parse postgres_bind_address: {}",
+                e
+            )))
         }
-        Err(e) => return Err(CubeError::internal(format!("Failed to parse postgres_bind_address: {}", e)))
     };
 
     let session = session_manager
-        .create_session(
-            DatabaseProtocol::PostgreSQL,
-            host,
-            port
-        )
+        .create_session(DatabaseProtocol::PostgreSQL, host, port)
         .await;
 
     session
