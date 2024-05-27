@@ -120,14 +120,6 @@ export async function runEnvironment(
     CUBEJS_TELEMETRY: 'false',
   });
 
-  const _path = `${path.resolve(process.cwd(), `./fixtures/${type}.env`)}`;
-  if (fs.existsSync(_path)) {
-    config({
-      path: _path,
-      encoding: 'utf8',
-      override: true,
-    });
-  }
   Object.keys(fixtures.cube.environment).forEach((key) => {
     const val = fixtures.cube.environment[key];
     const { length } = val;
