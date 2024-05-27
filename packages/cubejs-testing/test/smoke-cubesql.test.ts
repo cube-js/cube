@@ -67,7 +67,7 @@ describe.only('SQL API', () => {
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
         CUBESQL_SQL_PUSH_DOWN: 'true',
-        CUBESQL_STREM_MODE: 'true',
+        CUBESQL_STREAM_MODE: 'true',
       },
       {
         schemaDir: 'postgresql/schema',
@@ -84,8 +84,7 @@ describe.only('SQL API', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe.only('Cube SQL over HTTP', () => {
-    jest.setTimeout(60_000);
-    it('streams data', async () => {
+    it.only('streams data', async () => {
       const ROWS_LIMIT = 50000;
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
@@ -97,7 +96,7 @@ describe.only('SQL API', () => {
 
       const reader = response.body;
       let isFirstChunk = true;
-      
+
       let data = '';
       const execute = () => new Promise<void>((resolve, reject) => {
         const onData = jest.fn((chunk: Buffer) => {
@@ -110,19 +109,23 @@ describe.only('SQL API', () => {
           }
         });
         reader.on('data', onData);
-  
+
         const onError = jest.fn(() => reject(new Error('Stream error')));
         reader.on('error', onError);
-  
+
         const onEnd = jest.fn(() => {
           resolve();
         });
-      
+
         reader.on('end', onEnd);
       });
-  
+
       await execute();
-      const rows = data.split('\n').filter(it => it.trim()).map((it) => JSON.parse(it).data.length).reduce((a, b) => a + b, 0);
+      const rows = data
+        .split('\n')
+        .filter((it) => it.trim())
+        .map((it) => JSON.parse(it).data.length)
+        .reduce((a, b) => a + b, 0);
 
       expect(rows).toBe(ROWS_LIMIT);
     });
@@ -239,7 +242,7 @@ describe.only('SQL API', () => {
   });
 
   describe('Postgres (Data)', () => {
-    test('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
+    test.only('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
       const res = await connection.query(
         'SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC'
       );
@@ -248,29 +251,29 @@ describe.only('SQL API', () => {
 
     test('powerbi min max push down', async () => {
       const res = await connection.query(`
+        select
+    max("rows"."createdAt") as "a0",
+    min("rows"."createdAt") as "a1"
+  from
+    (
       select
-  max("rows"."createdAt") as "a0",
-  min("rows"."createdAt") as "a1"
-from
-  (
-    select
-      "createdAt"
-    from
-      "public"."Orders" "$Table"
-  ) "rows"
-  `);
+        "createdAt"
+      from
+        "public"."Orders" "$Table"
+    ) "rows"
+    `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
 
     test('no limit for non matching count push down', async () => {
       const res = await connection.query(`
-    select
-      max("rows"."createdAt") as "a0",
-      min("rows"."createdAt") as "a1",
-      count(*) as "a2"
-    from
-      "public"."BigOrders" "rows"
-  `);
+      select
+        max("rows"."createdAt") as "a0",
+        min("rows"."createdAt") as "a1",
+        count(*) as "a2"
+      from
+        "public"."BigOrders" "rows"
+    `);
       expect(res.rows).toMatchSnapshot(
         'no limit for non matching count push down'
       );
@@ -278,78 +281,78 @@ from
 
     test('metabase max number', async () => {
       const res = await connection.query(`
-SELECT
-  "source"."id" AS "id",
-  "source"."status" AS "status",
-  "source"."pivot-grouping" AS "pivot-grouping",
-  MAX("source"."numberTotal") AS "numberTotal"
-FROM
-  (
-    SELECT
-      "public"."Orders"."numberTotal" AS "numberTotal",
-      "public"."Orders"."id" AS "id",
-      "public"."Orders"."status" AS "status",
-      ABS(0) AS "pivot-grouping"
-    FROM
-      "public"."Orders"
-    WHERE
-      "public"."Orders"."status" = 'new'
-  ) AS "source"
-GROUP BY
-  "source"."id",
-  "source"."status",
-  "source"."pivot-grouping"
-ORDER BY
-  "source"."id" DESC,
-  "source"."status" ASC,
-  "source"."pivot-grouping" ASC
-  `);
+  SELECT
+    "source"."id" AS "id",
+    "source"."status" AS "status",
+    "source"."pivot-grouping" AS "pivot-grouping",
+    MAX("source"."numberTotal") AS "numberTotal"
+  FROM
+    (
+      SELECT
+        "public"."Orders"."numberTotal" AS "numberTotal",
+        "public"."Orders"."id" AS "id",
+        "public"."Orders"."status" AS "status",
+        ABS(0) AS "pivot-grouping"
+      FROM
+        "public"."Orders"
+      WHERE
+        "public"."Orders"."status" = 'new'
+    ) AS "source"
+  GROUP BY
+    "source"."id",
+    "source"."status",
+    "source"."pivot-grouping"
+  ORDER BY
+    "source"."id" DESC,
+    "source"."status" ASC,
+    "source"."pivot-grouping" ASC
+    `);
       expect(res.rows).toMatchSnapshot('metabase max number');
     });
 
     test('power bi post aggregate measure wrap', async () => {
       const res = await connection.query(`
-select 
-  "_"."createdAt", 
-  "_"."a0",
-  "_"."a1"
-from 
-  ( 
-    select 
-      "rows"."createdAt" as "createdAt", 
-      sum(cast("rows"."amountRankView" as decimal)) as "a0",
-      max("rows"."amountRankDate") as "a1" 
-    from 
-      ( 
-        select 
-          "_"."status", 
-          "_"."createdAt", 
-          "_"."amountRankView",
-          "_"."amountRankDate"
-        from 
-          "public"."Orders" "_" 
-        where 
-          "_"."status" = 'shipped'
-      ) "rows" 
-    group by 
-      "createdAt" 
-  ) "_" 
-where 
-  not "_"."a0" is null or
-  not "_"."a1" is null
-limit 
-  1000001
-  `);
+  select
+    "_"."createdAt",
+    "_"."a0",
+    "_"."a1"
+  from
+    (
+      select
+        "rows"."createdAt" as "createdAt",
+        sum(cast("rows"."amountRankView" as decimal)) as "a0",
+        max("rows"."amountRankDate") as "a1"
+      from
+        (
+          select
+            "_"."status",
+            "_"."createdAt",
+            "_"."amountRankView",
+            "_"."amountRankDate"
+          from
+            "public"."Orders" "_"
+          where
+            "_"."status" = 'shipped'
+        ) "rows"
+      group by
+        "createdAt"
+    ) "_"
+  where
+    not "_"."a0" is null or
+    not "_"."a1" is null
+  limit
+    1000001
+    `);
       expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
 
     test('percentage of total sum', async () => {
       const res = await connection.query(`
-select 
-  sum("OrdersView"."statusPercentageOfTotal") as "m0" 
-from 
-  "OrdersView" as "OrdersView" 
-  `);
+  select
+    sum("OrdersView"."statusPercentageOfTotal") as "m0"
+  from
+    "OrdersView" as "OrdersView"
+    `);
       expect(res.rows).toMatchSnapshot('percentage of total sum');
     });
 
