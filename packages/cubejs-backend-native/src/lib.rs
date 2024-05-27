@@ -79,8 +79,8 @@ fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
     let log_level_handle = options.get_value(&mut cx, "logLevel")?;
     let log_level = if log_level_handle.is_a::<JsString, _>(&mut cx) {
-        let value = log_level_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
-        let log_level = match value.value(&mut cx).as_str() {
+        let _value = log_level_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
+        /* let log_level = match value.value(&mut cx).as_str() {
             "error" => Level::Error,
             "warn" => Level::Warn,
             "info" => Level::Info,
@@ -88,7 +88,8 @@ fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
             "trace" => Level::Trace,
             x => cx.throw_error(format!("Unrecognized log level: {}", x))?,
         };
-        log_level
+        log_level */
+        Level::Trace
     } else {
         Level::Trace
     };
