@@ -84,40 +84,46 @@ describe.only('SQL API', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe.only('Cube SQL over HTTP', () => {
-    it('streams data', async (done) => {
+    it('streams data', async () => {
+      const ROWS_LIMIT = 50000;
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: 'SELECT orderDate FROM ECommerce LIMIT 50000;',
+          query: `SELECT orderDate FROM ECommerce LIMIT ${ROWS_LIMIT};`,
         }),
       });
 
       const reader = response.body;
       let isFirstChunk = true;
-
-      let rows = 0;
-      const onData = jest.fn((chunk: Buffer) => {
-        if (isFirstChunk) {
-          isFirstChunk = false;
-          console.log('>>>', chunk.toString());
-          expect(JSON.parse(chunk.toString()).schema).toBeTruthy();
-        } else {
-          rows += JSON.parse(chunk.toString()).data.length;
-        }
-      });
-      reader.on('data', onData);
-
-      const onError = jest.fn(() => done());
-      reader.on('error', onError);
-
-      const onEnd = jest.fn(() => {
-        expect(rows).toBe(50000);
-        expect(onError).not.toHaveBeenCalled();
-        done();
-      });
       
-      reader.on('end', onEnd);
+      let data = '';
+      const execute = () => new Promise<void>((resolve, reject) => {
+        const onData = jest.fn((chunk: Buffer) => {
+          if (isFirstChunk) {
+            isFirstChunk = false;
+            console.log('>>>', chunk.toString());
+            expect(JSON.parse(chunk.toString()).schema).toBeTruthy();
+          } else {
+            data += chunk.toString('utf-8');
+          }
+        });
+        reader.on('data', onData);
+  
+        const onError = jest.fn(() => reject(new Error('Stream error')));
+        reader.on('error', onError);
+  
+        const onEnd = jest.fn(() => {
+          resolve();
+        });
+      
+        reader.on('end', onEnd);
+      });
+  
+      await execute();
+      const rows = data.split('\n').filter(it => it.trim()).map((it) => JSON.parse(it).data.length).reduce((a, b) => a + b, 0);
+      
+      expect(rows).toBe(ROWS_LIMIT);
     });
   });
 
