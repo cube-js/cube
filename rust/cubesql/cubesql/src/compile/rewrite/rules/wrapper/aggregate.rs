@@ -234,12 +234,6 @@ impl WrapperRules {
         }
         Self::list_pushdown_pullup_rules(
             rules,
-            "wrapper-grouping-set-expr",
-            "AggregateGroupExpr",
-            "WrappedSelectGroupExpr",
-        );
-        Self::list_pushdown_pullup_rules(
-            rules,
             "wrapper-grouping-set-members",
             "GroupingSetExprMembers",
             "GroupingSetExprMembers",
