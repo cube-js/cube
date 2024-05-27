@@ -90,7 +90,7 @@ export async function runEnvironment(
   suf?: string,
   { extendedEnv }: { extendedEnv?: string } = {}
 ): Promise<Environment> {
-  const fixtures = getFixtures(type, extendedEnv);
+  const fixture = getFixtures(type, extendedEnv);
   getTempPath();
   getSchemaPath(type, suf);
   getCubeJsPath(type);
@@ -110,7 +110,7 @@ export async function runEnvironment(
     })
     .argv;
   const isLocal = mode === 'local';
-  const [composePath, composeFile] = getComposePath(type, isLocal);
+  const [composePath, composeFile] = getComposePath(type, fixture, isLocal);
   const compose = new DockerComposeEnvironment(
     composePath,
     composeFile,
@@ -120,8 +120,8 @@ export async function runEnvironment(
     CUBEJS_TELEMETRY: 'false',
   });
 
-  Object.keys(fixtures.cube.environment).forEach((key) => {
-    const val = fixtures.cube.environment[key];
+  Object.keys(fixture.cube.environment).forEach((key) => {
+    const val = fixture.cube.environment[key];
     const { length } = val;
 
     if (val.indexOf('${') === 0 && val.indexOf('}') === length - 1) {
@@ -136,8 +136,8 @@ export async function runEnvironment(
 
     if (process.env[key]) {
       compose.withEnvironment({ [key]: <string>process.env[key] });
-    } else if (fixtures.cube.environment[key]) {
-      process.env[key] = fixtures.cube.environment[key];
+    } else if (fixture.cube.environment[key]) {
+      process.env[key] = fixture.cube.environment[key];
     }
   });
 
@@ -158,8 +158,8 @@ export async function runEnvironment(
   };
 
   const cliEnv = isLocal ? new CubeCliEnvironment(composePath) : null;
-  const mappedDataPort = fixtures.data ? environment.getContainer('data').getMappedPort(
-    parseInt(fixtures.data.ports[0], 10),
+  const mappedDataPort = fixture.data ? environment.getContainer('data').getMappedPort(
+    parseInt(fixture.data.ports[0], 10),
   ) : null;
   if (cliEnv) {
     cliEnv.withEnvironment({
@@ -176,19 +176,19 @@ export async function runEnvironment(
   }
   const cube = cliEnv ? {
     port: 4000,
-    pgPort: parseInt(fixtures.cube.ports[1], 10),
+    pgPort: parseInt(fixture.cube.ports[1], 10),
     logs: cliEnv.cli?.stdout || process.stdout
   } : {
     port: environment.getContainer('cube').getMappedPort(
-      parseInt(fixtures.cube.ports[0], 10),
+      parseInt(fixture.cube.ports[0], 10),
     ),
-    pgPort: fixtures.cube.ports[1] && environment.getContainer('cube').getMappedPort(
-      parseInt(fixtures.cube.ports[1], 10),
+    pgPort: fixture.cube.ports[1] && environment.getContainer('cube').getMappedPort(
+      parseInt(fixture.cube.ports[1], 10),
     ) || undefined,
     logs: await environment.getContainer('cube').logs(),
   };
 
-  if (fixtures.data) {
+  if (fixture.data) {
     const data = {
       port: mappedDataPort!,
       logs: await environment.getContainer('data').logs(),
