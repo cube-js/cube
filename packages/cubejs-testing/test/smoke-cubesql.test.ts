@@ -63,6 +63,7 @@ describe.only('SQL API', () => {
         //
         CUBEJS_PG_SQL_PORT: `${pgPort}`,
         CUBESQL_SQL_PUSH_DOWN: 'true',
+        CUBESQL_STREM_MODE: 'true',
       },
       {
         schemaDir: 'postgresql/schema',
