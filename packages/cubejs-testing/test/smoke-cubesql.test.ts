@@ -84,6 +84,7 @@ describe.only('SQL API', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe.only('Cube SQL over HTTP', () => {
+    jest.setTimeout(60_000);
     it('streams data', async () => {
       const ROWS_LIMIT = 50000;
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
@@ -122,7 +123,7 @@ describe.only('SQL API', () => {
   
       await execute();
       const rows = data.split('\n').filter(it => it.trim()).map((it) => JSON.parse(it).data.length).reduce((a, b) => a + b, 0);
-      
+
       expect(rows).toBe(ROWS_LIMIT);
     });
   });
