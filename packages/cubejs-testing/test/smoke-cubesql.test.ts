@@ -13,7 +13,7 @@ import {
   JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
 } from './smoke-tests';
 
-describe.only('SQL API', () => {
+describe('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
 
   let connection: PgClient;
@@ -84,7 +84,7 @@ describe.only('SQL API', () => {
     await db.stop();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
-  describe.only('Cube SQL over HTTP', () => {
+  describe('Cube SQL over HTTP', () => {
     const token = jwt.sign(
       {
         user: 'admin',
@@ -260,7 +260,7 @@ describe.only('SQL API', () => {
   });
 
   describe('Postgres (Data)', () => {
-    test.only('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
+    test('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
       const res = await connection.query(
         'SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC'
       );
