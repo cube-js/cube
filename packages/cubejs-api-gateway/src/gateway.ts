@@ -358,7 +358,7 @@ class ApiGateway {
         res.setHeader('Transfer-Encoding', 'chunked');
 
         try {
-          await server.execSql(req.body.query, res);
+          await server.execSql(req.body.query, res, req.context?.securityContext);
         } catch (error: any) {
           res.status(500).end(JSON.stringify(error));
         }

@@ -2,6 +2,7 @@
 import { afterAll, beforeAll, jest, expect } from '@jest/globals';
 import { Client as PgClient } from 'pg';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
+import jwt from 'jsonwebtoken';
 import type { StartedTestContainer } from 'testcontainers';
 
 import fetch from 'node-fetch';
@@ -84,11 +85,24 @@ describe.only('SQL API', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe.only('Cube SQL over HTTP', () => {
-    it.only('streams data', async () => {
-      const ROWS_LIMIT = 50000;
+    const token = jwt.sign(
+      {
+        user: 'admin',
+      },
+      DEFAULT_CONFIG.CUBEJS_API_SECRET,
+      {
+        expiresIn: '1h',
+      }
+    );
+
+    it('streams data', async () => {
+      const ROWS_LIMIT = 40;
       const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: token,
+        },
         body: JSON.stringify({
           query: `SELECT orderDate FROM ECommerce LIMIT ${ROWS_LIMIT};`,
         }),
@@ -102,8 +116,12 @@ describe.only('SQL API', () => {
         const onData = jest.fn((chunk: Buffer) => {
           if (isFirstChunk) {
             isFirstChunk = false;
-            console.log('>>>', chunk.toString());
-            expect(JSON.parse(chunk.toString()).schema).toBeTruthy();
+            expect(JSON.parse(chunk.toString()).schema).toEqual([
+              {
+                name: 'orderDate',
+                column_type: 'String',
+              },
+            ]);
           } else {
             data += chunk.toString('utf-8');
           }
@@ -374,7 +392,7 @@ describe.only('SQL API', () => {
 
     test('select dimension agg where false', async () => {
       const query =
-        'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
+          'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
       const res = await connection.query(query);
       expect(res.rows).toEqual([{ max: null }]);
     });
