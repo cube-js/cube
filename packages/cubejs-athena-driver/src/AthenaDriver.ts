@@ -247,6 +247,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
     values: unknown[],
     options: StreamOptions,
   ): Promise<StreamTableDataWithTypes> {
+    console.log("!!!! ==== athena stream query", query);
     const qid = await this.startQuery(query, values);
     await this.waitForSuccess(qid);
     const iter = this.lazyRowIterator(qid, query, true);
