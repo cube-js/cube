@@ -199,6 +199,9 @@ export async function runEnvironment(
       data,
       stop: async () => {
         await environment.down({ timeout: 30 * 1000 });
+        if (cliEnv) {
+          await cliEnv.down();
+        }
       },
     };
   }
