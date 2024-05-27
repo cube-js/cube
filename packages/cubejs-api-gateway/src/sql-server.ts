@@ -172,8 +172,6 @@ export class SQLServer {
       },
       sql: async ({ request, session, query, memberToAlias, expressionParams }) => {
         const context = await contextByRequest(request, session);
-        console.log("!!!! api-sql: ", query);
-        console.log("!!!! api-sql request: ", request);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {

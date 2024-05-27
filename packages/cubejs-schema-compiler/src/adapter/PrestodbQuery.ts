@@ -114,7 +114,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.statements.select = 'SELECT {{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
-      '{% if group_by %} GROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+      '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
       '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
       '{% if offset %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit %}\nLIMIT {{ limit }}{% endif %}';
