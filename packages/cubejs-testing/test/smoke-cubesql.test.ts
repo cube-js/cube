@@ -6,7 +6,11 @@ import type { StartedTestContainer } from 'testcontainers';
 
 import fetch from 'node-fetch';
 import { BirdBox, getBirdbox } from '../src';
-import { DEFAULT_CONFIG, JEST_AFTER_ALL_DEFAULT_TIMEOUT, JEST_BEFORE_ALL_DEFAULT_TIMEOUT } from './smoke-tests';
+import {
+  DEFAULT_CONFIG,
+  JEST_AFTER_ALL_DEFAULT_TIMEOUT,
+  JEST_BEFORE_ALL_DEFAULT_TIMEOUT,
+} from './smoke-tests';
 
 describe.only('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -80,14 +84,14 @@ describe.only('SQL API', () => {
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
 
   describe.only('Cube SQL over HTTP', () => {
-    it('streams data', async () => {
-      const response = await (await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
+    it('streams data', async (done) => {
+      const response = await fetch(`${birdbox.configuration.apiUrl}/cubesql`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          query: 'SELECT orderDate FROM ECommerce LIMIT 50000;'
+          query: 'SELECT orderDate FROM ECommerce LIMIT 50000;',
         }),
-      }));
+      });
 
       const reader = response.body;
       let isFirstChunk = true;
@@ -104,14 +108,16 @@ describe.only('SQL API', () => {
       });
       reader.on('data', onData);
 
+      const onError = jest.fn(() => done());
+      reader.on('error', onError);
+
       const onEnd = jest.fn(() => {
         expect(rows).toBe(50000);
+        expect(onError).not.toHaveBeenCalled();
+        done();
       });
+      
       reader.on('end', onEnd);
-
-      const onError = jest.fn();
-      reader.on('error', onError);
-      expect(onError).not.toHaveBeenCalled();
     });
   });
 
@@ -120,11 +126,15 @@ describe.only('SQL API', () => {
       const conn = await createPostgresClient('admin', 'admin_password');
 
       try {
-        const res = await conn.query('SELECT "user", "uid" FROM SecurityContextTest');
-        expect(res.rows).toEqual([{
-          user: 'admin',
-          uid: '1'
-        }]);
+        const res = await conn.query(
+          'SELECT "user", "uid" FROM SecurityContextTest'
+        );
+        expect(res.rows).toEqual([
+          {
+            user: 'admin',
+            uid: '1',
+          },
+        ]);
       } finally {
         await conn.end();
       }
@@ -136,7 +146,9 @@ describe.only('SQL API', () => {
 
         throw new Error('Code must thrown auth error, something wrong...');
       } catch (e: any) {
-        expect(e.message).toContain('password authentication failed for user "admin"');
+        expect(e.message).toContain(
+          'password authentication failed for user "admin"'
+        );
       }
     });
 
@@ -144,39 +156,57 @@ describe.only('SQL API', () => {
       const conn = await createPostgresClient('admin', 'admin_password');
 
       try {
-        const res = await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'moderator\'');
-        expect(res.rows).toEqual([{
-          user: 'moderator',
-          uid: '2'
-        }]);
+        const res = await conn.query(
+          'SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'moderator\''
+        );
+        expect(res.rows).toEqual([
+          {
+            user: 'moderator',
+            uid: '2',
+          },
+        ]);
       } finally {
         await conn.end();
       }
     });
 
     test('Security Context (Moderator -> Usr1) - allowed sqlCanChangeUser', async () => {
-      const conn = await createPostgresClient('moderator', 'moderator_password');
+      const conn = await createPostgresClient(
+        'moderator',
+        'moderator_password'
+      );
 
       try {
-        const res = await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'usr1\'');
-        expect(res.rows).toEqual([{
-          user: 'usr1',
-          uid: '3'
-        }]);
+        const res = await conn.query(
+          'SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'usr1\''
+        );
+        expect(res.rows).toEqual([
+          {
+            user: 'usr1',
+            uid: '3',
+          },
+        ]);
       } finally {
         await conn.end();
       }
     });
 
     test('Security Context (Moderator -> Usr2) - not allowed', async () => {
-      const conn = await createPostgresClient('moderator', 'moderator_password');
+      const conn = await createPostgresClient(
+        'moderator',
+        'moderator_password'
+      );
 
       try {
-        await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'usr2\'');
+        await conn.query(
+          'SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'usr2\''
+        );
 
         throw new Error('Code must thrown auth error, something wrong...');
       } catch (e: any) {
-        expect(e.message).toContain('You cannot change security context via __user from moderator to usr2, because it\'s not allowed');
+        expect(e.message).toContain(
+          'You cannot change security context via __user from moderator to usr2, because it\'s not allowed'
+        );
       } finally {
         await conn.end();
       }
@@ -186,11 +216,15 @@ describe.only('SQL API', () => {
       const conn = await createPostgresClient('usr1', 'user1_password');
 
       try {
-        await conn.query('SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'moderator\'');
+        await conn.query(
+          'SELECT "user", "uid" FROM SecurityContextTest WHERE __user = \'moderator\''
+        );
 
         throw new Error('Code must thrown auth error, something wrong...');
       } catch (e: any) {
-        expect(e.message).toContain('You cannot change security context via __user from usr1 to moderator, because it\'s not allowed');
+        expect(e.message).toContain(
+          'You cannot change security context via __user from usr1 to moderator, because it\'s not allowed'
+        );
       } finally {
         await conn.end();
       }
@@ -199,7 +233,9 @@ describe.only('SQL API', () => {
 
   describe('Postgres (Data)', () => {
     test('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC', async () => {
-      const res = await connection.query('SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC');
+      const res = await connection.query(
+        'SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC'
+      );
       expect(res.rows).toMatchSnapshot('sql_orders');
     });
 
@@ -228,7 +264,9 @@ from
     from
       "public"."BigOrders" "rows"
   `);
-      expect(res.rows).toMatchSnapshot('no limit for non matching count push down');
+      expect(res.rows).toMatchSnapshot(
+        'no limit for non matching count push down'
+      );
     });
 
     test('metabase max number', async () => {
@@ -325,13 +363,15 @@ from
     });
 
     test('select dimension agg where false', async () => {
-      const query = 'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
+      const query =
+        'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';
       const res = await connection.query(query);
       expect(res.rows).toEqual([{ max: null }]);
     });
 
     test('where segment is false', async () => {
-      const query = 'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
+      const query =
+        'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
     });
