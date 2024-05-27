@@ -399,7 +399,7 @@ describe('SQL API', () => {
 
     test('where segment is false', async () => {
       const query =
-        'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
+        'SELECT value AS val FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
     });
