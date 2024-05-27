@@ -746,6 +746,7 @@ pub enum ListType {
     AggregateGroupExpr,
     AggregateAggrExpr,
     ScalarFunctionExprArgs,
+    GroupingSetExprMembers,
     WrappedSelectProjectionExpr,
     WrappedSelectGroupExpr,
     WrappedSelectAggrExpr,
@@ -760,6 +761,7 @@ impl ListType {
             Self::WindowWindowExpr => window_window_expr_empty_tail(),
             Self::AggregateGroupExpr => aggr_group_expr_empty_tail(),
             Self::AggregateAggrExpr => aggr_aggr_expr_empty_tail(),
+            Self::GroupingSetExprMembers => grouping_set_expr_members_empty_tail(),
             Self::ScalarFunctionExprArgs => scalar_fun_expr_args_empty_tail(),
             Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty_tail(),
             Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
@@ -827,6 +829,9 @@ impl ListNodeSearcher {
             }
             ListType::WrappedSelectProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
+            }
+            ListType::GroupingSetExprMembers => {
+                matches!(node, LogicalPlanLanguage::GroupingSetExprMembers(_))
             }
             ListType::WrappedSelectGroupExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectGroupExpr(_))
@@ -935,6 +940,7 @@ impl ListNodeApplierList {
             ListType::WrappedSelectProjectionExpr => {
                 LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
             }
+            ListType::GroupingSetExprMembers => LogicalPlanLanguage::GroupingSetExprMembers(list),
             ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
             ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
@@ -1410,6 +1416,10 @@ fn aggr_aggr_expr_empty_tail() -> String {
 
 fn grouping_set_expr(members: impl Display, expr_type: impl Display) -> String {
     format!("(GroupingSetExpr {} {})", members, expr_type)
+}
+
+fn grouping_set_expr_members_empty_tail() -> String {
+    format!("GroupingSetExprMembers")
 }
 
 fn aggr_aggr_expr_legacy(left: impl Display, right: impl Display) -> String {

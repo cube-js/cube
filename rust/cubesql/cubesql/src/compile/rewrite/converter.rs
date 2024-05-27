@@ -525,12 +525,12 @@ impl LogicalPlanToLanguageConverter {
             }
             Expr::GroupingSet(groupping_set) => match groupping_set {
                 GroupingSet::Rollup(members) => {
-                    let members = add_binary_expr_list_node!(
+                    let members = add_expr_flat_list_node!(
                         graph,
                         members,
                         query_params,
                         GroupingSetExprMembers,
-                        false
+                        flat_list
                     );
                     let expr_type =
                         add_expr_data_node!(graph, GroupingSetType::Rollup, GroupingSetExprType);

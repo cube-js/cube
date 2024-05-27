@@ -217,6 +217,12 @@ impl WrapperRules {
                 ListType::AggregateGroupExpr,
                 ListType::WrappedSelectGroupExpr,
             );
+            Self::flat_list_pushdown_pullup_rules(
+                rules,
+                "wrapper-grouping-set-members",
+                ListType::GroupingSetExprMembers,
+                ListType::GroupingSetExprMembers,
+            );
         } else {
             Self::list_pushdown_pullup_rules(
                 rules,
@@ -231,13 +237,13 @@ impl WrapperRules {
                 "AggregateGroupExpr",
                 "WrappedSelectGroupExpr",
             );
+            Self::list_pushdown_pullup_rules(
+                rules,
+                "wrapper-grouping-set-members",
+                "GroupingSetExprMembers",
+                "GroupingSetExprMembers",
+            );
         }
-        Self::list_pushdown_pullup_rules(
-            rules,
-            "wrapper-grouping-set-members",
-            "GroupingSetExprMembers",
-            "GroupingSetExprMembers",
-        );
     }
 
     pub fn aggregate_rules_subquery(
