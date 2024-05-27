@@ -17,7 +17,7 @@ import {
   SASProtocol,
   generateBlobSASQueryParameters,
 } from '@azure/storage-blob';
-import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions } from '@cubejs-backend/base-driver';
+import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions, GenericDataBaseType } from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -99,7 +99,13 @@ type ShowDatabasesRow = {
   databaseName: string,
 };
 
+type ColumnInfo = {
+  name: any;
+  type: GenericDataBaseType;
+};
+
 const DatabricksToGenericType: Record<string, string> = {
+  binary: 'hll_datasketches',
   'decimal(10,0)': 'bigint',
 };
 
@@ -537,8 +543,9 @@ export class DatabricksDriver extends JDBCDriver {
   public async queryColumnTypes(
     sql: string,
     params?: unknown[]
-  ): Promise<{ name: any; type: string; }[]> {
+  ): Promise<ColumnInfo[]> {
     const result = [];
+
     // eslint-disable-next-line camelcase
     const response = await this.query<{col_name: string; data_type: string}>(
       `DESCRIBE QUERY ${sql}`,
@@ -631,7 +638,7 @@ export class DatabricksDriver extends JDBCDriver {
   private async unloadWithSql(tableFullName: string, sql: string, params: unknown[]) {
     const types = await this.queryColumnTypes(sql, params);
 
-    await this.createExternalTableFromSql(tableFullName, sql, params);
+    await this.createExternalTableFromSql(tableFullName, sql, params, types);
     
     return types;
   }
@@ -641,9 +648,8 @@ export class DatabricksDriver extends JDBCDriver {
    */
   private async unloadWithTable(tableFullName: string) {
     const types = await this.tableColumnTypes(tableFullName);
-    const columns = types.map(t => t.name).join(', ');
 
-    await this.createExternalTableFromTable(tableFullName, columns);
+    await this.createExternalTableFromTable(tableFullName, types);
     
     return types;
   }
@@ -735,14 +741,17 @@ export class DatabricksDriver extends JDBCDriver {
       },
       region: this.config.awsRegion,
     });
+
     const url = new URL(pathname);
     const list = await client.listObjectsV2({
       Bucket: url.host,
       Prefix: url.pathname.slice(1),
     });
+
     if (list.Contents === undefined) {
       throw new Error(`No content in specified path: ${pathname}`);
     }
+
     const csvFile = await Promise.all(
       list.Contents
         .filter(file => file.Key && /.csv$/i.test(file.Key))
@@ -758,7 +767,21 @@ export class DatabricksDriver extends JDBCDriver {
       throw new Error('No CSV files were exported to the specified bucket. ' +
         'Please check your export bucket configuration.');
     }
+
     return csvFile;
+  }
+
+  protected generateTableColumnsForExport(columns: ColumnInfo[]): string {
+    const wrapped = columns.map((c) => {
+      if (c.type === 'hll_datasketches') {
+        // [UNSUPPORTED_DATA_TYPE_FOR_DATASOURCE] The CSV datasource doesn't support type \"BINARY\". SQLSTATE: 0A000
+        return `base64(${c.name})`;
+      } else {
+        return c.name;
+      }
+    });
+
+    return wrapped.join(', ');
   }
 
   /**
@@ -778,14 +801,20 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[]) {
+  private async createExternalTableFromSql(tableFullName: string, sql: string, params: unknown[], columns: ColumnInfo[]) {
+    let select = sql;
+
+    if (columns.find((column) => column.type === 'hll_datasketches')) {
+      select = `SELECT ${this.generateTableColumnsForExport(columns)} FROM (${sql})`;
+    }
+
     try {
       await this.query(
         `
         CREATE TABLE ${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
-        AS (${sql});
+        AS (${select});
         `,
         params,
       );
@@ -811,14 +840,14 @@ export class DatabricksDriver extends JDBCDriver {
    * `fs.s3a.access.key <aws-access-key>`
    * `fs.s3a.secret.key <aws-secret-key>`
    */
-  private async createExternalTableFromTable(tableFullName: string, columns: string) {
+  private async createExternalTableFromTable(tableFullName: string, columns: ColumnInfo[]) {
     try {
       await this.query(
         `
         CREATE TABLE _${tableFullName}
         USING CSV LOCATION '${this.config.exportBucketMountDir || this.config.exportBucket}/${tableFullName}.csv'
         OPTIONS (escape = '"')
-        AS SELECT ${columns} FROM ${tableFullName}
+        AS SELECT ${this.generateTableColumnsForExport(columns)} FROM ${tableFullName}
         `,
         [],
       );
