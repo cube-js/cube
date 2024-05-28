@@ -311,25 +311,28 @@ describe('SQLInterface', () => {
         canSwitchUserForSession: (_payload) => true,
       });
 
-      const connection = new Client({
-        host: '127.0.0.1',
-        database: 'test',
-        port: 5555,
-        user: 'allowed_user',
-        password: 'password_for_allowed_user',
-      });
-      await connection.connect();
-
+      let buf = '';
       let rows = 0;
       const write = jest.fn((chunk, _, callback) => {
-        expect(chunk).toBeInstanceOf(Buffer);
-        const result = JSON.parse(chunk.toString('utf-8'));
-        if (result.data) {
-          rows += result.data.length;
-        }
+        const lines = (buf + chunk.toString('utf-8')).split('\n');
+        buf = lines.pop() || '';
+
+        rows = lines
+          .filter((it) => it.trim().length)
+          .map((it) => {
+            const json = JSON.parse(it);
+            expect(json.error).toBeUndefined();
+
+            return json.data?.length || 0;
+          })
+          .reduce((a, b) => a + b, rows);
 
         callback();
       });
+
+      if (buf.length > 0) {
+        rows += JSON.parse(buf).data.length;
+      }
 
       const cubeSqlStream = new Writable({
         write,
@@ -344,7 +347,6 @@ describe('SQLInterface', () => {
         cubeSqlStream
       );
 
-      // expect(onDrain).toHaveBeenCalled();
       expect(rows).toBe(100000);
 
       await native.shutdownInterface(instance);
