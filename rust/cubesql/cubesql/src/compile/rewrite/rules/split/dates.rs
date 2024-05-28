@@ -90,18 +90,6 @@ impl SplitRules {
             false,
             rules,
         );
-        self.single_arg_pass_through_rules(
-            "date-trunc-pass-through",
-            |expr| self.fun_expr("DateTrunc", vec![literal_expr("?granularity"), expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "date-part-pass-through",
-            |expr| self.fun_expr("DatePart", vec![literal_expr("?granularity"), expr]),
-            false,
-            rules,
-        );
     }
 
     fn transform_date_part(
