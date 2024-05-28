@@ -179,7 +179,7 @@ SELECT
   END) real_status,
   SUM(number)
 FROM orders
-  CROSS JOIN Users
+CROSS JOIN users
 GROUP BY 1;
 ```
 
@@ -201,11 +201,11 @@ SELECT
   SUM(amount) AS total
 FROM (
   SELECT
-    Users.city AS city,
+    users.city AS city,
     SUM(number) AS amount,
     orders.status
   FROM orders
-    CROSS JOIN Users
+  CROSS JOIN users
   GROUP BY 1, 3
 ) AS inner
 GROUP BY 1, 2

@@ -43,13 +43,15 @@ and the sections below for details on each query type.
 | Query type | Supported by [APIs][ref-apis] | Supported in [Playground][ref-playground] |
 | --- | --- | --- |
 | [Regular query](#regular-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ✅ Yes |
+| [Query with post-processing](#query-with-post-processing) | [SQL API][ref-sql-api] only | ❌ No |
+| [Query with push-down](#query-with-push-down) | [SQL API][ref-sql-api] only | ❌ No |
+| [Compare date range query](#compare-date-range-query) | [REST API][ref-rest-api] only | ❌ No |
+| [Total query](#total-query) | [REST API][ref-rest-api] only | ❌ No |
 | [Ungrouped query](#ungrouped-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ❌ No |
-| [Compare date range query](#compare-date-range-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api] | ❌ No |
-| [Total query](#total-query) | [REST API][ref-rest-api] | ❌ No |
 
 ### Regular query
 
-This is the most common type of queries. Regular queries include:
+**This is the most common type of queries.** Regular queries include:
 - Lists of dimensions and measures that you'd like to see in the result set.
 - Optionally, filters to apply before returning the result set.
 - Optionally, a [row limit](#row-limit) and an offset for the result set.
@@ -59,36 +61,228 @@ sources][ref-data-sources] that always includes all dimensions in the `GROUP BY`
 statement. See [ungrouped queries](#ungrouped-query) if you'd like to override
 this behavior.
 
+Regular queries immensely benefit from [in-memory cache and
+pre-aggregations][ref-caching]. They can also be modified before execution with
+[`query_rewrite`][ref-query-rewrite].
+
 #### Example
 
 See an example of a regular query using the SQL API syntax:
 
 ```sql
 SELECT
-  city,
-  MEASURE(amount)
+  users.state,
+  users.city,
+  orders.status,
+  MEASURE(orders.count)
 FROM orders
-WHERE status = 'shipped'
-GROUP BY 1
-LIMIT 100
+CROSS JOIN users
+WHERE
+  users.state != 'us-wa'
+  AND orders.created_at BETWEEN '2020-01-01' AND '2021-01-01'
+GROUP BY 1, 2, 3
+LIMIT 10;
 ```
 
 The same query using the REST API syntax looks as follows:
 
 ```json
 {
-  "dimensions": ["orders.city"],
-  "measures": ["orders.amount"],
+  "dimensions": [
+    "users.state",
+    "users.city",
+    "orders.status"
+  ],
+  "measures": [
+    "orders.count"
+  ],
   "filters": [
     {
-      "member": "orders.status",
-      "operator": "equals",
-      "values": ["shipped"]
+      "member": "users.state",
+      "operator": "notEquals",
+      "values": ["us-wa"]
     }
   ],
-  "limit": 100
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at",
+      "dateRange": ["2020-01-01", "2021-01-01"]
+    }
+  ],
+  "limit": 10
 }
 ```
+
+### Query with post-processing
+
+**Queries with post-processing are specific to the [SQL API][ref-sql-api].**
+They are structured in such a way that a [regular query](#regular-query) is
+part of a `FROM` clause or a common table expression (CTE):
+
+```sql
+-- Regular query in FROM
+SELECT ...
+FROM (
+  -- Regular query
+) AS regular_query_in_from
+GROUP BY ...
+ORDER BY ...
+
+-- Regular query in CTE
+WITH regular_query_in_cte AS (
+  -- Regular query
+)
+SELECT ...
+FROM regular_query_in_cte
+GROUP BY ...
+ORDER BY ...
+```
+
+To execute the *regular query* part, Cube will generate the SQL for an upstream
+[data source][ref-data-sources]. Then, Cube will do *post-processing* by
+executing the rest of the query using an internal SQL execution engine.
+
+Queries with post-processing, since they include regular queries, benefit from
+[in-memory cache and pre-aggregations][ref-caching]. They can also be modified
+before execution with [`query_rewrite`][ref-query-rewrite].
+
+However, the trade-off is that queries with post-processing support only a
+limited set of SQL functions and operators. 
+
+#### Example
+
+See an example of a query with post-processing. In this query, we derive new
+dimensions, post-aggregate measures, and perform additional filtering:
+
+```sql
+SELECT
+  UPPER(SUBSTRING(state FROM 4)) AS state,
+  CHAR_LENGTH(city) AS city_name_length,
+  CASE WHEN status = 'completed' THEN 'done' ELSE 'pending' END AS status,
+  SUM(count) AS total_count
+FROM (
+  SELECT
+    users.state,
+    users.city,
+    orders.status,
+    MEASURE(orders.count) AS count
+  FROM orders
+  CROSS JOIN users
+  WHERE
+    users.state != 'us-wa'
+    AND orders.created_at BETWEEN '2020-01-01' AND '2021-01-01'
+  GROUP BY 1, 2, 3
+  LIMIT 10
+) AS regular_query
+GROUP BY 1, 2, 3
+HAVING city_name_length > 10;
+```
+
+Let's assume that we run the query above and the following pre-aggregation
+is defined:
+
+```yaml
+pre_aggregations:
+  - name: main
+    measures:
+      - orders.count
+    dimensions:
+      - users.state
+      - users.city
+      - orders.status
+    time_dimension: orders.created_at
+    granularity: day
+```
+
+Cube will use this pre-aggregation, run the following SQL in Cube Store for
+the regular query, and then do post-processing to produce the result set:
+
+```sql
+SELECT
+  `users__state`,
+  `users__city`,
+  `orders__status`,
+  sum(`orders__count`) `orders__count`
+FROM
+  prod_pre_aggregations.orders_main_s3ebmau3_mw1bchy_1j4umn8
+WHERE
+  (
+    `users__state` <> 'us-wa'
+    OR `users__state` IS NULL
+  )
+  AND (
+    `orders__created_at_day` >= to_timestamp('2020-01-01T00:00:00.000')
+    AND `orders__created_at_day` <= to_timestamp('2021-01-01T23:59:59.999')
+  )
+GROUP BY 1, 2, 3
+ORDER BY 4 DESC
+LIMIT 10
+```
+
+### Query with push-down
+
+**Queries with push-down are specific to the [SQL API][ref-sql-api].**
+Unlike [queries with post-processing](#query-with-post-processing), they can
+have arbitrary structure and contain pretty much any SQL functions and operators.
+
+Thus, queries with push-down are not reducible to [regular
+queries](#regular-query) and post-processing on top of them. To execute a query
+with push-down, Cube will need to transform it and generate the SQL for an
+upstream [data source][ref-data-sources].
+
+Queries with push-down, since they don't include regular queries, can not
+utilize pre-aggregations; however, they still benefit from [in-memory
+cache][ref-caching]. Queries with push-down can also be modified before
+execution with [`query_rewrite`][ref-query-rewrite]; however, only applying
+additional filters is supported.
+
+#### Example
+
+See an example of a query with push-down. In this query, the filter in `WHERE`
+references a subquery. So, it can't be executed as a query with post-processing.
+It will be executed as a query with push-down instead:
+
+```sql
+SELECT
+  users.state,
+  users.city
+FROM users
+WHERE
+  users.orders_made = (
+    SELECT MAX(orders_made)
+    FROM users
+  )
+GROUP BY 1, 2
+```
+
+### Compare date range query
+
+**Compare date range queries are special cases of regular queries.**
+Similarly to [regular queries](#regular-queries), they include lists of
+dimensions and measures, filters, etc. and return a result set.
+
+However, unlike regular queries, they provide a convenient way to retrieve
+measure values for *more than one date range* for a time dimension. See [this
+blog post][blog-compare-date-range] for more details and examples.
+
+You can make a compare date range query by using the `compareDateRange`
+option with the [REST API][ref-rest-api-query-format-options-tdf]. For the SQL
+API, you can write an equivalent query using the `UNION ALL` statement.
+
+### Total query
+
+**Total queries are special cases of regular queries.**
+Similarly to [regular queries](#regular-queries), they include lists of
+dimensions and measures, filters, etc. and return a result set.
+
+In addition to that, they provide a convenient way to retrieve the total number
+of rows in the result set as if no [row limit](#row-limit) or offset are set in
+the query. This is useful for creating user interfaces with
+[pagination][ref-pagination-recipe].
+
+You can make a total query by using the `total` option with the [REST
+API][ref-rest-api-query-format-options]. For the SQL API, you can write an
+equivalent query using the `UNION ALL` statement.
 
 ### Ungrouped query
 
@@ -96,7 +290,7 @@ Similarly to [regular queries](#regular-queries), ungrouped queries include
 lists of dimensions and measures, filters, etc. and return a result set.
 
 However, unlike for regular queries, Cube will not add the
-`GROUP BY` statement when generating the SQL for the upstream data sources.
+`GROUP BY` statement when generating the SQL for an upstream data source.
 Instead, raw results after filtering and joining will be returned without any
 grouping. Measures will be rendered as their `sql` without any aggregation.
 Time dimensions will be truncated by granularity as usual, however, not grouped by.
@@ -113,33 +307,6 @@ option][ref-conf-allow-ungrouped] to override this.
 
 Additionally, note that ungrouped queries have additional requirements for
 [pre-aggregation matching][ref-matching-preaggs-ungrouped].
-
-### Compare date range query
-
-Similarly to [regular queries](#regular-queries), compare date range queries
-include lists of dimensions and measures, filters, etc. and return a result set.
-
-However, unlike regular queries, they provide a convenient way to retrieve
-measure values for *more than one date range* for a time dimension. See [this
-blog post][blog-compare-date-range] for more details and examples.
-
-You can make a compare date range query by using the `compareDateRange`
-option with the [REST API][ref-rest-api-query-format-options-tdf]. For the SQL
-API, you can write an equivalent query using the `UNION ALL` statement.
-
-### Total query
-
-Similarly to [regular queries](#regular-queries), total queries include lists
-of dimensions and measures, filters, etc. and return a result set.
-
-In addition to that, they provide a convenient way to retrieve the total number
-of rows in the result set as if no [row limit](#row-limit) or offset are set in
-the query. This is useful for creating user interfaces with
-[pagination][ref-pagination-recipe].
-
-You can make a total query by using the `total` option with the [REST
-API][ref-rest-api-query-format-options]. For the SQL API, you can write an
-equivalent query using the `UNION ALL` statement.
 
 
 [wiki-utc-time-zone]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
@@ -158,4 +325,7 @@ equivalent query using the `UNION ALL` statement.
 [ref-pagination-recipe]: /guides/recipes/queries/pagination
 [ref-primary-key]: /reference/data-model/dimensions#primary_key
 [ref-conf-allow-ungrouped]: /reference/configuration/config#allow_ungrouped_without_primary_key
+[ref-caching]: /product/caching
+[ref-query-rewrite]: /reference/configuration/config#query_rewrite
+[ref-ref-sql-api]: /reference/sql-api
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
