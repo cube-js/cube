@@ -107,31 +107,13 @@ jobs:
         run: npm install -g yarn
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-        shell: bash
-      - name: Restore yarn cache
-        uses: actions/cache@v3
+      - name: Install cargo-cp-artifact
+        run: npm install -g cargo-cp-artifact@0.1
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
-          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-      - name: Copy yarn.lock file
-        run: cp yarn.lock packages/cubejs-docker
-      - name: Yarn install
-        uses: nick-invision/retry@v2
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Compile TypeScript
-        run: yarn tsc
+          workspaces: ./packages/cubejs-backend-native
+          key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          shared-key: native-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         env:
