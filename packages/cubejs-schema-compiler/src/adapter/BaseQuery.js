@@ -1887,7 +1887,6 @@ export class BaseQuery {
    * @returns {string}
    */
   aggregateSubQueryGroupByClause() {
-    const dimensionColumns = this.dimensionColumns();
     return this.groupByClause();
   }
 
