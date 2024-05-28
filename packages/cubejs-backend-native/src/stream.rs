@@ -14,7 +14,7 @@ use crate::channel::call_js_fn;
 use cubesql::CubeError;
 
 use neon::prelude::*;
-use tokio::sync::{oneshot, watch, Semaphore};
+use tokio::sync::{oneshot, Semaphore};
 
 #[cfg(build = "debug")]
 use log::trace;
@@ -40,9 +40,7 @@ fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 pub struct OnDrainHandler {
     channel: Arc<Channel>,
     js_stream: Arc<Root<JsObject>>,
-    paused_tx: Arc<watch::Sender<bool>>,
     semaphore: Arc<Semaphore>,
-    tokio_handle: Arc<tokio::runtime::Handle>,
 }
 
 unsafe impl Sync for OnDrainHandler {}
@@ -53,16 +51,12 @@ impl OnDrainHandler {
     pub fn new(
         channel: Arc<Channel>,
         js_stream: Arc<Root<JsObject>>,
-        paused_tx: Arc<watch::Sender<bool>>,
         semaphore: Arc<Semaphore>,
-        tokio_handle: Arc<tokio::runtime::Handle>,
     ) -> Self {
         Self {
             channel,
             js_stream,
-            paused_tx,
             semaphore,
-            tokio_handle,
         }
     }
 
@@ -90,18 +84,7 @@ impl OnDrainHandler {
     }
 
     fn on_drain(&self) {
-        let sem = self.semaphore.clone();
-        let paused_tx = self.paused_tx.clone();
-
-        self.tokio_handle.spawn(async move {
-            let _permit = sem.acquire().await;
-            match paused_tx.send(false) {
-                Ok(_) => {}
-                Err(e) => {
-                    log::error!("Failed to resume stream: {}", e)
-                }
-            }
-        });
+        self.semaphore.add_permits(1);
     }
 }
 
