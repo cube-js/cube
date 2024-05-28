@@ -143,8 +143,15 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
     "--------------------",
+
     "week granularity is not supported for intervals",
     "--------------------",
-    "querying BigECommerce: rolling window by 2 week"
+    "querying BigECommerce: rolling window by 2 week",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup"
   ]
 }

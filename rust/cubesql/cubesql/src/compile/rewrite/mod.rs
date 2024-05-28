@@ -14,7 +14,7 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::{
         plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
-        ExprRewriter, JoinConstraint, JoinType, Operator, RewriteRecursion,
+        ExprRewriter, GroupingSet, JoinConstraint, JoinType, Operator, RewriteRecursion,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -60,6 +60,12 @@ impl Display for LikeType {
 pub enum WrappedSelectType {
     Projection,
     Aggregate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum GroupingSetType {
+    Rollup,
+    Cube,
 }
 
 crate::plan_to_language! {
@@ -476,6 +482,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             meta: Option<Vec<(String, String)>>,
         },
+        GroupingSetExpr {
+            members: Vec<Expr>,
+            type: GroupingSetType,
+        },
         QueryParam {
             index: usize,
         },
@@ -736,6 +746,7 @@ pub enum ListType {
     AggregateGroupExpr,
     AggregateAggrExpr,
     ScalarFunctionExprArgs,
+    GroupingSetExprMembers,
     WrappedSelectProjectionExpr,
     WrappedSelectGroupExpr,
     WrappedSelectAggrExpr,
@@ -750,6 +761,7 @@ impl ListType {
             Self::WindowWindowExpr => window_window_expr_empty_tail(),
             Self::AggregateGroupExpr => aggr_group_expr_empty_tail(),
             Self::AggregateAggrExpr => aggr_aggr_expr_empty_tail(),
+            Self::GroupingSetExprMembers => grouping_set_expr_members_empty_tail(),
             Self::ScalarFunctionExprArgs => scalar_fun_expr_args_empty_tail(),
             Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty_tail(),
             Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
@@ -817,6 +829,9 @@ impl ListNodeSearcher {
             }
             ListType::WrappedSelectProjectionExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
+            }
+            ListType::GroupingSetExprMembers => {
+                matches!(node, LogicalPlanLanguage::GroupingSetExprMembers(_))
             }
             ListType::WrappedSelectGroupExpr => {
                 matches!(node, LogicalPlanLanguage::WrappedSelectGroupExpr(_))
@@ -925,6 +940,7 @@ impl ListNodeApplierList {
             ListType::WrappedSelectProjectionExpr => {
                 LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
             }
+            ListType::GroupingSetExprMembers => LogicalPlanLanguage::GroupingSetExprMembers(list),
             ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
             ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
             ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
@@ -1396,6 +1412,14 @@ fn aggr_aggr_expr(exprs: Vec<impl Display>) -> String {
 
 fn aggr_aggr_expr_empty_tail() -> String {
     aggr_aggr_expr(Vec::<String>::new())
+}
+
+fn grouping_set_expr(members: impl Display, expr_type: impl Display) -> String {
+    format!("(GroupingSetExpr {} {})", members, expr_type)
+}
+
+fn grouping_set_expr_members_empty_tail() -> String {
+    format!("GroupingSetExprMembers")
 }
 
 fn aggr_aggr_expr_legacy(left: impl Display, right: impl Display) -> String {
@@ -2151,4 +2175,21 @@ pub fn add_root_original_expr_alias(
     } else {
         false
     }
+}
+
+pub fn extract_exprlist_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Expr> {
+    let mut result = Vec::new();
+    for expr in exprs {
+        match expr {
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::Cube(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::GroupingSets(sets) => {
+                    result.extend(sets.iter().flat_map(|s| s.iter().cloned()))
+                }
+            },
+            _ => result.push(expr.clone()),
+        }
+    }
+    result
 }

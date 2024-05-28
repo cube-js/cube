@@ -138,6 +138,9 @@
     "SQL API: reuse params",
     "SQL API: post-aggregate percentage of total",
     "SQL API: powerbi min max ungrouped flag",
-    "SQL API: powerbi min max push down"
+    "SQL API: powerbi min max push down",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup"
   ]
 }

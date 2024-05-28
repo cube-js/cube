@@ -2,7 +2,8 @@ use crate::{
     compile::rewrite::{
         aggregate,
         analysis::LogicalPlanAnalysis,
-        column_name_to_member_vec, cube_scan_wrapper, original_expr_name,
+        column_name_to_member_vec, cube_scan_wrapper, grouping_set_expr, original_expr_name,
+        rewrite,
         rules::{members::MemberRules, wrapper::WrapperRules},
         subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
         wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
@@ -10,7 +11,8 @@ use crate::{
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
-        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerUngrouped,
+        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
     var, var_iter,
@@ -23,100 +25,143 @@ impl WrapperRules {
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
-        rules.extend(vec![transforming_rewrite(
-            "wrapper-push-down-aggregate-to-cube-scan",
-            aggregate(
+        rules.extend(vec![
+            transforming_rewrite(
+                "wrapper-push-down-aggregate-to-cube-scan",
+                aggregate(
+                    cube_scan_wrapper(
+                        wrapper_pullup_replacer(
+                            "?cube_scan_input",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
+                        "CubeScanWrapperFinalized:false",
+                    ),
+                    "?group_expr",
+                    "?aggr_expr",
+                    "AggregateSplit:false",
+                ),
                 cube_scan_wrapper(
-                    wrapper_pullup_replacer(
-                        "?cube_scan_input",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "?in_projection",
-                        "?cube_members",
+                    wrapped_select(
+                        "WrappedSelectSelectType:Aggregate",
+                        wrapper_pullup_replacer(
+                            wrapped_select_projection_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_subqueries_empty_tail(),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pushdown_replacer(
+                            "?group_expr",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pushdown_replacer(
+                            "?aggr_expr",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_window_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            "?cube_scan_input",
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapped_select_joins_empty_tail(),
+                        wrapper_pullup_replacer(
+                            wrapped_select_filter_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapped_select_having_expr_empty_tail(),
+                        "WrappedSelectLimit:None",
+                        "WrappedSelectOffset:None",
+                        wrapper_pullup_replacer(
+                            wrapped_select_order_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "?ungrouped",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        "WrappedSelectAlias:None",
+                        "WrappedSelectDistinct:false",
+                        "?select_ungrouped",
+                        "WrappedSelectUngroupedScan:false",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                "?group_expr",
-                "?aggr_expr",
-                "AggregateSplit:false",
-            ),
-            cube_scan_wrapper(
-                wrapped_select(
-                    "WrappedSelectSelectType:Aggregate",
-                    wrapper_pullup_replacer(
-                        wrapped_select_projection_expr_empty_tail(),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapper_pullup_replacer(
-                        wrapped_select_subqueries_empty_tail(),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?group_expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapper_pushdown_replacer(
-                        "?aggr_expr",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapper_pullup_replacer(
-                        wrapped_select_window_expr_empty_tail(),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapper_pullup_replacer(
-                        "?cube_scan_input",
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapped_select_joins_empty_tail(),
-                    wrapper_pullup_replacer(
-                        wrapped_select_filter_expr_empty_tail(),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    wrapped_select_having_expr_empty_tail(),
-                    "WrappedSelectLimit:None",
-                    "WrappedSelectOffset:None",
-                    wrapper_pullup_replacer(
-                        wrapped_select_order_expr_empty_tail(),
-                        "?alias_to_cube",
-                        "?ungrouped",
-                        "WrapperPullupReplacerInProjection:false",
-                        "?cube_members",
-                    ),
-                    "WrappedSelectAlias:None",
-                    "WrappedSelectDistinct:false",
+                self.transform_aggregate(
+                    "?group_expr",
+                    "?aggr_expr",
+                    "?ungrouped",
                     "?select_ungrouped",
-                    "WrappedSelectUngroupedScan:false",
                 ),
-                "CubeScanWrapperFinalized:false",
             ),
-            self.transform_aggregate(
-                "?group_expr",
-                "?aggr_expr",
-                "?ungrouped",
-                "?select_ungrouped",
+            transforming_rewrite(
+                "wrapper-groupping-set-push-down",
+                wrapper_pushdown_replacer(
+                    grouping_set_expr("?rollout_members", "?type"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "WrapperPullupReplacerInProjection:false",
+                    "?cube_members",
+                ),
+                grouping_set_expr(
+                    wrapper_pushdown_replacer(
+                        "?rollout_members",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    "?type",
+                ),
+                self.check_rollup_allowed("?alias_to_cube"),
             ),
-        )]);
+            rewrite(
+                "wrapper-groupping-set-pull-up",
+                grouping_set_expr(
+                    wrapper_pullup_replacer(
+                        "?rollout_members",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    "?type",
+                ),
+                wrapper_pullup_replacer(
+                    grouping_set_expr("?rollout_members", "?type"),
+                    "?alias_to_cube",
+                    "?ungrouped",
+                    "WrapperPullupReplacerInProjection:false",
+                    "?cube_members",
+                ),
+            ),
+        ]);
 
         // TODO add flag to disable dimension rules
         MemberRules::measure_rewrites(
@@ -172,6 +217,12 @@ impl WrapperRules {
                 ListType::AggregateGroupExpr,
                 ListType::WrappedSelectGroupExpr,
             );
+            Self::flat_list_pushdown_pullup_rules(
+                rules,
+                "wrapper-grouping-set-members",
+                ListType::GroupingSetExprMembers,
+                ListType::GroupingSetExprMembers,
+            );
         } else {
             Self::list_pushdown_pullup_rules(
                 rules,
@@ -185,6 +236,12 @@ impl WrapperRules {
                 "wrapper-aggregate-group-expr",
                 "AggregateGroupExpr",
                 "WrappedSelectGroupExpr",
+            );
+            Self::list_pushdown_pullup_rules(
+                rules,
+                "wrapper-grouping-set-members",
+                "GroupingSetExprMembers",
+                "GroupingSetExprMembers",
             );
         }
     }
@@ -378,6 +435,33 @@ impl WrapperRules {
             return true;
         }
         false
+    }
+
+    fn check_rollup_allowed(
+        &self,
+        alias_to_cube_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta = self.meta_context.clone();
+        move |egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                WrapperPullupReplacerAliasToCube
+            )
+            .cloned()
+            {
+                if let Some(sql_generator) = meta.sql_generator_by_alias_to_cube(&alias_to_cube) {
+                    if sql_generator
+                        .get_sql_templates()
+                        .templates
+                        .contains_key("expressions/rollup")
+                    {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
     }
 
     fn pushdown_measure(

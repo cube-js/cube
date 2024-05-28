@@ -8,27 +8,27 @@ use crate::{
             provider::CubeContext,
         },
         rewrite::{
-            analysis::LogicalPlanAnalysis, rewriter::Rewriter, AggregateFunctionExprDistinct,
-            AggregateFunctionExprFun, AggregateSplit, AggregateUDFExprFun, AliasExprAlias,
-            AnyExprAll, AnyExprOp, BetweenExprNegated, BinaryExprOp, CastExprDataType,
-            ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube, CubeScanLimit,
-            CubeScanOffset, CubeScanUngrouped, CubeScanWrapped, DimensionName,
-            EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
+            analysis::LogicalPlanAnalysis, extract_exprlist_from_groupping_set, rewriter::Rewriter,
+            AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
+            AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
+            BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
+            CubeScanAliasToCube, CubeScanLimit, CubeScanOffset, CubeScanUngrouped, CubeScanWrapped,
+            DimensionName, EmptyRelationDerivedSourceTableName, EmptyRelationIsWrappable,
             EmptyRelationProduceOneRow, FilterMemberMember, FilterMemberOp, FilterMemberValues,
-            FilterOpOp, InListExprNegated, InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType,
-            JoinLeftOn, JoinRightOn, LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated,
-            LikeType, LimitFetch, LimitSkip, LiteralExprValue, LiteralMemberRelation,
-            LiteralMemberValue, LogicalPlanLanguage, MeasureName, MemberErrorError, OrderAsc,
-            OrderMember, OuterColumnExprColumn, OuterColumnExprDataType, ProjectionAlias,
-            ProjectionSplit, QueryParamIndex, ScalarFunctionExprFun, ScalarUDFExprFun,
-            ScalarVariableExprDataType, ScalarVariableExprVariable, SegmentMemberMember,
-            SortExprAsc, SortExprNullsFirst, SubqueryTypes, TableScanFetch, TableScanProjection,
-            TableScanSourceTableName, TableScanTableName, TableUDFExprFun, TimeDimensionDateRange,
-            TimeDimensionGranularity, TimeDimensionName, TryCastExprDataType, UnionAlias,
-            WindowFunctionExprFun, WindowFunctionExprWindowFrame, WrappedSelectAlias,
-            WrappedSelectDistinct, WrappedSelectJoinJoinType, WrappedSelectLimit,
-            WrappedSelectOffset, WrappedSelectSelectType, WrappedSelectType,
-            WrappedSelectUngrouped,
+            FilterOpOp, GroupingSetExprType, GroupingSetType, InListExprNegated,
+            InSubqueryExprNegated, JoinJoinConstraint, JoinJoinType, JoinLeftOn, JoinRightOn,
+            LikeExprEscapeChar, LikeExprLikeType, LikeExprNegated, LikeType, LimitFetch, LimitSkip,
+            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
+            MeasureName, MemberErrorError, OrderAsc, OrderMember, OuterColumnExprColumn,
+            OuterColumnExprDataType, ProjectionAlias, ProjectionSplit, QueryParamIndex,
+            ScalarFunctionExprFun, ScalarUDFExprFun, ScalarVariableExprDataType,
+            ScalarVariableExprVariable, SegmentMemberMember, SortExprAsc, SortExprNullsFirst,
+            SubqueryTypes, TableScanFetch, TableScanProjection, TableScanSourceTableName,
+            TableScanTableName, TableUDFExprFun, TimeDimensionDateRange, TimeDimensionGranularity,
+            TimeDimensionName, TryCastExprDataType, UnionAlias, WindowFunctionExprFun,
+            WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
+            WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
+            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
         },
     },
     sql::AuthContextRef,
@@ -43,10 +43,11 @@ use datafusion::{
     catalog::TableReference,
     error::DataFusionError,
     logical_plan::{
-        build_join_schema, build_table_udf_schema, exprlist_to_fields, normalize_cols,
+        build_join_schema, build_table_udf_schema, exprlist_to_fields,
+        exprlist_to_fields_from_schema, normalize_cols,
         plan::{Aggregate, Extension, Filter, Join, Projection, Sort, TableUDFs, Window},
         replace_col_to_expr, Column, CrossJoin, DFField, DFSchema, DFSchemaRef, Distinct,
-        EmptyRelation, Expr, ExprRewritable, ExprRewriter, Like, Limit, LogicalPlan,
+        EmptyRelation, Expr, ExprRewritable, ExprRewriter, GroupingSet, Like, Limit, LogicalPlan,
         LogicalPlanBuilder, TableScan, Union,
     },
     physical_plan::planner::DefaultPhysicalPlanner,
@@ -522,6 +523,33 @@ impl LogicalPlanToLanguageConverter {
                 let key = Self::add_expr_replace_params(graph, key, query_params, flat_list)?;
                 graph.add(LogicalPlanLanguage::GetIndexedFieldExpr([expr, key]))
             }
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(members) => {
+                    let members = add_expr_flat_list_node!(
+                        graph,
+                        members,
+                        query_params,
+                        GroupingSetExprMembers,
+                        flat_list
+                    );
+                    let expr_type =
+                        add_expr_data_node!(graph, GroupingSetType::Rollup, GroupingSetExprType);
+                    graph.add(LogicalPlanLanguage::GroupingSetExpr([members, expr_type]))
+                }
+                GroupingSet::Cube(members) => {
+                    let members = add_binary_expr_list_node!(
+                        graph,
+                        members,
+                        query_params,
+                        GroupingSetExprMembers,
+                        false
+                    );
+                    let expr_type =
+                        add_expr_data_node!(graph, GroupingSetType::Cube, GroupingSetExprType);
+                    graph.add(LogicalPlanLanguage::GroupingSetExpr([members, expr_type]))
+                }
+                _ => unimplemented!("Unsupported grouping set type: {:?}", expr),
+            },
             // TODO: Support all
             _ => unimplemented!("Unsupported node type: {:?}", expr),
         })
@@ -1200,6 +1228,16 @@ pub fn node_to_expr(
                 negated,
             }
         }
+        LogicalPlanLanguage::GroupingSetExpr(params) => {
+            let members =
+                match_expr_list_node!(node_by_id, to_expr, params[0], GroupingSetExprMembers);
+            let expr_type = match_data_node!(node_by_id, params[1], GroupingSetExprType);
+
+            match expr_type {
+                GroupingSetType::Rollup => Expr::GroupingSet(GroupingSet::Rollup(members)),
+                GroupingSetType::Cube => Expr::GroupingSet(GroupingSet::Cube(members)),
+            }
+        }
         x => panic!("Unexpected expression node: {:?}", x),
     })
 }
@@ -1237,7 +1275,7 @@ impl LanguageToLogicalPlanConverter {
                     replace_qualified_col_with_flat_name_if_missing(expr, input.schema(), true)?;
                 let alias = match_data_node!(node_by_id, params[2], ProjectionAlias);
                 let input_schema = DFSchema::new_with_metadata(
-                    exprlist_to_fields(&expr, input.schema())?,
+                    exprlist_to_fields(&expr, &input)?,
                     HashMap::new(),
                 )?;
                 let schema = match alias {
@@ -1268,7 +1306,7 @@ impl LanguageToLogicalPlanConverter {
                     true,
                 )?;
                 let mut window_fields: Vec<DFField> =
-                    exprlist_to_fields(window_expr.iter(), input.schema())?;
+                    exprlist_to_fields(window_expr.iter(), &input)?;
                 window_fields.extend_from_slice(input.schema().fields());
 
                 LogicalPlan::Window(Window {
@@ -1301,7 +1339,7 @@ impl LanguageToLogicalPlanConverter {
                 )?;
                 let all_expr = group_expr.iter().chain(aggr_expr.iter());
                 let schema = Arc::new(DFSchema::new_with_metadata(
-                    exprlist_to_fields(all_expr, input.schema())?,
+                    exprlist_to_fields(all_expr, &input)?,
                     HashMap::new(),
                 )?);
 
@@ -2137,7 +2175,11 @@ impl LanguageToLogicalPlanConverter {
                 let all_expr_without_window = match select_type {
                     WrappedSelectType::Projection => projection_expr.clone(),
                     WrappedSelectType::Aggregate => {
-                        group_expr.iter().chain(aggr_expr.iter()).cloned().collect()
+                        extract_exprlist_from_groupping_set(&group_expr)
+                            .iter()
+                            .chain(aggr_expr.iter())
+                            .cloned()
+                            .collect()
                     }
                 };
                 // TODO support asterisk query?
@@ -2157,8 +2199,10 @@ impl LanguageToLogicalPlanConverter {
                 }
                 let schema_with_subqueries = from.schema().join(&subqueries_schema)?;
 
-                let without_window_fields =
-                    exprlist_to_fields(all_expr_without_window.iter(), &schema_with_subqueries)?;
+                let without_window_fields = exprlist_to_fields_from_schema(
+                    all_expr_without_window.iter(),
+                    &schema_with_subqueries,
+                )?;
                 let replace_map = all_expr_without_window
                     .iter()
                     .zip(without_window_fields.iter())
@@ -2217,7 +2261,7 @@ impl LanguageToLogicalPlanConverter {
                     without_window_fields
                         .into_iter()
                         .chain(
-                            exprlist_to_fields(
+                            exprlist_to_fields_from_schema(
                                 window_expr_rebased.iter(),
                                 &schema_with_subqueries,
                             )?

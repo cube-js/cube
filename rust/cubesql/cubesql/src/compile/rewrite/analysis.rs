@@ -874,6 +874,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[1], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::GroupingSetExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
             LogicalPlanLanguage::QueryParam(_) => Some(vec),
             LogicalPlanLanguage::SortExpr(params) => {
@@ -896,6 +900,14 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::AggregateUDFExprArgs(params)
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
             | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
+                for p in params.iter() {
+                    vec.extend(referenced_columns(*p)?.into_iter());
+                }
+
+                Some(vec)
+            }
+
+            LogicalPlanLanguage::GroupingSetExprMembers(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }

@@ -156,6 +156,10 @@
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: Nested Rollup"
   ]
 }

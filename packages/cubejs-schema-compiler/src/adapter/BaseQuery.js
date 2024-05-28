@@ -1899,7 +1899,11 @@ export class BaseQuery {
       return '';
     }
     const dimensionColumns = this.dimensionColumns();
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
+    if (!dimensionColumns.length) {
+      return '';
+    }
+    const dimensionNames = dimensionColumns.map((c, i) => `${i + 1}`);
+    return this.rollupGroupByClause(dimensionNames);
   }
 
   getFieldIndex(id) {
@@ -1991,6 +1995,53 @@ export class BaseQuery {
     }
     const offset = this.offset ? parseInt(this.offset, 10) : null;
     return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @param {Array<string>} dimensionNames
+   * @returns {string}
+   */
+  rollupGroupByClause(dimensionNames) {
+    if (this.ungrouped) {
+      return '';
+    }
+    const dimensionColumns = this.dimensionColumns();
+    if (!dimensionColumns.length) {
+      return '';
+    }
+
+    const groupingSets = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupingSet);
+
+    let result = ' GROUP BY ';
+
+    dimensionColumns.forEach((c, i) => {
+      const groupingSet = groupingSets[i];
+      const comma = i > 0 ? ', ' : '';
+      const prevId = i > 0 ? (groupingSets[i - 1] || { id: null }).id : null;
+      const currId = (groupingSet || { id: null }).id;
+
+      if (prevId !== null && currId !== prevId) {
+        result += ')';
+      }
+
+      if ((prevId === null || currId !== prevId) && groupingSet != null) {
+        if (groupingSet.groupType === 'Rollup') {
+          result += `${comma}ROLLUP(`;
+        } else if (groupingSet.groupType === 'Cube') {
+          result += `${comma}CUBE(`;
+        }
+      } else {
+        result += `${comma}`;
+      }
+
+      result += dimensionNames[i];
+    });
+    if (groupingSets[groupingSets.length - 1] != null) {
+      result += ')';
+    }
+
+    return result;
   }
 
   /**
@@ -2937,10 +2988,11 @@ export class BaseQuery {
           '{{ from | indent(2, true) }}\n' +
           ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
-          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
+        group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
@@ -2954,6 +3006,8 @@ export class BaseQuery {
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         subquery: '({{ expr }})',
         in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
+        rollup: 'ROLLUP({{ exprs_concat }})',
+        cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
         true: 'TRUE',
