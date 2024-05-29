@@ -361,9 +361,11 @@ export class BaseFilter extends BaseDimension {
     if (date && date.match(dateTimeLocalMsRegex)) {
       return date;
     }
+
     if (date && date.match(dateRegex)) {
       return `${date}T00:00:00.000`;
     }
+
     if (!date) {
       return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT00:00:00.000');
     }
@@ -381,12 +383,15 @@ export class BaseFilter extends BaseDimension {
     if (date && date.match(dateTimeLocalMsRegex)) {
       return date;
     }
+
     if (date && date.match(dateRegex)) {
-      return `${date}T23:59:59.999`;
+      return `${date}T23:59:59.${'9'.repeat(this.query.timestampPrecision())}`;
     }
+
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT23:59:59.999');
+      return moment.tz(date, this.query.timezone).format(`YYYY-MM-DDT23:59:59.${'9'.repeat(this.query.timestampPrecision())}`);
     }
+
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
