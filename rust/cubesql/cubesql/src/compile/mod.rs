@@ -14344,12 +14344,9 @@ ORDER BY "source"."str0" ASC
 
     #[tokio::test]
     async fn metabase_aggreagte_by_week_of_year() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
         init_logger();
 
-        let query_plan = convert_select_to_query_plan(
+        let logical_plan = convert_select_to_query_plan(
                 "SELECT ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0)) AS \"order_date\", 
                                min(\"KibanaSampleDataEcommerce\".\"minPrice\") AS \"min\"
                 FROM \"KibanaSampleDataEcommerce\"
@@ -14358,23 +14355,27 @@ ORDER BY "source"."str0" ASC
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
-        .await;
+        .await
+        .as_logical_plan();
 
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.minPrice".to_string()]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("week".to_string()),
+                    date_range: None,
+                },]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
         );
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("CEIL("));
-        assert!(sql.contains("EXTRACT("));
-        assert!(sql.contains("DATE_TRUNC("));
     }
 
     #[tokio::test]
