@@ -474,7 +474,7 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                     vec![arg]
                 }
             };
-            
+
             method.call(&mut cx, this, args)?;
 
             Ok(())
