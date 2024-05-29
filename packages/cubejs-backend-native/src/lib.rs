@@ -401,6 +401,11 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
             .get::<JsFunction, _, _>(&mut cx, "end")?
             .root(&mut cx),
     );
+    let js_stream_status_fn = Arc::new(
+        node_stream
+            .get::<JsFunction, _, _>(&mut cx, "status")?
+            .root(&mut cx),
+    );
     let node_stream_root = cx
         .argument::<JsObject>(2)?
         .downcast_or_throw::<JsObject, _>(&mut cx)?
@@ -441,6 +446,10 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                 Ok(v) => v.into_inner(&mut cx),
                 Err(v) => v.as_ref().to_inner(&mut cx),
             };
+            let status = match Arc::try_unwrap(js_stream_status_fn) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
             let this = match Arc::try_unwrap(node_stream_arc) {
                 Ok(v) => v.into_inner(&mut cx),
                 Err(v) => v.as_ref().to_inner(&mut cx),
@@ -458,9 +467,14 @@ fn exec_sql(mut cx: FunctionContext) -> JsResult<JsValue> {
                         CHUNK_DELIM
                     );
                     let arg = cx.string(error_response).upcast::<JsValue>();
+
+                    let status_args = vec![cx.number(500).upcast::<JsValue>()];
+                    status.call(&mut cx, this, status_args)?;
+
                     vec![arg]
                 }
             };
+            
             method.call(&mut cx, this, args)?;
 
             Ok(())
