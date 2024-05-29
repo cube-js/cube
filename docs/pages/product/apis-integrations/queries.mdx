@@ -276,12 +276,43 @@ Similarly to [regular queries](#regular-query), they include lists of
 dimensions and measures, filters, etc. and return a result set.
 
 However, unlike regular queries, they provide a convenient way to retrieve
-measure values for *more than one date range* for a time dimension. See [this
-blog post][blog-compare-date-range] for more details and examples.
+measure values for *more than one date range* for a time dimension.
 
 You can make a compare date range query by using the `compareDateRange`
-option with the [REST API][ref-rest-api-query-format-options-tdf]. For the SQL
-API, you can write an equivalent query using the `UNION ALL` statement.
+option with the [REST API][ref-rest-api-query-format-options-tdf].
+
+### Example
+
+```json
+{
+  "queryType": "multi",
+  "query": {
+    "dimensions": ["orders.city"],
+    "measures": ["orders.amount"],
+    "filters": [
+      {
+        "member": "orders.status",
+        "operator": "equals",
+        "values": ["shipped"]
+      }
+    ],
+    "timeDimensions": [{
+      "dimension": "orders.created_at",
+      "compareDateRange": [
+        ["2024-01-01", "2024-12-31"],
+        ["2023-01-01", "2023-12-31"],
+        ["2022-01-01", "2022-12-31"],
+      ],
+      "granularity": "year",
+    }],
+  "limit": 100
+  }
+}
+```
+
+See [this blog post][blog-compare-date-range] for more details and examples.
+
+For the SQL API, you can write an equivalent query using the `UNION ALL` statement.
 
 ### Total query
 
