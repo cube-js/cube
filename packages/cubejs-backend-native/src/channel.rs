@@ -282,14 +282,9 @@ pub async fn call_js_fn<R: Sized + Send + 'static>(
                 }
             };
 
-            tx.send(result_from_js_value(&mut cx, result))
-                .map_err(|_| {
-                    CubeError::internal(
-                        "AsyncChannel: Unable to send result from JS back to Rust, channel closed"
-                            .to_string(),
-                    )
-                })
-                .unwrap();
+            if tx.send(result_from_js_value(&mut cx, result)).is_err() {
+                log::debug!("AsyncChannel: Unable to send result from JS back to Rust, channel closed")
+            }
 
             Ok(())
         })

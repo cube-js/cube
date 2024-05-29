@@ -772,7 +772,7 @@ mod tests {
         );
 
         insta::assert_snapshot!(
-            "TableValue serializer",
+            "table_value_serializer",
             serde_json::to_string(&frame.data).unwrap()
         );
     }
