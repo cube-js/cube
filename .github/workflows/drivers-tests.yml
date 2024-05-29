@@ -12,9 +12,10 @@ on:
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-backend-shared/**'
       - 'packages/cubejs-server-core/**'
+      - 'packages/cubejs-schema-compiler/**'
+
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
-
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
@@ -36,9 +37,10 @@ on:
       - 'packages/cubejs-query-orchestrator/src/**'
       - 'packages/cubejs-backend-shared/**'
       - 'packages/cubejs-server-core/**'
+      - 'packages/cubejs-schema-compiler/**'
+
       - 'packages/cubejs-base-driver/src/**'
       - 'packages/cubejs-jdbc-driver/src/**'
-
       - 'packages/cubejs-athena-driver/**'
       - 'packages/cubejs-bigquery-driver/**'
       - 'packages/cubejs-clickhouse-driver/**'
