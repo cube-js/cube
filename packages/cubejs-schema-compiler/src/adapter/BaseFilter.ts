@@ -9,7 +9,7 @@ import type { BaseQuery } from './BaseQuery';
 const moment = momentRange.extendMoment(require('moment-timezone'));
 
 const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
-const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
+const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.(\d\d\d)|(\d\d\d\d\d\d)$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 export class BaseFilter extends BaseDimension {
@@ -369,6 +369,7 @@ export class BaseFilter extends BaseDimension {
     if (!date) {
       return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT00:00:00.000');
     }
+
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
