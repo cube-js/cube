@@ -231,7 +231,9 @@ export class BaseTimeDimension extends BaseFilter {
       ];
     }
 
-    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()]);
+    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()], {
+      timestampPrecision: this.query.timestampPrecision(),
+    });
   }
 
   public wildcardRange() {
