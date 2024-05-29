@@ -1,0 +1,5 @@
+---
+source: cubesql/src/sql/dataframe.rs
+expression: "serde_json::to_string(&frame.data).unwrap()"
+---
+[{"values":[null,true,"simple_str","123","12345","123456789","1.23","1.23456789","1234567.89","1993-05-21T00:00:00.000","0 years 1 mons 2 days 3 hours 4 mins 5.000006 secs","1993-05-21"]}]

@@ -689,4 +689,91 @@ mod tests {
             +------------+"
         );
     }
+
+    #[test]
+    fn test_dataframe_tablevalue_serializer() {
+        let frame = DataFrame::new(
+            vec![
+                Column::new(
+                    "null_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "bool_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "string_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int16_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "decimal128_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "timestamp_col".to_string(),
+                    ColumnType::Timestamp,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "interval_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "date_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+            ],
+            vec![Row::new(vec![
+                TableValue::Null,
+                TableValue::Boolean(true),
+                TableValue::String("simple_str".to_string()),
+                TableValue::Int16(123),
+                TableValue::Int32(12345),
+                TableValue::Int64(123456789),
+                TableValue::Float32(1.23),
+                TableValue::Float64(1.23456789),
+                TableValue::Decimal128(Decimal128Value::new(123456789, 2)),
+                TableValue::Timestamp(TimestampValue::new(737942400 * 1_000_000_000, None)),
+                TableValue::Interval(IntervalValue::new(1, 2, 3, 4, 5, 6)),
+                TableValue::Date(NaiveDate::from_ymd_opt(1993, 5, 21).unwrap()),
+            ])],
+        );
+
+        insta::assert_snapshot!(
+            "TableValue serializer",
+            serde_json::to_string(&frame.data).unwrap()
+        );
+    }
 }
