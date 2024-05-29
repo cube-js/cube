@@ -298,6 +298,19 @@ from
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
     });
 
+    test('tableau bi fiscal year query', async () => {
+      const query = `
+      SELECT 
+        CAST("orders"."status" AS TEXT) AS "status",
+        CAST(TRUNC(EXTRACT(YEAR FROM ("orders"."createdAt" + 11 * INTERVAL '1 MONTH'))) AS INT) AS "yr:created_at:ok"
+      FROM
+        "public"."Orders" AS "orders"
+      GROUP BY 1, 2 ORDER BY status`;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('result');
+    });
+    
     test('query with intervals', async () => {
       const query = `
       SELECT 
@@ -308,7 +321,7 @@ from
         "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3",
         "orders"."createdAt" + 11 * INTERVAL '1 MON 12345 MS' + 10 * INTERVAL '1 MON 12345 MS' AS "c4"
       FROM
-        "public"."Orders" AS "orders" `;
+        "public"."Orders" AS "orders" ORDER BY createdAt`;
 
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('timestamps');

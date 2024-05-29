@@ -1242,7 +1242,9 @@ pub fn transform_response<V: ValueObject>(
                     IntervalYearMonthBuilder,
                     response,
                     field_name,
-                    { },
+                    {
+                        // TODO
+                    },
                     {
                         (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
                     }
@@ -1254,7 +1256,9 @@ pub fn transform_response<V: ValueObject>(
                     IntervalDayTimeBuilder,
                     response,
                     field_name,
-                    { },
+                    {
+                        // TODO
+                    },
                     {
                         (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
                     }
@@ -1266,7 +1270,9 @@ pub fn transform_response<V: ValueObject>(
                     IntervalMonthDayNanoBuilder,
                     response,
                     field_name,
-                    { },
+                    {
+                        // TODO
+                    },
                     {
                         (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
                     }

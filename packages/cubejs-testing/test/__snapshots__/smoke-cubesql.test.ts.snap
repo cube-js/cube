@@ -155,3 +155,20 @@ Array [
   },
 ]
 `;
+
+exports[`SQL API Postgres (Data) tableau bi fiscal year query: result 1`] = `
+Array [
+  Object {
+    "status": "new",
+    "yr:created_at:ok": 2024,
+  },
+  Object {
+    "status": "processed",
+    "yr:created_at:ok": 2024,
+  },
+  Object {
+    "status": "shipped",
+    "yr:created_at:ok": 2024,
+  },
+]
+`;
