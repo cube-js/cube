@@ -459,9 +459,69 @@ pub fn long_in_expr(c: &mut Criterion) {
     bench_func!("long_in_expr", get_long_in_expr(), c);
 }
 
+fn get_tableau_logical_17_query() -> String {
+    r#"
+    SELECT LOWER(CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT)) AS "TEMP(Test)(1234567890)(0)"
+    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    GROUP BY 1
+    "#
+    .into()
+}
+
+pub fn tableau_logical_17(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("tableau_logical_17", get_tableau_logical_17_query(), c);
+}
+
+fn get_ts_last_day_redshift_query() -> String {
+    r#"
+    WITH "qt_0" AS (
+        SELECT 
+            DATE_TRUNC('month', "ta_1"."order_date") "ca_1", 
+            CASE
+                WHEN sum("ta_1"."sumPrice") IS NOT NULL THEN sum("ta_1"."sumPrice")
+                ELSE 0
+            END "ca_2"
+        FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+        WHERE (
+            "ta_1"."order_date" >= DATE '1999-12-29'
+            AND "ta_1"."order_date" < DATE '1999-12-30'
+        )
+        GROUP BY "ca_1"
+    )
+    SELECT 
+        min("ta_2"."ca_1") "ca_3", 
+        max("ta_2"."ca_1") "ca_4"
+    FROM "qt_0" "ta_2"
+    "#
+    .into()
+}
+
+pub fn ts_last_day_redshift(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("ts_last_day_redshift", get_ts_last_day_redshift_query(), c);
+}
+
+fn get_tableau_bugs_b8888_query() -> String {
+    r#"
+    SELECT CAST(TRUNC((CASE WHEN 7 = 0 THEN NULL ELSE CAST(((6 + (1 + CAST(EXTRACT(DOW FROM (DATE_TRUNC( 'YEAR', CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) ) + (CASE WHEN (CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) < 3) THEN -10 ELSE 2 END) * INTERVAL '1 MONTH')) AS INTEGER))) + (EXTRACT(EPOCH FROM (CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) - (DATE_TRUNC( 'YEAR', CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) ) + (CASE WHEN (CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) < 3) THEN -10 ELSE 2 END) * INTERVAL '1 MONTH'))) / (60.0 * 60 * 24))) AS DOUBLE PRECISION) / 7 END)) AS BIGINT) AS "Week #",
+        COUNT(DISTINCT "KibanaSampleDataEcommerce"."order_date") AS "ctd:order_date:ok",
+        CAST(TRUNC(EXTRACT(YEAR FROM ("KibanaSampleDataEcommerce"."order_date" + 10 * INTERVAL '1 MONTH'))) AS INTEGER) AS "yr:order_date:ok"
+    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    GROUP BY 1,
+        3
+    "#.into()
+}
+
+pub fn tableau_bugs_b8888(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("tableau_bugs_b8888", get_tableau_bugs_b8888_query(), c);
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
-    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k, tableau_logical_17,
+        tableau_bugs_b8888, ts_last_day_redshift
 }
 criterion_main!(benches);
