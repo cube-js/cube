@@ -95,28 +95,30 @@ The same query using the REST API syntax looks as follows:
 
 ```json
 {
-  "dimensions": [
-    "users.state",
-    "users.city",
-    "orders.status"
-  ],
-  "measures": [
-    "orders.count"
-  ],
-  "filters": [
-    {
-      "member": "users.state",
-      "operator": "notEquals",
-      "values": ["us-wa"]
-    }
-  ],
-  "timeDimensions": [
-    {
-      "dimension": "orders.created_at",
-      "dateRange": ["2020-01-01", "2021-01-01"]
-    }
-  ],
-  "limit": 10
+  "query" : {
+    "dimensions": [
+      "users.state",
+      "users.city",
+      "orders.status"
+    ],
+    "measures": [
+      "orders.count"
+    ],
+    "filters": [
+      {
+        "member": "users.state",
+        "operator": "notEquals",
+        "values": ["us-wa"]
+      }
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "orders.created_at",
+        "dateRange": ["2020-01-01", "2021-01-01"]
+      }
+    ],
+    "limit": 10
+  }
 }
 ```
 
