@@ -1,5 +1,5 @@
 module.exports = {
-  "queries": "Querying data APIs",
+  "queries": "Queries",
   "sql-api": "SQL API",
   "rest-api": "REST API",
   "graphql-api": "GraphQL API",

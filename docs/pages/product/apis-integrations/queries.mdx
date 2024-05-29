@@ -223,7 +223,7 @@ WHERE
   )
 GROUP BY 1, 2, 3
 ORDER BY 4 DESC
-LIMIT 10
+LIMIT 10;
 ```
 
 ### Query with push-down
@@ -236,6 +236,13 @@ Thus, queries with push-down are not reducible to [regular
 queries](#regular-query) and post-processing on top of them. To execute a query
 with push-down, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
+
+<InfoBox>
+
+Query push-down in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
 
 Queries with push-down, since they don't include regular queries, can not
 utilize pre-aggregations; however, they still benefit from [in-memory
@@ -259,7 +266,7 @@ WHERE
     SELECT MAX(orders_made)
     FROM users
   )
-GROUP BY 1, 2
+GROUP BY 1, 2;
 ```
 
 ### Compare date range query
