@@ -1,9 +1,16 @@
-# Querying the data model
+---
+redirect_from:
+  - /product/data-modeling/queries
+---
 
-Ultimately, after creating a data model, you would like to *ask questions
-to it*, i.e., run queries against this data model. This page describes the
-concepts of querying Cube, common to [all or most APIs][ref-apis]
-that you will use to run these queries.
+# Querying data APIs
+
+After creating a [data model][ref-data-model], you would like to *ask questions
+to it*, i.e., run queries against this data model. This page describes the common
+concepts of querying Cube through its [data APIs][ref-apis].
+
+All queries share the same [query defaults](#query-defaults) and each query fall
+into one of [query types](#query-types).
 
 ## Query defaults
 
@@ -310,6 +317,7 @@ Additionally, note that ungrouped queries have additional requirements for
 
 
 [wiki-utc-time-zone]: https://en.wikipedia.org/wiki/Coordinated_Universal_Time
+[ref-data-model]: /product/data-modeling/overview
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
 [ref-sql-api]: /product/apis-integrations/sql-api

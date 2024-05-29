@@ -56,7 +56,6 @@ The following Docker Compose file will run Cube with the SQL API enabled on
 port 15432, accessible using `user` as the user name, `pass` as the password,
 and any string as the database name:
 
-
 ```yaml filename="docker-compose.yml"
 version: "2.2"
  
@@ -108,6 +107,31 @@ PGPASSWORD=pass \
   -p 5432 \
   -U cube awesome-ecom
 ```
+
+### Query planning
+
+**By default, the SQL API executes queries as [queries with
+post-processing][ref-queries-wpp].** Such queries support only a limited set
+of SQL functions and operators, and sometimes you can get the following error:
+`Error during rewrite: Can't detect Cube query and it may be not supported yet.`
+
+You can use the `CUBESQL_SQL_PUSH_DOWN` environment variable to instruct the SQL API
+to execute such queries as [queries with push-down][ref-queries-wpd].
+
+<InfoBox>
+
+Query push-down in the SQL API is available as public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+<Diagram src="https://ucarecdn.com/01a6c900-abf1-4929-8e0f-519390d1c2a4/"/>
+
+The creation of a query plan is a resource-intensive task, and sometimes you can
+get the following error: `Error during rewrite: Can't find rewrite due to 10002
+AST node limit reached.` Use the following environment variables to allocate more
+resources for query planning: `CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`,
+`CUBESQL_REWRITE_TIMEOUT`.
 
 ## Querying Fundamentals
 
@@ -764,4 +788,6 @@ WHERE is_completed = true
 [cube-bi-use-case]: https://cube.dev/use-cases/connected-bi
 [ref-ref-sql-api]: /reference/sql-api
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types
+[ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-push-down
 [link-psql]: https://www.postgresql.org/docs/current/app-psql.html
