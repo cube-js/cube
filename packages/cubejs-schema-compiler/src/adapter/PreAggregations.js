@@ -199,6 +199,7 @@ export class PreAggregations {
       preAggregationId: `${cube}.${preAggregationName}`,
       timezone: this.query.options && this.query.options.timezone,
       timestampFormat: queryForSqlEvaluation.timestampFormat(),
+      timestampPrecision: queryForSqlEvaluation.timestampPrecision(),
       tableName,
       invalidateKeyQueries,
       partitionInvalidateKeyQueries,

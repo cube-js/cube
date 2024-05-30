@@ -86,6 +86,7 @@ export const utcToLocalTimeZone = (timezone: string, timestampFormat: string, ti
       return inDbTimeZoneDate.toJSON().replace('Z', '');
     }
   }
+
   return moment.tz(timestamp, 'UTC').tz(timezone).format(timestampFormat);
 };
 

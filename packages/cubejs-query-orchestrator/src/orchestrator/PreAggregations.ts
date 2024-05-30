@@ -196,6 +196,7 @@ export type PreAggregationDescription = {
   partitionGranularity: string;
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
+  timestampPrecision: number;
   expandedPartition: boolean;
   unionWithSourceData: LambdaOptions;
   buildRangeStart?: string;
@@ -1826,9 +1827,10 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange)], () => PreAggregationPartitionRangeLoader.timeSeries(
+    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`], () => PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
+      this.preAggregation.timestampPrecision
     ));
     if (partitionRanges.length > this.options.maxPartitions) {
       throw new Error(
@@ -1851,6 +1853,7 @@ export class PreAggregationPartitionRangeLoader {
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       this.orNowIfEmpty([startDate, endDate]),
+      this.preAggregation.timestampPrecision,
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
@@ -1920,8 +1923,10 @@ export class PreAggregationPartitionRangeLoader {
     ];
   }
 
-  public static timeSeries(granularity: string, dateRange: QueryDateRange): QueryDateRange[] {
-    return timeSeries(granularity, dateRange);
+  public static timeSeries(granularity: string, dateRange: QueryDateRange, timestampPrecision: number): QueryDateRange[] {
+    return timeSeries(granularity, dateRange, {
+      timestampPrecision
+    });
   }
 
   public static partitionTableName(tableName: string, partitionGranularity: string, dateRange: string[]) {
