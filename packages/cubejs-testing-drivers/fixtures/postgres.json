@@ -153,9 +153,6 @@
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
-    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
-    "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
   ]
 }

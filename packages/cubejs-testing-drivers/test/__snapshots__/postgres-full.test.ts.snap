@@ -5895,6 +5895,22 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce: null boolean 1`] = `
+Array [
+  Object {
+    "BigECommerce.returning": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce: null sum 1`] = `
+Array [
+  Object {
+    "BigECommerce.totalSales": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/postgres-driver querying BigECommerce: partitioned pre-agg 1`] = `
 Array [
   Object {
@@ -10286,6 +10302,71 @@ Array [
     "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
     "ECommerce.productName": "Wausau Papers Astrobrights Colored Envelopes",
     "ECommerce.totalQuantity": "3",
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery 1`] = `
+Array [
+  Object {
+    "ECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "ECommerce.totalProfit": "29.6548",
+    "ECommerce.totalSales": "259.876",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "ECommerce.totalProfit": "6.1992",
+    "ECommerce.totalSales": "18.368",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "ECommerce.totalProfit": "583.5945",
+    "ECommerce.totalSales": "2471.56",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "ECommerce.totalProfit": "6.4176",
+    "ECommerce.totalSales": "36.672",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "ECommerce.totalProfit": "353.6849",
+    "ECommerce.totalSales": "1288.21",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "ECommerce.totalProfit": "34.2361",
+    "ECommerce.totalSales": "728.734",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "ECommerce.totalProfit": "461.1332",
+    "ECommerce.totalSales": "2340.872",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "ECommerce.totalProfit": "139.997",
+    "ECommerce.totalSales": "2219.468",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "ECommerce.totalProfit": "1132.6617",
+    "ECommerce.totalSales": "5573.922",
+  },
+  Object {
+    "ECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "ECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "ECommerce.totalProfit": "303.9737",
+    "ECommerce.totalSales": "2434.222",
   },
 ]
 `;
