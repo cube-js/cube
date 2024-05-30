@@ -9,21 +9,21 @@ type QueryDateRange = [string, string];
 
 export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: number) => QueryDateRange[]> = {
   day: (range: DateRange, digits) => Array.from(range.snapTo('day').by('day'))
-    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-DDT00:00:00.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
   month: (range: DateRange, digits) => Array.from(range.snapTo('month').by('month'))
-    .map(d => [d.format('YYYY-MM-01T00:00:00.000'), d.endOf('month').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-01T00:00:00.${'0'.repeat(digits)}`), d.endOf('month').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
   year: (range: DateRange, digits) => Array.from(range.snapTo('year').by('year'))
-    .map(d => [d.format('YYYY-01-01T00:00:00.000'), d.endOf('year').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-01-01T00:00:00.${'0'.repeat(digits)}`), d.endOf('year').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
   hour: (range: DateRange, digits) => Array.from(range.snapTo('hour').by('hour'))
-    .map(d => [d.format('YYYY-MM-DDTHH:00:00.000'), d.format(`YYYY-MM-DDTHH:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-DDTHH:00:00.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDTHH:59:59.${'9'.repeat(digits)}`)]),
   minute: (range: DateRange, digits) => Array.from(range.snapTo('minute').by('minute'))
-    .map(d => [d.format('YYYY-MM-DDTHH:mm:00.000'), d.format(`YYYY-MM-DDTHH:mm:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-DDTHH:mm:00.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDTHH:mm:59.${'9'.repeat(digits)}`)]),
   second: (range: DateRange, digits) => Array.from(range.snapTo('second').by('second'))
-    .map(d => [d.format('YYYY-MM-DDTHH:mm:ss.000'), d.format(`YYYY-MM-DDTHH:mm:ss.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-DDTHH:mm:ss.${'0'.repeat(digits)}`), d.format(`YYYY-MM-DDTHH:mm:ss.${'9'.repeat(digits)}`)]),
   week: (range: DateRange, digits) => Array.from(range.snapTo(<unitOfTime.Diff>'isoWeek').by('week'))
-    .map(d => [d.startOf('isoWeek').format('YYYY-MM-DDT00:00:00.000'), d.endOf('isoWeek').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.startOf('isoWeek').format(`YYYY-MM-DDT00:00:00.${'0'.repeat(digits)}`), d.endOf('isoWeek').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
   quarter: (range: DateRange, digits) => Array.from(range.snapTo('quarter').by('quarter'))
-    .map(d => [d.format('YYYY-MM-DDT00:00:00.000'), d.endOf('quarter').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
+    .map(d => [d.format(`YYYY-MM-DDT00:00:00.${'0'.repeat(digits)}`), d.endOf('quarter').format(`YYYY-MM-DDT23:59:59.${'9'.repeat(digits)}`)]),
 };
 
 type TimeSeriesOptions = {
