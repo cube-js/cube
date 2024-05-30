@@ -65,6 +65,7 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
       return inDbTimeZoneDate.toJSON().replace('Z', '');
     }
   }
+
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 

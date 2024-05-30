@@ -478,13 +478,6 @@ export class BaseQuery {
   }
 
   /**
-   * @return {number}
-   */
-  timestampPrecision() {
-    return 3;
-  }
-
-  /**
    * Returns SQL query string.
    * @returns {string}
    */
@@ -2681,6 +2674,13 @@ export class BaseQuery {
    */
   timestampFormat() {
     return 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]';
+  }
+
+  /**
+   * @return {number}
+   */
+  timestampPrecision() {
+    return 3;
   }
 
   /**
