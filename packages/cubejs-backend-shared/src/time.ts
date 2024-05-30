@@ -55,7 +55,7 @@ export const BUILD_RANGE_START_LOCAL = '__BUILD_RANGE_START_LOCAL';
 export const BUILD_RANGE_END_LOCAL = '__BUILD_RANGE_END_LOCAL';
 
 export const inDbTimeZone = (timezone: string, timestampFormat: string, timestamp: string): string => {
-  if (timestamp.length === 23) {
+  if (timestamp.length === 23 || timestamp.length === 26) {
     const zone = moment.tz.zone(timezone);
     if (!zone) {
       throw new Error(`Unknown timezone: ${timezone}`);
@@ -64,13 +64,28 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
     const parsedTime = Date.parse(`${timestamp}Z`);
     const offset = zone.utcOffset(parsedTime);
     const inDbTimeZoneDate = new Date(parsedTime + offset * 60 * 1000);
+
     if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSZ') {
       return inDbTimeZoneDate.toJSON();
+    } else if (timestampFormat === 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]' || timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSSSSZ') {
+      const value = inDbTimeZoneDate.toJSON();
+      if (value.endsWith('999Z')) {
+        // emulate microseconds
+        return value.replace('Z', '999Z');
+      }
+
+      // emulate microseconds
+      return value.replace('Z', '000Z');
     } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSS') {
       return inDbTimeZoneDate.toJSON().replace('Z', '');
+    } else if (timestampFormat === 'YYYY-MM-DDTHH:mm:ss.SSSSSS') {
+      // emulate microseconds
+      return inDbTimeZoneDate.toJSON().replace('Z', '000');
     }
   }
 
+  // moment doesn't support microseconds,
+  // it will fill it with zeros
   return moment.tz(timestamp, timezone).utc().format(timestampFormat);
 };
 
