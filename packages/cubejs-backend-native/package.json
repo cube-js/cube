@@ -44,8 +44,7 @@
   },
   "dependencies": {
     "@cubejs-backend/cubesql": "^0.35.40",
-    "@cubejs-backend/shared": "^0.35.33",
-    "@cubejs-infra/post-installer": "^0.0.7"
+    "@cubejs-backend/shared": "^0.35.33"
   },
   "resources": {
     "vars": {

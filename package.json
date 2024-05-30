@@ -67,7 +67,13 @@
   },
   "resolutions": {
     "@types/node": "^16",
-    "@types/ramda": "0.27.40"
+    "@types/ramda": "0.27.40",
+    "@oclif/color": "1.0.13",
+    "braces": "3.0.3",
+    "semver": "7.5.2",
+    "colors": "1.4.0",
+    "es5-ext": "0.10.63",
+    "micromatch": "4.0.6"
   },
   "license": "MIT",
   "packageManager": "yarn@1.22.19"

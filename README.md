@@ -8,7 +8,7 @@
 [![GitHub Actions](https://github.com/cube-js/cube/workflows/Build/badge.svg)](https://github.com/cube-js/cube/actions?query=workflow%3ABuild+branch%3Amaster)
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_shield)
 
-__Cube is the semantic layer for building data applications.__ It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
+**Cube is the semantic layer for building data applications.** It helps data engineers and application developers access data from modern data stores, organize it into consistent definitions, and deliver it to every application.
 
 <img
   src="https://ucarecdn.com/8d945f29-e9eb-4e7f-9e9e-29ae7074e195/"
@@ -28,9 +28,9 @@ For more details, see the [introduction](https://cube.dev/docs/cubejs-introducti
 
 If you are building a data application—such as a business intelligence tool or a customer-facing analytics feature—you’ll probably face the following problems:
 
-1. __SQL code organization.__ Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modeling framework.
-2. __Performance.__ Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
-3. __Access Control.__ It is important to secure and govern access to data for all downstream data consuming applications.
+1. **SQL code organization.** Sooner or later, modeling even a dozen metrics with a dozen dimensions using pure SQL queries becomes a maintenance nightmare, which leads to building a modeling framework.
+2. **Performance.** Most of the time and effort in modern analytics software development is spent providing adequate time to insight. In a world where every company’s data is big data, writing just SQL queries to get insight isn’t enough anymore.
+3. **Access Control.** It is important to secure and govern access to data for all downstream data consuming applications.
 
 Cube has the necessary infrastructure and features to implement efficient data modeling, access control, and performance optimizations so that every application—like embedded analytics, dashboarding and reporting tools, data notebooks, and other tools—can access consistent data via REST, SQL, and GraphQL APIs.
 
@@ -75,12 +75,12 @@ For a step-by-step guide on Docker, [see the docs](https://cube.dev/docs/getting
 
 There are many ways you can contribute to Cube! Here are a few possibilities:
 
-* Star this repo and follow us on [Twitter](https://twitter.com/the_cube_dev).
-* Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
-* Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
-* Create issues every time you feel something is missing or goes wrong.
-* Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
-* Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels.
+- Star this repo and follow us on [Twitter](https://twitter.com/the_cube_dev).
+- Add Cube to your stack on [Stackshare](https://stackshare.io/cube-js).
+- Upvote issues with 👍 reaction so we know what's the demand for particular issue to prioritize it within road map.
+- Create issues every time you feel something is missing or goes wrong.
+- Ask questions on [Stack Overflow with cube.js tag](https://stackoverflow.com/questions/tagged/cube.js) if others can have these questions as well.
+- Provide pull requests for all open issues and especially for those with [help wanted](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"help+wanted") and [good first issue](https://github.com/cube-js/cube/issues?q=is%3Aissue+is%3Aopen+label%3A"good+first+issue") labels.
 
 All sort of contributions are **welcome and extremely helpful** 🙌 Please refer to [the contribution guide](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md) for more information.
 
@@ -90,5 +90,13 @@ Cube Client is [MIT licensed](./packages/cubejs-client-core/LICENSE).
 
 Cube Backend is [Apache 2.0 licensed](./packages/cubejs-server/LICENSE).
 
-
 [![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fcube-js%2Fcube.js?ref=badge_large)
+
+## Steps to build docker image
+
+```bash
+cp yarn.lock packages/cubejs-docker/
+cd packages/cubejs-docker
+docker build -t aptyadmin/cubejs:v0.35.41.1 -f latest.Dockerfile .
+docker push  aptyadmin/cubejs:v0.35.41.1
+```
