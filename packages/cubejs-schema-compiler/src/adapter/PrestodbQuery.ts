@@ -119,7 +119,7 @@ export class PrestodbQuery extends BaseQuery {
       '{% if offset %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
-    templates.expressions.interval = 'INTERVAL \'{{ num }}\' {{ date_part }}';
+    templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
     return templates;
   }

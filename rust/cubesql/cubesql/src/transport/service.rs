@@ -370,6 +370,10 @@ impl SqlTemplates {
         })
     }
 
+    pub fn contains_template(&self, template_name: &str) -> bool {
+        self.templates.contains_key(template_name)
+    }
+
     pub fn aggregate_function_name(
         &self,
         aggregate_function: AggregateFunction,
@@ -661,15 +665,38 @@ impl SqlTemplates {
         )
     }
 
-    pub fn interval_expr(
+    pub fn interval_any_expr(
         &self,
         interval: String,
         num: i64,
-        date_part: String,
+        date_part: &'static str,
+    ) -> Result<String, CubeError> {
+        const INTERVAL_TEMPLATE: &str = "expressions/interval";
+        const INTERVAL_SINGLE_TEMPLATE: &str = "expressions/interval_single_date_part";
+        if self.contains_template(INTERVAL_TEMPLATE) {
+            self.interval_expr(interval)
+        } else if self.contains_template(INTERVAL_SINGLE_TEMPLATE) {
+            self.interval_single_expr(num, date_part)
+        } else {
+            let msg = format!(
+                "Error getting {INTERVAL_TEMPLATE:?}, {INTERVAL_SINGLE_TEMPLATE:?} templates: no such templates"
+            );
+            Err(CubeError::internal(msg))
+        }
+    }
+
+    pub fn interval_expr(&self, interval: String) -> Result<String, CubeError> {
+        self.render_template("expressions/interval", context! { interval => interval })
+    }
+
+    pub fn interval_single_expr(
+        &self,
+        num: i64,
+        date_part: &'static str,
     ) -> Result<String, CubeError> {
         self.render_template(
-            "expressions/interval",
-            context! { interval => interval, num => num, date_part => date_part },
+            "expressions/interval_single_date_part",
+            context! { num => num, date_part => date_part },
         )
     }
 

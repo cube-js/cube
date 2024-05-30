@@ -326,5 +326,25 @@ from
       const res = await connection.query(query);
       expect(res.rows).toMatchSnapshot('timestamps');
     });
+
+    test('query with intervals (SQL PUSH DOWN)', async () => {
+      const query = `
+      SELECT 
+        CONCAT(DATE(createdAt), ' :') AS d,
+        "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
+        "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
+        "orders"."createdAt" + 11 * INTERVAL '321 DAYS' AS "c2",
+        "orders"."createdAt" + 11 * INTERVAL '43210 SECONDS' AS "c3",
+        "orders"."createdAt" + 11 * INTERVAL '32 DAYS 20 HOURS' AS "c4",
+        "orders"."createdAt" + 11 * INTERVAL '1 MON 12345 MS' + 10 * INTERVAL '1 MON 12345 MS' AS "c5",
+        "orders"."createdAt" + 11 * INTERVAL '12345 MS' AS "c6",
+        "orders"."createdAt" + 11 * INTERVAL '2 DAY 12345 MS' AS "c7",
+        "orders"."createdAt" + 11 * INTERVAL '3 MON 2 DAY 12345 MS' AS "c8"
+      FROM
+        "public"."Orders" AS "orders" ORDER BY createdAt`;
+
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('timestamps');
+    });
   });
 });

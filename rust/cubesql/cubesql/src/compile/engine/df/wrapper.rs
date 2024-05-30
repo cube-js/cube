@@ -1535,7 +1535,7 @@ impl CubeScanWrapperNode {
                                 (
                                     sql_generator
                                         .get_sql_templates()
-                                        .interval_expr(interval, num.into(), date_part.to_string())
+                                        .interval_any_expr(interval, num.into(), date_part)
                                         .map_err(|e| {
                                             DataFusionError::Internal(format!(
                                                 "Can't generate SQL for interval: {}",
@@ -1552,35 +1552,138 @@ impl CubeScanWrapperNode {
                             if let Some(x) = x {
                                 let days = x >> 32;
                                 let millis = x & 0xFFFFFFFF;
-                                if days > 0 && millis > 0 {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for interval: mixed intervals aren't supported: {} days {} millis encoded as {}",
-                                        days, millis, x
-                                    )));
+
+                                let templates = sql_generator.get_sql_templates();
+                                let single = !templates.contains_template("expressions/interval");
+
+                                const DAY: &str = "DAY";
+                                const MS: &str = "MILLISECOND";
+
+                                let generated_sql = match (days, millis) {
+                                    (0, ms) => match single {
+                                        true => templates.interval_single_expr(ms, MS),
+                                        _ => templates.interval_expr(format!("{ms} {MS}")),
+                                    },
+                                    (days, 0) => match single {
+                                        true => templates.interval_single_expr(days, DAY),
+                                        _ => templates.interval_expr(format!("{days} {DAY}")),
+                                    },
+                                    (days, ms) => {
+                                        if single {
+                                            let days = templates.interval_single_expr(days, DAY);
+                                            let ms = templates.interval_single_expr(ms, MS);
+                                            match (days, ms) {
+                                                (Ok(days), Ok(ms)) => {
+                                                    Ok(format!("({days} + {ms})"))
+                                                }
+                                                (Err(e), _) | (_, Err(e)) => Err(e),
+                                            }
+                                        } else {
+                                            let interval = format!("{days} {DAY} {ms} {MS}");
+                                            templates.interval_expr(interval)
+                                        }
+                                    }
                                 }
-                                let (num, date_part) = if days > 0 {
-                                    (days, "DAY")
-                                } else {
-                                    (millis, "MILLISECOND")
-                                };
-                                let interval = format!("{} {}", num, date_part);
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .interval_expr(interval, num, date_part.to_string())
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for interval: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for interval: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                (generated_sql, sql_query)
                             } else {
                                 ("NULL".to_string(), sql_query)
                             }
                         }
-                        // ScalarValue::IntervalMonthDayNano(_) => {}
+                        ScalarValue::IntervalMonthDayNano(x) => {
+                            if let Some(interval) = x {
+                                // MONTH_BITS | DAY_BITS | MS_BITS
+                                // const MONTH_BITS: i32 = 32;
+                                const DAY_BITS: i32 = 32;
+                                const MS_BITS: i32 = 64;
+                                const MONTH_SH: i32 = DAY_BITS + MS_BITS;
+                                const DAY_SH: i32 = MS_BITS;
+
+                                let interval = interval as u128;
+                                let months = (interval >> MONTH_SH) as i32;
+                                let days = (interval >> DAY_SH) as i32;
+                                let ns = interval as i64;
+                                let ms = ns / 1_000_000;
+
+                                let templates = sql_generator.get_sql_templates();
+                                let single = !templates.contains_template("expressions/interval");
+
+                                const MONTH: &str = "MONTH";
+                                const DAY: &str = "DAY";
+                                const MS: &str = "MILLISECOND";
+
+                                let gen_one_part = |num, date_part| {
+                                    if single {
+                                        templates.interval_single_expr(num, date_part)
+                                    } else {
+                                        let interval = format!("{} {}", num, date_part);
+                                        templates.interval_expr(interval)
+                                    }
+                                };
+                                let gen_two_parts = |num1, date_part1, num2, date_part2| {
+                                    if single {
+                                        let i1 = templates.interval_single_expr(num1, date_part1);
+                                        let i2 = templates.interval_single_expr(num2, date_part2);
+                                        match (i1, i2) {
+                                            (Ok(interval1), Ok(interval2)) => {
+                                                Ok(format!("({interval1} + {interval2})"))
+                                            }
+                                            (Err(e), _) | (_, Err(e)) => Err(e),
+                                        }
+                                    } else {
+                                        let interval =
+                                            format!("{num1} {date_part1} {num2} {date_part2}");
+                                        templates.interval_expr(interval)
+                                    }
+                                };
+
+                                let generated_sql = match (months, days, ms) {
+                                    (0, 0, ms) => gen_one_part(ms, MS),
+                                    (0, days, 0) => gen_one_part(days.into(), DAY),
+                                    (months, 0, 0) => gen_one_part(months.into(), MONTH),
+                                    (0, days, ms) => gen_two_parts(days.into(), DAY, ms, MS),
+                                    (months, 0, ms) => gen_two_parts(months.into(), MONTH, ms, MS),
+                                    (mon, d, 0) => gen_two_parts(mon.into(), MONTH, d.into(), DAY),
+                                    (mons, days, ms) => {
+                                        if single {
+                                            let mons = mons.into();
+                                            let days = days.into();
+                                            let mons = templates.interval_single_expr(mons, MONTH);
+                                            let days = templates.interval_single_expr(days, DAY);
+                                            let ms = templates.interval_single_expr(ms, MS);
+                                            match (mons, days, ms) {
+                                                (Ok(mons), Ok(days), Ok(ms)) => {
+                                                    Ok(format!("({mons} + {days} + {ms})"))
+                                                }
+                                                (Err(e), ..) | (_, Err(e), ..) | (.., Err(e)) => {
+                                                    Err(e)
+                                                }
+                                            }
+                                        } else {
+                                            let interval =
+                                                format!("{mons} {MONTH} {days} {DAY} {ms} {MS}");
+                                            templates.interval_expr(interval)
+                                        }
+                                    }
+                                }
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for interval: {}",
+                                        e
+                                    ))
+                                })?;
+
+                                (generated_sql, sql_query)
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::Struct(_, _) => {}
                         ScalarValue::Null => ("NULL".to_string(), sql_query),
                         x => {
