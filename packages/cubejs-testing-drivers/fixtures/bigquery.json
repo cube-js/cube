@@ -159,9 +159,6 @@
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
-    "--------------------",
-    "week granularity is not supported for intervals",
-    "--------------------",
 
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
