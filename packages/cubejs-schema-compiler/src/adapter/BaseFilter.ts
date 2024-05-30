@@ -363,11 +363,11 @@ export class BaseFilter extends BaseDimension {
     }
 
     if (date && date.match(dateRegex)) {
-      return `${date}T00:00:00.000`;
+      return `${date}T00:00:00.${'0'.repeat(this.query.timestampPrecision())}`;
     }
 
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT00:00:00.000');
+      return moment.tz(date, this.query.timezone).format(`YYYY-MM-DDT00:00:00.${'0'.repeat(this.query.timestampPrecision())}`);
     }
 
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
