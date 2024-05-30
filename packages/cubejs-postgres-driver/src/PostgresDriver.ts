@@ -260,6 +260,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  protected nullTypeId: number | null = null;
+
+  protected async loadNullTypeId(conn: PoolClient): Promise<void> {
+    if (!this.nullTypeId) {
+      const nullField = await conn.query('SELECT NULL', []);
+      this.nullTypeId = nullField.fields[0].dataTypeID;
+    }
+  }
+
   protected async prepareConnection(
     conn: PoolClient,
     options: { executionTimeout: number } = {
@@ -270,11 +279,12 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     await conn.query(`SET statement_timeout TO ${options.executionTimeout}`);
 
     await this.loadUserDefinedTypes(conn);
+    await this.loadNullTypeId(conn);
   }
 
   protected mapFields(fields: FieldDef[]) {
     return fields.map((f) => {
-      const postgresType = this.getPostgresTypeForField(f.dataTypeID);
+      const postgresType = f.dataTypeID == this.nullTypeId ? 'null' : this.getPostgresTypeForField(f.dataTypeID);
       if (!postgresType) {
         throw new Error(
           `Unable to detect type for field "${f.name}" with dataTypeID: ${f.dataTypeID}`

@@ -1,5 +1,18 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`SQL API (STREAM_MODE ON) Postgres (Data) select null in subquery (STREAM_MODE ON): power bi post aggregate measure wrap 1`] = `
+Array [
+  Object {
+    "usr": null,
+    "val": 789,
+  },
+  Object {
+    "usr": null,
+    "val": 987,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) SELECT COUNT(*) as cn, "status" FROM Orders GROUP BY 2 ORDER BY cn DESC: sql_orders 1`] = `
 Array [
   Object {

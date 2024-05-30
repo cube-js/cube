@@ -7,6 +7,65 @@ import type { StartedTestContainer } from 'testcontainers';
 import { BirdBox, getBirdbox } from '../src';
 import { DEFAULT_CONFIG, JEST_AFTER_ALL_DEFAULT_TIMEOUT, JEST_BEFORE_ALL_DEFAULT_TIMEOUT } from './smoke-tests';
 
+// TODO: Random port?
+const pgPort = 5656;
+let connectionId = 0;
+
+async function createPostgresClient(user: string, password: string) {
+  connectionId++;
+  const currentConnId = connectionId;
+
+  console.debug(`[pg] new connection ${currentConnId}`);
+
+  const conn = new PgClient({
+    database: 'db',
+    port: pgPort,
+    host: 'localhost',
+    user,
+    password,
+    ssl: false,
+  });
+  conn.on('error', (err) => {
+    console.log(err);
+  });
+  conn.on('end', () => {
+    console.debug(`[pg] end ${currentConnId}`);
+  });
+
+  await conn.connect();
+
+  return conn;
+}
+
+async function beforeAllInner(streamMode: 'true' | 'false' = 'false') {
+  const db = await PostgresDBRunner.startContainer({});
+  const birdbox = await getBirdbox(
+    'postgres',
+    {
+      ...DEFAULT_CONFIG,
+      //
+      CUBESQL_LOG_LEVEL: 'trace',
+      //
+      CUBEJS_DB_TYPE: 'postgres',
+      CUBEJS_DB_HOST: db.getHost(),
+      CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
+      CUBEJS_DB_NAME: 'test',
+      CUBEJS_DB_USER: 'test',
+      CUBEJS_DB_PASS: 'test',
+      //
+      CUBEJS_PG_SQL_PORT: `${pgPort}`,
+      CUBESQL_SQL_PUSH_DOWN: 'true',
+      CUBESQL_STREAM_MODE: streamMode,
+    },
+    {
+      schemaDir: 'postgresql/schema',
+      cubejsConfig: 'postgresql/single/sqlapi.js',
+    }
+  );
+  const connection = await createPostgresClient('admin', 'admin_password');
+  return {db, birdbox, connection};
+}
+
 describe('SQL API', () => {
   jest.setTimeout(60 * 5 * 1000);
 
@@ -14,61 +73,11 @@ describe('SQL API', () => {
   let birdbox: BirdBox;
   let db: StartedTestContainer;
 
-  // TODO: Random port?
-  const pgPort = 5656;
-  let connectionId = 0;
-
-  async function createPostgresClient(user: string, password: string) {
-    connectionId++;
-    const currentConnId = connectionId;
-
-    console.debug(`[pg] new connection ${currentConnId}`);
-
-    const conn = new PgClient({
-      database: 'db',
-      port: pgPort,
-      host: 'localhost',
-      user,
-      password,
-      ssl: false,
-    });
-    conn.on('error', (err) => {
-      console.log(err);
-    });
-    conn.on('end', () => {
-      console.debug(`[pg] end ${currentConnId}`);
-    });
-
-    await conn.connect();
-
-    return conn;
-  }
-
   beforeAll(async () => {
-    db = await PostgresDBRunner.startContainer({});
-    birdbox = await getBirdbox(
-      'postgres',
-      {
-        ...DEFAULT_CONFIG,
-        //
-        CUBESQL_LOG_LEVEL: 'trace',
-        //
-        CUBEJS_DB_TYPE: 'postgres',
-        CUBEJS_DB_HOST: db.getHost(),
-        CUBEJS_DB_PORT: `${db.getMappedPort(5432)}`,
-        CUBEJS_DB_NAME: 'test',
-        CUBEJS_DB_USER: 'test',
-        CUBEJS_DB_PASS: 'test',
-        //
-        CUBEJS_PG_SQL_PORT: `${pgPort}`,
-        CUBESQL_SQL_PUSH_DOWN: 'true',
-      },
-      {
-        schemaDir: 'postgresql/schema',
-        cubejsConfig: 'postgresql/single/sqlapi.js',
-      }
-    );
-    connection = await createPostgresClient('admin', 'admin_password');
+    const inner = await beforeAllInner('false');
+    db = inner.db;
+    birdbox = inner.birdbox;
+    connection = inner.connection;
   }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
 
   afterAll(async () => {
@@ -296,6 +305,47 @@ from
       const query = 'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
       const res = await connection.query(query);
       expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
+    });
+  });
+});
+
+describe('SQL API (STREAM_MODE ON)', () => {
+  jest.setTimeout(60 * 5 * 1000);
+
+  let connection: PgClient;
+  let birdbox: BirdBox;
+  let db: StartedTestContainer;
+
+  beforeAll(async () => {
+    const inner = await beforeAllInner('true');
+    db = inner.db;
+    birdbox = inner.birdbox;
+    connection = inner.connection;
+  }, JEST_BEFORE_ALL_DEFAULT_TIMEOUT);
+
+  afterAll(async () => {
+    await connection.end();
+    await birdbox.stop();
+    await db.stop();
+  }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  describe('Postgres (Data)', () => {
+    test('where segment is false (STREAM_MODE ON)', async () => {
+      const query = 'SELECT value AS val, * FROM "SegmentTest" WHERE segment_eq_1 IS FALSE ORDER BY value;';
+      const res = await connection.query(query);
+      expect(res.rows.map((x) => x.val)).toEqual([789, 987]);
+    });
+
+    test('select null in subquery (STREAM_MODE ON)', async () => {
+      const query = `
+      SELECT * FROM (
+        SELECT NULL AS "usr", 
+        value AS val 
+        FROM "SegmentTest" WHERE segment_eq_1 IS FALSE 
+        ORDER BY value
+      ) "y";`;
+      const res = await connection.query(query);
+      expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
   });
 });
