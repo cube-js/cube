@@ -1,6 +1,7 @@
 import {
   setupLogger,
   registerInterface,
+  execSql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
@@ -32,6 +33,10 @@ export class SQLServer {
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
+  }
+
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
   }
 
   public async init(options: SQLServerOptions): Promise<void> {

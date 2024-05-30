@@ -134,6 +134,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: false,
         })?;
+
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),

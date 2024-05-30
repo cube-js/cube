@@ -89,6 +89,14 @@ import {
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
 
+type HandleErrorOptions = {
+    e: any,
+    res: ResponseResultFn,
+    context?: any,
+    query?: any,
+    requestStarted?: Date
+};
+
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
     handler(req as any, res).catch(next);
@@ -348,6 +356,27 @@ class ApiGateway {
       })
     );
 
+    app.post(
+      `${this.basePath}/v1/cubesql`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        const server = this.initSQLServer();
+        
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        try {
+          await server.execSql(req.body.query, res, req.context?.securityContext);
+        } catch (e: any) {
+          this.handleError({
+            e,
+            context: req.context,
+            res: this.resToResultFn(res)
+          });
+        }
+      })
+    );
+
     // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
@@ -471,8 +500,14 @@ class ApiGateway {
     app.use(this.handleErrorMiddleware);
   }
 
+  protected _sqlServer: SQLServer | undefined;
+
   public initSQLServer() {
-    return new SQLServer(this);
+    if (!this._sqlServer) {
+      this._sqlServer = new SQLServer(this);
+    }
+
+    return this._sqlServer;
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
@@ -496,7 +531,7 @@ class ApiGateway {
         ...this.parseQueryParam(queryingOptions || {}),
         throwErrors: true
       }));
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -550,10 +585,11 @@ class ApiGateway {
         response.compilerId = metaConfig.compilerId;
       }
       res(response);
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e,
         context,
+        // @ts-ignore
         res,
         requestStarted,
       });
@@ -588,7 +624,7 @@ class ApiGateway {
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e,
         context,
@@ -619,7 +655,7 @@ class ApiGateway {
         );
 
       res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -681,7 +717,7 @@ class ApiGateway {
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -715,7 +751,7 @@ class ApiGateway {
           preAggregationPartition
         )
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -735,7 +771,7 @@ class ApiGateway {
         );
 
       res({ result });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -785,7 +821,7 @@ class ApiGateway {
    */
   private async preAggregationsJobs(req: Request, res: ExpressResponse) {
     const response = this.resToResultFn(res);
-    const started = new Date();
+    const requestStarted = new Date();
     const context = <RequestContext>req.context;
     const query = <PreAggsJobsRequest>req.body;
     let result;
@@ -851,8 +887,8 @@ class ApiGateway {
         source: req.header('source') || 'unknown',
       });
       response(result, { status: 200 });
-    } catch (e) {
-      this.handleError({ e, context, query, res: response, started });
+    } catch (e: any) {
+      this.handleError({ e, context, query, res: response, requestStarted });
     }
   }
 
@@ -1105,7 +1141,7 @@ class ApiGateway {
       res({
         result: await orchestratorApi.getPreAggregationQueueStates()
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1122,7 +1158,7 @@ class ApiGateway {
       res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1244,7 +1280,7 @@ class ApiGateway {
       res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1314,7 +1350,7 @@ class ApiGateway {
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
       res({ cubeNameToDataSource, dataSourceToSqlGenerator });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1404,7 +1440,7 @@ class ApiGateway {
         transformedQueries: sqlQueries.map((sqlQuery) => sqlQuery.canUseTransformedQuery),
         pivotQuery: getPivotQuery(queryType, normalizedQueries)
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1722,7 +1758,7 @@ class ApiGateway {
       } else {
         res(results[0]);
       }
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1734,7 +1770,6 @@ class ApiGateway {
     const {
       context,
       res,
-      apiType = 'sql',
     } = request;
     const requestStarted = new Date();
 
@@ -1855,7 +1890,7 @@ class ApiGateway {
       res(request.streaming ? results[0] : {
         results,
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1916,7 +1951,7 @@ class ApiGateway {
         res(error.message, error.opts);
       }
       await subscribe({ error, result });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1977,7 +2012,7 @@ class ApiGateway {
 
   public handleError({
     e, context, query, res, requestStarted
-  }: any) {
+  }: HandleErrorOptions) {
     const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
     
     const plainError = e.plainMessages;
@@ -2339,7 +2374,7 @@ class ApiGateway {
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: any) {
       if (next) {
         next(e);
       } else {

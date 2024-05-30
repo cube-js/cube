@@ -15,12 +15,13 @@ use datafusion::{
         projection_drop_out::ProjectionDropOut,
         utils::from_plan,
     },
-    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan},
+    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan, RecordBatchStream},
     prelude::*,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
 };
+use futures::FutureExt;
 use itertools::Itertools;
 use log::warn;
 use serde::Serialize;
@@ -50,7 +51,7 @@ use self::{
 use crate::{
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
-        dataframe,
+        dataframe::{self},
         session::DatabaseProtocol,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
@@ -1739,6 +1740,36 @@ pub async fn convert_sql_to_cube_query(
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone(), &mut None)?;
     convert_statement_to_cube_query(&stmt, meta, session, &mut None, None).await
+}
+
+pub async fn get_df_batches(
+    plan: &QueryPlan,
+) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, CubeError> {
+    match plan {
+        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+            let df = DataFrame::new(ctx.state.clone(), &plan);
+            let safe_stream = async move {
+                std::panic::AssertUnwindSafe(df.execute_stream())
+                    .catch_unwind()
+                    .await
+            };
+            match safe_stream.await {
+                Ok(sendable_batch) => {
+                    match sendable_batch {
+                        Ok(stream) => {
+                            return Ok(stream);
+                        }
+                        Err(err) => return Err(CubeError::panic(Box::new(err)).into()),
+                    };
+                }
+                Err(err) => return Err(CubeError::panic(err).into()),
+            }
+        }
+        _ => Err(CubeError::user(
+            "Only SELECT queries are supported for Cube SQL over HTTP".to_string(),
+        )
+        .into()),
+    }
 }
 
 pub fn find_cube_scans_deep_search(
