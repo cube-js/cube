@@ -71,6 +71,10 @@ export class BigqueryQuery extends BaseQuery {
     return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
   }
 
+  public timestampFormat() {
+    return 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]';
+  }
+
   public timestampPrecision(): number {
     return 6;
   }

@@ -56,6 +56,7 @@ export const inDbTimeZone = (timezone: string, timestampFormat: string, timestam
     if (!zone) {
       throw new Error(`Unknown timezone: ${timezone}`);
     }
+
     const parsedTime = Date.parse(`${timestamp}Z`);
     const offset = zone.utcOffset(parsedTime);
     const inDbTimeZoneDate = new Date(parsedTime + offset * 60 * 1000);
