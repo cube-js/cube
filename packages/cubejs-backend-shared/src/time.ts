@@ -36,6 +36,10 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
     throw new Error(`Unsupported time granularity: ${granularity}`);
   }
 
+  if (!options.timestampPrecision) {
+    throw new Error(`options.timestampPrecision is required, actual: ${options.timestampPrecision}`);
+  }
+
   // moment.range works with strings
   const range = moment.range(<any>dateRange[0], <any>dateRange[1]);
 
@@ -108,10 +112,12 @@ export const addSecondsToLocalTimestamp = (timestamp: string, timezone: string, 
     if (!zone) {
       throw new Error(`Unknown timezone: ${timezone}`);
     }
+
     const parsedTime = Date.parse(`${timestamp}Z`);
     const offset = zone.utcOffset(parsedTime);
     return new Date(parsedTime + offset * 60 * 1000 + seconds * 1000);
   }
+
   return moment.tz(timestamp, timezone)
     .add(seconds, 'second')
     .toDate();
