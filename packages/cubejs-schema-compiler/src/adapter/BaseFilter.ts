@@ -1,12 +1,10 @@
 import inlection from 'inflection';
-import * as momentRange from 'moment-range';
+import moment from 'moment-timezone';
 import { contains, join, map } from 'ramda';
 import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseDimension } from './BaseDimension';
 import type { BaseQuery } from './BaseQuery';
-
-const moment = momentRange.extendMoment(require('moment-timezone'));
 
 const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
 const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.(\d\d\d)|(\d\d\d\d\d\d)$/;
@@ -377,6 +375,7 @@ export class BaseFilter extends BaseDimension {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }
+
     return this.query.inDbTimeZone(this.formatFromDate(date));
   }
 

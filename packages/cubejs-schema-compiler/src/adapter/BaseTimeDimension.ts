@@ -1,13 +1,10 @@
-import Moment from 'moment-timezone';
-import { extendMoment } from 'moment-range';
+import moment from 'moment-timezone';
 import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
-
-const moment = extendMoment(Moment as any);
 
 export class BaseTimeDimension extends BaseFilter {
   public readonly dateRange: any;

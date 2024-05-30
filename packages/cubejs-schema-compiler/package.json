@@ -50,7 +50,6 @@
     "joi": "^17.8.3",
     "js-yaml": "^4.1.0",
     "lru-cache": "^5.1.1",
-    "moment-range": "^4.0.1",
     "moment-timezone": "^0.5.33",
     "node-dijkstra": "^2.5.0",
     "ramda": "^0.27.2",
