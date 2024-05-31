@@ -27,6 +27,7 @@ use egg::{
 };
 use itertools::Itertools;
 use std::{
+    borrow::Cow,
     fmt::{self, Display, Formatter},
     ops::Index,
     slice::Iter,
@@ -727,7 +728,31 @@ where
     .unwrap()
 }
 
-type ListMatches = Vec<Subst>;
+struct ListMatches {
+    len: usize,
+    substs: Vec<Subst>,
+    prevs: Vec<usize>,
+    start: usize,
+}
+impl ListMatches {
+    fn range(&self) -> std::ops::Range<usize> {
+        self.start..self.substs.len()
+    }
+    fn for_each(&self, mut f: impl FnMut(&[&Subst])) {
+        let mut substs = Vec::with_capacity(self.len);
+        for i in self.range() {
+            substs.clear();
+            let mut i = i;
+            while i != usize::MAX {
+                substs.push(&self.substs[i]);
+                i = self.prevs[i];
+            }
+            substs.reverse();
+            assert_eq!(substs.len(), self.len);
+            f(&substs);
+        }
+    }
+}
 
 #[derive(Clone, PartialEq)]
 pub enum ListType {
@@ -837,59 +862,61 @@ impl ListNodeSearcher {
         &'a self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         limit: usize,
-        matches: SearchMatches<'a, LogicalPlanLanguage>,
-    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        let mut new_substs: Vec<Subst> = vec![];
-        for subst in &matches.substs {
-            let list_id = subst[self.list_var];
-            for node in egraph[list_id].iter() {
-                let list_children = node.children();
-                if !self.match_node(node) || list_children.is_empty() {
-                    continue;
-                }
+        list_subst: &Subst,
+        output: &mut Vec<Subst>,
+    ) {
+        let list_id = list_subst[self.list_var];
+        for node in egraph[list_id].iter() {
+            let list_children = node.children();
+            if !self.match_node(node) || list_children.is_empty() {
+                continue;
+            }
 
-                let matches_product = list_children
+            let mut list_matches = ListMatches {
+                len: list_children.len(),
+                substs: vec![],
+                prevs: vec![],
+                start: 0,
+            };
+
+            list_matches.substs = self
+                .elem_pattern
+                .search_eclass_with_limit(egraph, list_children[0], limit)
+                .map_or(vec![], |ms| ms.substs);
+
+            list_matches.prevs = vec![usize::MAX; list_matches.substs.len()];
+
+            let agree = |subst1: &Subst, subst2: &Subst| {
+                self.top_level_elem_vars
                     .iter()
-                    .map(|child| {
-                        self.elem_pattern
-                            .search_eclass_with_limit(egraph, *child, limit)
-                            .map_or(vec![], |ms| ms.substs)
-                    })
-                    .multi_cartesian_product();
+                    .all(|&v| subst1.get(v) == subst2.get(v))
+            };
 
-                // TODO(mwillsey) this could be optimized more by filtering the
-                // matches as you go
-                for list_matches in matches_product {
-                    let subst0 = &list_matches[0];
-                    let agree_with_top_level = list_matches.iter().all(|m| {
-                        self.top_level_elem_vars
-                            .iter()
-                            .all(|&v| m.get(v) == subst0.get(v))
-                    });
-
-                    if agree_with_top_level {
-                        let mut subst = subst.clone();
-                        assert_eq!(list_matches.len(), list_children.len());
-                        for &var in &self.top_level_elem_vars {
-                            if let Some(id) = list_matches[0].get(var) {
-                                subst.insert(var, *id);
+            for &list_child in &list_children[1..] {
+                debug_assert_eq!(list_matches.substs.len(), list_matches.prevs.len());
+                let range = list_matches.range();
+                if range.is_empty() {
+                    break;
+                }
+                list_matches.start = list_matches.substs.len();
+                self.elem_pattern
+                    .search_eclass_with_fn(egraph, list_child, |subst| {
+                        for i in range.clone() {
+                            if agree(&list_matches.substs[i], subst) {
+                                list_matches.substs.push(subst.clone());
+                                list_matches.prevs.push(i);
                             }
                         }
-                        subst.data = Some(Arc::new(list_matches));
-                        new_substs.push(subst);
-                    }
-                }
+                        Ok(())
+                    })
+                    .unwrap_or_default();
             }
-        }
 
-        if new_substs.is_empty() {
-            None
-        } else {
-            Some(SearchMatches {
-                substs: new_substs,
-                eclass: matches.eclass,
-                ast: matches.ast.clone(),
-            })
+            if !list_matches.range().is_empty() {
+                let mut subst = list_subst.clone();
+                subst.data = Some(Arc::new(list_matches));
+                output.push(subst);
+            }
         }
     }
 }
@@ -901,11 +928,19 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         eclass: Id,
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        let matches = self
-            .list_pattern
-            .search_eclass_with_limit(egraph, eclass, limit)?;
+        let mut matches = SearchMatches {
+            substs: vec![],
+            eclass,
+            ast: Some(Cow::Borrowed(&self.list_pattern.ast)),
+        };
+        self.list_pattern
+            .search_eclass_with_fn(egraph, eclass, |subst| {
+                self.search_from_list_matches(egraph, limit, subst, &mut matches.substs);
+                Ok(())
+            })
+            .unwrap_or_default();
 
-        self.search_from_list_matches(egraph, limit, matches)
+        (!matches.substs.is_empty()).then(|| matches)
     }
 
     fn search_with_limit(
@@ -913,11 +948,28 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+        let mut result: Vec<SearchMatches<_>> = vec![];
         self.list_pattern
-            .search_with_limit(egraph, limit)
-            .into_iter()
-            .filter_map(|matches| self.search_from_list_matches(egraph, limit, matches))
-            .collect()
+            .search_with_fn(egraph, |id, list_subst| {
+                let last = match result.last_mut() {
+                    Some(top) if top.eclass == id => top,
+                    _ => {
+                        result.push(SearchMatches {
+                            substs: vec![],
+                            eclass: id,
+                            ast: Some(Cow::Borrowed(&self.list_pattern.ast)),
+                        });
+                        result.last_mut().unwrap()
+                    }
+                };
+                debug_assert_eq!(last.eclass, id);
+                self.search_from_list_matches(egraph, limit, list_subst, &mut last.substs);
+                Ok(())
+            })
+            .unwrap_or_default();
+
+        result.retain(|matches| !matches.substs.is_empty());
+        result
     }
 
     fn vars(&self) -> Vec<Var> {
@@ -1011,42 +1063,42 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
     fn apply_one(
         &self,
         egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        eclass: Id,
+        mut eclass: Id,
         subst: &Subst,
         _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
         _rule_name: Symbol,
     ) -> Vec<Id> {
-        let mut subst = subst.clone();
-
         let data = subst
             .data
             .as_ref()
             .expect("no data, did you use ListNodeSearcher?");
-        let list_matches = data
-            .downcast_ref::<ListMatches>()
-            .expect("wrong data type")
-            .clone();
+        let list_matches = data.downcast_ref::<ListMatches>().expect("wrong data type");
 
-        for list in &self.lists {
-            let new_list = list_matches
-                .iter()
-                .map(|list_subst| {
-                    let mut subst = subst.clone();
-                    subst.extend(list_subst.iter());
-                    egraph.add_instantiation(&list.elem_pattern, &subst)
-                })
-                .collect();
+        let mut subst = subst.clone();
+        let mut result_ids = vec![];
+        list_matches.for_each(|list_substs| {
+            for list in &self.lists {
+                let new_list = list_substs
+                    .iter()
+                    .map(|list_subst| {
+                        let mut subst = subst.clone();
+                        subst.extend(list_subst.iter());
+                        egraph.add_instantiation(&list.elem_pattern, &subst)
+                    })
+                    .collect();
 
-            subst.insert(list.new_list_var, egraph.add(list.make_node(new_list)));
-        }
+                subst.insert(list.new_list_var, egraph.add(list.make_node(new_list)));
+            }
+            let mut subst = subst.clone();
+            subst.extend(list_substs[0].iter());
+            let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
+            if egraph.union(eclass, new_id) {
+                result_ids.push(new_id);
+                eclass = new_id;
+            }
+        });
 
-        let result_id = egraph.add_instantiation(&self.list_pattern, &subst);
-
-        if egraph.union(eclass, result_id) {
-            vec![result_id]
-        } else {
-            vec![]
-        }
+        result_ids
     }
 
     fn vars(&self) -> Vec<Var> {
