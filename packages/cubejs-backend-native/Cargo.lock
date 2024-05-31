@@ -859,7 +859,7 @@ checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 [[package]]
 name = "egg"
 version = "0.9.5"
-source = "git+https://github.com/cube-js/egg.git?rev=bdf05cee0a145a524fe8c6c33aa577ac50ace7c9#bdf05cee0a145a524fe8c6c33aa577ac50ace7c9"
+source = "git+https://github.com/cube-js/egg.git?rev=58c2586473360f0821e91ef196b55070ac1afedc#58c2586473360f0821e91ef196b55070ac1afedc"
 dependencies = [
  "env_logger",
  "fxhash",
