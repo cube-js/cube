@@ -149,11 +149,20 @@ impl CLRepr {
             Ok(CLRepr::String(v.value(cx), StringType::Normal))
         } else if from.is_a::<JsArray, _>(cx) {
             let v = from.downcast_or_throw::<JsArray, _>(cx)?;
-            let el = v.to_vec(cx)?;
 
-            let mut r = Vec::with_capacity(el.len());
+            let mut r = Vec::with_capacity(v.len(cx) as usize);
 
-            for el in el {
+            for i in 0..v.len(cx) {
+                let el = v.get(cx, i)?;
+
+                let circular_reference = from.strict_equals(cx, el);
+                if circular_reference {
+                    #[cfg(debug_assertions)]
+                    log::warn!("Circular referenced array detected");
+
+                    continue;
+                }
+
                 r.push(Self::from_js_ref(el, cx)?)
             }
 
@@ -166,6 +175,14 @@ impl CLRepr {
             for i in 0..properties.len(cx) {
                 let property: Handle<JsString> = properties.get(cx, i)?;
                 let property_val = v.get_value(cx, property)?;
+
+                let circular_reference = from.strict_equals(cx, property_val);
+                if circular_reference {
+                    #[cfg(debug_assertions)]
+                    log::warn!("Circular referenced object detected");
+
+                    continue;
+                }
 
                 obj.insert(property.value(cx), Self::from_js_ref(property_val, cx)?);
             }
