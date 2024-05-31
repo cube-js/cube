@@ -7,11 +7,25 @@ describe('Cross language representation (CLR)', () => {
     const native = loadNative();
 
     const clr: any = {
-      true_field: true
+      true_field: true,
+      false_field: false,
+      null_field: null,
+      array_of_objects: [{
+        title: 'object 1',
+      }, {
+        title: 'object 2',
+      }]
     };
 
     expect(native.__js_to_clrepr_to_js(clr)).toEqual({
       true_field: true,
+      false_field: false,
+      null_field: undefined,
+      array_of_objects: [{
+        title: 'object 1',
+      }, {
+        title: 'object 2',
+      }]
     });
   });
 
