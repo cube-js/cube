@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Features
+
+* sql api over http ([#8254](https://github.com/cube-js/cube/issues/8254)) ([4c18954](https://github.com/cube-js/cube/commit/4c18954452bf14268a2f368960a72fec45f274dc))
+
+
+
+
+
 ## [0.35.42](https://github.com/cube-js/cube/compare/v0.35.41...v0.35.42) (2024-05-30)
 
 **Note:** Version bump only for package @cubejs-backend/testing

@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Bug Fixes
+
+* **native:** CLR - handle 1 level circular references for objects & arrays ([#8314](https://github.com/cube-js/cube/issues/8314)) ([7e8e1ff](https://github.com/cube-js/cube/commit/7e8e1ffdaba612e10f30a2a8eb59eeea47c55dcd))
+* **native:** Python - don't crash on extend_context ([#8315](https://github.com/cube-js/cube/issues/8315)) ([e7e7067](https://github.com/cube-js/cube/commit/e7e70673dce7fa923c41d5ae50eb973462a92188))
+
+
+### Features
+
+* **bigquery-driver:** Use 6 digits precision for timestamps ([#8308](https://github.com/cube-js/cube/issues/8308)) ([568bfe3](https://github.com/cube-js/cube/commit/568bfe34bc6aca136b580acb8873d208b522a2f3))
+* sql api over http ([#8254](https://github.com/cube-js/cube/issues/8254)) ([4c18954](https://github.com/cube-js/cube/commit/4c18954452bf14268a2f368960a72fec45f274dc))
+
+
+
+
+
 ## [0.35.42](https://github.com/cube-js/cube/compare/v0.35.41...v0.35.42) (2024-05-30)
 
 
