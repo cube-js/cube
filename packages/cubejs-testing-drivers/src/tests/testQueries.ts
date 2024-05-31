@@ -70,11 +70,21 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       }
     }
 
-    function executePg(name: string, test: () => Promise<void>) {
+    function executePg(name: string, test: (connection: PgClient) => Promise<void>) {
       if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
-        it.skip(name, test);
+        it.skip(name, () => {
+          // nothing to do
+        });
       } else {
-        it(name, test);
+        it(name, async () => {
+          const connection = await createPostgresClient();
+
+          try {
+            await test(connection);
+          } finally {
+            await connection.end();
+          }
+        });
       }
     }
 
@@ -1543,8 +1553,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }
 
-    executePg('SQL API: powerbi min max push down', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: powerbi min max push down', async (connection) => {
       const res = await connection.query(`
       select
   max("rows"."orderDate") as "a0",
@@ -1560,8 +1569,7 @@ from
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
 
-    executePg('SQL API: powerbi min max ungrouped flag', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: powerbi min max ungrouped flag', async (connection) => {
       const res = await connection.query(`
       select 
   count(distinct("rows"."totalSales")) + max( 
@@ -1583,8 +1591,7 @@ from
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
     });
 
-    executePg('SQL API: ungrouped pre-agg', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: ungrouped pre-agg', async (connection) => {
       const res = await connection.query(`
     select
       "productName",
@@ -1596,8 +1603,7 @@ from
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
 
-    executePg('SQL API: post-aggregate percentage of total', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: post-aggregate percentage of total', async (connection) => {
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
@@ -1607,8 +1613,7 @@ from
       expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
     });
 
-    executePg('SQL API: reuse params', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: reuse params', async (connection) => {
       const res = await connection.query(`
     select
       date_trunc('year', "orderDate") as "c0",
@@ -1629,8 +1634,7 @@ from
       expect(res.rows).toMatchSnapshot('reuse_params');
     });
 
-    executePg('SQL API: Simple Rollup', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: Simple Rollup', async (connection) => {
       const res = await connection.query(`
     select
         rowId, orderId, orderDate, sum(count)
@@ -1644,8 +1648,7 @@ from
       expect(res.rows).toMatchSnapshot('simple_rollup');
     });
 
-    executePg('SQL API: Complex Rollup', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: Complex Rollup', async (connection) => {
       const res = await connection.query(`
     select
         rowId, orderId, orderDate, city, sum(count)
@@ -1658,8 +1661,8 @@ from
   `);
       expect(res.rows).toMatchSnapshot('complex_rollup');
     });
-    executePg('SQL API: Nested Rollup', async () => {
-      const connection = await createPostgresClient();
+
+    executePg('SQL API: Nested Rollup', async (connection) => {
       const res = await connection.query(`
     select rowId, orderId, orderDate, sum(cnt)
     from (

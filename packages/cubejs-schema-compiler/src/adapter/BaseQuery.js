@@ -452,6 +452,10 @@ export class BaseQuery {
     return new BaseGroupFilter(filter);
   }
 
+  /**
+   * @param timeDimension
+   * @return {BaseTimeDimension}
+   */
   newTimeDimension(timeDimension) {
     return new BaseTimeDimension(this, timeDimension);
   }
@@ -1395,10 +1399,18 @@ export class BaseQuery {
     return this.timeDimensions.map(d => d.dateSeriesSelectColumn());
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   dateSeriesSql(timeDimension) {
     return `(${this.seriesSql(timeDimension)}) ${this.asSyntaxTable} ${timeDimension.dateSeriesAliasName()}`;
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
@@ -2662,6 +2674,13 @@ export class BaseQuery {
    */
   timestampFormat() {
     return 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]';
+  }
+
+  /**
+   * @return {number}
+   */
+  timestampPrecision() {
+    return 3;
   }
 
   /**
