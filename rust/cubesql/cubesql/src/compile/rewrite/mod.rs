@@ -832,21 +832,15 @@ impl ListNodeSearcher {
             }
         }
     }
-}
 
-impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
-    fn search_eclass_with_limit(
-        &self,
+    fn search_from_list_matches<'a>(
+        &'a self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        eclass: Id,
         limit: usize,
+        matches: SearchMatches<'a, LogicalPlanLanguage>,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
-        let mut matches = self
-            .list_pattern
-            .search_eclass_with_limit(egraph, eclass, limit)?;
-
         let mut new_substs: Vec<Subst> = vec![];
-        for subst in matches.substs {
+        for subst in &matches.substs {
             let list_id = subst[self.list_var];
             for node in egraph[list_id].iter() {
                 let list_children = node.children();
@@ -888,8 +882,42 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
             }
         }
 
-        matches.substs = new_substs;
-        (!matches.substs.is_empty()).then(|| matches)
+        if new_substs.is_empty() {
+            None
+        } else {
+            Some(SearchMatches {
+                substs: new_substs,
+                eclass: matches.eclass,
+                ast: matches.ast.clone(),
+            })
+        }
+    }
+}
+
+impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
+    fn search_eclass_with_limit(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclass: Id,
+        limit: usize,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        let matches = self
+            .list_pattern
+            .search_eclass_with_limit(egraph, eclass, limit)?;
+
+        self.search_from_list_matches(egraph, limit, matches)
+    }
+
+    fn search_with_limit(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        limit: usize,
+    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+        self.list_pattern
+            .search_with_limit(egraph, limit)
+            .into_iter()
+            .filter_map(|matches| self.search_from_list_matches(egraph, limit, matches))
+            .collect()
     }
 
     fn vars(&self) -> Vec<Var> {

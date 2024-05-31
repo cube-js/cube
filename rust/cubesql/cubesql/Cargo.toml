@@ -48,7 +48,7 @@ nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = { rev = "bdf05cee0a145a524fe8c6c33aa577ac50ace7c9", git = "https://github.com/cube-js/egg.git" }
+egg = { rev = "7d645d8b329bcce2e490e0703f717fb22093fccb", git = "https://github.com/cube-js/egg.git" }
 paste = "1.0.6"
 csv = "1.1.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
