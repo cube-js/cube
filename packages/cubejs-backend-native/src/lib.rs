@@ -485,7 +485,7 @@ fn is_fallback_build(mut cx: FunctionContext) -> JsResult<JsBoolean> {
 }
 
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
-    let arg = cx.argument::<JsValue>(1)?;
+    let arg = cx.argument::<JsValue>(0)?;
     let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
 
     arg_clrep.into_js(&mut cx)

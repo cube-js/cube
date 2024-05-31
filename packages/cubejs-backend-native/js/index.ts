@@ -97,7 +97,7 @@ export type SQLInterfaceOptions = {
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
 };
 
-function loadNative() {
+export function loadNative() {
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
     return require(path.join(__dirname, '/../../index.node'));
