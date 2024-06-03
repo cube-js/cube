@@ -6,12 +6,12 @@ reference those tables and columns.
 By default, the SQL API executes only [regular queries][ref-regular-queries] and
 [queries with post-processing][ref-queries-wpp]. You can also
 [configure][ref-sql-api-conf-query-plan] it to execute [queries with
-push-down][ref-queries-wpd]. This page explains their format and details if they
+pushdown][ref-queries-wpd]. This page explains their format and details if they
 are handled differently by the SQL API.
 
 <InfoBox>
 
-Query push-down in the SQL API is available in public preview.
+Query pushdown in the SQL API is available in public preview.
 [Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
 </InfoBox>
@@ -98,12 +98,12 @@ WHERE is_completed IS TRUE;
 Please [refer to this page](/product/apis-integrations/sql-api/joins) for details
 on joins.
 
-## Post-processing and push-down
+## Post-processing and pushdown
 
 By default, the SQL API executes only [regular queries][ref-regular-queries] and
 [queries with post-processing][ref-queries-wpp]. You can also
 [configure][ref-sql-api-conf-query-plan] it to execute [queries with
-push-down][ref-queries-wpd].
+pushdown][ref-queries-wpd].
 
 ### Query post-processing
 
@@ -197,20 +197,20 @@ ORDER BY 1;
 The above query works because the `CASE` expression is supported in `SELECT`
 queries **not** querying cube tables.
 
-### Query push-down
+### Query pushdown
 
 <WarningBox heading={`🐣  Preview`}>
 
-  Query push-down is currently in public preview, and the API and behavior may
+  Query pushdown is currently in public preview, and the API and behavior may
   change in future versions.
   
-  Query push-down is disabled by default and is controlled by
+  Query pushdown is disabled by default and is controlled by
   `CUBESQL_SQL_PUSH_DOWN` environment variable.
   In future versions, `CUBESQL_SQL_PUSH_DOWN` will be enabled by default.
 
 </WarningBox>
 
-Query push-down provides a safe net for queries that can't be rewritten
+Query pushdown provides a safe net for queries that can't be rewritten
 into combination of a [regular query][ref-regular-queries] and post-processing.
 Such queries' SQL would be transpiled to target database query leveraging
 all target database capabilities for data processing.
@@ -234,7 +234,7 @@ To balance between SQL guarantees and OLAP requirements, Cube
 
 <WarningBox>
 
-  This behavior is enabled whenever query push-down is enabled.
+  This behavior is enabled whenever query pushdown is enabled.
   In future versions it'd become default behavior.
 
 </WarningBox>
@@ -318,10 +318,10 @@ SQL API supports two types of queries against *cube tables*: aggregated
 
 <InfoBox>
 
-Without query push-down, queries that Cube runs against your database will always be aggregated,
+Without query pushdown, queries that Cube runs against your database will always be aggregated,
 regardless of whether you use aggregated (with `GROUP BY`) or non-aggregated
 queries with the SQL API.
-Whenever you enable query push-down, queries which do not contain `GROUP BY` clause will be executed as ungrouped queries.
+Whenever you enable query pushdown, queries which do not contain `GROUP BY` clause will be executed as ungrouped queries.
 
 </InfoBox>
 
@@ -334,7 +334,7 @@ SELECT
 FROM orders
 ```
 
-With query push-down disabled, Cube will still use `GROUP BY` to execute such a query.
+With query pushdown disabled, Cube will still use `GROUP BY` to execute such a query.
 
 <WarningBox>
 
@@ -342,12 +342,12 @@ In future versions automatic use of `GROUP BY` for every query would be deprecat
 
 </WarningBox>
 
-Whenever query push-down is enabled, such query would run as ungrouped query.
+Whenever query pushdown is enabled, such query would run as ungrouped query.
 As with REST API such queries do not use `GROUP BY` and render measures as if those would be grouped by primary key of a cube.
 
 <WarningBox>
 
-If query push-down is enabled, calculated `number`, `string` or `time` measures queried by SQL API can't use aggregation function definitions with it's `sql` paremeter.
+If query pushdown is enabled, calculated `number`, `string` or `time` measures queried by SQL API can't use aggregation function definitions with it's `sql` paremeter.
 Such measures can still reference other aggregate type measures though.
 
 </WarningBox>
@@ -376,7 +376,7 @@ operation, and it's enforced by the SQL API as well.
 
 ## Filtering
 
-Without query push-down, Cube supports most simple equality operators like
+Without query pushdown, Cube supports most simple equality operators like
 `=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
 Cube tries to push down all filters into a [regular query][ref-regular-queries].
 In some cases, filtering can only be done during [post-processing][ref-queries-wpp].
@@ -385,7 +385,7 @@ it's possible.
 
 ## Ordering
 
-Without query push-down, Cube tries to push down all `ORDER BY` statements into
+Without query pushdown, Cube tries to push down all `ORDER BY` statements into
 a [regular query][ref-regular-queries].
 
 ### Row limit edge case
@@ -426,7 +426,7 @@ As you can see, the sorting operation is done after the regular query and the pr
 [ref-sql-api-conf-query-plan]: /product/apis-integrations/sql-api#query-planning
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
-[ref-queries-wpd]: /product/apis-integrations/queries#query-with-push-down
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-data-model-concepts]: /product/data-modeling/concepts
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types

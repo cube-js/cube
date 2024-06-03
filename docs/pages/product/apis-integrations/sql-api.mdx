@@ -88,7 +88,7 @@ In the SQL API, each cube or view from the [data model][ref-data-model-concepts]
 is represented as a table. Measures, dimensions, and segments are represented as
 columns in these tables. SQL API can execute [regular queries][ref-regular-queries],
 [queries with post-processing][ref-queries-wpp], and [queries with
-push-down][ref-queries-wpd] that can reference these tables and columns.
+pushdown][ref-queries-wpd] that can reference these tables and columns.
 
 Under the hood, the SQL API uses [Apache DataFusion][link-datafusion] as
 its query engine. It's responsible for query planning and execution.
@@ -101,27 +101,27 @@ query plan out of a wide variety of possible plans to execute.
 Overall, query planning is a seamless process. 
 SQL API does its best to execute a query as a [regular query][ref-regular-queries]
 or a [query with post-processing][ref-queries-wpp]. If that is not possible,
-then the query would be executed as a [query with push-down][ref-queries-wpd].
+then the query would be executed as a [query with pushdown][ref-queries-wpd].
 There are trade-offs associated with each query type:
 
 | Query type | In-memory cache | Pre-aggregations | SQL support |
 | ---- | ---- | ---- | ---- |
 | [Regular queries][ref-regular-queries] | ✅ Used | ✅ Used | 🟡 Very limited |
 | [Queries with post-processing][ref-queries-wpp] | ✅ Used | ✅ Used | 🟡 Limited |
-| [Queries with push-down][ref-queries-wpd] | ✅ Used | ❌ Not used | ✅ Extensive |
+| [Queries with pushdown][ref-queries-wpd] | ✅ Used | ❌ Not used | ✅ Extensive |
 
 <InfoBox>
 
-Query push-down in the SQL API is available in public preview.
+Query pushdown in the SQL API is available in public preview.
 [Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
 </InfoBox>
 
 <WarningBox>
 
-**Query push-down is disabled by default.** You should explicitly [enable
+**Query pushdown is disabled by default.** You should explicitly [enable
 it](#query-planning). In future versions, it will be enabled by default. Also,
-enabling query push-down would affect how [ungrouped queries][ref-ungrouped-queries]
+enabling query pushdown would affect how [ungrouped queries][ref-ungrouped-queries]
 are executed; check [query format][ref-sql-query-format] for details.
 
 </WarningBox>
@@ -199,11 +199,11 @@ set of SQL functions and operators, and sometimes you can get the following erro
 `Error during rewrite: Can't detect Cube query and it may be not supported yet.`
 
 You can use the `CUBESQL_SQL_PUSH_DOWN` environment variable to instruct the SQL API
-to execute such queries as [queries with push-down][ref-queries-wpd].
+to execute such queries as [queries with pushdown][ref-queries-wpd].
 
 <InfoBox>
 
-Query push-down in the SQL API is available in public preview.
+Query pushdown in the SQL API is available in public preview.
 [Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
 </InfoBox>
@@ -234,7 +234,7 @@ Use the following environment variables to allocate more resources for query pla
 [ref-data-model-concepts]: /product/data-modeling/concepts
 [ref-regular-queries]: /product/apis-integrations/queries#regular-query
 [ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
-[ref-queries-wpd]: /product/apis-integrations/queries#query-with-push-down
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [link-datafusion]: https://arrow.apache.org/datafusion/
 [link-egg]: https://github.com/egraphs-good/egg
