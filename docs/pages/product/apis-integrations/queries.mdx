@@ -51,7 +51,7 @@ and the sections below for details on each query type.
 | --- | --- | --- |
 | [Regular query](#regular-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ✅ Yes |
 | [Query with post-processing](#query-with-post-processing) | [SQL API][ref-sql-api] only | ❌ No |
-| [Query with push-down](#query-with-push-down) | [SQL API][ref-sql-api] only | ❌ No |
+| [Query with pushdown](#query-with-pushdown) | [SQL API][ref-sql-api] only | ❌ No |
 | [Compare date range query](#compare-date-range-query) | [REST API][ref-rest-api] only | ❌ No |
 | [Total query](#total-query) | [REST API][ref-rest-api] only | ❌ No |
 | [Ungrouped query](#ungrouped-query) | [SQL API][ref-sql-api], [REST API][ref-rest-api], [GraphQL API][ref-graphql-api] | ❌ No |
@@ -226,35 +226,35 @@ ORDER BY 4 DESC
 LIMIT 10;
 ```
 
-### Query with push-down
+### Query with pushdown
 
-**Queries with push-down are specific to the [SQL API][ref-sql-api].**
+**Queries with pushdown are specific to the [SQL API][ref-sql-api].**
 Unlike [queries with post-processing](#query-with-post-processing), they can
 have arbitrary structure and contain pretty much any SQL functions and operators.
 
-Thus, queries with push-down are not reducible to [regular
+Thus, queries with pushdown are not reducible to [regular
 queries](#regular-query) and post-processing on top of them. To execute a query
-with push-down, Cube will need to transform it and generate the SQL for an
+with pushdown, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
 
 <InfoBox>
 
-Query push-down in the SQL API is available in public preview.
+Query pushdown in the SQL API is available in public preview.
 [Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
 </InfoBox>
 
-Queries with push-down, since they don't include regular queries, can not
+Queries with pushdown, since they don't include regular queries, can not
 utilize pre-aggregations; however, they still benefit from [in-memory
-cache][ref-caching]. Queries with push-down can also be modified before
+cache][ref-caching]. Queries with pushdown can also be modified before
 execution with [`query_rewrite`][ref-query-rewrite]; however, only applying
 additional filters is supported.
 
 #### Example
 
-See an example of a query with push-down. In this query, the filter in `WHERE`
+See an example of a query with pushdown. In this query, the filter in `WHERE`
 references a subquery. So, it can't be executed as a query with post-processing.
-It will be executed as a query with push-down instead:
+It will be executed as a query with pushdown instead:
 
 ```sql
 SELECT
