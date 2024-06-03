@@ -3533,6 +3533,9 @@ mod tests {
             .await;
     }
 
+    // This test is temporary modified because of the "disable quote handling in CSV import" hotfix, as
+    // now not all CSV files are supported. It should return to normal after changing the hotfix for a
+    // more general solution.
     #[tokio::test]
     async fn disk_space_limit() {
         Config::test("disk_space_limit")
@@ -3568,19 +3571,19 @@ mod tests {
                             let path_2 = dir.clone().join("foo-cluster-2.csv.gz");
                             let mut file = File::create(path_1.clone()).unwrap();
 
-                            file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
+                            file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).unwrap();
                             for i in 0..50
                             {
-                                file.write_all(format!("{},\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
+                                file.write_all(format!("{}\u{0001}\"New York\"\u{0001}\"[\"\"\"\"]\"\u{0001}2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
                             }
 
 
                             let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
-                            file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                            file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).await.unwrap();
                             for i in 0..50
                             {
-                                file.write_all(format!("{},San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n", i).as_bytes()).await.unwrap();
+                                file.write_all(format!("{}\u{0001}San Francisco\u{0001}\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\u{0001}2021-01-24 12:12:23 UTC\n", i).as_bytes()).await.unwrap();
                             }
 
                             file.shutdown().await.unwrap();
@@ -3591,14 +3594,14 @@ mod tests {
                         let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
                         let _ = service.exec_query(
                             &format!(
-                                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
                         ).await.unwrap();
 
                         let res = service.exec_query(
                             &format!(
-                                "CREATE TABLE Foo.Persons2 (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                "CREATE TABLE Foo.Persons2 (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
                         ).await;
@@ -3614,6 +3617,9 @@ mod tests {
             .await;
     }
 
+    // This test is temporary modified because of the "disable quote handling in CSV import" hotfix, as
+    // now not all CSV files are supported. It should return to normal after changing the hotfix for a
+    // more general solution.
     #[tokio::test]
     async fn disk_space_limit_per_worker() {
         Config::test("disk_space_limit_per_worker")
@@ -3649,19 +3655,19 @@ mod tests {
                             let path_2 = dir.clone().join("foo-cluster-2.csv.gz");
                             let mut file = File::create(path_1.clone()).unwrap();
 
-                            file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
+                            file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).unwrap();
                             for i in 0..50
                             {
-                                file.write_all(format!("{},\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
+                                file.write_all(format!("{}\u{0001}\"New York\"\u{0001}\"[\"\"\"\"]\"\u{0001}2021-01-24 19:12:23.123 UTC\n", i).as_bytes()).unwrap();
                             }
 
 
                             let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
-                            file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
+                            file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).await.unwrap();
                             for i in 0..50
                             {
-                                file.write_all(format!("{},San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n", i).as_bytes()).await.unwrap();
+                                file.write_all(format!("{}\u{0001}San Francisco\u{0001}\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\u{0001}2021-01-24 12:12:23 UTC\n", i).as_bytes()).await.unwrap();
                             }
 
                             file.shutdown().await.unwrap();
@@ -3672,14 +3678,14 @@ mod tests {
                         let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
                         let _ = service.exec_query(
                             &format!(
-                                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
                         ).await.unwrap();
 
                         let res = service.exec_query(
                             &format!(
-                                "CREATE TABLE Foo.Persons2 (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                                "CREATE TABLE Foo.Persons2 (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                                 paths.iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
                             )
                         ).await;
@@ -3759,6 +3765,9 @@ mod tests {
         }).await;
     }
 
+    // This test is temporary modified because of the "disable quote handling in CSV import" hotfix, as
+    // now not all CSV files are supported. It should return to normal after changing the hotfix for a
+    // more general solution.
     #[test]
     fn create_table_with_temp_file() {
         tokio::runtime::Builder::new_multi_thread()
@@ -3777,12 +3786,12 @@ mod tests {
 
                 let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
 
-                file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
-                file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
-                file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("4,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
-                file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).await.unwrap();
+                file.write_all("1\u{0001}San Francisco\u{0001}\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\u{0001}2021-01-24 12:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("2\u{0001}\"New York\"\u{0001}\"[\"\"\"\"]\"\u{0001}2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("3\u{0001}New York\u{0001}\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("4\u{0001}New York\u{0001}\"\"\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("5\u{0001}New York\u{0001}\"\"\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
 
                 file.shutdown().await.unwrap();
 
@@ -3795,7 +3804,7 @@ mod tests {
             let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
             let _ = service.exec_query(
                 &format!(
-                    "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                    "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                     paths.into_iter().map(|p| format!("'{}'", p)).join(",")
                 )
             ).await.unwrap();
@@ -3803,8 +3812,57 @@ mod tests {
             let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
 
-            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"' or arr = '\"[\"\"\"\"]\"' or arr is null or arr = '\"\"'").await.unwrap();
             assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(5)])]);
+        }).await;
+
+            }
+            )
+    }
+
+    #[test]
+    fn create_table_with_temp_file_without_escaping() {
+        tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .thread_stack_size(4 * 1024 * 1024)
+            .build()
+            .unwrap()
+            .block_on( async {
+        Config::run_test("create_table_with_temp_file_without_escaping", async move |services| {
+            let service = services.sql_service;
+
+            let paths = {
+                let dir = env::temp_dir();
+
+                let path_2 = dir.clone().join("foo-4.csv.gz");
+
+                let mut file = GzipEncoder::new(BufWriter::new(tokio::fs::File::create(path_2.clone()).await.unwrap()));
+
+                file.write_all("1,San Francisco,2021-01-24 12:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("2,\"New York,2021-01-24 19:12:23 UTC\n".as_bytes()).await.unwrap();
+                file.write_all("3,,2021-01-25 19:12:23 UTC\n".as_bytes()).await.unwrap();
+
+                file.shutdown().await.unwrap();
+
+                let remote_fs = services.injector.get_service_typed::<dyn RemoteFs>().await;
+                remote_fs.upload_file(path_2.to_str().unwrap().to_string(), "temp-uploads/foo-4.csv.gz".to_string()).await.unwrap();
+
+                vec!["temp://foo-4.csv.gz".to_string()]
+            };
+
+            let _ = service.exec_query("CREATE SCHEMA IF NOT EXISTS Foo").await.unwrap();
+            let _ = service.exec_query(
+                &format!(
+                    "CREATE TABLE Foo.PersonsWithoutEscaping (id int, city text, t timestamp) WITH (input_format = 'csv_no_header') INDEX persons_city (`city`, `id`) LOCATION {}",
+                    paths.into_iter().map(|p| format!("'{}'", p)).join(",")
+                )
+            ).await.unwrap();
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.PersonsWithoutEscaping").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
+
+            let result = service.exec_query("SELECT count(*) as cnt from Foo.PersonsWithoutEscaping WHERE city = 'San Francisco' or city = '\"New York' or city is null").await.unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3)])]);
         }).await;
 
             }

@@ -2001,6 +2001,9 @@ async fn group_by_without_aggregates(service: Box<dyn SqlClient>) {
     );
 }
 
+// This test is temporary modified because of the "disable quote handling in CSV import" hotfix, as
+// now not all CSV files are supported. It should return to normal after changing the hotfix for a
+// more general solution.
 async fn create_table_with_location(service: Box<dyn SqlClient>) {
     let paths = {
         let dir = env::temp_dir();
@@ -2009,32 +2012,32 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         let path_2 = dir.clone().join("foo-2.csv.gz");
         let mut file = File::create(path_1.clone()).unwrap();
 
-        file.write_all("id,city,arr,t\n".as_bytes()).unwrap();
-        file.write_all("1,San Francisco,\"[\"\"Foo\n\n\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).unwrap();
-        file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23.123 UTC\n".as_bytes())
+        file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).unwrap();
+        file.write_all("1\u{0001}San Francisco\u{0001}\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\u{0001}2021-01-24 12:12:23 UTC\n".as_bytes()).unwrap();
+        file.write_all("2\u{0001}\"New York\"\u{0001}\"[\"\"\"\"]\"\u{0001}2021-01-24 19:12:23.123 UTC\n".as_bytes())
             .unwrap();
-        file.write_all("3,New York,\"de Comunicación\",2021-01-25 19:12:23 UTC\n".as_bytes())
+        file.write_all("3\u{0001}New York\u{0001}\"de Comunicación\"\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes())
             .unwrap();
 
         let mut file = GzipEncoder::new(BufWriter::new(
             tokio::fs::File::create(path_2.clone()).await.unwrap(),
         ));
 
-        file.write_all("id,city,arr,t\n".as_bytes()).await.unwrap();
-        file.write_all("1,San Francisco,\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\",\"2021-01-24 12:12:23 UTC\"\n".as_bytes()).await.unwrap();
-        file.write_all("2,\"New York\",\"[\"\"\"\"]\",2021-01-24 19:12:23 UTC\n".as_bytes())
+        file.write_all("id\u{0001}city\u{0001}arr\u{0001}t\n".as_bytes()).await.unwrap();
+        file.write_all("1\u{0001}San Francisco\u{0001}\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"\u{0001}2021-01-24 12:12:23 UTC\n".as_bytes()).await.unwrap();
+        file.write_all("2\u{0001}\"New York\"\u{0001}\"[\"\"\"\"]\"\u{0001}2021-01-24 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("3,New York,,2021-01-25 19:12:23 UTC\n".as_bytes())
+        file.write_all("3\u{0001}New York\u{0001}\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("4,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes())
+        file.write_all("4\u{0001}New York\u{0001}\"\"\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("5,New York,\"\",2021-01-25 19:12:23 UTC\n".as_bytes())
+        file.write_all("5\u{0001}New York\u{0001}\"\"\u{0001}2021-01-25 19:12:23 UTC\n".as_bytes())
             .await
             .unwrap();
-        file.write_all("6,New York,\\\\N,\"\\N\"\n".as_bytes())
+        file.write_all("6\u{0001}New York\u{0001}\\\\N\u{0001}\\N\n".as_bytes())
             .await
             .unwrap();
 
@@ -2049,7 +2052,7 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         .unwrap();
     let _ = service.exec_query(
             &format!(
-                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) INDEX persons_city (`city`, `id`) LOCATION {}",
+                "CREATE TABLE Foo.Persons (id int, city text, t timestamp, arr text) WITH (delimiter = '^A') INDEX persons_city (`city`, `id`) LOCATION {}",
                 paths.into_iter().map(|p| format!("'{}'", p.to_string_lossy())).join(",")
             )
         ).await.unwrap();
@@ -2065,8 +2068,8 @@ async fn create_table_with_location(service: Box<dyn SqlClient>) {
         .unwrap();
     assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(9)])]);
 
-    let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '[\"Foo\",\"Bar\",\"FooBar\"]' or arr = '[\"\"]' or arr is null").await.unwrap();
-    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(7)])]);
+    let result = service.exec_query("SELECT count(*) as cnt from Foo.Persons WHERE arr = '\"[\"\"Foo\"\",\"\"Bar\"\",\"\"FooBar\"\"]\"' or arr = '\"[\"\"\"\"]\"' or arr is null or arr = '\"\"'").await.unwrap();
+    assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8)])]);
 }
 
 async fn create_table_with_location_messed_order(service: Box<dyn SqlClient>) {
