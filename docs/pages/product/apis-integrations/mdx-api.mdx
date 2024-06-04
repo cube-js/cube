@@ -1,6 +1,6 @@
 # MDX API
 
-The MDX (MultiDimensional eXpressions) API provides a robust interface for connecting desktop applications, such as Microsoft Excel, to the Cube Cloud semantic layer via the XMLA (XML for Analysis) standard. 
+The MDX (MultiDimensional eXpressions) API provides a robust interface for connecting applications, such as Microsoft Excel, to the Cube Cloud semantic layer via the XMLA (XML for Analysis) standard. 
 
 Key Features:
 
@@ -9,10 +9,9 @@ Key Features:
 - <b>Real-time access:</b> Fetch live data from Cube Cloud, ensuring that your analyses and reports always reflect the most current information.
 
 <WarningBox>
-  The AI API is available on [Cube
+  The MDX API is available on [Cube
   Cloud](/getting-started#getting-started-with-cube-cloud) only. It is currently
-  in preview and should not be used for production workloads. Please contact
-  your Cube representative to have it enabled for your account.
+  in preview.
 </WarningBox>
 
 ## Configuration
@@ -23,19 +22,19 @@ If you wish to enable or disable the MDX API on a specific Cube deployment, you 
 
 To find your MDX API's credentials along with XMLA endpoint, go to "Settings" in the Cube Cloud sidebar, then "Connections and APIs"
 
-## Getting Started
+## Using MDX API with Excel
 
-### Data modeling
+Once MDX API is enabled, you can use it to connect to Cube from Excel. In Excel, go to the **Data tab**, click **Get Data** and select **From Database -> From Analysis Services**.
 
 <InfoBox>
   Please note that only the [views](/reference/data-model/view) will be available for connections via MDX API
 </InfoBox>
 
-To use the MDX API, set up one or more views before getting started.
+The following section describes Excel-specific configuration options.
 
-#### Dimension hierarchies
+### Dimension hierarchies
 
-MDX API supports dimension hierarchies. You can define multiple hierarchies in the view's schema file.
+MDX API supports dimension hierarchies. You can define multiple hierarchies.
 Each level in the hierarchy is a dimension from the view.
 
 ```yaml
@@ -51,7 +50,7 @@ views:
             - city
 ```
 
-#### Measure groups
+### Measure groups
 
 MDX API supports organizing measures into groups (folders). You can define measure groups in the view's schema file. 
 
@@ -71,6 +70,6 @@ views:
               - completed_percentage
 ```
 
-### Authentication and authorization
+## Authentication and authorization
 
 Authentication and authorization work the same as for the [SQL API](/product/apis-integrations/sql-api/security).
