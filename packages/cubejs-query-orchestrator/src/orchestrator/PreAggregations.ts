@@ -1898,7 +1898,7 @@ export class PreAggregationPartitionRangeLoader {
       throw new Error(`Date range expected to be a string array but ${range} found`);
     }
 
-    if (range[0].length !== 23 || range[1].length !== 23) {
+    if ((range[0].length !== 23 && range[0].length !== 26) || (range[1].length !== 23 && range[0].length !== 26)) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }
   }
