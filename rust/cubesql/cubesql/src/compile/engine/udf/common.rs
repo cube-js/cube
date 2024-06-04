@@ -40,10 +40,7 @@ use sha1_smol::Sha1;
 
 use crate::{
     compile::engine::{
-        df::{
-            coerce::common_type_coercion,
-            columar::if_then_else,
-        },
+        df::{coerce::common_type_coercion, columar::if_then_else},
         udf::utils::*,
     },
     sql::SessionState,
@@ -425,13 +422,14 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = &args[1];
         let right = &args[2];
 
-        let return_type = common_type_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Positive and negative results must be the same type, actual: [{}, {}]",
-                left.data_type(),
-                right.data_type(),
-            ))
-        })?;
+        let return_type =
+            common_type_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Positive and negative results must be the same type, actual: [{}, {}]",
+                    left.data_type(),
+                    right.data_type(),
+                ))
+            })?;
 
         let cond_array = match condition.data_type() {
             // // Arrow doesnt support UTF8 -> Boolean cast
@@ -495,13 +493,14 @@ pub fn create_least_udf() -> ScalarUDF {
         let left = &args[0];
         let right = &args[1];
 
-        let base_type = common_type_coercion(&left.data_type(), &right.data_type()).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Unable to coercion types, actual: [{}, {}]",
-                &left.data_type(),
-                &right.data_type(),
-            ))
-        })?;
+        let base_type =
+            common_type_coercion(&left.data_type(), &right.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &left.data_type(),
+                    &right.data_type(),
+                ))
+            })?;
 
         let result = if left.is_null(0) {
             cast(&left, &base_type)?
