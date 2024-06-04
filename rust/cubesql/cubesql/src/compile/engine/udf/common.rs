@@ -5,11 +5,11 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
+            Float64Array, GenericStringArray, Int64Array,
+            Int64Builder, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
+            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
             TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
+            UInt32Builder, UInt64Builder, Float64Builder, Int32Builder
         },
         compute::{cast, concat},
         datatypes::{
@@ -561,6 +561,146 @@ pub fn create_least_udf() -> ScalarUDF {
     ScalarUDF::new(
         "least",
         &Signature::any(2, Volatility::Immutable),
+        &return_type,
+        &fun,
+    )
+}
+
+/// The GREATEST function selects the largest value from a list of any number of expressions.
+/// The expressions must all be convertible to a common data type, which will be the type of
+/// the result. The SQL standard requires greatest and least to return null in case one argument
+/// is null. However, in Postgres NULL values in the list are ignored.
+/// We follow Postgres: The result will be NULL only if all the expressions evaluate to NULL.
+pub fn create_greatest_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() > 0);
+
+        let mut base_type = DataType::Null;
+        let array_len = args[0].len();
+
+        for arg in args {
+            base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type,
+                    arg.data_type(),
+                ))
+            })?;
+        }
+
+        // Creating a new builder with the base_type
+        let mut builder: Box<dyn ArrayBuilder> = match base_type {
+            DataType::UInt64 => Box::new(UInt64Builder::new(array_len)),
+            DataType::Int64 => Box::new(Int64Builder::new(array_len)),
+            DataType::Float64 => Box::new(Float64Builder::new(array_len)),
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "unsupported type in greatest function, actual: {}",
+                    base_type
+                )));
+            }
+        };
+
+        // Iterating over strings
+        for i in 0..array_len {
+            let mut max_value: Option<ScalarValue> = None;
+
+            // Iterating over columns
+            for arg in args {
+                if arg.is_null(i) {
+                    continue;
+                }
+
+                let scalar_value = ScalarValue::try_from_array(arg, i)?;
+
+                max_value = match max_value {
+                    Some(current_max) => {
+                        if scalar_value > current_max {
+                            Some(scalar_value)
+                        } else {
+                            Some(current_max)
+                        }
+                    }
+                    None => Some(scalar_value),
+                };
+            }
+
+            match max_value {
+                Some(ScalarValue::UInt64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<UInt64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Int64(Some(v))) => {
+                    let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Float64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Float64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                _ => match base_type {
+                    DataType::UInt64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Int64 => {
+                        let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Float64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "unsupported type in greatest function, actual: {}",
+                            base_type
+                        )));
+                    }
+                },
+            }
+        }
+
+        let array = builder.finish();
+        Ok(Arc::new(array) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |types| {
+        assert!(types.len() > 0);
+
+        let mut ti = types.iter();
+        let mut base_type = ti.next().unwrap().clone();
+
+        for t in ti {
+            base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type, t,
+                ))
+            })?;
+        }
+
+        Ok(Arc::new(base_type))
+    });
+
+    ScalarUDF::new(
+        "greatest",
+        &Signature::variadic(
+            vec![DataType::Int64, DataType::UInt64, DataType::Float64],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -3463,7 +3603,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Int64,
         vol = Volatile
     );
-    register_fun_stub!(udf, "greatest", argc = 2);
     register_fun_stub!(
         udf,
         "has_column_privilege",
