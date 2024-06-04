@@ -852,54 +852,6 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            transforming_rewrite(
-                "filter-replacer-date-trunc-equals",
-                filter_replacer(
-                    binary_expr(
-                        self.fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "=",
-                        self.fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?date")],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        binary_expr(
-                            column_expr("?column"),
-                            ">=",
-                            self.fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?date")],
-                            ),
-                        ),
-                        "AND",
-                        binary_expr(
-                            column_expr("?column"),
-                            "<",
-                            binary_expr(
-                                self.fun_expr(
-                                    "DateTrunc",
-                                    vec![literal_expr("?granularity"), literal_expr("?date")],
-                                ),
-                                "+",
-                                literal_expr("?interval"),
-                            ),
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                self.transform_granularity_to_interval("?granularity", "?interval"),
-            ),
             rewrite(
                 "filter-str-pos-to-like",
                 filter_replacer(
@@ -1756,12 +1708,12 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "filter-date-trunc-eq-literal-date",
+                "filter-date-trunc-eq-literal",
                 filter_replacer(
                     binary_expr(
                         self.fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
+                            vec!["?granularity".to_string(), column_expr("?column")],
                         ),
                         "=",
                         "?date".to_string(),
@@ -1772,41 +1724,19 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        binary_expr(
-                            column_expr("?column"),
-                            ">=",
-                            self.fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), "?date".to_string()],
-                            ),
-                        ),
+                        binary_expr(column_expr("?column"), ">=", literal_expr("?start_date")),
                         "AND",
-                        binary_expr(
-                            column_expr("?column"),
-                            "<",
-                            self.fun_expr(
-                                "DateTrunc",
-                                vec![
-                                    literal_expr("?granularity"),
-                                    udf_expr(
-                                        "date_add",
-                                        vec![
-                                            "?date".to_string(),
-                                            literal_expr("?date_add_interval"),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                        ),
+                        binary_expr(column_expr("?column"), "<", literal_expr("?end_date")),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_date_trunc_eq_literal_date(
+                self.transform_date_trunc_eq_literal(
                     "?granularity",
                     "?date",
-                    "?date_add_interval",
+                    "?start_date",
+                    "?end_date",
                 ),
             ),
             rewrite(
@@ -3949,43 +3879,57 @@ impl FilterRules {
         }
     }
 
-    fn transform_date_trunc_eq_literal_date(
+    fn transform_date_trunc_eq_literal(
         &self,
         granularity_var: &'static str,
         date_var: &'static str,
-        date_add_interval_var: &'static str,
+        start_date_var: &'static str,
+        end_date_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let date_var = var!(date_var);
-        let date_add_interval_var = var!(date_add_interval_var);
+        let start_date_var = var!(start_date_var);
+        let end_date_var = var!(end_date_var);
         move |egraph, subst| {
-            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(granularity)) = granularity {
-                    if let Some(date_add_interval) =
-                        utils::granularity_str_to_interval(&granularity)
-                    {
-                        if let Some(ConstantFolding::Scalar(date)) =
-                            &egraph[subst[date_var]].data.constant
-                        {
-                            if let ScalarValue::TimestampNanosecond(Some(date), None) = date {
-                                if let Some(true) =
-                                    utils::is_literal_date_trunced(*date, &granularity)
-                                {
-                                    subst.insert(
-                                        date_add_interval_var,
-                                        egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                                            LiteralExprValue(date_add_interval),
-                                        )),
-                                    );
+            let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
+                &egraph[subst[granularity_var]].data.constant
+            else {
+                return false;
+            };
 
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            false
+            let Some(ConstantFolding::Scalar(date)) = &egraph[subst[date_var]].data.constant else {
+                return false;
+            };
+            let Some(Some(date)) = Self::scalar_dt_to_naive_datetime(date) else {
+                return false;
+            };
+
+            let Some((start_date, end_date)) =
+                Self::naive_datetime_to_range_by_granularity(date, granularity)
+            else {
+                return false;
+            };
+
+            let (Some(start_date), Some(end_date)) = (
+                start_date.timestamp_nanos_opt(),
+                end_date.timestamp_nanos_opt(),
+            ) else {
+                return false;
+            };
+
+            subst.insert(
+                start_date_var,
+                egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                    ScalarValue::TimestampNanosecond(Some(start_date), None),
+                ))),
+            );
+            subst.insert(
+                end_date_var,
+                egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                    ScalarValue::TimestampNanosecond(Some(end_date), None),
+                ))),
+            );
+            true
         }
     }
 
@@ -4515,7 +4459,7 @@ impl FilterRules {
                 for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                     let Some(values) = list
                         .into_iter()
-                        .map(|literal| Self::scalar_utf8_dt_to_naive_datetime(literal))
+                        .map(|literal| Self::scalar_dt_to_naive_datetime(literal))
                         .collect::<Option<HashSet<_>>>()
                         .map(|values| {
                             let mut values = values.into_iter().collect::<Vec<_>>();
@@ -4626,7 +4570,17 @@ impl FilterRules {
     // The outer Option's purpose is to signal when the type is incorrect
     // or parsing couldn't interpret the value as a NativeDateTime.
     // The inner Option is None when the ScalarValue is None.
-    fn scalar_utf8_dt_to_naive_datetime(literal: &ScalarValue) -> Option<Option<NaiveDateTime>> {
+    fn scalar_dt_to_naive_datetime(literal: &ScalarValue) -> Option<Option<NaiveDateTime>> {
+        if let ScalarValue::TimestampNanosecond(ts, None) = literal {
+            let Some(ts) = ts else {
+                return Some(None);
+            };
+            let ts_seconds = *ts / 1_000_000_000;
+            let ts_nanos = (*ts % 1_000_000_000) as u32;
+            let dt = NaiveDateTime::from_timestamp_opt(ts_seconds, ts_nanos).map(|dt| Some(dt));
+            return dt;
+        };
+
         let ScalarValue::Utf8(str) = literal else {
             return None;
         };

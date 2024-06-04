@@ -23347,4 +23347,65 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_date_trunc_eq_literal() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                DATE_TRUNC('quarter', order_date) as "c0",
+                DATE_PART('quarter', order_date) as "c1"
+            FROM
+                "KibanaSampleDataEcommerce" as "KibanaSampleDataEcommerce"
+            WHERE
+                (
+                    DATE_TRUNC('year', order_date) = '2024-01-01 00:00:00.0'
+                )
+            GROUP BY
+                DATE_TRUNC('quarter', order_date),
+                DATE_PART('quarter', order_date)
+            ORDER BY
+                CASE
+                    WHEN DATE_TRUNC('quarter', order_date) IS NULL THEN 1
+                    ELSE 0
+                END,
+                DATE_TRUNC('quarter', order_date) ASC
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("quarter".to_string()),
+                        date_range: Some(json!(vec![
+                            "2024-01-01T00:00:00.000Z".to_string(),
+                            "2024-12-31T23:59:59.999Z".to_string(),
+                        ])),
+                    },
+                    V1LoadRequestQueryTimeDimension {
+                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                        granularity: Some("quarter".to_string()),
+                        date_range: None,
+                    },
+                ]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
 }
