@@ -33,6 +33,14 @@ export class DatabricksQuery extends BaseQuery {
     return `hll_union_agg(${sql})`;
   }
 
+  public hllCardinality(sql: string): string {
+    return `hll_sketch_estimate(${sql})`;
+  }
+
+  public hllCardinalityMerge(sql: string): string {
+    return `hll_sketch_estimate(hll_union_agg(${sql}))`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `approx_count_distinct(${sql})`;
   }

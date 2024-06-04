@@ -5641,62 +5641,62 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMAAQh1Y8MTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "1",
   },
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Day": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Day": "0",
   },
 ]
 `;
@@ -5706,62 +5706,62 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMAAgjGpV0EbWeVBQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "2",
   },
   Object {
     "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMAAwjGpV0EbWeVBdqYAgkAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "3",
   },
   Object {
     "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMAAwjamAIJ6CE5G/uO1AUAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "3",
   },
   Object {
     "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMAAwjoITkb+47UBRTYkAYAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "3",
   },
   Object {
     "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMABgh9zTgSDp/uCA7uygZ50PgpizSQCBTYkAYAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "6",
   },
   Object {
     "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AwEHDAUAAAkMAAAA4B8KEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAoEl8XAAAAAAAAAACLNJAIAAAAAAAAAAAOn+4I0W28CAAAAACRJ4AGErDjEAAAAAAAAAAAAAAAAFZIQwYAAAAAAAAAAHnQ+CkAAAAAAAAAAAAAAAB9zTgSXtC3BQ7uygY=",
+    "BigECommerce.rollingCountApproxBy2Month": "12",
   },
   Object {
     "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMABwgoEl8XXtC3BVZIQwYSsOMQ4B8KEJEngAbRbbwIAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "7",
   },
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AgEHDAMABghDlnsO7DmKBPJjqw78y0YJdUNCCVZIegQAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Month": "6",
   },
   Object {
     "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AwEHDAUAAAkJAAAAAAAAAAAAAAAAAAAAQ5Z7DgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIoWkwcAAAAA7DmKBAAAAACOs/QcAAAAAHVjwxMAAAAA8mOrDgAAAAAAAAAAdUNCCVZIegQAAAAAAAAAAAAAAAAAAAAAAAAAAPzLRgkAAAAAAAAAAAAAAAA=",
+    "BigECommerce.rollingCountApproxBy2Month": "9",
   },
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AwEHDAUAAAkLAAAAAAAAAAAAAAAAAAAAAAAAAESp2gcAAAAAAAAAAMeEQgYAAAAAAAAAAIoWkwfrb3YGAAAAAAAAAACOs/QcAAAAANDitwYAAAAAAAAAAAAAAACnMT0FdWPDEwAAAAA3S2QEAAAAABklOQ8AAAAAuwK2EAAAAAAAAAAAAAAAAAAAAAA=",
+    "BigECommerce.rollingCountApproxBy2Month": "11",
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Month": "AwEHDAUAAAkPAAAAAAAAAKcxPQUZJTkPAAAAAESp2gcAAAAAAAAAAMeEQgYAAAAAAAAAAOtvdgZLwMMMAAAAAAAAAAAAAAAAz4iBCdmqYwYAAAAAAAAAAHNyXwU07gsFldqrFAAAAAA3S2QEAAAAABk01QsAAAAAuwK2EAAAAAAAAAAA0OK3BgAAAAA=",
+    "BigECommerce.rollingCountApproxBy2Month": "15",
   },
 ]
 `;
@@ -5771,62 +5771,62 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAQhtZ5UFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "1",
   },
   Object {
     "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAQjamAIJAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "1",
   },
   Object {
     "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAQj7jtQFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "1",
   },
   Object {
     "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAgh9zTgSDp/uCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "2",
   },
   Object {
     "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAwjgHwoQKBJfF17QtwUAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "3",
   },
   Object {
     "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMEAAgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "0",
   },
   Object {
     "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAwjsOYoE/MtGCfJjqw4AAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "3",
   },
   Object {
     "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAgiKFpMHdWPDEwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "2",
   },
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAginMT0F0OK3BgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "2",
   },
   Object {
     "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
-    "BigECommerce.rollingCountApproxBy2Week": "AgEHDAMAAgiV2qsUc3JfBQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+    "BigECommerce.rollingCountApproxBy2Week": "2",
   },
 ]
 `;
