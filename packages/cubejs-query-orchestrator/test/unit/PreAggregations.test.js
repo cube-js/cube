@@ -375,16 +375,23 @@ describe('PreAggregations', () => {
     test('6 timestamps - valid intersection', () => {
       expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
         ['2024-01-05T00:00:00.000000', '2024-01-05T23:59:59.999999'],
-        ['2024-01-01T00:00:00.000000', '2024-01-32T23:59:59.999999'],
+        ['2024-01-01T00:00:00.000000', '2024-01-31T23:59:59.999999'],
       )).toEqual(
         ['2024-01-05T00:00:00.000000', '2024-01-05T23:59:59.999999']
+      );
+
+      expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-20T00:00:00.000000', '2024-02-05T23:59:59.999999'],
+        ['2024-01-01T00:00:00.000000', '2024-01-31T23:59:59.999999'],
+      )).toEqual(
+        ['2024-01-20T00:00:00.000000', '2024-01-31T23:59:59.999999']
       );
     });
 
     test('3 timestamps - valid intersection', () => {
       expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
         ['2024-01-05T00:00:00.000', '2024-01-05T23:59:59.999'],
-        ['2024-01-01T00:00:00.000', '2024-01-32T23:59:59.999'],
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
       )).toEqual(
         ['2024-01-05T00:00:00.000', '2024-01-05T23:59:59.999']
       );
