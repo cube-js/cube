@@ -339,6 +339,30 @@
           "rolling_window": {
             "trailing": "2 month"
           }
+        },
+        {
+          "name": "rollingCountApproxBy2Day",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 day"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Week",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 week"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Month",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 month"
+          }
         }
       ]
     }
