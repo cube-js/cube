@@ -25,7 +25,7 @@ import path from 'path';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
-import { QueryStream, nextFn, Row } from './QueryStream';
+import { QueryStream, nextFn, Row, transformRow } from './QueryStream';
 
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
@@ -246,6 +246,7 @@ export class JDBCDriver extends BaseDriver {
 
   protected async queryPromised(query: string, cancelObj: any, options: any) {
     options = options || {};
+
     try {
       const conn = await this.pool.acquire();
       try {
@@ -337,11 +338,18 @@ export class JDBCDriver extends BaseDriver {
     await setQueryTimeout(600);
     const executeQueryAsync = promisify(statement.execute.bind(statement));
     const resultSet = await executeQueryAsync(query);
-    const toObjArrayAsync =
-      resultSet.toObjArray && promisify(resultSet.toObjArray.bind(resultSet)) ||
-      (() => Promise.resolve(resultSet));
 
-    return toObjArrayAsync();
+    if (resultSet.toObjArray) {
+      const result: any = await (promisify(resultSet.toObjArray.bind(resultSet)))();
+
+      for (const [key, row] of Object.entries(result)) {
+        result[key] = transformRow(row);
+      }
+
+      return result;
+    }
+
+    return resultSet;
   }
 
   public async release() {
