@@ -1535,6 +1535,50 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    if (includeHLLSuite) {
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 day', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Day',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 week', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Week',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 month', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Month',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+    }
+
     execute('querying BigECommerce: totalProfitYearAgo', async () => {
       const response = await client.load({
         measures: [
