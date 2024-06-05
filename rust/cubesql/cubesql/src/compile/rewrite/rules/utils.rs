@@ -1,7 +1,17 @@
 use std::cmp::{max, min};
 
 use chrono::{Datelike, NaiveDateTime, Timelike};
-use datafusion::{physical_plan::aggregates::AggregateFunction, scalar::ScalarValue};
+use datafusion::{
+    logical_plan::{Expr, Operator},
+    physical_plan::aggregates::AggregateFunction,
+    scalar::ScalarValue,
+};
+
+use crate::compile::rewrite::{
+    analysis::LogicalPlanAnalysis, BinaryExprOp, LiteralExprValue, LogicalPlanLanguage,
+};
+
+use egg::{EGraph, Id};
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
     if to_normalize {
@@ -182,4 +192,181 @@ pub fn is_literal_date_trunced(ns: i64, granularity: &str) -> Option<bool> {
         "year" => is_year_trunced(dt),
         _ => return None,
     })
+}
+
+#[derive(Clone, Copy)]
+pub struct DecomposedDayTime {
+    pub days: i32,
+    pub ms: i32,
+}
+impl DecomposedDayTime {
+    /// DAY_BITS | MS_BITS
+    const MS_BITS: i32 = 32;
+
+    /// # Args
+    /// * `interval` is value from `ScalarValue::IntervalDayTime(Some(interval))`
+    pub fn from_interval(interval: i64) -> Self {
+        Self {
+            days: (interval >> Self::MS_BITS) as i32,
+            ms: interval as i32,
+        }
+    }
+
+    pub fn is_single_part(&self) -> bool {
+        self.days == 0 || self.ms == 0
+    }
+    pub fn ms_scalar(&self) -> ScalarValue {
+        let value = Some(self.ms as i64);
+        ScalarValue::IntervalDayTime(value)
+    }
+    pub fn days_scalar(&self) -> ScalarValue {
+        let value = Some((self.days as i64) << Self::MS_BITS);
+        ScalarValue::IntervalDayTime(value)
+    }
+
+    pub fn create_decomposed_expr(self) -> Expr {
+        match (self.days, self.ms) {
+            (0, _) => Expr::Literal(self.ms_scalar()),
+            (_, 0) => Expr::Literal(self.days_scalar()),
+            _ => Expr::BinaryExpr {
+                left: Box::new(Expr::Literal(self.days_scalar())),
+                op: Operator::Plus,
+                right: Box::new(Expr::Literal(self.ms_scalar())),
+            },
+        }
+    }
+
+    pub fn add_decomposed_to_egraph(
+        self,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> Id {
+        let add_literal = |egraph: &mut EGraph<_, _>, scalar| {
+            let id = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                scalar,
+            )));
+            egraph.add(LogicalPlanLanguage::LiteralExpr([id]))
+        };
+
+        match (self.days, self.ms) {
+            (0, _) => add_literal(egraph, self.ms_scalar()),
+            (_, 0) => add_literal(egraph, self.days_scalar()),
+            _ => {
+                let op = Operator::Plus;
+                let op = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(op)));
+                let left = add_literal(egraph, self.days_scalar());
+                let right = add_literal(egraph, self.ms_scalar());
+
+                egraph.add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+            }
+        }
+    }
+}
+
+pub struct DecomposedMonthDayNano {
+    pub months: i32,
+    pub days: i32,
+    pub ms: i64,
+}
+impl DecomposedMonthDayNano {
+    // MONTH_BITS | DAY_BITS | MS_BITS
+    // const MONTH_BITS: i32 = 32;
+    const DAY_BITS: i32 = 32;
+    const MS_BITS: i32 = 64;
+    const MONTH_SH: i32 = Self::DAY_BITS + Self::MS_BITS;
+    const DAY_SH: i32 = Self::MS_BITS;
+    const MS_TO_NS: i64 = 1_000_000;
+
+    /// # Args
+    /// * `interval` is value from `ScalarValue::IntervalMonthDayNano(Some(interval))`
+    pub fn from_interval(interval: i128) -> Self {
+        let interval = interval as u128;
+        let months = (interval >> Self::MONTH_SH) as i32;
+        let days = (interval >> Self::DAY_SH) as i32;
+        let ns = interval as i64;
+        let ms = ns / Self::MS_TO_NS;
+        DecomposedMonthDayNano { months, days, ms }
+    }
+
+    pub fn is_single_part(&self) -> bool {
+        if self.months == 0 {
+            self.days == 0 || self.ms == 0
+        } else {
+            self.days == 0 && self.ms == 0
+        }
+    }
+    pub fn ms_scalar(&self) -> ScalarValue {
+        let value = Some((self.ms * Self::MS_TO_NS) as i128);
+        ScalarValue::IntervalMonthDayNano(value)
+    }
+    pub fn days_scalar(&self) -> ScalarValue {
+        let value = Some((self.days as i128) << Self::DAY_SH);
+        ScalarValue::IntervalMonthDayNano(value)
+    }
+    pub fn months_scalar(&self) -> ScalarValue {
+        let value = Some((self.months as i128) << Self::MONTH_SH);
+        ScalarValue::IntervalMonthDayNano(value)
+    }
+
+    pub fn create_decomposed_expr(self) -> Expr {
+        let bin = |l, r| Expr::BinaryExpr {
+            left: Box::new(Expr::Literal(l)),
+            op: Operator::Plus,
+            right: Box::new(Expr::Literal(r)),
+        };
+
+        match (self.months, self.days, self.ms) {
+            (0, 0, _) => Expr::Literal(self.ms_scalar()),
+            (0, _, 0) => Expr::Literal(self.days_scalar()),
+            (_, 0, 0) => Expr::Literal(self.months_scalar()),
+
+            (0, _, _) => bin(self.days_scalar(), self.ms_scalar()),
+            (_, 0, _) => bin(self.months_scalar(), self.ms_scalar()),
+            (_, _, 0) => bin(self.months_scalar(), self.days_scalar()),
+
+            _ => Expr::BinaryExpr {
+                left: Box::new(Expr::Literal(self.months_scalar())),
+                op: Operator::Plus,
+                right: Box::new(bin(self.days_scalar(), self.ms_scalar())),
+            },
+        }
+    }
+
+    pub fn add_decomposed_to_egraph(
+        self,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> Id {
+        let add_literal = |egraph: &mut EGraph<_, _>, scalar| {
+            let id = egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                scalar,
+            )));
+            egraph.add(LogicalPlanLanguage::LiteralExpr([id]))
+        };
+        let add_binary = |egraph: &mut EGraph<_, _>, l, r| {
+            let op = Operator::Plus;
+            let op = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(op)));
+            let left = add_literal(egraph, l);
+            let right = add_literal(egraph, r);
+
+            egraph.add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+        };
+
+        match (self.months, self.days, self.ms) {
+            (0, 0, _) => add_literal(egraph, self.ms_scalar()),
+            (0, _, 0) => add_literal(egraph, self.days_scalar()),
+            (_, 0, 0) => add_literal(egraph, self.months_scalar()),
+
+            (0, _, _) => add_binary(egraph, self.days_scalar(), self.ms_scalar()),
+            (_, 0, _) => add_binary(egraph, self.months_scalar(), self.ms_scalar()),
+            (_, _, 0) => add_binary(egraph, self.months_scalar(), self.days_scalar()),
+
+            _ => {
+                let op = Operator::Plus;
+                let op = egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(op)));
+                let left = add_literal(egraph, self.months_scalar());
+                let right = add_binary(egraph, self.days_scalar(), self.ms_scalar());
+
+                egraph.add(LogicalPlanLanguage::BinaryExpr([left, op, right]))
+            }
+        }
+    }
 }
