@@ -1597,7 +1597,7 @@ impl LanguageToLogicalPlanConverter {
                                         TimeDimensionDateRange
                                     );
                                     let expr = self.to_expr(params[3])?;
-                                    query_time_dimensions.push(V1LoadRequestQueryTimeDimension {
+                                    let query_time_dimension = V1LoadRequestQueryTimeDimension {
                                         dimension: dimension.to_string(),
                                         granularity: granularity.clone(),
                                         date_range: date_range.map(|date_range| {
@@ -1608,7 +1608,10 @@ impl LanguageToLogicalPlanConverter {
                                                     .collect(),
                                             )
                                         }),
-                                    });
+                                    };
+                                    if !query_time_dimensions.contains(&query_time_dimension) {
+                                        query_time_dimensions.push(query_time_dimension);
+                                    }
                                     if let Some(granularity) = &granularity {
                                         fields.push((
                                             DFField::new(
