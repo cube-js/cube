@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.45](https://github.com/cube-js/cube/compare/v0.35.44...v0.35.45) (2024-06-05)
+
+
+### Performance Improvements
+
+* **cubesql:** Improve rewrite engine performance ([4f78b8a](https://github.com/cube-js/cube/commit/4f78b8a9b75672227e7114be6a524a1b1ced8ff6))
+
+
+
+
+
 ## [0.35.44](https://github.com/cube-js/cube/compare/v0.35.43...v0.35.44) (2024-06-04)
 
 **Note:** Version bump only for package @cubejs-backend/native
