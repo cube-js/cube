@@ -4383,11 +4383,6 @@ limit
                     },
                     V1LoadRequestQueryTimeDimension {
                         dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("year".to_string()),
-                        date_range: None,
-                    },
-                    V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                         granularity: Some("month".to_string()),
                         date_range: None,
                     }
@@ -23385,21 +23380,14 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: Some(vec![
-                    V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("quarter".to_string()),
-                        date_range: Some(json!(vec![
-                            "2024-01-01T00:00:00.000Z".to_string(),
-                            "2024-12-31T23:59:59.999Z".to_string(),
-                        ])),
-                    },
-                    V1LoadRequestQueryTimeDimension {
-                        dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
-                        granularity: Some("quarter".to_string()),
-                        date_range: None,
-                    },
-                ]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("quarter".to_string()),
+                    date_range: Some(json!(vec![
+                        "2024-01-01T00:00:00.000Z".to_string(),
+                        "2024-12-31T23:59:59.999Z".to_string(),
+                    ])),
+                },]),
                 order: None,
                 limit: None,
                 offset: None,
