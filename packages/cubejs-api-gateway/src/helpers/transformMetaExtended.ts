@@ -34,9 +34,11 @@ function handleDimensionCaseCondition(caseCondition: any) {
   };
 }
 
-function transformCube(cube: any, cubeDefinitions: any) {
+function transformCube(cube: any, cubeDefinitions: any, extended: boolean = true) {
   return {
     ...cube,
+    // we dont want to expose sqlTable
+    sqlTable: undefined,
     extends: stringifyMemberSql(cubeDefinitions[cube?.name]?.extends),
     sql: stringifyMemberSql(cubeDefinitions[cube?.name]?.sql),
     fileName: cubeDefinitions[cube?.name]?.fileName,

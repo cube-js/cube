@@ -579,7 +579,11 @@ class ApiGateway {
         return;
       }
       const cubesConfig = includeCompilerId ? metaConfig.cubes : metaConfig;
-      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => cube.config);
+      const cubes = this.filterVisibleItemsInMeta(context, cubesConfig).map(cube => ({
+        ...cube.config,
+        // we dont want to expose sqlTable
+        sqlTable: undefined,
+      }));
       const response: { cubes: any[], compilerId?: string } = { cubes };
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;

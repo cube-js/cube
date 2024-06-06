@@ -80,6 +80,8 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
       {
         config: {
           name: 'Foo',
+          type: 'cube',
+          title: 'My Cube called Foo',
           measures: [
             {
               name: 'Foo.bar',
@@ -98,6 +100,30 @@ export const compilerApi = jest.fn().mockImplementation(async () => ({
           ],
         },
       },
+      {
+        config: {
+          name: 'Bar',
+          type: 'cube',
+          title: 'My Cube called Bar',
+          sqlTable: 'my_sql_table',
+          measures: [
+            {
+              name: 'Bar.bar',
+              isVisible: true,
+            },
+          ],
+          dimensions: [
+            {
+              name: 'Bar.id',
+              isVisible: true,
+            },
+            {
+              name: 'Bar.time',
+              isVisible: true,
+            },
+          ],
+        },
+      }
     ];
   },
 

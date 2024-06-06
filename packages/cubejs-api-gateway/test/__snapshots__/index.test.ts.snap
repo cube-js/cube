@@ -45,6 +45,29 @@ Array [
       },
     ],
     "name": "Foo",
+    "title": "My Cube called Foo",
+    "type": "cube",
+  },
+  Object {
+    "dimensions": Array [
+      Object {
+        "isVisible": true,
+        "name": "Bar.id",
+      },
+      Object {
+        "isVisible": true,
+        "name": "Bar.time",
+      },
+    ],
+    "measures": Array [
+      Object {
+        "isVisible": true,
+        "name": "Bar.bar",
+      },
+    ],
+    "name": "Bar",
+    "title": "My Cube called Bar",
+    "type": "cube",
   },
 ]
 `;
