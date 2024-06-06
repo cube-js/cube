@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.46](https://github.com/cube-js/cube/compare/v0.35.45...v0.35.46) (2024-06-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Channel closed in query queue cache ([#8327](https://github.com/cube-js/cube/issues/8327)) ([8898fb1](https://github.com/cube-js/cube/commit/8898fb19bb39dd4778fee695df1ef8497ee28eb2))
+
+
+
+
+
 ## [0.35.45](https://github.com/cube-js/cube/compare/v0.35.44...v0.35.45) (2024-06-05)
 
 

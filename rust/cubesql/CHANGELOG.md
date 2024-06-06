@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.46](https://github.com/cube-js/cube.js/compare/v0.35.45...v0.35.46) (2024-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
 ## [0.35.45](https://github.com/cube-js/cube.js/compare/v0.35.44...v0.35.45) (2024-06-05)
 
 
