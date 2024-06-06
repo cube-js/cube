@@ -95,30 +95,28 @@ The same query using the REST API syntax looks as follows:
 
 ```json
 {
-  "query" : {
-    "dimensions": [
-      "users.state",
-      "users.city",
-      "orders.status"
-    ],
-    "measures": [
-      "orders.count"
-    ],
-    "filters": [
-      {
-        "member": "users.state",
-        "operator": "notEquals",
-        "values": ["us-wa"]
-      }
-    ],
-    "timeDimensions": [
-      {
-        "dimension": "orders.created_at",
-        "dateRange": ["2020-01-01", "2021-01-01"]
-      }
-    ],
-    "limit": 10
-  }
+  "dimensions": [
+    "users.state",
+    "users.city",
+    "orders.status"
+  ],
+  "measures": [
+    "orders.count"
+  ],
+  "filters": [
+    {
+      "member": "users.state",
+      "operator": "notEquals",
+      "values": ["us-wa"]
+    }
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at",
+      "dateRange": ["2020-01-01", "2021-01-01"]
+    }
+  ],
+  "limit": 10
 }
 ```
 
@@ -287,30 +285,29 @@ option with the [REST API][ref-rest-api-query-format-options-tdf].
 
 ```json
 {
-  "queryType": "multi",
-  "query": {
-    "dimensions": ["orders.city"],
-    "measures": ["orders.amount"],
-    "filters": [
-      {
-        "member": "orders.status",
-        "operator": "equals",
-        "values": ["shipped"]
-      }
+  "dimensions": ["orders.city"],
+  "measures": ["orders.amount"],
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": ["shipped"]
+    }
+  ],
+  "timeDimensions": [{
+    "dimension": "orders.created_at",
+    "compareDateRange": [
+      ["2024-01-01", "2024-12-31"],
+      ["2023-01-01", "2023-12-31"],
+      ["2022-01-01", "2022-12-31"],
     ],
-    "timeDimensions": [{
-      "dimension": "orders.created_at",
-      "compareDateRange": [
-        ["2024-01-01", "2024-12-31"],
-        ["2023-01-01", "2023-12-31"],
-        ["2022-01-01", "2022-12-31"],
-      ],
-      "granularity": "year",
-    }],
+    "granularity": "year",
+  }],
   "limit": 100
-  }
 }
 ```
+
+**NOTE:** `compareDateRange` queries may require to set `queryType` to be run.
 
 See [this blog post][blog-compare-date-range] for more details and examples.
 
