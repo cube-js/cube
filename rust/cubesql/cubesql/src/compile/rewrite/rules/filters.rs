@@ -2522,7 +2522,7 @@ impl FilterRules {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
                     subst.insert(
                         new_limit_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(1)))),
+                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(0)))),
                     );
                     subst.insert(
                         new_limit_skip_var,
