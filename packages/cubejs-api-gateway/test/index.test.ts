@@ -583,6 +583,8 @@ describe('API Gateway', () => {
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+
+    expect(res.body.cubes).toMatchSnapshot();
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
@@ -596,6 +598,8 @@ describe('API Gateway', () => {
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+
+    expect(res.body.cubes).toMatchSnapshot();
   });
 
   describe('multi query support', () => {

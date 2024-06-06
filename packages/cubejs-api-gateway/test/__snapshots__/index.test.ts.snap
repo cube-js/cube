@@ -1,0 +1,50 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`API Gateway meta endpoint extended to get schema information with additional data 1`] = `
+Array [
+  Object {
+    "dimensions": Array [
+      Object {
+        "isVisible": true,
+        "name": "Foo.id",
+      },
+      Object {
+        "isVisible": true,
+        "name": "Foo.time",
+      },
+    ],
+    "measures": Array [
+      Object {
+        "isVisible": true,
+        "name": "Foo.bar",
+      },
+    ],
+    "name": "Foo",
+    "sql": "'SELECT * FROM Foo'",
+  },
+]
+`;
+
+exports[`API Gateway meta endpoint to get schema information 1`] = `
+Array [
+  Object {
+    "dimensions": Array [
+      Object {
+        "isVisible": true,
+        "name": "Foo.id",
+      },
+      Object {
+        "isVisible": true,
+        "name": "Foo.time",
+      },
+    ],
+    "measures": Array [
+      Object {
+        "isVisible": true,
+        "name": "Foo.bar",
+      },
+    ],
+    "name": "Foo",
+  },
+]
+`;
