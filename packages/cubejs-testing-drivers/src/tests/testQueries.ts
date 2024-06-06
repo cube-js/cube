@@ -1706,6 +1706,34 @@ from
       expect(res.rows).toMatchSnapshot('complex_rollup');
     });
 
+    executePg('SQL API: Rollup with aliases', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId as "row", orderId as "order", orderDate as "orderData", city as "city", sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(rowId, 2), 3, ROLLUP(4) 
+    order by 1, 2, 3, 4
+
+  `);
+      expect(res.rows).toMatchSnapshot('rollup_with_aliases');
+    });
+
+    executePg('SQL API: Rollup over exprs', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId + sales * 2 as "order", orderDate as "orderData", city as "city", sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2, 3) 
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('rollup_over_exprs');
+    });
+
     executePg('SQL API: Nested Rollup', async (connection) => {
       const res = await connection.query(`
     select rowId, orderId, orderDate, sum(cnt)
@@ -1723,6 +1751,25 @@ from
 
   `);
       expect(res.rows).toMatchSnapshot('nested_rollup');
+    });
+
+    executePg('SQL API: Nested Rollup with aliases', async (connection) => {
+      const res = await connection.query(`
+    select rowId as "row", orderId as "order", orderDate as "date", sum(cnt)
+    from (
+        select
+            rowId, orderId, orderDate, sum(count) as cnt
+        from
+        "ECommerce" as "ECommerce"
+        group by 1, 2, 3
+
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
     });
   });
 }

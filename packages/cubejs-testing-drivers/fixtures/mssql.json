@@ -141,6 +141,9 @@
     "SQL API: powerbi min max push down",
     "SQL API: Simple Rollup",
     "SQL API: Complex Rollup",
-    "SQL API: Nested Rollup"
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases"
   ]
 }
