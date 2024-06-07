@@ -375,6 +375,41 @@ describe('ClickHouse DataSchemaCompiler', () => {
       return true;
     });
   }
+  it('collation in order by', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+      cube('visitors', {
+        sql: \`
+        select * from visitors
+        \`,
+
+        dimensions: {
+          source: {
+            type: 'string',
+            sql: 'source'
+          }
+        }
+      })
+    `);
+    await compiler.compile();
+
+    const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [],
+      dimensions: ['visitors.source'],
+      order: [{
+        id: 'visitors.source',
+        desc: false
+      }],
+      timezone: 'America/Los_Angeles'
+    });
+    logSqlAndParams(query);
+
+    const sqlAndParams = query.buildSqlAndParams();
+    const res = await dbRunner.testQuery(sqlAndParams);
+    const sql = sqlAndParams[0];
+    expect(sql).toMatch('ORDER BY source COLLATE \'en\'');
+
+    expect(res).toEqual([{ visitors__source: 'google' }, { visitors__source: 'Google' }, { visitors__source: 'some' }]);
+  });
 
   it('export import', () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
