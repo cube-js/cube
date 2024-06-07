@@ -44,19 +44,19 @@ export function getPreAggregationReferences(
     references.measures = [...transformedQuery.leafMeasures];
   }
 
-  if (transformedQuery.sortedDimensions.length) {
+  if (transformedQuery.ownedDimensions.length) {
     references.dimensions = [
-      ...transformedQuery.sortedDimensions.filter(
+      ...transformedQuery.ownedDimensions.filter(
         (name) => !segments.has(name)
       ),
     ];
     references.segments = [
-      ...transformedQuery.sortedDimensions.filter((name) => segments.has(name)),
+      ...transformedQuery.ownedDimensions.filter((name) => segments.has(name)),
     ];
   }
 
-  if (transformedQuery.sortedTimeDimensions?.[0]?.[0]) {
-    const [dimension, granularity] = transformedQuery.sortedTimeDimensions[0];
+  if (transformedQuery.ownedTimeDimensionsWithRollupGranularity?.[0]?.[0]) {
+    const [dimension, granularity] = transformedQuery.ownedTimeDimensionsWithRollupGranularity[0];
     references.timeDimensions = [
       {
         dimension,

@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-client/vue",
-  "version": "0.31.46",
+  "version": "0.35.23",
   "engines": {},
   "repository": {
     "type": "git",
@@ -28,23 +28,22 @@
     "src"
   ],
   "dependencies": {
-    "@cubejs-client/core": "^0.31.46",
+    "@cubejs-client/core": "^0.35.23",
     "core-js": "^3.6.5",
     "ramda": "^0.27.2"
   },
   "devDependencies": {
-    "@vue/cli-plugin-babel": "^3.5.0",
-    "@vue/cli-plugin-eslint": "^4.2.3",
-    "@vue/cli-plugin-unit-jest": "^4.2.3",
-    "@vue/cli-service": "^4.2.3",
-    "@vue/test-utils": "^1.2.0",
-    "babel-core": "7.0.0-bridge.0",
-    "babel-eslint": "^10.1.0",
-    "babel-jest": "^23.6.0",
+    "@vue/babel-preset-app": "^5",
+    "@vue/cli-plugin-babel": "^5",
+    "@vue/cli-plugin-eslint": "^5",
+    "@vue/cli-plugin-unit-jest": "^5",
+    "@vue/cli-service": "^5",
+    "@vue/test-utils": "^1.3",
+    "@vue/vue2-jest": "^27",
     "eslint": "^7.21.0",
     "eslint-plugin-vue": "^6.2.1",
-    "vue": "^2.6.6",
-    "vue-template-compiler": "^2.6.12"
+    "vue": "^2.7",
+    "vue-template-compiler": "^2.7"
   },
   "peerDependencies": {
     "vue": "^2.6.6"

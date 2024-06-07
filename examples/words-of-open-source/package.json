@@ -1,0 +1,11 @@
+{
+    "name": "cubejs-project-template",
+    "version": "0.0.1",
+    "private": true,
+    "scripts": {
+      "dev": "cubejs-server"
+    },
+    "template": "docker",
+    "templateVersion": "0.28.19"
+  }
+  

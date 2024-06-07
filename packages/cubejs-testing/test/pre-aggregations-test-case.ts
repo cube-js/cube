@@ -1,5 +1,5 @@
 import { jest, expect, beforeAll, afterAll } from '@jest/globals';
-import cubejs, { Query, CubejsApi } from '@cubejs-client/core';
+import cubejs, { Query, CubeApi } from '@cubejs-client/core';
 import fetch from 'node-fetch';
 import WebSocketTransport from '@cubejs-client/ws-transport';
 
@@ -25,6 +25,27 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
         dimension: 'visitors.createdAt',
         granularity: 'day',
         dateRange: ['2017-01-02', '2017-01-05']
+      }],
+      order: {
+        'visitors.createdAt': 'asc',
+        'visitors.source': 'asc'
+      }
+    }
+  ],
+  [
+    { name: 'Rolling with Quarter granularity' },
+    {
+      measures: [
+        'visitors.checkinsRollingTotal',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'quarter',
+        dateRange: ['2017-01-01', '2017-01-05']
       }],
       order: {
         'visitors.createdAt': 'asc',
@@ -75,6 +96,30 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
     }
   ],
   [
+    { name: 'Rolling Mixed With Dimension No Granularity' },
+    {
+      measures: [
+        'visitors.checkinsRollingTotal',
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      filters: [{
+        member: 'visitors.source',
+        operator: 'equals',
+        values: ['some']
+      }],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        dateRange: ['2017-01-02', '2017-01-05']
+      }],
+      order: {
+        'visitors.source': 'asc'
+      }
+    }
+  ],
+  [
     { name: 'Empty partitions' },
     {
       measures: [
@@ -96,8 +141,8 @@ export function createBirdBoxTestCase(name: string, entrypoint: () => Promise<Bi
     jest.setTimeout(60 * 5 * 1000);
 
     let birdbox: BirdBox;
-    let httpClient: CubejsApi;
-    let _wsClient: CubejsApi;
+    let httpClient: CubeApi;
+    let _wsClient: CubeApi;
     let wsTransport: WebSocketTransport;
 
     // eslint-disable-next-line consistent-return

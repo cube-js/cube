@@ -1,15 +1,19 @@
+use crate::metastore::{table::Table, IdRow};
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::sql::InlineTables;
 use crate::sql::SqlQueryContext;
 use crate::store::DataFrame;
 use crate::{app_metrics, CubeError};
+use deepsize::DeepSizeOf;
 use futures::Future;
 use log::trace;
-use std::collections::HashSet;
+use moka::future::{Cache, ConcurrentCacheExt, Iter};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{watch, Mutex};
 
-#[derive(Clone, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Hash, Eq, PartialEq, Debug, DeepSizeOf)]
 pub struct SqlResultCacheKey {
     query: String,
     inline_tables: InlineTables,
@@ -18,6 +22,10 @@ pub struct SqlResultCacheKey {
 }
 
 impl SqlResultCacheKey {
+    pub fn get_query(&self) -> &String {
+        &self.query
+    }
+
     pub fn from_plan(query: &str, inline_tables: &InlineTables, plan: &SerializedPlan) -> Self {
         let mut partition_ids = HashSet::new();
         let mut chunk_ids = HashSet::new();
@@ -61,20 +69,55 @@ pub struct SqlResultCache {
     queue_cache: Mutex<
         lru::LruCache<SqlQueueCacheKey, watch::Receiver<Option<Result<Arc<DataFrame>, CubeError>>>>,
     >,
-    result_cache: Mutex<lru::LruCache<SqlResultCacheKey, Arc<DataFrame>>>,
+    result_cache: Cache<SqlResultCacheKey, Arc<DataFrame>>,
+    create_table_cache:
+        Mutex<HashMap<(String, String), watch::Receiver<Option<Result<IdRow<Table>, CubeError>>>>>,
+}
+
+pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> u32 {
+    (key.deep_size_of() + df.deep_size_of())
+        .try_into()
+        .unwrap_or(u32::MAX)
 }
 
 impl SqlResultCache {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(
+        capacity_bytes: u64,
+        time_to_idle_secs: Option<u64>,
+        queue_cache_max_capacity: u64,
+    ) -> Self {
+        let cache_builder = if let Some(time_to_idle_secs) = time_to_idle_secs {
+            Cache::builder().time_to_idle(Duration::from_secs(time_to_idle_secs))
+        } else {
+            Cache::builder()
+        };
+
         Self {
-            queue_cache: Mutex::new(lru::LruCache::new(capacity)),
-            result_cache: Mutex::new(lru::LruCache::new(capacity)),
+            queue_cache: Mutex::new(lru::LruCache::new(queue_cache_max_capacity as usize)),
+            result_cache: cache_builder
+                .max_capacity(capacity_bytes)
+                .weigher(sql_result_cache_sizeof)
+                .build(),
+            create_table_cache: Mutex::new(HashMap::new()),
         }
     }
 
     pub async fn clear(&self) {
-        self.result_cache.lock().await.clear();
-        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+        // invalidation will be done in the background
+        self.result_cache.invalidate_all();
+        // it doesnt flush all, blocking, but it's ok because it's used in one command.
+        self.result_cache.sync();
+
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(self.result_cache.weighted_size() as i64);
+    }
+
+    pub fn entry_count(&self) -> u64 {
+        self.result_cache.entry_count()
+    }
+
+    pub fn iter(&self) -> Iter<'_, SqlResultCacheKey, Arc<DataFrame>> {
+        self.result_cache.iter()
     }
 
     #[tracing::instrument(level = "trace", skip(self, context, plan, exec))]
@@ -88,27 +131,39 @@ impl SqlResultCache {
     where
         F: Future<Output = Result<DataFrame, CubeError>> + Send + 'static,
     {
-        let inline_tables = &context.inline_tables;
-        let result_key = SqlResultCacheKey::from_plan(query, inline_tables, &plan);
-        let cached_result = {
-            let mut result_cache = self.result_cache.lock().await;
-            result_cache.get(&result_key).cloned()
-        };
-        if let Some(result) = cached_result {
-            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
+        let result_key = SqlResultCacheKey::from_plan(query, &context.inline_tables, &plan);
 
+        if let Some(result) = self.result_cache.get(&result_key) {
+            app_metrics::DATA_QUERIES_CACHE_HIT.increment();
             trace!("Using result cache for '{}'", query);
             return Ok(result);
         }
 
-        let queue_key = SqlQueueCacheKey::from_query(query, inline_tables);
+        let queue_key = SqlQueueCacheKey::from_query(query, &context.inline_tables);
         let (sender, receiver) = {
             let key = queue_key.clone();
             let mut cache = self.queue_cache.lock().await;
+
+            if cache.contains(&key) {
+                if let Some(receiver) = cache.get(&key) {
+                    if receiver.has_changed().is_err() {
+                        log::error!("Queue cache contains closed channel");
+                        cache.pop(&key);
+                    }
+                } else {
+                    log::error!("Queue cache doesn't contains channel");
+                    cache.pop(&key);
+                }
+            }
+
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
-                app_metrics::DATA_QUERIES_CACHE_SIZE.report(cache.len() as i64);
+
+                app_metrics::DATA_QUERIES_CACHE_SIZE.report(self.result_cache.entry_count() as i64);
+                app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                    .report(self.result_cache.weighted_size() as i64);
+
                 (Some(tx), None)
             } else {
                 (None, cache.get(&key).cloned())
@@ -126,16 +181,22 @@ impl SqlResultCache {
             }
             match &result {
                 Ok(r) => {
-                    let mut result_cache = self.result_cache.lock().await;
-                    if !result_cache.contains(&result_key) {
-                        result_cache.put(result_key.clone(), r.clone());
-                        app_metrics::DATA_QUERIES_CACHE_SIZE.report(result_cache.len() as i64);
+                    if !self.result_cache.contains_key(&result_key) {
+                        self.result_cache
+                            .insert(result_key.clone(), r.clone())
+                            .await;
+
+                        app_metrics::DATA_QUERIES_CACHE_SIZE
+                            .report(self.result_cache.entry_count() as i64);
+                        app_metrics::DATA_QUERIES_CACHE_WEIGHT
+                            .report(self.result_cache.weighted_size() as i64);
                     }
                 }
                 Err(_) => {
                     trace!("Removing error result from cache");
                 }
             }
+
             self.queue_cache.lock().await.pop(&queue_key);
 
             return result;
@@ -146,6 +207,56 @@ impl SqlResultCache {
         std::mem::drop(context);
 
         self.wait_for_queue(receiver, query).await
+    }
+
+    pub async fn create_table<F>(
+        &self,
+        schema_name: String,
+        table_name: String,
+        exec: impl FnOnce() -> F,
+    ) -> Result<IdRow<Table>, CubeError>
+    where
+        F: Future<Output = Result<IdRow<Table>, CubeError>> + Send + 'static,
+    {
+        let key = (schema_name.clone(), table_name.clone());
+        let (sender, mut receiver) = {
+            let mut cache = self.create_table_cache.lock().await;
+            let key = key.clone();
+            if !cache.contains_key(&key) {
+                let (tx, rx) = watch::channel(None);
+                cache.insert(key, rx);
+
+                (Some(tx), None)
+            } else {
+                (None, cache.get(&key).cloned())
+            }
+        };
+
+        if let Some(sender) = sender {
+            let result = exec().await;
+            if let Err(e) = sender.send(Some(result.clone())) {
+                trace!(
+                    "Failed to set cached query result, possibly flushed from LRU cache: {}",
+                    e
+                );
+            }
+
+            self.create_table_cache.lock().await.remove(&key);
+
+            return result;
+        }
+
+        if let Some(receiver) = &mut receiver {
+            loop {
+                receiver.changed().await?;
+                let x = receiver.borrow();
+                let value = x.as_ref();
+                if let Some(value) = value {
+                    return value.clone();
+                }
+            }
+        }
+        panic!("Unexpected state: wait receiver expected but cache was empty")
     }
 
     #[tracing::instrument(level = "trace", skip(self, receiver))]
@@ -169,6 +280,13 @@ impl SqlResultCache {
     }
 }
 
+impl Drop for SqlResultCache {
+    fn drop(&mut self) {
+        app_metrics::DATA_QUERIES_CACHE_SIZE.report(0);
+        app_metrics::DATA_QUERIES_CACHE_WEIGHT.report(0);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::queryplanner::serialized_plan::SerializedPlan;
@@ -189,7 +307,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(100);
+        let cache = SqlResultCache::new(1 << 20, Some(120), 1000);
         let schema = Arc::new(DFSchema::new(Vec::new())?);
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation {
@@ -200,6 +318,7 @@ mod tests {
                 indices: Vec::new(),
                 multi_part_subtree: HashMap::new(),
             },
+            None,
         )
         .await?;
         let counter = Arc::new(AtomicI64::new(1));

@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -68,7 +68,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -93,7 +93,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -143,7 +143,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -168,7 +168,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -192,7 +192,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -216,7 +216,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -240,7 +240,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -264,7 +264,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -288,7 +288,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -313,7 +313,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -337,7 +337,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -357,36 +357,12 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_HACKTOBERFEST }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  highcharts:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/highcharts/*,examples/highcharts/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: highcharts
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_HIGHCHARTS }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   mapbox:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -405,36 +381,12 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_MAPBOX }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  material-ui-dashboard:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/material-ui-dashboard/*,examples/material-ui-dashboard/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: material-ui-dashboard
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_MATERIAL_UI_DASHBOARD }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   react-dashboard:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -453,36 +405,12 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REACT_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  react-data-table:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-data-table/*,examples/react-data-table/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: react-data-table
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REACT_DATA_TABLE }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   react-muze:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -506,7 +434,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -525,37 +453,12 @@ jobs:
           CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_REAL_TIME_DASHBOARD }}
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  vue-query-builder:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/vue-query-builder/*,examples/vue-query-builder/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: vue-query-builder
-          EXAMPLE_FRONTEND_BUILD_SUBDIRECTORY: dist/
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH_VUE_QUERY_BUILDER }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   web-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -579,7 +482,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -603,7 +506,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -627,7 +530,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -652,7 +555,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -678,7 +581,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -703,7 +606,7 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -722,36 +625,12 @@ jobs:
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
-  react-pivot-table:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 30
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - uses: pheel/path-watcher-action@v1
-        id: modified
-        with:
-          paths: '.github/workflows/examples-publish.yml,.github/actions/deploy-example.sh,examples/react-pivot-table/*,examples/react-pivot-table/**'
-
-      - if: steps.modified.outputs.modified
-        uses: actions/setup-node@v3
-        with:
-          node-version: 14.x
-
-      - if: steps.modified.outputs.modified
-        run: .github/actions/deploy-example.sh
-        env:
-          EXAMPLE_SLUG: react-pivot-table
-          EXAMPLE_CUBE_SKIP: 1
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-
   multitenancy-workshop:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -769,13 +648,13 @@ jobs:
           EXAMPLE_SLUG: multitenancy-workshop
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-  
+
   aws-web-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified
@@ -794,13 +673,13 @@ jobs:
           EXAMPLE_CUBE_SKIP: 1
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           EXAMPLE_FRONTEND_SUBDIRECTORY: 'analytics-dashboard'
-  
+
   event-analytics:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: pheel/path-watcher-action@v1
         id: modified

@@ -1,0 +1,67 @@
+# Explo
+
+[Explo](https://www.explo.co) is an customer-facing analytics platform that
+enables embedding of interactive dashboards and reports into your
+customer-facing web applications.
+
+<InfoBox>
+
+Watch how Cube and Explo work together in this webinar recording: [Embedded
+Analytics Made Simple](https://cube.dev/events/customer-facing-analytics-made-simple).
+
+</InfoBox>
+
+## SQL API
+
+You can use the [SQL API][ref-sql-api] to connect Cube to Explo.
+
+### Cube Cloud
+
+On the&nbsp;<Btn>Overview</Btn> page of your Cube Cloud deployment,
+click&nbsp;<Btn>Connect to SQL API</Btn> and select&nbsp;<Btn>Explo</Btn>
+from the list. You should see the screen like the one below with
+your connection credentials:
+
+<Screenshot src="https://ucarecdn.com/508349b3-2ba7-4751-965f-92eb7fff35e5/"/>
+
+### Self-hosted Cube
+
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Explo.
+
+## Connecting from Explo
+
+To connect to Cube, go to the&nbsp;<Btn>Data</Btn> page and
+click&nbsp;<Btn>Connect Data Source</Btn>:
+
+<Screenshot src="https://ucarecdn.com/0e6a6719-c2cd-4c1f-83bc-0599ca24df4b/"/>
+
+When asked to select a database, choose&nbsp;<Btn>Cube Cloud</Btn> from the
+list:
+
+<Screenshot src="https://ucarecdn.com/af9b6cbc-c8bd-415c-91cb-fc185f82f368/"/>
+
+Enter the credentials for Cube's SQL API:
+
+<Screenshot src="https://ucarecdn.com/3787f4da-b5c1-463a-a9fb-7a4d02171a9e/"/>
+
+You should get a message that Explo successfully connected to Cube and found
+some tables:
+
+<Screenshot src="https://ucarecdn.com/2431a6a1-28bb-4a01-9512-926a194fd594/"/>
+
+## Querying data
+
+To query your data, go to the&nbsp;<Btn>Dashboards</Btn> page and
+click&nbsp;<Btn>Create Dashboard</Btn>. Proceed with adding a new dataset
+to this dashboard by clicking&nbsp;<Btn>+</Btn> (choose the schema you've
+created just a few minutes ago):
+
+<Screenshot src="https://ucarecdn.com/d57adb21-9af8-4446-b5cd-296ebe5c912e/"/>
+
+Finally, you can write SQL to query Cube via the SQL API:
+
+<Screenshot src="https://ucarecdn.com/57387725-35bb-416b-886b-81fe564c5e75/"/>
+
+[ref-sql-api]: /product/apis-integrations/sql-api

@@ -1,0 +1,293 @@
+---
+redirect_from:
+  - /http-api/rest
+---
+
+# REST API
+
+REST API enables Cube to deliver data over the HTTP protocol to certain kinds of
+data applications, including but not limited to the following ones:
+
+- Most commonly, front-end applications
+- Some [data notebooks][ref-notebooks], e.g., [Observable][ref-observable]
+- Some AI-based applications, e.g., [Delphi][ref-delphi]
+- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
+- Automated jobs
+
+Often, the REST API is used to enable [embedded analytics][cube-ea] and
+[real-time analytics][cube-rta] use cases.
+
+<InfoBox>
+
+If you've chosen [GraphQL][graphql] as a query language for your front-end
+application, consider using the [GraphQL API][ref-graphql-api] that Cube also
+provides.
+
+</InfoBox>
+
+Under the hood, REST API also provides endpoints for [GraphQL
+API][ref-graphql-api] and [Orchestration API][ref-orchestration-api]. However,
+they target specific use cases and are not usually considered part of the REST
+API.
+
+## Example request
+
+You can use the `curl` utility to execute requests to the REST API:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  -G \
+  --data-urlencode 'query={
+    "dimensions": [
+      "users.state",
+      "users.city",
+      "orders.status"
+    ],
+    "measures": [
+      "orders.count"
+    ],
+    "filters": [
+      {
+        "member": "users.state",
+        "operator": "notEquals",
+        "values": ["us-wa"]
+      }
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "orders.created_at",
+        "dateRange": ["2020-01-01", "2021-01-01"]
+      }
+    ],
+    "limit": 10
+  }' \
+  http://localhost:4000/cubejs-api/v1/load
+```
+
+You can also use the [`jq` utility][link-jq-utility] to format responses
+from the REST API in your terminal:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  -G \
+  --data-urlencode 'query={"measures": ["orders.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load | jq .data
+```
+
+You can also introspect the data model by querying the [`/v1/meta`
+endpoint][ref-ref-meta-endpoint]:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  http://localhost:4000/cubejs-api/v1/meta | jq
+```
+
+Check [query format][ref-rest-query-format] for details about supported queries.
+Also, check [REST API reference][ref-ref-rest-api] for the list of supported API
+endpoints.
+
+## Configuration
+
+REST API is enabled by default and secured using [API scopes][self-api-scopes]
+and [CORS][self-cors].
+
+### Base path
+
+By default, all REST API endpoints are prefixed with a base path of
+`/cubejs-api`, e.g., the `/v1/load` endpoint will be available at
+`/cubejs-api/v1/load`.
+
+<InfoBox>
+
+Exception: `/livez` and `/readyz` endpoints are not prefixed with a base path.
+
+</InfoBox>
+
+You can set a desired base path using the [`basePath`][ref-conf-basepath]
+configuration option.
+
+### API scopes
+
+Each REST API endpoint belongs to an API scope, e.g., the `/v1/load` endpoint
+belongs to the `data` scope. API scopes allow to secure access to API endpoints
+by making them accessible to specific users only or disallowing access for
+everyone. By default, API endpoints in all scopes, except for `jobs`, are
+accessible for everyone.
+
+| API scope | REST API endpoints                                                                        | Accessible by default? |
+| --------- | ----------------------------------------------------------------------------------------- | ---------------------- |
+| `meta`    | [`/v1/meta`][ref-ref-meta]                                                                | ✅ Yes                 |
+| `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
+| `graphql` | `/graphql`                                                                                | ✅ Yes                 |
+| `jobs`    | [`/v1/run-scheduled-refresh`][ref-ref-rsr]<br/>[`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No                  |
+
+<InfoBox>
+
+Exception: `/livez` and `/readyz` endpoints don't belong to any scope. Access to
+these endpoints can't be controlled using API scopes.
+
+</InfoBox>
+
+You can set accessible API scopes _for all requests_ using the
+`CUBEJS_DEFAULT_API_SCOPES` environment variable. For example, to disallow
+access to the GraphQL API for everyone, set `CUBEJS_DEFAULT_API_SCOPES` to
+`meta,data`.
+
+You can also select accessible API scopes _for each request_ using the
+[`contextToApiScopes`][ref-conf-contexttoapiscopes] configuration option, based
+on the provided [security context][ref-security-context]. For example, to
+restrict access to the `/v1/meta` endpoint to service accounts only, you can set
+`CUBEJS_DEFAULT_API_SCOPES` to `data,graphql` and use the following
+configuration in the `cube.js` file, assuming that service accounts have
+`service: true` in their security context:
+
+```javascript
+module.exports = {
+  contextToApiScopes: (securityContext, defaultScopes) => {
+    if (securityContext.service) {
+      return ["meta", ...defaultScopes];
+    }
+
+    return defaultScopes;
+  },
+};
+```
+
+### CORS
+
+REST API supports [Cross-Origin Resource Sharing (CORS)][mdn-cors]. By default,
+requests from any origin (`*`) are allowed.
+
+You can configure CORS using the [`http.cors`][ref-config-cors] configuration
+option. For example, to allow requests from a specific domain only, use the
+following configuration in the `cube.js` file:
+
+```javascript
+module.exports = {
+  http: {
+    cors: {
+      origin: "https://example.com",
+    },
+  },
+};
+```
+
+## Prerequisites
+
+### Authentication
+
+Cube uses API tokens to authorize requests and also for passing additional
+security context, which can be used in the
+[`queryRewrite`][ref-config-queryrewrite] property in your [`cube.js`
+configuration file][ref-config-js].
+
+The API Token is passed via the Authorization Header. The token itself is a
+[JSON Web Token](https://jwt.io), the [Security section][ref-security] describes
+how to generate it.
+
+In the development environment the token is not required for authorization, but
+you can still use it to pass a security context.
+
+### Continue wait
+
+If the request takes too long to be processed, Cube Backend responds with
+`{ "error": "Continue wait" }` and 200 status code. This is how the long polling
+mechanism in Cube is implemented. Clients should continuously retry the same
+query in a loop until they get a successful result. Subsequent calls to the Cube
+endpoints are idempotent and don't lead to scheduling new database queries if
+not required by the [`refresh_key`][ref-schema-ref-cube-refresh-key]. Also,
+receiving `Continue wait` doesn't mean the database query has been canceled, and
+it's actually still being processed by the Cube. Database queries that weren't
+started and are no longer waited by the client's long polling loop will be
+marked as orphaned and removed from the querying queue.
+
+Possible reasons of **Continue wait**:
+
+- The query requested is heavy, and it takes some time for the database to
+  process it. Clients should wait for its completion, continuously sending the
+  same REST API request. [`continueWaitTimeout`][ref-conf-queue-opts] can be
+  adjusted in order to change the time Cube waits before returning
+  `Continue wait` message.
+- There are many queries requested and Cube backend queues them to save database
+  from overloading.
+
+### Error Handling
+
+Cube REST API has basic errors and HTTP Error codes for all requests.
+
+| Status | Error response                 | Description                                                                                          |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 400    | Error message                  | General error. It may be a database error, timeout, or other issue. Check error message for details. |
+| 403    | Authorization header isn't set | You didn't provide an auth token. Provide a valid API Token or disable authorization.                |
+| 403    | Invalid token                  | The auth token provided is not valid. It may be expired or have invalid signature.                   |
+| 500    | Error message                  | Cube internal server error. Check error message for details.                                         |
+
+### Request Span Annotation
+
+For monitoring tools such as Cube Cloud proper request span annotation should be
+provided in `x-request-id` header of a request. Each request id should consist
+of two parts: `spanId` and `requestSequenceId` which define `x-request-id` as
+whole: `${spanId}-span-${requestSequenceId}`. Values of `x-request-id` header
+should be unique for each separate request. `spanId` should define user
+interaction span such us `Continue wait` retry cycle and it's value shouldn't
+change during one single interaction.
+
+### Pagination
+
+Cube supports paginated requests for the `/v1/load` endpoint by including
+[`limit` and `offset` parameters][ref-rest-query-format] in the query. For
+example, the following query will retrieve rows 101-200 from the `Orders` cube:
+
+```json
+{
+  "dimensions": ["Orders.status"],
+  "measures": ["Orders.count"],
+  "timeDimensions": [
+    {
+      "dimension": "Orders.createdAt",
+      "dateRange": "last year",
+      "granularity": "day"
+    }
+  ],
+  "limit": 100,
+  "offset": 100
+}
+```
+
+[mdn-cors]: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+[ref-config-js]: /reference/configuration/config
+[ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
+[ref-conf-queue-opts]: /reference/configuration/config#queueoptions
+[ref-rest-query-format]: /product/apis-integrations/rest-api/query-format#query-properties
+[ref-ref-meta-endpoint]: /reference/rest-api#v1meta
+[ref-config-cors]: /reference/configuration/config#http
+[ref-schema-ref-cube-refresh-key]:
+  /reference/data-model/cube#refresh_key
+[ref-security]: /product/auth
+[ref-notebooks]: /product/configuration/visualization-tools#notebooks
+[ref-observable]: /product/configuration/visualization-tools/observable
+[ref-delphi]: /product/configuration/visualization-tools/delphi
+[ref-low-code]:
+  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
+[ref-retool]: /product/configuration/visualization-tools/retool
+[ref-conf-basepath]: /reference/configuration/config#basepath
+[ref-conf-contexttoapiscopes]:
+  /reference/configuration/config#contexttoapiscopes
+[ref-ref-load]: /reference/rest-api#v1load
+[ref-ref-meta]: /reference/rest-api#v1meta
+[ref-ref-sql]: /reference/rest-api#v1sql
+[ref-ref-rsr]: /reference/rest-api#v1run-scheduled-refresh
+[ref-ref-paj]: /reference/rest-api#v1pre-aggregationsjobs
+[ref-security-context]: /product/auth/context
+[ref-graphql-api]: /product/apis-integrations/graphql-api
+[ref-orchestration-api]: /product/apis-integrations/orchestration-api
+[cube-ea]: https://cube.dev/use-cases/embedded-analytics
+[cube-rta]: https://cube.dev/use-cases/real-time-analytics
+[graphql]: https://graphql.org
+[self-api-scopes]: #configuration-api-scopes
+[self-cors]: #configuration-cors
+[ref-ref-rest-api]: /reference/rest-api
+[link-jq-utility]: https://jqlang.github.io/jq/

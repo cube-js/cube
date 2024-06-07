@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use warp::{Filter, Rejection, Reply};
 
-use crate::codegen::http_message_generated::{
-    get_root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
+use crate::codegen::{
+    root_as_http_message, HttpColumnValue, HttpColumnValueArgs, HttpError, HttpErrorArgs,
     HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpResultSet, HttpResultSetArgs, HttpRow,
     HttpRowArgs,
 };
@@ -50,6 +50,8 @@ pub struct HttpServer {
     worker_loop: WorkerLoop,
     drop_orphaned_messages_loop: WorkerLoop,
     cancel_token: CancellationToken,
+    max_message_size: usize,
+    max_frame_size: usize,
 }
 
 crate::di_service!(HttpServer, []);
@@ -81,6 +83,8 @@ impl HttpServer {
         check_orphaned_messages_interval: Duration,
         drop_processing_messages_after: Duration,
         drop_complete_messages_after: Duration,
+        max_message_size: usize,
+        max_frame_size: usize,
     ) -> Arc<Self> {
         Arc::new(Self {
             bind_address,
@@ -89,6 +93,8 @@ impl HttpServer {
             check_orphaned_messages_interval,
             drop_processing_messages_after,
             drop_complete_messages_after,
+            max_message_size,
+            max_frame_size,
             worker_loop: WorkerLoop::new("HttpServer message processing"),
             drop_orphaned_messages_loop: WorkerLoop::new("HttpServer drop orphaned messages"),
             cancel_token: CancellationToken::new(),
@@ -121,14 +127,16 @@ impl HttpServer {
         let context_filter = tx_to_move_filter.and(auth_filter.clone());
 
         let context_filter_to_move = context_filter.clone();
+        let max_frame_size = self.max_frame_size.clone();
+        let max_message_size = self.max_message_size.clone();
 
         let query_route = warp::path!("ws")
             .and(context_filter_to_move)
             .and(warp::ws::ws())
-            .and_then(|tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
+            .and_then(move |tx: mpsc::Sender<(mpsc::Sender<Arc<HttpMessage>>, SqlQueryContext, HttpMessage)>, sql_query_context: SqlQueryContext, ws: Ws| async move {
                 let tx_to_move = tx.clone();
                 let sql_query_context = sql_query_context.clone();
-                Result::<_, Rejection>::Ok(ws.on_upgrade(async move |mut web_socket| {
+                Result::<_, Rejection>::Ok(ws.max_frame_size(max_frame_size).max_message_size(max_message_size).on_upgrade(async move |mut web_socket| {
                     let (response_tx, mut response_rx) = mpsc::channel::<Arc<HttpMessage>>(10000);
                     loop {
                         tokio::select! {
@@ -137,6 +145,10 @@ impl HttpServer {
                                 let send_res = web_socket.send(Message::binary(res.bytes())).await;
                                 if let Err(e) = send_res {
                                     error!("Websocket message send error: {:?}", e)
+                                }
+                                if res.should_close_connection() {
+                                   log::warn!("Websocket connection closed");
+                                   break;
                                 }
                             }
                             Some(msg) = web_socket.next() => {
@@ -276,12 +288,21 @@ impl HttpServer {
                                 "Error processing HTTP command: {}\n",
                                 e.display_with_backtrace()
                             );
+                                let command = if e.is_wrong_connection() {
+                                    HttpCommand::CloseConnection {
+                                        error: e.to_string(),
+                                    }
+
+                                } else {
+                                    HttpCommand::Error {
+                                        error: e.to_string(),
+                                    }
+                                };
+
                                 HttpMessage {
                                     message_id,
                                     connection_id,
-                                    command: HttpCommand::Error {
-                                        error: e.to_string(),
-                                    },
+                                    command,
                                 }
                             }
                         });
@@ -568,6 +589,9 @@ pub enum HttpCommand {
     ResultSet {
         data_frame: Arc<DataFrame>,
     },
+    CloseConnection {
+        error: String,
+    },
     Error {
         error: String,
     },
@@ -575,18 +599,14 @@ pub enum HttpCommand {
 
 impl HttpMessage {
     pub fn bytes(&self) -> Vec<u8> {
-        let mut builder = flatbuffers::FlatBufferBuilder::new_with_capacity(1024);
+        let mut builder = FlatBufferBuilder::with_capacity(1024);
         let args = HttpMessageArgs {
             message_id: self.message_id,
             command_type: match self.command {
-                HttpCommand::Query { .. } => {
-                    crate::codegen::http_message_generated::HttpCommand::HttpQuery
-                }
-                HttpCommand::ResultSet { .. } => {
-                    crate::codegen::http_message_generated::HttpCommand::HttpResultSet
-                }
-                HttpCommand::Error { .. } => {
-                    crate::codegen::http_message_generated::HttpCommand::HttpError
+                HttpCommand::Query { .. } => crate::codegen::HttpCommand::HttpQuery,
+                HttpCommand::ResultSet { .. } => crate::codegen::HttpCommand::HttpResultSet,
+                HttpCommand::CloseConnection { .. } | HttpCommand::Error { .. } => {
+                    crate::codegen::HttpCommand::HttpError
                 }
             },
             command: match &self.command {
@@ -612,7 +632,7 @@ impl HttpMessage {
                         .as_union_value(),
                     )
                 }
-                HttpCommand::Error { error } => {
+                HttpCommand::Error { error } | HttpCommand::CloseConnection { error } => {
                     let error_offset = builder.create_string(&error);
                     Some(
                         HttpError::create(
@@ -646,10 +666,13 @@ impl HttpMessage {
                 .as_ref()
                 .map(|c| builder.create_string(c)),
         };
-        let message =
-            crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
+        let message = crate::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         builder.finished_data().to_vec() // TODO copy
+    }
+
+    pub fn should_close_connection(&self) -> bool {
+        matches!(self.command, HttpCommand::CloseConnection { .. })
     }
 
     fn build_columns<'a: 'ma, 'ma>(
@@ -658,9 +681,9 @@ impl HttpMessage {
     ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
         let columns = columns
             .iter()
-            .map(|c| c.get_name().as_str())
+            .map(|c| builder.create_string(c.get_name()))
             .collect::<Vec<_>>();
-        let columns_vec = builder.create_vector_of_strings(columns.as_slice());
+        let columns_vec = builder.create_vector(columns.as_slice());
         columns_vec
     }
 
@@ -687,7 +710,17 @@ impl HttpMessage {
                         let string_value = Some(builder.create_string(&v.to_string()));
                         HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
                     }
+                    TableValue::Int96(v) => {
+                        let string_value = Some(builder.create_string(&v.to_string()));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
                     TableValue::Decimal(v) => {
+                        let scale =
+                            u8::try_from(columns[i].get_column_type().target_scale()).unwrap();
+                        let string_value = Some(builder.create_string(&v.to_string(scale)));
+                        HttpColumnValue::create(builder, &HttpColumnValueArgs { string_value })
+                    }
+                    TableValue::Decimal96(v) => {
                         let scale =
                             u8::try_from(columns[i].get_column_type().target_scale()).unwrap();
                         let string_value = Some(builder.create_string(&v.to_string(scale)));
@@ -724,12 +757,12 @@ impl HttpMessage {
     }
 
     pub async fn read(buffer: Vec<u8>) -> Result<Self, CubeError> {
-        let http_message = get_root_as_http_message(buffer.as_slice());
+        let http_message = root_as_http_message(buffer.as_slice())?;
         Ok(HttpMessage {
             message_id: http_message.message_id(),
             connection_id: http_message.connection_id().map(|s| s.to_string()),
             command: match http_message.command_type() {
-                crate::codegen::http_message_generated::HttpCommand::HttpQuery => {
+                crate::codegen::HttpCommand::HttpQuery => {
                     let query = http_message.command_as_http_query().unwrap();
                     let mut inline_tables = Vec::new();
                     if let Some(query_inline_tables) = query.inline_tables() {
@@ -776,7 +809,7 @@ impl HttpMessage {
                         trace_obj: query.trace_obj().map(|q| q.to_string()),
                     }
                 }
-                crate::codegen::http_message_generated::HttpCommand::HttpResultSet => {
+                crate::codegen::HttpCommand::HttpResultSet => {
                     let result_set = http_message.command_as_http_result_set().unwrap();
                     let mut result_rows = Vec::new();
                     if let Some(rows) = result_set.rows() {
@@ -824,10 +857,8 @@ impl HttpMessage {
 
 #[cfg(test)]
 mod tests {
-    use crate::codegen::http_message_generated::{
-        HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs,
-    };
-    use crate::config::init_test_logger;
+    use crate::codegen::{HttpMessageArgs, HttpQuery, HttpQueryArgs, HttpTable, HttpTableArgs};
+    use crate::config::{init_test_logger, Config};
     use crate::http::{HttpCommand, HttpMessage, HttpServer};
     use crate::metastore::{Column, ColumnType};
     use crate::mysql::MockSqlAuthService;
@@ -840,6 +871,7 @@ mod tests {
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
+    use log::trace;
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -853,12 +885,11 @@ mod tests {
         builder: &'ma mut FlatBufferBuilder<'a>,
         columns: &Vec<Column>,
     ) -> WIPOffset<Vector<'a, ForwardsUOffset<&'a str>>> {
-        let types = columns
+        let str_types = columns
             .iter()
-            .map(|c| c.get_column_type().to_string())
+            .map(|c| builder.create_string(&c.get_column_type().to_string()))
             .collect::<Vec<_>>();
-        let str_types = types.iter().map(|t| t.as_str()).collect::<Vec<_>>();
-        let types_vec = builder.create_vector_of_strings(str_types.as_slice());
+        let types_vec = builder.create_vector(str_types.as_slice());
         types_vec
     }
 
@@ -913,7 +944,7 @@ mod tests {
             3,,2020-01-03T00:00:00.000Z
             4,four,
         "};
-        let mut builder = flatbuffers::FlatBufferBuilder::new_with_capacity(1024);
+        let mut builder = flatbuffers::FlatBufferBuilder::with_capacity(1024);
         let query_offset = builder.create_string("query");
         let mut inline_tables_offsets = Vec::with_capacity(1);
         let name_offset = builder.create_string("table");
@@ -942,12 +973,11 @@ mod tests {
         );
         let args = HttpMessageArgs {
             message_id: 1234,
-            command_type: crate::codegen::http_message_generated::HttpCommand::HttpQuery,
+            command_type: crate::codegen::HttpCommand::HttpQuery,
             command: Some(query_value.as_union_value()),
             connection_id: Some(connection_id_offset),
         };
-        let message =
-            crate::codegen::http_message_generated::HttpMessage::create(&mut builder, &args);
+        let message = crate::codegen::HttpMessage::create(&mut builder, &args);
         builder.finish(message, None);
         let bytes = builder.finished_data().to_vec();
         let message = HttpMessage::read(bytes).await.unwrap();
@@ -984,14 +1014,20 @@ mod tests {
         async fn exec_query_with_context(
             &self,
             _context: SqlQueryContext,
-            _query: &str,
+            query: &str,
         ) -> Result<Arc<DataFrame>, CubeError> {
             tokio::time::sleep(Duration::from_secs(2)).await;
             let counter = self.message_counter.fetch_add(1, Ordering::Relaxed);
-            Ok(Arc::new(DataFrame::new(
-                vec![Column::new("foo".to_string(), ColumnType::String, 0)],
-                vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
-            )))
+            if query == "close_connection" {
+                Err(CubeError::wrong_connection("wrong connection".to_string()))
+            } else if query == "error" {
+                Err(CubeError::internal("error".to_string()))
+            } else {
+                Ok(Arc::new(DataFrame::new(
+                    vec![Column::new("foo".to_string(), ColumnType::String, 0)],
+                    vec![Row::new(vec![TableValue::String(format!("{}", counter))])],
+                )))
+            }
         }
 
         async fn plan_query(&self, _query: &str) -> Result<QueryPlans, CubeError> {
@@ -1029,6 +1065,9 @@ mod tests {
         };
         let mut auth = MockSqlAuthService::new();
         auth.expect_authenticate().return_const(Ok(None));
+
+        let config = Config::test("ws_test").config_obj();
+
         let http_server = Arc::new(HttpServer::new(
             "127.0.0.1:53031".to_string(),
             Arc::new(auth),
@@ -1036,6 +1075,8 @@ mod tests {
             Duration::from_millis(100),
             Duration::from_millis(10000),
             Duration::from_millis(1000),
+            config.transport_max_message_size(),
+            config.transport_max_frame_size(),
         ));
         {
             let http_server = http_server.clone();
@@ -1044,19 +1085,25 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        async fn connect_and_send(
-            message_id: u32,
-            connection_id: Option<String>,
-        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
-            let (mut socket, _) = connect_async(Url::parse("ws://127.0.0.1:53031/ws").unwrap())
+        async fn connect() -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            let (socket, _) = connect_async(Url::parse("ws://127.0.0.1:53031/ws").unwrap())
                 .await
                 .unwrap();
+            socket
+        }
+
+        async fn send_query(
+            socket: &mut WebSocketStream<MaybeTlsStream<TcpStream>>,
+            message_id: u32,
+            connection_id: Option<String>,
+            query: &str,
+        ) {
             socket
                 .send(Message::binary(
                     HttpMessage {
                         message_id,
                         command: HttpCommand::Query {
-                            query: "foo".to_string(),
+                            query: query.to_string(),
                             inline_tables: vec![],
                             trace_obj: None,
                         },
@@ -1066,7 +1113,23 @@ mod tests {
                 ))
                 .await
                 .unwrap();
+        }
+
+        async fn connect_and_send_query(
+            message_id: u32,
+            connection_id: Option<String>,
+            query: &str,
+        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            let mut socket = connect().await;
+            send_query(&mut socket, message_id, connection_id, query).await;
             socket
+        }
+
+        async fn connect_and_send(
+            message_id: u32,
+            connection_id: Option<String>,
+        ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+            connect_and_send_query(message_id, connection_id, "foo").await
         }
 
         async fn assert_message(
@@ -1086,6 +1149,7 @@ mod tests {
                     .next()
                     .unwrap()
                 {
+                    trace!("Message: {}", v.as_str());
                     assert_eq!(v.as_str(), counter);
                 } else {
                     panic!("String expected");
@@ -1111,6 +1175,7 @@ mod tests {
             // Orphaned complete message
             async move {
                 // takes message 1
+                tokio::time::sleep(Duration::from_millis(300)).await;
                 let mut socket = connect_and_send(1, Some("bar".to_string())).await;
                 socket.close(None).await.unwrap();
             },
@@ -1147,6 +1212,25 @@ mod tests {
                 socket.close(None).await.unwrap();
             },
         );
+
+        tokio::time::sleep(Duration::from_millis(2500)).await;
+        let mut socket = connect_and_send(3, Some("foo".to_string())).await;
+        assert_message(&mut socket, "6").await;
+
+        let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
+        assert_message(&mut socket2, "7").await;
+
+        send_query(&mut socket, 3, Some("foo".to_string()), "close_connection").await;
+        socket.next().await.unwrap().unwrap();
+
+        send_query(&mut socket2, 3, Some("foo".to_string()), "error").await;
+        socket2.next().await.unwrap().unwrap();
+
+        send_query(&mut socket, 3, Some("foo".to_string()), "foo").await;
+        assert!(socket.next().await.unwrap().is_err());
+
+        let mut socket2 = connect_and_send(3, Some("foo2".to_string())).await;
+        assert_message(&mut socket2, "10").await;
 
         http_server.stop_processing().await;
     }

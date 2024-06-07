@@ -1,0 +1,21 @@
+{# https://cube.dev/docs/recipes/active-users #}
+
+{%- set metrics = {
+  "mau": 30,
+  "wau": 7,
+  "day": 1
+} %}
+
+cubes:
+  - name: cube_05
+    sql_table: public.orders
+
+    measures:
+      {%- for name, days in metrics | items %}
+      - name: {{ name }}
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: {{ days | safe }} day
+          offset: start
+      {% endfor %}

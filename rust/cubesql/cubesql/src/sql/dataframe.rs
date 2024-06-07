@@ -13,8 +13,8 @@ use datafusion::arrow::{
         Array, ArrayRef, BooleanArray, Date32Array, Date64Array, DecimalArray, Float16Array,
         Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
         IntervalDayTimeArray, IntervalMonthDayNanoArray, IntervalYearMonthArray, LargeStringArray,
-        ListArray, StringArray, TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
+        ListArray, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, IntervalUnit, Schema, TimeUnit},
     record_batch::RecordBatch,
@@ -22,6 +22,7 @@ use datafusion::arrow::{
 };
 use pg_srv::IntervalValue;
 use rust_decimal::prelude::*;
+use serde::{Serialize, Serializer};
 use std::{
     fmt::{self, Debug, Formatter},
     io,
@@ -30,10 +31,11 @@ use std::{
 use super::{ColumnFlags, ColumnType};
 use crate::CubeError;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Column {
     name: String,
     column_type: ColumnType,
+    #[serde(skip_serializing)]
     column_flags: ColumnFlags,
 }
 
@@ -59,7 +61,7 @@ impl Column {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Row {
     values: Vec<TableValue>,
 }
@@ -101,6 +103,29 @@ pub enum TableValue {
     Date(NaiveDate),
     Timestamp(TimestampValue),
     Interval(IntervalValue),
+}
+
+impl Serialize for TableValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            TableValue::Null => serializer.serialize_none(),
+            TableValue::Boolean(val) => serializer.serialize_bool(val),
+            TableValue::String(ref val) => serializer.serialize_str(val),
+            TableValue::Int16(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Int64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float32(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Float64(val) => serializer.serialize_str(&val.to_string()),
+            TableValue::Decimal128(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Timestamp(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Interval(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::Date(ref val) => serializer.serialize_str(val.to_string().as_str()),
+            TableValue::List(ref val) => serializer.serialize_str(val.to_string().as_str()),
+        }
+    }
 }
 
 impl ToString for TableValue {
@@ -392,6 +417,7 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt64 => Ok(ColumnType::Int64),
+        DataType::Null => Ok(ColumnType::String),
         x => Err(CubeError::internal(format!("unsupported type {:?}", x))),
     }
 }
@@ -471,6 +497,22 @@ pub fn batch_to_dataframe(
                         } else {
                             TableValue::Date(a.value_as_date(i).expect(
                                 "value_as_date must return Option with NaiveDate for Date64Array",
+                            ))
+                        });
+                    }
+                }
+                DataType::Timestamp(TimeUnit::Millisecond, tz) => {
+                    let a = array
+                        .as_any()
+                        .downcast_ref::<TimestampMillisecondArray>()
+                        .unwrap();
+                    for i in 0..num_rows {
+                        rows[i].push(if a.is_null(i) {
+                            TableValue::Null
+                        } else {
+                            TableValue::Timestamp(TimestampValue::new(
+                                a.value(i) * 1_000_000_i64,
+                                tz.clone(),
                             ))
                         });
                     }
@@ -609,6 +651,11 @@ pub fn batch_to_dataframe(
                         });
                     }
                 }
+                DataType::Null => {
+                    for i in 0..num_rows {
+                        rows[i].push(TableValue::Null)
+                    }
+                }
                 x => panic!("Unsupported data type: {:?}", x),
             }
         }
@@ -640,6 +687,93 @@ mod tests {
             +------------+\n\
             | simple_str |\n\
             +------------+"
+        );
+    }
+
+    #[test]
+    fn test_dataframe_tablevalue_serializer() {
+        let frame = DataFrame::new(
+            vec![
+                Column::new(
+                    "null_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "bool_col".to_string(),
+                    ColumnType::Boolean,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "string_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int16_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "int64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float32_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "float64_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "decimal128_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "timestamp_col".to_string(),
+                    ColumnType::Timestamp,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "interval_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+                Column::new(
+                    "date_col".to_string(),
+                    ColumnType::String,
+                    ColumnFlags::empty(),
+                ),
+            ],
+            vec![Row::new(vec![
+                TableValue::Null,
+                TableValue::Boolean(true),
+                TableValue::String("simple_str".to_string()),
+                TableValue::Int16(123),
+                TableValue::Int32(12345),
+                TableValue::Int64(123456789),
+                TableValue::Float32(1.23),
+                TableValue::Float64(1.23456789),
+                TableValue::Decimal128(Decimal128Value::new(123456789, 2)),
+                TableValue::Timestamp(TimestampValue::new(737942400 * 1_000_000_000, None)),
+                TableValue::Interval(IntervalValue::new(1, 2, 3, 4, 5, 6)),
+                TableValue::Date(NaiveDate::from_ymd_opt(1993, 5, 21).unwrap()),
+            ])],
+        );
+
+        insta::assert_snapshot!(
+            "table_value_serializer",
+            serde_json::to_string(&frame.data).unwrap()
         );
     }
 }

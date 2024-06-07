@@ -9,13 +9,12 @@ import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-ba
 import {
   CancelableInterval,
   createCancelableInterval, formatDuration, getAnonymousId,
-  getEnv, assertDataSource, getRealType, internalExceptions, track,
+  getEnv, assertDataSource, getRealType, internalExceptions, track, FileRepository, SchemaFileRepository,
 } from '@cubejs-backend/shared';
 
-import type { Application as ExpressApplication, NextFunction } from 'express';
+import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import { FileRepository, SchemaFileRepository } from './FileRepository';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
@@ -60,16 +59,16 @@ function wrapToFnIfNeeded<T, R>(possibleFn: T | ((a: R) => T)): (a: R) => T {
   return () => possibleFn;
 }
 
-class AcceptAllAcceptor {
-  public shouldAccept(): ContextAcceptanceResult {
+class AcceptAllAcceptor implements ContextAcceptor {
+  public async shouldAccept(): Promise<ContextAcceptanceResult> {
     return { accepted: true };
   }
 
-  public shouldAcceptHttp(): ContextAcceptanceResultHttp {
+  public async shouldAcceptHttp(): Promise<ContextAcceptanceResultHttp> {
     return { accepted: true };
   }
 
-  public shouldAcceptWs(): ContextAcceptanceResultWs {
+  public async shouldAcceptWs(): Promise<ContextAcceptanceResultWs> {
     return { accepted: true };
   }
 }
@@ -102,13 +101,13 @@ export class CubejsServerCore {
    */
   public static getDriverMaxPool = getDriverMaxPool;
 
-  public readonly repository: FileRepository;
+  public repository: FileRepository;
 
   protected devServer: DevServer | undefined;
 
   protected readonly orchestratorStorage: OrchestratorStorage = new OrchestratorStorage();
 
-  protected readonly repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
+  protected repositoryFactory: ((context: RequestContext) => SchemaFileRepository) | (() => FileRepository);
 
   protected contextToDbType: DbTypeAsyncFn;
 
@@ -150,11 +149,8 @@ export class CubejsServerCore {
 
   public coreServerVersion: string | null = null;
 
-  private contextAcceptor: ContextAcceptor;
+  protected contextAcceptor: ContextAcceptor;
 
-  /**
-   * Class constructor.
-   */
   public constructor(
     opts: CreateOptions = {},
     protected readonly systemOptions?: SystemOptions,
@@ -309,13 +305,15 @@ export class CubejsServerCore {
         oldLogger(msg, params);
       });
 
-      setInterval(() => {
-        if (loadRequestCount > 0 || loadSqlRequestCount > 0) {
-          this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount, loadSqlRequestSuccessCount: loadSqlRequestCount });
-        }
-        loadRequestCount = 0;
-        loadSqlRequestCount = 0;
-      }, 60000);
+      if (this.options.telemetry) {
+        setInterval(() => {
+          if (loadRequestCount > 0 || loadSqlRequestCount > 0) {
+            this.event('Load Request Success Aggregated', { loadRequestSuccessCount: loadRequestCount, loadSqlRequestSuccessCount: loadSqlRequestCount });
+          }
+          loadRequestCount = 0;
+          loadSqlRequestCount = 0;
+        }, 60000);
+      }
 
       this.event('Server Start');
     }
@@ -346,11 +344,11 @@ export class CubejsServerCore {
         () => this.handleScheduledRefreshInterval({}),
         {
           interval: scheduledRefreshTimer,
-          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval Error', {
-            error: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
+          onDuplicatedExecution: (intervalId) => this.logger('Refresh Scheduler Interval', {
+            warning: `Previous interval #${intervalId} was not finished with ${scheduledRefreshTimer} interval`
           }),
           onDuplicatedStateResolved: (intervalId, elapsed) => this.logger('Refresh Scheduler Long Execution', {
-            warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}`
+            warning: `Interval #${intervalId} finished after ${formatDuration(elapsed)}. Please consider reducing total number of partitions by using rollup_lambda pre-aggregations.`
           })
         }
       );
@@ -373,6 +371,7 @@ export class CubejsServerCore {
     this.driver = null;
     this.options.externalDbType = this.options.externalDbType ||
       <DatabaseType | undefined>process.env.CUBEJS_EXT_DB_TYPE;
+    this.options.schemaPath = process.env.CUBEJS_SCHEMA_PATH || this.options.schemaPath;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
   }
 
@@ -453,18 +452,20 @@ export class CubejsServerCore {
         extendContext: this.options.extendContext,
         playgroundAuthSecret: getEnv('playgroundAuthSecret'),
         jwt: this.options.jwt,
-        refreshScheduler: () => new RefreshScheduler(this),
+        refreshScheduler: this.getRefreshScheduler.bind(this),
         scheduledRefreshContexts: this.options.scheduledRefreshContexts,
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
+        contextToApiScopes: this.options.contextToApiScopes,
+        event: this.event,
       }
     ));
   }
 
   protected createApiGatewayInstance(
     apiSecret: string,
-    getCompilerApi: (context: RequestContext) => CompilerApi,
-    getOrchestratorApi: (context: RequestContext) => OrchestratorApi,
+    getCompilerApi: (context: RequestContext) => Promise<CompilerApi>,
+    getOrchestratorApi: (context: RequestContext) => Promise<OrchestratorApi>,
     logger: LoggerFn,
     options: ApiGatewayOptions
   ): ApiGateway {
@@ -473,7 +474,7 @@ export class CubejsServerCore {
 
   protected async contextRejectionMiddleware(req, res, next) {
     if (!this.standalone) {
-      const result = this.contextAcceptor.shouldAcceptHttp(req.context);
+      const result = await this.contextAcceptor.shouldAcceptHttp(req.context);
       if (!result.accepted) {
         res.writeHead(result.rejectStatusCode!, result.rejectHeaders!);
         res.send();
@@ -485,8 +486,8 @@ export class CubejsServerCore {
     }
   }
 
-  public getCompilerApi(context: RequestContext) {
-    const appId = this.contextToAppId(context);
+  public async getCompilerApi(context: RequestContext) {
+    const appId = await this.contextToAppId(context);
     let compilerApi = this.compilerCache.get(appId);
     const currentSchemaVersion = this.options.schemaVersion && (() => this.options.schemaVersion(context));
 
@@ -505,7 +506,7 @@ export class CubejsServerCore {
           ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
-          preAggregationsSchema: this.preAggregationsSchema(context),
+          preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
           allowNodeRequire: this.options.allowNodeRequire,
@@ -527,11 +528,14 @@ export class CubejsServerCore {
 
     this.reloadEnvVariables();
 
+    this.repository = new FileRepository(this.options.schemaPath);
+    this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
+    
     this.startScheduledRefreshTimer();
   }
 
-  public getOrchestratorApi(context: RequestContext): OrchestratorApi {
-    const orchestratorId = this.contextToOrchestratorId(context);
+  public async getOrchestratorApi(context: RequestContext): Promise<OrchestratorApi> {
+    const orchestratorId = await this.contextToOrchestratorId(context);
 
     if (this.orchestratorStorage.has(orchestratorId)) {
       return this.orchestratorStorage.get(orchestratorId);
@@ -546,14 +550,15 @@ export class CubejsServerCore {
 
     let externalPreAggregationsDriverPromise: Promise<BaseDriver> | null = null;
 
+    const contextToDbType: DbTypeAsyncFn = this.contextToDbType.bind(this);
     const externalDbType = this.contextToExternalDbType(context);
 
-    // orchestrator options can be empty, if user didnt define it.
-    // so we are adding default and configuring queues concurrencies.
+    // orchestrator options can be empty, if user didn't define it.
+    // so we are adding default and configuring queues concurrency.
     const orchestratorOptions =
       this.optsHandler.getOrchestratorInitializedOptions(
         context,
-        this.orchestratorOptions(context) || {},
+        (await this.orchestratorOptions(context)) || {},
       );
 
     const orchestratorApi = this.createOrchestratorApi(
@@ -638,8 +643,12 @@ export class CubejsServerCore {
             }
           })();
         }),
-        contextToDbType: this.contextToDbType.bind(this),
-        contextToExternalDbType: this.contextToExternalDbType.bind(this),
+        contextToDbType: async (dataSource) => contextToDbType({
+          ...context,
+          dataSource
+        }),
+        // speedup with cache
+        contextToExternalDbType: () => externalDbType,
         redisPrefix: orchestratorId,
         skipExternalCacheAndQueue: externalDbType === 'cubestore',
         cacheAndQueueDriver: this.options.cacheAndQueueDriver,
@@ -665,6 +674,7 @@ export class CubejsServerCore {
         allowUngroupedWithoutPrimaryKey:
             this.options.allowUngroupedWithoutPrimaryKey ||
             getEnv('allowUngroupedWithoutPrimaryKey'),
+        convertTzForRawTimeDimension: getEnv('convertTzForRawTimeDimension'),
         compileContext: options.context,
         dialectClass: options.dialectClass,
         externalDialectClass: options.externalDialectClass,
@@ -697,9 +707,17 @@ export class CubejsServerCore {
         error: 'At least one context should be returned by scheduledRefreshContexts'
       });
     }
-    const contexts = allContexts.filter(
-      (context) => this.contextAcceptor.shouldAccept(this.migrateBackgroundContext(context)).accepted
-    );
+
+    const contexts = [];
+
+    for (const allContext of allContexts) {
+      const res = await this.contextAcceptor.shouldAccept(
+        this.migrateBackgroundContext(allContext)
+      );
+      if (res.accepted) {
+        contexts.push(allContext);
+      }
+    }
 
     const batchLimit = pLimit(this.options.scheduledRefreshBatchSize);
     return Promise.all(
@@ -802,6 +820,7 @@ export class CubejsServerCore {
         : {
           maxPoolSize:
             await CubejsServerCore.getDriverMaxPool(context, options),
+          testConnectionTimeout: options?.testConnectionTimeout,
         };
       opts.dataSource = assertDataSource(context.dataSource);
       return CubejsServerCore.createDriver(type, opts);

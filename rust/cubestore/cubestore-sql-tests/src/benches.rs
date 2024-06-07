@@ -1,7 +1,8 @@
-use crate::to_rows;
+use crate::{to_rows, SqlClient};
 use async_trait::async_trait;
 use cubestore::cluster::Cluster;
 use cubestore::config::{env_parse, Config, CubeServices};
+use cubestore::metastore::{Column, ColumnType};
 use cubestore::table::TableValue;
 use cubestore::util::strings::path_to_string;
 use cubestore::CubeError;
@@ -36,6 +37,7 @@ pub fn cubestore_benches() -> Vec<Arc<dyn Bench>> {
         Arc::new(SimpleBench {}),
         Arc::new(ParquetMetadataCacheBench {}),
         Arc::new(CacheSetGetBench {}),
+        Arc::new(QueueListBench::new(16 * 1024)),
     ];
 }
 
@@ -86,7 +88,7 @@ impl Bench for ParquetMetadataCacheBench {
         let config = Config::test(name.as_str()).update_config(|mut c| {
             c.partition_split_threshold = 10_000_000;
             c.max_partition_split_threshold = 10_000_000;
-            c.max_cached_queries = 0;
+            c.query_cache_max_capacity_bytes = 0;
             c.metadata_cache_max_capacity_bytes =
                 env_parse("CUBESTORE_METADATA_CACHE_MAX_CAPACITY_BYTES", 0);
             c.metadata_cache_time_to_idle_secs = 1000;
@@ -176,6 +178,66 @@ impl Bench for CacheSetGetBench {
 
         let rows = to_rows(&r);
         assert_eq!(rows, vec![vec![TableValue::String("my_value".to_string())]]);
+
+        Ok(())
+    }
+}
+
+pub struct QueueListBench {
+    payload_size: usize,
+}
+
+impl QueueListBench {
+    pub fn new(payload_size: usize) -> Self {
+        Self { payload_size }
+    }
+}
+
+#[async_trait]
+impl Bench for crate::benches::QueueListBench {
+    fn config(self: &Self, prefix: &str) -> (String, Config) {
+        let name = config_name(prefix, "queue_list_bench");
+        let config = Config::test(name.as_str()).update_config(|c| c);
+        (name, config)
+    }
+
+    async fn setup(self: &Self, services: &CubeServices) -> Result<Arc<BenchState>, CubeError> {
+        for i in 1..5_001 {
+            services
+                .sql_service
+                .exec_query(&format!(
+                    r#"QUEUE ADD PRIORITY {} "STANDALONE#queue:{}" "{}";"#,
+                    i,
+                    i,
+                    "a".repeat(self.payload_size)
+                ))
+                .await?;
+        }
+
+        let state = Arc::new(());
+        Ok(state)
+    }
+
+    async fn bench(
+        self: &Self,
+        services: &CubeServices,
+        _state: Arc<BenchState>,
+    ) -> Result<(), CubeError> {
+        let r = services
+            .sql_service
+            .exec_query(r#"QUEUE PENDING "STANDALONE#queue""#)
+            .await?;
+
+        assert_eq!(
+            r.get_columns(),
+            &vec![
+                Column::new("id".to_string(), ColumnType::String, 0),
+                Column::new("queue_id".to_string(), ColumnType::String, 1),
+                Column::new("status".to_string(), ColumnType::String, 2),
+                Column::new("extra".to_string(), ColumnType::String, 3)
+            ]
+        );
+        assert_eq!(r.get_rows().len(), 5_000);
 
         Ok(())
     }

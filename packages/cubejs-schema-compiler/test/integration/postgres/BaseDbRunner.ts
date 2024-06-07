@@ -68,7 +68,8 @@ export class BaseDbRunner {
         (replacedQuery, desc) => {
           const partitionUnion = desc.dateRange && PreAggregationPartitionRangeLoader.timeSeries(
             desc.partitionGranularity,
-            PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange)
+            PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
+            desc.timestampPrecision
           ).map(
             range => `SELECT * FROM ${PreAggregationPartitionRangeLoader.partitionTableName(desc.tableName, desc.partitionGranularity, range)}_${suffix}`
           ).join(' UNION ALL ');
@@ -121,7 +122,8 @@ export class BaseDbRunner {
         const loadSql = this.tempTableSql(desc);
         return desc.dateRange ? R.unnest(PreAggregationPartitionRangeLoader.timeSeries(
           desc.partitionGranularity,
-          PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange)
+          PreAggregationPartitionRangeLoader.intersectDateRanges(desc.dateRange, desc.matchedTimeDimensionDateRange),
+          desc.timestampPrecision
         ).map(
           range => desc.invalidateKeyQueries.map(
             (sql) => this.replacePartitionName(sql, desc, seed, desc.partitionGranularity, range)

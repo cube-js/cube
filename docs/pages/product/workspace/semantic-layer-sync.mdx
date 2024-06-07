@@ -1,0 +1,405 @@
+# Semantic Layer Sync
+
+Semantic Layer Sync synchronizes the [data model][ref-data-model] of a semantic
+layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
+
+<SuccessBox>
+
+Semantic Layer Sync with Metabase, Preset, and Superset is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing). Support for Tableau and Power BI is available
+on [Enterprise and above](https://cube.dev/pricing) tiers.
+
+</SuccessBox>
+
+Semantic Layer Sync programmatically connects a BI tool to Cube via the [SQL
+API][ref-sql-api] and creates or updates BI-specific entities that correspond to
+entities within the data model in Cube, e.g., cubes, views, measures,
+dimensions.
+
+<Diagram src="https://ucarecdn.com/f598f41c-36ec-4ed9-960f-7c902a77ed74/" />
+
+In general, here's how Cube entities match BI-specific ones:
+
+| Cube                        | BI tool                     |
+| --------------------------- | --------------------------- |
+| Deployment, branch          | Database                    |
+| Cube, view                  | Dataset, table, data source |
+| Measure, dimension, segment | Column, dimension, metric   |
+
+## Supported tools
+
+Semantic Layer Sync supports the following BI tools. Check relevant pages for details
+on configuration and features for specific tools:
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="semantic-layer-sync/superset"
+    imageUrl="https://static.cube.dev/icons/superset.svg"
+    title="Apache Superset"
+  />
+  <GridItem
+    url="semantic-layer-sync/metabase"
+    imageUrl="https://static.cube.dev/icons/metabase.svg"
+    title="Metabase"
+  />
+  <GridItem
+    url="semantic-layer-sync/power-bi"
+    imageUrl="https://static.cube.dev/icons/powerbi.svg"
+    title="Power BI"
+  />
+  <GridItem
+    url="semantic-layer-sync/preset"
+    imageUrl="https://static.cube.dev/icons/preset.svg"
+    title="Preset"
+  />
+  <GridItem
+    url="semantic-layer-sync/tableau"
+    imageUrl="https://static.cube.dev/icons/tableau.svg"
+    title="Tableau"
+  />
+</Grid>
+
+## Creating syncs
+
+You can create a new sync by navigating to the <Btn>Semantic Layer Sync</Btn>
+tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>+ Create
+Sync</Btn>.
+
+<Screenshot src="https://ucarecdn.com/d4f4c753-ea8f-459b-aec2-73846da06b41/" />
+
+Follow the steps in the wizard to create a sync with any of supported BI tools.
+
+### Configuration
+
+Under the hood, Semantic Layer Sync is configured using the `semantic_layer_sync`
+option in the [configuration file][ref-config-file].
+
+This function accepts a security context and returns an array of configured
+syncs. It can also be asynchronous, allowing for dynamic definition of syncs,
+e.g., loading the configuration from a remote API endpoint.
+
+Each sync is configured with a mandatory `name` and a `type` as well as the
+`config` object with BI-specific credentials, e.g., a workspace URL and an API
+key. `config` also includes the `database` name that will be created and updated
+in the corresponding BI tool.
+
+A sync can be disabled by setting `active` to `false`; such syncs will not run
+automatically. If `active` is undefined, a sync is considered enabled.
+
+Example configuration with a single disabled sync:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'active': False,
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: staging-deployment'
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        active: false,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: staging-deployment",
+        },
+      },
+    ];
+  },
+};
+```
+
+</CodeTabs>
+
+### Multitenancy
+
+If multiple security contexts are defined via the
+[`scheduledRefreshContexts`][ref-config-contexts] configuration option,
+`semanticLayerSync` can provide custom configuration for each of them.
+
+<WarningBox>
+
+By default, multitenancy support in `semanticLayerSync` is disabled. Please
+contact support to enable multitenancy support in `semanticLayerSync` for your
+Cube Cloud account.
+
+</WarningBox>
+
+You can synchronize the data model of each tenant to a different BI tool or a
+different database in a single BI tool, or implement another scenario that makes
+sense in your use case.
+
+Example configuration for the case when each department wants have their data
+model synchronized to a dedicated database in a BI tool:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  department = ctx['securityContext']['department']
+
+  return [
+    {
+      'type': 'metabase',
+      'name': f"Metabase Sync for {department}",
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'example.metabaseapp.com',
+        'database': f"Cube Cloud: {department}",
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    const department = securityContext.department;
+
+    return [
+      {
+        type: "metabase",
+        name: `Metabase Sync for ${department}`,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "example.metabaseapp.com",
+          database: `Cube Cloud: ${department}`,
+        },
+      },
+    ];
+  },
+};
+```
+
+</CodeTabs>
+
+Example confguration for the case when only `admin` data model should be
+synchronized with a couple of BI tools:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  if ctx['securityContext']['role'] == 'admin':
+    return [
+      {
+        'type': 'superset',
+        'name': 'Superset Sync',
+        'config': {
+          'user': 'mail@example.com',
+          'password': '4dceae-606a03-93ae6dc7',
+          'url': 'superset.example.com',
+          'database': 'Cube Cloud: sls-test (admin)'
+        }
+      },
+      {
+        'type': 'preset',
+        'name': 'Preset Sync',
+        'config': {
+          'api_token': '07988f63-c200-499e-97c9-ba137d8918aa',
+          'api_secret': 'c19fbab4fd4945899795d32898f2e1165bef8e5ee653',
+          'workspace_url': '12345678.us1a.app.preset.io',
+          'database': 'Cube Cloud: sls-test (admin)'
+        }
+      }
+    ]
+  } else {
+    # Only sync the 'admin' data model
+    return []
+  }
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    if (securityContext.role === "admin") {
+      return [
+        {
+          type: "superset",
+          name: "Superset Sync",
+          config: {
+            user: "mail@example.com",
+            password: "4dceae-606a03-93ae6dc7",
+            url: "superset.example.com",
+            database: "Cube Cloud: sls-test (admin)",
+          },
+        },
+        {
+          type: "preset",
+          name: "Preset Sync",
+          config: {
+            api_token: "07988f63-c200-499e-97c9-ba137d8918aa",
+            api_secret: "c19fbab4fd4945899795d32898f2e1165bef8e5ee653",
+            workspace_url: "12345678.us1a.app.preset.io",
+            database: "Cube Cloud: sls-test (admin)",
+          },
+        },
+      ];
+    } else {
+      // Only sync the 'admin' data model
+      return [];
+    }
+  },
+};
+```
+
+</CodeTabs>
+
+## Running syncs
+
+Cube automatically runs configured syncs every time a [new build is deployed](#on-build).
+Additionally, you can configure syncs to run [on schedule](#on-schedule).
+Finally, you can [manually](#manually) trigger any sync to run.
+
+During the sync, Cube will either create from scratch or update a database in
+the corresponding BI tool and the data model associated with it. Syncing a
+branch in [development mode][ref-dev-mode] will create a separate database,
+leaving the one associated with the production branch intact.
+
+### On build
+
+When the data model is updated, all configured syncs will automatically run.
+
+<WarningBox>
+
+If data model is updated dynamically and the
+[`schemaVersion`][ref-config-schemaversion] configuration option is used to
+track data model changes, syncs will not automatically run. This behavior is
+disabled by default. Please contact support to enable running syncs when the
+data model is updated dynamically for your Cube Cloud account.
+
+</WarningBox>
+
+### On schedule
+
+You can use the `scheduleInterval` option to specify the interval for running
+a particular sync on schedule. This is useful for cases when you expect that
+a BI tool might be temporarily unavailable via its API; the next scheduled sync
+will likely succeed anyway.
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'active': False,
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: staging-deployment',
+        'scheduleInterval': 'every 10 minutes'
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        active: false,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: staging-deployment",
+          scheduleInterval: "every 10 minutes"
+        }
+      }
+    ]
+  }
+}
+```
+
+</CodeTabs>
+
+The `scheduleInterval` option accepts values in the `every [number] [period]`
+format, where `[number]` can be any positive integer, and `[period]` can be
+any value from the following list: `day`, `hour`, `minute`, or `days`, `hours`,
+`minutes`.
+
+<InfoBox>
+
+Development instances and [auto-suspended][ref-auto-sus] production clusters
+can't run syncs on schedule.
+
+</InfoBox>
+
+### Manually
+
+You can also run a sync manually by navigating to the <Btn>Semantic Layer
+Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>Start
+Sync</Btn> next to a relevant sync. This is convenient for working in the
+[development mode][ref-dev-mode].
+
+<Screenshot src="https://ucarecdn.com/e48cef02-cc89-466d-a293-11a04aacb116/" />
+
+## Viewing history
+
+You can view the history of runs for a particular sync by navigating to
+the <Btn>Semantic Layer Sync</Btn> tab on the <Btn>BI Integrations</Btn> page
+and clicking <Btn>Show History</Btn> next to a relevant sync.
+
+<Screenshot src="https://ucarecdn.com/a3cc5fc8-8458-483e-999c-5654eb8072b4/" />
+
+## Cleaning up
+
+You can remove the synced assets (e.g., data sources and datasets) from BI tools
+by clicking on <Btn>...</Btn> of a respective tool and choosing <Btn>Remove synced
+assets</Btn>. It would remove the assets synced from the branch you're currently
+on, i.e., your development mode branch, shared branch, or main branch.
+
+<Screenshot
+  highlight="inset(72.5% 0.5% 5% 80% round 10px)"
+  src="https://ucarecdn.com/10770acd-a358-4b6a-98bc-6eb1bf9c0a81/"
+/>
+
+
+[ref-data-model]: /product/data-modeling/overview
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-config-file]: /product/configuration#configuration-options
+[ref-config-sls]: /reference/configuration/config#semanticlayersync
+[ref-config-contexts]: /reference/configuration/config#scheduledrefreshcontexts
+[ref-config-schemaversion]: /reference/configuration/config#schemaversion
+[ref-workspace-sls]: /workspace/bi-integrations
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension

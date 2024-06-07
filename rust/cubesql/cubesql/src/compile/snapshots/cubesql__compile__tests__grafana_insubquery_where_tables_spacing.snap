@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select quote_ident(table_name) as \\\"table\\\" from information_schema.tables\\\n            \\n    where quote_ident(table_schema) not in ('information_schema',\\\n            \\n                             'pg_catalog',\\\n            \\n                             '_timescaledb_cache',\\\n            \\n                             '_timescaledb_catalog',\\\n            \\n                             '_timescaledb_internal',\\\n            \\n                             '_timescaledb_config',\\\n            \\n                             'timescaledb_information',\\\n            \\n                             'timescaledb_experimental')\\\n            \\n      and \\\n            \\n          quote_ident(table_schema) IN (\\\n            \\n          SELECT\\\n            \\n            CASE WHEN trim(s[i]) = '\\\"$user\\\"' THEN user ELSE trim(s[i]) END\\\n            \\n          FROM\\\n            \\n            generate_series(\\\n            \\n              array_lower(string_to_array(current_setting('search_path'),','),1),\\\n            \\n              array_upper(string_to_array(current_setting('search_path'),','),1)\\\n            \\n            ) as i,\\\n            \\n            string_to_array(current_setting('search_path'),',') s\\\n            \\n          )\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------------+
+| table                       |
++-----------------------------+
+| "KibanaSampleDataEcommerce" |
+| "Logs"                      |
+| "NumberCube"                |
+| "WideCube"                  |
++-----------------------------+

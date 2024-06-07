@@ -1,23 +1,26 @@
 {
   "name": "@cubejs-backend/oracle-driver",
   "description": "Cube.js oracle database driver",
-  "author": "Trikoz I.",
-  "version": "0.31.58",
+  "author": "Cube Dev, Inc.",
+  "version": "0.35.43",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-oracle-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "driver/OracleDriver.js",
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.58",
+    "@cubejs-backend/base-driver": "^0.35.43",
     "ramda": "^0.27.0"
   },
   "optionalDependencies": {
-    "oracledb": "^4.2.0"
+    "oracledb": "^6.2.0"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "license": "Apache-2.0",
   "publishConfig": {

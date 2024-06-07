@@ -6,19 +6,25 @@ use crate::metastore::table::Table;
 use crate::metastore::{Column, ColumnType, IdRow, Index, Partition};
 use crate::queryplanner::filter_by_key_range::FilterByKeyRangeExec;
 use crate::queryplanner::optimizations::CubeQueryPlanner;
+use crate::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use crate::queryplanner::planning::{get_worker_plan, Snapshot, Snapshots};
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
 use crate::queryplanner::serialized_plan::{IndexSnapshot, RowFilter, RowRange, SerializedPlan};
+use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::store::DataFrame;
 use crate::table::data::rows_to_columns;
 use crate::table::parquet::CubestoreParquetMetadataCache;
 use crate::table::{Row, TableValue, TimestampValue};
+use crate::telemetry::suboptimal_query_plan_event;
+use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
 use arrow::array::{
-    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array,
-    Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
-    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, MutableArrayData, StringArray,
-    TimestampMicrosecondArray, TimestampNanosecondArray, UInt64Array,
+    make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
+    Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
+    Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
+    Int96Decimal10Array, Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array,
+    Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
+    TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
 use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use arrow::ipc::reader::StreamReader;
@@ -72,7 +78,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError>;
+    ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError>;
 
     async fn router_plan(
         &self,
@@ -85,6 +91,7 @@ pub trait QueryExecutor: DIService + Send + Sync {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError>;
 
     async fn pp_worker_plan(
@@ -99,6 +106,7 @@ crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
 pub struct QueryExecutorImpl {
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
+    memory_handler: Arc<dyn MemoryHandler>,
 }
 
 crate::di_service!(QueryExecutorImpl, [QueryExecutor]);
@@ -112,6 +120,7 @@ impl QueryExecutor for QueryExecutorImpl {
         cluster: Arc<dyn Cluster>,
     ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
         let collect_span = tracing::span!(tracing::Level::TRACE, "collect_physical_plan");
+        let trace_obj = plan.trace_obj();
         let (physical_plan, logical_plan) = self.router_plan(plan, cluster).await?;
         let split_plan = physical_plan;
 
@@ -119,6 +128,13 @@ impl QueryExecutor for QueryExecutorImpl {
             "Router Query Physical Plan: {}",
             pp_phys_plan(split_plan.as_ref())
         );
+
+        let flags = PhysicalPlanFlags::with_execution_plan(split_plan.as_ref());
+        if flags.is_suboptimal_query() {
+            if let Some(trace_obj) = trace_obj.as_ref() {
+                suboptimal_query_plan_event(trace_obj, flags.to_json())?;
+            }
+        }
 
         let execution_time = SystemTime::now();
 
@@ -159,9 +175,15 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    ) -> Result<(SchemaRef, Vec<RecordBatch>), CubeError> {
+    ) -> Result<(SchemaRef, Vec<RecordBatch>, usize), CubeError> {
+        let data_loaded_size = DataLoadedSize::new();
         let (physical_plan, logical_plan) = self
-            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .worker_plan(
+                plan,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                Some(data_loaded_size.clone()),
+            )
             .await?;
         let worker_plan;
         let max_batch_rows;
@@ -217,7 +239,7 @@ impl QueryExecutor for QueryExecutorImpl {
         }
         // TODO: stream results as they become available.
         let results = regroup_batches(results?, max_batch_rows)?;
-        Ok((worker_plan.schema(), results))
+        Ok((worker_plan.schema(), results, data_loaded_size.get()))
     }
 
     async fn router_plan(
@@ -243,6 +265,7 @@ impl QueryExecutor for QueryExecutorImpl {
         plan: SerializedPlan,
         remote_to_local_names: HashMap<String, String>,
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<(Arc<dyn ExecutionPlan>, LogicalPlan), CubeError> {
         let plan_to_move = plan.logical_plan(
             remote_to_local_names,
@@ -250,7 +273,7 @@ impl QueryExecutor for QueryExecutorImpl {
             self.parquet_metadata_cache.cache().clone(),
         )?;
         let plan = Arc::new(plan);
-        let ctx = self.worker_context(plan.clone())?;
+        let ctx = self.worker_context(plan.clone(), data_loaded_size)?;
         let plan_ctx = ctx.clone();
         Ok((
             plan_ctx.create_physical_plan(&plan_to_move.clone())?,
@@ -265,7 +288,12 @@ impl QueryExecutor for QueryExecutorImpl {
         chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
     ) -> Result<String, CubeError> {
         let (physical_plan, _) = self
-            .worker_plan(plan, remote_to_local_names, chunk_id_to_record_batches)
+            .worker_plan(
+                plan,
+                remote_to_local_names,
+                chunk_id_to_record_batches,
+                None,
+            )
             .await?;
 
         let worker_plan;
@@ -283,9 +311,13 @@ impl QueryExecutor for QueryExecutorImpl {
 }
 
 impl QueryExecutorImpl {
-    pub fn new(parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>) -> Arc<Self> {
+    pub fn new(
+        parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
+        memory_handler: Arc<dyn MemoryHandler>,
+    ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
             parquet_metadata_cache,
+            memory_handler,
         })
     }
 
@@ -301,6 +333,7 @@ impl QueryExecutorImpl {
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
                     cluster,
                     serialized_plan,
+                    self.memory_handler.clone(),
                 ))),
         )))
     }
@@ -308,12 +341,17 @@ impl QueryExecutorImpl {
     fn worker_context(
         &self,
         serialized_plan: Arc<SerializedPlan>,
+        data_loaded_size: Option<Arc<DataLoadedSize>>,
     ) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
                 .with_batch_size(4096)
                 .with_concurrency(1)
-                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(serialized_plan))),
+                .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
+                    serialized_plan,
+                    self.memory_handler.clone(),
+                    data_loaded_size,
+                ))),
         )))
     }
 }
@@ -1347,6 +1385,12 @@ macro_rules! convert_array_cast_native {
     ($V: expr, (Decimal)) => {{
         crate::util::decimal::Decimal::new($V)
     }};
+    ($V: expr, (Decimal96)) => {{
+        crate::util::decimal::Decimal96::new($V)
+    }};
+    ($V: expr, (Int96)) => {{
+        crate::util::int96::Int96::new($V)
+    }};
     ($V: expr, $T: ty) => {{
         $V as $T
     }};
@@ -1393,8 +1437,15 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
             let array = batch.column(column_index);
             let num_rows = batch.num_rows();
             match array.data_type() {
+                DataType::UInt16 => convert_array!(array, num_rows, rows, UInt16Array, Int, i64),
+                DataType::UInt32 => convert_array!(array, num_rows, rows, UInt32Array, Int, i64),
                 DataType::UInt64 => convert_array!(array, num_rows, rows, UInt64Array, Int, i64),
+                DataType::Int16 => convert_array!(array, num_rows, rows, Int16Array, Int, i64),
+                DataType::Int32 => convert_array!(array, num_rows, rows, Int32Array, Int, i64),
                 DataType::Int64 => convert_array!(array, num_rows, rows, Int64Array, Int, i64),
+                DataType::Int96 => {
+                    convert_array!(array, num_rows, rows, Int96Array, Int96, (Int96))
+                }
                 DataType::Float64 => {
                     let a = array.as_any().downcast_ref::<Float64Array>().unwrap();
                     for i in 0..num_rows {
@@ -1461,6 +1512,62 @@ pub fn batch_to_dataframe(batches: &Vec<RecordBatch>) -> Result<DataFrame, CubeE
                     Int64Decimal10Array,
                     Decimal,
                     (Decimal)
+                ),
+                DataType::Int96Decimal(0) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal0Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(1) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal1Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(2) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal2Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(3) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal3Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(4) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal4Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(5) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal5Array,
+                    Decimal96,
+                    (Decimal96)
+                ),
+                DataType::Int96Decimal(10) => convert_array!(
+                    array,
+                    num_rows,
+                    rows,
+                    Int96Decimal10Array,
+                    Decimal96,
+                    (Decimal96)
                 ),
                 DataType::Timestamp(TimeUnit::Microsecond, None) => {
                     let a = array
@@ -1529,11 +1636,16 @@ pub fn arrow_to_column_type(arrow_type: DataType) -> Result<ColumnType, CubeErro
             scale: scale as i32,
             precision: 18,
         }),
+        DataType::Int96Decimal(scale) => Ok(ColumnType::Decimal {
+            scale: scale as i32,
+            precision: 27,
+        }),
         DataType::Boolean => Ok(ColumnType::Boolean),
         DataType::Int8
         | DataType::Int16
         | DataType::Int32
         | DataType::Int64
+        | DataType::Int96
         | DataType::UInt8
         | DataType::UInt16
         | DataType::UInt32
@@ -1643,4 +1755,41 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
     let mut a = MutableArrayData::new(vec![a.data()], false, len);
     a.extend(0, start, start + len);
     make_array(a.freeze())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arrow::datatypes::Field;
+
+    #[test]
+    fn test_batch_to_dataframe() -> Result<(), CubeError> {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("uint32", DataType::UInt32, true),
+            Field::new("int32", DataType::Int32, true),
+            Field::new("str32", DataType::Utf8, true),
+        ]));
+        let result = batch_to_dataframe(&vec![RecordBatch::try_new(
+            schema,
+            vec![
+                Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(Int32Array::from_iter(vec![Some(1), None])) as ArrayRef,
+                Arc::new(StringArray::from_iter(vec![Some("test".to_string()), None])) as ArrayRef,
+            ],
+        )?])?;
+
+        assert_eq!(
+            result.get_rows(),
+            &vec![
+                Row::new(vec![
+                    TableValue::Int(1),
+                    TableValue::Int(1),
+                    TableValue::String("test".to_string())
+                ]),
+                Row::new(vec![TableValue::Null, TableValue::Null, TableValue::Null,])
+            ]
+        );
+
+        Ok(())
+    }
 }

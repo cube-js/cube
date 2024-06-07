@@ -1,3 +1,4 @@
+pub mod cleanup;
 pub mod gcs;
 pub mod minio;
 pub mod queue;
@@ -13,6 +14,7 @@ use datafusion::cube_ext;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use log::debug;
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -20,7 +22,7 @@ use tempfile::{NamedTempFile, PathPersistError};
 use tokio::fs;
 use tokio::sync::{Mutex, RwLock};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteFile {
     pub remote_path: String,
     pub updated: DateTime<Utc>,
@@ -37,20 +39,70 @@ impl RemoteFile {
     }
 }
 
-#[async_trait]
+#[cuberpc::service]
 pub trait RemoteFs: DIService + Send + Sync + Debug {
     /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
     /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
-    async fn temp_upload_path(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError>;
+
+    /// Convention is to use this directory for creating files to be uploaded later.
+    async fn uploads_dir(&self) -> Result<String, CubeError>;
+
+    /// Check existance and size of uploaded file. Raise error if file doesn't exists or has wrong
+    /// size
+    async fn check_upload_file(
+        &self,
+        remote_path: String,
+        expected_size: u64,
+    ) -> Result<(), CubeError>;
+
+    /// In addition to uploading this file to the remote filesystem, this function moves the file
+    /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
+    async fn upload_file(
+        &self,
+        temp_upload_path: String,
+        remote_path: String,
+    ) -> Result<u64, CubeError>;
+
+    async fn download_file(
+        &self,
+        remote_path: String,
+        expected_file_size: Option<u64>,
+    ) -> Result<String, CubeError>;
+
+    async fn delete_file(&self, remote_path: String) -> Result<(), CubeError>;
+
+    async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError>;
+
+    async fn list_with_metadata(&self, remote_prefix: String)
+        -> Result<Vec<RemoteFile>, CubeError>;
+
+    async fn local_path(&self) -> Result<String, CubeError>;
+
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError>;
+}
+
+pub struct CommonRemoteFsUtils;
+
+impl CommonRemoteFsUtils {
+    ///
+    /// Use this path to prepare files for upload. Writing into `local_path()` directly can result
+    /// in files being deleted by the background cleanup process, see `QueueRemoteFs::cleanup_loop`.
+    pub async fn temp_upload_path(
+        remote_fs: &dyn RemoteFs,
+        remote_path: String,
+    ) -> Result<String, CubeError> {
         // Putting files into a subdirectory prevents cleanups from removing them.
-        self.local_file(&format!("uploads/{}", remote_path)).await
+        remote_fs
+            .local_file(format!("uploads/{}", remote_path))
+            .await
     }
 
     /// Convention is to use this directory for creating files to be uploaded later.
-    async fn uploads_dir(&self) -> Result<String, CubeError> {
+    pub async fn uploads_dir(remote_fs: &dyn RemoteFs) -> Result<String, CubeError> {
         // Call to `temp_upload_path` ensures we created the uploads dir.
-        let file_in_dir = self
-            .temp_upload_path("never_created_remote_fs_file")
+        let file_in_dir = remote_fs
+            .temp_upload_path("never_created_remote_fs_file".to_string())
             .await?;
         Ok(Path::new(&file_in_dir)
             .parent()
@@ -61,12 +113,12 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
     }
     /// Check existance and size of uploaded file. Raise error if file doesn't exists or has wrong
     /// size
-    async fn check_upload_file(
-        &self,
-        remote_path: &str,
+    pub async fn check_upload_file(
+        remote_fs: &dyn RemoteFs,
+        remote_path: String,
         expected_size: u64,
     ) -> Result<(), CubeError> {
-        match self.list_with_metadata(&remote_path).await {
+        match remote_fs.list_with_metadata(remote_path.clone()).await {
             Ok(list) => {
                 let list_res = list.iter().next().ok_or(CubeError::internal(
                         format!("File {} can't be listed after upload. Either there's Cube Store cluster misconfiguration, or storage can't provide the required consistency.", remote_path),
@@ -90,30 +142,6 @@ pub trait RemoteFs: DIService + Send + Sync + Debug {
             Err(e) => Err(e),
         }
     }
-
-    /// In addition to uploading this file to the remote filesystem, this function moves the file
-    /// from `temp_upload_path` to `self.local_path(remote_path)` on the local file system.
-    async fn upload_file(
-        &self,
-        temp_upload_path: &str,
-        remote_path: &str,
-    ) -> Result<u64, CubeError>;
-
-    async fn download_file(
-        &self,
-        remote_path: &str,
-        expected_file_size: Option<u64>,
-    ) -> Result<String, CubeError>;
-
-    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError>;
-
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError>;
-
-    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError>;
-
-    async fn local_path(&self) -> String;
-
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError>;
 }
 
 pub fn ensure_temp_file_is_dropped(path: String) {
@@ -157,19 +185,36 @@ impl LocalDirRemoteFs {
 }
 
 di_service!(LocalDirRemoteFs, [RemoteFs]);
+di_service!(RemoteFsRpcClient, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for LocalDirRemoteFs {
+    async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+    }
+
+    async fn uploads_dir(&self) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::uploads_dir(self).await
+    }
+
+    async fn check_upload_file(
+        &self,
+        remote_path: String,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+    }
+
     async fn upload_file(
         &self,
-        temp_upload_path: &str,
-        remote_path: &str,
+        temp_upload_path: String,
+        remote_path: String,
     ) -> Result<u64, CubeError> {
         let mut has_remote = false;
         if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
             has_remote = true;
             debug!("Uploading {}", remote_path);
-            let dest = remote_dir.as_path().join(remote_path);
+            let dest = remote_dir.as_path().join(&remote_path);
             fs::create_dir_all(dest.parent().unwrap())
                 .await
                 .map_err(|e| {
@@ -192,12 +237,12 @@ impl RemoteFs for LocalDirRemoteFs {
         }
         if has_remote {
             let size = fs::metadata(&temp_upload_path).await?.len();
-            self.check_upload_file(&remote_path, size).await?;
+            self.check_upload_file(remote_path.clone(), size).await?;
         }
 
-        let local_path = self.dir.as_path().join(remote_path);
+        let local_path = self.dir.as_path().join(&remote_path);
 
-        if Path::new(temp_upload_path) != local_path {
+        if Path::new(&temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await
                 .map_err(|e| {
@@ -223,10 +268,10 @@ impl RemoteFs for LocalDirRemoteFs {
 
     async fn download_file(
         &self,
-        remote_path: &str,
+        remote_path: String,
         _expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
-        let mut local_file = self.dir.as_path().join(remote_path);
+        let mut local_file = self.dir.as_path().join(&remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dir = local_dir.join("downloads");
         fs::create_dir_all(&downloads_dir).await?;
@@ -237,7 +282,7 @@ impl RemoteFs for LocalDirRemoteFs {
                     cube_ext::spawn_blocking(move || NamedTempFile::new_in(downloads_dir))
                         .await??
                         .into_temp_path();
-                fs::copy(remote_dir.as_path().join(remote_path), &temp_path)
+                fs::copy(remote_dir.as_path().join(&remote_path), &temp_path)
                     .await
                     .map_err(|e| {
                         CubeError::internal(format!(
@@ -261,11 +306,11 @@ impl RemoteFs for LocalDirRemoteFs {
         Ok(local_file.into_os_string().into_string().unwrap())
     }
 
-    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
         debug!("Deleting {}", remote_path);
         {
             if let Some(remote_dir) = self.remote_dir.write().await.as_ref() {
-                let remote = remote_dir.as_path().join(remote_path);
+                let remote = remote_dir.as_path().join(&remote_path);
                 if fs::metadata(remote.clone()).await.is_ok() {
                     fs::remove_file(remote.clone()).await?;
                     Self::remove_empty_paths(remote_dir.clone(), remote.clone()).await?;
@@ -274,7 +319,7 @@ impl RemoteFs for LocalDirRemoteFs {
         }
 
         let _local_guard = acquire_lock("delete file", self.dir_delete_mut.lock()).await?;
-        let local = self.dir.as_path().join(remote_path);
+        let local = self.dir.as_path().join(&remote_path);
         if fs::metadata(local.clone()).await.is_ok() {
             fs::remove_file(local.clone()).await?;
             LocalDirRemoteFs::remove_empty_paths(self.dir.as_path().to_path_buf(), local.clone())
@@ -284,7 +329,7 @@ impl RemoteFs for LocalDirRemoteFs {
         Ok(())
     }
 
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+    async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         Ok(self
             .list_with_metadata(remote_prefix)
             .await?
@@ -293,7 +338,10 @@ impl RemoteFs for LocalDirRemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
         let remote_dir = self.remote_dir.read().await.as_ref().cloned();
         let result = Self::list_recursive(
             remote_dir.clone().unwrap_or(self.dir.clone()),
@@ -304,11 +352,11 @@ impl RemoteFs for LocalDirRemoteFs {
         Ok(result)
     }
 
-    async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+    async fn local_path(&self) -> Result<String, CubeError> {
+        Ok(self.dir.to_str().unwrap().to_owned())
     }
 
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
         let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())
@@ -326,8 +374,19 @@ impl LocalDirRemoteFs {
     pub async fn remove_empty_paths(root: PathBuf, path: PathBuf) -> Result<(), CubeError> {
         if let Some(parent_path) = path.parent() {
             let mut dir = fs::read_dir(parent_path).await?;
-            if dir.next_entry().await?.is_none() {
-                fs::remove_dir(parent_path).await?;
+            if !parent_path
+                .as_os_str()
+                .to_string_lossy()
+                .contains("temp-uploads")
+                && dir.next_entry().await?.is_none()
+            {
+                fs::remove_dir(parent_path).await.map_err(|e| {
+                    CubeError::internal(format!(
+                        "Error during removal of empty path '{}': {}",
+                        parent_path.as_os_str().to_string_lossy(),
+                        e
+                    ))
+                })?;
             }
             if root != parent_path.to_path_buf() {
                 return Ok(Self::remove_empty_paths_boxed(root, parent_path.to_path_buf()).await?);
@@ -389,8 +448,11 @@ impl LocalDirRemoteFs {
 
 #[cfg(test)]
 mod tests {
+    use super::gcs::GCSRemoteFs;
+    use super::minio::MINIORemoteFs;
     use super::s3::S3RemoteFs;
     use super::*;
+    use crate::config::init_test_logger;
     use std::io::prelude::*;
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
@@ -427,11 +489,11 @@ mod tests {
         remote_fs: &Arc<dyn RemoteFs>,
         remote_file: &str,
     ) -> Result<String, CubeError> {
-        let temp_upload_path = remote_fs.temp_upload_path(remote_file).await?;
+        let temp_upload_path = remote_fs.temp_upload_path(remote_file.to_string()).await?;
         let mut file = fs::File::create(&temp_upload_path).unwrap();
         file.write_all(b"test").unwrap();
         remote_fs
-            .upload_file(&temp_upload_path, remote_file)
+            .upload_file(temp_upload_path.clone(), remote_file.to_string())
             .await?;
 
         Ok(temp_upload_path)
@@ -443,9 +505,16 @@ mod tests {
         name_maker: NameMaker,
         download_test: bool,
     ) {
-        assert_eq!(remote_fs.local_path().await, local_dir.to_str().unwrap());
+        assert_eq!(
+            remote_fs.local_path().await.unwrap(),
+            local_dir.to_str().unwrap()
+        );
 
-        let local_file = remote_fs.local_file("test.tst").await.ok().unwrap();
+        let local_file = remote_fs
+            .local_file("test.tst".to_string())
+            .await
+            .ok()
+            .unwrap();
         assert_eq!(local_file, local_dir.join("test.tst").to_str().unwrap());
 
         let local_file_path = Path::new("test_dir")
@@ -454,7 +523,7 @@ mod tests {
             .unwrap()
             .to_owned();
         let local_file = remote_fs
-            .local_file(local_file_path.as_ref())
+            .local_file(local_file_path.to_string())
             .await
             .unwrap();
 
@@ -478,7 +547,7 @@ mod tests {
             assert!(local_dir.join(filename).is_file());
         }
 
-        let mut remote_list = remote_fs.list(&name_maker.name("test-")).await.unwrap();
+        let mut remote_list = remote_fs.list(name_maker.name("test-")).await.unwrap();
         remote_list.sort();
         remote_list
             .iter()
@@ -487,7 +556,7 @@ mod tests {
                 assert_eq!(list_name, origin_name);
             });
 
-        let mut remote_list = remote_fs.list(&name_maker.name("subdir/")).await.unwrap();
+        let mut remote_list = remote_fs.list(name_maker.name("subdir/")).await.unwrap();
         remote_list.sort();
         remote_list
             .iter()
@@ -497,7 +566,7 @@ mod tests {
             });
 
         let mut remote_list = remote_fs
-            .list_with_metadata(&name_maker.name("test"))
+            .list_with_metadata(name_maker.name("test"))
             .await
             .unwrap();
 
@@ -518,19 +587,25 @@ mod tests {
 
             for filename in root_files.iter().chain(subdir_files.iter()) {
                 assert!(!local_dir.join(filename).is_file());
-                remote_fs.download_file(filename, None).await.unwrap();
+                remote_fs
+                    .download_file(filename.clone(), None)
+                    .await
+                    .unwrap();
                 assert!(local_dir.join(filename).is_file());
             }
         }
 
         for filename in root_files.iter().chain(subdir_files.iter()) {
-            assert!(local_dir.join(filename).is_file());
-            assert_eq!(&remote_fs.list(filename).await.unwrap()[0], filename);
+            assert!(local_dir.join(&filename).is_file());
+            assert_eq!(
+                &remote_fs.list(filename.clone()).await.unwrap()[0],
+                filename
+            );
 
-            remote_fs.delete_file(filename).await.unwrap();
+            remote_fs.delete_file(filename.clone()).await.unwrap();
 
-            assert!(!local_dir.join(filename).is_file());
-            assert!(&remote_fs.list(filename).await.unwrap().is_empty());
+            assert!(!local_dir.join(&filename).is_file());
+            assert!(&remote_fs.list(filename.clone()).await.unwrap().is_empty());
         }
     }
 
@@ -557,11 +632,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_s3() {
+    async fn aws_s3() -> Result<(), CubeError> {
         if env::var("CUBESTORE_AWS_ACCESS_KEY_ID").is_err() {
-            return;
+            return Ok(());
         }
 
+        init_test_logger().await;
         let region = "us-west-2".to_string();
         let bucket_name = "cube-store-ci-test".to_string();
 
@@ -573,8 +649,7 @@ mod tests {
             region.clone(),
             bucket_name.clone(),
             None,
-        )
-        .unwrap();
+        )?;
 
         let name_maker = NameMaker::new(Uuid::new_v4().to_string());
         test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
@@ -592,5 +667,70 @@ mod tests {
         test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
 
         clear_test_dir("aws_s3");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn minio_remote_fs() -> Result<(), CubeError> {
+        if env::var("CUBESTORE_MINIO_ACCESS_KEY_ID").is_err() {
+            return Ok(());
+        }
+
+        init_test_logger().await;
+        let bucket_name = "cube-store-ci-test".to_string();
+
+        clear_test_dir("minio_remote_fs");
+        let local_path = get_test_local_dir("minio_remote_fs");
+
+        let remote_fs = MINIORemoteFs::new(local_path.clone(), bucket_name.clone(), None)?;
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+
+        let remote_fs = MINIORemoteFs::new(
+            local_path.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("aws_s3");
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn gcp_remote_fs() -> Result<(), CubeError> {
+        if env::var("CUBESTORE_GCP_CREDENTIALS").is_err() {
+            return Ok(());
+        }
+
+        init_test_logger().await;
+        let bucket_name = "cube-store-ci-test-v2".to_string();
+
+        clear_test_dir("gcp_remote_fs");
+        let local_path = get_test_local_dir("gcp_remote_fs");
+
+        let remote_fs = GCSRemoteFs::new(local_path.clone(), bucket_name.clone(), None)?;
+
+        let name_maker = NameMaker::new(Uuid::new_v4().to_string());
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("gcp_remote_fs");
+
+        let remote_fs = GCSRemoteFs::new(
+            local_path.clone(),
+            bucket_name.clone(),
+            Some("remotefs_test_subpathdir".to_string()),
+        )
+        .unwrap();
+
+        test_remote_filesystem(remote_fs, local_path.as_ref(), name_maker.clone(), true).await;
+
+        clear_test_dir("gcp_remote_fs");
+        Ok(())
     }
 }

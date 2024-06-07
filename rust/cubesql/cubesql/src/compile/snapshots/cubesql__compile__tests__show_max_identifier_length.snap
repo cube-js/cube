@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"show max_identifier_length;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| setting |
++---------+
+| 63      |
++---------+

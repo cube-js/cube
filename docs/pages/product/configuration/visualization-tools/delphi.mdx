@@ -1,0 +1,71 @@
+---
+redirect_from:
+  - /config/downstream/delphi
+---
+
+# Delphi
+
+[Delphi][delphi-website] is a conversational interface for the semantic layer,
+powered by the large language model (LLM) technology by OpenAI.
+
+It provides a Slack bot that takes questions in natural language, translates
+them into queries to Cube, and delivers the results back to Slack. You can learn
+more about Delphi from the [blog post][delphi-blog-post] or see it in action in
+this video:
+
+<YouTubeVideo url="https://www.youtube.com/embed/FotEaaf20gY" />
+
+To start using Delphi, you need to install its bot (application) to your Slack
+workspace, configure it, add to necessary channels, and start asking questions.
+
+## Installing Delphi to Slack
+
+Go to the [Slack application][delphi-slack-install] page; this will start the
+installation.
+
+<InfoBox>
+
+You may need to be a Slack workspace administrator to install a new application.
+
+</InfoBox>
+
+## Configuring the connection to Cube
+
+In Slack, navigate to the <Btn>Delphi</Btn> app on the left sidebar.
+
+In the <Btn>Home</Btn> tab, choose <Btn>Cube</Btn> as the connection type:
+
+<Screenshot src="https://ucarecdn.com/690ee2c3-a9e9-47b5-b005-83f95f917a74/" />
+
+Then, enter your credentials:
+
+- Delphi Client ID and API Key
+- Cube [REST API][ref-rest-api] URL and a [JSON Web Token][ref-jwt]
+
+<Screenshot src="https://ucarecdn.com/6400e6d1-e850-4111-adad-289a2e37e182/" />
+
+<InfoBox>
+
+If you don’t have Delphi Client ID and API Key yet, get them by
+[email][delphi-email] from the Delphi team.
+
+</InfoBox>
+
+## Asking questions
+
+Send Delphi a direct message or add it to relevant channels.
+
+Start with `@Delphi` and ask anything about your Cube [data
+model][ref-data-model].
+
+<Screenshot src="https://ucarecdn.com/e75fc12b-06c2-453b-bc97-9a3bfda538a9/" />
+
+[delphi-website]: https://www.delphihq.com/
+[delphi-blog-post]:
+  https://cube.dev/blog/conversational-interface-for-semantic-layer
+[delphi-slack-install]: https://delphi-prod.onrender.com/slack/install
+[delphi-email]:
+  mailto:michael@delphihq.com?subject=Delphi%20credentials%20to%20use%20with%20Cube
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-jwt]: /product/auth#generating-json-web-tokens-jwt
+[ref-data-model]: /product/data-modeling/overview

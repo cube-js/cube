@@ -7,19 +7,30 @@ use crate::{
             converter::LanguageToLogicalPlanConverter,
             cost::BestCubePlan,
             rules::{
-                case::CaseRules, dates::DateRules, filters::FilterRules, members::MemberRules,
-                order::OrderRules, split::SplitRules,
+                case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
+                flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
+                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
-            LogicalPlanLanguage,
+            LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
     },
+    config::ConfigObj,
     sql::AuthContextRef,
+    transport::{MetaContext, SpanId},
     CubeError,
 };
-use datafusion::{logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner};
+use datafusion::{
+    logical_plan::LogicalPlan, physical_plan::planner::DefaultPhysicalPlanner, scalar::ScalarValue,
+};
 use egg::{EGraph, Extractor, Id, IterationData, Language, Rewrite, Runner, StopReason};
 use itertools::Itertools;
-use std::{collections::HashSet, env, ffi::OsStr, fs, io::Write, sync::Arc, time::Duration};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::{HashMap, HashSet},
+    env, fs,
+    sync::Arc,
+    time::Duration,
+};
 
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -28,186 +39,110 @@ pub struct Rewriter {
 
 pub type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugNode {
+    id: String,
+    label: String,
+    #[serde(rename = "comboId")]
+    combo_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugEdge {
+    source: String,
+    target: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugCombo {
+    id: String,
+    label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DebugData {
+    nodes: Vec<DebugNode>,
+    #[serde(rename = "removedNodes")]
+    removed_nodes: Vec<DebugNode>,
+    edges: Vec<DebugEdge>,
+    #[serde(rename = "removedEdges")]
+    removed_edges: Vec<DebugEdge>,
+    combos: Vec<DebugCombo>,
+    #[serde(rename = "removedCombos")]
+    removed_combos: Vec<DebugCombo>,
+    #[serde(rename = "appliedRules")]
+    applied_rules: Option<Vec<String>>,
+}
+
 #[derive(Debug)]
 pub struct IterDebugInfo {
-    svg_file: String,
-    formatted_egraph: String,
-    formatted_nodes_csv: Vec<Vec<String>>,
-    formatted_edges_csv: Vec<Vec<String>>,
+    debug_data: DebugData,
 }
 
 impl IterDebugInfo {
-    pub fn format_egraph(graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>) -> String {
-        let clusters = graph
-            .classes()
-            .map(|class| {
-                let node_names = class
-                    .nodes
-                    .iter()
-                    .map(|n| format!("{:?}", format!("{:?}", n)))
-                    .collect::<Vec<_>>();
-                let links = node_names
-                    .iter()
-                    .map(|n| {
-                        format!(
-                            "    {} [shape=rect];\n    {:?} -> {};\n",
-                            n,
-                            format!("#{}", class.id),
-                            n
-                        )
-                    })
-                    .join("\n");
-                let external_links = class
-                    .nodes
-                    .iter()
-                    .flat_map(|n| {
-                        n.children().iter().map(move |c| {
-                            format!("  {:?} -> {:?};", format!("{:?}", n), format!("#{}", c))
-                        })
-                    })
-                    .collect::<Vec<_>>();
-                (
-                    format!(
-                        "  subgraph cluster_{} {{\
-\n    style=filled;\
-\n    color=lightgrey;\
-\n    node [style=filled,color=white];\
-\n{}\
-\n  }}",
-                        class.id, links
-                    ),
-                    external_links,
-                )
-            })
-            .collect::<Vec<_>>();
-        format!(
-            "digraph Egraph {{\
-\n{}\
-\n{}\
-}}",
-            clusters
-                .iter()
-                .map(|(cluster, _)| cluster.to_string())
-                .join("\n"),
-            clusters
-                .iter()
-                .map(|(_, links)| links.join("\n"))
-                .join("\n"),
-        )
-    }
-
-    pub fn format_nodes_csv(
+    pub fn prepare_debug_data(
         graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        iteration_id: usize,
-    ) -> Vec<Vec<String>> {
-        let mut res = Vec::new();
-        for class in graph.classes() {
-            res.push(vec![
-                class.id.to_string(),
-                format!("#{}", class.id),
-                class.id.to_string(),
-                format!("<[{}.0, {}.0]>", iteration_id, iteration_id),
-            ]);
-            res.extend(
-                class
-                    .nodes
-                    .iter()
-                    .map(|n| {
-                        vec![
-                            format!("{:?}", n),
-                            format!("{:?}", n),
-                            class.id.to_string(),
-                            format!("<[{}.0, {}.0]>", iteration_id, iteration_id),
-                        ]
-                    })
-                    .collect::<Vec<_>>(),
-            );
-        }
-        res
-    }
-
-    pub fn format_edges_csv(
-        graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        iteration_id: usize,
-    ) -> Vec<Vec<String>> {
-        let mut res = Vec::new();
-        for class in graph.classes() {
-            res.extend(
-                class
-                    .nodes
-                    .iter()
-                    .map(|n| {
-                        vec![
-                            class.id.to_string(),
-                            format!("{:?}", n),
-                            "directed".to_string(),
-                            format!("<[{}.0, {}.0]>", iteration_id, iteration_id),
-                        ]
-                    })
-                    .collect::<Vec<_>>(),
-            );
-
-            res.extend(
-                class
-                    .nodes
-                    .iter()
-                    .flat_map(|n| {
-                        n.children().iter().map(move |c| {
-                            vec![
-                                format!("{:?}", n),
-                                c.to_string(),
-                                "directed".to_string(),
-                                format!("<[{}.0, {}.0]>", iteration_id, iteration_id),
-                            ]
+    ) -> DebugData {
+        DebugData {
+            applied_rules: None,
+            nodes: graph
+                .classes()
+                .flat_map(|class| {
+                    let mut result = class
+                        .nodes
+                        .iter()
+                        .map(|n| {
+                            let node_id = format!("{}-{:?}", class.id, n);
+                            DebugNode {
+                                id: node_id.to_string(),
+                                label: format!("{:?}", n),
+                                combo_id: format!("c{}", class.id),
+                            }
                         })
-                    })
-                    .collect::<Vec<_>>(),
-            );
+                        .collect::<Vec<_>>();
+                    result.push(DebugNode {
+                        id: class.id.to_string(),
+                        label: class.id.to_string(),
+                        combo_id: format!("c{}", class.id),
+                    });
+                    result
+                })
+                .collect(),
+            edges: graph
+                .classes()
+                .flat_map(|class| {
+                    class
+                        .nodes
+                        .iter()
+                        .map(|n| DebugEdge {
+                            source: class.id.to_string(),
+                            target: format!("{}-{:?}", class.id, n,),
+                        })
+                        .chain(class.nodes.iter().flat_map(|n| {
+                            n.children().iter().map(move |c| DebugEdge {
+                                source: format!("{}-{:?}", class.id, n),
+                                target: c.to_string(),
+                            })
+                        }))
+                        .collect::<Vec<_>>()
+                })
+                .collect(),
+            combos: graph
+                .classes()
+                .map(|class| DebugCombo {
+                    id: format!("c{}", class.id),
+                    label: format!("#{}", class.id),
+                })
+                .collect(),
+            removed_nodes: Vec::new(),
+            removed_edges: Vec::new(),
+            removed_combos: Vec::new(),
         }
-        res
-    }
-
-    pub fn run_dot<S, I>(graph: String, args: I) -> Result<(), CubeError>
-    where
-        S: AsRef<OsStr>,
-        I: IntoIterator<Item = S>,
-    {
-        use std::process::{Command, Stdio};
-        let mut child = Command::new(env::var("CUBESQL_DOT_PATH").unwrap_or("dot".to_string()))
-            .args(args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .spawn()?;
-        let stdin = child.stdin.as_mut().expect("Failed to open stdin");
-        write!(stdin, "{}", graph)?;
-        match child.wait()?.code() {
-            Some(0) => Ok(()),
-            Some(e) => Err(CubeError::internal(format!(
-                "dot program returned error code {}",
-                e
-            ))),
-            None => Err(CubeError::internal(
-                "dot program was killed by a signal".to_string(),
-            )),
-        }
-    }
-
-    pub fn export_svg(&self) -> Result<(), CubeError> {
-        Self::run_dot(
-            self.formatted_egraph.to_string(),
-            &["-Tsvg", "-o", self.svg_file.as_str()],
-        )
     }
 
     fn make(runner: &CubeRunner) -> Self {
-        let iteration_id = runner.iterations.len();
-        let svg_file = format!("egraph-debug/iteration-{}.svg", iteration_id);
-        let formatted_egraph = Self::format_egraph(&runner.egraph);
         IterDebugInfo {
-            svg_file,
-            formatted_egraph,
-            formatted_nodes_csv: Self::format_nodes_csv(&runner.egraph, iteration_id),
-            formatted_edges_csv: Self::format_edges_csv(&runner.egraph, iteration_id),
+            debug_data: Self::prepare_debug_data(&runner.egraph),
         }
     }
 }
@@ -282,9 +217,91 @@ impl Rewriter {
         .with_time_limit(Duration::from_secs(
             env::var("CUBESQL_REWRITE_TIMEOUT")
                 .map(|v| v.parse::<u64>().unwrap())
-                .unwrap_or(15),
+                .unwrap_or(30),
         ))
+        .with_scheduler(egg::SimpleScheduler)
         .with_egraph(egraph)
+    }
+
+    pub async fn run_rewrite_to_completion(
+        &mut self,
+        auth_context: AuthContextRef,
+        qtrace: &mut Option<Qtrace>,
+    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+        let cube_context = self.cube_context.clone();
+        let egraph = self.graph.clone();
+        if let Some(qtrace) = qtrace {
+            qtrace.set_original_graph(&egraph);
+        }
+
+        let rules = cube_context
+            .sessions
+            .server
+            .compiler_cache
+            .rewrite_rules(
+                auth_context.clone(),
+                cube_context.session_state.protocol.clone(),
+                false,
+            )
+            .await?;
+
+        let (plan, qtrace_egraph_iterations) = tokio::task::spawn_blocking(move || {
+            let (runner, qtrace_egraph_iterations) =
+                Self::run_rewrites(&cube_context, egraph, rules, "intermediate")?;
+
+            Ok::<_, CubeError>((runner.egraph, qtrace_egraph_iterations))
+        })
+        .await??;
+
+        if let Some(qtrace) = qtrace {
+            qtrace.set_egraph_iterations(qtrace_egraph_iterations);
+        }
+
+        Ok(plan)
+    }
+
+    pub fn add_param_values(
+        &mut self,
+        param_values: &HashMap<usize, ScalarValue>,
+    ) -> Result<(), CubeError> {
+        let mut query_param_id_to_value = HashMap::new();
+        for (param_index, value) in param_values {
+            // TODO use lookups instead of iteration
+            for class in self.graph.classes() {
+                for node in &class.nodes {
+                    if let LogicalPlanLanguage::QueryParamIndex(QueryParamIndex(found_index)) = node
+                    {
+                        if found_index == param_index {
+                            let query_param_id = self
+                                .graph
+                                .lookup(LogicalPlanLanguage::QueryParam([class.id]))
+                                .ok_or_else(|| {
+                                    CubeError::internal(format!(
+                                        "Can't find param query node with id {}",
+                                        class.id
+                                    ))
+                                })?;
+                            query_param_id_to_value.insert(query_param_id, value.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        for (query_param_id, value) in query_param_id_to_value {
+            let expr_value =
+                self.graph
+                    .add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        value.clone(),
+                    )));
+            let literal_id = self
+                .graph
+                .add(LogicalPlanLanguage::LiteralExpr([expr_value]));
+            self.graph.union(query_param_id, literal_id);
+        }
+        self.graph.rebuild();
+
+        Ok(())
     }
 
     pub async fn find_best_plan(
@@ -292,6 +309,7 @@ impl Rewriter {
         root: Id,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
+        span_id: Option<Arc<SpanId>>,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -299,107 +317,47 @@ impl Rewriter {
             qtrace.set_original_graph(&egraph);
         }
 
+        let rules = cube_context
+            .sessions
+            .server
+            .compiler_cache
+            .rewrite_rules(
+                auth_context.clone(),
+                cube_context.session_state.protocol.clone(),
+                true,
+            )
+            .await?;
+
         let (plan, qtrace_egraph_iterations, qtrace_best_graph) =
             tokio::task::spawn_blocking(move || {
-                let rules = Self::rewrite_rules(cube_context.clone());
-                let runner = Self::rewrite_runner(cube_context.clone(), egraph);
-                let runner = runner.run(rules.iter());
-                if !IterInfo::egraph_debug_enabled() {
-                    log::debug!("Iterations: {:?}", runner.iterations);
-                }
-                let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
-                let stop_reason = match stop_reason {
-                    None => Some("timeout reached".to_string()),
-                    Some(StopReason::Saturated) => None,
-                    Some(StopReason::NodeLimit(limit)) => {
-                        Some(format!("{} AST node limit reached", limit))
-                    }
-                    Some(StopReason::IterationLimit(limit)) => {
-                        Some(format!("{} iteration limit reached", limit))
-                    }
-                    Some(StopReason::Other(other)) => Some(other.to_string()),
-                    Some(StopReason::TimeLimit(seconds)) => {
-                        Some(format!("{} seconds timeout reached", seconds))
-                    }
-                };
-                if let Some(stop_reason) = stop_reason {
-                    return Err(CubeError::user(format!(
-                        "Can't find rewrite due to {}",
-                        stop_reason
-                    )));
-                }
-                if IterInfo::egraph_debug_enabled() {
-                    let _ = fs::remove_dir_all("egraph-debug");
-                    let _ = fs::create_dir_all("egraph-debug");
-                    let mut nodes = csv::Writer::from_path("egraph-debug/nodes.csv")
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
-                    let mut edges = csv::Writer::from_path("egraph-debug/edges.csv")
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
-                    nodes
-                        .write_record(&["Id", "Label", "Cluster", "Timeset"])
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
-                    edges
-                        .write_record(&["Source", "Target", "Type", "Timeset"])
-                        .map_err(|e| CubeError::internal(e.to_string()))?;
-                    for i in &runner.iterations {
-                        i.data.debug_info.as_ref().unwrap().export_svg()?;
-                        for node in i
-                            .data
-                            .debug_info
-                            .as_ref()
-                            .unwrap()
-                            .formatted_nodes_csv
-                            .iter()
-                        {
-                            nodes
-                                .write_record(node)
-                                .map_err(|e| CubeError::internal(e.to_string()))?;
-                        }
-                        for edge in i
-                            .data
-                            .debug_info
-                            .as_ref()
-                            .unwrap()
-                            .formatted_edges_csv
-                            .iter()
-                        {
-                            edges
-                                .write_record(edge)
-                                .map_err(|e| CubeError::internal(e.to_string()))?;
-                        }
-                    }
-                }
-                let qtrace_egraph_iterations = if Qtrace::is_enabled() {
-                    runner
-                        .iterations
-                        .iter()
-                        .map(|iteration| {
-                            QtraceEgraphIteration::make(
-                                iteration,
-                                iteration
-                                    .data
-                                    .debug_qtrace_eclasses
-                                    .as_ref()
-                                    .cloned()
-                                    .unwrap(),
-                            )
-                        })
-                        .collect()
-                } else {
-                    vec![]
-                };
-                let extractor = Extractor::new(&runner.egraph, BestCubePlan);
-                let (_, best) = extractor.find_best(root);
+                let (runner, qtrace_egraph_iterations) =
+                    Self::run_rewrites(&cube_context, egraph, rules, "final")?;
+
+                let extractor =
+                    Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
+                let (best_cost, best) = extractor.find_best(root);
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
                 } else {
                     vec![]
                 };
                 let new_root = Id::from(best.as_ref().len() - 1);
-                log::debug!("Best: {:?}", best);
-                let converter =
-                    LanguageToLogicalPlanConverter::new(best, cube_context.clone(), auth_context);
-                Ok((
+                log::debug!(
+                    "Best: {}",
+                    best.as_ref()
+                        .iter()
+                        .enumerate()
+                        .map(|(i, n)| format!("{}: {:?}", i, n))
+                        .join(", ")
+                );
+                log::debug!("Best cost: {:?}", best_cost);
+                let converter = LanguageToLogicalPlanConverter::new(
+                    best,
+                    cube_context.clone(),
+                    auth_context,
+                    span_id.clone(),
+                );
+                Ok::<_, CubeError>((
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,
                     qtrace_best_graph,
@@ -415,20 +373,169 @@ impl Rewriter {
         plan
     }
 
+    fn run_rewrites(
+        cube_context: &Arc<CubeContext>,
+        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+        stage: &str,
+    ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
+        let runner = Self::rewrite_runner(cube_context.clone(), egraph);
+        let runner = runner.run(rules.iter());
+        if !IterInfo::egraph_debug_enabled() {
+            log::debug!("Iterations: {:?}", runner.iterations);
+        }
+        let stop_reason = &runner.iterations[runner.iterations.len() - 1].stop_reason;
+        let stop_reason = match stop_reason {
+            None => Some("timeout reached".to_string()),
+            Some(StopReason::Saturated) => None,
+            Some(StopReason::NodeLimit(limit)) => Some(format!("{} AST node limit reached", limit)),
+            Some(StopReason::IterationLimit(limit)) => {
+                Some(format!("{} iteration limit reached", limit))
+            }
+            Some(StopReason::Other(other)) => Some(other.to_string()),
+            Some(StopReason::TimeLimit(seconds)) => {
+                Some(format!("{} seconds timeout reached", seconds))
+            }
+        };
+        if IterInfo::egraph_debug_enabled() {
+            let dir = format!("egraph-debug-{}", stage);
+            let _ = fs::create_dir_all(dir.clone());
+            let _ = fs::create_dir_all(format!("{}/public", dir));
+            let _ = fs::create_dir_all(format!("{}/src", dir));
+            fs::copy(
+                "egraph-debug-template/public/index.html",
+                format!("{}/public/index.html", dir),
+            )?;
+            fs::copy(
+                "egraph-debug-template/package.json",
+                format!("{}/package.json", dir),
+            )?;
+            fs::copy(
+                "egraph-debug-template/src/index.js",
+                format!("{}/src/index.js", dir),
+            )?;
+
+            let mut iterations = Vec::new();
+            let mut last_debug_data: Option<DebugData> = None;
+            for i in &runner.iterations {
+                let debug_data_clone = i.data.debug_info.as_ref().unwrap().debug_data.clone();
+                let mut debug_data = i.data.debug_info.as_ref().unwrap().debug_data.clone();
+                if let Some(last) = last_debug_data {
+                    debug_data
+                        .nodes
+                        .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
+                    debug_data.edges.retain(|n| {
+                        !last
+                            .edges
+                            .iter()
+                            .any(|ln| ln.source == n.source && ln.target == n.target)
+                    });
+                    debug_data
+                        .combos
+                        .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
+
+                    debug_data.removed_nodes = last.nodes.clone();
+                    debug_data
+                        .removed_nodes
+                        .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
+                    debug_data.removed_edges = last.edges.clone();
+                    debug_data.removed_edges.retain(|n| {
+                        !debug_data_clone
+                            .edges
+                            .iter()
+                            .any(|ln| ln.source == n.source && ln.target == n.target)
+                    });
+                    debug_data.removed_combos = last.combos.clone();
+                    debug_data
+                        .removed_combos
+                        .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
+                }
+                debug_data.applied_rules =
+                    Some(i.applied.iter().map(|s| format!("{:?}", s)).collect());
+                iterations.push(debug_data);
+                last_debug_data = Some(debug_data_clone);
+            }
+            fs::write(
+                format!("{}/src/iterations.js", dir),
+                &format!(
+                    "export const iterations = {};",
+                    serde_json::to_string_pretty(&iterations)?
+                ),
+            )?;
+        }
+        if let Some(stop_reason) = stop_reason {
+            return Err(CubeError::user(format!(
+                "Can't find rewrite due to {}",
+                stop_reason
+            )));
+        }
+        let qtrace_egraph_iterations = if Qtrace::is_enabled() {
+            runner
+                .iterations
+                .iter()
+                .map(|iteration| {
+                    QtraceEgraphIteration::make(
+                        iteration,
+                        iteration
+                            .data
+                            .debug_qtrace_eclasses
+                            .as_ref()
+                            .cloned()
+                            .unwrap(),
+                    )
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        Ok((runner, qtrace_egraph_iterations))
+    }
+
+    pub fn sql_push_down_enabled() -> bool {
+        env::var("CUBESQL_SQL_PUSH_DOWN")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false)
+    }
+
     pub fn rewrite_rules(
-        cube_context: Arc<CubeContext>,
+        meta_context: Arc<MetaContext>,
+        config_obj: Arc<dyn ConfigObj>,
+        eval_stable_functions: bool,
     ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+        let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
-            Box::new(MemberRules::new(cube_context.clone())),
-            Box::new(FilterRules::new(cube_context.clone())),
-            Box::new(DateRules::new(cube_context.clone())),
-            Box::new(OrderRules::new(cube_context.clone())),
-            Box::new(SplitRules::new(cube_context.clone())),
-            Box::new(CaseRules::new(cube_context.clone())),
+            Box::new(MemberRules::new(
+                meta_context.clone(),
+                config_obj.clone(),
+                sql_push_down,
+            )),
+            Box::new(FilterRules::new(
+                meta_context.clone(),
+                config_obj.clone(),
+                eval_stable_functions,
+            )),
+            Box::new(DateRules::new(config_obj.clone())),
+            Box::new(OrderRules::new()),
+            Box::new(CommonRules::new(config_obj.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
             rewrites.extend(r.rewrite_rules());
+        }
+        if sql_push_down {
+            rewrites.extend(
+                WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
+            );
+            rewrites.extend(FlattenRules::new(config_obj.clone()).rewrite_rules());
+        }
+        if config_obj.push_down_pull_up_split() {
+            rewrites
+                .extend(SplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules());
+        } else {
+            rewrites.extend(
+                OldSplitRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
+            );
+            rewrites.extend(CaseRules::new().rewrite_rules());
         }
         if let Ok(disabled_rule_names) = env::var("CUBESQL_DISABLE_REWRITES") {
             let disabled_rule_names = disabled_rule_names

@@ -1,0 +1,1006 @@
+---
+redirect_from:
+  - /caching/using-pre-aggregations
+---
+
+# Using pre-aggregations
+
+Pre-aggregations is a powerful way to speed up your Cube queries. There are many
+configuration options to consider. Please make sure to also check [the
+Pre-Aggregations reference in the data modeling
+section][ref-schema-ref-preaggs].
+
+## Matching queries
+
+When executing a query, Cube will try to [match and fulfill it with a
+pre-aggregation][ref-matching-preaggs] in the first place.
+
+If there's no matching pre-aggregation, Cube will query the upstream data
+source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
+
+## Rollup-only mode
+
+In the rollup-only mode, Cube will **only** fulfill queries using
+pre-aggregations. To enable the rollup-only mode, use the
+`CUBEJS_ROLLUP_ONLY` environment variable.
+
+It can be useful to prevent queries from your end users from ever hitting the
+upstream data source, e.g., if you prefer to use your data warehouse only to
+build and refresh pre-aggregations and keep it suspended the rest of the time.
+
+<WarningBox>
+
+When the rollup-only mode is used with a single-node deployment (where the API
+instance also serves as a [refresh worker][ref-deploy-refresh-wrkr]), queries
+that can't be fulfilled with pre-aggregations will result in an error.
+Scheduled refreshes will continue to work in the background.
+
+</WarningBox>
+
+## Refresh strategy
+
+Refresh strategy can be customized by setting the
+[`refresh_key`][ref-schema-ref-preaggs-refresh-key] property for the
+pre-aggregation.
+
+The default value of [`refresh_key`][ref-schema-ref-preaggs-refresh-key] is
+`every: 1 hour`, if neither of the cubes overrides it's `refreshKey` parameter. 
+It can be redefined either by overriding the default value of
+the [`every` property][ref-schema-ref-preaggs-refresh-key-every]:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        type: rollup
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    amount_by_created: {
+      type: `rollup`,
+      measures: [amount],
+      time_dimension: created_at,
+      granularity: `month`,
+      refresh_key: {
+        every: `12 hour`,
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Or by providing a [`sql` property][ref-schema-ref-preaggs-refresh-key-sql]
+instead, and leaving `every` unchanged from its default value:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          # every will default to `10 seconds` here
+          sql: SELECT MAX(created_at) FROM orders
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    amount_by_created: {
+      measures: [amount],
+      time_dimension: created_at,
+      granularity: `month`,
+      refresh_key: {
+        // every will default to `10 seconds` here
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Or both `every` and `sql` can be defined together:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: amount_by_created
+        measures:
+          - amount
+        time_dimension: created_at
+        granularity: month
+        refresh_key:
+          every: 12 hour
+          sql: SELECT MAX(created_at) FROM orders
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    amount_by_created: {
+      measures: [amount],
+      time_dimension: created_at,
+      granularity: `month`,
+      refresh_key: {
+        every: `12 hour`,
+        sql: `SELECT MAX(created_at) FROM orders`,
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+When `every` and `sql` are used together, Cube will run the query from the `sql`
+property on an interval defined by the `every` property. If the query returns
+new results, then the pre-aggregation will be refreshed.
+
+## Partitioning
+
+[Partitioning][wiki-partitioning] is an extremely effective optimization for
+accelerating pre-aggregations build and refresh time. It effectively "shards"
+the data between multiple tables, splitting them by a defined attribute. Cube
+can be configured to incrementally refresh only the last set of partitions
+through the `updateWindow` property. This leads to faster refresh times due to
+unnecessary data not being reloaded, and even reduced cost for some databases
+like [BigQuery](/product/configuration/data-sources/google-bigquery) or
+[AWS Athena](/product/configuration/data-sources/aws-athena).
+
+Any `rollup` pre-aggregation can be partitioned by time using the
+`partition_granularity` property in [a pre-aggregation
+definition][ref-schema-ref-preaggs]. In the example below, the
+`partition_granularity` is set to `month`, which means Cube will generate
+separate tables for each month's worth of data. Once built, it will continue to
+refresh on a daily basis the last 3 months of data.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: category_and_date
+        measures:
+          - count
+          - revenue
+        dimensions:
+          - category
+        time_dimension: created_at
+        granularity: day
+        partition_granularity: month
+        refresh_key:
+          every: 1 day
+          incremental: true
+          update_window: 3 months
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  preAggregations: {
+    category_and_date: {
+      measures: [count, revenue],
+      dimensions: [category],
+      time_dimension: created_at,
+      granularity: `day`,
+      partition_granularity: `month`,
+      refresh_key: {
+        every: `1 day`,
+        incremental: true,
+        update_window: `3 months`,
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+### Partitioning by non-time dimension
+
+Cube Store uses an auto-partitioning technique to split Cube logical partitions into multiple physical ones.
+The partitioning key is the same as the sorting key of an index.
+Every physical partition is stored as a separate parquet file.
+Split is performed based on underlying parquet file sizes and rows inside those files.
+So simplest way to ensure proper partitioning is to introduce an index.
+For bigger pre-aggregations first columns of an index will determine the partitioning scheme.
+An interesting consequence of having time dimension partitioning enabled with an index is data partitioned by time and then by sorting the key of an index.
+It leads to that even in case of optimal index in place querying time is proportional to count of involved time partitions.
+This issue can be addressed by lambda pre-aggregations.
+
+Alternatively, if you want to explicitly introduce key partitioning, you can use multi-tenancy to introduce multiple orchestrator IDs.
+Each orchestrator ID can use a different pre-aggregation schema, so you may define those based on the partitioning key you want to introduce.
+This technique, together with multi-router Cube Store approach, allows you to achieve linear scaling on the partitioning key of your choice.
+
+## Using indexes
+
+[Indexes][ref-ref-indexes] are sorted copies of pre-aggregation data.
+
+**When you define a pre-aggregation without any explicit indexes, the default
+index is created.** In this index, dimensions come first, time dimensions come
+second, and measures come last.
+
+When you define additional indexes, you don't incur any additional costs on
+the data warehouse side. However, the pre-aggregation build time for a
+particular pre-aggregation increases with each index.
+
+### When to use indexes?
+
+At query time, if the default index can't be selected for a merge sort scan,
+then a less performant hash aggregation would be used. It usually means that
+the full table needs to be scanned to get query results.
+
+It usually doesn't make much difference if the pre-aggregation table is only
+several MBs in size. However, for larger pre-aggregations, indexes are usually
+required to achieve optimal performance, especially if not all dimensions from
+a pre-aggregation are used in a particular query.
+
+### Best practices
+
+Most pre-aggregations represent [additive][ref-additivity] rollups. For such
+rollups, **the rule of thumb is that, for most queries, there should be
+at least one index that makes a particular query scan very little amount of
+data,** which makes it very fast. (There are exceptions to this rule like
+top-k queries or queries with only low selectivity range filters. Optimization
+for these use cases usually involves remodeling data and queries.)
+
+To maximize performance, you can introduce an index per each query type so
+that the set of dimensions used in a query overlaps as much as possible with
+the set of dimensions in the index. Measures are usually only used in indexes
+if you plan to filter on a measure value and the cardinality of the possible
+values of the measure is low.
+
+The order in which dimensions are specified in the index is **very** important;
+suboptimal ordering can lead to diminished performance. To improve the
+performance of an index the main thing to consider is its order of dimensions.
+The rule of thumb for dimension order is as follows:
+
+- Dimensions used in high selectivity, single-value filters come first.
+- Dimensions used in `GROUP BY` come second.
+- Everything else used in the query comes in the end, including dimensions
+used in low selectivity, multiple-value filters.
+
+It might sound counter-intuitive to have dimensions used in `GROUP BY` before
+dimensions used in multiple-value filters. However, Cube Store always performs
+scans on sorted data, and if `GROUP BY` matches index ordering, merge
+sort-based algorithms are used for querying, which are usually much faster
+than hash-based `GROUP BY` in case index ordering doesn't match the query.
+
+If in doubt, always [use `EXPLAIN` and `EXPLAIN ANALYZE`](#explain-queries)
+to figure out the final query plan.
+
+#### Example
+
+Suppose you have a pre-aggregation that has millions of rows and the following
+structure:
+
+| timestamp           | product_name  | product_category | zip_code | order_total |
+| ------------------- | ------------- | ---------------- | -------- | ----------- |
+| 2023-01-01 10:00:00 | Keyboard      | Electronics      | 88523    | 1000        |
+| 2023-01-01 10:00:00 | Mouse         | Electronics      | 88523    | 800         |
+| 2023-01-01 10:00:00 | Plastic Chair | Furniture        | 88523    | 2000        |
+| 2023-01-01 11:00:00 | Keyboard      | Electronics      | 88524    | 2000        |
+| 2023-01-01 11:00:00 | Plastic Chair | Furniture        | 88524    | 3000        |
+
+The pre-aggregation definition looks as follows:
+
+<CodeTabs>
+
+```javascript
+cube("orders", {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      measures: [order_total],
+      dimensions: [product_name, product_category, zip_code],
+      time_dimension: timestamp,
+      granularity: `hour`,
+      partition_granularity: `day`,
+      allow_non_strict_date_range_match: true,
+      refresh_key: {
+        every: `1 hour`,
+        incremental: true,
+        update_window: `1 day`,
+      },
+      build_range_start: {
+        sql: `SELECT DATE_SUB(NOW(), 365)`,
+      },
+      build_range_end: {
+        sql: `SELECT NOW()`,
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        measures:
+          - order_total
+        dimensions:
+          - product_name
+          - product_category
+          - zip_code
+        time_dimension: timestamp
+        granularity: hour
+        partition_granularity: day
+        allow_non_strict_date_range_match: true
+        refresh_key:
+          every: 1 hour
+          incremental: true
+          update_window: 1 day
+        build_range_start:
+          sql: SELECT DATE_SUB(NOW(), 365)
+        build_range_end:
+          sql: SELECT NOW()
+```
+
+</CodeTabs>
+
+You run the following query on a regular basis, with the only difference
+between queries being the filter values:
+
+```json
+{
+  "measures": [
+    "orders.order_total"
+  ],
+  "timeDimensions": [
+    {
+      "dimension": "orders.timestamp",
+      "granularity": "hour",
+      "dateRange": [
+        "2022-12-14T06:00:00.000",
+        "2023-01-13T06:00:00.000"
+      ]
+    }
+  ],
+  "order": {
+    "orders.timestamp": "asc"
+  },
+  "filters": [
+    {
+      "member": "orders.product_category",
+      "operator": "equals",
+      "values": [
+        "Electronics"
+      ]
+    },
+    {
+      "member": "orders.product_name",
+      "operator": "equals",
+      "values": [
+        "Keyboard",
+        "Mouse"
+      ]
+    }
+  ],
+  "dimensions": [
+    "orders.zip_code"
+  ],
+  "limit": 10000
+}
+```
+
+After running this query on a dataset with millions of records you find that
+it's taking too long to run, so you decide to add an index to target this
+specific query. Taking into account the best practices, you should define an
+index as follows:
+
+<CodeTabs>
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      // ...
+
+      indexes: {
+        category_productname_zipcode_index: {
+          columns: [
+            product_category,
+            zip_code,
+            product_name
+          ],
+        },
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        # ...
+
+        indexes:
+          - name: category_productname_zipcode_index
+            columns:
+              - product_category
+              - zip_code
+              - product_name
+```
+
+</CodeTabs>
+
+Here's why:
+
+- The `product_category` dimension comes first as it's used in a single-value
+filter.
+- Then, the `zip_code` dimension comes second as it's used in `GROUP BY`.
+- The `product_name` dimension comes last as it's used in a multiple-value
+filter.
+
+The data within `category_productname_zipcode_index` would look as follows:
+
+| product_category | zip_code | product_name  | timestamp           | order_total |
+| ---------------- | -------- | ------------- | ------------------- | ----------- |
+| Electronics      | 88523    | Mouse         | 2023-01-01 10:00:00 | 800         |
+| Electronics      | 88523    | Plastic Chair | 2023-01-01 10:00:00 | 2000        |
+| Furniture        | 88523    | Keyboard      | 2023-01-01 10:00:00 | 1000        |
+| Electronics      | 88524    | Keyboard      | 2023-01-01 11:00:00 | 2000        |
+| Furniture        | 88524    | Plastic Chair | 2023-01-01 11:00:00 | 3000        |
+
+### Aggregating indexes
+
+Aggregating indexes can be defined as well. Such indexes contain **only**
+dimensions and pre-aggregated measures from the pre-aggregation definition.
+
+Queries with the following characteristics can target aggregating indexes:
+
+- They cannot make use of any `filters` other than for dimensions that are
+included in that index.
+- **All** dimensions used in the query must be defined in the aggregating
+index.
+
+Queries that do not have the characteristics above can still make use of
+regular indexes so that their performance can still be optimized.
+
+**In other words, an aggregating index is a rollup of data in a rollup table.**
+Data needs to be downloaded from the upstream data source as many times as
+many pre-aggregations you have. Compared to having multiple pre-aggregations,
+having a single pre-aggregation with multiple aggregating indexes gives you
+pretty much the same performance from the Cube Store side but multiple times
+less cost from a data warehouse side.
+
+Aggregating indexes are defined by using the [`type` option][ref-ref-index-type]
+in the index definition:
+
+<CodeTabs>
+
+```javascript
+cube("orders", {
+  // ...
+
+  pre_aggregations: {
+    main: {
+      // ...
+
+      indexes: {
+        // ...
+
+        zip_code_index: {
+          columns: [zip_code],
+          type: `aggregate`,
+        },
+      },
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: main
+        # ...
+
+        indexes:
+          # ...
+
+          - name: zip_code_index
+            columns:
+              - zip_code
+            type: aggregate
+```
+
+</CodeTabs>
+
+The data for `zip_code_index` would look as follows:
+
+| zip_code | order_total |
+| -------- | ----------- |
+| 88523    | 3800        |
+| 88524    | 5000        |
+
+## Inspecting pre-aggregations
+
+Cube Store partially supports the MySQL protocol. This allows you to execute
+simple queries using a familiar SQL syntax. You can connect using the MySQL CLI
+client, for example:
+
+```bash
+mysql -h <CUBESTORE_IP> --user=cubestore -pcubestore
+```
+
+<WarningBox>
+
+Only Linux and Mac OS versions of MySQL client are supported as of right now.
+You can install one on ubuntu using `apt-get install default-mysql-client`
+command or `brew install mysql-client` on Mac OS. Windows versions of the MySQL
+client aren't supported.
+
+</WarningBox>
+
+To check which pre-aggregations are managed by Cube Store, you could run the
+following query:
+
+```sql
+SELECT * FROM information_schema.tables;
++----------------------+-----------------------------------------------+
+| table_schema         | table_name                                    |
++----------------------+-----------------------------------------------+
+| dev_pre_aggregations | orders_main20190101_23jnqarg_uiyfxd0f_1gifflf |
+| dev_pre_aggregations | orders_main20190301_24ph0a1c_utzntnv_1gifflf  |
+| dev_pre_aggregations | orders_main20190201_zhrh5kj1_rkmsrffi_1gifflf |
+| dev_pre_aggregations | orders_main20191001_mdw2hxku_waxajvwc_1gifflf |
+| dev_pre_aggregations | orders_main20190701_izc2tl0h_bxsf1zlb_1gifflf |
++----------------------+-----------------------------------------------+
+5 rows in set (0.01 sec)
+```
+
+These pre-aggregations are stored as Parquet files under the `.cubestore/`
+folder in the project root during development.
+
+### `EXPLAIN` queries
+
+Cube Store's MySQL protocol also supports `EXPLAIN` and `EXPLAIN ANALYZE`
+queries both of which are useful for determining how much processing a query
+will require.
+
+`EXPLAIN` queries show the logical plan for a query:
+
+```sql
+ EXPLAIN SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform;
++-------------------------------------------------------------------------------------------------------------------------------------+
+| logical plan                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
++--------------------------------------------------------------------------------------------------------------------------------------+
+| Projection, [dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__platform, dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)]
+  Aggregate
+    ClusterSend, indices: [[96]]
+      Scan dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r, source: CubeTable(index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126]), fields: [orders__gender, orders__platform, orders__count] |
++-------------------------------------------------------------------------------------------------------------------------------------+
+```
+
+`EXPLAIN ANALYZE` queries show the physical plan for the router and all workers
+used for query processing:
+
+```sql
+ EXPLAIN ANALYZE SELECT orders__platform, orders__gender, sum(orders__count) FROM dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r
+ GROUP BY orders__gender, orders__platform
+
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| node type | node name       | physical plan                                                                                                                                                                                                                                                                                                                                                   |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+| router    |                 | Projection, [orders__platform, orders__gender, SUM(dev_pre_aggregations.orders_general_o32v4dvq_vbyemtl2_1h5hs8r.orders__count)@2:SUM(orders__count)]
+  FinalInplaceAggregate
+    ClusterSend, partitions: [[123, 126]]                                                                                                                                         |
+| worker    | 127.0.0.1:10001 | PartialInplaceAggregate
+  Merge
+    Scan, index: orders_general_plat_gender_o32v4dvq_vbyemtl2_1h5hs8r:96:[123, 126], fields: [orders__gender, orders__platform, orders__count]
+      Projection, [orders__gender, orders__platform, orders__count]
+        ParquetScan, files: /.cubestore/data/126-0qtyakym.parquet |
++-----------+-----------------+--------------------------------------------------------------------------------------------------------------------------+
+```
+
+When you're debugging performance, one thing to keep in mind is that Cube Store, due to its design, will always use some index to query data, and usage of the index itself doesn't necessarily tell if the particular query is performing optimally or not.
+What's important to look at is aggregation and partition merge strategies.
+In most of the cases for aggregation, Cube Store will use `HashAggregate` or `InplaceAggregate` strategy as well as `Merge` and `MergeSort` operators to merge different partitions.
+Even for larger datasets, scan operations on sorted data will almost always be much more efficient and faster than hash aggregate as the Cube Store optimizer decides to use those only if there's an index with appropriate sorting.
+So, as a rule of thumb, if you see in your plan `PartialHashAggregate` and `FinalHashAggregate` nodes together with `Merge` operators, those queries most likely perform sub-optimally.
+On the other hand, if you see `PartialInplaceAggregate`, `FinalInplaceAggregate`, and `FullInplaceAggregate` together with `MergeSort` operators in your plan, then there's a high chance the query performs optimally.
+Sometimes, there can be exceptions to this rule. 
+For example, a total count query run on top of the index will perform `HashAggregate` strategy on top of `MergeSort` nodes even if all required indexes are in place.
+This query would be optimal as well.
+
+## Pre-aggregations storage
+
+The default pre-aggregations storage in Cube is its own purpose-built storage
+layer: Cube Store.
+
+Alternatively, you can store pre-aggregations **internally** in the source
+database. To store a pre-aggregation internally, set `external: false` in
+pre-aggregation definition.
+
+Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
+**internally** by default. It is not recommended to store `original_sql`
+pre-aggregations in Cube Store.
+
+## Joins between pre-aggregations
+
+When making a query that joins data from two different cubes, Cube can use
+pre-aggregations instead of running the base SQL queries. To get started, first
+ensure both cubes have valid pre-aggregations:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        measures:
+          - CUBE.count
+        dimensions:
+          - CUBE.user_id
+          - CUBE.status
+        time_dimension: CUBE.created_at
+        granularity: day
+
+    joins:
+      - name: users
+        sql: "{CUBE.user_id} = ${users.id}"
+        relationship: many_to_one
+
+  - name: users
+    # ...
+
+    pre_aggregations:
+      - name: users_rollup
+        dimensions:
+          - CUBE.id
+          - CUBE.name
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    orders_rollup: {
+      measures: [CUBE.count],
+      dimensions: [CUBE.user_id, CUBE.status],
+      time_dimension: CUBE.created_at,
+      granularity: `day`,
+    },
+  },
+
+  joins: {
+    users: {
+      sql: `${CUBE.user_id} = ${users.id}`,
+      relationship: `many_to_one`,
+    },
+  },
+});
+
+cube(`users`, {
+  // ...
+
+  pre_aggregations: {
+    users_rollup: {
+      dimensions: [CUBE.id, CUBE.name],
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Before we continue, let's add an index to the `orders_rollup` pre-aggregation so
+that the `rollup_join` pre-aggregation can work correctly:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      - name: orders_rollup
+        # ...
+
+        indexes:
+          - name: user_index
+            columns:
+              - CUBE.user_id
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    orders_rollup: {
+      // ...
+
+      indexes: {
+        user_index: {
+          columns: [CUBE.user_id],
+        },
+      },
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Now we can add a new pre-aggregation of type `rollup_join` to the `orders` cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    # ...
+
+    pre_aggregations:
+      # ...
+
+      - name: orders_with_users_rollup
+        type: rollup_join
+        measures:
+          - CUBE.count
+        dimensions:
+          - users.name
+        time_dimension: CUBE.created_at
+        granularity: day
+        rollups:
+          - users.users_rollup
+          - CUBE.orders_rollup
+```
+
+```javascript
+cube(`orders`, {
+  // ...
+
+  pre_aggregations: {
+    // ...
+
+    orders_with_users_rollup: {
+      type: `rollup_join`,
+      measures: [CUBE.count],
+      dimensions: [users.name],
+      time_dimension: CUBE.created_at,
+      granularity: `day`,
+      rollups: [users.users_rollup, CUBE.orders_rollup],
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+With all of the above set up, making a query such as the following will now use
+`orders.orders_rollup` and `users.users_rollup`, avoiding a database request:
+
+```json
+{
+  "dimensions": ["users.name"],
+  "timeDimensions": [
+    {
+      "dimension": "orders.created_at",
+      "dateRange": "This month"
+    }
+  ],
+  "order": {
+    "orders.count": "desc"
+  },
+  "measures": ["orders.count"]
+}
+```
+
+## Pre-Aggregation build strategies
+
+<InfoBox>
+
+For ideal performance, pre-aggregations should be built using a dedicated
+Refresh Worker. [See here for more details][ref-prod-list-refresh].
+
+</InfoBox>
+
+Cube supports three different strategies for building pre-aggregations. To see
+which strategies your database supports, please refer to its individual page
+from [Connecting to the Database][ref-config-db].
+
+### Simple
+
+When using the simple strategy, Cube will use the source database as a temporary
+staging area for writing pre-aggregations to determine column types. The data is
+loaded back into memory before writing them to Cube Store (or an external
+database).
+
+<InfoBox>
+
+For larger datasets, we strongly recommend using the [Batching][self-batching]
+or [Export Bucket][self-export-bucket] strategies instead.
+
+</InfoBox>
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://ucarecdn.com/9aee19aa-2d52-4022-928d-5c97be9417e5/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+### Batching
+
+Batching is a more performant strategy where Cube sends compressed CSVs for Cube
+Store to ingest.
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://ucarecdn.com/deb0194a-f7cb-49bc-84a6-d07bdeb8bd36/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+The performance scales to the amount of memory available on the Cube instance.
+Batching is automatically enabled for any databases that can support it.
+
+### Export bucket
+
+<WarningBox>
+
+The export bucket strategy requires permission to execute `CREATE TABLE`
+statements in the data source as part of the pre-aggregation build process.
+
+</WarningBox>
+
+<WarningBox>
+
+Do not confuse the export bucket with the Cube Store storage bucket. Those are
+two separate storages and should never be mixed.
+
+</WarningBox>
+
+When dealing with larger pre-aggregations (more than 100k rows), performance can
+be significantly improved by using an export bucket. This allows the source
+database to temporarily materialize the data locally, which is then loaded into
+Cube Store in parallel:
+
+<div style={{ textAlign: "center" }}>
+  <img
+    alt="Internal vs External vs External with Cube Store diagram"
+    src="https://ucarecdn.com/f43999c4-cf91-4d36-9650-3078312fb9c9/"
+    style={{ border: "none" }}
+    width="100%"
+  />
+</div>
+
+Enabling the export bucket functionality requires extra configuration; please
+refer to the database-specific documentation for more details:
+
+- [AWS Athena][ref-export-athena]
+- [AWS Redshift][ref-export-redshift]
+- [BigQuery][ref-export-bigquery]
+- [Snowflake][ref-export-snowflake]
+
+When using cloud storage, it is important to correctly configure any data
+retention policies to clean up the data in the export bucket as Cube does not
+currently manage this. For most use-cases, 1 day is sufficient.
+
+## Streaming pre-aggregations
+
+Streaming pre-aggregations are different from traditional pre-aggregations in
+the way they are being updated. Traditional pre-aggregations follow the “pull”
+model — Cube **pulls updates** from the data source based on some cadence and/or
+condition. Streaming pre-aggregations follow the “push” model — Cube
+**subscribes to the updates** from the data source and always keeps
+pre-aggregation up to date.
+
+You don’t need to define `refresh_key` for streaming pre-aggregations. Whether
+pre-aggregation is streaming or not is defined by the data source.
+
+Currently, Cube supports only one streaming data source -
+[ksqlDB](/product/configuration/data-sources/ksqldb). All pre-aggregations where
+data source is ksqlDB are streaming.
+
+We are working on supporting more data sources for streaming pre-aggregations,
+please [let us know](https://cube.dev/contact) if you are interested in early
+access to any of these drivers or would like Cube to support any other SQL
+streaming engine.
+
+[ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
+[ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
+[ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
+[ref-export-snowflake]: /product/configuration/data-sources/snowflake#export-bucket
+[ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
+[ref-config-db]: /product/configuration/data-sources
+[ref-config-driverfactory]: /reference/configuration/config#driverfactory
+[ref-config-extdriverfactory]:
+  /reference/configuration/config#externaldriverfactory
+[ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
+[ref-connect-db-redshift]: /product/configuration/data-sources/aws-redshift
+[ref-connect-db-bigquery]: /product/configuration/data-sources/google-bigquery
+[ref-connect-db-mysql]: /product/configuration/data-sources/mysql
+[ref-connect-db-postgres]: /product/configuration/data-sources/postgres
+[ref-connect-db-snowflake]: /product/configuration/data-sources/snowflake
+[ref-schema-timedimension]: /reference/data-model/types-and-formats#time-1
+[ref-schema-ref-preaggs]: /reference/data-model/pre-aggregations
+[ref-schema-ref-preaggs-index]:
+  /reference/data-model/pre-aggregations#indexes
+[ref-schema-ref-preaggs-refresh-key]:
+  /reference/data-model/pre-aggregations#refresh_key
+[ref-schema-ref-preaggs-refresh-key-every]:
+  /reference/data-model/pre-aggregations#every
+[ref-schema-ref-preaggs-refresh-key-sql]:
+  /reference/data-model/pre-aggregations#sql
+[ref-deploy-refresh-wrkr]: /product/deployment#refresh-worker
+[ref-schema-ref-preaggs-sched-refresh]:
+  /reference/data-model/pre-aggregations#scheduled_refresh
+[ref-prod-list-refresh]:
+  /product/deployment/production-checklist#set-up-refresh-worker
+[ref-original-sql]:
+  /reference/data-model/pre-aggregations#original_sql
+[self-batching]: #batching
+[self-export-bucket]: #export-bucket
+[wiki-partitioning]: https://en.wikipedia.org/wiki/Partition_(database)
+[ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
+[ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
+[ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations

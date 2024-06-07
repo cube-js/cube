@@ -2,6 +2,15 @@
 
 exports[`postgresql-cubestore HTTP Transport Empty partitions: Empty partitions 1`] = `Array []`;
 
+exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension No Granularity: Rolling Mixed With Dimension No Granularity 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRollingTotal": null,
+    "visitors.source": "some",
+  },
+]
+`;
+
 exports[`postgresql-cubestore HTTP Transport Rolling Mixed With Dimension: Rolling Mixed With Dimension 1`] = `
 Array [
   Object {
@@ -92,6 +101,29 @@ Array [
     "visitors.count": "1",
     "visitors.createdAt": "2017-01-05T00:00:00.000",
     "visitors.createdAt.day": "2017-01-05T00:00:00.000",
+  },
+]
+`;
+
+exports[`postgresql-cubestore HTTP Transport Rolling with Quarter granularity: Rolling with Quarter granularity 1`] = `
+Array [
+  Object {
+    "visitors.checkinsRollingTotal": "0",
+    "visitors.createdAt": "2017-01-01T00:00:00.000",
+    "visitors.createdAt.quarter": "2017-01-01T00:00:00.000",
+    "visitors.source": null,
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "1",
+    "visitors.createdAt": "2017-01-01T00:00:00.000",
+    "visitors.createdAt.quarter": "2017-01-01T00:00:00.000",
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.checkinsRollingTotal": "5",
+    "visitors.createdAt": "2017-01-01T00:00:00.000",
+    "visitors.createdAt.quarter": "2017-01-01T00:00:00.000",
+    "visitors.source": "some",
   },
 ]
 `;

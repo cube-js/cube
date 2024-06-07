@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT regexp_replace('Test test test', 'test')\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------------------------------+
+| regexpreplace(Utf8("Test test test"),Utf8("test")) |
++----------------------------------------------------+
+| Test  test                                         |
++----------------------------------------------------+

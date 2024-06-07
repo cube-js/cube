@@ -9,6 +9,7 @@ import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
+import { QueryStream } from './QueryStream';
 
 export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
 
@@ -29,8 +30,31 @@ export interface QueryOrchestratorOptions {
   skipExternalCacheAndQueue?: boolean;
 }
 
+let redisDeprecationShowed = false;
+
+function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQueryDriverType {
+  if (options.cacheAndQueueDriver) {
+    return options.cacheAndQueueDriver;
+  }
+
+  const cacheAndQueueDriver = getEnv('cacheAndQueueDriver');
+  if (cacheAndQueueDriver) {
+    return cacheAndQueueDriver;
+  }
+
+  if (getEnv('redisUrl') || getEnv('redisUseIORedis')) {
+    return 'redis';
+  }
+
+  if (getEnv('nodeEnv') === 'production') {
+    return 'cubestore';
+  }
+
+  return 'memory';
+}
+
 export class QueryOrchestrator {
-  protected readonly queryCache: QueryCache;
+  protected queryCache: QueryCache;
 
   protected readonly preAggregations: PreAggregations;
 
@@ -40,7 +64,7 @@ export class QueryOrchestrator {
 
   private queueEventsBus: RedisQueueEventsBus | LocalQueueEventsBus;
 
-  private readonly cacheAndQueueDriver: string;
+  protected readonly cacheAndQueueDriver: string;
 
   public constructor(
     protected readonly redisPrefix: string,
@@ -49,30 +73,41 @@ export class QueryOrchestrator {
     options: QueryOrchestratorOptions = {}
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;
-
-    const cacheAndQueueDriver = options.cacheAndQueueDriver || getEnv('cacheAndQueueDriver') || (
-      (getEnv('nodeEnv') === 'production' || getEnv('redisUrl') || getEnv('redisUseIORedis'))
-        ? 'redis'
-        : 'memory'
-    );
-    this.cacheAndQueueDriver = cacheAndQueueDriver;
+    const cacheAndQueueDriver = detectQueueAndCacheDriver(options);
 
     if (!['redis', 'memory', 'cubestore'].includes(cacheAndQueueDriver)) {
-      throw new Error('Only \'redis\', \'memory\' or \'cubestore\' are supported for cacheAndQueueDriver option');
+      throw new Error(
+        `Only 'cubestore', 'redis' or 'memory' are supported for cacheAndQueueDriver option, passed: ${cacheAndQueueDriver}`
+      );
+    }
+
+    if (cacheAndQueueDriver === 'redis' && !redisDeprecationShowed) {
+      this.logger('Redis Deprecation', {
+        warning: (
+          'Redis queue and cache driver is deprecated and no longer supported. Please consider switching to cubestore option.'
+        )
+      });
+
+      redisDeprecationShowed = true;
     }
 
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
     const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
     this.redisPool = redisPool;
+    this.cacheAndQueueDriver = cacheAndQueueDriver;
 
     const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
-      const externalDriver = await externalDriverFactory();
-      if (externalDriver instanceof CubeStoreDriver) {
-        return externalDriver;
+      if (externalDriverFactory) {
+        const externalDriver = await externalDriverFactory();
+        if (externalDriver instanceof CubeStoreDriver) {
+          return externalDriver;
+        }
+
+        throw new Error('It`s not possible to use Cube Store as queue/cache driver without using it as external');
       }
 
-      throw new Error('It`s not possible to use CubeStore as queue & cache driver without using it as external');
+      throw new Error('Cube Store was specified as queue/cache driver. Please set CUBEJS_CUBESTORE_HOST and CUBEJS_CUBESTORE_PORT variables. Please see https://cube.dev/docs/deployment/production-checklist#set-up-cube-store to learn more.');
     } : undefined;
 
     this.queryCache = new QueryCache(
@@ -137,7 +172,17 @@ export class QueryOrchestrator {
    * Force reconcile queue logic to be executed.
    */
   public async forceReconcile(datasource = 'default') {
-    await this.queryCache.forceReconcile(datasource);
+    // pre-aggregations queue reconcile
+    const preaggsQueue = await this.preAggregations.getQueue(datasource);
+    if (preaggsQueue) {
+      await preaggsQueue.reconcileQueue();
+    }
+
+    // queries queue reconcile
+    const queryQueue = await this.queryCache.getQueue(datasource);
+    if (queryQueue) {
+      await queryQueue.reconcileQueue();
+    }
   }
 
   /**
@@ -263,6 +308,11 @@ export class QueryOrchestrator {
       lastRefreshTimestamp,
       result.lastRefreshTime?.getTime()
     ]);
+
+    if (result instanceof QueryStream) {
+      // TODO do some wrapper object to provide metadata?
+      return result;
+    }
 
     return {
       ...result,
@@ -392,6 +442,7 @@ export class QueryOrchestrator {
     const { external } = preAggregation;
 
     const data = await this.fetchQuery({
+      dataSource: preAggregation.dataSource,
       continueWait: true,
       query,
       external,
@@ -430,9 +481,5 @@ export class QueryOrchestrator {
 
   public async updateRefreshEndReached() {
     return this.preAggregations.updateRefreshEndReached();
-  }
-
-  public async fetchSchema(dataSource: string) {
-    return this.queryCache.fetchSchema(dataSource);
   }
 }

@@ -1,0 +1,118 @@
+# Matching queries with pre-aggregations
+
+When executing a query, Cube will try to match and fulfill it with the best
+available pre-aggregation.
+
+Since pre-aggregations contain a *condensed representation* of the data from
+the upstream data source (rather than a copy of that data), Cube needs to ensure
+that fulfilling a query with a pre-aggregation is possible and doing so will
+produce correct results. 
+
+If there's no matching pre-aggregation, Cube will fall back to querying
+the upstream data source, unless the [rollup-only mode][ref-rollup-only-mode]
+is enabled.
+
+<InfoBox>
+
+If you don't know why a query doesn't match a pre-aggregation, check
+[common pitfalls](#common-pitfalls) first.
+
+</InfoBox>
+
+## Eligible pre-aggregations
+
+Cube will search for matching pre-aggregations in all cubes that define
+members in the query.
+
+Pre-aggregations are tested in the order they are defined in the data model
+file. However, `rollup` pre-aggregations are tested before `original_sql`
+pre-aggregations.
+
+The first pre-aggregation that matches a query is be used.
+
+## Matching algorithm
+
+Cube goes through the following steps to determine whether a query matches a
+particular eligible pre-aggregation:
+
+<Diagram src="https://ucarecdn.com/f986b0cb-a9ea-47b7-a743-ca9a4644c246/" />
+
+See the details for each step:
+
+- **Is query leaf-measure additive?** Cube checks that all [leaf
+measures][ref-leaf-measures] in the query are [additive][ref-measure-additivity].
+If the query contains [calculated measures][ref-calculated-measures] (e.g.,
+measures defined as `{sum} / {count}`), then referenced leaf measures will be
+checked for additivity.
+- **Does every member of the query exist in the pre-aggregation?** Cube checks
+that the pre-aggregation contains all dimensions, filter dimensions, and leaf
+measures from the query.
+- **Are any query measures multiplied in the cube's data schema?** Cube checks
+if any measures are multiplied via a [`one_to_many`
+relationship][ref-schema-joins-rel] between cubes in the query.
+- **Does the query specify granularity for its time dimension?** Cube checks
+that the time dimension granularity is set in the query.
+- **Are query filter dimensions included in its own dimensions?** Cube checks
+that all filter dimensions are also included as dimensions in the query.
+- **Does every member in the query exist in the pre-aggregation?** Cube checks
+that the pre-aggregation contains all dimensions and measures used in the query.
+
+### Matching time dimensions
+
+There are extra considerations that apply to matching time dimensions.
+
+- **Time dimension and granularity in the query together act as a dimension.**
+If the date range isn't aligned with granularity, a common granularity is used.
+This common granularity is selected using the [greatest common divisor][wiki-gcd]
+across both the query and pre-aggregation. For example, the common granularity
+between `hour` and `day` is `hour` because both `hour` and `day` can be divided
+by `hour`.
+- **The query's granularity's date range must match the start date and end date
+from time dimensions.** For example, when using a granularity of `month`,
+the values should be the start and end days of the month, i.e.,
+`['2020-01-01T00:00:00.000', '2020-01-31T23:59:59.999']`; when the granularity
+is `day`, the values should be the start and end hours of the day, i.e.,
+`['2020-01-01T00:00:00.000', '2020-01-01T23:59:59.999']`. Date ranges are
+inclusive, and the minimum granularity is `second`. Use the
+[`allow_non_strict_date_range_match`][ref-non-strict-date-range-match] to allow
+a pre-aggregation to match a non-strict date range anyway.
+- **The time zone in the query must match the time zone of a pre-aggregation.**
+You can configure a list of time zones that pre-aggregations will be built for
+using the [`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
+configuration option.
+
+### Matching ungrouped queries
+
+There are extra considerations that apply to matching [ungrouped
+queries][ref-ungrouped-queries]:
+
+- The pre-aggregation should include [primary keys][ref-primary-key] of all
+cubes involved in the query.
+- If multiple cubes are referenced in the query, the pre-aggregation should
+include only members of these cubes.
+
+## Common pitfalls
+
+- Most commonly, a query would not match a pre-aggregation because they contain
+[non-additive measures][ref-measure-additivity]. See [this
+recipe][ref-non-additive-recipe] for workarounds.
+
+- If a query uses any time zone other than `UTC`, please check the section on
+[matching time dimensions](#matching-time-dimensions) and the
+[`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
+configuration option.
+
+
+[ref-rollup-only-mode]: /product/caching/using-pre-aggregations#rollup-only-mode
+[ref-schema-dims]: /reference/data-model/dimensions
+[ref-schema-joins]: /reference/data-model/joins
+[ref-schema-joins-rel]: /reference/data-model/joins#relationship
+[wiki-gcd]: https://en.wikipedia.org/wiki/Greatest_common_divisor
+[ref-measure-additivity]: /product/data-modeling/concepts#measure-additivity
+[ref-leaf-measures]: /product/data-modeling/concepts#leaf-measures
+[ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
+[ref-non-strict-date-range-match]: /reference/data-model/pre-aggregations#allow_non_strict_date_range_match
+[ref-non-additive-recipe]: /guides/recipes/query-acceleration/non-additivity
+[ref-conf-scheduled-refresh-time-zones]: /reference/configuration/config#scheduled_refresh_time_zones
+[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
+[ref-primary-key]: /reference/data-model/dimensions#primary_key

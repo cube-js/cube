@@ -1,0 +1,246 @@
+---
+redirect_from:
+  - /backend/sql
+---
+
+# SQL API
+
+SQL API enables Cube to deliver data over the [Postgres-compatible
+protocol][postgres-protocol] to certain kinds of data applications, including
+but not limited to the following ones:
+
+- Most commonly, [business intelligence tools][ref-bi], e.g.,
+  [Tableau][ref-tableau], [Power BI][ref-powerbi], [Thoughtspot][ref-thoughtspot],
+  [Sigma][ref-sigma], [Looker Studio][ref-looker-studio], [Superset /
+  Preset][ref-superset], and [Metabase][ref-metabase]
+- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
+  or [Deepnote][ref-deepnote]
+- Reverse ETL tools, e.g., Census or Hightouch
+
+Often, the SQL API is used to enable internal or self-serve [business
+intelligence][cube-bi-use-case] use cases.
+
+<InfoBox>
+
+Please use [this GitHub issue](https://github.com/cube-js/cube/issues/3906) to
+suggest tools of your interest and vote for already proposed ones.
+
+</InfoBox>
+
+## Example request
+
+You can use the [`psql` utility][link-psql] to connect to the SQL API:
+
+```bash
+# Cube Core
+PGPASSWORD=password \
+  psql -h localhost \
+  -p 15432 \
+  -U user cube
+```
+
+```bash
+# Cube Cloud
+PGPASSWORD=password \
+  psql -h awesome-ecom.sql.gcp-us-central1.cubecloudapp.dev \
+  -p 5432 \
+  -U cube awesome-ecom
+```
+
+Then, you can run queries in the Postgres dialect, just like the following one:
+
+```sql
+SELECT
+  users.state,
+  users.city,
+  orders.status,
+  MEASURE(orders.count)
+FROM orders
+CROSS JOIN users
+WHERE
+  users.state != 'us-wa'
+  AND orders.created_at BETWEEN '2020-01-01' AND '2021-01-01'
+GROUP BY 1, 2, 3
+LIMIT 10;
+```
+
+You can also introspect the data model in a Postgres-native way by querying [tables
+in `information_schema`][link-postgres-information-schema] or using [backslash
+commands][link-postgres-backslash-commands]:
+
+```sql
+SELECT *
+FROM information_schema.tables
+WHERE table_schema = 'public';
+```
+
+```sql
+\d
+```
+
+Check [query format][ref-sql-query-format] for details about supported queries.
+Also, check [SQL API reference][ref-ref-sql-api] for the list of supported SQL
+commands, functions, and operators.
+
+## Fundamentals
+
+In the SQL API, each cube or view from the [data model][ref-data-model-concepts]
+is represented as a table. Measures, dimensions, and segments are represented as
+columns in these tables. SQL API can execute [regular queries][ref-regular-queries],
+[queries with post-processing][ref-queries-wpp], and [queries with
+pushdown][ref-queries-wpd] that can reference these tables and columns.
+
+Under the hood, the SQL API uses [Apache DataFusion][link-datafusion] as
+its query engine. It's responsible for query planning and execution.
+As part of query planning, the SQL API also uses [egg][link-egg] (an [e-graph term
+rewriting][link-egraphs] library) to analyze incoming SQL queries and find the best
+query plan out of a wide variety of possible plans to execute.
+
+<Diagram src="https://ucarecdn.com/70646e5a-12bd-45a3-84ad-004de11ed536/"/>
+
+Overall, query planning is a seamless process. 
+SQL API does its best to execute a query as a [regular query][ref-regular-queries]
+or a [query with post-processing][ref-queries-wpp]. If that is not possible,
+then the query would be executed as a [query with pushdown][ref-queries-wpd].
+There are trade-offs associated with each query type:
+
+| Query type | In-memory cache | Pre-aggregations | SQL support |
+| ---- | ---- | ---- | ---- |
+| [Regular queries][ref-regular-queries] | ✅ Used | ✅ Used | 🟡 Very limited |
+| [Queries with post-processing][ref-queries-wpp] | ✅ Used | ✅ Used | 🟡 Limited |
+| [Queries with pushdown][ref-queries-wpd] | ✅ Used | ❌ Not used | ✅ Extensive |
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+<WarningBox>
+
+**Query pushdown is disabled by default.** You should explicitly [enable
+it](#query-planning). In future versions, it will be enabled by default. Also,
+enabling query pushdown would affect how [ungrouped queries][ref-ungrouped-queries]
+are executed; check [query format][ref-sql-query-format] for details.
+
+</WarningBox>
+
+## Configuration
+
+### Cube Core
+
+**SQL API is disabled by default.** To enable the SQL API, set `CUBEJS_PG_SQL_PORT`
+to a port number you'd like to connect to with a Postgres-compatible tool.
+
+| Credential | Environment variable, etc.     |
+|:---------- |:------------------------------ |
+| Host       | Host you're running Cube at    |
+| Port       | Set via `CUBEJS_PG_SQL_PORT`   |
+| User name  | Set via `CUBEJS_SQL_USER`      |
+| Password   | Set via `CUBEJS_SQL_PASSWORD`  |
+| Database   | Any valid string, e.g., `cube` |
+
+You can also use
+[`checkSqlAuth`][ref-config-checksqlauth],
+[`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
+to configure [custom authentication][ref-sql-api-auth].
+
+#### Example
+
+The following Docker Compose file will run Cube with the SQL API enabled on
+port 15432, accessible using `user` as the user name, `password` as the password,
+and any string as the database name:
+
+```yaml filename="docker-compose.yml"
+version: "2.2"
+ 
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_API_SECRET=SECRET
+
+      - CUBEJS_DB_USER=cube
+      - CUBEJS_DB_PASS=12345
+      - CUBEJS_DB_HOST=demo-db-examples.cube.dev
+      - CUBEJS_DB_NAME=ecom
+      - CUBEJS_DB_TYPE=postgres
+
+      - CUBEJS_PG_SQL_PORT=15432      # SQL API credential
+      - CUBEJS_SQL_USER=user          # SQL API credential
+      - CUBEJS_SQL_PASSWORD=password  # SQL API credential
+    volumes:
+      - .:/cube/conf
+```
+
+After running it with `docker compose up`, you can finally connect and execute
+an [example request](#example-request).
+
+### Cube Cloud
+
+**SQL API is enabled by default.** You can find credentials for the SQL API on
+the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
+
+By default, the SQL API is enabled on port 5432, the user name is `cube`, and
+a random  string is generated for the password. You can customize these with
+`CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and `CUBEJS_SQL_PASSWORD` environment
+variables by navigating to <Btn>Settings → Configration</Btn>.
+
+### Query planning
+
+**By default, the SQL API executes queries as [regular queries][ref-regular-queries]
+or [queries with post-processing][ref-queries-wpp].** Such queries support only a limited
+set of SQL functions and operators, and sometimes you can get the following error:
+`Error during rewrite: Can't detect Cube query and it may be not supported yet.`
+
+You can use the `CUBESQL_SQL_PUSH_DOWN` environment variable to instruct the SQL API
+to execute such queries as [queries with pushdown][ref-queries-wpd].
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+Query planning is a resource-intensive task, and sometimes you can get the following
+error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+Use the following environment variables to allocate more resources for query planning:
+`CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
+
+
+[ref-sql-api-auth]: /product/apis-integrations/sql-api/security
+[ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
+[ref-config-canswitchsqluser]: /reference/configuration/config#canswitchsqluser
+[ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
+[ref-superset]: /product/configuration/visualization-tools/superset
+[ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-thoughtspot]: /product/configuration/visualization-tools/thoughtspot
+[ref-sigma]: /product/configuration/visualization-tools/sigma
+[ref-looker-studio]: /product/configuration/visualization-tools/looker-studio
+[ref-metabase]: /product/configuration/visualization-tools/metabase
+[ref-notebooks]: /product/configuration/visualization-tools#notebooks
+[ref-jupyter]: /product/configuration/visualization-tools/jupyter
+[ref-hex]: /product/configuration/visualization-tools/hex
+[ref-deepnote]: /product/configuration/visualization-tools/deepnote
+[ref-sql-query-format]: /product/apis-integrations/sql-api/query-format
+[ref-ref-sql-api]: /reference/sql-api
+[ref-data-model-concepts]: /product/data-modeling/concepts
+[ref-regular-queries]: /product/apis-integrations/queries#regular-query
+[ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
+[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
+[link-datafusion]: https://arrow.apache.org/datafusion/
+[link-egg]: https://github.com/egraphs-good/egg
+[link-egraphs]: https://docs.rs/egg/latest/egg/tutorials/_01_background/index.html
+[link-psql]: https://www.postgresql.org/docs/current/app-psql.html
+[link-postgres-information-schema]: https://www.postgresql.org/docs/16/information-schema.html
+[link-postgres-backslash-commands]: https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS
+[postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
+[cube-bi-use-case]: https://cube.dev/use-cases/connected-bi

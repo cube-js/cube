@@ -30,7 +30,7 @@ function mutexPromise(promise) {
   });
 }
 
-class CubejsApi {
+class CubeApi {
   constructor(apiToken, options) {
     if (apiToken !== null && !Array.isArray(apiToken) && typeof apiToken === 'object') {
       options = apiToken;
@@ -56,6 +56,7 @@ class CubejsApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
 
     this.updateAuthorizationPromise = null;
   }
@@ -257,30 +258,62 @@ class CubejsApi {
    * @returns ResultSet
    * @private
    */
-  loadResponseInternal(response) {
+  loadResponseInternal(response, options = {}) {
     if (
-      response.results.length &&
-      response.results[0].query.responseFormat &&
-      response.results[0].query.responseFormat === ResultType.COMPACT
+      response.results.length
     ) {
-      response.results.forEach((result, j) => {
-        const data = [];
-        result.data.dataset.forEach((r) => {
-          const row = {};
-          result.data.members.forEach((m, i) => {
-            row[m] = r[i];
+      if (options.castNumerics) {
+        response.results.forEach((result) => {
+          const numericMembers = Object.entries({
+            ...result.annotation.measures,
+            ...result.annotation.dimensions,
+          }).map(([k, v]) => {
+            if (v.type === 'number') {
+              return k;
+            }
+            
+            return undefined;
+          }).filter(Boolean);
+          
+          result.data = result.data.map((row) => {
+            numericMembers.forEach((key) => {
+              if (row[key] != null) {
+                row[key] = Number(row[key]);
+              }
+            });
+            
+            return row;
           });
-          data.push(row);
         });
-        response.results[j].data = data;
-      });
+      }
+      
+      if (response.results[0].query.responseFormat &&
+        response.results[0].query.responseFormat === ResultType.COMPACT) {
+        response.results.forEach((result, j) => {
+          const data = [];
+          result.data.dataset.forEach((r) => {
+            const row = {};
+            result.data.members.forEach((m, i) => {
+              row[m] = r[i];
+            });
+            data.push(row);
+          });
+          response.results[j].data = data;
+        });
+      }
     }
+    
     return new ResultSet(response, {
       parseDateMeasures: this.parseDateMeasures
     });
   }
 
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
@@ -293,13 +326,18 @@ class CubejsApi {
         query,
         queryType: 'multi',
       }),
-      this.loadResponseInternal.bind(this),
+      (response) => this.loadResponseInternal(response, options),
       options,
       callback
     );
   }
 
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
@@ -312,7 +350,7 @@ class CubejsApi {
         query,
         queryType: 'multi',
       }),
-      this.loadResponseInternal.bind(this),
+      (response) => this.loadResponseInternal(response, options),
       { ...options, subscribe: true },
       callback
     );
@@ -346,7 +384,7 @@ class CubejsApi {
   }
 }
 
-export default (apiToken, options) => new CubejsApi(apiToken, options);
+export default (apiToken, options) => new CubeApi(apiToken, options);
 
-export { CubejsApi, HttpTransport, ResultSet, RequestError };
+export { CubeApi, HttpTransport, ResultSet, RequestError, Meta };
 export * from './utils';

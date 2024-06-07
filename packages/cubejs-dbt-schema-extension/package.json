@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/dbt-schema-extension",
   "description": "Cube.js dbt Schema Extension",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.59",
+  "version": "0.35.47",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-dbt-schema-extension"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
     "dist/src",
@@ -25,19 +25,19 @@
     "lint:fix": "eslint --fix src/* --ext .ts,.js"
   },
   "dependencies": {
-    "@cubejs-backend/schema-compiler": "^0.31.59",
+    "@cubejs-backend/schema-compiler": "^0.35.47",
     "fs-extra": "^9.1.0",
     "inflection": "^1.12.0",
     "node-fetch": "^2.6.1"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-backend/testing": "^0.31.59",
+    "@cubejs-backend/linter": "^0.35.0",
+    "@cubejs-backend/testing": "^0.35.47",
     "@types/generic-pool": "^3.1.9",
-    "@types/jest": "^26.0.24",
-    "jest": "^26.6.3",
+    "@types/jest": "^27",
+    "jest": "^27",
     "stream-to-array": "^2.3.0",
-    "typescript": "~4.9.5"
+    "typescript": "~5.2.2"
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"

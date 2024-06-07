@@ -1,12 +1,12 @@
 {
   "name": "@cubejs-client/react",
-  "version": "0.31.46",
+  "version": "0.35.23",
   "author": "Cube Dev, Inc.",
   "license": "MIT",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
@@ -24,7 +24,7 @@
   ],
   "dependencies": {
     "@babel/runtime": "^7.1.2",
-    "@cubejs-client/core": "^0.31.46",
+    "@cubejs-client/core": "^0.35.23",
     "core-js": "^3.6.5",
     "ramda": "^0.27.2"
   },

@@ -1,4 +1,4 @@
-FROM node:14.21.1-buster-slim AS base
+FROM node:18.20.1-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -9,8 +9,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python2 python3 gcc g++ make cmake openjdk-11-jdk-headless \
-    && npm config set python /usr/bin/python2.7 \
+       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -50,6 +49,7 @@ COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-d
 COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/package.json
 COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
 COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
+COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
 COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
 COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
 COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
@@ -86,16 +86,21 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.5
+RUN yarn policies set-version v1.22.19
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
 
 # There is a problem with release process.
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
+
 FROM base as prod_base_dependencies
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
 FROM prod_base_dependencies as prod_dependencies
-COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
@@ -119,6 +124,7 @@ COPY packages/cubejs-clickhouse-driver/ packages/cubejs-clickhouse-driver/
 COPY packages/cubejs-crate-driver/ packages/cubejs-crate-driver/
 COPY packages/cubejs-dremio-driver/ packages/cubejs-dremio-driver/
 COPY packages/cubejs-druid-driver/ packages/cubejs-druid-driver/
+COPY packages/cubejs-duckdb-driver/ packages/cubejs-duckdb-driver/
 COPY packages/cubejs-elasticsearch-driver/ packages/cubejs-elasticsearch-driver/
 COPY packages/cubejs-firebolt-driver/ packages/cubejs-firebolt-driver/
 COPY packages/cubejs-hive-driver/ packages/cubejs-hive-driver/
@@ -165,7 +171,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates \
+    && apt-get install -y ca-certificates python3 libpython3-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .
@@ -175,6 +181,7 @@ COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV PYTHONUNBUFFERED=1
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

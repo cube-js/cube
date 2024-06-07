@@ -1,13 +1,54 @@
 import moment from 'moment-timezone';
-import { UserError } from '../../src/compiler/UserError';
-import { PostgresQuery } from '../../src/adapter/PostgresQuery';
-import { prepareCompiler } from './PrepareCompiler';
-import { MssqlQuery } from '../../src/adapter/MssqlQuery';
-import { BaseQuery } from '../../src';
-import { createCubeSchema, createJoinedCubesSchema } from './utils';
+import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
+import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
+import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
+import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
 describe('SQL Generation', () => {
-  describe('Common', () => {
+  describe('Common - Yaml - syntax sugar', () => {
+    const compilers = /** @type Compilers */ prepareYamlCompiler(
+      createCubeSchemaYaml({ name: 'cards', sqlTable: 'card_tbl' })
+    );
+
+    it('Simple query', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('card_tbl');
+    });
+  });
+
+  describe('Common - JS - syntax sugar', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchema({
+        name: 'cards',
+        sqlTable: 'card_tbl'
+      })
+    );
+
+    it('Simple query', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('card_tbl');
+    });
+  });
+
+  describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
         name: 'cards',
@@ -19,7 +60,54 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with different granularity', async () => {
+    it('Test time series with 6 digits timestamp presicion - bigquery', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000000', '2021-01-01T23:59:59.999999'],
+          ['2021-01-02T00:00:00.000000', '2021-01-02T23:59:59.999999']
+        ]);
+      }
+
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'day',
+        dateRange: ['2021-01-01', '2021-01-02']
+      });
+
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.998')).toEqual(
+        '2021-01-01T23:59:59.998000'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+    });
+
+    it('Test time series with different granularity - postgres', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -570,21 +658,25 @@ describe('SQL Generation', () => {
 
   describe('FILTER_PARAMS', () => {
     /** @type {Compilers} */
-    const compilers = prepareCompiler(`cube('Order', {
-        sql: \`select * from order where \${FILTER_PARAMS.Order.type.filter('type')}\`,
-        measures: {
-          count: {
-            sql: 'id',
-            type: 'count',
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [{
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            }]
           },
-        },
-        dimensions: {
-          type: {
-            sql: 'type',
-            type: 'string',
-          },
-        },
-      })`);
+        ]
+      })
+    );
 
     it('inserts filter params into query', async () => {
       await compilers.compiler.compile();
@@ -599,7 +691,7 @@ describe('SQL Generation', () => {
         ],
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where type = \$\d\$\)/);
+      expect(cubeSQL).toContain('where ((type = $0$))');
     });
 
     it('inserts "or" filter', async () => {
@@ -624,7 +716,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) OR (type = $1$)))');
     });
 
     it('inserts "and" filter', async () => {
@@ -649,7 +741,93 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) AND (type = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((type = $0$) AND (type = $1$)) OR ((type = $2$) AND (type = $3$))))');
+    });
+
+    it('inserts "and + or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value1'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value2'],
+                  }
+                ]
+              },
+              {
+                or: [
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value3'],
+                  },
+                  {
+                    member: 'Order.type',
+                    operator: 'equals',
+                    values: ['value4'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
   });
 });

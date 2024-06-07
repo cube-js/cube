@@ -1,0 +1,248 @@
+# Dynamic data models with Jinja and Python
+
+Cube supports authoring dynamic data models using the [Jinja templating
+language][jinja] and Python. This allows de-duplicating common patterns in your data models
+as well as dynamically generating data models from a remote data source.
+
+Jinja is supported in all YAML data model files.
+
+## Jinja
+
+Please check the [Jinja documentation][jinja-docs] for details on Jinja syntax.
+
+<ReferenceBox>
+
+Currently, there's no way to preview the data model code in YAML after applying
+Jinja templates.
+Please [track this issue](https://github.com/cube-js/cube/issues/8134).
+
+As a workaround, you can view the resulting data model in
+[Playground](/product/workspace/playground) and
+[Data Graph](http://localhost:3000/product/workspace/data-model#data-graph).
+You can also introspect the data model using the [`/v1/meta` REST API
+endpoint](/reference/rest-api#v1meta).
+
+</ReferenceBox>
+
+### Loops
+
+Jinja supports [looping][jinja-docs-for-loop] over lists and dictionaries. In
+the following example, we loop over a list of nested properties and generate a
+`LEFT JOIN UNNEST` clause for each one: for each one:
+
+```yaml
+{%- set nested_properties = [
+  "referrer",
+  "href",
+  "host",
+  "pathname",
+  "search"
+] -%}
+
+cubes:
+  - name: analytics
+    sql: >
+      SELECT
+      {%- for prop in nested_properties %}
+        {{ prop }}_prop.value AS {{ prop }}
+      {%- endfor %}
+      FROM public.events
+      {%- for prop in nested_properties %}
+      LEFT JOIN UNNEST(properties) AS {{ prop }}_prop ON {{ prop }}_prop.key = '{{ prop }}'
+      {%- endfor %}
+```
+
+Another useful pattern is to loop over a dictionary of values and generate a
+measure for each one, as in the following example:
+
+```yaml
+{%- set metrics = {
+  "mau": 30,
+  "wau": 7,
+  "day": 1
+} %}
+
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    measures:
+      {%- for name, days in metrics | items %}
+      - name: {{ name | safe }}
+        type: count_distinct
+        sql: user_id
+        rolling_window:
+          trailing: {{ days }} day
+          offset: start
+      {% endfor %}
+```
+
+### Macros
+
+Cube data models also support Jinja macros, which allow you to define reusable
+snippets of code. You can read more about macros in the [Jinja
+documentation][jinja-docs-macros].
+
+In the following example, we define a macro called `dimension()` which generates
+a dimension definition in Cube. This macro is then invoked multiple times to
+generate multiple dimensions:
+
+```yaml
+{# Declare the macro before using it, otherwise Jinja will throw an error. #}
+{%- macro dimension(column_name, type='string', primary_key=False) -%}
+      - name: {{ column_name }}
+        sql: {{ column_name }}
+        type: {{ type }}
+        {% if primary_key -%}
+        primary_key: true
+        {% endif -%}
+{% endmacro -%}
+
+cubes:
+  - name: orders
+    sql_table: public.orders
+
+    dimensions:
+      {{ dimension('id', 'number', primary_key=True) }}
+      {{ dimension('status') }}
+      {{ dimension('created_at', 'time') }}
+      {{ dimension('completed_at', 'time') }}
+```
+
+You could also use macros to generate SQL snippets for use in the `sql`
+property:
+
+```yaml
+{%- macro cents_to_dollars(column_name, precision=2) -%}
+  ({{ column_name }} / 100)::NUMERIC(16, {{ precision }})
+{%- endmacro -%}
+
+cubes:
+  - name: payments
+    sql: >
+      SELECT
+        id AS payment_id,
+        {{ cents_to_dollars('amount') }} AS amount_usd
+      FROM app_data.payments
+```
+
+### Escaping unsafe strings
+
+[Auto-escaping][jinja-docs-autoescaping] of unsafe string values in Jinja
+templates is enabled by default. It means that any strings coming from Python
+might get wrapped in quotes, potentially breaking YAML syntax.
+
+You can work around that by using the [`safe` Jinja
+filter][jinja-docs-filters-safe] with such string values:
+
+```yaml
+cubes:
+  - name: my_cube
+    description: {{ get_unsafe_string() | safe }}
+```
+
+Alternatively, you can wrap unsafe strings into instances of the following
+class in your Python code, effectively marking them as safe. This is
+particularly useful for library code, e.g., similar to the
+[`cube_dbt`][ref-cube-dbt] package.
+
+```python
+class SafeString(str):
+  is_safe: bool
+
+  def __init__(self, v: str):
+    self.is_safe = True
+```
+
+## Python
+
+You can declare and invoke Python functions from within a Jinja template. This
+allows the reuse of existing code to generate data models. Cube uses Python 3.9 to execute Python code. 
+It also installs packages listed in the `requirements.txt` with pip on the startup.
+
+These helper functions must be located in `model/globals.py` file or explicitly loaded from the YAML files.
+In the following example, we declare a function called `load_data()` which will load data from a remote
+API endpoint. We will then use the function to generate a data model in Cube.
+
+```python
+from cube import TemplateContext
+ 
+template = TemplateContext()
+
+@template.function('load_data')
+def load_data():
+   client = MyApiClient("example.com")
+   return client.load_data()
+
+
+class MyApiClient:
+  def __init__(self, api_url):
+    self.api_url = api_url
+
+  # mock API call
+  def load_data(self):
+    api_response = {
+      "cubes": [
+        {
+          "name": "cube_from_api",
+          "measures": [
+            { "name": "count", "type": "count" },
+            { "name": "total", "type": "sum", "sql": "amount" }
+          ],
+          "dimensions": []
+        },
+        {
+          "name": "cube_from_api_with_dimensions",
+          "measures": [
+            { "name": "active_users", "type": "count_distinct", "sql": "user_id" }
+          ],
+          "dimensions": [
+            { "name": "city", "sql": "city_column", "type": "string" }
+          ]
+        }
+      ]
+    }
+    return api_response
+```
+
+Now that we've decorated our function with the `@template.function` decorator, we can
+call it from within a Jinja template. In the following example, we'll call the
+`load_data()` function and use the result to generate a data model.
+
+```yaml
+cubes:
+  {# Here we use the decorated function from earlier #}
+  {%- for cube in load_data()["cubes"] %}
+
+  - name: {{ cube.name }}
+
+  {%- if cube.measures is not none and cube.measures|length > 0 %}
+    measures:
+      {%- for measure in cube.measures %}
+      - name: {{ measure.name }}
+        type: {{ measure.type }}
+      {%- if measure.sql %}
+        sql: {{ measure.sql }}
+      {%- endif %}
+      {%- endfor %}
+  {%- endif %}
+
+  {%- if cube.dimensions is not none and cube.dimensions|length > 0 %}
+    dimensions:
+      {%- for dimension in cube.dimensions %}
+      - name: {{ dimension.name }}
+        type: {{ dimension.type }}
+        sql: {{ dimension.sql }}
+      {%- endfor %}
+  {%- endif %}
+  {%- endfor %}
+```
+
+[jinja]: https://jinja.palletsprojects.com/
+[jinja-docs]: https://jinja.palletsprojects.com/en/3.1.x/templates/
+[jinja-docs-for-loop]: https://jinja.palletsprojects.com/en/3.1.x/templates/#for
+[jinja-docs-macros]:
+  https://jinja.palletsprojects.com/en/3.1.x/templates/#macros
+[jinja-docs-autoescaping]: https://jinja.palletsprojects.com/en/3.1.x/api/#autoescaping
+[jinja-docs-filters-safe]: https://jinja.palletsprojects.com/en/3.1.x/templates/#jinja-filters.safe
+[ref-cube-dbt]: /reference/python/cube_dbt

@@ -1,6 +1,4 @@
-import fs from 'fs-extra';
-import path from 'path';
-import { Constructor } from '@cubejs-backend/shared';
+import { Constructor, packageExists } from '@cubejs-backend/shared';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
 import {
   DatabaseType,
@@ -16,11 +14,16 @@ import DriverDependencies from './DriverDependencies';
 export const driverDependencies = (dbType: DatabaseType) => {
   if (DriverDependencies[dbType]) {
     return DriverDependencies[dbType];
-  } else if (
-    fs.existsSync(path.join('node_modules', `${dbType}-cubejs-driver`))
-  ) {
+  }
+
+  if (packageExists(`@cubejs-backend/${dbType}-driver`, true)) {
+    return `@cubejs-backend/${dbType}-driver`;
+  }
+
+  if (packageExists(`${dbType}-cubejs-driver`, true)) {
     return `${dbType}-cubejs-driver`;
   }
+
   throw new Error(`Unsupported db type: ${dbType}`);
 };
 

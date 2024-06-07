@@ -1,0 +1,62 @@
+---
+redirect_from:
+  - /deployment/platforms/cube-cloud
+---
+
+# Deploying Cube to Cube Cloud
+
+This page explains the basics of deploying Cube to [Cube Cloud][link-cube-cloud],
+a purpose-built fully-managed platform to run Cube applications in production. It is made
+and supported by the creators of Cube and incorporates all the best
+practices of running and scaling Cube applications.
+
+<InfoBox>
+
+Are you moving from a self-hosted installation to Cube Cloud? Please
+[follow this guide][blog-migrate-to-cube-cloud] to migrate.
+
+</InfoBox>
+
+<InfoBox>
+
+Are you new to Cube Cloud? Please [follow this guide][ref-getting-started]
+to create your first deployment.
+
+</InfoBox>
+
+In Cube Cloud, you can:
+
+* [Create an account](https://cubecloud.dev/auth/signup).
+* Invite one or more users to the account, [assign roles][ref-rbac] to them,
+  and enable [single sign-on][ref-sso].
+* Use a supported [cloud provider][ref-providers] and, optionally, connect with a [dedicated VPC][ref-vpc].
+* Create one or more [deployments][ref-deployments] of [various
+  types][ref-deployment-types], and set up [continuous deployment][ref-cd].
+* Within each deployment, allocate resources, run Cube, and use a set of
+  API endpoints for the source code in the main branch, any other branch,
+  or any user-specific [development mode][ref-dev-mode] branch.
+* Assign a [custom domain][ref-domains] to API endpoints of any deployment.
+* Review [performance insights][ref-performance], use the [deployment warm-up][ref-warmup],
+and fine-tune deployments for better [scalability][ref-scalability].
+* Set up account-wide [budgets][ref-budgets] to control resource consumption
+  and use [auto-suspension][ref-auto-sus] to reduce resource consumption of
+  non-production deployments.
+
+[blog-migrate-to-cube-cloud]:
+  https://cube.dev/blog/migrating-from-self-hosted-to-cube-cloud/
+[link-cube-cloud]: https://cubecloud.dev
+[ref-getting-started]: /product/getting-started
+[ref-rbac]: /product/workspace/access-control
+[ref-sso]: /product/workspace/sso
+[ref-deployment-types]: /product/deployment/cloud/deployment-types
+[ref-deployments]: /product/deployment/cloud/deployments
+[ref-cd]: /product/deployment/cloud/continuous-deployment
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-domains]: /product/deployment/cloud/custom-domains
+[ref-warmup]: /product/deployment/cloud/warm-up
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension
+[ref-budgets]: /product/workspace/budgets
+[ref-performance]: /product/workspace/performance
+[ref-scalability]: /product/deployment/cloud/scalability
+[ref-providers]: /product/deployment/cloud/providers
+[ref-vpc]: /product/deployment/cloud/vpc

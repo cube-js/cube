@@ -16,3 +16,97 @@ Array [
   },
 ]
 `;
+
+exports[`SQL API Postgres (Data) date/string measures in view: date case 1`] = `
+Array [
+  Object {
+    "val": "2024-01-01T00:00:00.000",
+  },
+  Object {
+    "val": "2024-01-02T00:00:00.000",
+  },
+  Object {
+    "val": "2024-01-03T00:00:00.000",
+  },
+  Object {
+    "val": "2024-01-04T00:00:00.000",
+  },
+  Object {
+    "val": "2024-01-05T00:00:00.000",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) date/string measures in view: string case 1`] = `
+Array [
+  Object {
+    "val": "1 / 100",
+  },
+  Object {
+    "val": "1 / 200",
+  },
+  Object {
+    "val": "1 / 300",
+  },
+  Object {
+    "val": "1 / 500",
+  },
+  Object {
+    "val": "1 / 600",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) metabase max number: metabase max number 1`] = `
+Array [
+  Object {
+    "id": 2,
+    "numberTotal": 200,
+    "pivot-grouping": 0,
+    "status": "new",
+  },
+  Object {
+    "id": 1,
+    "numberTotal": 100,
+    "pivot-grouping": 0,
+    "status": "new",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) no limit for non matching count push down: no limit for non matching count push down 1`] = `
+Array [
+  Object {
+    "a0": 2024-01-05T00:00:00.000Z,
+    "a1": 2024-01-01T00:00:00.000Z,
+    "a2": "100000",
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) percentage of total sum: percentage of total sum 1`] = `
+Array [
+  Object {
+    "m0": 1,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) power bi post aggregate measure wrap: power bi post aggregate measure wrap 1`] = `
+Array [
+  Object {
+    "a0": 1,
+    "a1": "2024-01-05T00:00:00.000",
+    "createdAt": 2024-01-05T00:00:00.000Z,
+  },
+]
+`;
+
+exports[`SQL API Postgres (Data) powerbi min max push down: powerbi_min_max_push_down 1`] = `
+Array [
+  Object {
+    "a0": 2024-01-05T00:00:00.000Z,
+    "a1": 2024-01-01T00:00:00.000Z,
+  },
+]
+`;

@@ -4,24 +4,24 @@ import color from '@oclif/color';
 const currentNodeVersion = process.versions.node;
 const semver = currentNodeVersion.split('.');
 const major = parseInt(<string> semver[0], 10);
-const _minor = parseInt(<string> semver[1], 10);
+// const _minor = parseInt(<string> semver[1], 10);
 
-if (major < 12 || major === 15) {
+if (major < 16 || major === 15 || major === 17) {
   console.error(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
-      'Cube.js CLI requires Node.js 12 or higher (except 15). \n' +
+      'Cube.js CLI requires Node.js 18 or higher \n' +
       'Please update your Node.js version.'
     )
   );
   process.exit(1);
 }
 
-if (major === 12) {
+if (major === 16) {
   process.emitWarning(
     color.red(
       `You are running Node.js ${currentNodeVersion}.\n` +
-      'Support for Node.js 12 will be removed soon. Please upgrade to Node.js 14 or higher.'
+      'Support for Node.js 16 will be removed soon. Please upgrade to Node.js 18 or higher.'
     )
   );
 }

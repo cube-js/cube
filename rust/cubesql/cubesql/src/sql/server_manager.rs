@@ -1,5 +1,7 @@
 use crate::{
+    config::ConfigObj,
     sql::{
+        compiler_cache::CompilerCache,
         database_variables::{
             mysql_default_global_variables, postgres_default_global_variables,
             DatabaseVariablesToUpdate,
@@ -42,6 +44,8 @@ pub struct ServerManager {
     // Non references
     pub configuration: ServerConfiguration,
     pub nonce: Option<Vec<u8>>,
+    pub config_obj: Arc<dyn ConfigObj>,
+    pub compiler_cache: Arc<dyn CompilerCache>,
     postgres_variables: RwLockSync<DatabaseVariables>,
     mysql_variables: RwLockSync<DatabaseVariables>,
 }
@@ -52,12 +56,16 @@ impl ServerManager {
     pub fn new(
         auth: Arc<dyn SqlAuthService>,
         transport: Arc<dyn TransportService>,
+        compiler_cache: Arc<dyn CompilerCache>,
         nonce: Option<Vec<u8>>,
+        config_obj: Arc<dyn ConfigObj>,
     ) -> Self {
         Self {
             auth,
             transport,
+            compiler_cache,
             nonce,
+            config_obj,
             configuration: ServerConfiguration::default(),
             postgres_variables: RwLockSync::new(postgres_default_global_variables()),
             mysql_variables: RwLockSync::new(mysql_default_global_variables()),

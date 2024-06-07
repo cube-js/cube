@@ -1,11 +1,11 @@
 {
   "name": "@cubejs-client/ngx",
-  "version": "0.31.30",
+  "version": "0.35.0",
   "author": "Cube Dev, Inc.",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-ngx"
   },
   "description": "Cube.js client for Angular",
@@ -44,7 +44,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "module": "dist/fesm5/cubejs-client-ngx.js",
+  "module": "dist/fesm2015/cubejs-client-ngx.js",
   "es2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/cubejs-client-ngx.js",
   "es2015": "dist/fesm2015/cubejs-client-ngx.js",
   "esm5": "dist/esm5/cubejs-client-ngx.js",

@@ -6,7 +6,7 @@
 
 import { getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, UnloadOptions } from '@cubejs-backend/base-driver';
+import { DownloadTableCSVData, DriverCapabilities, UnloadOptions } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -61,9 +61,23 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
        * Max pool size value for the [cube]<-->[db] pool.
        */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
     super(options);
+  }
+
+  protected primaryKeysQuery() {
+    return null;
+  }
+
+  protected foreignKeysQuery() {
+    return null;
   }
 
   /**
@@ -146,10 +160,13 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     return false;
   }
 
-  public async unload(table: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
+  public async unload(tableName: string, options: UnloadOptions): Promise<DownloadTableCSVData> {
     if (!this.config.exportBucket) {
       throw new Error('Unload is not configured');
     }
+
+    const types = await this.tableColumnTypes(tableName);
+    const columns = types.map(t => t.name).join(', ');
 
     const { bucketType, bucketName, region, unloadArn, keyId, secretKey } = this.config.exportBucket;
 
@@ -192,7 +209,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         }
       });
 
-      const baseQuery = `UNLOAD ('SELECT * FROM ${table}') TO '${bucketType}://${bucketName}/${exportPathName}/'`;
+      const baseQuery = `
+        UNLOAD ('SELECT ${columns} FROM ${tableName}')
+        TO '${bucketType}://${bucketName}/${exportPathName}/'
+      `;
+      
       // Prefer the unloadArn if it is present
       const credentialQuery = unloadArn
         ? `iam_role '${unloadArn}'`
@@ -209,6 +230,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         return {
           exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile: [],
+          types
         };
       }
 
@@ -237,6 +259,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         return {
           exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
           csvFile,
+          types
         };
       }
 
@@ -246,5 +269,11 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
       await conn.release();
     }
+  }
+
+  public capabilities(): DriverCapabilities {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }

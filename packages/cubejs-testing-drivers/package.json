@@ -1,0 +1,91 @@
+{
+  "name": "@cubejs-backend/testing-drivers",
+  "version": "0.35.47",
+  "description": "Cube.js drivers test suite",
+  "author": "Cube Dev, Inc.",
+  "license": "MIT",
+  "main": "dist/src/index.js",
+  "typings": "dist/src/index.d.ts",
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "scripts": {
+    "tsc": "tsc",
+    "lint": "eslint src/* test/ --ext .ts",
+    "lint:fix": "eslint --fix src/* test/ --ext .ts",
+    "image": "node dist/test/image",
+    "athena-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/athena-driver.test.js",
+    "athena-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/athena-core.test.js",
+    "athena-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/athena-full.test.js",
+    "bigquery-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/bigquery-driver.test.js",
+    "bigquery-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/bigquery-core.test.js",
+    "bigquery-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/bigquery-full.test.js",
+    "clickhouse-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/clickhouse-driver.test.js",
+    "clickhouse-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/clickhouse-core.test.js",
+    "clickhouse-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/clickhouse-full.test.js",
+    "databricks-jdbc-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-driver.test.js",
+    "databricks-jdbc-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-core.test.js",
+    "databricks-jdbc-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-full.test.js",
+    "databricks-jdbc-export-bucket-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/databricks-jdbc-export-bucket-full.test.js",
+    "mssql-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mssql-driver.test.js",
+    "mssql-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mssql-core.test.js",
+    "mssql-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mssql-full.test.js",
+    "mysql-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mysql-driver.test.js",
+    "mysql-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mysql-core.test.js",
+    "mysql-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/mysql-full.test.js",
+    "postgres-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/postgres-driver.test.js",
+    "postgres-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/postgres-core.test.js",
+    "postgres-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/postgres-full.test.js",
+    "snowflake-driver": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/snowflake-driver.test.js",
+    "snowflake-core": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/snowflake-core.test.js",
+    "snowflake-full": "TZ=UTC jest --forceExit --runInBand --verbose -i dist/test/snowflake-full.test.js",
+    "tst": "clear && yarn tsc && yarn bigquery-core"
+  },
+  "files": [
+    "dist/src"
+  ],
+  "dependencies": {
+    "@cubejs-backend/athena-driver": "^0.35.47",
+    "@cubejs-backend/base-driver": "^0.35.43",
+    "@cubejs-backend/cubestore-driver": "^0.35.46",
+    "@cubejs-backend/dotenv": "^9.0.2",
+    "@cubejs-backend/linter": "^0.35.0",
+    "@cubejs-backend/postgres-driver": "^0.35.47",
+    "@cubejs-backend/query-orchestrator": "^0.35.46",
+    "@cubejs-backend/redshift-driver": "^0.35.47",
+    "@cubejs-backend/server-core": "^0.35.47",
+    "@cubejs-backend/shared": "^0.35.43",
+    "@cubejs-backend/testing-shared": "^0.35.47",
+    "@cubejs-client/core": "^0.35.23",
+    "@cubejs-client/ws-transport": "^0.35.23",
+    "@jest/globals": "^27",
+    "@types/jest": "^27",
+    "@types/node": "^16",
+    "dotenv": "^16.0.3",
+    "fs-extra": "^11.1.1",
+    "jest": "^27",
+    "jsonwebtoken": "^8.5.1",
+    "pg": "^8.7.3",
+    "ramda": "^0.28.0",
+    "testcontainers": "^9.3.0",
+    "typescript": "~5.2.2",
+    "yaml": "^1.10.2",
+    "yargs": "^17.7.1"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "jest": {
+    "coveragePathIgnorePatterns": [
+      ".*\\.d\\.ts"
+    ],
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/dist/test/**/*.(test|spec).(ts|js)"
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}

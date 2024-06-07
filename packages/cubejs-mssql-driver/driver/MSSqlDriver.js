@@ -10,6 +10,7 @@ const {
 } = require('@cubejs-backend/shared');
 const sql = require('mssql');
 const { BaseDriver } = require('@cubejs-backend/base-driver');
+const QueryStream = require('./QueryStream');
 
 
 const GenericTypeToMSSql = {
@@ -41,12 +42,17 @@ class MSSqlDriver extends BaseDriver {
    * Class constructor.
    */
   constructor(config = {}) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
 
+    /**
+     * @type {import('mssql').config}
+     */
     this.config = {
       readOnly: true,
       server: getEnv('dbHost', { dataSource }),
@@ -55,7 +61,7 @@ class MSSqlDriver extends BaseDriver {
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       domain: getEnv('dbDomain', { dataSource }),
-      requestTimeout: 10 * 60 * 1000, // 10 minutes
+      requestTimeout: getEnv('dbQueryTimeout') * 1000,
       options: {
         encrypt: getEnv('dbSsl', { dataSource }),
         useUTC: false
@@ -66,11 +72,8 @@ class MSSqlDriver extends BaseDriver {
           getEnv('dbMaxPoolSize', { dataSource }) ||
           8,
         min: 0,
-        evictionRunIntervalMillis: 10000,
-        softIdleTimeoutMillis: 30000,
-        idleTimeoutMillis: 30000,
-        testOnBorrow: true,
-        acquireTimeoutMillis: 20000
+        idleTimeoutMillis: 30 * 1000,
+        acquireTimeoutMillis: 20 * 1000
       },
       ...config
     };
@@ -89,6 +92,135 @@ class MSSqlDriver extends BaseDriver {
 
   testConnection() {
     return this.initialConnectPromise.then((pool) => pool.request().query('SELECT 1 as number'));
+  }
+
+  /**
+   * Executes query in streaming mode.
+   *
+   * @param {string} query 
+   * @param {Array} values 
+   * @param {{ highWaterMark: number? }} options
+   * @return {Promise<StreamTableDataWithTypes>}
+   */
+  async stream(
+    query,
+    values,
+    options,
+  ) {
+    const pool = await this.initialConnectPromise;
+    const request = pool.request();
+
+    request.stream = true;
+    (values || []).forEach((v, i) => {
+      request.input(`_${i + 1}`, v);
+    });
+    request.query(query);
+
+    const stream = new QueryStream(request, options?.highWaterMark);
+    const fields = await new Promise((resolve, reject) => {
+      request.on('recordset', (columns) => {
+        resolve(this.mapFields(columns));
+      });
+      request.on('error', (err) => {
+        reject(err);
+      });
+      stream.on('error', (err) => {
+        reject(err);
+      })
+    });
+    return {
+      rowStream: stream,
+      types: fields,
+      release: async () => {
+        request.cancel();
+      },
+    };
+  }
+
+  /**
+   * @param {{
+   *   [name: string]: {
+   *     index: number,
+   *     name: string,
+   *     type: *,
+   *     nullable: boolean,
+   *     caseSensitive: boolean,
+   *     identity: boolean,
+   *     readOnly: boolean,
+   *     length: number?,
+   *     scale: number?,
+   *     precision: number?
+   *   }
+   * }} fields 
+   */
+  mapFields(fields) {
+    return Object.keys(fields).map((field) => {
+      let type;
+      switch (fields[field].type) {
+        case sql.Bit:
+          type = 'boolean';
+          break;
+        // integers
+        case sql.Int:
+        case sql.SmallInt:
+        case sql.TinyInt:
+        case sql.BigInt:
+          type = 'int';
+          break;
+        // float
+        case sql.Money:
+        case sql.SmallMoney:
+        case sql.Numeric:
+        case sql.Decimal:
+          type = 'decimal';
+          break;
+        // double
+        case sql.Real:
+        case sql.Float:
+          type = 'double';
+          break;
+        // strings
+        case sql.Char:
+        case sql.NChar:
+        case sql.Text:
+        case sql.NText:
+        case sql.VarChar:
+        case sql.NVarChar:
+        case sql.Xml:
+          type = 'text';
+          break;
+        // date and time
+        case sql.Time:
+          type = 'time';
+          break;
+        case sql.Date:
+          type = 'timestamp';
+          break;
+        case sql.DateTime:
+        case sql.DateTime2:
+        case sql.SmallDateTime:
+        case sql.DateTimeOffset:
+          type = 'timestamp';
+          break;
+        // others
+        case sql.UniqueIdentifier:
+        case sql.Variant:
+        case sql.Binary:
+        case sql.VarBinary:
+        case sql.Image:
+        case sql.UDT:
+        case sql.Geography:
+        case sql.Geometry:
+        case sql.TVP:
+          type = 'string';
+          break;
+        // unknown
+        default:
+          type = 'string';
+          break;
+      }
+      return { name: fields[field].name, type: this.toGenericType(type) };
+    });
   }
 
   query(query, values) {
@@ -157,7 +289,11 @@ class MSSqlDriver extends BaseDriver {
     `;
   }
 
-  async downloadQueryResults(query, values) {
+  async downloadQueryResults(query, values, options) {
+    if ((options || {}).streamImport) {
+      return this.stream(query, values, options);
+    }
+
     const result = await this.query(query, values);
     const types = Object.keys(result.columns).map((key) => ({
       name: result.columns[key].name,
@@ -184,6 +320,12 @@ class MSSqlDriver extends BaseDriver {
 
   wrapQueryWithLimit(query) {
     query.query = `SELECT TOP ${query.limit} * FROM (${query.query}) AS t`;
+  }
+
+  capabilities() {
+    return {
+      incrementalSchemaLoading: true,
+    };
   }
 }
 

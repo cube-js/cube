@@ -1,0 +1,17 @@
+{%- set my_sequence_1 = [1,2,3,4,5] -%}
+{%- set my_sequence_2 = [5,4,3,2,1] -%}
+{%- set my_map = {'field_a' : 5, 'field_b' : 15} -%}
+{%- set my_int_tuple = new_int_tuple() -%}
+{%- set my_str_tuple = new_str_tuple() -%}
+
+test:
+  arg_sum_integers_int_int: {{ arg_sum_integers(1, 1) }}
+  arg_sum_integers_int_float: {{ arg_sum_integers(1, 3.14) }}
+  arg_bool_true: {{ arg_bool(true) }}
+  arg_bool_false: {{ arg_bool(false) }}
+  arg_str: {{ arg_str("hello world") }}
+  arg_null: {{ arg_null(null) }}
+  arg_seq_1: {{ arg_seq(my_sequence_1) }}
+  arg_seq_2: {{ arg_seq(my_sequence_2) }}
+  arg_sum_tuple: {{ arg_sum_tuple(my_int_tuple) }}
+  arg_sum_map: {{ arg_sum_map(my_map) }}

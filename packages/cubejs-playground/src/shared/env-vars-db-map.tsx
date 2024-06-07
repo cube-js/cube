@@ -38,7 +38,6 @@ const envVarsDbMap = [
       { title: 'Hive/SparkSQL', driver: 'hive', logo: logoHive },
       { title: 'Oracle', driver: 'oracle', logo: logoOracle },
       { title: 'QuestDB', driver: 'questdb', logo: logoQuestdb },
-      { title: 'Materialize', driver: 'materialize', logo: logoMaterialize },
       { title: 'Crate', driver: 'crate', logo: logoCrate },
     ],
     settings: [...BASE_SERVER, DB_NAME, ...BASE_CRED],
@@ -98,9 +97,19 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
     ],
   },
   {
-    databases: [{ title: 'Firebolt', driver: 'firebolt', logo: logoFirebolt }],
+    databases: [
+      {
+        title: 'Firebolt',
+        driver: 'firebolt',
+        logo: logoFirebolt,
+        instructions: `
+Specify the Firebolt Service Account <a href="https://docs.firebolt.io/godocs/Guides/managing-your-organization/service-accounts.html" target="_blank">client ID and secret.</a>
+    `,
+      },
+    ],
     settings: [
-      ...BASE_CRED,
+      { env: 'CUBEJS_DB_USER', title: 'Client ID' },
+      { env: 'CUBEJS_DB_PASS', title: 'Client Secret' },
       DB_NAME,
       { env: 'CUBEJS_FIREBOLT_ACCOUNT', title: 'Account' },
       { env: 'CUBEJS_FIREBOLT_ENGINE_NAME', title: 'Engine name' },
@@ -117,6 +126,15 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
       // { env: 'CUBEJS_DB_SSL_CERT', title: '' },
       // { env: 'CUBEJS_DB_SSL_CIPHERS' },
       // { env: 'CUBEJS_DB_SSL_PASSPHRASE' }
+    ],
+  },
+  {
+    databases: [{ title: 'Materialize', driver: 'materialize', logo: logoMaterialize },],
+    settings: [
+      ...BASE_SERVER,
+      ...BASE_CRED,
+      DB_NAME,
+      { env: 'CUBEJS_DB_MATERIALIZE_CLUSTER', title: 'Cluster' },
     ],
   },
   {

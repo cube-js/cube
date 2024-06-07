@@ -3,7 +3,8 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync},
+    sync::{Arc, RwLock as RwLockSync, Weak},
+    time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -14,6 +15,7 @@ use crate::{
             DatabaseVariablesToUpdate,
         },
         extended::PreparedStatement,
+        temp_tables::TempTableManager,
     },
     transport::LoadRequestMeta,
     RWLockAsync,
@@ -26,7 +28,7 @@ use super::{
 
 extern crate lazy_static;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DatabaseProtocol {
     MySQL,
     PostgreSQL,
@@ -80,47 +82,60 @@ pub struct SessionState {
     pub connection_id: u32,
     // secret for this session
     pub secret: u32,
-    // client address, immutable
-    pub host: String,
+    // client ip, immutable
+    pub client_ip: String,
+    // client port, immutable
+    pub client_port: u16,
     // client protocol, mysql/postgresql, immutable
     pub protocol: DatabaseProtocol,
 
     // session db variables
     variables: RwLockSync<Option<DatabaseVariables>>,
 
+    // session temporary tables
+    temp_tables: Arc<TempTableManager>,
+
     properties: RwLockSync<SessionProperties>,
 
     // @todo Remove RWLock after split of Connection & SQLWorker
     // Context for Transport
-    auth_context: RwLockSync<Option<AuthContextRef>>,
+    auth_context: RwLockSync<(Option<AuthContextRef>, SystemTime)>,
 
     transaction: RwLockSync<TransactionState>,
     query: RwLockSync<QueryState>,
 
     // Extended Query
     pub statements: RWLockAsync<HashMap<String, PreparedStatement>>,
+
+    auth_context_expiration: Duration,
 }
 
 impl SessionState {
     pub fn new(
         connection_id: u32,
-        host: String,
+        client_ip: String,
+        client_port: u16,
         protocol: DatabaseProtocol,
         auth_context: Option<AuthContextRef>,
+        auth_context_expiration: Duration,
+        session_manager: Weak<SessionManager>,
     ) -> Self {
         let mut rng = rand::thread_rng();
 
         Self {
             connection_id,
             secret: rng.gen(),
-            host,
+            client_ip,
+            client_port,
             protocol,
             variables: RwLockSync::new(None),
+            temp_tables: Arc::new(TempTableManager::new(session_manager)),
             properties: RwLockSync::new(SessionProperties::new(None, None)),
-            auth_context: RwLockSync::new(auth_context),
+            auth_context: RwLockSync::new((auth_context, SystemTime::now())),
             transaction: RwLockSync::new(TransactionState::None),
             query: RwLockSync::new(QueryState::None),
             statements: RWLockAsync::new(HashMap::new()),
+            auth_context_expiration,
         }
     }
 
@@ -276,12 +291,23 @@ impl SessionState {
         guard.database = database;
     }
 
+    pub fn is_auth_context_expired(&self) -> bool {
+        let guard = self
+            .auth_context
+            .read()
+            .expect("failed to unlock auth_context for reading");
+        let (_, created_at) = &*guard;
+        let now = SystemTime::now();
+        let duration = now.duration_since(*created_at).unwrap_or_default();
+        duration > self.auth_context_expiration
+    }
+
     pub fn auth_context(&self) -> Option<AuthContextRef> {
         let guard = self
             .auth_context
             .read()
             .expect("failed to unlock auth_context for reading");
-        guard.clone()
+        guard.0.clone()
     }
 
     pub fn set_auth_context(&self, auth_context: Option<AuthContextRef>) {
@@ -289,7 +315,7 @@ impl SessionState {
             .auth_context
             .write()
             .expect("failed to auth_context properties for writting");
-        *guard = auth_context;
+        *guard = (auth_context, SystemTime::now());
     }
 
     // TODO: Read without copy by holding acquired lock
@@ -349,6 +375,10 @@ impl SessionState {
         }
     }
 
+    pub fn temp_tables(&self) -> Arc<TempTableManager> {
+        Arc::clone(&self.temp_tables)
+    }
+
     pub fn get_load_request_meta(&self) -> LoadRequestMeta {
         let application_name = if let Some(var) = self.get_variable("application_name") {
             Some(var.value.to_string())
@@ -395,9 +425,9 @@ impl Session {
             usesysid: 0,
             usename: self.state.user(),
             application_name,
-            client_addr: None,
+            client_addr: self.state.client_ip.clone(),
             client_hostname: None,
-            client_port: None,
+            client_port: self.state.client_port.clone(),
             query,
         }
     }
@@ -406,7 +436,7 @@ impl Session {
     pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
         SessionProcessList {
             id: self.state.connection_id,
-            host: self.state.host.clone(),
+            host: self.state.client_ip.clone(),
             user: self.state.user(),
             database: self.state.database(),
         }
@@ -430,8 +460,8 @@ pub struct SessionStatActivity {
     pub usesysid: u32,
     pub usename: Option<String>,
     pub application_name: Option<String>,
-    pub client_addr: Option<String>,
+    pub client_addr: String,
     pub client_hostname: Option<String>,
-    pub client_port: Option<String>,
+    pub client_port: u16,
     pub query: Option<String>,
 }

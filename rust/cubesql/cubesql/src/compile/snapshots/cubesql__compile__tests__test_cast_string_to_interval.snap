@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT CAST('3 DAY' AS INTERVAL) AS d3\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++------------------------------------------------+
+| d3                                             |
++------------------------------------------------+
+| 0 years 0 mons 3 days 0 hours 0 mins 0.00 secs |
++------------------------------------------------+

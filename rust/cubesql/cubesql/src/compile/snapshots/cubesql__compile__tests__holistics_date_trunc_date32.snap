@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"\n                with \\\"h__dates\\\" AS (\n                    SELECT\n                        CAST ('2023-02-01' AS date) as \\\"start_range\\\",\n                        CAST ( '2023-02-28' AS date ) as \\\"end_range\\\",\n                        28 as \\\"length\\\"\n                )\n                SELECT\n                    DATE_TRUNC( 'month', \\\"start_range\\\") AS \\\"dm_ddt_d_6e2110\\\",\n                    MAX(\\\"length\\\") AS \\\"h_dates_length\\\"\n                FROM \\\"h__dates\\\"\n                GROUP BY 1\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-------------------------+----------------+
+| dm_ddt_d_6e2110         | h_dates_length |
++-------------------------+----------------+
+| 2023-02-01T00:00:00.000 | 28             |
++-------------------------+----------------+

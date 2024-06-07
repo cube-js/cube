@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.58",
+  "version": "0.35.46",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-cubestore-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
     "README.md",
@@ -26,11 +26,11 @@
     "lint:fix": "eslint --fix src/*.ts"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.58",
-    "@cubejs-backend/cubestore": "^0.31.58",
-    "@cubejs-backend/shared": "^0.31.57",
+    "@cubejs-backend/base-driver": "^0.35.43",
+    "@cubejs-backend/cubestore": "^0.35.46",
+    "@cubejs-backend/shared": "^0.35.43",
     "csv-write-stream": "^2.0.0",
-    "flatbuffers": "^1.12.0",
+    "flatbuffers": "23.3.3",
     "fs-extra": "^9.1.0",
     "generic-pool": "^3.6.0",
     "moment-timezone": "^0.5.31",
@@ -41,12 +41,13 @@
     "ws": "^7.4.3"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
-    "@types/flatbuffers": "^1.10.0",
+    "@cubejs-backend/linter": "^0.35.0",
+    "@types/csv-write-stream": "^2.0.0",
     "@types/generic-pool": "^3.1.9",
+    "@types/node": "^14",
     "@types/ws": "^7.4.0",
-    "jest": "^26.6.3",
-    "typescript": "~4.9.5"
+    "jest": "^27",
+    "typescript": "~5.2.2"
   },
   "license": "Apache-2.0",
   "publishConfig": {

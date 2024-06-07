@@ -22,16 +22,26 @@ fn main() {
         .as_str()
         .unwrap()
         .to_string();
-    let metrics_mode = match std::env::var("CUBESTORE_METRICS") {
+    let metrics_format = match std::env::var("CUBESTORE_METRICS_FORMAT") {
         Ok(s) if s == "statsd" => metrics::Compatibility::StatsD,
         Ok(s) if s == "dogstatsd" => metrics::Compatibility::DogStatsD,
         Ok(s) => panic!(
-            "CUBESTORE_METRICS must be 'statsd' or 'dogstatsd', got '{}'",
+            "CUBESTORE_METRICS_FORMAT must be 'statsd' or 'dogstatsd', got '{}'",
             s
         ),
         Err(_) => metrics::Compatibility::StatsD,
     };
-    init_metrics("127.0.0.1:0", "127.0.0.1:8125", metrics_mode);
+    let metrics_addr =
+        std::env::var("CUBESTORE_METRICS_ADDRESS").unwrap_or("127.0.0.1".to_string());
+    let metrics_port = std::env::var("CUBESTORE_METRICS_PORT").unwrap_or("8125".to_string());
+    let metrics_server_address = format!("{}:{}", metrics_addr, metrics_port);
+
+    init_metrics(
+        "127.0.0.1:0",
+        metrics_server_address,
+        metrics_format,
+        vec![],
+    );
     let telemetry_env = std::env::var("CUBESTORE_TELEMETRY")
         .or(std::env::var("CUBEJS_TELEMETRY"))
         .unwrap_or("true".to_string());

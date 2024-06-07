@@ -13,12 +13,13 @@ const generateTestEnv = (apiSecret, dbType) => ({
 
 test('dotEnv should return default env vars for mysql DB type', () => {
   const dbType = 'mysql';
-  const expectedDotEnvVars = `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+  const expectedDotEnvVars = `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
 CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_SCHEMA_PATH=model
 CUBEJS_WEB_SOCKETS=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
@@ -26,12 +27,13 @@ CUBEJS_WEB_SOCKETS=true`;
 
 test('dotEnv should return default env vars for unsupported DB type', () => {
   const dbType = 'unsupported';
-  const expectedDotEnvVars = `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+  const expectedDotEnvVars = `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
 CUBEJS_EXTERNAL_DEFAULT=true
 CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_SCHEMA_PATH=model
 CUBEJS_WEB_SOCKETS=true`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
@@ -39,7 +41,7 @@ CUBEJS_WEB_SOCKETS=true`;
 
 test('dotEnv should return Athena-specific env vars for Athena DB type', () => {
   const dbType = 'athena';
-  const expectedDotEnvVars = `# Cube.js environment variables: https://cube.dev/docs/reference/environment-variables
+  const expectedDotEnvVars = `# Cube environment variables: https://cube.dev/docs/reference/environment-variables
 CUBEJS_AWS_KEY=<YOUR ATHENA AWS KEY HERE>
 CUBEJS_AWS_SECRET=<YOUR ATHENA SECRET KEY HERE>
 CUBEJS_AWS_REGION=<AWS REGION STRING, e.g. us-east-1>
@@ -50,7 +52,8 @@ CUBEJS_DEV_MODE=true
 CUBEJS_DB_TYPE=${dbType}
 CUBEJS_API_SECRET=${secret}
 CUBEJS_EXTERNAL_DEFAULT=true
-CUBEJS_SCHEDULED_REFRESH_DEFAULT=true`;
+CUBEJS_SCHEDULED_REFRESH_DEFAULT=true
+CUBEJS_SCHEMA_PATH=model`;
 
   expect(dotEnv(generateTestEnv(secret, dbType))).toBe(expectedDotEnvVars);
 });

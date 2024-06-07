@@ -6,12 +6,16 @@ import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
 import R from 'ramda';
-import { AbstractExtension } from '../extensions';
 
+import { isNativeSupported } from '@cubejs-backend/shared';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 
+const NATIVE_IS_SUPPORTED = isNativeSupported();
+
 const moduleFileCache = {};
+
+const JINJA_SYNTAX = /{%|%}|{{|}}/ig;
 
 export class DataSchemaCompiler {
   constructor(repository, options = {}) {
@@ -30,8 +34,10 @@ export class DataSchemaCompiler {
     this.compilerCache = options.compilerCache;
     this.errorReport = options.errorReport;
     this.standalone = options.standalone;
+    this.nativeInstance = options.nativeInstance;
     this.yamlCompiler = options.yamlCompiler;
     this.yamlCompiler.dataSchemaCompiler = this;
+    this.pythonContext = null;
   }
 
   compileObjects(compileServices, objects, errorsReport) {
@@ -48,25 +54,55 @@ export class DataSchemaCompiler {
     }
   }
 
+  /**
+   * @protected
+   */
+  async loadPythonContext(files, nsFileName) {
+    const ns = files.find((f) => f.fileName === nsFileName);
+    if (ns) {
+      return this.nativeInstance.loadPythonContext(
+        ns.fileName,
+        ns.content
+      );
+    }
+
+    return {
+      filters: {},
+      variables: {},
+      functions: {}
+    };
+  }
+
+  /**
+   * @protected
+   */
+  async doCompile() {
+    const files = await this.repository.dataSchemaFiles();
+
+    this.pythonContext = await this.loadPythonContext(files, 'globals.py');
+    this.yamlCompiler.initFromPythonContext(this.pythonContext);
+
+    const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
+
+    const errorsReport = new ErrorReporter(null, [], this.errorReport);
+    this.errorsReport = errorsReport;
+
+    // TODO: required in order to get pre transpile compilation work
+    const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
+
+    const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
+
+    return compilePhase({ cubeCompilers: this.cubeNameCompilers })
+      .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
+      .then(() => compilePhase({
+        cubeCompilers: this.cubeCompilers,
+        contextCompilers: this.contextCompilers,
+      }));
+  }
+
   compile() {
     if (!this.compilePromise) {
-      this.compilePromise = this.repository.dataSchemaFiles().then((files) => {
-        const toCompile = files.filter((f) => !this.filesToCompile || this.filesToCompile.indexOf(f.fileName) !== -1);
-
-        const errorsReport = new ErrorReporter(null, [], this.errorReport);
-        this.errorsReport = errorsReport;
-        // TODO: required in order to get pre transpile compilation work
-        const transpile = () => toCompile.map(f => this.transpileFile(f, errorsReport)).filter(f => !!f);
-
-        const compilePhase = (compilers) => this.compileCubeFiles(compilers, transpile(), errorsReport);
-
-        return compilePhase({ cubeCompilers: this.cubeNameCompilers })
-          .then(() => compilePhase({ cubeCompilers: this.preTranspileCubeCompilers }))
-          .then(() => compilePhase({
-            cubeCompilers: this.cubeCompilers,
-            contextCompilers: this.contextCompilers,
-          }));
-      }).then((res) => {
+      this.compilePromise = this.doCompile().then((res) => {
         if (!this.omitErrors) {
           this.throwIfAnyErrors();
         }
@@ -78,7 +114,22 @@ export class DataSchemaCompiler {
   }
 
   transpileFile(file, errorsReport) {
-    if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
+    if (R.endsWith('.jinja', file.fileName) ||
+      (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName))
+      // TODO do Jinja syntax check with jinja compiler
+      && file.content.match(JINJA_SYNTAX)
+    ) {
+      if (NATIVE_IS_SUPPORTED !== true) {
+        throw new Error(
+          `Native extension is required to process jinja files. ${NATIVE_IS_SUPPORTED.reason}. Read more: ` +
+          'https://github.com/cube-js/cube/blob/master/packages/cubejs-backend-native/README.md#supported-architectures-and-platforms'
+        );
+      }
+
+      this.yamlCompiler.getJinjaEngine().loadTemplate(file.fileName, file.content);
+
+      return file;
+    } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       return file;
     } else if (R.endsWith('.js', file.fileName)) {
       return this.transpileJsFile(file, errorsReport);
@@ -169,8 +220,27 @@ export class DataSchemaCompiler {
     }
 
     compiledFiles[file.fileName] = true;
+
     if (R.endsWith('.js', file.fileName)) {
       this.compileJsFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
+    } else if (R.endsWith('.yml.jinja', file.fileName) || R.endsWith('.yaml.jinja', file.fileName) ||
+      (
+        R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)
+        // TODO do Jinja syntax check with jinja compiler
+      ) && file.content.match(JINJA_SYNTAX)
+    ) {
+      asyncModules.push(() => this.yamlCompiler.compileYamlWithJinjaFile(
+        file,
+        errorsReport,
+        cubes,
+        contexts,
+        exports,
+        asyncModules,
+        toCompile,
+        compiledFiles,
+        this.standalone ? {} : this.cloneCompileContextWithGetterAlias(this.compileContext),
+        this.pythonContext
+      ));
     } else if (R.endsWith('.yml', file.fileName) || R.endsWith('.yaml', file.fileName)) {
       this.yamlCompiler.compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
     }
@@ -181,6 +251,7 @@ export class DataSchemaCompiler {
     if (err) {
       errorsReport.error(err.toString());
     }
+
     try {
       vm.runInNewContext(file.content, {
         view: (name, cube) => (
@@ -234,11 +305,19 @@ export class DataSchemaCompiler {
             return exports[foundFile.fileName];
           }
         },
-        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : R.clone(this.compileContext || {}),
+        COMPILE_CONTEXT: this.standalone ? this.standaloneCompileContextProxy() : this.cloneCompileContextWithGetterAlias(this.compileContext || {}),
       }, { filename: file.fileName, timeout: 15000 });
     } catch (e) {
       errorsReport.error(e);
     }
+  }
+
+  // Alias "securityContext" with "security_context" (snake case version)
+  // to support snake case based data models
+  cloneCompileContextWithGetterAlias(compileContext) {
+    const clone = R.clone(compileContext || {});
+    clone.security_context = compileContext.securityContext;
+    return clone;
   }
 
   standaloneCompileContextProxy() {

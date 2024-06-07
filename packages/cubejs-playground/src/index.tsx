@@ -4,13 +4,13 @@ import { createHashHistory } from 'history';
 
 import App from './App';
 import { page } from './events';
-import { TemplateGalleryPage } from './pages';
 import {
   ExplorePage,
-  DashboardPage,
   ConnectionWizardPage,
   SchemaPage,
   IndexPage,
+  ConnectToBiPage,
+  FrontendIntegrationsPage,
 } from './pages';
 import { SecurityContextProvider } from './components/SecurityContext/SecurityContextProvider';
 import { AppContextProvider } from './components/AppContext';
@@ -74,11 +74,15 @@ ReactDOM.render(
           path="/connection"
           component={() => <ConnectionWizardPage history={history} />}
         />
-        <Route key="dashboard" path="/dashboard" component={DashboardPage} />
         <Route
-          key="template-gallery"
-          path="/template-gallery"
-          component={TemplateGalleryPage}
+          key="connect-to-bi"
+          path="/connect-to-bi"
+          component={ConnectToBiPage}
+        />
+        <Route
+          key="frontend-integrations"
+          path="/frontend-integrations"
+          component={FrontendIntegrationsPage}
         />
       </App>
     </AppContextProvider>

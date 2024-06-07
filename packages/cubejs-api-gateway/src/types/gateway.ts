@@ -18,6 +18,7 @@ import {
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
+  ContextToApiScopesFn,
 } from '../interfaces';
 
 type UserBackgroundContext = {
@@ -37,7 +38,7 @@ type UserBackgroundContext = {
 /**
  * Function that should provides a logic of scheduled returning of
  * the user background context. Used as a part of a main
- * configuration object of the Gateway to provide extendabillity to
+ * configuration object of the Gateway to provide extendability to
  * this logic.
  */
 type ScheduledRefreshContextsFn =
@@ -68,6 +69,8 @@ interface ApiGatewayOptions {
    * @deprecated Use checkAuth property instead.
    */
   checkAuthMiddleware?: CheckAuthMiddlewareFn;
+  contextToApiScopes?: ContextToApiScopesFn;
+  event?: (name: string, props?: object) => void;
 }
 
 export {

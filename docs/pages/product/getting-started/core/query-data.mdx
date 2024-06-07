@@ -1,0 +1,60 @@
+---
+redirect_from:
+  - /getting-started/core/query-data
+---
+
+# Query data
+
+In this step, you will learn how to query your data using the data models you
+created in the previous step. Cube provides several ways to query your data, and
+we'll go over them here.
+
+## Playground
+
+[Playground](/product/workspace/playground) is a web-based tool which allows for
+model generation and data exploration. On the <Btn>Build</Btn> tab, you can
+select the measures and dimensions, and then run the query. Let's do this for
+the `orders` cube you generated in the previous step.
+
+Click <Btn>+ Measure</Btn> to display the available measures and add
+`orders.count`, then click <Btn>+ Dimension</Btn> for available dimensions and
+add `orders.status`:
+
+<Screenshot src="https://ucarecdn.com/fbbd5b27-f6b3-4e86-b7d3-7c562bd202f1/" />
+
+Then, click <Btn>Run</Btn> to execute the query and see the results:
+
+<Screenshot src="https://ucarecdn.com/aadc3670-10ba-42af-8f69-0f8fb5c31c2d/" />
+
+Please feel free to experiment: select other measures or dimensions, pick a
+granularity for the time dimension instead of <Btn>w/o grouping</Btn>, or choose
+another chart type instead of <Btn>Table</Btn>.
+
+## APIs and integrations
+
+Cube provides a [rich set of options][ref-downstream] to deliver data to other
+tools: a suite of APIs, [JavaScript SDKs][ref-frontend-int], and integrations.
+
+Connectivity to BI tools and data notebooks is enabled by the [SQL
+API][ref-sql-api] which is Postgres-compatible: if something connects to
+Postgres, it will work with Cube. Check the <Btn>Connect to BI</Btn> tab for
+connection instructions for specific BI tools:
+
+<Screenshot src="https://ucarecdn.com/359af961-983f-41f2-829e-fc66910bfdb5/" />
+
+Connectivity to data applications is enabled by the [REST API][ref-rest-api] and
+the [GraphQL API][ref-graphql-api] as well as [JavaScript
+SDKs][ref-frontend-int]. Check the <Btn>Frontend Integrations</Btn> tab for
+usage instructions for these APIs:
+
+<Screenshot src="https://ucarecdn.com/5cbfa497-f633-4488-b6a2-de3beeec00bd/" />
+
+Now that we've seen how to use Cube's APIs, let's take a look at [how to add
+pre-aggregations][next] to speed up your queries.
+
+[ref-graphql-api]: /reference/graphql-api
+[ref-rest-api]: /reference/rest-api
+[ref-downstream]: /product/configuration/visualization-tools
+[ref-frontend-int]: /product/apis-integrations/javascript-sdk
+[ref-sql-api]: /product/apis-integrations/sql-api
+[next]: /product/getting-started/core/add-a-pre-aggregation

@@ -8,7 +8,12 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import { BaseDriver, TableQueryResult } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  DownloadQueryResultsOptions,
+  DownloadQueryResultsResult,
+  TableQueryResult, TableStructure,
+} from '@cubejs-backend/base-driver';
 import { DruidClient, DruidClientBaseConfiguration, DruidClientConfiguration } from './DruidClient';
 import { DruidQuery } from './DruidQuery';
 
@@ -40,11 +45,26 @@ export class DruidDriver extends BaseDriver {
    */
   public constructor(
     config: DruidDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -90,7 +110,8 @@ export class DruidDriver extends BaseDriver {
   }
 
   public async query<R = unknown>(query: string, values: unknown[] = []): Promise<Array<R>> {
-    return this.client.query(query, this.normalizeQueryValues(values));
+    const result = await this.client.query<R>(query, this.normalizeQueryValues(values));
+    return result.rows;
   }
 
   public informationSchemaQuery() {
@@ -105,7 +126,7 @@ export class DruidDriver extends BaseDriver {
     `;
   }
 
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     throw new Error('Unable to create schema, Druid does not support it');
   }
 
@@ -113,6 +134,29 @@ export class DruidDriver extends BaseDriver {
     return this.query<TableQueryResult>('SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ?', [
       schemaName
     ]);
+  }
+
+  public async downloadQueryResults(query: string, values: unknown[], _options: DownloadQueryResultsOptions): Promise<DownloadQueryResultsResult> {
+    const { rows, columns } = await this.client.query<any>(query, this.normalizeQueryValues(values));
+    if (!columns) {
+      throw new Error(
+        'You are using an old version of Druid. Unable to detect column types in readOnly mode.'
+      );
+    }
+
+    const types: TableStructure = [];
+
+    for (const [name, meta] of Object.entries(columns)) {
+      types.push({
+        name,
+        type: this.toGenericType(meta.sqlType.toLowerCase()),
+      });
+    }
+
+    return {
+      rows,
+      types,
+    };
   }
 
   protected normalizeQueryValues(values: unknown[]) {

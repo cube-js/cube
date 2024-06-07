@@ -1,15 +1,16 @@
 use crate::sql::shim::ConnectionError;
 use itertools::Itertools;
 use log::trace;
-use msql_srv::Column as MysqlColumn;
 use pg_srv::{
     protocol::{ErrorCode, ErrorResponse},
     BindValue, PgType,
 };
-use sqlparser::ast::{self, Expr, Function, FunctionArgExpr, Ident, Value};
+use sqlparser::ast::{
+    self, ArrayAgg, Expr, Function, FunctionArg, FunctionArgExpr, Ident, ObjectName, Value,
+};
 use std::{collections::HashMap, error::Error};
 
-use super::types::{ColumnFlags, ColumnType};
+use super::types::ColumnType;
 
 enum PlaceholderType {
     String,
@@ -118,6 +119,9 @@ trait Visitor<'ast, E: Error> {
                 self.visit_expr(expr)?;
                 self.visit_query(subquery)?;
             }
+            Expr::AnyAllSubquery(query) => {
+                self.visit_query(query)?;
+            }
             Expr::InUnnest {
                 expr, array_expr, ..
             } => {
@@ -210,6 +214,20 @@ trait Visitor<'ast, E: Error> {
             Expr::Position { expr, r#in } => {
                 self.visit_expr(expr)?;
                 self.visit_expr(r#in)?;
+            }
+            Expr::ArrayAgg(ArrayAgg {
+                expr,
+                order_by,
+                limit,
+                ..
+            }) => {
+                self.visit_expr(expr)?;
+                if let Some(order_by) = order_by {
+                    self.visit_expr(&mut order_by.expr)?;
+                }
+                if let Some(limit) = limit {
+                    self.visit_expr(limit)?;
+                }
             }
         };
 
@@ -319,6 +337,10 @@ trait Visitor<'ast, E: Error> {
             self.visit_expr(having)?;
         }
 
+        for group_by in &mut select.group_by {
+            self.visit_expr(group_by)?;
+        }
+
         Ok(())
     }
 
@@ -350,6 +372,14 @@ trait Visitor<'ast, E: Error> {
         }
         if let Some(limit) = query.limit.as_mut() {
             self.visit_expr_with_placeholder_type(limit, PlaceholderType::Number)?;
+        }
+        if let Some(offset) = query.offset.as_mut() {
+            self.visit_expr_with_placeholder_type(&mut offset.value, PlaceholderType::Number)?;
+        }
+        if let Some(fetch) = query.fetch.as_mut() {
+            if let Some(quantity) = fetch.quantity.as_mut() {
+                self.visit_expr_with_placeholder_type(quantity, PlaceholderType::Number)?;
+            }
         }
 
         Ok(())
@@ -488,17 +518,6 @@ impl FoundParameter {
     }
 }
 
-impl Into<MysqlColumn> for FoundParameter {
-    fn into(self) -> MysqlColumn {
-        MysqlColumn {
-            table: String::new(),
-            column: "not implemented".to_owned(),
-            coltype: self.coltype.to_mysql(),
-            colflags: ColumnFlags::empty().to_mysql(),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct PostgresStatementParamsFinder {
     parameters: HashMap<String, FoundParameter>,
@@ -535,42 +554,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsFinder {
 
                 self.parameters
                     .insert(position.to_string(), FoundParameter::new(pt.to_coltype()));
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct MySQLStatementParamsFinder {
-    parameters: Vec<FoundParameter>,
-}
-
-impl MySQLStatementParamsFinder {
-    pub fn new() -> Self {
-        Self {
-            parameters: Vec::new(),
-        }
-    }
-
-    pub fn find(mut self, stmt: &ast::Statement) -> Result<Vec<FoundParameter>, ConnectionError> {
-        self.visit_statement(&mut stmt.clone())?;
-
-        Ok(self.parameters)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MySQLStatementParamsFinder {
-    fn visit_value(
-        &mut self,
-        v: &mut ast::Value,
-        pt: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match v {
-            Value::Placeholder(_) => {
-                self.parameters.push(FoundParameter::new(pt.to_coltype()));
             }
             _ => {}
         };
@@ -633,73 +616,6 @@ impl<'ast> Visitor<'ast, ConnectionError> for PostgresStatementParamsBinder {
                         *value = ast::Value::Null;
                     }
                 }
-            }
-            _ => {}
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug)]
-pub struct MysqlStatementParamsBinder {
-    values: Vec<BindValue>,
-    position: usize,
-}
-
-impl MysqlStatementParamsBinder {
-    pub fn new(values: Vec<BindValue>) -> Self {
-        Self {
-            values,
-            position: 0,
-        }
-    }
-
-    pub fn bind(mut self, stmt: &mut ast::Statement) -> Result<(), ConnectionError> {
-        self.visit_statement(stmt)
-    }
-}
-
-impl<'ast> Visitor<'ast, ConnectionError> for MysqlStatementParamsBinder {
-    fn visit_value(
-        &mut self,
-        value: &mut ast::Value,
-        placeholder_type: PlaceholderType,
-    ) -> Result<(), ConnectionError> {
-        match &value {
-            ast::Value::Placeholder(_) => {
-                let to_replace = self.values.get(self.position).ok_or({
-                    ConnectionError::from(ErrorResponse::error(
-                        ErrorCode::InternalError,
-                        format!(
-                            "Unable to find value for placeholder at position: {}",
-                            self.position
-                        ),
-                    ))
-                })?;
-                match to_replace {
-                    BindValue::String(v) => {
-                        // FIXME: this workaround is needed as we don't know types on Bind
-                        *value = match placeholder_type {
-                            PlaceholderType::String => ast::Value::SingleQuotedString(v.clone()),
-                            PlaceholderType::Number => ast::Value::Number(v.clone(), false),
-                        };
-                    }
-                    BindValue::Bool(v) => {
-                        *value = ast::Value::Boolean(*v);
-                    }
-                    BindValue::Int64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_i64);
-                    }
-                    BindValue::Float64(v) => {
-                        *value = ast::Value::Number(v.to_string(), *v < 0_f64);
-                    }
-                    BindValue::Null => {
-                        *value = ast::Value::Null;
-                    }
-                };
-
-                self.position += 1;
             }
             _ => {}
         };
@@ -813,7 +729,29 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                     "timestamptz" => {
                         self.visit_expr(&mut *cast_expr)?;
 
-                        *data_type = ast::DataType::Timestamp
+                        *data_type = ast::DataType::Timestamp;
+                    }
+                    "regtype" => {
+                        self.visit_expr(&mut *cast_expr)?;
+
+                        if let Expr::Identifier(_) = &**cast_expr {
+                            *expr = Expr::Function(Function {
+                                name: ObjectName(vec![Ident {
+                                    value: "format_type".to_string(),
+                                    quote_style: None,
+                                }]),
+                                args: vec![
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(*cast_expr.clone())),
+                                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                                        Value::Null,
+                                    ))),
+                                ],
+                                over: None,
+                                distinct: false,
+                                special: false,
+                                approximate: false,
+                            })
+                        }
                     }
                     // TODO:
                     _ => (),
@@ -1107,7 +1045,7 @@ impl<'ast> Visitor<'ast, ConnectionError> for SensitiveDataSanitizer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{compile::parser::MySqlDialectWithBackTicks, CubeError};
+    use crate::CubeError;
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
@@ -1337,26 +1275,15 @@ mod tests {
             ],
         )?;
 
-        Ok(())
-    }
+        assert_pg_params_finder(
+            "SELECT 1 OFFSET $1",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
-    fn assert_mysql_params_finder(
-        input: &str,
-        expected: Vec<FoundParameter>,
-    ) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&MySqlDialectWithBackTicks {}, &input).unwrap();
-
-        let finder = MySQLStatementParamsFinder::new();
-        let result = finder.find(&stmts[0]).unwrap();
-
-        assert_eq!(result, expected);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_mysql_placeholder_find() -> Result<(), CubeError> {
-        assert_mysql_params_finder("SELECT ?", vec![FoundParameter::new(ColumnType::String)])?;
+        assert_pg_params_finder(
+            "SELECT 1 FETCH FIRST $1 ROWS ONLY",
+            vec![FoundParameter::new(ColumnType::Int64)],
+        )?;
 
         Ok(())
     }
@@ -1376,6 +1303,11 @@ mod tests {
     fn test_placeholder_replacer() -> Result<(), CubeError> {
         assert_placeholder_replacer("SELECT ?", "SELECT 'replaced_placeholder'")?;
         assert_placeholder_replacer("SELECT 1 LIMIT ?", "SELECT 1 LIMIT 1")?;
+        assert_placeholder_replacer("SELECT 1 OFFSET ?", "SELECT 1 OFFSET 1")?;
+        assert_placeholder_replacer(
+            "SELECT 1 FETCH FIRST ? ROWS ONLY",
+            "SELECT 1 FETCH FIRST 1 ROWS ONLY",
+        )?;
 
         Ok(())
     }

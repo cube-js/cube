@@ -55,7 +55,7 @@ export class SubscriptionServer {
       if (message.authorization) {
         authContext = { isSubscription: true };
         await this.apiGateway.checkAuthFn(authContext, message.authorization);
-        const acceptanceResult = this.contextAcceptor(authContext);
+        const acceptanceResult = await this.contextAcceptor(authContext);
         if (!acceptanceResult.accepted) {
           this.sendMessage(connectionId, acceptanceResult.rejectMessage);
           return;

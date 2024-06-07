@@ -1,5 +1,6 @@
 use std::cmp::{max, min};
 
+use chrono::{Datelike, NaiveDateTime, Timelike};
 use datafusion::{physical_plan::aggregates::AggregateFunction, scalar::ScalarValue};
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
@@ -42,6 +43,7 @@ pub fn granularity_str_to_interval(granularity: &str) -> Option<ScalarValue> {
 
 fn granularity_to_interval(granularity: &str) -> Option<ScalarValue> {
     let interval = match granularity.to_lowercase().as_str() {
+        "millisecond" | "min_unit" => ScalarValue::IntervalDayTime(Some(1)),
         "second" => ScalarValue::IntervalDayTime(Some(1000)),
         "minute" => ScalarValue::IntervalDayTime(Some(60000)),
         "hour" => ScalarValue::IntervalDayTime(Some(3600000)),
@@ -148,6 +150,36 @@ pub fn reaggragate_fun(cube_fun: &str) -> Option<AggregateFunction> {
         "count" | "sum" => AggregateFunction::Sum,
         "min" => AggregateFunction::Min,
         "max" => AggregateFunction::Max,
+        _ => return None,
+    })
+}
+
+pub fn is_literal_date_trunced(ns: i64, granularity: &str) -> Option<bool> {
+    let granularity = parse_granularity_string(granularity, false)?;
+    let ns_in_seconds = 1_000_000_000;
+    if ns % ns_in_seconds > 0 {
+        return Some(false);
+    }
+    let seconds = ns / ns_in_seconds;
+    let dt = NaiveDateTime::from_timestamp_opt(seconds, 0)?;
+
+    let is_minute_trunced = |dt: NaiveDateTime| dt.second() == 0;
+    let is_hour_trunced = |dt| is_minute_trunced(dt) && dt.minute() == 0;
+    let is_day_trunced = |dt| is_hour_trunced(dt) && dt.hour() == 0;
+    let is_week_trunced = |dt| is_day_trunced(dt) && dt.weekday().num_days_from_monday() == 0;
+    let is_month_trunced = |dt| is_day_trunced(dt) && dt.day() == 1;
+    let is_quarter_trunced = |dt| is_month_trunced(dt) && dt.month0() % 3 == 0;
+    let is_year_trunced = |dt| is_month_trunced(dt) && dt.month() == 1;
+
+    Some(match granularity.as_str() {
+        "second" => true,
+        "minute" => is_minute_trunced(dt),
+        "hour" => is_hour_trunced(dt),
+        "day" => is_day_trunced(dt),
+        "week" => is_week_trunced(dt),
+        "month" => is_month_trunced(dt),
+        "quarter" => is_quarter_trunced(dt),
+        "year" => is_year_trunced(dt),
         _ => return None,
     })
 }

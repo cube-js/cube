@@ -1,62 +1,94 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.31.59",
+  "version": "0.35.47",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
   "typings": "dist/js/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cube-js/cube.js.git"
+    "url": "git+https://github.com/cube-js/cube.git"
   },
   "scripts": {
     "tsc": "tsc",
     "build": "tsc",
-    "native:build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "native:build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "native:build-debug": "npm run native:build --",
     "native:build-release": "npm run native:build -- --release",
-    "install": "node-pre-gyp install || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
-    "upload-binary-cross": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package --target_arch=$PACKAGE_TARGET_ARCH --target_platform=$PACKAGE_TARGET_PLATFORM --target_libc=$PACKAGE_TARGET_LIBC && node-pre-gyp-github publish",
-    "upload-binary": "mkdir -p native && cp index.node native/index.node && node-pre-gyp package && node-pre-gyp-github publish",
-    "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node test/server.js",
-    "test:unit": "jest --forceExit test",
-    "test:cargo": "cargo test"
+    "native:build-debug-python": "npm run native:build -- --features python",
+    "native:build-release-python": "npm run native:build -- --release --features python",
+    "postinstall": "post-installer || echo 'Your system is not supported by @cubejs-backend/native, some feature will be unavailable.'",
+    "test:server": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/server.js",
+    "test:server:stream": "CUBESQL_STREAM_MODE=true CUBESQL_LOG_LEVEL=error CUBESQL_PG_PORT=5555 node dist/test/server.js",
+    "test:python": "CUBEJS_NATIVE_INTERNAL_DEBUG=true CUBESQL_LOG_LEVEL=trace CUBESQL_PG_PORT=5555 node dist/test/python.js",
+    "test:unit": "jest --forceExit",
+    "test:cargo": "cargo test",
+    "lint": "eslint test/ js/ --ext .ts",
+    "lint:fix": "eslint --fix test/ js/ --ext .ts"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "files": [
     "dist/js"
   ],
   "devDependencies": {
-    "@cubejs-infra/node-pre-gyp-github": "^1.0.3",
-    "@types/jest": "^26",
-    "@types/node": "^12",
+    "@cubejs-backend/linter": "^0.35.0",
+    "@types/jest": "^27",
+    "@types/node": "^14",
     "cargo-cp-artifact": "^0.1",
-    "jest": "^26",
-    "mysql2": "^2.3.3",
-    "typescript": "~4.9.5"
+    "jest": "^27",
+    "pg": "^8.11.3",
+    "typescript": "~5.2.2",
+    "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.31.59",
-    "@cubejs-backend/shared": "^0.31.57",
-    "@mapbox/node-pre-gyp": "^1"
+    "@cubejs-backend/cubesql": "^0.35.47",
+    "@cubejs-backend/shared": "^0.35.43",
+    "@cubejs-infra/post-installer": "^0.0.7"
   },
-  "binary": {
-    "module_name": "index",
-    "host": "https://github.com/cube-js/cube.js/releases/download/",
-    "remote_path": "v{version}",
-    "package_name": "native-{platform}-{arch}-{libc}.tar.gz",
-    "module_path": "native",
-    "pkg_path": "."
+  "resources": {
+    "vars": {
+      "libpython_or_fallback": {
+        "default": "fallback",
+        "value": [
+          "libpython",
+          [
+            "3.12",
+            "3.11",
+            "3.10",
+            "3.9"
+          ]
+        ],
+        "constraints": {
+          "platform-arch": [
+            "linux-x64",
+            "linux-arm64"
+          ]
+        }
+      }
+    },
+    "files": [
+      {
+        "host": "https://github.com/cube-js/cube/releases/download/v${version}/",
+        "path": "native-${platform}-${arch}-${libc}-${libpython_or_fallback}.tar.gz",
+        "not_found": "Your system is not supported by @cubejs-backend/native, some feature will be unavailable."
+      }
+    ]
   },
   "jest": {
     "testEnvironment": "node",
     "verbose": true,
     "roots": [
-      "<rootDir>/js/",
-      "<rootDir>/test/"
-    ]
+      "<rootDir>/dist/test/"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/dist/test/setup/index.js"
+    ],
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
   },
   "license": "Apache-2.0",
   "publishConfig": {

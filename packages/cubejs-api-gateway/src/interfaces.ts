@@ -28,6 +28,7 @@ import {
   CheckSQLAuthSuccessResponse,
   CheckSQLAuthFn,
   CanSwitchSQLUserFn,
+  ContextToApiScopesFn,
 } from './types/auth';
 
 import {
@@ -38,6 +39,8 @@ import {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest
 } from './types/request';
 
 export {
@@ -62,6 +65,9 @@ export {
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
+  ResponseResultFn,
+  QueryRequest,
+  ContextToApiScopesFn,
 };
 
 /**
@@ -85,11 +91,13 @@ export type ContextRejectionMiddlewareFn =
    next: ExpressNextFunction,
  ) => void;
 
+type ContextAcceptorResult = { accepted: boolean; rejectMessage?: any };
+
 /**
  * ContextAcceptorFn type that matches the ContextAcceptor.shouldAcceptWs
  * signature from the server-core package
  */
-export type ContextAcceptorFn = (context: RequestContext) => { accepted: boolean; rejectMessage?: any };
+export type ContextAcceptorFn = (context: RequestContext) => Promise<ContextAcceptorResult> | ContextAcceptorResult;
 
 /**
  * Logger middleware.

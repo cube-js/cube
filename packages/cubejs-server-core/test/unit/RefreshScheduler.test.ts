@@ -1,9 +1,9 @@
 import R from 'ramda';
 import { BaseDriver } from '@cubejs-backend/query-orchestrator';
-import { CubejsServerCore, DatabaseType, SchemaFileRepository } from '../../src';
+import { pausePromise, SchemaFileRepository } from '@cubejs-backend/shared';
+import { CubejsServerCore } from '../../src';
 import { RefreshScheduler } from '../../src/core/RefreshScheduler';
 import { CompilerApi } from '../../src/core/CompilerApi';
-import { OrchestratorApi } from '../../src/core/OrchestratorApi';
 
 const schemaContent = `
 cube('Foo', {
@@ -332,34 +332,37 @@ class MockDriver extends BaseDriver {
 
 let testCounter = 1;
 
-const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { repository: SchemaFileRepository, useOriginalSqlPreAggregations?: boolean }) => {
-  const serverCore = new CubejsServerCore({
-    dbType: 'postgres',
-    apiSecret: 'foo',
-  });
-  const compilerApi = new CompilerApi(
-    repository,
-    async () => 'postgres',
-    {
-      compileContext: {
-        useOriginalSqlPreAggregations,
-      },
-      logger: (msg, params) => {
-        console.log(msg, params);
-      },
-    }
-  );
-
+const setupScheduler = ({ repository, useOriginalSqlPreAggregations, skipAssertSecurityContext }: { repository: SchemaFileRepository, useOriginalSqlPreAggregations?: boolean, skipAssertSecurityContext?: true }) => {
   const mockDriver = new MockDriver();
+  const externalDriver = new MockDriver();
 
-  const orchestratorApi = new OrchestratorApi(
-    () => mockDriver,
-    (msg, params) => console.log(msg, params),
-    {
-      contextToDbType: async () => 'postgres',
-      contextToExternalDbType(): DatabaseType {
-        return 'cubestore';
-      },
+  class CubejsServerCoreDisabledRefreshTimer extends CubejsServerCore {
+    public startScheduledRefreshTimer() {
+      // disabling interval
+      return null;
+    }
+  }
+
+  const serverCore = new CubejsServerCoreDisabledRefreshTimer({
+    apiSecret: 'foo',
+    logger: (msg, params) => console.log(msg, params),
+    driverFactory: async ({ securityContext }) => {
+      expect(typeof securityContext).toEqual('object');
+      if (!skipAssertSecurityContext) {
+        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
+      }
+
+      return mockDriver;
+    },
+    externalDriverFactory: async ({ securityContext }) => {
+      expect(typeof securityContext).toEqual('object');
+      if (!skipAssertSecurityContext) {
+        expect(securityContext.hasOwnProperty('tenantId')).toEqual(true);
+      }
+
+      return externalDriver;
+    },
+    orchestratorOptions: () => ({
       continueWaitTimeout: 0.1,
       queryCacheOptions: {
         queueOptions: () => ({
@@ -373,14 +376,26 @@ const setupScheduler = ({ repository, useOriginalSqlPreAggregations }: { reposit
         }),
       },
       redisPrefix: `TEST_${testCounter++}`,
+    })
+  });
+
+  const compilerApi = new CompilerApi(
+    repository,
+    async () => 'postgres',
+    {
+      compileContext: {
+        useOriginalSqlPreAggregations,
+      },
+      logger: (msg, params) => {
+        console.log(msg, params);
+      },
     }
   );
 
-  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(() => compilerApi);
-  jest.spyOn(serverCore, 'getOrchestratorApi').mockImplementation(() => <any>orchestratorApi);
+  jest.spyOn(serverCore, 'getCompilerApi').mockImplementation(async () => compilerApi);
 
   const refreshScheduler = new RefreshScheduler(serverCore);
-  return { refreshScheduler, orchestratorApi, mockDriver };
+  return { refreshScheduler, compilerApi, mockDriver };
 };
 
 describe('Refresh Scheduler', () => {
@@ -390,6 +405,11 @@ describe('Refresh Scheduler', () => {
     delete process.env.CUBEJS_DROP_PRE_AGG_WITHOUT_TOUCH;
     delete process.env.CUBEJS_TOUCH_PRE_AGG_TIMEOUT;
     delete process.env.CUBEJS_DB_QUERY_TIMEOUT;
+  });
+
+  afterAll(async () => {
+    // align logs from STDOUT
+    await pausePromise(250);
   });
 
   test('Round robin pre-aggregation refresh by history priority', async () => {
@@ -875,6 +895,7 @@ describe('Refresh Scheduler', () => {
     process.env.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
     const { refreshScheduler } = setupScheduler({
       repository: repositoryWithoutPreAggregations,
+      skipAssertSecurityContext: true,
     });
 
     for (let i = 0; i < 50; i++) {

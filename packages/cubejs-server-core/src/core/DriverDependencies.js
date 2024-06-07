@@ -21,6 +21,7 @@ module.exports = {
   elasticsearch: '@cubejs-backend/elasticsearch-driver',
   dremio: '@cubejs-backend/dremio-driver',
   druid: '@cubejs-backend/druid-driver',
+  duckdb: '@cubejs-backend/duckdb-driver',
   cubestore: '@cubejs-backend/cubestore-driver',
   ksql: '@cubejs-backend/ksql-driver',
   questdb: '@cubejs-backend/questdb-driver',

@@ -1,10 +1,10 @@
 {
   "name": "@cubejs-client/dx",
-  "version": "0.31.30",
+  "version": "0.35.0",
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-client-dx"
   },
   "description": "Cube.js Client Developer eXperience",
@@ -28,13 +28,16 @@
   "devDependencies": {
     "@babel/core": "^7.3.3",
     "@babel/preset-env": "^7.3.1",
-    "@types/jest": "^26.0.9",
-    "babel-jest": "^26.0.1",
+    "@types/jest": "^27",
+    "babel-jest": "^27",
     "eslint": "^7.21.0",
     "eslint-config-airbnb-base": "^13.1.0",
     "eslint-plugin-import": "^2.16.0",
     "eslint-plugin-node": "^5.2.1",
-    "jest": "^26.0.1"
+    "jest": "^27"
+  },
+  "jest": {
+    "testEnvironment": "node"
   },
   "publishConfig": {
     "access": "public"

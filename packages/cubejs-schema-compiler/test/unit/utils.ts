@@ -1,23 +1,25 @@
+import YAML from 'js-yaml';
+
 interface CreateCubeSchemaOptions {
   name: string,
+  publicly?: boolean,
+  shown?: boolean,
+  sqlTable?: string,
   refreshKey?: string,
   preAggregations?: string,
+  joins?: string,
 }
 
-/**
- * Returns test cube schema based on incoming parameters.
- * @param {CreateCubeSchemaOptions} param
- * @returns {string}
- */
-export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }: CreateCubeSchemaOptions) {
+export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
   return ` 
     cube('${name}', {
-        sql: \`
-        select * from cards
-        \`,
-        
+        ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
+
+        ${publicly !== undefined ? `public: ${publicly},` : ''}
+        ${shown !== undefined ? `shown: ${shown},` : ''}
         ${refreshKey}
-   
+        ${joins ? `joins: ${joins},` : ''}
+
         measures: {
           count: {
             type: 'count'
@@ -35,19 +37,33 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }
             type: \`min\`
           }
         },
-  
+
         dimensions: {
           id: {
             type: 'number',
             sql: 'id',
             primaryKey: true
           },
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
           createdAt: {
             type: 'time',
             sql: 'created_at'
           },
+          location: {
+            type: 'string',
+            sql: 'location'
+          }
         },
-        
+
+        segments: {
+          sfUsers: {
+            sql: \`\${CUBE}.location = 'San Francisco'\`
+          }
+        },
+
         preAggregations: {
             ${preAggregations}
         }
@@ -55,11 +71,119 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '' }
   `;
 }
 
+export type CreateSchemaOptions = {
+  cubes?: unknown[],
+  views?: unknown[]
+};
+
+export function createSchemaYaml(schema: CreateSchemaOptions): string {
+  return YAML.dump(schema);
+}
+
+export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
+  return ` 
+    cubes:
+      - name: ${name}
+        sql_table: ${sqlTable}
+    
+        measures:
+          - name: count
+            type: count
+          - name: sum
+            type: sum
+            sql: amount
+          - name: min
+            sql: amount
+            type: min
+          - name: max
+            sql: amount
+            type: max
+        dimensions:
+          - name: id
+            sql: id
+            type: number
+            primary_key: true
+          - name: createdAt
+            sql: created_at
+            type: time
+  `;
+}
+
+export function createECommerceSchema() {
+  return {
+    cubes: [{
+      name: 'orders',
+      sql_table: 'orders',
+      measures: [{
+        name: 'count',
+        type: 'count',
+      }],
+      dimensions: [
+        {
+          name: 'created_at',
+          sql: 'created_at',
+          type: 'time',
+        },
+        {
+          name: 'updated_at',
+          sql: '{created_at}',
+          type: 'time',
+        },
+        {
+          name: 'status',
+          sql: 'status',
+          type: 'string',
+        }
+      ],
+      preAggregations: [
+        {
+          name: 'orders_by_day_with_day',
+          measures: ['count'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
+        },
+        {
+          name: 'orders_by_day_with_day_by_status',
+          measures: ['count'],
+          dimensions: ['status'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
+        }
+      ]
+    }],
+    views: [{
+      name: 'orders_view',
+      cubes: [{
+        join_path: 'orders',
+        includes: [
+          'created_at',
+          'updated_at',
+          'count',
+          'status',
+        ]
+      }]
+    }]
+  };
+}
+
 /**
  * Returns joined test cubes schema. Schema looks like: A -< B -< C >- D >- E.
  * The original data set can be found under the link.
  * {@link https://docs.google.com/spreadsheets/d/1BNDpA7x4JLhlvvPdrQIC0c0PH4xZhdRrEFfXdRW1j4U/edit?usp=sharing|Dataset}
- * @returns {string}
  */
 export function createJoinedCubesSchema(): string {
   return `

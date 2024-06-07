@@ -128,9 +128,8 @@ describe('test authorization', () => {
       .get('/test-auth-fake')
       .set('Authorization', `Authorization: ${badToken}`)
       .expect(403);
-
-    // No bad logs
-    expect(loggerMock.mock.calls.length).toEqual(0);
+      
+    expect(loggerMock.mock.calls.length).toEqual(1);
     expect(handlerMock.mock.calls.length).toEqual(2);
 
     expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);

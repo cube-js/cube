@@ -91,7 +91,7 @@ const create = async (projectName, options) => {
     logStage('Installing JDBC dependencies');
 
     // eslint-disable-next-line import/no-dynamic-require,global-require,@typescript-eslint/no-var-requires
-    const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver', 'driver', 'JDBCDriver'));
+    const JDBCDriver = require(path.join(process.cwd(), 'node_modules', '@cubejs-backend', 'jdbc-driver'));
 
     const { jdbcDriver } = await inquirer.prompt([{
       type: 'list',
@@ -185,7 +185,7 @@ export function configureCreateCommand(program: CommanderStatic) {
       '-t, --template <template>',
       'App template. Options: docker (default), express, serverless, serverless-google.'
     )
-    .description('Create new Cube.js app')
+    .description('Create new Cube app')
     .action(
       (projectName, options) => create(projectName, options)
         .catch(e => displayError(e.stack || e, { projectName, dbType: options.dbType }))

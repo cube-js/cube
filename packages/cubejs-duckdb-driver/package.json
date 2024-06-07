@@ -1,0 +1,53 @@
+{
+  "name": "@cubejs-backend/duckdb-driver",
+  "description": "Cube DuckDB database driver",
+  "author": "Cube Dev, Inc.",
+  "version": "0.35.47",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cube-js/cube.git",
+    "directory": "packages/cubejs-duckdb-driver"
+  },
+  "engines": {
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
+  },
+  "files": [
+    "dist/src",
+    "index.js"
+  ],
+  "main": "index.js",
+  "typings": "dist/src/index.d.ts",
+  "scripts": {
+    "build": "rm -rf dist && npm run tsc",
+    "tsc": "tsc",
+    "watch": "tsc -w",
+    "integration": "npm run integration:duckdb",
+    "integration:duckdb": "jest --verbose dist/test",
+    "lint": "eslint src/* --ext .ts",
+    "lint:fix": "eslint --fix src/* --ext .ts"
+  },
+  "dependencies": {
+    "@cubejs-backend/base-driver": "^0.35.43",
+    "@cubejs-backend/schema-compiler": "^0.35.47",
+    "@cubejs-backend/shared": "^0.35.43",
+    "duckdb": "^0.10.2"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@cubejs-backend/linter": "^0.35.0",
+    "@cubejs-backend/testing-shared": "^0.35.47",
+    "@types/jest": "^27",
+    "@types/node": "^16",
+    "jest": "^27",
+    "typescript": "~5.2.2"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "jest": {
+    "testEnvironment": "node"
+  },
+  "eslintConfig": {
+    "extends": "../cubejs-linter"
+  }
+}

@@ -3,12 +3,11 @@ name: Build
 on:
   push:
     paths:
+      - '.github/actions/smoke.sh'
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/cubestore/js-wrapper/**'
-      - 'rust/cubestore/tsconfig.json'
-      - 'rust/cubestore/package.json'
+      - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
@@ -23,9 +22,7 @@ on:
       - '.github/workflows/push.yml'
       - '.github/workflows/master.yml'
       - 'packages/**'
-      - 'rust/cubestore/js-wrapper/**'
-      - 'rust/cubestore/tsconfig.json'
-      - 'rust/cubestore/package.json'
+      - 'rust/cubestore/**'
       - 'rust/cubesql/**'
       - '.eslintrc.js'
       - '.prettierrc'
@@ -43,7 +40,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x, 16.x, 18.x]
+        node-version: [18.x, 20.x]
       fail-fast: false
 
     steps:
@@ -52,14 +49,14 @@ jobs:
         env:
           OUT: ${{ needs['latest-tag-sha'].outputs.sha }}
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -68,20 +65,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -98,12 +92,12 @@ jobs:
         run: yarn build
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
-      - uses: codecov/codecov-action@v1
-        if: (matrix.node-version == '16.x')
-        with:
-          files: ./packages/*/coverage/clover.xml
-          flags: cube-backend
-          verbose: true # optional (default = false)
+#      - uses: codecov/codecov-action@v1
+#        if: (matrix.node-version == '18.x')
+#        with:
+#          files: ./packages/*/coverage/clover.xml
+#          flags: cube-backend
+#          verbose: true # optional (default = false)
 
   lint:
     runs-on: ubuntu-20.04
@@ -113,33 +107,30 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -163,33 +154,30 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
-      - name: Install Node.js 14.x
+      - name: Install Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 14.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-14.x-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-14.x-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -209,138 +197,94 @@ jobs:
         env:
           NODE_OPTIONS: --max_old_space_size=4096
 
-  integration-redis:
-    needs: [unit, lint, latest-tag-sha]
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
-
-    services:
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    strategy:
-      matrix:
-        node-version: [14.x]
-      fail-fast: false
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-03-08
-          override: true
-          components: rustfmt
-      - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
-      - name: Get yarn cache directory path
-        id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
-        uses: actions/cache@v3
-        with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
-      - name: Yarn install
-        uses: nick-invision/retry@v2
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Lerna tsc
-        run: yarn tsc
-      - name: Run Redis Integration with Redis Driver
-        timeout-minutes: 10
-        run: |
-          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
-        env:
-          CUBEJS_REDIS_USE_IOREDIS: false
-      - name: Run Redis Integration with IORedis Driver
-        timeout-minutes: 10
-        run: |
-          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
-        env:
-          CUBEJS_REDIS_USE_IOREDIS: true
-      - name: Setup Redis Cluster
-        uses: vishnudxb/redis-cluster@1.0.5
-        with:
-          master1-port: 5000
-          master2-port: 5001
-          master3-port: 5002
-          slave1-port: 5003
-          slave2-port: 5004
-          slave3-port: 5005
-      - name: Run Redis Integration with Cluster
-        timeout-minutes: 10
-        run: |
-          yarn lerna run --concurrency 1 --stream --no-prefix integration:redis
-        env:
-          CUBEJS_REDIS_USE_IOREDIS: true
-          CUBEJS_REDIS_SENTINEL: "redis+sentinel://localhost:5000,localhost:5001,localhost:5002/mymaster/0"
-
-  integration-cubestore:
+  build-cubestore:
     needs: [latest-tag-sha]
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./rust/cubestore -> target
+          # Separate path for release key to protect cache bloating
+          shared-key: cubestore-release
+          key: ubuntu-20.04
+      - name: Build Cube Store
+        run: |
+          cd rust/cubestore
+          cargo build --release -j 4
+      - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
+        uses: actions/upload-artifact@v3
+        with:
+          name: cubestored-x86_64-unknown-linux-gnu-release
+          path: ./rust/cubestore/target/release/cubestored
+          retention-days: 5
+
+  integration-cubestore:
+    needs: [latest-tag-sha, build-cubestore]
+    runs-on: ubuntu-20.04
+    timeout-minutes: 60
+    if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [18.x]
       fail-fast: false
 
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
+        uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -353,17 +297,15 @@ jobs:
           command: yarn install --frozen-lockfile
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v1
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
+        uses: actions/download-artifact@v3
         with:
-          working-directory: ./rust/cubestore
-          key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+          path: ./rust/cubestore/target/release/
+          name: cubestored-x86_64-unknown-linux-gnu-release
       - name: Run Cube Store in background
-        run: RUNNER_TRACKING_ID="" && ./rust/cubestore/target/debug/cubestored &
+        run: |
+          chmod +x ./rust/cubestore/target/release/cubestored
+          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/release/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
@@ -377,20 +319,20 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [18.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
-            'mysql-aurora-serverless', 'crate'
+            'mysql-aurora-serverless', 'crate', 'mongobi'
         ]
       fail-fast: false
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly-2022-03-08
+          toolchain: nightly-2023-12-13
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
@@ -399,20 +341,17 @@ jobs:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -430,45 +369,52 @@ jobs:
         run: ./.github/actions/integration/${{ matrix.db }}.sh
 
   integration-smoke:
-    needs: [ latest-tag-sha ]
+    needs: [ latest-tag-sha, build-cubestore ]
     runs-on: ubuntu-20.04
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     strategy:
       matrix:
-        node-version: [ 14.x ]
+        node-version: [ 18.x ]
       fail-fast: false
 
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          override: true
-          components: rustfmt
+        uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-${{ matrix.node-version }}-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:
@@ -479,32 +425,23 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: yarn install --frozen-lockfile
+      - name: Install instant client for Oracle
+        uses: GoodManWEN/oracle-client-action@main
       - name: Build client
         run: yarn build
       - name: Lerna tsc
         run: yarn tsc
-      - uses: Swatinem/rust-cache@v1
+      - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
+        uses: actions/download-artifact@v3
         with:
-          working-directory: ./rust/cubestore
-          key: ubuntu-20.04
-      - name: Build cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+          path: rust/cubestore/downloaded/latest/bin/
+          name: cubestored-x86_64-unknown-linux-gnu-release
+      - name: Chmod +x for cubestored
+        run: |
+          chmod +x ./rust/cubestore/downloaded/latest/bin/cubestored
       - name: Run Integration smoke tests
         timeout-minutes: 30
-        env:
-          CUBEJS_AWS_KEY: ${{ secrets.CUBEJS_AWS_KEY }}
-          CUBEJS_AWS_SECRET: ${{ secrets.CUBEJS_AWS_SECRET }}
-          CUBEJS_AWS_REGION: us-east-1
-          CUBEJS_AWS_S3_OUTPUT_LOCATION: s3://cubejs-opensource/testing/output
-          CUBEJS_DB_EXPORT_BUCKET: s3://cubejs-opensource/testing/export
-        run: |
-          mkdir -p rust/cubestore/downloaded/latest/bin
-          cp rust/cubestore/target/debug/cubestored rust/cubestore/downloaded/latest/bin/cubestored
-          cd packages/cubejs-testing/
-          yarn run smoke
+        run: ./.github/actions/smoke.sh
 
   docker-image-latest-set-tag:
     # At least git should be completed pushed up until this moment
@@ -515,7 +452,7 @@ jobs:
       tag: ${{ steps.get-tag.outputs.tag }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - id: get-tag
         run: echo "::set-output name=tag::$(git tag --contains $GITHUB_SHA)"
         env:
@@ -526,7 +463,7 @@ jobs:
     outputs:
       sha: ${{ steps.get-tag.outputs.sha }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - id: git-log
@@ -548,7 +485,7 @@ jobs:
     needs: [latest-tag-sha]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     name: Build & Test :dev for ${{ matrix.name }} without pushing
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 60
     services:
       registry:
@@ -565,8 +502,24 @@ jobs:
             tag: tmp-dev
       fail-fast: false
     steps:
+      - name: Maximize build space (disk space limitations)
+        run: |
+          echo "Before"
+          df -h
+          sudo apt-get remove -y 'php.*'
+          sudo apt-get remove -y '^mongodb-.*'
+          sudo apt-get remove -y '^mysql-.*'
+          sudo apt-get autoremove -y
+          sudo apt-get clean
+
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          echo "After"
+          df -h
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -583,26 +536,23 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 16.x
+      - name: Use Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 16.x
+          node-version: 18.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "::set-output name=dir::$(yarn cache dir)"
-      - name: Restore lerna
+        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        shell: bash
+      - name: Restore yarn cache
         uses: actions/cache@v3
         with:
-          path: |
-            ${{ steps.yarn-cache-dir-path.outputs.dir }}
-            node_modules
-            rust/cubestore/node_modules
-            packages/*/node_modules
-          key: ${{ runner.os }}-workspace-main-16.x-${{ hashFiles('**/yarn.lock') }}
+          path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
-            ${{ runner.os }}-workspace-main-16.x-
+            ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.5
+        run: yarn policies set-version v1.22.19
       - name: Yarn install
         uses: nick-invision/retry@v2
         env:

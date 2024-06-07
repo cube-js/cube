@@ -1,0 +1,10 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 11756
+expression: "execute_query(\"SELECT current_timestamp::date = current_date\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++-----------------------------------------------------+
+| CAST(current_timestamp() AS Date32) = currentdate() |
++-----------------------------------------------------+
+| true                                                |
++-----------------------------------------------------+

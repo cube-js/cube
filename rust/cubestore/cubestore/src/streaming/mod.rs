@@ -1,5 +1,9 @@
 pub mod kafka;
+mod kafka_post_processing;
+mod topic_table_provider;
+mod traffic_sender;
 
+mod buffered_stream;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::metastore::replay_handle::{ReplayHandle, SeqPointer, SeqPointerForLocation};
@@ -12,10 +16,11 @@ use crate::streaming::kafka::{KafkaClientService, KafkaStreamingSource};
 use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
-use crate::CubeError;
+use crate::{app_metrics, CubeError};
 use arrow::array::ArrayBuilder;
 use arrow::array::ArrayRef;
 use async_trait::async_trait;
+use buffered_stream::BufferedStream;
 use chrono::Utc;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use futures::future::join_all;
@@ -31,8 +36,8 @@ use std::io::{Cursor, Write};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-#[cfg(debug_assertions)]
-use stream_debug::MockStreamingSource;
+use tracing::Instrument;
+use traffic_sender::TrafficSender;
 use warp::hyper::body::Bytes;
 
 #[async_trait]
@@ -77,6 +82,7 @@ impl StreamingServiceImpl {
         &self,
         table: &IdRow<Table>,
         location: &str,
+        trace_obj: Option<String>,
     ) -> Result<Arc<dyn StreamingSource>, CubeError> {
         let location_url = Url::parse(location)?;
         if location_url.scheme() != "stream" {
@@ -84,11 +90,6 @@ impl StreamingServiceImpl {
                 "Non stream location received: {}",
                 location
             )));
-        }
-
-        #[cfg(debug_assertions)]
-        if location_url.host_str() == Some("mockstream") {
-            return Ok(Arc::new(MockStreamingSource {}));
         }
 
         let meta_source = self
@@ -109,6 +110,17 @@ impl StreamingServiceImpl {
         if partition.is_none() {
             table_name = location_url.path().to_string().replace("/", "");
         }
+        let seq_column = table
+            .get_row()
+            .seq_column()
+            .ok_or_else(|| {
+                CubeError::internal(format!(
+                    "Seq column is not defined for streaming table '{}'",
+                    table.get_row().get_table_name()
+                ))
+            })?
+            .clone();
+
         match meta_source.get_row().source_type() {
             SourceCredentials::KSql {
                 user,
@@ -118,35 +130,42 @@ impl StreamingServiceImpl {
                 user: user.clone(),
                 password: password.clone(),
                 table: table_name,
+                trace_obj,
                 endpoint_url: url.to_string(),
                 select_statement: table.get_row().select_statement().clone(),
                 partition,
                 ksql_client: self.ksql_client.clone(),
                 offset: table.get_row().stream_offset().clone(),
+                columns: table.get_row().get_columns().clone(),
+                seq_column_index: seq_column.get_index(),
+
             })),
             SourceCredentials::Kafka {
                 user,
                 password,
                 host,
                 use_ssl,
-            } => Ok(Arc::new(KafkaStreamingSource::new(
+            } => Ok(Arc::new(KafkaStreamingSource::try_new(
                 table.get_id(),
                 table.get_row().unique_key_columns()
                     .ok_or_else(|| CubeError::internal(format!("Streaming table without unique key columns: {:?}", table)))?
                     .into_iter().cloned().collect(),
+                seq_column,
                 table.get_row().get_columns().clone(),
                 user.clone(),
                 password.clone(),
                 table_name,
                 host.clone(),
                 table.get_row().select_statement().clone(),
+                table.get_row().source_columns().clone(),
                 table.get_row().stream_offset().clone(),
                 partition.ok_or_else(||
                     CubeError::internal(format!("Loading kafka streams without partition is not supported. Partition is expected to be present in location url but found '{}'", location_url))
                 )?,
                 self.kafka_client.clone(),
                 *use_ssl,
-            ))),
+                trace_obj,
+            )?)),
         }
     }
 
@@ -209,7 +228,12 @@ impl StreamingService for StreamingServiceImpl {
             return Ok(());
         }
 
-        let source = self.source_by(&table, location).await?;
+        let trace_obj = self
+            .meta_store
+            .get_trace_obj_by_table_id(table.get_id())
+            .await?;
+
+        let source = self.source_by(&table, location, trace_obj).await?;
         let seq_column = table.get_row().seq_column().ok_or_else(|| {
             CubeError::internal(format!(
                 "Seq column is not defined for streaming table '{}'",
@@ -218,14 +242,18 @@ impl StreamingService for StreamingServiceImpl {
         })?;
         let location_index = table.get_row().location_index(location)?;
         let initial_seq_value = self.initial_seq_for(&table, location).await?;
-        let mut stream = source
+        let stream = source
             .row_stream(
                 table.get_row().get_columns().clone(),
                 seq_column.clone(),
                 initial_seq_value.clone(),
             )
-            .await?
-            .ready_chunks(self.config_obj.wal_split_threshold() as usize);
+            .await?;
+        let mut stream = BufferedStream::new(
+            stream,
+            self.config_obj.wal_split_threshold() as usize,
+            Duration::from_millis(1000),
+        );
 
         let finish = |builders: Vec<Box<dyn ArrayBuilder>>| {
             builders.into_iter().map(|mut b| b.finish()).collect_vec()
@@ -233,16 +261,11 @@ impl StreamingService for StreamingServiceImpl {
 
         let mut sealed = false;
 
-        let seq_column_index = table
-            .get_row()
-            .seq_column()
-            .expect(&format!(
-                "Streaming table {:?} with undefined seq column",
-                table
-            ))
-            .get_index();
+        let seq_column_index = source.source_seq_column_index();
 
         let mut last_init_seq_check = SystemTime::now();
+        let mut round_trip_started: Option<SystemTime> = None;
+        let tags = vec![format!("location:{}", location)];
 
         while !sealed {
             let new_rows = match tokio::time::timeout(
@@ -263,6 +286,16 @@ impl StreamingService for StreamingServiceImpl {
                 }
             };
 
+            if let Some(round_trip) = round_trip_started {
+                if let Ok(process_time) = round_trip.elapsed() {
+                    app_metrics::STREAMING_ROUNDTRIP_TIME
+                        .report_with_tags(process_time.as_millis() as i64, Some(&tags));
+                }
+            }
+
+            round_trip_started = Some(SystemTime::now());
+            let process_started = SystemTime::now();
+
             if last_init_seq_check.elapsed().unwrap().as_secs()
                 > self.config_obj.stream_replay_check_interval_secs()
             {
@@ -278,12 +311,14 @@ impl StreamingService for StreamingServiceImpl {
 
             let rows = new_rows;
             debug!("Received {} rows for {}", rows.len(), location);
-            let table_cols = table.get_row().get_columns().as_slice();
+            let table_cols = source.source_columns().as_slice();
             let mut builders = create_array_builders(table_cols);
 
             let mut start_seq: Option<i64> = None;
             let mut end_seq: Option<i64> = None;
 
+            app_metrics::STREAMING_ROWS_READ.add_with_tags(rows.len() as i64, Some(&tags));
+            app_metrics::STREAMING_ROUNDTRIP_ROWS.report_with_tags(rows.len() as i64, Some(&tags));
             for row in rows {
                 let row = row?;
                 append_row(&mut builders, table_cols, &row);
@@ -310,8 +345,9 @@ impl StreamingService for StreamingServiceImpl {
                 .create_replay_handle(table.get_id(), location_index, seq_pointer)
                 .await?;
             let data = finish(builders);
-            let data = source.apply_post_filter(data).await?;
+            let data = source.apply_post_processing(data).await?;
 
+            let partition_started_at = SystemTime::now();
             let new_chunks = self
                 .chunk_store
                 .partition_data(
@@ -320,9 +356,17 @@ impl StreamingService for StreamingServiceImpl {
                     table.get_row().get_columns().as_slice(),
                     true,
                 )
+                .instrument(tracing::trace_span!("streaming_partition_data"))
                 .await?;
 
+            if let Ok(time) = partition_started_at.elapsed() {
+                app_metrics::STREAMING_PARTITION_TIME
+                    .report_with_tags(time.as_millis() as i64, Some(&tags));
+            }
+
+            let upload_started_at = SystemTime::now();
             let new_chunk_ids: Result<Vec<(u64, Option<u64>)>, CubeError> = join_all(new_chunks)
+                .instrument(tracing::trace_span!("streaming_upload_chunks"))
                 .await
                 .into_iter()
                 .map(|c| {
@@ -330,9 +374,32 @@ impl StreamingService for StreamingServiceImpl {
                     Ok((c.get_id(), file_size))
                 })
                 .collect();
+
+            if let Ok(time) = upload_started_at.elapsed() {
+                app_metrics::STREAMING_UPLOAD_TIME
+                    .report_with_tags(time.as_millis() as i64, Some(&tags));
+            }
+
+            let new_chunk_ids = new_chunk_ids?;
+
+            app_metrics::STREAMING_CHUNKS_READ
+                .add_with_tags(new_chunk_ids.len() as i64, Some(&tags));
+            app_metrics::STREAMING_ROUNDTRIP_CHUNKS
+                .report_with_tags(new_chunk_ids.len() as i64, Some(&tags));
+            if let Some(last_seq) = end_seq {
+                app_metrics::STREAMING_LASTOFFSET.report_with_tags(last_seq, Some(&tags));
+                if let Some(lag) = source.calulate_lag(last_seq.clone()).await {
+                    app_metrics::STREAMING_LAG.report_with_tags(lag, Some(&tags));
+                }
+            }
             self.meta_store
-                .activate_chunks(table.get_id(), new_chunk_ids?, Some(replay_handle.get_id()))
+                .activate_chunks(table.get_id(), new_chunk_ids, Some(replay_handle.get_id()))
                 .await?;
+
+            if let Ok(process_time) = process_started.elapsed() {
+                app_metrics::STREAMING_IMPORT_TIME
+                    .report_with_tags(process_time.as_millis() as i64, Some(&tags));
+            }
 
             sealed = self.try_seal_table(&table).await?;
         }
@@ -345,7 +412,7 @@ impl StreamingService for StreamingServiceImpl {
         table: IdRow<Table>,
         location: &str,
     ) -> Result<(), CubeError> {
-        let source = self.source_by(&table, location).await?;
+        let source = self.source_by(&table, location, None).await?;
         source.validate_table_location()?;
         Ok(())
     }
@@ -360,8 +427,16 @@ pub trait StreamingSource: Send + Sync {
         initial_seq_value: Option<i64>,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError>;
 
-    async fn apply_post_filter(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
+    fn source_columns(&self) -> &Vec<Column>;
+
+    fn source_seq_column_index(&self) -> usize;
+
+    async fn apply_post_processing(&self, data: Vec<ArrayRef>) -> Result<Vec<ArrayRef>, CubeError> {
         Ok(data)
+    }
+
+    async fn calulate_lag(&self, _current_seq: i64) -> Option<i64> {
+        None
     }
 
     fn validate_table_location(&self) -> Result<(), CubeError>;
@@ -372,11 +447,14 @@ pub struct KSqlStreamingSource {
     user: Option<String>,
     password: Option<String>,
     table: String,
+    trace_obj: Option<String>,
     endpoint_url: String,
     select_statement: Option<String>,
     offset: Option<StreamOffset>,
     partition: Option<usize>,
     ksql_client: Arc<dyn KsqlClient>,
+    columns: Vec<Column>,
+    seq_column_index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -481,6 +559,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Int96 => Err(CubeError::user(
+            "int96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Bytes => match value {
             _ => Err(CubeError::internal(format!(
                 "ksql source bytes import isn't supported"
@@ -517,6 +598,9 @@ pub fn parse_json_value(column: &Column, value: &JsonValue) -> Result<TableValue
                 x
             ))),
         },
+        ColumnType::Decimal96 { .. } => Err(CubeError::user(
+            "decimal96 unsupported for streaming data".to_string(),
+        )),
         ColumnType::Float => match value {
             JsonValue::Number(v) => Ok(TableValue::Float(OrdF64(v.clone().into()))),
             JsonValue::Null => Ok(TableValue::Null),
@@ -600,9 +684,11 @@ impl KSqlStreamingSource {
         tail_bytes: &mut Bytes,
         bytes: Result<Bytes, reqwest::Error>,
         columns: Vec<Column>,
+        traffic_sender: &Arc<TrafficSender>,
     ) -> Result<Vec<Row>, CubeError> {
         let mut rows = Vec::new();
         let b = bytes?;
+        traffic_sender.process_event(b.len() as u64)?;
         let string = String::from_utf8_lossy(&b);
         let mut concat = Cursor::new(Vec::new());
         concat.write_all(tail_bytes)?;
@@ -789,6 +875,8 @@ impl StreamingSource for KSqlStreamingSource {
             )
             .await?;
         let column_to_move = columns.clone();
+        let traffic_sender = TrafficSender::new(self.trace_obj.clone());
+
         Ok(Box::pin(
             res.bytes_stream()
                 .scan(
@@ -798,13 +886,18 @@ impl StreamingSource for KSqlStreamingSource {
                           -> futures_util::future::Ready<
                         Option<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>>,
                     > {
-                        let rows = Self::parse_lines(tail_bytes, bytes, column_to_move.clone())
-                            .map_err(|e| {
-                                CubeError::internal(format!(
-                                    "Error during parsing ksql response: {}",
-                                    e
-                                ))
-                            });
+                        let rows = Self::parse_lines(
+                            tail_bytes,
+                            bytes,
+                            column_to_move.clone(),
+                            &traffic_sender,
+                        )
+                        .map_err(|e| {
+                            CubeError::internal(format!(
+                                "Error during parsing ksql response: {}",
+                                e
+                            ))
+                        });
                         futures_util::future::ready(Some(Box::pin(stream::iter(match rows {
                             Ok(rows) => rows.into_iter().map(|r| Ok(r)).collect::<Vec<_>>(),
                             Err(e) => vec![Err(e)],
@@ -815,85 +908,23 @@ impl StreamingSource for KSqlStreamingSource {
         ))
     }
 
+    fn source_columns(&self) -> &Vec<Column> {
+        &self.columns
+    }
+
+    fn source_seq_column_index(&self) -> usize {
+        self.seq_column_index
+    }
+
     fn validate_table_location(&self) -> Result<(), CubeError> {
         self.query(None)?;
         Ok(())
     }
 }
 
-#[cfg(debug_assertions)]
-mod stream_debug {
-    use super::*;
-    use crate::table::TimestampValue;
-    use async_std::task::{Context, Poll};
-    use chrono::{DateTime, Utc};
-
-    struct MockRowStream {
-        last_id: i64,
-        last_readed: DateTime<Utc>,
-    }
-
-    impl MockRowStream {
-        fn new(last_id: i64) -> Self {
-            Self {
-                last_id,
-                last_readed: Utc::now(),
-            }
-        }
-    }
-
-    impl Stream for MockRowStream {
-        type Item = Result<Row, CubeError>;
-
-        fn poll_next(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            /* if Utc::now().signed_duration_since(self.last_readed).num_milliseconds() < 10 {
-            return Poll::Pending;
-            } */
-
-            let mut last_id = self.last_id;
-            last_id += 1;
-            let row = Row::new(vec![
-                TableValue::Int(last_id),
-                TableValue::Int(last_id % 10),
-                TableValue::Timestamp(TimestampValue::new(Utc::now().timestamp_nanos())),
-                TableValue::Int(last_id),
-            ]);
-            unsafe {
-                let self_mut = self.get_unchecked_mut();
-
-                self_mut.last_id = last_id;
-                self_mut.last_readed = Utc::now();
-            }
-            std::thread::sleep(Duration::from_millis(if rand::random::<u64>() % 200 == 7 {
-                500
-            } else {
-                0
-            }));
-            Poll::Ready(Some(Ok(row)))
-        }
-    }
-
-    pub struct MockStreamingSource {}
-
-    #[async_trait]
-    impl StreamingSource for MockStreamingSource {
-        async fn row_stream(
-            &self,
-            _columns: Vec<Column>,
-            _seq_column: Column,
-            initial_seq_value: Option<i64>,
-        ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
-            Ok(Box::pin(MockRowStream::new(initial_seq_value.unwrap_or(0))))
-        }
-
-        fn validate_table_location(&self) -> Result<(), CubeError> {
-            Ok(())
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::metastore::job::{Job, JobType};
     use futures_timer::Delay;
     use std::time::Duration;
 
@@ -905,7 +936,7 @@ mod tests {
     use crate::metastore::{MetaStoreTable, RowKey};
 
     use super::*;
-    use crate::metastore::job::JobType;
+    use crate::metastore::chunks::chunk_file_name;
     use crate::scheduler::SchedulerImpl;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::kafka::KafkaMessage;
@@ -1018,7 +1049,7 @@ mod tests {
                 return Ok(KsqlResponse::JsonNl { values });
             }
 
-            for i in offset..50000 {
+            for i in offset..5000 {
                 for j in 0..2 {
                     if let Some(p) = &partition {
                         if *p != j {
@@ -1052,7 +1083,7 @@ mod tests {
             _use_ssl: bool,
             to_row: Arc<dyn Fn(KafkaMessage) -> Result<Option<Row>, CubeError> + Send + Sync>,
         ) -> Result<Pin<Box<dyn Stream<Item = Result<Row, CubeError>> + Send>>, CubeError> {
-            let max_offset = 50000;
+            let max_offset = 5000;
             let offset = match offset {
                 Offset::Beginning => 0,
                 Offset::End => max_offset,
@@ -1112,7 +1143,8 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
+            c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KsqlClient, _, _, _>(async move |_| {
@@ -1121,6 +1153,7 @@ mod tests {
                 .await
         }, async move |services| {
             let chunk_store = services.injector.get_service_typed::<dyn ChunkDataStore>().await;
+            let cluster = services.injector.get_service_typed::<dyn Cluster>().await;
             let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
             let service = services.sql_service;
             let meta_store = services.meta_store;
@@ -1149,26 +1182,42 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
             let mut middle_chunk = None;
             for chunk in chunks.iter() {
+                if chunk.get_row().get_partition_id() != 1 {
+                    continue;
+                }
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
-                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 32768).unwrap_or(false)).unwrap_or(false)) {
-                            chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
+                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
+                            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+                            chunk_store.free_memory_chunk(chunk_name).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
                         }
                     }
                 }
             }
-            Delay::new(Duration::from_millis(10000)).await;
-            scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition = &meta_store.get_partition(partition_id).await.unwrap();
+
+            let node = cluster.node_name_by_partition(partition);
+            let job = meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await.unwrap();
+            if job.is_some() {
+                cluster.notify_job_runner(node).await.unwrap();
+            }
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
@@ -1190,7 +1239,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
 
@@ -1207,7 +1256,7 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             println!("replay handles pre merge: {:#?}", service
                 .exec_query("SELECT * FROM system.replay_handles")
@@ -1253,7 +1302,8 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
+            c.compaction_in_memory_chunks_schedule_period_secs = 0;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1262,6 +1312,7 @@ mod tests {
                 .await
         }, async move |services| {
             let chunk_store = services.injector.get_service_typed::<dyn ChunkDataStore>().await;
+            let cluster = services.injector.get_service_typed::<dyn Cluster>().await;
             let scheduler = services.injector.get_service_typed::<SchedulerImpl>().await;
             let service = services.sql_service;
             let meta_store = services.meta_store;
@@ -1290,48 +1341,54 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
             let listener = services.cluster.job_result_listener();
             let chunks = meta_store.chunks_table().all_rows().await.unwrap();
             let replay_handles = meta_store.get_replay_handles_by_ids(chunks.iter().filter_map(|c| c.get_row().replay_handle_id().clone()).collect()).await.unwrap();
             let mut middle_chunk = None;
             for chunk in chunks.iter() {
+                if chunk.get_row().get_partition_id() != 1 {
+                    continue;
+                }
                 if let Some(handle_id) = chunk.get_row().replay_handle_id() {
                     let handle = replay_handles.iter().find(|h| h.get_id() == *handle_id).unwrap();
                     if let Some(seq_pointers) = handle.get_row().seq_pointers_by_location() {
-                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 32768).unwrap_or(false)).unwrap_or(false)) {
-                            chunk_store.free_memory_chunk(chunk.get_id()).await.unwrap();
+                        if seq_pointers.iter().any(|p| p.as_ref().map(|p| p.start_seq().as_ref().zip(p.end_seq().as_ref()).map(|(a, b)| *a > 0 && *b <= 3276).unwrap_or(false)).unwrap_or(false)) {
+                            let chunk_name = chunk_file_name(chunk.get_id(), chunk.get_row().suffix());
+                            chunk_store.free_memory_chunk(chunk_name).await.unwrap();
                             middle_chunk = Some(chunk.clone());
                             break;
                         }
                     }
                 }
             }
-            Delay::new(Duration::from_millis(10000)).await;
-            scheduler.schedule_compaction_in_memory_chunks_if_needed(&meta_store.get_partition(middle_chunk.unwrap().get_row().get_partition_id()).await.unwrap()).await.unwrap();
+
+            let partition_id = middle_chunk.unwrap().get_row().get_partition_id();
+            let partition = &meta_store.get_partition(partition_id).await.unwrap();
+
+            let node = cluster.node_name_by_partition(partition);
+            let job = meta_store
+                .add_job(Job::new(
+                    RowKey::Table(TableId::Partitions, partition_id),
+                    JobType::InMemoryChunksCompaction,
+                    node.to_string(),
+                ))
+                .await.unwrap();
+            if job.is_some() {
+                cluster.notify_job_runner(node).await.unwrap();
+            }
 
             let wait = listener.wait_for_job_results(vec![
                 (RowKey::Table(TableId::Partitions, 1), JobType::InMemoryChunksCompaction),
             ]);
             timeout(Duration::from_secs(10), wait).await.unwrap().unwrap();
 
-            println!("chunks: {:#?}", service
-                .exec_query("SELECT * FROM system.chunks")
-                .await
-                .unwrap()
-            );
-            println!("replay handles: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
-
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000 - 16384)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000 - 1638)])]);
 
             let listener = services.cluster.job_result_listener();
 
@@ -1348,13 +1405,8 @@ mod tests {
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(100000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
 
-            println!("replay handles pre merge: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
 
             scheduler.merge_replay_handles().await.unwrap();
 
@@ -1364,11 +1416,6 @@ mod tests {
                 .unwrap();
             assert_eq!(result.get_rows().len(), 0);
 
-            println!("replay handles after merge: {:#?}", service
-                .exec_query("SELECT * FROM system.replay_handles")
-                .await
-                .unwrap()
-            );
 
             service
                 .exec_query("DROP TABLE test.events_by_type_1")
@@ -1394,7 +1441,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1416,7 +1463,7 @@ mod tests {
 
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int) \
-                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 10000 and FILTER_ID < 14000') \
+                            WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE WHERE FILTER_ID >= 1000 and FILTER_ID < 1400') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`) INDEX by_anonymous(`ANONYMOUSID`, `FILTER_ID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
                 .unwrap();
@@ -1425,25 +1472,25 @@ mod tests {
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
             ]);
-            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+            let _ = timeout(Duration::from_secs(15), wait).await;
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(800)])]);
 
             let result = service
                 .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10000)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1000)])]);
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(13999)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(1399)])]);
         })
             .await;
     }
@@ -1458,7 +1505,7 @@ mod tests {
             c.compaction_chunks_count_threshold = 100;
             c.compaction_chunks_total_size_threshold = 100000;
             c.stale_stream_timeout = 1;
-            c.wal_split_threshold = 16384;
+            c.wal_split_threshold = 1638;
             c
         }).start_with_injector_override(async move |injector| {
             injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
@@ -1481,9 +1528,9 @@ mod tests {
             let _ = service
                 .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` timestamp) \
                             WITH (stream_offset = 'earliest', select_statement = 'SELECT * FROM EVENTS_BY_TYPE \
-                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T10:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            WHERE  TIMESTAMP >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
                             AND
-                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T11:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            TIMESTAMP < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
                             ') \
                             unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
                 .await
@@ -1493,25 +1540,269 @@ mod tests {
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
                 (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
             ]);
-            timeout(Duration::from_secs(15), wait).await.unwrap().unwrap();
+            let _ = timeout(Duration::from_secs(15), wait).await;
 
             let result = service
                 .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(8400)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
 
             let result = service
                 .exec_query("SELECT min(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(10 * 3600)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
 
             let result = service
                 .exec_query("SELECT max(FILTER_ID) FROM test.events_by_type_1 ")
                 .await
                 .unwrap();
-            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(11 * 3600 + 600 - 1)])]);
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
+        })
+            .await;
+    }
+
+    #[tokio::test]
+    async fn streaming_projection_kafka_create_table() {
+        Config::test("streaming_projection_kafka_create_table").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 1638;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  *
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`, `FILTER_ID`, `TIMESTAMP`) INDEX by_anonymous(`ANONYMOUSID`, `TIMESTAMP`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_2 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID as MESSAGEID, FILTER_ID + 5 as FILTER_ID, TIMESTAMP as TIMESTAMP
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            service
+                .exec_query("CREATE TABLE test.events_by_type_3 (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID as ANONYMOUSID, MESSAGEID + 3 as MESSAGEID, FILTER_ID + 5 as FILTER_ID
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            '\
+                            ) \
+                            unique key (`ANONYMOUSID`, `MESSAGEID`) INDEX by_anonymous(`ANONYMOUSID`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .expect_err("Validation should fail");
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_4 (`an_id` text, `message_id` text, `filter_id` int, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_5 (`an_id` text, `message_id` text, `filter_id` float, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .expect_err("Validation should fail");
+        })
+            .await;
+    }
+    #[tokio::test]
+    async fn streaming_projection_kafka_timestamp_ops() {
+        Config::test("streaming_projection_kafka_timestamp_ops").update_config(|mut c| {
+            c.stream_replay_check_interval_secs = 1;
+            c.compaction_in_memory_chunks_max_lifetime_threshold = 8;
+            c.partition_split_threshold = 1000000;
+            c.max_partition_split_threshold = 1000000;
+            c.compaction_chunks_count_threshold = 100;
+            c.compaction_chunks_total_size_threshold = 100000;
+            c.stale_stream_timeout = 1;
+            c.wal_split_threshold = 1638;
+            c
+        }).start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn KafkaClientService, _, _, _>(async move |_| {
+                Arc::new(MockKafkaClient)
+            })
+                .await
+        }, async move |services| {
+            //PARSE_TIMESTAMP('2023-01-24T23:59:59.999Z', 'yyyy-MM-dd''T''HH:mm:ss.SSSX', 'UTC')
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+            service
+                .exec_query("CREATE SOURCE OR UPDATE kafka AS 'kafka' VALUES (user = 'foo', password = 'bar', host = 'localhost:9092')")
+                .await
+                .unwrap();
+
+            let listener = services.cluster.job_result_listener();
+
+            let _ = service
+                .exec_query("CREATE TABLE test.events_by_type_1 (`an_id` text, `message_id` text, `filter_id` int, `minute_timestamp` timestamp) \
+                            WITH (\
+                                  stream_offset = 'earliest',
+                                  select_statement = 'SELECT \
+                                  ANONYMOUSID an_id,
+                                  MESSAGEID message_id,
+                                  FILTER_ID filter_id,
+                                  PARSE_TIMESTAMP(\
+                                    FORMAT_TIMESTAMP(\
+                                        CONVERT_TZ(\
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
+                                            \\'UTC\\', 
+                                            \\'UTC\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
+                                        ), 
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
+                                        \\'UTC\\' 
+                                    ) minute_timestamp
+                                   FROM EVENTS_BY_TYPE \
+                            WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            AND
+                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') < PARSE_TIMESTAMP(\\'1970-01-01T01:10:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
+                            \
+                            ',\
+                            source_table='CREATE TABLE EVENTS_BY_TYPE (`ANONYMOUSID` text, `MESSAGEID` text, `FILTER_ID` int, `TIMESTAMP` text)'\
+                            ) \
+                            unique key (`message_id`, `an_id`) INDEX by_anonymous(`message_id`) location 'stream://kafka/EVENTS_BY_TYPE/0', 'stream://kafka/EVENTS_BY_TYPE/1'")
+                .await
+                .unwrap();
+
+            let wait = listener.wait_for_job_results(vec![
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/0".to_string())),
+                (RowKey::Table(TableId::Tables, 1), JobType::TableImportCSV("stream://kafka/EVENTS_BY_TYPE/1".to_string())),
+            ]);
+            let _ = timeout(Duration::from_secs(15), wait).await;
+
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(20 * 60)])]);
+            let result = service
+                .exec_query("SELECT COUNT(*) FROM test.events_by_type_1 where minute_timestamp = to_timestamp('1970-01-01T01:06:00'))")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(2 * 60)])]);
+            let result = service
+                .exec_query("SELECT minute_timestamp, count(*) FROM test.events_by_type_1 group by 1")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows().len(), 10);
+
+            let result = service
+                .exec_query("SELECT min(filter_id) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600)])]);
+
+            let result = service
+                .exec_query("SELECT max(filter_id) FROM test.events_by_type_1 ")
+                .await
+                .unwrap();
+            assert_eq!(result.get_rows(), &vec![Row::new(vec![TableValue::Int(3600 + 600 - 1)])]);
         })
             .await;
     }

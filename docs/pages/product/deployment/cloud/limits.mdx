@@ -1,0 +1,96 @@
+---
+redirect_from:
+  - /cloud/limits
+---
+
+# Limits and quotas in Cube Cloud
+
+Cube Cloud implements limits on resource usage on account and deployment levels
+to ensure the best experience for all Cube Cloud users.
+
+<SuccessBox>
+
+Limits apply to Cube Cloud accounts on [all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Limit types
+
+Each limit can be of one of the following types:
+
+- _Hard limit_ either has a threshold that can't be exceeded or prevents further
+  use of a resource when a threshhold is hit until a cool-down period passes
+  (e.g., until the next day starts) or the limit is increased (e.g., when a Cube
+  Cloud account upgrades to another tier).
+- _Soft limit_ may allow further use of a resource after a threshold is hit.
+
+## Resources
+
+The following resources are subject to limits, depending on [deployment
+types][ref-deployment-types] and [pricing tiers][ref-pricing]:
+
+| Resource                                                                            | Free Tier |  Starter  |  Premium  | Enterprise |      Enterprise Premier       |
+| ----------------------------------------------------------------------------------- | :-------: | :-------: | :-------: | :--------: | :---------------------------: |
+| Number of deployments                                                               |     2     | Unlimited | Unlimited | Unlimited  |           Unlimited           |
+| Number of API instances per deployment                                              |     1     |    20     |    20     |     20     | [Contact us][cube-contact-us] |
+| Number of Cube Store workers per deployment                                         |     2     |    16     |    16     |     16     | [Contact us][cube-contact-us] |
+| Queries per day for each [development instance][ref-dev-instance]                   |   1,000   |  10,000   | Unlimited | Unlimited  | Unlimited                     |
+| Queries per day for each [production cluster][ref-prod-cluster]                     |     —     |  50,000   | Unlimited | Unlimited  | Unlimited                     |
+| Queries processed by [Query History][ref-query-history] per day for each deployment |   1,000   |  Depends on [Query History tier][ref-query-history-tiers]   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
+| Data retained by [Query History][ref-query-history]                                 |   1 day   |   Depends on [Query History tier][ref-query-history-tiers]   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
+
+### Number of deployments
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Number of API instances
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Number of Cube Store workers
+
+This is a hard limit. Consider upgrading to [another tier][ref-pricing].
+
+### Queries per day
+
+This is a hard limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
+When a threshold is hit, further queries will not be processed. In that case,
+consider upgrading a development instance to a production cluster.
+Alternatively, consider upgrading to [another tier][ref-pricing].
+
+### Queries processed by Query History per day
+
+This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
+When a threshold is hit, query processing will be stopped. Please [contact
+support][cube-contact-us] for further assistance.
+
+### Data retained by Query History
+
+This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
+## Quotas
+
+The [REST][ref-rest-api] and [GraphQL][ref-gql-api] APIs both have a standard
+quota of 100 requests per second per deployment; this can also go higher
+for short bursts of traffic. These limits can be raised on request,
+[contact support][cube-contact-us] for more details.
+
+When the quota is exceeded, the API will return a `429 Too Many Requests`
+response.
+
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-gql-api]: /product/apis-integrations/graphql-api
+[ref-deployment-types]: /product/deployment/cloud/deployment-types
+[ref-pricing]: /product/deployment/cloud/pricing
+[ref-query-history]: /product/workspace/query-history
+[ref-dev-instance]:
+  /product/deployment/cloud/deployment-types#development-instance
+[ref-prod-cluster]:
+  /product/deployment/cloud/deployment-types#production-cluster
+[cube-contact-us]: https://cube.dev/contact
+[ref-query-history-tiers]: /product/deployment/cloud/pricing#query-history-tiers

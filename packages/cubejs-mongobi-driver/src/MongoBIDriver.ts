@@ -44,15 +44,30 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: MongoBIDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
-    const dataSource =
-      config.dataSource ||
-      assertDataSource('default');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { dataSource: configDataSource, maxPoolSize, testConnectionTimeout, ...mongoBIDriverConfiguration } = config;
+    const dataSource = configDataSource || assertDataSource('default');
 
     this.config = {
       host: getEnv('dbHost', { dataSource }),
@@ -60,7 +75,9 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
       port: getEnv('dbPort', { dataSource }),
       user: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
-      ssl: this.getSslOptions(dataSource),
+      // mysql2 uses own typings for ssl property, which is not correct
+      // Types of property 'pfx' are incompatible. Skipping validation with any cast
+      ssl: this.getSslOptions(dataSource) as any,
       authPlugins: {
         mysql_clear_password: () => async () => {
           const password =
@@ -80,7 +97,7 @@ export class MongoBIDriver extends BaseDriver implements DriverInterface {
 
         return next();
       },
-      ...config
+      ...mongoBIDriverConfiguration
     };
     this.pool = genericPool.createPool({
       create: async () => {

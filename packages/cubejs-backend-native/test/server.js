@@ -1,95 +1,151 @@
-const native = require('../dist/js/index');
+import { FakeRowStream } from './response-fake';
+
+const native = require('../js/index');
 const meta_fixture = require('./meta');
 
 (async () => {
-    const load = async ({ request, session, query }) => {
-      console.log('[js] load',  {
-        request,
-        session,
-        query ,
-      });
+  const load = async ({ request, session, query }) => {
+    console.log('[js] load', {
+      request,
+      session,
+      query,
+    });
 
-      throw new Error('load is not implemented');
+    throw new Error('load is not implemented');
+  };
+
+  const sqlApiLoad = async ({ request, session, query, streaming }) => {
+    console.log('[js] sqlApiLoad', {
+      request,
+      session,
+      query,
+      streaming
+    });
+
+    if (streaming) {
+      return {
+        stream: new FakeRowStream(query),
+      };
+    }
+
+    throw new Error('sqlApiLoad is not implemented');
+  };
+
+  const sql = async () => {
+    console.log('[js] sql');
+
+    throw new Error('sql is not implemented');
+  };
+
+  const meta = async ({ request, session }) => {
+    console.log('[js] meta', {
+      request,
+      session
+    });
+
+    return meta_fixture;
+  };
+
+  const stream = async ({ request, session, query }) => {
+    console.log('[js] stream', {
+      request,
+      session,
+      query,
+    });
+
+    return {
+      stream: new FakeRowStream(query),
     };
+  };
 
-    const meta = async ({ request, session }) => {
-        console.log('[js] meta',  {
-          request,
-          session
-        });
+  const checkAuth = async ({ request, user, password }) => {
+    console.log('[js] checkAuth', {
+      request,
+      user,
+      password
+    });
 
-        return meta_fixture;
-    };
-
-    const stream = async ({ request, session, query }) => {
-      console.log('[js] stream',  {
-        request,
-        session,
-        query ,
-      });
-
-      throw new Error('stream is not implemented');
-    };
-
-    const checkAuth = async ({ request, user }) => {
-      console.log('[js] checkAuth',  {
-        request,
-        user,
-      });
-
-      if (user) {
-        // without password
-        if (user === 'wp') {
-          return {
-            password: null,
-            superuser: false,
-          };
-        }
-
-        if (user === 'admin') {
-          return {
-            password: null,
-            superuser: true,
-          };
-        }
-
+    if (user) {
+      // without password
+      if (user === 'wp') {
         return {
-          password: 'test',
+          password,
           superuser: false,
-        }
+        };
       }
 
-      throw new Error('Please specify password');
+      if (user === 'admin') {
+        return {
+          password,
+          superuser: true,
+        };
+      }
+
+      return {
+        password: 'test',
+        superuser: false,
+      };
+    }
+
+    throw new Error('Please specify password');
+  };
+
+  const sqlGenerators = async ({ request, session }) => {
+    console.log('[js] sqlGenerators', {
+      request,
+      session,
+    });
+
+    return {
+      cubeNameToDataSource: {},
+      dataSourceToSqlGenerator: {},
     };
+  };
 
-    native.setupLogger(
-      ({ event }) => console.log(event),
-      'trace',
-    );
+  const logLoadEvent = async () => {
+    console.log('[js] logLoadEvent');
+  };
 
-    const server = await native.registerInterface({
-      // nonce: '12345678910111213141516'.substring(0, 20),
-      checkAuth,
-      load,
-      meta,
-      stream,
-    });
-    console.log({
-      server
-    });
+  const canSwitchUserForSession = async () => {
+    console.log('[js] canSwitchUserForSession');
 
-    process.on('SIGINT', async () => {
-      console.log('SIGINT signal');
+    return true;
+  };
 
-      try {
-        await native.shutdownInterface(server);
-      } catch (e) {
-        console.log(e);
-      } finally {
-        process.exit(1);
-      }
-    });
+  native.setupLogger(
+    ({ event }) => console.log(event),
+    'trace',
+  );
 
-    // block
-    await new Promise(() => {});
+  const server = await native.registerInterface({
+    // nonce: '12345678910111213141516'.substring(0, 20),
+    checkAuth,
+    load,
+    sql,
+    meta,
+    stream,
+    sqlApiLoad,
+    sqlGenerators,
+    logLoadEvent,
+    canSwitchUserForSession,
+    pgPort: '5555',
+  });
+  console.log({
+    server
+  });
+
+  process.on('SIGINT', async () => {
+    console.log('SIGINT signal');
+
+    try {
+      await native.shutdownInterface(server);
+    } catch (e) {
+      console.log(e);
+    } finally {
+      process.exit(1);
+    }
+  });
+
+  // block
+  await new Promise(() => {});
 })();

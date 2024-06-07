@@ -69,6 +69,9 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionsForSelect: any[] = this.dimensionsForSelect();
     const dimensionColumns = dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
       .reduce((a, b) => a.concat(b), [])
@@ -99,7 +102,12 @@ export class KsqlQuery extends BaseQuery {
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
     const [sql] = this.preAggregationSql(cube, preAggregation);
-    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql));
+    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql)) ||
+      preAggregation.type === 'rollup' && !!this.dimensionsForSelect().find(d => d.definition().primaryKey);
+  }
+
+  public preAggregationAllowUngroupingWithPrimaryKey(_cube: any, _preAggregation: any) {
+    return true;
   }
 
   public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {

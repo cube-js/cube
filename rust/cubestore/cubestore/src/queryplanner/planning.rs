@@ -44,12 +44,13 @@ use crate::metastore::{
 use crate::queryplanner::optimizations::rewrite_plan::{rewrite_plan, PlanRewriter};
 use crate::queryplanner::panic::{plan_panic_worker, PanicWorkerNode};
 use crate::queryplanner::partition_filter::PartitionFilter;
+use crate::queryplanner::providers::InfoSchemaQueryCacheTableProvider;
 use crate::queryplanner::query_executor::{ClusterSendExec, CubeTable, InlineTableProvider};
 use crate::queryplanner::serialized_plan::{
     IndexSnapshot, InlineSnapshot, PartitionSnapshot, SerializedPlan,
 };
 use crate::queryplanner::topk::{materialize_topk, plan_topk, ClusterAggregateTopK};
-use crate::queryplanner::CubeTableLogical;
+use crate::queryplanner::{CubeTableLogical, InfoSchemaTableProvider};
 use crate::table::{cmp_same_types, Row};
 use crate::CubeError;
 use datafusion::logical_plan;
@@ -669,6 +670,16 @@ fn single_value_filter_columns<'a>(
             columns.push(c);
             true
         }
+        Expr::Not(e) => {
+            let expr = e.as_ref();
+            match expr {
+                Expr::Column(c) => {
+                    columns.push(c);
+                    true
+                }
+                _ => false,
+            }
+        }
         Expr::Literal(_) => true,
         Expr::BinaryExpr { left, op, right } => match op {
             Operator::Eq => {
@@ -857,8 +868,19 @@ impl ChooseIndex<'_> {
                         None,
                     )
                     .into_plan());
+                } else if let Some(_) = source.as_any().downcast_ref::<InfoSchemaTableProvider>() {
+                    return Err(DataFusionError::Plan(
+                        "Unexpected table source: InfoSchemaTableProvider".to_string(),
+                    ));
+                } else if let Some(_) = source
+                    .as_any()
+                    .downcast_ref::<InfoSchemaQueryCacheTableProvider>()
+                {
+                    return Err(DataFusionError::Plan(
+                        "Unexpected table source: InfoSchemaQueryCacheTableProvider".to_string(),
+                    ));
                 } else {
-                    panic!("Unexpected table source")
+                    return Err(DataFusionError::Plan("Unexpected table source".to_string()));
                 }
             }
             _ => return Ok(p),
@@ -2116,6 +2138,7 @@ pub mod tests {
             None,
             None,
             None,
+            None,
             Vec::new(),
             None,
             None,
@@ -2161,6 +2184,7 @@ pub mod tests {
             None,
             None,
             true,
+            None,
             None,
             None,
             None,
@@ -2222,6 +2246,7 @@ pub mod tests {
             None,
             None,
             None,
+            None,
             Vec::new(),
             None,
             None,
@@ -2246,13 +2271,11 @@ pub mod tests {
     }
 
     fn initial_plan(s: &str, i: &TestIndices) -> LogicalPlan {
-        let statement;
-        if let Statement::Statement(s) = CubeStoreParser::new(s).unwrap().parse_statement().unwrap()
-        {
-            statement = s;
-        } else {
-            panic!("not a statement")
-        }
+        let statement = match CubeStoreParser::new(s).unwrap().parse_statement().unwrap() {
+            Statement::Statement(s) => s,
+            other => panic!("not a statement, actual {:?}", other),
+        };
+
         let plan = SqlToRel::new(i)
             .statement_to_plan(&DFStatement::Statement(statement))
             .unwrap();

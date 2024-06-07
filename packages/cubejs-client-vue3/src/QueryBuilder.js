@@ -77,7 +77,7 @@ export default {
       type: Object,
       default: () => ({}),
     },
-    cubejsApi: {
+    cubeApi: {
       type: Object,
       required: true,
     },
@@ -131,7 +131,7 @@ export default {
   render() {
     const {
       chartType,
-      cubejsApi,
+      cubeApi,
       dimensions,
       filters,
       measures,
@@ -247,7 +247,7 @@ export default {
       QueryRenderer,
       {
         query: this.validatedQuery,
-        cubejsApi,
+        cubeApi,
         builderProps,
         slots: this.$slots,
         on: {
@@ -270,7 +270,12 @@ export default {
         [
           ...this.measures,
           ...this.dimensions,
-          ...this.timeDimensions.map(({ dimension }) => toOrderMember(dimension)),
+          ...this.timeDimensions.reduce((acc, { dimension, granularity }) => {
+            if (granularity !== undefined) {
+              acc.push(toOrderMember(dimension));
+            }
+            return acc;
+          }, []),
         ]
           .map((member, index) => {
             const id = member.name || member.id;
@@ -378,7 +383,7 @@ export default {
         this.chartType = chartType || this.chartType;
         this.pivotConfig = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
-          pivotConfig || this.pivotConfig
+          pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
         this.copyQueryFromProps(validatedQuery);
       }
@@ -394,12 +399,12 @@ export default {
   },
 
   async mounted() {
-    this.meta = await this.cubejsApi.meta();
+    this.meta = await this.cubeApi.meta();
 
     this.copyQueryFromProps();
 
     if (isQueryPresent(this.initialQuery)) {
-      const dryRunResponse = await this.cubejsApi.dryRun(this.initialQuery);
+      const dryRunResponse = await this.cubeApi.dryRun(this.initialQuery);
       this.pivotConfig = ResultSet.getNormalizedPivotConfig(
         dryRunResponse?.pivotQuery || {},
         this.pivotConfig
@@ -639,7 +644,7 @@ export default {
         }
 
         if (isQueryPresent(query) && hasQueryChanged) {
-          this.cubejsApi
+          this.cubeApi
             .dryRun(query, {
               mutexObj: this.mutex,
             })

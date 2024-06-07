@@ -15,6 +15,14 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
     'CUBEJS_DB_EXPORT_BUCKET',
     'CUBEJS_DB_BQ_CREDENTIALS',
   ],
+  snowflake: [
+    'CUBEJS_DB_USER',
+    'CUBEJS_DB_PASS',
+    'CUBEJS_DB_NAME',
+    'CUBEJS_DB_SNOWFLAKE_ACCOUNT',
+    'CUBEJS_DB_SNOWFLAKE_REGION',
+    'CUBEJS_DB_SNOWFLAKE_WAREHOUSE',
+  ],
   crate: [],
   firebolt: [
     'CUBEJS_DB_USER',
@@ -24,6 +32,7 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   ],
   materialize: [],
   multidb: [],
+  oracle: [],
   questdb: [],
   postgres: [],
   redshift: [
@@ -47,4 +56,5 @@ export const REQUIRED_ENV_VARS: {[key: string]: string[]} = {
   prestodb: [],
   trino: [],
   mssql: [],
+  duckdb: [],
 };

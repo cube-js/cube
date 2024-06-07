@@ -74,4 +74,12 @@ describe('PrestoHouseDriver', () => {
       await driver.testConnection();
     });
   });
+
+  // eslint-disable-next-line func-names
+  it('should test informationSchemaQuery', async () => {
+    await doWithDriver(async (driver: any) => {
+      const informationSchemaQuery=driver.informationSchemaQuery();
+      expect(informationSchemaQuery).toContain("columns.table_schema = 'sf1'");
+    });
+  });
 });

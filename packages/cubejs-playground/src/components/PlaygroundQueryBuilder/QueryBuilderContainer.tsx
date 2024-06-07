@@ -7,8 +7,15 @@ import styled from 'styled-components';
 
 import { Button, CubeLoader } from '../../atoms';
 import { useCloud } from '../../cloud';
-import { useAppContext, useCubejsApi, useSecurityContext } from '../../hooks';
-import { useRollupDesignerContext, RollupDesignerContext } from '../../rollup-designer';
+import {
+  useAppContext,
+  useCubejsApi,
+  useSecurityContext
+} from '../../hooks';
+import {
+  RollupDesignerContext,
+  useRollupDesignerContext,
+} from '../../rollup-designer';
 import { ChartRendererStateProvider } from '../QueryTabs/ChartRendererStateProvider';
 import { QueryTabs, QueryTabsProps } from '../QueryTabs/QueryTabs';
 import {
@@ -32,7 +39,6 @@ type QueryBuilderContainerProps = Pick<
   | 'defaultQuery'
   | 'initialVizState'
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'extra'
   | 'onVizStateChanged'
   | 'onSchemaChange'
@@ -64,14 +70,13 @@ export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
   }
 
   return (
-    <CubeProvider cubejsApi={cubejsApi}>
+    <CubeProvider cubeApi={cubejsApi}>
       <RollupDesignerContext apiUrl={apiUrl!}>
         <ChartRendererStateProvider>
           <StyledCard bordered={false}>
             <QueryTabsRenderer
               apiUrl={apiUrl!}
               token={currentToken!}
-              dashboardSource={props.dashboardSource}
               securityContextToken={securityContextToken}
               extra={props.extra}
               schemaVersion={props.schemaVersion}
@@ -95,7 +100,6 @@ type QueryTabsRendererProps = {
 } & Pick<
   PlaygroundQueryBuilderProps,
   | 'schemaVersion'
-  | 'dashboardSource'
   | 'onVizStateChanged'
   | 'onSchemaChange'
   | 'extra'
@@ -106,7 +110,6 @@ function QueryTabsRenderer({
   apiUrl,
   token,
   securityContextToken,
-  dashboardSource,
   onSecurityContextModalOpen,
   ...props
 }: QueryTabsRendererProps) {
@@ -139,7 +142,7 @@ function QueryTabsRenderer({
               size="small"
               onClick={() => toggleModal()}
             >
-              Add Rollup to Schema
+              Add Rollup to Data Model
             </Button>
           ) : null}
         </Space>
@@ -158,7 +161,6 @@ function QueryTabsRenderer({
             query,
             chartType,
           }}
-          dashboardSource={dashboardSource}
           schemaVersion={props.schemaVersion}
           extra={props.extra}
           onSchemaChange={props.onSchemaChange}

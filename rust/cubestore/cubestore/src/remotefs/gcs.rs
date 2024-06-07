@@ -1,5 +1,6 @@
+use crate::app_metrics;
 use crate::di_service;
-use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
+use crate::remotefs::{CommonRemoteFsUtils, LocalDirRemoteFs, RemoteFile, RemoteFs};
 use crate::util::lock::acquire_lock;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -118,30 +119,53 @@ di_service!(GCSRemoteFs, [RemoteFs]);
 
 #[async_trait]
 impl RemoteFs for GCSRemoteFs {
+    async fn temp_upload_path(&self, remote_path: String) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::temp_upload_path(self, remote_path).await
+    }
+
+    async fn uploads_dir(&self) -> Result<String, CubeError> {
+        CommonRemoteFsUtils::uploads_dir(self).await
+    }
+
+    async fn check_upload_file(
+        &self,
+        remote_path: String,
+        expected_size: u64,
+    ) -> Result<(), CubeError> {
+        CommonRemoteFsUtils::check_upload_file(self, remote_path, expected_size).await
+    }
+
     async fn upload_file(
         &self,
-        temp_upload_path: &str,
-        remote_path: &str,
+        temp_upload_path: String,
+        remote_path: String,
     ) -> Result<u64, CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:upload_file".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Uploading {}", remote_path);
-        let file = File::open(temp_upload_path).await?;
+        let file = File::open(temp_upload_path.clone()).await?;
         let stream = FramedRead::new(file, BytesCodec::new());
         let stream = stream.map(|r| r.map(|b| b.to_vec()));
         Object::create_streamed(
             self.bucket.as_str(),
             stream,
             None,
-            self.gcs_path(remote_path).as_str(),
+            self.gcs_path(&remote_path).as_str(),
             "application/octet-stream",
         )
         .await?;
 
-        let size = fs::metadata(temp_upload_path).await?.len();
-        self.check_upload_file(remote_path, size).await?;
+        let size = fs::metadata(temp_upload_path.clone()).await?.len();
+        self.check_upload_file(remote_path.clone(), size).await?;
 
-        let local_path = self.dir.as_path().join(remote_path);
-        if Path::new(temp_upload_path) != local_path {
+        let local_path = self.dir.as_path().join(&remote_path);
+        if Path::new(&temp_upload_path) != local_path {
             fs::create_dir_all(local_path.parent().unwrap())
                 .await
                 .map_err(|e| {
@@ -159,15 +183,22 @@ impl RemoteFs for GCSRemoteFs {
 
     async fn download_file(
         &self,
-        remote_path: &str,
+        remote_path: String,
         _expected_file_size: Option<u64>,
     ) -> Result<String, CubeError> {
-        let mut local_file = self.dir.as_path().join(remote_path);
+        let mut local_file = self.dir.as_path().join(&remote_path);
         let local_dir = local_file.parent().unwrap();
         let downloads_dirs = local_dir.join("downloads");
 
         fs::create_dir_all(&downloads_dirs).await?;
         if !local_file.exists() {
+            app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+                1,
+                Some(&vec![
+                    "operation:download_file".to_string(),
+                    "driver:gcs".to_string(),
+                ]),
+            );
             let time = SystemTime::now();
             debug!("Downloading {}", remote_path);
             let (temp_file, temp_path) =
@@ -177,7 +208,7 @@ impl RemoteFs for GCSRemoteFs {
             let mut writer = BufWriter::new(tokio::fs::File::from_std(temp_file));
             let mut stream = Object::download_streamed(
                 self.bucket.as_str(),
-                self.gcs_path(remote_path).as_str(),
+                self.gcs_path(&remote_path).as_str(),
             )
             .await?;
 
@@ -205,10 +236,17 @@ impl RemoteFs for GCSRemoteFs {
         Ok(local_file.into_os_string().into_string().unwrap())
     }
 
-    async fn delete_file(&self, remote_path: &str) -> Result<(), CubeError> {
+    async fn delete_file(&self, remote_path: String) -> Result<(), CubeError> {
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            1,
+            Some(&vec![
+                "operation:delete_file".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         let time = SystemTime::now();
         debug!("Deleting {}", remote_path);
-        Object::delete(self.bucket.as_str(), self.gcs_path(remote_path).as_str()).await?;
+        Object::delete(self.bucket.as_str(), self.gcs_path(&remote_path).as_str()).await?;
         info!("Deleting {} ({:?})", remote_path, time.elapsed()?);
 
         let _guard = acquire_lock("delete file", self.delete_mut.lock()).await?;
@@ -222,7 +260,7 @@ impl RemoteFs for GCSRemoteFs {
         Ok(())
     }
 
-    async fn list(&self, remote_prefix: &str) -> Result<Vec<String>, CubeError> {
+    async fn list(&self, remote_prefix: String) -> Result<Vec<String>, CubeError> {
         Ok(self
             .list_with_metadata(remote_prefix)
             .await?
@@ -231,8 +269,11 @@ impl RemoteFs for GCSRemoteFs {
             .collect::<Vec<_>>())
     }
 
-    async fn list_with_metadata(&self, remote_prefix: &str) -> Result<Vec<RemoteFile>, CubeError> {
-        let prefix = self.gcs_path(remote_prefix);
+    async fn list_with_metadata(
+        &self,
+        remote_prefix: String,
+    ) -> Result<Vec<RemoteFile>, CubeError> {
+        let prefix = self.gcs_path(&remote_prefix);
         let list = Object::list_prefix(self.bucket.as_str(), prefix.as_str()).await?;
         let leading_slash = Regex::new(format!("^{}", self.gcs_path("")).as_str()).unwrap();
         let result = list
@@ -252,14 +293,28 @@ impl RemoteFs for GCSRemoteFs {
             .flatten()
             .flatten()
             .collect::<Vec<_>>();
+        let mut pages_count = result.len() / 1_000;
+        if result.len() % 1_000 > 0 {
+            pages_count += 1;
+        }
+        if pages_count > 100 {
+            log::warn!("S3 list returned more than 100 pages: {}", pages_count);
+        }
+        app_metrics::REMOTE_FS_OPERATION_CORE.add_with_tags(
+            pages_count as i64,
+            Some(&vec![
+                "operation:list".to_string(),
+                "driver:gcs".to_string(),
+            ]),
+        );
         Ok(result)
     }
 
-    async fn local_path(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+    async fn local_path(&self) -> Result<String, CubeError> {
+        Ok(self.dir.to_str().unwrap().to_owned())
     }
 
-    async fn local_file(&self, remote_path: &str) -> Result<String, CubeError> {
+    async fn local_file(&self, remote_path: String) -> Result<String, CubeError> {
         let buf = self.dir.join(remote_path);
         fs::create_dir_all(buf.parent().unwrap()).await?;
         Ok(buf.to_str().unwrap().to_string())

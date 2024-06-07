@@ -1,0 +1,163 @@
+---
+redirect_from:
+  - /recipes/using-apache-superset-with-cube-sql
+  - /config/downstream/superset
+---
+
+# Superset / Preset
+
+[Apache Superset][superset] is a popular open-source data exploration and
+visualization platform. [Preset][preset] is a fully-managed service for
+Superset.
+
+## Semantic Layer Sync
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
+Superset or Preset. It automatically synchronizes the [data
+model][ref-data-model] between Cube and Superset or Preset.
+
+## SQL API
+
+You can also use the [SQL API][ref-sql-api] to connect Cube to Superset or
+Preset.
+
+<WarningBox>
+
+[Semantic Layer Sync][ref-sls] is the recommended way to connect Superset or
+Preset to Cube. If you're using the SQL API, consider migrating to Semantic
+Layer Sync.
+
+</WarningBox>
+
+Here's a short video guide:
+
+<LoomVideo url="https://www.loom.com/embed/3e85b7fe3fef4c7bbb8b255ad3f2c675" />
+
+### Cube Cloud
+
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
+
+<Screenshot src="https://cubedev-blog-images.s3.us-east-2.amazonaws.com/bac4cfb4-d89c-46fa-a7d4-552c2ece4a18.GIF" />
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Superset later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+
+### Connecting from Superset
+
+Apache Superset connects to Cube as to a Postgres database.
+
+In Apache Superset, go to **Data > Databases**, then click **+ Database** to add
+a new database:
+
+<Screenshot
+  alt="Apache Superset: databases page"
+  src="https://ucarecdn.com/cb3fe91a-6ce2-4c0e-8997-fdb2d4507beb/"
+/>
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+Let's use the following Cube data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: orders
+
+    measures:
+      - name: count
+        type: count
+
+    dimensions:
+      - name: status
+        sql: status
+        type: string
+
+      - name: created
+        sql: created_at
+        type: time
+```
+
+```javascript
+cube(`orders`, {
+  sql_table: `orders`,
+
+  measures: {
+    count: {
+      type: `count`,
+    },
+  },
+
+  dimensions: {
+    status: {
+      sql: `status`,
+      type: `string`,
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+    },
+  },
+});
+```
+
+</CodeTabs>
+
+Using the SQL API, `orders` will be exposed as a table. In Superset, we can
+create datasets based on tables. Let's create one from `orders` table:
+
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/eebd3839-03db-4492-a7e4-a7cc1d9ffc73/"
+/>
+
+Now, we can explore this dataset. Let's create a new chart of type line with
+"Orders" dataset.
+
+<Screenshot
+  alt="Apache Superset: SQL Editor page with successful query"
+  src="https://ucarecdn.com/c509c6fb-f633-4ded-ae94-d4768978c47a/"
+/>
+
+We can select the `COUNT(*)` as a metric and `created_at` as the time column
+with a time grain of `month`.
+
+The `COUNT(*)` aggregate function is being mapped to a measure of type
+[count](/reference/data-model/types-and-formats#count) in Cube's
+**Orders** data model file.
+
+## Additional Configuration
+
+### Pre-Aggregations
+
+To allow queries from Superset to match pre-aggregations in Cube, [the
+`allow_non_strict_date_range_match`
+property][ref-schema-ref-preagg-allownonstrict] must be set to `true` in the
+pre-aggregation definition. This is because Superset uses loose date ranges when
+generating SQL queries.
+
+[ref-getting-started]: /product/getting-started/cloud
+[ref-schema-ref-preagg-allownonstrict]:
+  /reference/data-model/pre-aggregations#allow_non_strict_date_range_match
+[superset]: https://superset.apache.org/
+[superset-docs-installation-docker]:
+  https://superset.apache.org/docs/installation/installing-superset-using-docker-compose
+[preset]: https://preset.io
+[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-data-model]: /product/data-modeling/overview

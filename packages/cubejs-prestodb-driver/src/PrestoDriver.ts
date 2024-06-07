@@ -16,7 +16,10 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
+
 import { Transform, TransformCallback } from 'stream';
+import type { ConnectionOptions as TLSConnectionOptions } from 'tls';
+
 import {
   map, zipObj, prop, concat
 } from 'ramda';
@@ -32,8 +35,9 @@ export type PrestoDriverConfiguration = {
   user?: string;
   // eslint-disable-next-line camelcase
   basic_auth?: { user: string, password: string };
-  ssl?: string;
+  ssl?: string | TLSConnectionOptions;
   dataSource?: string;
+  queryTimeout?: number;
 };
 
 /**
@@ -123,6 +127,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
         this.client.execute({
           query,
           schema: this.config.schema || 'default',
+          session: this.config.queryTimeout ? `query_max_run_time=${this.config.queryTimeout}s` : undefined,
           columns: (error: any, columns: TableStructure) => {
             resolve({
               rowStream,
@@ -170,6 +175,13 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       return <Promise<DownloadQueryResultsResult>> this.stream(query, values, options);
     }
     return super.downloadQueryResults(query, values, options);
+  }
+
+  public informationSchemaQuery() {
+    if (this.config.schema) {
+      return `${super.informationSchemaQuery()} AND columns.table_schema = '${this.config.schema}'`;
+    }
+    return super.informationSchemaQuery();
   }
 
   public normalizeResultOverColumns(data: any[], columns: TableStructure) {

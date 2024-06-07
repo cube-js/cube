@@ -3,7 +3,25 @@ import crypto from 'crypto';
 
 import { Optional } from './type-helpers';
 
-type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
+export type PromiseLock = {
+  promise: Promise<void>,
+  resolve: () => void,
+};
+
+export function createPromiseLock(): PromiseLock {
+  let resolve: any = null;
+
+  return {
+    promise: new Promise<void>((resolver) => {
+      resolve = resolver;
+    }),
+    resolve: () => {
+      resolve();
+    }
+  };
+}
+
+export type CancelablePromiseCancel = (waitExecution?: boolean) => Promise<any>;
 
 export interface CancelablePromise<T> extends Promise<T> {
   cancel: CancelablePromiseCancel;
@@ -115,7 +133,7 @@ export function createCancelableInterval<T>(
   let intervalId: number = 0;
   let duplicatedExecutionTracked: boolean = false;
 
-  const timeout = setInterval(
+  const timerId = setInterval(
     async () => {
       if (execution) {
         if (options.onDuplicatedExecution) {
@@ -152,7 +170,7 @@ export function createCancelableInterval<T>(
 
   return {
     cancel: async (waitExecution: boolean = true) => {
-      clearInterval(timeout);
+      clearInterval(timerId);
 
       if (execution) {
         await execution.cancel(waitExecution);

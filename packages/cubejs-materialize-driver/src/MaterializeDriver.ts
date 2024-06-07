@@ -44,10 +44,50 @@ export class MaterializeDriver extends PostgresDriver {
    */
   public constructor(
     options: PostgresDriverConfiguration & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
+
+      /**
+       * Optional cluster name to set for the connection.
+       */
+      cluster?: string,
+
+      /**
+       * SSL is enabled by default. Set to false to disable.
+       */
+      ssl?: boolean | { rejectUnauthorized: boolean },
+
+      /**
+       * Application name to set for the connection.
+       */
+      application_name?: string,
     } = {},
   ) {
+    // Enable SSL by default if not set explicitly to false
+    const sslEnv = process.env.CUBEJS_DB_SSL;
+    if (sslEnv === 'false') {
+      options.ssl = false;
+    } else if (sslEnv === 'true') {
+      options.ssl = { rejectUnauthorized: true };
+    } else if (options.ssl === undefined) {
+      options.ssl = true;
+    }
+    // Set application name to 'cubejs-materialize-driver' by default
+    options.application_name = options.application_name || 'cubejs-materialize-driver';
+
     super(options);
   }
 
@@ -56,6 +96,11 @@ export class MaterializeDriver extends PostgresDriver {
   ) {
     await conn.query(`SET TIME ZONE '${this.config.storeTimezone || 'UTC'}'`);
     // Support for statement_timeout is still pending. https://github.com/MaterializeInc/materialize/issues/10390
+
+    // Set cluster to the CUBEJS_DB_MATERIALIZE_CLUSTER env variable if it exists
+    if (process.env.CUBEJS_DB_MATERIALIZE_CLUSTER) {
+      await conn.query(`SET CLUSTER TO ${process.env.CUBEJS_DB_MATERIALIZE_CLUSTER}`);
+    }
   }
 
   protected async loadUserDefinedTypes(): Promise<void> {
@@ -66,14 +111,13 @@ export class MaterializeDriver extends PostgresDriver {
    * @param {string} schemaName
    * @return {Promise<Array<unknown>>}
    */
-  public async createSchemaIfNotExists(schemaName: string): Promise<unknown[]> {
+  public async createSchemaIfNotExists(schemaName: string): Promise<void> {
     const schemas = await this.query(
       `SHOW SCHEMAS WHERE name = '${schemaName}'`, []
     );
     if (schemas.length === 0) {
       await this.query(`CREATE SCHEMA IF NOT EXISTS ${schemaName}`, []);
     }
-    return [];
   }
 
   public async uploadTableWithIndexes(

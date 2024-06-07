@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "private": true,
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "scripts": {
       "link:dev": "yarn link @cubejs-backend/shared @cubejs-backend/server @cubejs-backend/server-core @cubejs-backend/api-gateway @cubejs-backend/schema-compiler @cubejs-backend/query-orchestrator @cubejs-client/ws-transport @cubejs-client/core @cubejs-backend/templates @cubejs-client/playground @cubejs-backend/athena-driver @cubejs-backend/bigquery-driver @cubejs-backend/postgres-driver @cubejs-backend/mssql-driver"
@@ -20,6 +20,7 @@
     "@cubejs-backend/dbt-schema-extension": "file:/cube-build/packages/cubejs-dbt-schema-extension",
     "@cubejs-backend/dremio-driver": "file:/cube-build/packages/cubejs-dremio-driver",
     "@cubejs-backend/druid-driver": "file:/cube-build/packages/cubejs-druid-driver",
+    "@cubejs-backend/duckdb-driver": "file:/cube-build/packages/cubejs-duckdb-driver",
     "@cubejs-backend/elasticsearch-driver": "file:/cube-build/packages/cubejs-elasticsearch-driver",
     "@cubejs-backend/firebolt-driver": "file:/cube-build/packages/cubejs-firebolt-driver",
     "@cubejs-backend/hive-driver": "file:/cube-build/packages/cubejs-hive-driver",

@@ -1,0 +1,163 @@
+---
+redirect_from:
+  - /config/databases/aws-athena
+---
+
+# AWS Athena
+
+## Prerequisites
+
+- [A set of IAM credentials][aws-docs-athena-access] which allow access to [AWS
+  Athena][aws-athena]
+- [The AWS region][aws-docs-regions]
+- [The S3 bucket][aws-s3] on AWS to [store query results][aws-docs-athena-query]
+
+## Setup
+
+### Manual
+
+Add the following to a `.env` file in your Cube project:
+
+```dotenv
+CUBEJS_DB_TYPE=athena
+CUBEJS_AWS_KEY=AKIA************
+CUBEJS_AWS_SECRET=****************************************
+CUBEJS_AWS_REGION=us-east-1
+CUBEJS_AWS_S3_OUTPUT_LOCATION=s3://my-athena-output-bucket
+CUBEJS_AWS_ATHENA_WORKGROUP=primary
+CUBEJS_AWS_ATHENA_CATALOG=AwsDataCatalog
+```
+
+### Cube Cloud
+
+<InfoBox heading="Allowing connections from Cube Cloud IP">
+
+In some cases you'll need to allow connections from your Cube Cloud deployment
+IP address to your database. You can copy the IP address from either the
+Database Setup step in deployment creation, or from <Btn>Settings →
+Configuration</Btn> in your deployment.
+
+</InfoBox>
+
+In Cube Cloud, select **AWS Athena** when creating a new deployment and fill in
+the required fields:
+
+<Screenshot
+  alt="Cube Cloud AWS Athena Configuration Screen"
+  src="https://ucarecdn.com/d30fa31d-e6ea-4a73-9950-1786634a1e32/"
+/>
+
+Cube Cloud also supports connecting to data sources within private VPCs. If you
+already have VPCs enabled in your account, check out the [VPC
+documentation][ref-cloud-conf-vpc] to learn how to get started.
+
+<SuccessBox>
+
+VPC connectivity is available in Cube Cloud on
+[Enterprise](https://cube.dev/pricing) tier. [Contact us][cube-contact] for
+details.
+
+</SuccessBox>
+
+[cube-pricing]: https://cube.dev/pricing/
+[cube-contact]: https://cube.dev/contact/
+[ref-cloud-conf-vpc]: /product/deployment/cloud/vpc
+
+## Environment Variables
+
+| Environment Variable            | Description                                                                                                            | Possible Values                                  | Required |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | :------: |
+| `CUBEJS_AWS_KEY`                | The AWS Access Key ID to use for database connections                                                                  | A valid AWS Access Key ID                        |    ✅    |
+| `CUBEJS_AWS_SECRET`             | The AWS Secret Access Key to use for database connections                                                              | A valid AWS Secret Access Key                    |    ✅    |
+| `CUBEJS_AWS_REGION`             | The AWS region of the Cube deployment                                                                                  | [A valid AWS region][aws-docs-regions]           |    ✅    |
+| `CUBEJS_AWS_S3_OUTPUT_LOCATION` | The S3 path to store query results made by the Cube deployment                                                         | A valid S3 path                                  |    ❌    |
+| `CUBEJS_AWS_ATHENA_WORKGROUP`   | The name of the workgroup in which the query is being started                                                          | [A valid Athena Workgroup][aws-athena-workgroup] |    ❌    |
+| `CUBEJS_AWS_ATHENA_CATALOG`     | The name of the catalog to use by default                                                                              | [A valid Athena Catalog name][awsdatacatalog]    |    ❌    |
+| `CUBEJS_DB_SCHEMA`              | The name of the schema to use as `information_schema` filter. Reduces count of tables loaded during schema generation. | A valid schema name                              |    ❌    |
+| `CUBEJS_CONCURRENCY`            | The number of concurrent connections each queue has to the database. Default is `5`                                    | A valid number                                   |    ❌    |
+
+## Pre-Aggregation Feature Support
+
+### count_distinct_approx
+
+Measures of type
+[`count_distinct_approx`][ref-schema-ref-types-formats-countdistinctapprox] can
+be used in pre-aggregations when using AWS Athena as a source database. To learn
+more about AWS Athena's support for approximate aggregate functions, [click
+here][aws-athena-docs-approx-agg-fns].
+
+## Pre-Aggregation Build Strategies
+
+<InfoBox>
+
+To learn more about pre-aggregation build strategies, [head
+here][ref-caching-using-preaggs-build-strats].
+
+</InfoBox>
+
+| Feature       | Works with read-only mode? | Is default? |
+| ------------- | :------------------------: | :---------: |
+| Batching      |             ❌             |     ✅      |
+| Export Bucket |             ❌             |     ❌      |
+
+By default, AWS Athena uses a [batching][self-preaggs-batching] strategy to
+build pre-aggregations.
+
+### Batching
+
+No extra configuration is required to configure batching for AWS Athena.
+
+### Export Bucket
+
+<WarningBox>
+
+AWS Athena **only** supports using AWS S3 for export buckets.
+
+</WarningBox>
+
+#### AWS S3
+
+For [improved pre-aggregation performance with large
+datasets][ref-caching-large-preaggs], enable export bucket functionality by
+configuring Cube with the following environment variables:
+
+<InfoBox>
+
+Ensure the AWS credentials are correctly configured in IAM to allow reads and
+writes to the export bucket in S3.
+
+</InfoBox>
+
+```dotenv
+CUBEJS_DB_EXPORT_BUCKET_TYPE=s3
+CUBEJS_DB_EXPORT_BUCKET=my.bucket.on.s3
+CUBEJS_DB_EXPORT_BUCKET_AWS_KEY=<AWS_KEY>
+CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET=<AWS_SECRET>
+CUBEJS_DB_EXPORT_BUCKET_AWS_REGION=<AWS_REGION>
+```
+
+## SSL
+
+Cube does not require any additional configuration to enable SSL as AWS Athena
+connections are made over HTTPS.
+
+[aws-athena]: https://aws.amazon.com/athena
+[aws-athena-workgroup]:
+  https://docs.aws.amazon.com/athena/latest/ug/workgroups-benefits.html
+[awsdatacatalog]:
+  https://docs.aws.amazon.com/athena/latest/ug/understanding-tables-databases-and-the-data-catalog.html
+[aws-s3]: https://aws.amazon.com/s3/
+[aws-docs-athena-access]:
+  https://docs.aws.amazon.com/athena/latest/ug/security-iam-athena.html
+[aws-docs-athena-query]:
+  https://docs.aws.amazon.com/athena/latest/ug/querying.html
+[aws-docs-regions]:
+  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
+[aws-athena-docs-approx-agg-fns]:
+  https://prestodb.io/docs/current/functions/aggregate.html#approximate-aggregate-functions
+[ref-caching-large-preaggs]:
+  /product/caching/using-pre-aggregations#export-bucket
+[ref-caching-using-preaggs-build-strats]:
+  /product/caching/using-pre-aggregations#pre-aggregation-build-strategies
+[ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
+[self-preaggs-batching]: #batching

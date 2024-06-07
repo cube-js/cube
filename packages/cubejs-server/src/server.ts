@@ -28,15 +28,12 @@ dotenv.config({
   multiline: 'line-breaks',
 });
 
-export type InitAppFn = (app: express.Application) => void | Promise<void>;
-
 interface HttpOptions {
   cors?: CorsOptions;
 }
 
 export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions, SQLServerOptions {
   webSockets?: boolean;
-  initApp?: InitAppFn;
   http?: HttpOptions;
   gracefulShutdown?: number;
 }
@@ -96,10 +93,6 @@ export class CubejsServer {
 
       if (this.config.gracefulShutdown) {
         app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));
-      }
-
-      if (this.config.initApp) {
-        await this.config.initApp(app);
       }
 
       await this.core.initApp(app);

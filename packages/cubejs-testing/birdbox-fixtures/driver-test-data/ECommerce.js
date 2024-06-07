@@ -45,7 +45,14 @@ cube(`ECommerce`, {
   },
   measures: {
     count: {
-      type: `count`,
+      type: 'count',
+      meta: {
+        foo: 'bar'
+      }
+    },
+    countApproxByCustomer: {
+      type: 'count_distinct_approx',
+      sql: 'customer_id',
     },
     totalQuantity: {
       sql: 'quantity',
@@ -113,4 +120,12 @@ cube(`ECommerce`, {
       type: 'number',
     },
   },
+});
+
+view(`ECommerceView`, {
+  cubes: [{
+    joinPath: ECommerce,
+    includes: `*`,
+    excludes: [`orderDate`]
+  }]
 });

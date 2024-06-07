@@ -1,0 +1,71 @@
+---
+redirect_from:
+  - /config/downstream/appsmith
+---
+
+# Appsmith
+
+[Appsmith](https://www.appsmith.com) is an open-source framework for building
+internal tools. You can connect a Cube deployment to Appsmith using Cube’s
+[REST API](/reference/rest-api).
+
+Here's a short video guide on how to connect Appsmith to Cube.
+
+<LoomVideo url="https://www.loom.com/embed/8898c6394cac46568c2be6ae526b1fd5" />
+
+## Use REST API in Cube
+
+### Cube Cloud
+
+Click the “How to connect” link on the Overview page, navigate to the REST API
+tab. You should see the screen below with your connection credentials (the REST
+API URL and the authorization token):
+
+<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
+
+### Self-hosted Cube
+
+For a Cube instance publicly available at a specific `HOST`, the REST API URL
+would be `HOST/cubejs-api/v1`. Please refer to the
+[REST API page](/reference/rest-api) for details.
+
+You will also need to generate a JSON Web Token that would be used to
+authenticate requests to Cube.
+
+Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
+to learn how to generate a token. We suggest generating a long-lived JWT that
+won't expire soon.
+
+## Create a new Data Source in Appsmith
+
+Copy and paste the REST API URL and the Authorization token to create a new data
+source in Appsmith.
+
+<Screenshot src="https://ucarecdn.com/bbdc1318-55aa-4b18-8358-d0ca1869c907/" />
+
+## Create a POST request in Appsmith
+
+Get your Cube query in the JSON
+[query format](/product/apis-integrations/rest-api/query-format) ready. You can
+copy it from Cube’s Playground or compose manually:
+
+<Screenshot src="https://ucarecdn.com/c6d098ab-7b45-4f67-85c8-c36a6cd45f39/" />
+
+Create a POST request, paste the JSON query in the **Body**. Make sure to add a
+`query` parameter for your JSON query.
+
+Because you saved the data source as `HOST/cubejs-api/v1`, don't forget to add a
+`/load` endpoint to the end of the data source API.
+
+Next, hit Run.
+
+<Screenshot src="https://ucarecdn.com/bee6da36-805e-4a78-97cb-4641046710cb/" />
+
+## Display the Data in Appsmith
+
+You have many options to display the data in Appsmith. For instance, you can
+display the data in a table widget. Also, you can create a chart widget and map
+the values to _x_ and _y_ coordinates accordingly, give a _title_ and _names_ to
+the _axis_.
+
+<Screenshot src="https://ucarecdn.com/d738b112-6eaf-4d5a-a2a0-bdf064465f54/" />

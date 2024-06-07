@@ -1,6 +1,7 @@
 import {
   setupLogger,
   registerInterface,
+  execSql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
@@ -34,6 +35,10 @@ export class SQLServer {
     );
   }
 
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
+  }
+
   public async init(options: SQLServerOptions): Promise<void> {
     if (this.sqlInterfaceInstance) {
       throw new Error('Unable to start SQL interface two times');
@@ -45,32 +50,67 @@ export class SQLServer {
     const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
       || this.createDefaultCanSwitchSqlUserFn(options);
 
+    const contextByRequest = async (request, session) => {
+      let userForContext = session.user;
+      let { securityContext } = session;
+
+      if (request.meta.changeUser && request.meta.changeUser !== session.user) {
+        const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
+        if (canSwitch) {
+          userForContext = request.meta.changeUser;
+          const current = await checkSqlAuth(request, userForContext, null);
+          securityContext = current.securityContext;
+        } else {
+          throw new Error(
+            `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
+          );
+        }
+      }
+      return this.contextByNativeReq(request, securityContext, request.id);
+    };
+
+    const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
+
     this.sqlInterfaceInstance = await registerInterface({
       port: options.sqlPort,
       pgPort: options.pgSqlPort,
       nonce: options.sqlNonce,
-      checkAuth: async ({ request, user }) => {
-        const { password, superuser } = await checkSqlAuth(request, user);
+      checkAuth: async ({ request, user, password }) => {
+        const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
         // Strip securityContext to improve speed deserialization
         return {
-          password,
+          password: returnedPassword,
           superuser: superuser || false,
+          securityContext,
+          skipPasswordCheck,
         };
       },
-      meta: async ({ request, session }) => {
-        // @todo Store security context in native
-        const { securityContext } = await checkSqlAuth(request, session.user);
-        const context = await this.apiGateway.contextByReq(<any> request, securityContext, request.id);
+      meta: async ({ request, session, onlyCompilerId }) => {
+        const context = await this.apiGateway.contextByReq(<any> request, session.securityContext, request.id);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
           try {
             await this.apiGateway.meta({
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                if (onlyCompilerId) {
+                  resolve({ compilerId: response.compilerId });
+                } else {
+                  resolve(response);
+                }
               },
+              includeCompilerId: true,
+              onlyCompilerId
             });
           } catch (e) {
             reject(e);
@@ -78,22 +118,7 @@ export class SQLServer {
         });
       },
       load: async ({ request, session, query }) => {
-        let userForContext = session.user;
-
-        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
-          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
-          if (canSwitch) {
-            userForContext = request.meta.changeUser;
-          } else {
-            throw new Error(
-              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
-            );
-          }
-        }
-
-        // @todo Store security context in native for session's user, but not for switching
-        const current = await checkSqlAuth(request, userForContext);
-        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+        const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -102,8 +127,80 @@ export class SQLServer {
               query,
               queryType: 'multi',
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
+              },
+              apiType: 'sql',
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      sqlApiLoad: async ({ request, session, query, queryKey, sqlQuery, streaming }) => {
+        const context = await contextByRequest(request, session);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.sqlApiLoad({
+              queryKey,
+              query,
+              sqlQuery,
+              streaming,
+              context,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
+              },
+              apiType: 'sql',
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      sql: async ({ request, session, query, memberToAlias, expressionParams }) => {
+        const context = await contextByRequest(request, session);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.sql({
+              query,
+              memberToAlias,
+              expressionParams,
+              exportAnnotatedSql: true,
+              memberExpressions: true,
+              disableExternalPreAggregations: true,
+              queryType: 'multi',
+              disableLimitEnforcing: true,
+              context,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -113,22 +210,7 @@ export class SQLServer {
         });
       },
       stream: async ({ request, session, query }) => {
-        let userForContext = session.user;
-
-        if (request.meta.changeUser && request.meta.changeUser !== session.user) {
-          const canSwitch = session.superuser || await canSwitchSqlUser(session.user, request.meta.changeUser);
-          if (canSwitch) {
-            userForContext = request.meta.changeUser;
-          } else {
-            throw new Error(
-              `You cannot change security context via __user from ${session.user} to ${request.meta.changeUser}, because it's not allowed.`
-            );
-          }
-        }
-
-        // @todo Store security context in native for session's user, but not for switching
-        const current = await checkSqlAuth(request, userForContext);
-        const context = await this.contextByNativeReq(request, current.securityContext, request.id);
+        const context = await contextByRequest(request, session);
 
         // eslint-disable-next-line no-async-promise-executor
         return new Promise(async (resolve, reject) => {
@@ -139,18 +221,50 @@ export class SQLServer {
           }
         });
       },
+      logLoadEvent: async ({ request, session, event, properties }) => {
+        const context = await contextByRequest(request, session);
+
+        this.apiGateway.log({
+          type: event,
+          ...properties
+        }, context);
+      },
+      sqlGenerators: async (paramsJson: string) => {
+        // TODO get rid of it
+        const { request, session } = JSON.parse(paramsJson);
+        const context = await this.apiGateway.contextByReq(<any> request, session.securityContext, request.id);
+
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise(async (resolve, reject) => {
+          try {
+            await this.apiGateway.sqlGenerators({
+              context,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
+              },
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+      },
+      canSwitchUserForSession: async ({ session, user }) => canSwitchUserForSession(session, user)
     });
   }
 
   protected wrapCheckSqlAuthFn(checkSqlAuth: CheckSQLAuthFn): CheckSQLAuthFn {
-    return async (req, user) => {
-      const response = await checkSqlAuth(req, user);
-      if (typeof response !== 'object' || response.password === null) {
+    return async (req, user, password) => {
+      const response = await checkSqlAuth(req, user, password);
+      if (typeof response !== 'object') {
         throw new Error('checkSqlAuth must return an object');
-      }
-
-      if (!response.password) {
-        throw new Error('checkSqlAuth must return an object with password field');
       }
 
       return response;
@@ -198,7 +312,8 @@ export class SQLServer {
 
       return {
         password: allowedPassword,
-        securityContext: {}
+        securityContext: {},
+        skipPasswordCheck: getEnv('devMode') && !allowedPassword
       };
     };
   }

@@ -8,7 +8,7 @@ type PrestoStartOptions = DBRunnerContainerOptions & {
 
 export class PrestoDbRunner extends DbRunnerAbstract {
   public static startContainer(options: PrestoStartOptions) {
-    const version = process.env.TEST_PRESTO_VERSION || options.version || '0.277';
+    const version = process.env.TEST_PRESTO_VERSION || options.version || '0.281';
 
     const container = new GenericContainer(`ahanaio/prestodb-sandbox:${version}`)
       .withExposedPorts(8080)

@@ -2,14 +2,14 @@
   "name": "@cubejs-backend/mysql-aurora-serverless-driver",
   "description": "Cube.js Aurora Serverless Mysql database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.31.58",
+  "version": "0.35.43",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.js.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-mysql-aurora-serverless-driver"
   },
   "engines": {
-    "node": "^12.0.0 || ^14.0.0 || >=16.0.0"
+    "node": "^14.0.0 || ^16.0.0 || >=17.0.0"
   },
   "main": "driver/AuroraServerlessMySqlDriver.js",
   "typings": "driver/index.d.ts",
@@ -21,16 +21,16 @@
     "lint": "eslint driver/*.js test/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.31.58",
-    "@cubejs-backend/shared": "^0.31.57",
+    "@cubejs-backend/base-driver": "^0.35.43",
+    "@cubejs-backend/shared": "^0.35.43",
     "@types/mysql": "^2.15.15",
     "aws-sdk": "^2.787.0",
     "data-api-client": "^1.1.0"
   },
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
+    "@cubejs-backend/linter": "^0.35.0",
     "@types/data-api-client": "^1.2.1",
-    "jest": "^26.6.3",
+    "jest": "^27",
     "testcontainers": "^8.12"
   },
   "license": "Apache-2.0",
@@ -41,6 +41,7 @@
     "extends": "../cubejs-linter"
   },
   "jest": {
+    "testEnvironment": "node",
     "testMatch": [
       "**/__tests__/**/*.js?(x)",
       "**/?(*.)+(spec|test|integration).js?(x)"

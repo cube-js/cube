@@ -1,4 +1,38 @@
-### General queue:
+### Queue design v1:
+
+Responses as TS types
+
+```typescript
+type integer = number;
+type QueueId = number;
+
+type AddToQueueResponse = {
+    id: QueueId,
+    added: boolean,
+    pending: string,
+}
+type RetrieveResponse = {
+    payload: string,
+    extra:   string,
+    pending: integer,
+    active: string,
+    id: QueueId
+}
+type AckResponse = {
+    success: boolean
+}
+type ResultResponse = {
+    payload: string
+    'type': ResultStatus
+}
+type ResultBlockingResponse = {
+    payload: string
+    'type': ResultStatus
+}
+enum ResultStatus {
+    Success = 'success'
+}
+```
 
 ```mermaid
 sequenceDiagram
@@ -8,12 +42,12 @@ sequenceDiagram
     participant CubeStore
 
     QueueQueue->>QueueDriverInterface: getResult
-    QueueDriverInterface->>+CubeStore: QUEUE RESULT ?
-    QueueDriverInterface-->>+QueueQueue: QueryResult|null
+    QueueDriverInterface->>+CubeStore: QUEUE RESULT ?path
+    QueueDriverInterface-->>+QueueQueue: ResultResponse|null
     deactivate CubeStore
 
     QueueQueue->>QueueDriverInterface: addToQueue
-    QueueDriverInterface->>+CubeStore: QUEUE ADD PRIORITY N key payload
+    QueueDriverInterface->>+CubeStore: QUEUE ADD PRIORITY N ?path ?payload
     QueueDriverInterface-->>+QueueQueue: AddToQueueResponse
 
     loop reconcileQueueImpl
@@ -30,7 +64,7 @@ sequenceDiagram
         QueueDriverInterface-->>+QueueQueue: getToProcessQueriesResponse
 
         QueueQueue-)+BackgroundQueryQueue: processQuery
-        Note over QueueQueue,BackgroundQueryQueue: Async call to procesQuery, which doesnt block here
+        Note over QueueQueue,BackgroundQueryQueue: Async call to processQuery, which doesnt block here
     end
 
     alt lookUpInActive: Lookup query in processing
@@ -51,7 +85,7 @@ sequenceDiagram
     QueueQueue->>QueueDriverInterface: getResultBlocking
     activate CubeStore
     QueueDriverInterface->>CubeStore: QUEUE RESULT_BLOCKING ?timeout ?key
-    CubeStore-->>+QueueQueue: QueryResult|null
+    CubeStore-->>+QueueQueue: ResultBlockingResponse|null
     deactivate CubeStore
 ```
 
@@ -65,16 +99,10 @@ sequenceDiagram
     participant CubeStore
 
     loop processQuery: Background execution
-        BackgroundQueryQueue->>QueueDriverInterface: getNextProcessingId
-        activate CubeStore
-        QueueDriverInterface->>CubeStore: CACHE INCR ?
-        CubeStore-->>+BackgroundQueryQueue: number
-        deactivate CubeStore
-
         BackgroundQueryQueue->>QueueDriverInterface: retrieveForProcessing
         activate CubeStore
-        QueueDriverInterface->>CubeStore: QUEUE RETRIEVE CONCURRENCY ?number ?key
-        CubeStore-->>+BackgroundQueryQueue: QueryDef
+        QueueDriverInterface->>CubeStore: QUEUE RETRIEVE CONCURRENCY ?number ?path
+        CubeStore-->>+BackgroundQueryQueue: RetrieveResponse
         deactivate CubeStore
 
         BackgroundQueryQueue->>QueueDriverInterface: optimisticQueryUpdate
@@ -101,7 +129,7 @@ sequenceDiagram
         BackgroundQueryQueue->>QueueDriverInterface: setResultAndRemoveQuery
         activate CubeStore
         QueueDriverInterface->>CubeStore: QUEUE ACK ?key ?result
-        CubeStore-->>+BackgroundQueryQueue: ok
+        CubeStore-->>+BackgroundQueryQueue: AckResponse
         deactivate CubeStore
     end
 ```

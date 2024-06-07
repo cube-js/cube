@@ -8,7 +8,7 @@ type MssqlStartOptions = DBRunnerContainerOptions & {
 
 export class MssqlDbRunner extends DbRunnerAbstract {
   public static startContainer(options: MssqlStartOptions) {
-    const version = process.env.TEST_MSSQL_VERSION || options.version || '2022-latest';
+    const version = process.env.TEST_MSSQL_VERSION || options.version || '2017-latest';
 
     const container = new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnv('ACCEPT_EULA', 'Y')

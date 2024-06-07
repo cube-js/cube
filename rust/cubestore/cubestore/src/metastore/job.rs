@@ -20,6 +20,7 @@ pub enum JobType {
     FinishMultiSplit,
     RepartitionChunk,
     InMemoryChunksCompaction,
+    NodeInMemoryChunksCompaction(/*node*/ String),
 }
 
 fn get_job_type_index(j: &JobType) -> u32 {
@@ -33,6 +34,23 @@ fn get_job_type_index(j: &JobType) -> u32 {
         JobType::FinishMultiSplit => 7,
         JobType::RepartitionChunk => 8,
         JobType::InMemoryChunksCompaction => 9,
+        JobType::NodeInMemoryChunksCompaction(_) => 10,
+    }
+}
+
+/// Get the priority of a job type. Higher numbers are higher priority.
+fn get_job_type_priority(j: &JobType) -> u32 {
+    match j {
+        JobType::WalPartitioning => 1000,
+        JobType::PartitionCompaction => 1000,
+        JobType::TableImport => 1000,
+        JobType::Repartition => 1000,
+        JobType::TableImportCSV(_) => 1000,
+        JobType::MultiPartitionSplit => 1000,
+        JobType::FinishMultiSplit => 1000,
+        JobType::RepartitionChunk => 1000,
+        JobType::InMemoryChunksCompaction => 10000,
+        JobType::NodeInMemoryChunksCompaction(_) => 10000,
     }
 }
 
@@ -43,6 +61,7 @@ pub enum JobStatus {
     Completed,
     Timeout,
     Error(String),
+    Orphaned,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]
@@ -108,6 +127,10 @@ impl Job {
             _ => false,
         }
     }
+
+    pub fn priority(&self) -> u32 {
+        get_job_type_priority(&self.job_type)
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -154,7 +177,7 @@ impl RocksSecondaryIndex<Job, JobIndexKey> for JobRocksIndex {
                 buf.write_u32::<BigEndian>(get_job_type_index(job_type))
                     .unwrap();
                 match job_type {
-                    JobType::TableImportCSV(l) => {
+                    JobType::TableImportCSV(l) | JobType::NodeInMemoryChunksCompaction(l) => {
                         buf.write_u64::<BigEndian>(l.len() as u64).unwrap();
                         buf.write(l.as_bytes()).unwrap();
                     }

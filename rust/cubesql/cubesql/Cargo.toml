@@ -9,15 +9,16 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 
 [dependencies]
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "a29e681ada5918c6d09bb7a02aa2333ed241e7d3", default-features = false, features = ["unicode_expressions"] }
+arc-swap = "1"
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
-thiserror = "1.0"
+thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "10782e5d11fc0e2900c9359dddee0fbefbffd359" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
-tokio = { version = "1.0", features = ["full", "rt", "tracing"] }
+tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }
 itertools = "0.10.2"
 serde_derive = "^1.0"
@@ -27,7 +28,7 @@ futures = "0.3.23"
 rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
-log = "=0.4.11"
+log = "0.4.21"
 rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
 postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
@@ -38,36 +39,39 @@ simple_logger = "=1.13.0"
 async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '76ea0132564959c41ea13f25511fbd84acd06464' }
 bincode = "1.3.1"
-chrono = "0.4.16"
+chrono = "0.4.31"
 chrono-tz = "0.6"
 mockall = "0.8.1"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
-mysql_common = "0.26.0"
-comfy-table = "4.1.1"
+comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = "0.7.1"
+egg = { rev = "58c2586473360f0821e91ef196b55070ac1afedc", git = "https://github.com/cube-js/egg.git" }
 paste = "1.0.6"
 csv = "1.1.6"
-tracing = { version = "0.1.35", features = ["async-await"] }
-console-subscriber = "0.1.6"
+tracing = { version = "0.1.40", features = ["async-await"] }
 async-stream = "0.3.3"
 futures-core = "0.3.23"
 futures-util = "0.3.23"
+sha1_smol = "1.0.0"
+tera = { version = "1", default-features = false }
+minijinja = { version = "1", features = ["json", "loader"] }
+lru = "0.12.1"
+sha2 = "0.10.8"
+bigdecimal = "0.4.2"
 
 
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
-mysql_async = "0.29"
 portpicker = "0.1.1"
 tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
+console-subscriber = "0.2.0"
 
 [[test]]
 name = "e2e"

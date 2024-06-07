@@ -1,4 +1,5 @@
 import R from 'ramda';
+import pLimit from 'p-limit';
 import { v4 as uuidv4 } from 'uuid';
 import crypto from 'crypto';
 import { Required } from '@cubejs-backend/shared';
@@ -35,7 +36,8 @@ type PreAggregationsQueryingOptions = {
     partitions?: string[]
   }[],
   forceBuildPreAggregations?: boolean,
-  throwErrors?: boolean
+  throwErrors?: boolean,
+  preAggregationLoadConcurrency?: number,
 };
 
 type RefreshQueries = {
@@ -142,7 +144,7 @@ export class RefreshScheduler {
     const baseQuerySql = await compilerApi.getSql(baseQuery);
     const preAggregationDescriptionList = baseQuerySql.preAggregations;
     const preAggregationDescription = preAggregationDescriptionList.find(p => p.preAggregationId === preAggregation.id);
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregationsLoadCacheByDataSource = {};
 
     // Return a empty array for cases with 2 same pre-aggregations but with different partitionGranularity
@@ -221,13 +223,13 @@ export class RefreshScheduler {
   /**
    * Evaluate and returns minimal QueryQueue concurrency value.
    */
-  protected getSchedulerConcurrency(
+  protected async getSchedulerConcurrency(
     core: CubejsServerCore,
     context: RequestContext,
-  ): null | number {
-    const preaggsQueues = core
-      .getOrchestratorApi(context)
-      .getQueryOrchestrator()
+  ): Promise<null | number> {
+    const orchestratorApi = await core
+      .getOrchestratorApi(context);
+    const preaggsQueues = orchestratorApi.getQueryOrchestrator()
       .getPreAggregations()
       .getQueues();
 
@@ -257,7 +259,7 @@ export class RefreshScheduler {
 
     const concurrency =
       options.concurrency ||
-      this.getSchedulerConcurrency(this.serverCore, context) ||
+      (await this.getSchedulerConcurrency(this.serverCore, context)) ||
       1;
 
     const queryingOptions: ScheduledRefreshQueryingOptions = {
@@ -276,7 +278,7 @@ export class RefreshScheduler {
     });
 
     try {
-      const compilerApi = this.serverCore.getCompilerApi(context);
+      const compilerApi = await this.serverCore.getCompilerApi(context);
       if (queryingOptions.preAggregationsWarmup) {
         await this.refreshPreAggregations(context, compilerApi, queryingOptions);
       } else {
@@ -292,7 +294,7 @@ export class RefreshScheduler {
     } catch (e: any) {
       if (e.error !== 'Continue wait') {
         this.serverCore.logger('Refresh Scheduler Error', {
-          error: e.error || e.stack || e.toString(),
+          error: e.stack || e.error || e.toString(),
           securityContext: context.securityContext,
           requestId: context.requestId
         });
@@ -312,14 +314,17 @@ export class RefreshScheduler {
     context: RequestContext,
     compilerApi: CompilerApi,
   ) {
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const compilers = await compilerApi.getCompilers();
+
     const { cubeEvaluator } = compilers;
     const processed = [];
+
     await Promise.all(cubeEvaluator.cubeNames().map(async (name) => {
       const ds = cubeEvaluator.cubeFromPath(name).dataSource ?? 'default';
       if (processed.indexOf(ds) === -1) {
         processed.push(ds);
-        await this.serverCore.getOrchestratorApi(context).forceReconcile(ds);
+        await orchestratorApi.forceReconcile(ds);
       }
     }));
   }
@@ -353,7 +358,7 @@ export class RefreshScheduler {
           timezone
         };
         const sqlQuery = await compilerApi.getSql(query);
-        const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+        const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
         await orchestratorApi.executeQuery({
           ...sqlQuery,
           sql: null,
@@ -372,7 +377,7 @@ export class RefreshScheduler {
     context,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const compilerApi = this.serverCore.getCompilerApi(context);
+    const compilerApi = await this.serverCore.getCompilerApi(context);
     const preAggregationsQueryingOptions = queryingOptions.preAggregations.reduce((obj, p) => {
       obj[p.id] = p;
       return obj;
@@ -382,7 +387,9 @@ export class RefreshScheduler {
       preAggregationIds: Object.keys(preAggregationsQueryingOptions)
     });
 
-    return Promise.all(preAggregations.map(async preAggregation => {
+    const loadConcurrency = pLimit(queryingOptions.preAggregationLoadConcurrency || 1);
+
+    return Promise.all(preAggregations.map(preAggregation => async () => {
       const { timezones } = queryingOptions;
       const { partitions: partitionsFilter, cacheOnly } = preAggregationsQueryingOptions[preAggregation.id] || {};
 
@@ -459,7 +466,7 @@ export class RefreshScheduler {
         errors,
         partitionsWithDependencies
       };
-    }));
+    }).map(loadConcurrency));
   }
 
   protected async roundRobinRefreshPreAggregationsQueryIterator(context, compilerApi: CompilerApi, queryingOptions, queriesCache: { [key: string]: Promise<PreAggregationDescription[][]> }) {
@@ -594,7 +601,7 @@ export class RefreshScheduler {
         for (;;) {
           const currentQuery = await queryIterator.current();
           if (currentQuery && queryIterator.partitionCounter() % concurrency === workerIndex) {
-            const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+            const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
             await orchestratorApi.executeQuery({ ...currentQuery, preAggregationsLoadCacheByDataSource });
           }
           const hasNext = await queryIterator.advance();
@@ -603,14 +610,16 @@ export class RefreshScheduler {
           }
         }
       }));
-    await this.serverCore.getOrchestratorApi(context).updateRefreshEndReached();
+
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
+    await orchestratorApi.updateRefreshEndReached();
   }
 
   public async buildPreAggregations(
     context: RequestContext,
     queryingOptions: PreAggregationsQueryingOptions
   ) {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
 
@@ -659,7 +668,7 @@ export class RefreshScheduler {
     context: RequestContext,
     queryingOptions: PreAggregationsQueryingOptions
   ): Promise<string[]> {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const preAggregations = await this.preAggregationPartitions(context, queryingOptions);
     const preAggregationsLoadCacheByDataSource = {};
     const jobsPromise = Promise.all(
@@ -673,7 +682,7 @@ export class RefreshScheduler {
                   const job = await orchestratorApi.executeQuery({
                     preAggregations: dependencies.concat([partition]),
                     continueWait: true,
-                    renewQuery: true,
+                    renewQuery: false,
                     forceBuildPreAggregations: true,
                     orphanedTimeout: 60 * 60,
                     requestId: context.requestId,
@@ -693,7 +702,9 @@ export class RefreshScheduler {
         );
       })
     );
+
     const jobedPAs = await jobsPromise;
+
     return getPreAggsJobsList(
       context,
       <JobedPreAggregation[][][][]>jobedPAs,
@@ -714,18 +725,23 @@ export class RefreshScheduler {
   public async getCachedBuildJobs(
     context: RequestContext,
     tokens: string[],
-  ): Promise<PreAggJob[]> {
-    const orchestratorApi = this.serverCore.getOrchestratorApi(context);
+  ): Promise<{ job: PreAggJob | null, token: string }[]> {
+    const orchestratorApi = await this.serverCore.getOrchestratorApi(context);
     const jobsPromise = Promise.all(
-      tokens.map(async (key) => {
-        const job = <PreAggJob>(await orchestratorApi
+      tokens.map(async (token) => {
+        const job = await orchestratorApi
           .getQueryOrchestrator()
           .getQueryCache()
           .getCacheDriver()
-          .get(`PRE_AGG_JOB_${key}`));
-        return job;
+          .get<PreAggJob>(`PRE_AGG_JOB_${token}`);
+
+        return {
+          job,
+          token
+        };
       })
     );
+
     const jobs = await jobsPromise;
     return jobs;
   }

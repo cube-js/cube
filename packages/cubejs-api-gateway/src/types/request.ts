@@ -52,6 +52,8 @@ interface Request extends ExpressRequest {
    */
   securityContext?: any,
 
+  requestStarted?: Date,
+
   /**
    * @deprecated
    */
@@ -87,6 +89,13 @@ type ExtendContextFn =
   (req: ExpressRequest) =>
     Promise<RequestExtension> | RequestExtension;
 
+type ErrorResponse = {
+  error: string,
+};
+
+type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
+
 /**
  * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
@@ -96,7 +105,7 @@ type ExtendContextFn =
  */
 type ResponseResultFn =
   (
-    message: Record<string, any> | Record<string, any>[],
+    message: (Record<string, any> | Record<string, any>[]) | ErrorResponse,
     extra?: { status: number }
   ) => void;
 
@@ -117,6 +126,20 @@ type QueryRequest = BaseRequest & {
   queryType?: RequestType;
   apiType?: ApiType;
   resType?: ResultType
+  memberToAlias?: Record<string, string>;
+  expressionParams?: string[];
+  exportAnnotatedSql?: boolean;
+  memberExpressions?: boolean;
+  disableExternalPreAggregations?: boolean;
+  disableLimitEnforcing?: boolean;
+};
+
+type SqlApiRequest = BaseRequest & {
+  query: Record<string, any>;
+  sqlQuery?: [string, string[]];
+  apiType?: ApiType;
+  queryKey: any;
+  streaming?: boolean;
 };
 
 /**
@@ -158,19 +181,22 @@ type PreAggsJobsRequest = {
   resType?: 'object' | 'array'
 };
 
-type PreAggJobStatusItem = {
+type PreAggJobStatusItemNotFound = {
   token: string;
-  table: string;
+  status: 'not_found' | 'pre_agg_not_found';
+};
+
+type PreAggJobStatusItemFound = {
+  token: string;
   status: string;
+  table: string;
   selector: PreAggsSelector;
 };
 
+type PreAggJobStatusItem = PreAggJobStatusItemNotFound | PreAggJobStatusItemFound;
+
 type PreAggJobStatusObject = {
-  [token: string]: {
-    table: string;
-    status: string;
-    selector: PreAggsSelector;
-  }
+  [token: string]: Omit<PreAggJobStatusItem, 'token'>
 };
 
 type PreAggJobStatusResponse =
@@ -182,10 +208,12 @@ export {
   RequestExtension,
   ExtendedRequestContext,
   Request,
+  SqlApiRequest,
   QueryRewriteFn,
   SecurityContextExtractorFn,
   ExtendContextFn,
   ResponseResultFn,
+  MetaResponseResultFn,
   BaseRequest,
   QueryRequest,
   PreAggsJobsRequest,

@@ -30,7 +30,7 @@ class QuestFilter extends BaseFilter {
 }
 
 export class QuestQuery extends BaseQuery {
-  public newFilter(filter: any) {
+  public newFilter(filter: any): BaseFilter {
     return new QuestFilter(this, filter);
   }
 
@@ -87,14 +87,14 @@ export class QuestQuery extends BaseQuery {
       .join(' AND ');
   }
 
-  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string): string {
+  public renderSqlMeasure(name: string, evaluateSql: string, symbol: any, cubeName: string, parentMeasure: string, orderBySql: string[]): string {
     // QuestDB doesn't support COUNT(column_name) syntax.
     // COUNT() or COUNT(*) should be used instead.
 
     if (symbol.type === 'count') {
       return 'count(*)';
     }
-    return super.renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure);
+    return super.renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql);
   }
 
   public primaryKeyCount(cubeName: string, distinct: boolean): string {

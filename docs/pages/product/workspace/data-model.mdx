@@ -1,0 +1,159 @@
+---
+redirect_from:
+  - /cloud/cube-ide
+  - /cloud/dev-tools/cube-ide
+  - /cloud/workspace/cube-ide
+---
+
+# Data Model
+
+With the web-based data model editor, you can write and test and your Cube [data
+model][ref-data-modeling] from your browser.
+
+<SuccessBox>
+
+Data model editor is available in Cube Cloud on
+[all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+Cube Cloud can create branch-based development API instances to quickly test
+changes in the data model in your frontend applications before pushing them into
+production.
+
+<LoomVideo url="https://www.loom.com/embed/101b6291b0ba4d1d8982faa3b8c5bd55" />
+
+## Development Mode
+
+In development mode, you can safely make changes to your project without
+affecting production deployment. Development mode uses a separate Git branch and
+allows testing your changes in Playground or via a separate API endpoint
+specific to this branch. This development API hot-reloads your data model
+changes, allowing you to quickly test API changes from your applications.
+
+To enter development mode, navigate to the <Btn>Data Model</Btn> screen and
+click <Btn>Enter Development Mode</Btn>.
+
+<Screenshot src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/" />
+
+When development mode is active, a grey bar will be visible at the top of the
+screen. It provides several useful controls and indicators:
+
+- The name of the current development Git branch
+- The status of the development API. After any changes to the project, the API
+  will hot-reload, and the API status will indicate when it's ready.
+- 'Copy API URL' will copy the API URL to the clipboard for the current
+  development branch.
+
+<Screenshot src="https://ucarecdn.com/915e829d-39a7-4d65-b5d4-678bc7545a6f/" />
+
+You can exit development mode by clicking <Btn>Exit</Btn> in the grey banner. If
+you've been editing a data model and navigate away, Cube Cloud will warn you if
+there are any unsaved changes:
+
+<Screenshot
+  src="https://ucarecdn.com/67b8e943-0043-4398-84fc-91d83765ed10/"
+  alt="Unsaved changes warning modal"
+/>
+
+## Data Graph
+
+In addition to exploring the code of data model files, you can view the visual
+representation of the data model, including relations between cubes.
+Click <Btn>Show Graph</Btn> in the top right part of the data model editor to
+open Data Graph:
+
+<Screenshot src="https://ucarecdn.com/30b7fa8c-fb9f-43fb-af1d-4ef98aae2829/" />
+
+Data Graph visualizes [cubes][ref-cubes] and [joins][ref-joins] between them as
+an [entity-relationship diagram][wiki-erd] (ERD). It allows to have a bird's-eye
+view of the data model and visually detect connected parts, i.e., groups of
+cubes that don't have any relationships with other groups.
+
+For clarity, only dimensions and custom SQL expressions used in joins are shown.
+Join [relationship types][ref-join-types] are depicted with the crow's foot
+notation:
+
+- Dash represents `one` in `one_to_one` and `one_to_many` types
+- Crow's foot represents `many` in `one_to_many` and `many_to_one` types
+
+You can pan and zoom the visualization, search cubes using the input box, hover
+over cubes to highlight their relationships, and click <Btn>Show Code</Btn> to
+view their code.
+
+<video width="100%" controls>
+  <source
+    src="https://ucarecdn.com/2cc26fee-f94e-4328-bc46-297bfdd6e726/video.mp4"
+    type="video/mp4"
+  />
+</video>
+
+## Git integration
+
+To add more Git branches to your Cube Cloud deployment and/or switch between
+them, click the branch name in the status bar:
+
+<Screenshot
+  src="https://ucarecdn.com/a3ea164f-b93c-4c83-b7a3-697dd025b74a/"
+  alt="Branch switcher"
+/>
+
+Speaking of Git branches, you can now easily add and remove branches with the
+same switcher; click <Btn>Add Branch</Btn> and enter a name for the new branch
+in the popup:
+
+<Screenshot
+  src="https://ucarecdn.com/15ea528f-4a54-40a1-83c7-2f67738a3e8b/"
+  alt="Create a new branch"
+/>
+
+These branches are shared, meaning everyone who has access to the deployment can
+see and edit them. This makes them extremely useful for out-of-band experiments
+where you can quickly test things in Cube Cloud without having to go through a
+CI/CD process.
+
+Unused branches can also be deleted. Ensure you are already on the branch you
+want to delete, then open the switcher and click <Btn>Remove Branch</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/f1d37fe6-a6ae-4d78-a801-133639daf1ec/"
+  alt="Delete a branch"
+/>
+
+## Generating data model files
+
+You can generate data model files when [creating a new
+deployment][ref-creating-deployment] or at later moment. To open the data model
+wizard, click on the <Btn>...</Btn> button on the right and select <Btn>Generate
+data model</Btn>:
+
+<Screenshot
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
+/>
+
+It is safe to generate data model files for tables that already have matching cubes.
+In that case, existing files will be renamed by appending `.backup` to their names.
+You would also be able to review changes to files on the <Btn>Changes</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/a8d53348-8441-41f3-969c-df46d41d78b6/" />
+
+
+## Creating pre-aggregations
+
+If you'd like to use the UI to create a pre-aggregation, you can click on the
+<Btn>...</Btn> button on the right and select <Btn>Add rollup</Btn> to open
+[Rollup Designer][ref-rollup-designer]:
+
+<Screenshot
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
+/>
+
+[ref-data-modeling]: /product/data-modeling/overview
+[ref-cubes]: /reference/data-model/cube
+[ref-joins]: /reference/data-model/joins
+[ref-join-types]: /reference/data-model/joins#relationship
+[wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
+[ref-rollup-designer]: /product/workspace/rollup-designer
+[ref-creating-deployment]: /product/deployment/cloud/deployments#creating-a-new-deployment

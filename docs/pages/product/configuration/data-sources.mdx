@@ -1,0 +1,248 @@
+---
+redirect_from:
+  - /connecting-to-the-database
+  - /config/databases
+---
+
+# Connecting to data sources
+
+Choose a data source to get started with below.
+
+Note that Cube also supports connecting to [multiple data
+sources][ref-config-multi-data-src] out of the box.
+
+## Data Warehouses
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/aws-redshift"
+    imageUrl="https://static.cube.dev/icons/redshift.svg"
+    title="Amazon Redshift"
+  />
+  <GridItem
+    url="data-sources/google-bigquery"
+    imageUrl="https://static.cube.dev/icons/bigquery.svg"
+    title="Google BigQuery"
+  />
+  <GridItem
+    url="data-sources/snowflake"
+    imageUrl="https://static.cube.dev/icons/snowflake.svg"
+    title="Snowflake"
+  />
+  <GridItem
+    url="data-sources/databricks-jdbc"
+    imageUrl="https://static.cube.dev/icons/databricks.svg"
+    title="Databricks"
+  />
+  <GridItem
+    url="data-sources/ms-fabric"
+    imageUrl="https://static.cube.dev/icons/ms-fabric-light.svg"
+    title="Microsoft Fabric"
+  />
+  <GridItem
+    url="data-sources/clickhouse"
+    imageUrl="https://static.cube.dev/icons/clickhouse.svg"
+    title="ClickHouse"
+  />
+  <GridItem
+    url="data-sources/singlestore"
+    imageUrl="https://static.cube.dev/icons/singlestore-light.svg"
+    title="SingleStore"
+  />
+  <GridItem
+    url="data-sources/firebolt"
+    imageUrl="https://static.cube.dev/icons/firebolt.svg"
+    title="Firebolt"
+  />
+</Grid>
+
+## Query Engines
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/aws-athena"
+    imageUrl="https://static.cube.dev/icons/athena.svg"
+    title="Amazon Athena"
+  />
+  <GridItem
+    url="data-sources/duckdb"
+    imageUrl="https://static.cube.dev/icons/duckdb-light.svg"
+    title="DuckDB / MotherDuck"
+  />
+  <GridItem
+    url="data-sources/hive"
+    imageUrl="https://static.cube.dev/icons/hive.svg"
+    title="Hive / SparkSQL"
+  />
+  <GridItem
+    url="data-sources/presto"
+    imageUrl="https://static.cube.dev/icons/presto.svg"
+    title="Presto"
+  />
+  <GridItem
+    url="data-sources/trino"
+    imageUrl="https://static.cube.dev/icons/trino.svg"
+    title="Trino"
+  />
+</Grid>
+
+## Transactional Databases
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/postgres"
+    imageUrl="https://static.cube.dev/icons/postgres.svg"
+    title="Postgres"
+  />
+  <GridItem
+    url="data-sources/ms-sql"
+    imageUrl="https://static.cube.dev/icons/ms-sql.svg"
+    title="Microsoft SQL Server"
+  />
+  <GridItem
+    url="data-sources/mysql"
+    imageUrl="https://static.cube.dev/icons/mysql.svg"
+    title="MySQL"
+  />
+  <GridItem
+    url="data-sources/oracle"
+    imageUrl="https://static.cube.dev/icons/oracle.svg"
+    title="Oracle"
+  />
+  <GridItem
+    url="data-sources/sqlite"
+    imageUrl="https://static.cube.dev/icons/sqlite.svg"
+    title="SQLite"
+  />
+</Grid>
+
+## Time Series Databases
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/questdb"
+    imageUrl="https://static.cube.dev/icons/questdb.svg"
+    title="QuestDB"
+  />
+</Grid>
+
+## Streaming
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/ksqldb"
+    imageUrl="https://static.cube.dev/icons/ksql.svg"
+    title="ksqlDB"
+  />
+  <GridItem
+    url="data-sources/materialize"
+    imageUrl="https://static.cube.dev/icons/materialize.svg"
+    title="Materialize"
+  />
+  <GridItem
+    url="data-sources/risingwave"
+    imageUrl="https://static.cube.dev/icons/risingwave.svg"
+    title="RisingWave"
+  />
+</Grid>
+
+## Other Data Sources
+
+<Grid imageSize={[56, 56]}>
+  <GridItem
+    url="data-sources/elasticsearch"
+    imageUrl="https://static.cube.dev/icons/elasticsearch.svg"
+    title="Elasticsearch"
+  />
+  <GridItem
+    url="data-sources/mongodb"
+    imageUrl="https://static.cube.dev/icons/mongo.svg"
+    title="MongoDB"
+  />
+  <GridItem
+    url="data-sources/druid"
+    imageUrl="https://static.cube.dev/icons/druid.svg"
+    title="Druid"
+  />
+  <GridItem
+    url="data-sources/duckdb"
+    imageUrl="https://static.cube.dev/icons/parquet.svg"
+    title="Parquet"
+  />
+  <GridItem
+    url="data-sources/duckdb"
+    imageUrl="https://static.cube.dev/icons/csv.svg"
+    title="CSV"
+  />
+  <GridItem
+    url="data-sources/duckdb"
+    imageUrl="https://static.cube.dev/icons/json.svg"
+    title="JSON"
+  />
+</Grid>
+
+## Driver Support
+
+Most of the drivers for data sources are supported either directly by the Cube
+team or by their vendors. The rest are community-supported and will be
+highlighted as such in their respective pages.
+
+## Third-party Drivers
+
+The following drivers were contributed by the Cube community. They are not part
+of the Cube distribution, however, they can still be used with Cube:
+
+- [CosmosDB driver](https://www.npmjs.com/package/cosmosdb-cubejs-driver)
+- [SAP Hana driver](https://www.npmjs.com/package/cubejs-hana-driver)
+- [ArangoDB driver](https://www.npmjs.com/package/arangodb-cubejs-driver)
+- [OpenDistro Elastic driver](https://www.npmjs.com/package/opendistro-cubejs-driver)
+- [Mydremio driver](https://www.npmjs.com/package/mydremio-cubejs-driver)
+- [Trino driver](https://www.npmjs.com/package/trino-cubejs-driver)
+- [Cratedb driver](https://www.npmjs.com/package/cratedb-cubejs-driver)
+- [Dremio ODBC driver](https://www.npmjs.com/package/dremio-odbc-cubejs-driver)
+- [Vertica Driver](https://www.npmjs.com/package/@knowitall/vertica-driver)
+
+## Currently Unsupported Data Sources
+
+If you'd like to connect to a data source which is not yet listed on this page,
+please see the list of [requested drivers](https://github.com/cube-js/cube/issues/7076)
+and [file an issue](https://github.com/cube-js/cube/issues) on GitHub.
+
+You're more than welcome to contribute new drivers as well as new features and
+patches to
+[existing drivers](https://github.com/cube-js/cube/tree/master/packages). Please
+check the
+[contribution guidelines](https://github.com/cube-js/cube/blob/master/CONTRIBUTING.md#contributing-database-drivers)
+and join the `#contributing-to-cube` channel in our
+[Slack community](https://slack.cube.dev).
+
+<InfoBox>
+
+You can [contact us](https://cube.dev/contact) to discuss an integration
+with a currently unsupported data source. We might be able to assist Cube Cloud
+users on [select tiers](https://cube.dev/pricing).
+
+</InfoBox>
+
+## Concurrency and pooling
+
+<InfoBox>
+
+All Cube database drivers come with presets for concurrency and pooling that
+work out-of-the-box. The following information is included as a reference.
+
+</InfoBox>
+
+For increased performance, Cube uses multiple concurrent connections to
+configured data sources. The `CUBEJS_CONCURRENCY` environment variable controls
+concurrency settings for query queues and the refresh scheduler as well as the
+maximum concurrent connections.
+
+For databases that support connection pooling,
+the maximum number of concurrent connections to the database can also be set by
+using the `CUBEJS_DB_MAX_POOL` environment variable; if changing this from the
+default, you must ensure that the new value is greater than the number of
+concurrent connections used by Cube's query queues and refresh scheduler.
+
+[ref-config-multi-data-src]:
+  /product/configuration/advanced/multiple-data-sources

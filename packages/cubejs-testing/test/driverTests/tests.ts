@@ -932,6 +932,55 @@ export const queryingECommerceCountByCitiesOrder = driverTest({
   schemas: commonSchemas
 });
 
+export const queryingECommerceCountApproxByCustomerOverProductNameByMonth = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName by month',
+  query: {
+    timeDimensions: [{
+      dimension: 'ECommerce.orderDate',
+      granularity: 'month'
+    }],
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.orderDate': 'desc',
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomerOverProductName = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer over productName',
+  query: {
+    dimensions: [
+      'ECommerce.productName'
+    ],
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+    order: {
+      'ECommerce.countApproxByCustomer': 'desc',
+      'ECommerce.productName': 'asc',
+    },
+  },
+  schemas: commonSchemas
+});
+
+export const queryingECommerceCountApproxByCustomer = driverTest({
+  name: 'querying ECommerce: count distinct approx by customer',
+  query: {
+    measures: [
+      'ECommerce.countApproxByCustomer'
+    ],
+  },
+  schemas: commonSchemas
+});
+
 export const queryingECommerceTotalQuantityAvgDiscountTotalSales = driverTest({
   name: 'querying ECommerce: total quantity, avg discount, total sales, ' +
     'total profit by product + order + total -- rounding in athena',
@@ -1289,5 +1338,16 @@ export const hiddenCube = driverTestFn({
   testFn: async (client) => {
     const meta = await client.meta();
     expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);
+  }
+});
+
+export const viewMetaExposed = driverTestFn({
+  name: 'view meta exposed',
+  schemas: commonSchemas,
+  testFn: async (client) => {
+    const meta = await client.meta();
+    const view = meta.cubes.find(cube => cube.name === 'ECommerceView');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.aggType).toBe('count');
+    expect(view?.measures?.find(m => m.name === 'ECommerceView.count')?.meta?.foo).toBe('bar');
   }
 });

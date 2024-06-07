@@ -171,6 +171,7 @@ impl Runtime {
         Self::wrap(
             tokio::runtime::Builder::new_current_thread()
                 .enable_all()
+                .thread_stack_size(4 * 1024 * 1024)
                 .build()
                 .unwrap(),
         )

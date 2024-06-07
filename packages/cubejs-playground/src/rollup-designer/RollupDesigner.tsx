@@ -229,7 +229,7 @@ export function RollupDesigner({
     if (transformedQuery) {
       cubeName = (
         transformedQuery?.leafMeasures[0] ||
-        transformedQuery?.sortedDimensions[0] ||
+        transformedQuery?.ownedDimensions[0] ||
         'CubeName'
       ).split('.')[0];
     } else if (!areReferencesEmpty(references)) {
@@ -387,7 +387,7 @@ export function RollupDesigner({
           <Space direction="vertical" style={{width: '100%'}} size={32}>
             <Flex justifyContent="end" gap={2} alignItems="center">
               <Box>
-                <Typography.Text>Schema Format</Typography.Text>
+                <Typography.Text>Data Model Format</Typography.Text>
               </Box>
 
               <Box>

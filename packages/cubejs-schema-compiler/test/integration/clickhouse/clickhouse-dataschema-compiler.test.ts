@@ -378,6 +378,7 @@ describe('ClickHouse DataSchemaCompiler', () => {
 
   it('export import', () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareCompiler({
+      localPath: () => '',
       dataSchemaFiles: () => Promise.resolve([
         {
           fileName: 'main.js',

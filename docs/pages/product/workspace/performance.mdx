@@ -1,0 +1,161 @@
+# Performance Insights
+
+The&nbsp;<Btn>Performance</Btn> page in Cube Cloud displays charts that help
+analyze the performance of your deployment and fine-tune its configuration.
+It's recommended to review Performance Insights when the workload changes
+or if you face any performance-related issues with your deployment.
+
+<SuccessBox>
+
+Performance Insights are available in Cube Cloud on [Premium and above
+tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Charts
+
+Charts provide insights into different aspects of your deployment.
+
+### API instances
+
+The&nbsp;<Btn>API instances</Btn> chart shows the number of API instances
+that served queries to the deployment.
+
+You can use this chart to **fine-tune the
+[auto-scaling][ref-scalability-api] configuration of API instances**, e.g.,
+increase the minimum and maximum number of API instances.
+
+For example, the following chart shows a deployment with sane auto-scaling
+limits that don't need adjusting. It looks like the deployment needs to
+sustain just a few infrequent load bursts per day and auto-scaling to 3 API
+instances does the job just fine:
+
+<Screenshot src="https://ucarecdn.com/71de8978-8d3f-42cd-a32f-03daa73ad561/"/>
+
+The next chart shows a deployment with auto-scaling limits that definitely
+need an adjustment. It looks like the load is so high that most of the time
+this deployment has to use at least 4-6 API instances. So, it would be wise
+to increase the minimum auto-scaling limit to 6 API instances:
+
+<Screenshot src="https://ucarecdn.com/e5c074b0-e4d4-442e-af48-e50ec0f61963/"/>
+
+When in doubt, consider using a higher minimum auto-scaling limit: when an
+additional API instance starts, it needs some time to compile the data model
+before it would be able to serve the requests. So, over-provisioning API
+instances with a higher minimum auto-scaling limit would allow to decrease
+the number of requests that had to wait for the [data model
+compilation](#data-model-compilation).
+
+Also, you can use this chart to **fine-tune the
+[auto-suspension][ref-auto-sus] configuration**, e.g., by turning
+auto-suspension off or increasing the auto-suspension threshold.
+For example, the following chart shows a [Development
+Instance][ref-dev-instance] deployment that is only accessed a few times
+a day and automatically suspends after a short period of inactivity:
+
+<Screenshot src="https://ucarecdn.com/9bf6760b-805c-413c-85fb-9402b48718cb/"/>
+
+The next chart shows a misconfigured [Production Cluster][ref-prod-cluster]
+deployment that serves the requests throughout the whole day but was
+configured to auto-suspend with a tiny threshold:
+
+<Screenshot src="https://ucarecdn.com/2938ff51-0699-4f60-bba6-03a0132774f0/"/>
+
+### Cache type
+
+The&nbsp;<Btn>Requests by cache type</Btn> chart shows the number of API
+requests that were fulfilled by specific [cache types][ref-cache-types],
+e.g., pre-aggregations, in-memory cache, no cache, etc. For example, the
+following chart shows a deployment that fulfills about 50% of requests by
+using pre-aggregations:
+
+<Screenshot src="https://ucarecdn.com/fe784a74-edd5-44c0-803f-267237219b1d/"/>
+
+The&nbsp;<Btn>Avg. response time by cache type</Btn> shows the difference
+in the response time for requests that hit pre-aggregations, in-memory cache,
+or no cache (i.e., the upstream data source). The next chart shows that
+pre-aggregations usually provide sub-second response times while queries to
+the data source take much longer:
+
+<Screenshot src="https://ucarecdn.com/94ac15b6-a59c-4474-ba68-e07657d55d78/"/>
+
+You can use these charts to see if you'd like to have more queries that hit
+the cache and have lower response time. In that case, **consider adding more
+[pre-aggregations][ref-pre-aggregations] in Cube Store** or fine-tune the
+existing ones, e.g., by **[using indexes][ref-indexes] to speed up 
+pre-aggregations with suboptimal query plans**.
+
+### Data model compilation
+
+The&nbsp;<Btn>Requests by data model compilation</Btn> chart shows the
+number of API requests that had or had not to wait for the data model
+compilation. For example, the following chart shows a deployment that
+only has a tiny fraction of requests that require the data model to be
+compiled:
+
+<Screenshot src="https://ucarecdn.com/022a6a71-121a-4b45-ba97-1b0fd2571556/"/>
+
+The&nbsp;<Btn>Wait time for data model compilation</Btn> chart
+shows the total time requests had to wait for the data model compilation.
+The next chart shows that at certain points of time requests had to wait
+dozens of seconds while the data model was being compiled:
+
+<Screenshot src="https://ucarecdn.com/520d7e4b-3838-48ae-b0aa-c988f588c3d7/"/>
+
+You can use these charts to **fine-tune the [auto-suspension][ref-auto-sus]
+configuration** (e.g., turn it off or increase the threshold so that API
+instances suspend less frequently), **identify [multitenancy][ref-multitenancy]
+misconfiguration** (e.g., suboptimal bucketing via
+[`context_to_app_id`][ref-context-to-app-id]), or
+**consider using a [multi-cluster deployment][ref-multi-cluster]** to
+distribute requests to different tenants over a number of Production
+Cluster deployments.
+
+### Cube Store
+
+The&nbsp;<Btn>Saturation for queries by Cube Store workers</Btn> chart
+shows if Cube Store workers are overloaded with serving **queries**.
+High saturation for queries prevents Cube Store workers from fulfilling
+requests and results in wait time displayed at the&nbsp;<Btn>Wait time for
+queries by Cube Store workers</Btn> chart.
+
+For example, the following chart shows a deployment that uses 4 Cube Store
+workers and almost never lets them come to saturation, resulting in no wait
+time for queries: 
+
+<Screenshot src="https://ucarecdn.com/9f33377e-ebf4-4227-9f49-a30b7f5bc04b/"/>
+
+Similarly, the&nbsp;<Btn>Saturation for jobs by Cube Store workers</Btn>
+and <Btn>Wait time for jobs by Cube Store workers</Btn> charts show if
+Cube Store Workers are overloaded with serving **jobs**, i.e., building
+pre-aggregations or performing internal tasks such as data compaction.
+
+For example, the following chart shows a misconfigured deployment that uses
+8 Cube Store workers and keeps them at full saturation during prolonged
+intervals, resulting in huge wait time and, in case of jobs, delayed refresh
+of pre-aggregations:
+
+<Screenshot src="https://ucarecdn.com/eb3f8897-5358-4e5b-8507-b10c122d6206/"/>
+
+The next chart shows that oversaturated Cube Store workers might yield
+hours of wait time for queries and jobs:
+
+<Screenshot src="https://ucarecdn.com/14edcb1d-a22c-47f8-aef4-636c0d726fb2/"/>
+
+You can use these charts to **fine-tune the [number of Cube Store
+workers][ref-scalability-cube-store]** used by your deployment, e.g.,
+increase it until you see that there's no saturation and no wait time
+for queries and jobs.
+
+
+[ref-scalability-api]: /product/deployment/cloud/scalability#auto-scaling-of-api-instances
+[ref-scalability-cube-store]: /product/deployment/cloud/scalability#sizing-cube-store-workers
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension
+[ref-dev-instance]: /product/deployment/cloud/deployment-types#development-instance
+[ref-prod-cluster]: /product/deployment/cloud/deployment-types#production-cluster
+[ref-multi-cluster]: /product/deployment/cloud/deployment-types#production-multi-cluster
+[ref-pre-aggregations]: /product/caching/using-pre-aggregations
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-context-to-app-id]: /reference/configuration/config#context_to_app_id
+[ref-cache-types]: /product/caching#cache-type
+[ref-indexes]: /product/caching/using-pre-aggregations#using-indexes

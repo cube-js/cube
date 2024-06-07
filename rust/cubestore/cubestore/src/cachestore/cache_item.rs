@@ -4,7 +4,7 @@ use crate::metastore::{
 use crate::{base_rocks_secondary_index, rocks_table_new, CubeError};
 use chrono::serde::ts_seconds_option;
 use chrono::{DateTime, Duration, Utc};
-use rocksdb::WriteBatch;
+use cuberockstore::rocksdb::WriteBatch;
 use serde::{Deserialize, Deserializer, Serialize};
 
 #[derive(Clone, Serialize, Deserialize, Debug, Eq, PartialEq)]
@@ -15,6 +15,12 @@ pub struct CacheItem {
     #[serde(with = "ts_seconds_option")]
     pub(crate) expire: Option<DateTime<Utc>>,
 }
+
+// Every RowKey uses 15 bytes
+// Table 58 (flex format)
+// SecondaryIndex::ByPrefix 8 + hash (let's take 18)
+// SecondaryIndex::ByPath 13 + hash (let's take 18)
+pub const CACHE_ITEM_SIZE_WITHOUT_VALUE: u32 = (15 * 3) + 58 + (8 + 18) + (13 + 18);
 
 impl RocksEntity for CacheItem {}
 
@@ -140,6 +146,16 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
         }
     }
 
+    fn raw_value_size(&self, row: &CacheItem) -> u32 {
+        let size: usize = CACHE_ITEM_SIZE_WITHOUT_VALUE as usize + row.value.len();
+
+        if let Ok(size) = u32::try_from(size) {
+            size
+        } else {
+            u32::MAX
+        }
+    }
+
     fn key_to_bytes(&self, key: &CacheItemIndexKey) -> Vec<u8> {
         match key {
             CacheItemIndexKey::ByPrefix(s) | CacheItemIndexKey::ByPath(s) => s.as_bytes().to_vec(),
@@ -155,6 +171,13 @@ impl RocksSecondaryIndex<CacheItem, CacheItemIndexKey> for CacheItemRocksIndex {
 
     fn is_ttl(&self) -> bool {
         true
+    }
+
+    fn store_ttl_extended_info(&self) -> bool {
+        match self {
+            CacheItemRocksIndex::ByPath => true,
+            CacheItemRocksIndex::ByPrefix => false,
+        }
     }
 
     fn get_expire(&self, row: &CacheItem) -> Option<DateTime<Utc>> {

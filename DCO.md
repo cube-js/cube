@@ -10,7 +10,7 @@ contribute and that they understand that the contribution is under the terms of
 the [Cube.js project licenses][link-licenses].
 
 [link-licenses]:
-  https://github.com/cube-js/cube.js/blob/master/README.md#license
+  https://github.com/cube-js/cube/blob/master/README.md#license
 
 # Developer's Certificate of Origin
 
@@ -23,7 +23,7 @@ the licenses granted herein, You reserve all right, title, and interest in and
 to Your Contributions.
 
 [link-dco]: https://developercertificate.org/
-[link-cubejs-repo]: https://github.com/cube-js/cube.js
+[link-cubejs-repo]: https://github.com/cube-js/cube
 
 ```
 Developer Certificate of Origin

@@ -1,0 +1,186 @@
+---
+redirect_from:
+  - /configuration/overview
+---
+
+# Overview
+
+Cube is configured via [environment variables][link-env-vars] and
+[configuration options][link-config] in a configuration file. Usually,
+both would be used to configure a Cube deployment in production.
+
+## Environment variables
+
+Environment variables are mostly used for configuration that is defined
+statically and is not supposed to change while a Cube deployment is running.
+
+<InfoBox>
+
+For example, `CUBEJS_DATASOURCES` defines a list of data sources to connect
+to; changing that list would require the deployment to restart.
+
+</InfoBox>
+
+See the [environment variables reference][link-env-vars] for all supported options.
+
+### Cube Core
+
+You can set environment variables in any way [supported by
+Docker][link-docker-env-vars], e.g., a `.env` file or the `environment`
+option in the `docker-compose.yml` file.
+
+### Cube Cloud
+
+You can set environment variables in <Btn>Settings → Configuration</Btn>:
+
+<Screenshot
+  alt="Cube Cloud Environment Variables Screen"
+  src="https://ucarecdn.com/b47693b9-f770-4e01-a0d1-60e3fcf19e23/"
+/>
+
+## Configuration options
+
+Configuration options are mostly used for configuration that is defined
+programmatically and applied dynamically while a Cube deployment is running.
+
+<InfoBox>
+
+For example, [`query_rewrite`](/reference/configuration/config#query_rewrite)
+provides a way to inspect, modify, or restrict every query that is being
+processed by Cube.
+
+</InfoBox>
+
+Configuration options take precedence over environment variables.
+See the [configuration options reference][link-config] for all supported options.
+
+### `cube.py` and `cube.js` files
+
+Configuration options can be defined either using Python, in a `cube.py` file,
+or using JavaScript, in a `cube.js` file in the root folder of a Cube project.
+
+<CodeTabs>
+
+```python
+from cube import config
+
+# Base path for the REST API
+config.base_path = '/cube-api'
+
+# Inspect, modify, or restrict every query
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  if 'order_id' in ctx['securityContext']:
+    query['filters'].append({
+      'member': 'orders_view.id',
+      'operator': 'equals',
+      'values': [ctx['securityContext']['order_id']]
+    })
+  return query
+  
+```
+
+```javascript
+module.exports = {
+  // Base path for the REST API
+  basePath: '/cube-api',
+
+  // Inspect, modify, or restrict every query
+  queryRewrite: (query, { securityContext }) => {
+    if (securityContext.order_id) {
+      query.filters.push({
+        member: 'orders_view.id',
+        operator: 'equals',
+        values: [securityContext.order_id]
+      });
+    }
+    return query;
+  },
+};
+```
+
+</CodeTabs>
+
+Both ways are equivalent; when in doubt, use Python.
+
+<InfoBox>
+
+Support for Python and the `cube.py` file was introduced in v0.34.
+
+</InfoBox>
+
+### Cube Core
+
+When using Docker, ensure that the configuration file and your [data model
+folder][ref-folder-structure] are mounted to `/cube/conf` within the
+Docker container.
+
+### Cube Cloud
+
+You can edit the configuration file by going into <Btn>Development Mode</Btn>
+and navigating to the <Btn>Data Model</Btn> page.
+
+## Runtimes and dependencies
+
+As of v0.34, Cube uses Python v3.9 and Node.js v16.20 as runtime environments
+for the code of configuration and [dynamic data models][ref-dynamic-data-models].
+
+It's recommended to use `requirements.txt` and `package.json` files to
+specify dependencies for your Python and JavaScript code, respectively.
+
+### Cube Core
+
+If you have specified Python packages in the `requirements.txt` file,
+make sure to install them by running `pip install -r requirements.txt`
+inside the Docker container.
+
+If you have specified npm packages in the `package.json` file, make sure
+to install them by running `npm install` inside the Docker container.
+Alternatively, you can run `npm install` on your local machine and mount
+the `node_modules` folder under `/cube/conf` in the Docker container;
+however, if your dependencies contain native extensions, they might not work
+when provided this way.
+
+To automate the installation of dependencies, build and use a [custom
+Docker image][ref-custom-docker-image].
+
+### Cube Cloud
+
+Cube Cloud automatically installs dependencies from `requirements.txt` and
+`package.json` files.
+
+## Development mode
+
+Cube can be run in an insecure, development mode by setting the
+`CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
+mode does the following:
+
+- Disables authentication checks.
+- Disables access control checks based on the [publicity][ref-data-model-publicity]
+of data model entities.
+- Enables Cube Store in single instance mode.
+- Enables background refresh for in-memory cache and [scheduled
+  pre-aggregations][link-scheduled-refresh].
+- Allows another log level to be set (`trace`).
+- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`.
+- Uses `memory` instead of `cubestore` as the default cache/queue engine.
+- Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
+  instead of throwing errors.
+
+[ref-ref-meta]: /reference/rest-api#v1meta
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-gql-api]: /product/apis-integrations/graphql-api
+[ref-sql-api]: /product/apis-integrations/sql-api
+
+[ref-folder-structure]:
+  /product/data-modeling/syntax#folder-structure
+[link-config]: /reference/configuration/config
+[link-dev-playground]: /product/workspace/playground
+[link-env-vars]: /reference/configuration/environment-variables
+[link-scheduled-refresh]:
+  /reference/data-model/pre-aggregations#scheduled_refresh
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
+
+[link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
+[ref-data-model-publicity]: /product/data-modeling/concepts/publicity

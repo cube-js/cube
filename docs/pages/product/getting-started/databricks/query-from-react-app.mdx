@@ -1,0 +1,86 @@
+# Query from a React app
+
+Cube offers both [REST](/product/apis-integrations/rest-api) and
+[GraphQL](/product/apis-integrations/graphql-api) APIs, which can be used to
+query data from applications built in React or other frontend frameworks.
+
+You can find your REST API endpoint on the <Btn>Overview</Btn> page. In
+development mode, Cube creates an isolated endpoint for testing data model
+changes without affecting production. The structure of your REST API endpoint in
+development mode should follow the format below.
+
+```yaml
+https://<deployment-id>.<region>.cubecloudapp.dev/dev-mode/<dev-branch-name>/cubejs-api/v1
+```
+
+To test your REST API from your terminal, you can use [curl](https://curl.se/).
+Click on “How to connect your application” next to the REST API, and it will
+display a code snippet that you can run in your terminal to test the endpoint
+with curl.
+
+<Diagram
+  alt="Querying Cube with curl"
+  src="https://ucarecdn.com/30f90999-dd1b-495c-97c7-4656e61e65c1/"
+/>
+
+Cube offers a frontend JavaScript SDK, as well as a React integration that you
+can use in your application.
+
+First, you’ll need to install two packages from `npm`:
+
+- [@cubejs-client/core](https://www.npmjs.com/package/@cubejs-client/core)
+- [@cubejs-client/react](https://www.npmjs.com/package/@cubejs-client/react)
+
+Next, initialize `cubeApi` within your application.
+
+Please note that you must sign your request with the correct authentication
+token. Cube uses the [JSON Web Token (JWT)](https://jwt.io/) standard by default
+to authenticate requests. You can copy a temporary token from the "How to
+connect to your application" modal window. For production use, you must generate
+this token from your secret key. You can learn more about this in the
+[Authentication & Authorization](/product/auth) section of the documentation.
+
+```jsx
+import cube from "@cubejs-client/core";
+
+const cubeApi = cube("your-token", {
+  apiUrl:
+    "https://<delpoyment-id>.<region>.cubecloudapp.dev/dev-mode/<dev-branch-name>/cubejs-api/v1",
+});
+```
+
+The Cube React package includes a `CubeProvider` that can be used in your React
+application.
+
+```jsx
+import { CubeProvider } from "@cubejs-client/react";
+
+<CubeProvider cubeApi={cubeApi}>// your application</CubeProvider>;
+```
+
+Finally, you can use the `useCubeQuery` hook to load data from Cube into your
+React application.
+
+```jsx
+import { useCubeQuery } from '@cubejs-client/react';
+...
+const { resultSet, isLoading, error, progress } = useCubeQuery({
+  "measures": ["orders_view.completed_count"],
+	"timeDimensions": [
+    {
+      "dimension": "orders_view.created_at",
+      "granularity": "month"
+    }
+  ]
+});
+```
+
+For more information on the Cube JavaScript frontend package and integration
+with React, please refer to the documentation.
+
+You can also explore example applications built with React on top of the Cube
+REST API, along with their source code.
+
+- [React with Highcharts](https://highcharts-demo.cube.dev/#/)
+- [React with AG Grid](https://react-pivot-table-demo.cube.dev/#/)
+- [React query builder](https://react-dashboard-demo.cube.dev/#/)

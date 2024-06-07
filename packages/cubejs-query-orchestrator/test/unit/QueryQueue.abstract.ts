@@ -1,5 +1,6 @@
+import { Readable } from 'stream';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
-import type { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
+import type { QueryKey } from '@cubejs-backend/base-driver';
 import { pausePromise } from '@cubejs-backend/shared';
 import crypto from 'crypto';
 
@@ -16,13 +17,15 @@ export type QueryQueueTestOptions = {
 
 export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}) => {
   describe(`QueryQueue${name}`, () => {
+    jest.setTimeout(10 * 1000);
+
     const delayFn = (result, delay) => new Promise(resolve => setTimeout(() => resolve(result), delay));
     const logger = jest.fn((message, event) => console.log(`${message} ${JSON.stringify(event)}`));
 
     let delayCount = 0;
     let streamCount = 0;
-    const processMessagePromises = [];
-    const processCancelPromises = [];
+    const processMessagePromises: Promise<any>[] = [];
+    const processCancelPromises: Promise<any>[] = [];
     let cancelledQuery;
 
     const tenantPrefix = crypto.randomBytes(6).toString('hex');
@@ -36,12 +39,24 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
           await setCancelHandler(result);
           return delayFn(result, query.delay);
         },
-        stream: async () => {
+        stream: async (query, stream) => {
           streamCount++;
+
+          // TODO: Fix an issue with a fast execution of stream handler which caused by removal of QueryStream from streams,
+          // while EventListener doesnt start to listen for started stream event
+          await pausePromise(250);
+
+          return new Promise((resolve, reject) => {
+            const readable = Readable.from([]);
+            readable.once('end', () => resolve(null));
+            readable.once('close', () => resolve(null));
+            readable.once('error', (err) => reject(err));
+            readable.pipe(stream);
+          });
         },
       },
-      sendProcessMessageFn: async (queryKeyHashed) => {
-        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed));
+      sendProcessMessageFn: async (queryKeyHashed, queueId) => {
+        processMessagePromises.push(queue.processQuery.bind(queue)(queryKeyHashed, queueId));
       },
       sendCancelMessageFn: async (query) => {
         processCancelPromises.push(queue.processCancel.bind(queue)(query));
@@ -82,16 +97,19 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     afterAll(async () => {
       await awaitProcessing();
       // stdout conflict with console.log
-      await pausePromise(100);
+      // TODO: find out why awaitProcessing doesnt work
+      await pausePromise(1 * 1000);
 
-      if (options?.afterAll) {
-        await options?.afterAll();
+      if (options.redisPool) {
+        await options.redisPool.cleanup();
       }
 
-      await options?.redisPool.cleanup();
+      if (options.afterAll) {
+        await options.afterAll();
+      }
     });
 
-    if (options?.beforeAll) {
+    if (options.beforeAll) {
       beforeAll(async () => {
         await options.beforeAll();
       });
@@ -144,7 +162,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('timeout', async () => {
       const query = ['select * from 3'];
 
-      await queue.executeInQueue('delay', query, { delay: 60 * 60 * 1000, result: '1', isJob: true });
+      // executionTimeout is 2s, 5s is enough
+      await queue.executeInQueue('delay', query, { delay: 5 * 1000, result: '1', isJob: true });
       await awaitProcessing();
 
       expect(logger.mock.calls.length).toEqual(5);
@@ -181,12 +200,22 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await delayFn(null, 200);
 
       await Promise.all([
-        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => results.push(r)),
-        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => results.push(r)),
-        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => results.push(r))
+        queue.executeInQueue('delay', '32', { delay: 100, result: '3' }, -9).then(r => {
+          results.push(['32', r]);
+        }),
+        queue.executeInQueue('delay', '33', { delay: 100, result: '2' }, -8).then(r => {
+          results.push(['33', r]);
+        }),
+        queue.executeInQueue('delay', '34', { delay: 100, result: '1' }, -7).then(r => {
+          results.push(['34', r]);
+        })
       ]);
 
-      expect(results.map(r => parseInt(r[0], 10) - parseInt(results[0][0], 10))).toEqual([0, 1, 2]);
+      expect(results).toEqual([
+        ['34', '11'],
+        ['33', '22'],
+        ['32', '33'],
+      ]);
     });
 
     test('sequence', async () => {
@@ -241,6 +270,7 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
 
         let orphanedTimeout = 2;
         await connection.addToQueue(keyScore, ['1', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 1,
           stageQueryKey: '1',
           requestId: '1',
           orphanedTimeout,
@@ -249,20 +279,26 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
         expect(await connection.getOrphanedQueries()).toEqual([]);
 
         orphanedTimeout = 60;
+
         await connection.addToQueue(keyScore, ['2', []], time + (orphanedTimeout * 1000), 'delay', { isJob: true, orphanedTimeout: time, }, priority, {
+          queueId: 2,
           stageQueryKey: '2',
           requestId: '2',
           orphanedTimeout,
         });
 
-        await pausePromise(2000);
+        await pausePromise(2000 + 500 /*  additional timeout on CI */);
 
         expect(await connection.getOrphanedQueries()).toEqual([
-          connection.redisHash(['1', []])
+          [
+            connection.redisHash(['1', []]),
+            // Redis doesnt support queueId, it will return Null
+            name.includes('Redis') ? null : expect.any(Number)
+          ]
         ]);
       } finally {
-        await connection.getQueryAndRemove(connection.redisHash(['1', []]));
-        await connection.getQueryAndRemove(connection.redisHash(['2', []]));
+        await connection.getQueryAndRemove(connection.redisHash(['1', []]), null);
+        await connection.getQueryAndRemove(connection.redisHash(['2', []]), null);
 
         queue.queueDriver.release(connection);
       }
@@ -296,21 +332,23 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
     test('stream handler', async () => {
       const key: QueryKey = ['select * from table', []];
       key.persistent = true;
-
-      queue.setQueryStream(key, {});
-
-      await queue.executeInQueue('stream', key, { }, 0);
+      const stream = await queue.executeInQueue('stream', key, { aliasNameToMember: {} }, 0);
       await awaitProcessing();
 
+      // QueryStream has a debounce timer to destroy stream
+      // without reading it, timer will block exit for jest
+      for await (const chunk of stream) {
+        console.log('streaming chunk: ', chunk);
+      }
+
       expect(streamCount).toEqual(1);
-      expect(logger.mock.calls.length).toEqual(3);
-      expect(logger.mock.calls[2][0]).toEqual('Performing query completed');
+      expect(logger.mock.calls[logger.mock.calls.length - 1][0]).toEqual('Performing query completed');
     });
 
     test('removed before reconciled', async () => {
       const query: QueryKey = ['select * from', []];
       const key = queue.redisHash(query);
-      await queue.processQuery(key);
+      await queue.processQuery(key, null);
       const result = await queue.executeInQueue('foo', key, query);
       expect(result).toBe('select * from bar');
     });
@@ -380,11 +418,11 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       await queue.reconcileQueue();
 
       await redisClient.addToQueue(
-        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1' }
+        keyScore, 'activated1', time, 'handler', <any>['select'], priority, { stageQueryKey: 'race', requestId: '1', queueId: 1 }
       );
 
       await redisClient.addToQueue(
-        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1' }
+        keyScore + 100, 'activated2', time + 100, 'handler2', <any>['select2'], priority, { stageQueryKey: 'race2', requestId: '1', queueId: 2 }
       );
 
       const processingId1 = await redisClient.getNextProcessingId();
@@ -407,8 +445,8 @@ export const QueryQueueTest = (name: string, options: QueryQueueTestOptions = {}
       expect(retrieve4[0]).toBe(1);
       expect(!!retrieve4[5]).toBe(true);
 
-      console.log(await redisClient.getQueryAndRemove('activated1' as any));
-      console.log(await redisClient.getQueryAndRemove('activated2' as any));
+      console.log(await redisClient.getQueryAndRemove('activated1' as any, null));
+      console.log(await redisClient.getQueryAndRemove('activated2' as any, null));
 
       await queue.queueDriver.release(redisClient);
       await queue.queueDriver.release(redisClient2);

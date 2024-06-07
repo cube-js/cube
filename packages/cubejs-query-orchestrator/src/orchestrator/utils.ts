@@ -2,7 +2,7 @@
 import * as querystring from 'querystring';
 import crypto from 'crypto';
 
-import { getProcessUid } from '@cubejs-backend/shared';
+import { getProcessUid, getNext } from '@cubejs-backend/shared';
 import { QueryKey, QueryKeyHash } from '@cubejs-backend/base-driver';
 
 function parseHostPort(addr: string): { host: string, port: number } {
@@ -188,19 +188,22 @@ export const processUidRE = /^[0-9a-f]{8}\b-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-
 /**
  * Returns query hash by specified `queryKey`.
  */
-export function getCacheHash(queryKey: QueryKey): QueryKeyHash {
+export function getCacheHash(queryKey: QueryKey, processUid?: string): QueryKeyHash {
+  processUid = processUid || getProcessUid();
   if (typeof queryKey === 'string' && queryKey.length < 256) {
     return queryKey as any;
   }
 
-  const hash = crypto
-    .createHash('md5')
-    .update(JSON.stringify(queryKey))
-    .digest('hex');
-
   if (typeof queryKey === 'object' && queryKey.persistent) {
-    return `${hash}@${getProcessUid()}` as any;
+    return `${crypto
+      .createHash('md5')
+      .update(JSON.stringify(queryKey))
+      .digest('hex')
+    }@${processUid}` as any;
+  } else {
+    return crypto
+      .createHash('md5')
+      .update(JSON.stringify(queryKey))
+      .digest('hex') as any;
   }
-
-  return hash as any;
 }

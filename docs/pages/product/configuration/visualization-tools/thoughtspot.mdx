@@ -1,0 +1,64 @@
+---
+redirect_from:
+  - /config/downstream/thoughtspot
+---
+
+# Thoughtspot
+
+You can connect to Cube from [Thoughtspot][thoughtspot] using the [Cube SQL
+API][ref-sql-api].
+
+## Enable Cube SQL API
+
+### Cube Cloud
+
+Click **How to connect your BI tool** link on the Overview page, navigate to the
+SQL API tab and enable it. Once enabled, you should see the screen like the one
+below with your connection credentials:
+
+<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
+
+### Self-hosted Cube
+
+You need to set the following environment variables to enable the Cube SQL API.
+These credentials will be required to connect to Cube from Thoughtspot later.
+
+```dotenv
+CUBEJS_PG_SQL_PORT=5432
+CUBEJS_SQL_USER=myusername
+CUBEJS_SQL_PASSWORD=mypassword
+```
+
+## Connecting from Thoughtspot
+
+Thoughtspot connects to Cube as a Postgres database.
+
+In Thoughtspot, go to the Setup tab, then click <Btn>Connect now</Btn> to add a new
+data source:
+
+<Screenshot src="https://ucarecdn.com/85bd8325-efd9-4cae-a463-e9b025a667cc/" />
+
+Enter a name for the data source, choose <Btn>Postgres</Btn> as the data
+warehouse and click <Btn>Continue</Btn> in the header.
+
+Enter credentials from the previous step and click <Btn>Continue</Btn>:
+
+<Screenshot src="https://ucarecdn.com/bddba9ac-1e24-4651-9086-75f1d0c3c811/" />
+
+Select columns from the desired cubes and click <Btn>Create Connection</Btn> on the
+next screen:
+
+<Screenshot src="https://ucarecdn.com/95692c63-e620-42a5-9355-b4df27d6b3c4/" />
+
+## Querying data
+
+Your cubes will be exposed as tables, where both your measures and dimensions
+are columns.
+
+[ref-getting-started]: /product/getting-started/cloud
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-connecting-from-tableau]:
+  https://cubedev-blog-images.s3.us-east-2.amazonaws.com/dc025b24-674f-4f32-ac44-421d546ee676.GIF
+[ref-querying-from-tableau]:
+  https://cubedev-blog-images.s3.us-east-2.amazonaws.com/ea73a998-e2ce-4814-863e-425b4d35860c.gif
+[thoughtspot]: https://www.thoughtspot.com/

@@ -10,7 +10,7 @@ import {
 } from '@cubejs-backend/shared';
 import {
   BaseDriver, DriverCapabilities,
-  DriverInterface,
+  DriverInterface, QueryOptions,
 } from '@cubejs-backend/base-driver';
 import { Kafka } from 'kafkajs';
 import sqlstring, { format as formatSql } from 'sqlstring';
@@ -72,7 +72,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
    * Returns default concurrency value.
    */
   public static getDefaultConcurrency(): number {
-    return 2;
+    return 1;
   }
 
   protected readonly config: KsqlDriverOptions;
@@ -86,11 +86,26 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
    */
   public constructor(
     config: Partial<KsqlDriverOptions> & {
+      /**
+       * Data source name.
+       */
       dataSource?: string,
+
+      /**
+       * Max pool size value for the [cube]<-->[db] pool.
+       */
       maxPoolSize?: number,
+
+      /**
+       * Time to wait for a response from a connection after validation
+       * request before determining it as not valid. Default - 10000 ms.
+       */
+      testConnectionTimeout?: number,
     } = {}
   ) {
-    super();
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+    });
 
     const dataSource =
       config.dataSource ||
@@ -305,7 +320,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public dropTable(tableName: string, options: any): Promise<any> {
     return this.dropTableMutex.runExclusive(
-      async () => super.dropTable(this.quoteIdentifier(this.tableDashName(tableName)), options)
+      async () => this.query(`DROP TABLE ${this.quoteIdentifier(this.tableDashName(tableName))} DELETE TOPIC`, [], options)
     );
   }
 

@@ -1,0 +1,151 @@
+# Deployments in Cube Cloud
+
+Deployments are top-level entities in Cube Cloud. They include the source
+code, configuration, allocated resources, API endpoints and essentially
+do all the heavy lifting, running workloads and fulfilling requests.
+
+## List of deployments
+
+Each account in Cube Cloud can have multiple deployments. Once you've
+logged in, you can access the list of deployments by clicking on
+the&nbsp;<Btn>Cube Cloud</Btn> logo in the top left corner.
+
+<Screenshot src="https://ucarecdn.com/cdd5831a-a8f8-4342-bc3e-25aab2c04a5b/"/>
+
+## Creating a new deployment
+
+Creating a new deployment is an essential prerequisite to running a Cube
+project in Cube Cloud.
+
+After you've created your [Cube Cloud account][cube-cloud-signup],
+click&nbsp;<Btn>+ Create Deployment</Btn> in the top-right corner of your
+list of deployments to jump into the wizard. Watch the following video for
+guidance on the rest of the steps:
+
+<YouTubeVideo url="https://www.youtube.com/embed/HVZ4ytDEjqc" />
+
+## Demo deployments
+
+After you've created your [Cube Cloud account][cube-cloud-signup] and
+proceeded to create a new deployment, you would be prompted to set up a
+connection to your [data source][ref-data-source].
+
+If, for any reason, you're not ready or unable to connect your staging or
+production data source at the moment, you can click&nbsp;<Btn>Create a demo
+deployment</Btn> in the yellow box:
+
+<Screenshot src="https://ucarecdn.com/559aeebe-d20f-4510-a22c-62532b59cbcc/"/>
+
+Shortly, Cube Cloud will create and pre-configure a new deployment in your
+account. You will see it as&nbsp;<Btn>Demo deployment</Btn> in the list of
+deployments. This new deployment will be:
+
+- Configured to use [DuckDB][ref-duckdb] as the data source.
+- Provided with a sample [data model][ref-data-model] backed with CSV files
+in a public S3 bucket.
+- Provided with an example of [dynamic data modeling][ref-dynamic-data-models]
+and programmatic [configuration options][ref-config-options].
+
+Watch the following video to for a step-by-step walkthrough:
+
+<YouTubeVideo url="https://www.youtube.com/embed/XeaZPUQRC8M" />
+
+Exploring the demo deployment is a great way to understand how Cube works.
+Use the [data model editor][ref-data-model] to review the data model and
+make sure to run a few queries in [Playground][ref-playground].
+
+## Deployment overview
+
+The&nbsp;<Btn>Overview</Btn> page of each deployment provides a high-level
+summary if its components and state:
+* API endpoints with URLs and connection instructions.
+* Allocated resources in line with the [deployment type][ref-deployment-types].
+* Activity log of the most recent events.
+
+<Screenshot src="https://ucarecdn.com/af8129b4-19bb-4dc1-90db-a726da367de8/"/>
+
+Additionally, the bar under the&nbsp;<Btn>Cube Cloud</Btn> logo displays
+user-specific state of the deployment:
+* Branch selector displays the source code branch that is currently
+  selected and being viewed by the user.
+* <Btn>Enter Development Mode</Btn> button indicates whether a user has
+  entered the [development mode][ref-dev-mode].
+
+## Cube version
+
+Each deployment in Cube Cloud runs a specific version of Cube, depending on the
+branch of the source code and the selected [update channel](#update-channels).
+
+### Current version
+
+You can check the current version of Cube that your deployment runs by
+navigating to <Btn>Overview → Resources & Logs → Cube API</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/83a5010a-3c02-4ce1-8e4f-fdbb2efc6a90/"
+  highlight="inset(42.5% 42.5% 32.5% 4% round 10px)"
+/>
+
+Non-main branches and [development mode][ref-dev-mode] branches always run
+the most up-to-date version of Cube.
+
+### Update channels
+
+Cube Cloud provides two update channels:
+
+* **Stable channel.** You should manually update the deployment to one of
+available stable versions.
+* **Latest channel.** On each build, the deployment is automatically updated
+to the most up-to-date version of Cube.
+
+You can view or change the update channel by navigating to <Btn>Settings →
+General → Cube version</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/b6ddfc8f-ee37-4b75-8108-ba12c020a9f6/"
+  highlight="inset(53.75% 42.5% 11.25% 20% round 10px)"
+/>
+
+## Resource consumption
+
+Each deployment allocates and consumes the following resources:
+
+* For the main branch of the source code, a set of resources in line with
+  the [deployment type][ref-deployment-types].
+* For any other branch of the source code, a [development
+  instance][ref-dev-instance].
+* For any user-specific [development mode][ref-dev-mode] branch, a
+  [development instance][ref-dev-instance].
+* If pre-aggregations are used, a minimum of two Cube Store workers.
+
+Cube Cloud only consumes resources when they are needed to run workloads:
+
+* For the main branch, resources are always consumed unless a deployment is
+  [auto-suspended][ref-auto-sus].
+* For any other branch or any user-specific development mode branch,
+  a development instance is allocated while there's some activity in the
+  branch, e.g., API endpoints are serving requests, a user is active in
+  Cube Cloud, etc. After a period of inactivity, the development instance
+  is deallocated.
+* For pre-aggregations, Cube Store workers are allocated while there's some
+  activity related to pre-aggregations, e.g., API endpoints are serving
+  requests to pre-aggregations, pre-aggregations are being built, etc.
+  After a period of inactivity, Cube Store workers are deallocated.
+
+Please refer to [total cost examples][ref-total-cost] to learn more about
+resource consumption in different scenarios.
+
+
+[cube-cloud-signup]: https://cubecloud.dev/auth/signup
+[ref-deployment-types]: /product/deployment/cloud/deployment-types
+[ref-dev-instance]: /product/deployment/cloud/deployment-types#development-instance
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension
+[ref-total-cost]: /product/deployment/cloud/pricing#total-cost-examples
+[ref-data-source]: /product/configuration/data-sources
+[ref-duckdb]: /product/configuration/data-sources/duckdb
+[ref-data-model]: /product/data-modeling/overview
+[ref-dynamic-data-models]: /product/data-modeling/dynamic
+[ref-config-options]: /product/configuration#configuration-options
+[ref-data-model]: /product/workspace/data-model
+[ref-playground]: /product/workspace/playground

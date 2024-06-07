@@ -41,11 +41,11 @@ export class DruidClient {
     });
   }
 
-  public async query<R = unknown>(query: string, parameters: { type: string, value: unknown }[]): Promise<R[]> {
+  public async query<R = unknown>(query: string, parameters: { type: string, value: unknown }[]): Promise<{ rows: R[], columns: Record<string, { sqlType: string }> | null }> {
     let cancelled = false;
     const cancelObj: any = {};
 
-    const promise: Promise<R[]> & { cancel?: () => void } = (async () => {
+    const promise: Promise<{ rows: R[], columns: any }> & { cancel?: () => void } = (async () => {
       cancelObj.cancel = async () => {
         cancelled = true;
       };
@@ -57,6 +57,8 @@ export class DruidClient {
           data: {
             query,
             parameters,
+            header: true,
+            sqlTypesHeader: true,
             resultFormat: 'object',
           },
         });
@@ -67,7 +69,19 @@ export class DruidClient {
           throw new Error('Query cancelled');
         }
 
-        return response.data;
+        if (response.headers['x-druid-sql-header-included']) {
+          const [columns, ...rows] = response.data;
+
+          return {
+            columns,
+            rows
+          };
+        } else {
+          return {
+            columns: null,
+            rows: response.data,
+          };
+        }
       } catch (e: any) {
         if (cancelled) {
           throw new Error('Query cancelled');

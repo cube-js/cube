@@ -1,15 +1,21 @@
 import YAML from 'js-yaml';
-import { camelize } from 'inflection';
 import * as t from '@babel/types';
 import { parse } from '@babel/parser';
 import babelGenerator from '@babel/generator';
 import babelTraverse from '@babel/traverse';
+import { JinjaEngine, NativeInstance, PythonCtx } from '@cubejs-backend/native';
+
+import type { FileContent } from '@cubejs-backend/shared';
+
+import { getEnv } from '@cubejs-backend/shared';
 import { CubePropContextTranspiler, transpiledFields, transpiledFieldsPatterns } from './transpilers';
 import { PythonParser } from '../parser/PythonParser';
 import { CubeSymbols } from './CubeSymbols';
 import { DataSchemaCompiler } from './DataSchemaCompiler';
 import { nonStringFields } from './CubeValidator';
 import { CubeDictionary } from './CubeDictionary';
+import { ErrorReporter } from './ErrorReporter';
+import { camelizeCube } from './utils';
 
 type EscapeStateStack = {
   inFormattedStr?: boolean;
@@ -21,19 +27,81 @@ type EscapeStateStack = {
 export class YamlCompiler {
   public dataSchemaCompiler: DataSchemaCompiler | null = null;
 
-  public constructor(private cubeSymbols: CubeSymbols, private cubeDictionary: CubeDictionary) {
+  protected jinjaEngine: JinjaEngine | null = null;
+
+  public constructor(
+    private readonly cubeSymbols: CubeSymbols,
+    private readonly cubeDictionary: CubeDictionary,
+    private readonly nativeInstance: NativeInstance,
+  ) {
   }
 
-  public compileYamlFile(file, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+  protected getJinjaEngine(): JinjaEngine {
+    if (this.jinjaEngine) {
+      return this.jinjaEngine;
+    }
+
+    throw new Error('Jinja engine was not initialized');
+  }
+
+  public initFromPythonContext(ctx: PythonCtx) {
+    this.jinjaEngine = this.nativeInstance.newJinjaEngine({
+      debugInfo: getEnv('devMode'),
+      filters: ctx.filters,
+      workers: 1,
+    });
+  }
+
+  public async compileYamlWithJinjaFile(
+    file: FileContent,
+    errorsReport: ErrorReporter,
+    cubes,
+    contexts,
+    exports,
+    asyncModules,
+    toCompile,
+    compiledFiles,
+    compileContext,
+    pythonContext
+  ) {
+    const compiledFile = {
+      fileName: file.fileName,
+      content: await this.getJinjaEngine().renderTemplate(file.fileName, compileContext, {
+        ...pythonContext.functions,
+        ...pythonContext.variables
+      }),
+    };
+
+    return this.compileYamlFile(
+      compiledFile,
+      errorsReport,
+      cubes,
+      contexts,
+      exports,
+      asyncModules,
+      toCompile,
+      compiledFiles
+    );
+  }
+
+  public compileYamlFile(file: FileContent, errorsReport: ErrorReporter, cubes, contexts, exports, asyncModules, toCompile, compiledFiles) {
+    if (!file.content.trim()) {
+      return;
+    }
+
     const yamlObj = YAML.load(file.content);
+    if (!yamlObj) {
+      return;
+    }
+
     for (const key of Object.keys(yamlObj)) {
       if (key === 'cubes') {
-        yamlObj.cubes.forEach(({ name, ...cube }) => {
+        (yamlObj.cubes || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'cube', { name, ...cube }, errorsReport);
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
         });
       } else if (key === 'views') {
-        yamlObj.views.forEach(({ name, ...cube }) => {
+        (yamlObj.views || []).forEach(({ name, ...cube }) => {
           const transpiledFile = this.transpileAndPrepareJsFile(file, 'view', { name, ...cube }, errorsReport);
           this.dataSchemaCompiler?.compileJsFile(transpiledFile, errorsReport, cubes, contexts, exports, asyncModules, toCompile, compiledFiles);
         });
@@ -43,7 +111,7 @@ export class YamlCompiler {
     }
   }
 
-  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport) {
+  private transpileAndPrepareJsFile(file, methodFn, cubeObj, errorsReport: ErrorReporter) {
     const yamlAst = this.transformYamlCubeObj(cubeObj, errorsReport);
 
     const cubeOrViewCall = t.callExpression(t.identifier(methodFn), [t.stringLiteral(cubeObj.name), yamlAst]);
@@ -55,76 +123,69 @@ export class YamlCompiler {
     };
   }
 
-  private transformYamlCubeObj(cubeObj, errorsReport) {
-    cubeObj = this.camelizeObj(cubeObj);
+  private transformYamlCubeObj(cubeObj, errorsReport: ErrorReporter) {
+    camelizeCube(cubeObj);
+
     cubeObj.measures = this.yamlArrayToObj(cubeObj.measures || [], 'measure', errorsReport);
     cubeObj.dimensions = this.yamlArrayToObj(cubeObj.dimensions || [], 'dimension', errorsReport);
     cubeObj.segments = this.yamlArrayToObj(cubeObj.segments || [], 'segment', errorsReport);
-    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'segment', errorsReport);
+    cubeObj.preAggregations = this.yamlArrayToObj(cubeObj.preAggregations || [], 'preAggregation', errorsReport);
     cubeObj.joins = this.yamlArrayToObj(cubeObj.joins || [], 'join', errorsReport);
+
     return this.transpileYaml(cubeObj, [], cubeObj.name, errorsReport);
   }
 
-  private camelizeObj(cubeObjPart: any): any {
-    if (typeof cubeObjPart === 'object') {
-      if (Array.isArray(cubeObjPart)) {
-        for (let i = 0; i < cubeObjPart.length; i++) {
-          cubeObjPart[i] = this.camelizeObj(cubeObjPart[i]);
-        }
-      } else {
-        for (const key of Object.keys(cubeObjPart)) {
-          cubeObjPart[key] = this.camelizeObj(cubeObjPart[key]);
-          const camelizedKey = camelize(key, true);
-          if (camelizedKey !== key) {
-            cubeObjPart[camelizedKey] = cubeObjPart[key];
-            delete cubeObjPart[key];
-          }
-        }
-      }
-    }
-    return cubeObjPart;
-  }
-
-  private transpileYaml(obj, propertyPath, cubeName, errorsReport) {
+  private transpileYaml(obj, propertyPath, cubeName, errorsReport: ErrorReporter) {
     if (transpiledFields.has(propertyPath[propertyPath.length - 1])) {
       for (const p of transpiledFieldsPatterns) {
         const fullPath = propertyPath.join('.');
         if (fullPath.match(p)) {
-          if (typeof obj === 'string' && propertyPath[propertyPath.length - 1] === 'sql') {
+          if (typeof obj === 'string' && ['sql', 'sqlTable'].includes(propertyPath[propertyPath.length - 1])) {
             return this.parsePythonIntoArrowFunction(`f"${this.escapeDoubleQuotes(obj)}"`, cubeName, obj, errorsReport);
           } else if (typeof obj === 'string') {
             return this.parsePythonIntoArrowFunction(obj, cubeName, obj, errorsReport);
           } else if (Array.isArray(obj)) {
             const resultAst = t.program([t.expressionStatement(t.arrayExpression(obj.map(code => {
               const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-              return ast?.body[0]?.expression;
+              return this.extractProgramBodyIfNeeded(ast);
             }).filter(ast => !!ast)))]);
             return this.astIntoArrowFunction(resultAst, '', cubeName);
           }
         }
       }
-    } else if (propertyPath[propertyPath.length - 1] === 'extends') {
+    }
+
+    if (propertyPath[propertyPath.length - 1] === 'extends') {
       const ast = this.parsePythonAndTranspileToJs(obj, errorsReport);
       return this.astIntoArrowFunction(ast, obj, cubeName, name => this.cubeDictionary.resolveCube(name));
     } else if (typeof obj === 'string') {
       let code = obj;
+
       if (!nonStringFields.has(propertyPath[propertyPath.length - 1])) {
         code = `f"${this.escapeDoubleQuotes(obj)}"`;
       }
+
       const ast = this.parsePythonAndTranspileToJs(code, errorsReport);
-      return ast?.body[0]?.expression;
+      return this.extractProgramBodyIfNeeded(ast);
     } else if (typeof obj === 'boolean') {
       return t.booleanLiteral(obj);
+    } else if (typeof obj === 'number') {
+      return t.numericLiteral(obj);
+    } else if (obj === null && propertyPath.includes('meta')) {
+      return t.nullLiteral();
     }
-    if (typeof obj === 'object') {
+
+    if (typeof obj === 'object' && obj !== null) {
       if (Array.isArray(obj)) {
         return t.arrayExpression(obj.map((value, i) => this.transpileYaml(value, propertyPath.concat(i.toString()), cubeName, errorsReport)));
       } else {
         const properties: any[] = [];
+
         for (const propKey of Object.keys(obj)) {
           const ast = this.transpileYaml(obj[propKey], propertyPath.concat(propKey), cubeName, errorsReport);
           properties.push(t.objectProperty(t.stringLiteral(propKey), ast));
         }
+
         return t.objectExpression(properties);
       }
     } else {
@@ -147,6 +208,11 @@ export class YamlCompiler {
       } else if (str[i] === '"' && stateStack.length === 0) {
         result.push('\\"');
       } else if (str[i] === '"' && peek().inStr) {
+        result.push(str[i]);
+        stateStack.pop();
+      } else if (str[i] === '`' && stateStack.length === 0) {
+        result.push('\\`');
+      } else if (str[i] === '`' && peek().inStr) {
         result.push(str[i]);
         stateStack.pop();
       } else if (str[i] === '{' && str[i + 1] === '{' && peek()?.inFormattedStr) {
@@ -176,26 +242,31 @@ export class YamlCompiler {
     return result.join('');
   }
 
-  private parsePythonIntoArrowFunction(codeString, cubeName, originalObj, errorsReport) {
+  private parsePythonIntoArrowFunction(codeString: string, cubeName, originalObj, errorsReport: ErrorReporter) {
     const ast = this.parsePythonAndTranspileToJs(codeString, errorsReport);
-    return this.astIntoArrowFunction(ast, codeString, cubeName);
+    return this.astIntoArrowFunction(ast as any, codeString, cubeName);
   }
 
-  private parsePythonAndTranspileToJs(codeString, errorsReport) {
+  private parsePythonAndTranspileToJs(codeString: string, errorsReport: ErrorReporter): t.Program | t.NullLiteral {
+    if (codeString === '' || codeString === 'f""') {
+      return t.nullLiteral();
+    }
+
     try {
       const pythonParser = new PythonParser(codeString);
       return pythonParser.transpileToJs();
     } catch (e: any) {
       errorsReport.error(`Can't parse python expression. Most likely this type of syntax isn't supported yet: ${e.message || e}`);
     }
+
     return t.nullLiteral();
   }
 
-  private astIntoArrowFunction(ast, codeString, cubeName, resolveSymbol?: (string) => any) {
-    const initialJs = babelGenerator(ast, {}, codeString).code;
+  private astIntoArrowFunction(input: t.Program | t.NullLiteral, codeString: string, cubeName, resolveSymbol?: (string) => any) {
+    const initialJs = babelGenerator(input, {}, codeString).code;
 
     // Re-parse generated JS to set all necessary parent paths
-    ast = parse(
+    const ast = parse(
       initialJs,
       {
         sourceType: 'script',
@@ -213,17 +284,40 @@ export class YamlCompiler {
 
     babelTraverse(ast, traverseObj);
 
-    return ast.program.body[0]?.expression;
+    const body: any = ast.program.body[0];
+    return body?.expression;
   }
 
-  private yamlArrayToObj(yamlArray, memberType, errorsReport) {
-    return yamlArray.map(({ name, ...rest }) => {
+  private yamlArrayToObj(yamlArray, memberType: string, errorsReport: ErrorReporter) {
+    if (!Array.isArray(yamlArray)) {
+      errorsReport.error(`${memberType}s must be defined as array`);
+      return {};
+    }
+
+    const remapped = yamlArray.map(({ name, indexes, ...rest }) => {
+      if (memberType === 'preAggregation' && indexes) {
+        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+      }
+
       if (!name) {
-        errorsReport.error(`name isn't defined for ${memberType}: ${YAML.stringify(rest)}`);
+        errorsReport.error(`name isn't defined for ${memberType}: ${JSON.stringify(rest)}`);
         return {};
+      } else if (indexes) {
+        return { [name]: { indexes, ...rest } };
       } else {
         return { [name]: rest };
       }
-    }).reduce((a, b) => ({ ...a, ...b }), {});
+    });
+
+    return remapped.reduce((a, b) => ({ ...a, ...b }), {});
+  }
+
+  private extractProgramBodyIfNeeded(ast: t.Node) {
+    if (t.isProgram(ast)) {
+      const body: any = ast?.body[0];
+      return body?.expression;
+    }
+
+    return ast;
   }
 }

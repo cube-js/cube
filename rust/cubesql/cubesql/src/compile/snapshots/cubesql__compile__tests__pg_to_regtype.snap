@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"select\n                    to_regtype('bool') b,\n                    to_regtype('name') n,\n                    to_regtype('_int4') ai,\n                    to_regtype('unknown') u\n                ;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++----+----+------+------+
+| b  | n  | ai   | u    |
++----+----+------+------+
+| 16 | 19 | 1007 | NULL |
++----+----+------+------+
