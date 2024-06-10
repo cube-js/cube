@@ -30,7 +30,6 @@ use std::{
     borrow::Cow,
     fmt::{self, Display, Formatter},
     ops::Index,
-    slice::Iter,
     str::FromStr,
     sync::Arc,
 };
@@ -958,14 +957,16 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
         (!matches.substs.is_empty()).then(|| matches)
     }
 
-    fn search_with_limit(
+    fn search_eclasses_with_limit(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
         let mut result: Vec<SearchMatches<_>> = vec![];
+
         self.list_pattern
-            .search_with_fn(egraph, |id, list_subst| {
+            .search_eclasses_with_fn(egraph, eclasses, |id, list_subst| {
                 let last = match result.last_mut() {
                     Some(top) if top.eclass == id => top,
                     _ => {
@@ -2080,78 +2081,24 @@ pub fn original_expr_name(
         })
 }
 
-fn search_match_chained<'a>(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    cur_match: SearchMatches<'a, LogicalPlanLanguage>,
-    chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
-) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-    let mut chain = chain.clone();
-    let mut matches_to_merge = Vec::new();
-    if let Some((var, pattern)) = chain.next() {
-        for subst in cur_match.substs.iter() {
-            if let Some(id) = subst.get(var.clone()) {
-                if let Some(next_match) = pattern.search_eclass(egraph, id.clone()) {
-                    let chain_matches = search_match_chained(
-                        egraph,
-                        SearchMatches {
-                            eclass: cur_match.eclass.clone(),
-                            substs: next_match
-                                .substs
-                                .iter()
-                                .map(|next_subst| {
-                                    let mut new_subst = subst.clone();
-                                    for pattern_var in pattern.vars().into_iter() {
-                                        if let Some(pattern_var_value) = next_subst.get(pattern_var)
-                                        {
-                                            new_subst
-                                                .insert(pattern_var, pattern_var_value.clone());
-                                        }
-                                    }
-                                    new_subst
-                                })
-                                .collect::<Vec<_>>(),
-                            // TODO merge
-                            ast: cur_match.ast.clone(),
-                        },
-                        chain.clone(),
-                    );
-                    matches_to_merge.extend(chain_matches);
-                }
-            }
-        }
-        if !matches_to_merge.is_empty() {
-            let mut substs = Vec::new();
-            for m in matches_to_merge {
-                substs.extend(m.substs.clone());
-            }
-            Some(SearchMatches {
-                eclass: cur_match.eclass.clone(),
-                substs,
-                // TODO merge
-                ast: cur_match.ast.clone(),
-            })
-        } else {
-            None
-        }
-    } else {
-        Some(cur_match)
-    }
-}
-
 pub struct ChainSearcher {
     main: Pattern<LogicalPlanLanguage>,
     chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
 }
 
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
-    fn search(
+    fn search_eclasses_with_limit(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclasses: &mut dyn Iterator<Item = Id>,
+        limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
-        let matches = self.main.search(egraph);
+        let matches = self
+            .main
+            .search_eclasses_with_limit(egraph, eclasses, limit);
         let mut result = Vec::new();
         for m in matches {
-            if let Some(m) = self.search_match_chained(egraph, m, self.chain.iter()) {
+            if let Some(m) = self.search_match_chained(egraph, m) {
                 result.push(m);
             }
         }
@@ -2165,7 +2112,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
         if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
-            self.search_match_chained(egraph, m, self.chain.iter())
+            self.search_match_chained(egraph, m)
         } else {
             None
         }
@@ -2184,10 +2131,31 @@ impl ChainSearcher {
     fn search_match_chained<'a>(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cur_match: SearchMatches<'a, LogicalPlanLanguage>,
-        chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
+        mut cur_match: SearchMatches<'a, LogicalPlanLanguage>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-        search_match_chained(egraph, cur_match, chain)
+        let mut new_substs = vec![];
+        for (var, pattern) in &self.chain {
+            assert!(new_substs.is_empty());
+            for subst in &cur_match.substs {
+                let eclass = subst[*var];
+                pattern
+                    .search_eclass_with_fn(egraph, eclass, |chain_subst| {
+                        let mut subst = subst.clone();
+                        subst.extend(chain_subst.iter());
+                        new_substs.push(subst);
+                        Ok(())
+                    })
+                    .unwrap_or_default();
+            }
+            std::mem::swap(&mut new_substs, &mut cur_match.substs);
+            new_substs.clear();
+        }
+
+        if cur_match.substs.is_empty() {
+            None
+        } else {
+            Some(cur_match)
+        }
     }
 }
 
