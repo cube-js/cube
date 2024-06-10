@@ -2954,7 +2954,16 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
-        LEAST: 'LEAST({{ args_concat }})',
+
+        // There is a difference in behaviour of these function processing in different DBs and DWHs.
+        // The SQL standard requires greatest and least to return null in case one argument is null.
+        // However, many DBMS ignore NULL values (mostly because greatest and least were often supported
+        // decades before they were added to the SQL standard in 2023).
+        // Cube follows the Postgres implementation (as we mimic the Postgres protocol) and ignores NULL values.
+        // So these functions are enabled on a driver-specific basis for databases that ignores NULLs.
+        // LEAST: 'LEAST({{ args_concat }})',
+        // GREATEST: 'GREATEST({{ args_concat }})',
+
         LOWER: 'LOWER({{ args_concat }})',
         UPPER: 'UPPER({{ args_concat }})',
         LEFT: 'LEFT({{ args_concat }})',
@@ -2976,7 +2985,6 @@ export class BaseQuery {
         REPEAT: 'REPEAT({{ args_concat }})',
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
-        GREATEST: 'GREATEST({{ args_concat }})',
 
         STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
