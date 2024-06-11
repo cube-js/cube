@@ -123,7 +123,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         throw e;
       }
     });
-  
+
     afterAll(async () => {
       try {
         console.log(`Dropping ${tables.length} fixture tables`);
@@ -150,7 +150,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         preAggregations: ['ECommerce.SAExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
-      
+
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['ECommerce.TAExternal'],
@@ -1615,22 +1615,22 @@ from
 
     executePg('SQL API: powerbi min max ungrouped flag', async (connection) => {
       const res = await connection.query(`
-      select 
-  count(distinct("rows"."totalSales")) + max( 
-    case 
-      when "rows"."totalSales" is null then 1 
-      else 0 
-    end 
-  ) as "a0", 
-  min("rows"."totalSales") as "a1", 
-  max("rows"."totalSales") as "a2" 
-from 
-  ( 
-    select 
-      "totalSales" 
-    from 
-      "public"."ECommerce" "$Table" 
-  ) "rows" 
+      select
+  count(distinct("rows"."totalSales")) + max(
+    case
+      when "rows"."totalSales" is null then 1
+      else 0
+    end
+  ) as "a0",
+  min("rows"."totalSales") as "a1",
+  max("rows"."totalSales") as "a2"
+from
+  (
+    select
+      "totalSales"
+    from
+      "public"."ECommerce" "$Table"
+  ) "rows"
   `);
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
     });
@@ -1639,9 +1639,9 @@ from
       const res = await connection.query(`
     select
       "productName",
-      "totalSales" 
-    from 
-      "public"."BigECommerce" "$Table" 
+      "totalSales"
+    from
+      "public"."BigECommerce" "$Table"
     order by 2 desc, 1 asc
   `);
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
@@ -1651,7 +1651,7 @@ from
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
-    from 
+    from
       "public"."BigECommerce" "BigECommerce"
   `);
       expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
@@ -1699,7 +1699,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(1, 2), 3, ROLLUP(4) 
+      ROLLUP(1, 2), 3, ROLLUP(4)
     order by 1, 2, 3, 4
 
   `);
@@ -1713,7 +1713,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(rowId, 2), 3, ROLLUP(4) 
+      ROLLUP(rowId, 2), 3, ROLLUP(4)
     order by 1, 2, 3, 4
 
   `);
@@ -1727,7 +1727,7 @@ from
     from
       "ECommerce" as "ECommerce"
     group by
-      ROLLUP(1, 2, 3) 
+      ROLLUP(1, 2, 3)
     order by 1, 2, 3
 
   `);

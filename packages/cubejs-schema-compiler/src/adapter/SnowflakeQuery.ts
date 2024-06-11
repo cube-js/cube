@@ -1,4 +1,5 @@
 import { BaseQuery } from './BaseQuery';
+import { BaseFilter } from './BaseFilter';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'DAY',
@@ -11,7 +12,28 @@ const GRANULARITY_TO_INTERVAL = {
   year: 'YEAR'
 };
 
+class SnowflakeFilter extends BaseFilter {
+  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    // From Snowflake docs:
+    // If you use the backslash as an escape character, then you must escape the backslash in both the expression
+    // and the ESCAPE clause. For example, the following command specifies that the escape character is the backslash,
+    // and then uses that escape character to search for % as a literal (without the escape character, the % would be
+    // treated as a wildcard): `'SOMETHING%' ILIKE '%\\%%' ESCAPE '\\';`
+    //
+    // Special chars in bind vars are escaped with backslash which in turn is also escaped by backslash.
+    // To get double backslashes passed inside generated SQL string we need to escape each one.
+    // That is why here are FOUR backslashes.
+    return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\\\'`;
+  }
+}
+
 export class SnowflakeQuery extends BaseQuery {
+  public newFilter(filter) {
+    return new SnowflakeFilter(this, filter);
+  }
+
   public convertTz(field) {
     return `CONVERT_TIMEZONE('${this.timezone}', ${field}::timestamp_tz)::timestamp_ntz`;
   }
