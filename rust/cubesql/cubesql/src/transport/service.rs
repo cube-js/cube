@@ -335,6 +335,7 @@ impl TransportService for HttpTransport {
 pub struct SqlTemplates {
     pub templates: HashMap<String, String>,
     pub reuse_params: bool,
+    pub cast_in_list_time_dimension: bool,
     jinja: Environment<'static>,
 }
 
@@ -353,7 +354,11 @@ pub struct TemplateColumn {
 }
 
 impl SqlTemplates {
-    pub fn new(templates: HashMap<String, String>, reuse_params: bool) -> Result<Self, CubeError> {
+    pub fn new(
+        templates: HashMap<String, String>,
+        reuse_params: bool,
+        cast_in_list_time_dimension: bool,
+    ) -> Result<Self, CubeError> {
         let mut jinja = Environment::new();
         for (name, template) in templates.iter() {
             jinja
@@ -370,6 +375,7 @@ impl SqlTemplates {
             templates,
             jinja,
             reuse_params,
+            cast_in_list_time_dimension,
         })
     }
 
