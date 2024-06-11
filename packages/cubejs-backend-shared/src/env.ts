@@ -1649,6 +1649,15 @@ const variables: Record<string, (...args: any) => any> = {
 
     return false;
   },
+    redisCaPath: () => get('CUBEJS_REDIS_CA_PATH')
+    .asString(),
+  redisCertPath: () => get('CUBEJS_REDIS_CLIENT_CERT_PATH')
+    .asString(),
+  redisKeyPath: () => get('CUBEJS_REDIS_CLIENT_KEY_PATH')
+    .asString(),
+  redisRejectUnauthorized: () => get('CUBEJS_REDIS_REJECT_UNAUTHORIZED')
+    .asBool(),
+  
   nodeEnv: () => get('NODE_ENV')
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
