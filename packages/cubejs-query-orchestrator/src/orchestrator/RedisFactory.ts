@@ -43,7 +43,16 @@ export async function createRedisClient(url: string, opts: ClientOpts = {}) {
   };
 
   if (getEnv('redisTls')) {
-    options.tls = {};
+    if (getEnv('redisCaPath') && getEnv('redisCertPath') && getEnv('redisKeyPath')) {
+      options.tls = {
+        ca: fs.readFileSync(getEnv('redisCaPath')),
+        cert: fs.readFileSync(getEnv('redisCertPath')),
+        key: fs.readFileSync(getEnv('redisKeyPath')),
+        rejectUnauthorized: getEnv('redisRejectUnauthorized')
+      };
+    } else {
+      options.tls = {};
+    }
   }
 
   if (getEnv('redisPassword')) {
