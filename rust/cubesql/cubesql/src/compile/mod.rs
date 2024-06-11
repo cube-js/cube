@@ -6060,6 +6060,201 @@ limit
     }
 
     #[tokio::test]
+    async fn test_date_minus_date_postgres() {
+        async fn check_date_minus_date(left: &str, right: &str, expected: &str) {
+            let column_name = "result";
+            assert_eq!(
+                execute_query(
+                    format!(
+                        r#"SELECT (CAST('{left}' AS TIMESTAMP) -
+                     CAST('{right}' AS TIMESTAMP)) AS "{column_name}""#
+                    ),
+                    DatabaseProtocol::PostgreSQL
+                )
+                .await
+                .unwrap(),
+                format!(
+                    "+-{empty:-<width$}-+\
+                    \n| {column_name:width$} |\
+                    \n+-{empty:-<width$}-+\
+                    \n| {expected:width$} |\
+                    \n+-{empty:-<width$}-+",
+                    empty = "",
+                    width = expected.len().max(column_name.len())
+                )
+            );
+        }
+
+        // TODO: Postgres output: "28 days 00:34:56.123457" here and below.
+        check_date_minus_date(
+            "2021-03-02 12:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 28 days 0 hours 34 mins 56.123456789 secs",
+        )
+        .await;
+
+        // TODO: The formatting of this fractional seconds value is incorrect (with its negative sign).
+        // Postgres output: "-28 days -00:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2021-03-02 12:34:56.123456789",
+            "0 years 0 mons -28 days 0 hours -34 mins -56.-123456789 secs",
+        )
+        .await;
+
+        // Postgres output: "89 days 01:34:56.123457"
+        check_date_minus_date(
+            "2021-05-02 13:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 89 days 1 hours 34 mins 56.123456789 secs",
+        )
+        .await;
+
+        // Postgres output: "-89 days -01:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2021-05-02 13:34:56.123456789",
+            "0 years 0 mons -89 days -1 hours -34 mins -56.-123456789 secs",
+        )
+        .await;
+
+        // Postgres output: "819 days 01:34:56.123457"
+        check_date_minus_date(
+            "2023-05-02 13:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 819 days 1 hours 34 mins 56.123456789 secs",
+        )
+        .await;
+
+        // Postgres output: "-819 days -01:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2023-05-02 13:34:56.123456789",
+            "0 years 0 mons -819 days -1 hours -34 mins -56.-123456789 secs",
+        )
+        .await;
+
+        // Check the result being zero, of course.
+        // Postgres output: "00:00:00"
+        check_date_minus_date(
+            "2021-02-02 12:34:56",
+            "2021-02-02 12:34:56.000",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+        check_date_minus_date(
+            "2021-02-02 12:34:56.789112358",
+            "2021-02-02 12:34:56.789112358",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Postgres treats 60 seconds the same here.
+        check_date_minus_date(
+            "2001-02-04 00:00:00.000",
+            "2001-02-03 23:59:60.000",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Perhaps out of scope for this test, document pluralizaton of interval rendering.
+        // Postgres output: "1 day 01:01:01"
+        // Note the lack of pluralization.
+        check_date_minus_date(
+            "2000-02-29 01:01:01.000",
+            "2000-02-28 00:00:00.000",
+            "0 years 0 mons 1 days 1 hours 1 mins 1.00 secs",
+        )
+        .await;
+
+        // Postgres output: "-1 days -01:01:01"
+        check_date_minus_date(
+            "2000-02-28 00:00:00.000",
+            "2000-02-29 01:01:01.000",
+            "0 years 0 mons -1 days -1 hours -1 mins -1.00 secs",
+        )
+        .await;
+
+        // TODO: This is the WRONG VALUE.  See batch_to_dataframe.
+        // Postgres output: 00:00:00.001
+        check_date_minus_date(
+            "2000-02-29 00:00:00.000",
+            "2000-02-28 23:59:59.999",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.1000000 secs",
+        )
+        .await;
+
+        // TODO: This is the WRONG VALUE.
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000",
+            "2000-02-25 13:59:59.999",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.1000000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000",
+            "2000-02-25 13:59:59.900",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100000000 secs",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_extract_epoch_from_interval() {
+        // Note that we haven't implemented any other extract fields on intervals, aside from epoch.
+        async fn check_extract_epoch(timestamp: &str, expected: &str) {
+            let column_name = "result";
+            assert_eq!(
+                execute_query(
+                    format!(r#"SELECT EXTRACT(EPOCH FROM CAST('{timestamp}' AS INTERVAL)) AS "{column_name}""#),
+                    DatabaseProtocol::PostgreSQL
+                ).await.unwrap(),
+                format!("+-{empty:-<width$}-+\
+                    \n| {column_name:width$} |\
+                    \n+-{empty:-<width$}-+\
+                    \n| {expected:width$} |\
+                    \n+-{empty:-<width$}-+",
+                    empty = "",
+                    width = expected.len().max(column_name.len())
+                )
+            );
+        }
+
+        // Postgres is rendered: "5.000000"
+        check_extract_epoch("5 seconds", "5").await;
+        check_extract_epoch("0 seconds", "0").await;
+        check_extract_epoch("1 day", "86400").await;
+        check_extract_epoch("1 day 25 seconds", "86425").await;
+        for i in 0..11 {
+            check_extract_epoch(&format!("{} month", i), &(86400 * 30 * i).to_string()).await;
+            check_extract_epoch(
+                &format!("{} month 1 day", i),
+                &(86400 * (30 * i + 1)).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} month 32 day", i),
+                &(86400 * (30 * i + 32)).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} months", i + 12),
+                &(86400 * (365 + 30 * i) + 86400 / 4).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} months 32 days", i + 12),
+                &(86400 * (365 + 30 * i + 32) + 86400 / 4).to_string(),
+            )
+            .await;
+        }
+
+        // TODO: Postgres surely does 5.123457.
+        check_extract_epoch("5.123456789 seconds", "5.123456789").await;
+    }
+
+    #[tokio::test]
     async fn test_date_add_sub_postgres() {
         async fn check_fun(op: &str, t: &str, i: &str, expected: &str) {
             assert_eq!(
