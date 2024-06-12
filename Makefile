@@ -2,9 +2,10 @@ CUBE_VERSION=$(shell node -e "console.log(require('./packages/cubejs-docker/pack
 GIT_REV := $(shell git rev-parse --short HEAD)
 DIRTY_FLAG := $(shell git diff HEAD --quiet || echo '-dirty')
 IMAGE_VERSION=${CUBE_VERSION}-${GIT_REV}${DIRTY_FLAG}
+AWS_ACCOUNT ?= 889818756387
 
-IMAGE=889818756387.dkr.ecr.us-east-1.amazonaws.com/incognia/cube:${IMAGE_VERSION}
-CUBESTORE_IMAGE=889818756387.dkr.ecr.us-east-1.amazonaws.com/incognia/cubestore:${IMAGE_VERSION}
+IMAGE=${AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/incognia/cube:${IMAGE_VERSION}
+CUBESTORE_IMAGE=${AWS_ACCOUNT}.dkr.ecr.us-east-1.amazonaws.com/incognia/cubestore:${IMAGE_VERSION}
 
 .PHONY: build push cubestore/build cubestore/push
 
