@@ -387,9 +387,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   // Extended version of tablesSchema containing primary and foreign keys
   public async tablesSchemaV2() {
-    const query = this.informationSchemaQuery();
-
-    const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    const tablesSchema = await this.tablesSchema();
     const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
 
     for (const pk of primaryKeys) {
