@@ -221,7 +221,7 @@ impl IntervalValue {
             ));
 
             if self.usecs != 0 {
-                res.push_str(&format!(".{:06}", self.usecs))
+                res.push_str(&format!(".{:06}", self.usecs.abs()))
             }
         }
 
@@ -231,18 +231,26 @@ impl IntervalValue {
     pub fn as_postgresql_str(&self) -> String {
         let (years, months) = self.extract_years_month();
 
+        // We manually format sign for the case where self.secs == 0, self.usecs < 0.
+        // We follow assumptions about consistency of hours/mins/secs/usecs signs as in
+        // as_iso_str here.
         format!(
-            "{} years {} mons {} days {} hours {} mins {}.{} secs",
+            "{} years {} mons {} days {} hours {} mins {}{}.{} secs",
             years,
             months,
             self.days,
             self.hours,
             self.mins,
-            self.secs,
+            if self.secs < 0 || self.usecs < 0 {
+                "-"
+            } else {
+                ""
+            },
+            self.secs.abs(),
             if self.usecs == 0 {
                 "00".to_string()
             } else {
-                format!("{:06}", self.usecs)
+                format!("{:06}", self.usecs.abs())
             }
         )
     }
@@ -344,6 +352,26 @@ mod tests {
         assert_eq!(
             IntervalValue::new(0, 0, 0, 0, 0, 0).to_string(),
             "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, 1, 23).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins 1.000023 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, -1, -23).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins -1.000023 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, 0, 0, -1, 0).to_string(),
+            "0 years 0 mons 0 days 0 hours 0 mins -1.00 secs".to_string()
+        );
+
+        assert_eq!(
+            IntervalValue::new(0, 0, -14, -5, -1, 0).to_string(),
+            "0 years 0 mons 0 days -14 hours -5 mins -1.00 secs".to_string()
         );
 
         Ok(())

@@ -6089,7 +6089,7 @@ limit
         check_date_minus_date(
             "2021-03-02 12:34:56.123456789",
             "2021-02-02 12:00:00.000",
-            "0 years 0 mons 28 days 0 hours 34 mins 56.123456789 secs",
+            "0 years 0 mons 28 days 0 hours 34 mins 56.123457 secs",
         )
         .await;
 
@@ -6098,7 +6098,7 @@ limit
         check_date_minus_date(
             "2021-02-02 12:00:00.000",
             "2021-03-02 12:34:56.123456789",
-            "0 years 0 mons -28 days 0 hours -34 mins -56.-123456789 secs",
+            "0 years 0 mons -28 days 0 hours -34 mins -56.123457 secs",
         )
         .await;
 
@@ -6106,7 +6106,7 @@ limit
         check_date_minus_date(
             "2021-05-02 13:34:56.123456789",
             "2021-02-02 12:00:00.000",
-            "0 years 0 mons 89 days 1 hours 34 mins 56.123456789 secs",
+            "0 years 0 mons 89 days 1 hours 34 mins 56.123457 secs",
         )
         .await;
 
@@ -6114,7 +6114,7 @@ limit
         check_date_minus_date(
             "2021-02-02 12:00:00.000",
             "2021-05-02 13:34:56.123456789",
-            "0 years 0 mons -89 days -1 hours -34 mins -56.-123456789 secs",
+            "0 years 0 mons -89 days -1 hours -34 mins -56.123457 secs",
         )
         .await;
 
@@ -6122,7 +6122,7 @@ limit
         check_date_minus_date(
             "2023-05-02 13:34:56.123456789",
             "2021-02-02 12:00:00.000",
-            "0 years 0 mons 819 days 1 hours 34 mins 56.123456789 secs",
+            "0 years 0 mons 819 days 1 hours 34 mins 56.123457 secs",
         )
         .await;
 
@@ -6130,7 +6130,7 @@ limit
         check_date_minus_date(
             "2021-02-02 12:00:00.000",
             "2023-05-02 13:34:56.123456789",
-            "0 years 0 mons -819 days -1 hours -34 mins -56.-123456789 secs",
+            "0 years 0 mons -819 days -1 hours -34 mins -56.123457 secs",
         )
         .await;
 
@@ -6175,27 +6175,53 @@ limit
         )
         .await;
 
-        // TODO: This is the WRONG VALUE.  See batch_to_dataframe.
         // Postgres output: 00:00:00.001
         check_date_minus_date(
             "2000-02-29 00:00:00.000",
             "2000-02-28 23:59:59.999",
-            "0 years 0 mons 0 days 0 hours 0 mins 0.1000000 secs",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.001000 secs",
         )
         .await;
 
-        // TODO: This is the WRONG VALUE.
         check_date_minus_date(
             "2000-02-25 14:00:00.000",
             "2000-02-25 13:59:59.999",
-            "0 years 0 mons 0 days 0 hours 0 mins 0.1000000 secs",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.001000 secs",
         )
         .await;
 
         check_date_minus_date(
             "2000-02-25 14:00:00.000",
             "2000-02-25 13:59:59.900",
-            "0 years 0 mons 0 days 0 hours 0 mins 0.100000000 secs",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000123956",
+            "2000-02-25 13:59:59.900123456",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000124956",
+            "2000-02-25 13:59:59.900123456",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100002 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 13:59:59.900123456",
+            "2000-02-25 14:00:00.000123956",
+            "0 years 0 mons 0 days 0 hours 0 mins -0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 13:59:59.900123456",
+            "2000-02-25 14:00:00.000124956",
+            "0 years 0 mons 0 days 0 hours 0 mins -0.100002 secs",
         )
         .await;
     }
