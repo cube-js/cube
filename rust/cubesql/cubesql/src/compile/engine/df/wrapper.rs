@@ -1,7 +1,9 @@
 use crate::{
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
-        rewrite::{extract_exprlist_from_groupping_set, WrappedSelectType},
+        rewrite::{
+            extract_exprlist_from_groupping_set, rules::filters::Decimal, WrappedSelectType,
+        },
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -1090,6 +1092,21 @@ impl CubeScanWrapperNode {
         Ok(serde_json::json!(res).to_string())
     }
 
+    fn format_sql_decimal_type(precision: usize, scale: usize) -> String {
+        format!("NUMERIC({}, {})", precision, scale)
+    }
+
+    fn generate_sql_cast_expr(
+        sql_generator: Arc<dyn SqlGenerator>,
+        inner_expr: String,
+        data_type: String,
+    ) -> result::Result<String, DataFusionError> {
+        sql_generator
+            .get_sql_templates()
+            .cast_expr(inner_expr, data_type)
+            .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e)))
+    }
+
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
         mut sql_query: SqlQuery,
@@ -1430,7 +1447,7 @@ impl CubeScanWrapperNode {
                         DataType::Utf8 => "TEXT".to_string(),
                         DataType::LargeUtf8 => "TEXT".to_string(),
                         DataType::Decimal(precision, scale) => {
-                            format!("NUMERIC({}, {})", precision, scale)
+                            CubeScanWrapperNode::format_sql_decimal_type(precision, scale)
                         }
                         x => {
                             return Err(DataFusionError::Execution(format!(
@@ -1439,12 +1456,11 @@ impl CubeScanWrapperNode {
                             )));
                         }
                     };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .cast_expr(expr, data_type)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e))
-                        })?;
+                    let resulting_sql = CubeScanWrapperNode::generate_sql_cast_expr(
+                        sql_generator,
+                        expr,
+                        data_type,
+                    )?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::TryCast { .. } => {}
@@ -1500,7 +1516,27 @@ impl CubeScanWrapperNode {
                             f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
                             sql_query,
                         ),
-                        // ScalarValue::Decimal128(_, _, _) => {}
+                        ScalarValue::Decimal128(x, precision, scale) => {
+                            // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
+                            let scale: usize = scale;
+
+                            (
+                                if let Some(x) = x {
+                                    let number = Decimal::format_string(x, scale);
+                                    let data_type = CubeScanWrapperNode::format_sql_decimal_type(
+                                        precision, scale,
+                                    );
+                                    CubeScanWrapperNode::generate_sql_cast_expr(
+                                        sql_generator,
+                                        format!("'{}'", number),
+                                        data_type,
+                                    )?
+                                } else {
+                                    "NULL".to_string()
+                                },
+                                sql_query,
+                            )
+                        }
                         ScalarValue::Int8(x) => (
                             x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
                             sql_query,

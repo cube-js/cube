@@ -13403,6 +13403,63 @@ ORDER BY
     }
 
     #[tokio::test]
+    async fn test_decimal128_literal_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        async fn check_fn(cast_expr: &str, expected_search_expr: &str) {
+            // Has some fluff to induce query push down.
+            let logical_plan = convert_select_to_query_plan(
+                format!("SELECT COUNT(*) + {} as cnt FROM KibanaSampleDataEcommerce WHERE LOWER(customer_gender) IN ('female')", cast_expr),
+                DatabaseProtocol::PostgreSQL
+            ).await.as_logical_plan();
+
+            let sql = logical_plan
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql;
+            assert!(
+                sql.contains(expected_search_expr),
+                "cast_expr is {}, expected_search_expr is {}",
+                cast_expr,
+                expected_search_expr
+            );
+        }
+
+        check_fn("CAST(2.0 AS NUMERIC)", "CAST('2' AS NUMERIC(38, 10))").await;
+        check_fn("CAST(2.73 AS NUMERIC)", "CAST('2.73' AS NUMERIC(38, 10))").await;
+        check_fn(
+            "CAST(2.73 AS NUMERIC(5, 2))",
+            "CAST('2.73' AS NUMERIC(5, 2))",
+        )
+        .await;
+        check_fn(
+            "CAST(-2.73 AS NUMERIC(5, 2))",
+            "CAST('-2.73' AS NUMERIC(5, 2))",
+        )
+        .await;
+        check_fn("CAST(0 AS NUMERIC(5, 2))", "CAST('0' AS NUMERIC(5, 2))").await;
+        check_fn("CAST(0 AS NUMERIC(2, 2))", "CAST('0' AS NUMERIC(2, 2))").await;
+        check_fn(
+            "CAST(0.340 AS NUMERIC(2, 2))",
+            "CAST('0.34' AS NUMERIC(2, 2))",
+        )
+        .await;
+        check_fn(
+            "CAST(0.342 AS NUMERIC(2, 2))",
+            "CAST('0.34' AS NUMERIC(2, 2))",
+        )
+        .await;
+        // TODO: Make these tests pass -- they aren't problems with literal generation, they're
+        // before that.
+        // check_fn("CAST(0.345 AS NUMERIC(2, 2))", "CAST('0.35' AS NUMERIC(2, 2))").await;
+        // check_fn("CAST(-0.345 AS NUMERIC(5, 2))", "CAST('-0.35' AS NUMERIC(5, 2))").await;
+    }
+
+    #[tokio::test]
     async fn test_triple_ident() -> Result<(), CubeError> {
         if !Rewriter::sql_push_down_enabled() {
             return Ok(());
