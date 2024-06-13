@@ -1797,7 +1797,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver SQL API: Extended nested Rollup over asteriks: extended_nested_rollup_over_asteriks 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver SQL API: Extended nested Rollup over asterisk: extended_nested_rollup_over_asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",
@@ -2247,7 +2247,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver SQL API: Nested Rollup over asteriks: nested_rollup_over_asteriks 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver SQL API: Nested Rollup over asterisk: nested_rollup_over_asterisk 1`] = `
 Array [
   Object {
     "SUM(a.count)": "1",

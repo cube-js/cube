@@ -1771,7 +1771,7 @@ from
   `);
       expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
     });
-    executePg('SQL API: Nested Rollup over asteriks', async (connection) => {
+    executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
     select rowId as "row", orderId as "order", orderDate as "date", sum(count)
     from (
@@ -1784,9 +1784,9 @@ from
     order by 1, 2, 3
 
   `);
-      expect(res.rows).toMatchSnapshot('nested_rollup_over_asteriks');
+      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
     });
-    executePg('SQL API: Extended nested Rollup over asteriks', async (connection) => {
+    executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
       const res = await connection.query(`
     select * from (
         select * from (
@@ -1803,7 +1803,7 @@ from
     ) q2 limit 100
 
   `);
-      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asteriks');
+      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
     });
   });
 }

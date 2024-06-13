@@ -161,7 +161,7 @@
     "SQL API: reuse params",
     "SQL API: Complex Rollup",
     "SQL API: Rollup with aliases",
-    "SQL API: Nested Rollup over asteriks",
-    "SQL API: Extended nested Rollup over asteriks"
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }
