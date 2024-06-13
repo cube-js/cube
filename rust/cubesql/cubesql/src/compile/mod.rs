@@ -1177,6 +1177,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_isnull_udf());
         ctx.register_udf(create_if_udf());
         ctx.register_udf(create_least_udf());
+        ctx.register_udf(create_greatest_udf());
         ctx.register_udf(create_convert_tz_udf());
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
@@ -7277,24 +7278,133 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_least() -> Result<(), CubeError> {
+    async fn test_least_single_row() -> Result<(), CubeError> {
         assert_eq!(
             execute_query(
                 "select \
+                least(100) as r0, \
                 least(1, 2) as r1, \
                 least(2, 1) as r2, \
-                least(null, 1) as r3, \
-                least(1, null) as r4
+                least(1.5, 2) as r3, \
+                least(2, 1.5) as r4, \
+                least(2.5, 2) as r5, \
+                least(2, 2.5) as r6, \
+                least(null, 1.5) as r7, \
+                least(-1.23, 3.44, 50) as r8, \
+                least(-1.23, 3.44, 4, 10, null, -5) as r9, \
+                least(null, null, null) as r10
             "
                 .to_string(),
-                DatabaseProtocol::MySQL
+                DatabaseProtocol::PostgreSQL
             )
             .await?,
-            "+----+----+------+------+\n\
-            | r1 | r2 | r3   | r4   |\n\
-            +----+----+------+------+\n\
-            | 1  | 1  | NULL | NULL |\n\
-            +----+----+------+------+"
+            "+-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
+            | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10  |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
+            | 100 | 1  | 1  | 1.5 | 1.5 | 2  | 2  | 1.5 | -1.23 | -5 | NULL |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_least_table() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                least(t.a, t.b, t.c) as r1 FROM ( \
+                    SELECT 1 as a, 2 as b, 3 as c \
+                        UNION ALL \
+                    SELECT 2, 1.5, null \
+                        UNION ALL \
+                    SELECT 0.72, -3.14, 25.5 \
+                        UNION ALL \
+                    SELECT 3.14159, -5.72, -25 \
+                        UNION ALL \
+                    SELECT null as a, null as b, null as c \
+                ) as t
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-------+\n\
+            | r1    |\n\
+            +-------+\n\
+            | 1     |\n\
+            | 1.5   |\n\
+            | -3.14 |\n\
+            | -25   |\n\
+            | NULL  |\n\
+            +-------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_greatest_single_row() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                greatest(100) as r0, \
+                greatest(1, 2) as r1, \
+                greatest(2, 3) as r2, \
+                greatest(1, 2.5) as r3, \
+                greatest(3.2, 1) as r4, \
+                greatest(2.5, 4) as r5, \
+                greatest(5, 2.5) as r6, \
+                greatest(null, 1.5) as r7, \
+                greatest(-1.23, -3.44) as r8, \
+                greatest(1, 2.0, null, 25) as r9, \
+                greatest(null, 1.5, null, 2.7, null, 3.1, null, -5, null, 10) as r10, \
+                greatest(null, null, null) as r11
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
+            | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10 | r11  |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
+            | 100 | 2  | 3  | 2.5 | 3.2 | 4  | 5  | 1.5 | -1.23 | 25 | 10  | NULL |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_greatest_table() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                greatest(t.a, t.b, t.c) as r1 FROM ( \
+                    SELECT 1 as a, 2 as b, 3 as c \
+                        UNION ALL \
+                    SELECT 1, 2.0, null \
+                        UNION ALL \
+                    SELECT -3.14, .72, 25.5 \
+                        UNION ALL \
+                    SELECT -3.14, -5.72, -25 \
+                        UNION ALL \
+                    SELECT null as a, null as b, null as c \
+                ) as t
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-------+\n\
+            | r1    |\n\
+            +-------+\n\
+            | 3     |\n\
+            | 2     |\n\
+            | 25.5  |\n\
+            | -3.14 |\n\
+            | NULL  |\n\
+            +-------+"
         );
 
         Ok(())

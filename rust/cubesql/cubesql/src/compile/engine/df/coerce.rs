@@ -37,6 +37,9 @@ pub fn numerical_coercion(lhs_type: &DataType, rhs_type: &DataType) -> Option<Da
         (_, DataType::Null) => Some(lhs_type.clone()),
         (DataType::Null, _) => Some(rhs_type.clone()),
         //
+        (_, DataType::Float64) => Some(DataType::Float64),
+        (DataType::Float64, _) => Some(DataType::Float64),
+        //
         (_, DataType::UInt64) => Some(DataType::UInt64),
         (DataType::UInt64, _) => Some(DataType::UInt64),
         //
