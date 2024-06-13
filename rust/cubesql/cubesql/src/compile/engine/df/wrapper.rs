@@ -627,10 +627,11 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
+                            let flat_group_expr = extract_exprlist_from_groupping_set(&group_expr);
                             let (group_by, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                extract_exprlist_from_groupping_set(&group_expr),
+                                flat_group_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
@@ -779,7 +780,7 @@ impl CubeScanWrapperNode {
                                                                     projection[i].clone()
                                                                 })
                                                         }).or_else(|| {
-                                                            group_expr
+                                                            flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
                                                                     expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
@@ -791,7 +792,7 @@ impl CubeScanWrapperNode {
                                                                 col_name,
                                                                 projection_expr,
                                                                 aggr_expr,
-                                                                group_expr
+                                                                flat_group_expr
                                                             ))
                                                         })?;
                                                     Ok(vec![
