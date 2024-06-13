@@ -1771,5 +1771,39 @@ from
   `);
       expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
     });
+    executePg('SQL API: Nested Rollup over asteriks', async (connection) => {
+      const res = await connection.query(`
+    select rowId as "row", orderId as "order", orderDate as "date", sum(count)
+    from (
+        select * 
+        from
+        "ECommerce" as "ECommerce"
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup_over_asteriks');
+    });
+    executePg('SQL API: Extended nested Rollup over asteriks', async (connection) => {
+      const res = await connection.query(`
+    select * from (
+        select * from (
+            select rowId as "row", orderId as "order", sum(count)
+            from (
+                select * 
+                from
+                "ECommerce" as "ECommerce"
+            ) a
+            group by
+            ROLLUP(row, order)
+            ORDER BY "rowId" ASC NULLS FIRST, "orderId" ASC NULLS FIRST OFFSET 0 ROWS FETCH FIRST 100 ROWS ONLY
+        ) q1
+    ) q2 limit 100
+
+  `);
+      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asteriks');
+    });
   });
 }
