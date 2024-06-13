@@ -4818,7 +4818,7 @@ impl Decimal {
     pub fn to_string(&self, scale: usize) -> String {
         let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
         let mut res = big_decimal.to_string();
-        if res.contains(".") {
+        if res.contains('.') {
             let mut truncate_len = res.len();
             for (i, c) in res.char_indices().rev() {
                 if c == '0' {
@@ -4833,5 +4833,9 @@ impl Decimal {
             res.truncate(truncate_len);
         }
         res
+    }
+
+    pub fn format_string(raw_value: i128, scale: usize) -> String {
+        Decimal::new(raw_value).to_string(scale)
     }
 }
