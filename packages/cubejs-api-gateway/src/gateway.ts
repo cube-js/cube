@@ -1684,6 +1684,7 @@ class ApiGateway {
 
       const sqlQueries = await this
         .getSqlQueriesInternal(context, normalizedQueries);
+      const memberNames = sqlQueries.map((sqlQuery) => sqlQuery.memberNames);
 
       let slowQuery = false;
 
@@ -1723,6 +1724,7 @@ class ApiGateway {
           isPlayground: Boolean(
             context.signedWithPlaygroundAuthSecret
           ),
+          memberNames,
           queries: results.length,
           queriesWithPreAggregations:
             results.filter(

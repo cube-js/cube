@@ -161,7 +161,8 @@ export class CompilerApi {
       aliasNameToMember: sqlGenerator.aliasNameToMember,
       rollupMatchResults: includeDebugInfo ?
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
+      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
+      memberNames: R.flatten(sqlGenerator.collectFromMembers(false, sqlGenerator.collectMemberNamesFor.bind(sqlGenerator), 'collectMemberNamesFor'))
     }));
 
     if (this.sqlCache) {
