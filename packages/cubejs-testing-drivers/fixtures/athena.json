@@ -93,6 +93,23 @@
         ]
       },
       {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
         "name": "CountByProduct",
         "time_dimension": "CUBE.orderDate",
         "granularity": "month",
@@ -126,8 +143,20 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
     "--------------------",
+
     "week granularity is not supported for intervals",
     "--------------------",
-    "querying BigECommerce: rolling window by 2 week"
+    "querying BigECommerce: rolling window by 2 week",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

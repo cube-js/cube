@@ -1,0 +1,75 @@
+# MDX API
+
+The MDX (MultiDimensional eXpressions) API provides a robust interface for connecting applications, such as Microsoft Excel, to the Cube Cloud semantic layer via the XMLA (XML for Analysis) standard. 
+
+Key Features:
+
+- <b>Direct connectivity:</b> Connect Excel and other compatible applications directly to Cube Cloud using standard XMLA protocols.
+- <b>Advanced analytical functions:</b> Utilize the power of MDX to execute sophisticated queries that include slicing, dicing, drilling down, and rolling up of data.
+- <b>Real-time access:</b> Fetch live data from Cube Cloud, ensuring that your analyses and reports always reflect the most current information.
+
+<WarningBox>
+  The MDX API is available on [Cube
+  Cloud](/getting-started#getting-started-with-cube-cloud) only. It is currently
+  in preview.
+</WarningBox>
+
+## Configuration
+
+While the MDX API is in preview, your Cube account team will enable and configure it for you.
+
+If you wish to enable or disable the MDX API on a specific Cube deployment, you may do so by going to "Settings" in the Cube Cloud sidebar, then "Configuration", and then toggling the "Enable MDX API" configuration flag switch.
+
+To find your MDX API's credentials along with XMLA endpoint, go to "Settings" in the Cube Cloud sidebar, then "Connections and APIs"
+
+## Using MDX API with Excel
+
+Once MDX API is enabled, you can use it to connect to Cube from Excel. In Excel, go to the **Data tab**, click **Get Data** and select **From Database -> From Analysis Services**.
+
+<InfoBox>
+  Please note that only the [views](/reference/data-model/view) will be available for connections via MDX API
+</InfoBox>
+
+The following section describes Excel-specific configuration options.
+
+### Dimension hierarchies
+
+MDX API supports dimension hierarchies. You can define multiple hierarchies.
+Each level in the hierarchy is a dimension from the view.
+
+```yaml
+views:
+  - name: orders_view
+    description: "Data about orders, amount, count and breakdown by status and geography."
+    meta:
+      hierarchies:
+        - name: "Geography"
+          levels:
+            - country
+            - state
+            - city
+```
+
+### Measure groups
+
+MDX API supports organizing measures into groups (folders). You can define measure groups in the view's schema file. 
+
+```yaml
+views:
+  - name: orders_view
+    description: "Data about orders, amount, count and breakdown by status and geography."
+    meta:
+      folders:
+          - name: "Folder A"
+            members:
+              - total_amount
+              - average_order_value
+          - name: "Folder B"
+            members:
+              - completed_count
+              - completed_percentage
+```
+
+## Authentication and authorization
+
+Authentication and authorization work the same as for the [SQL API](/product/apis-integrations/sql-api/security).

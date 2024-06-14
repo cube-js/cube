@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/native",
-  "version": "0.35.37",
+  "version": "0.35.49",
   "author": "Cube Dev, Inc.",
   "description": "Native module for Cube.js (binding to Rust codebase)",
   "main": "dist/js/index.js",
@@ -12,7 +12,7 @@
   "scripts": {
     "tsc": "tsc",
     "build": "tsc",
-    "native:build": "tsc && cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
+    "native:build": "cargo-cp-artifact -a cdylib cubejs-native index.node -- cargo build --message-format=json-render-diagnostics",
     "native:build-debug": "npm run native:build --",
     "native:build-release": "npm run native:build -- --release",
     "native:build-debug-python": "npm run native:build -- --features python",
@@ -43,8 +43,8 @@
     "uuid": "^8.3.2"
   },
   "dependencies": {
-    "@cubejs-backend/cubesql": "^0.35.37",
-    "@cubejs-backend/shared": "^0.35.33",
+    "@cubejs-backend/cubesql": "^0.35.49",
+    "@cubejs-backend/shared": "^0.35.43",
     "@cubejs-infra/post-installer": "^0.0.7"
   },
   "resources": {

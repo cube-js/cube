@@ -36,7 +36,9 @@ type BoxedChannel = JsBox<RefCell<JsAsyncChannel>>;
 impl Finalize for JsAsyncChannel {}
 
 fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
+    let this = cx
+        .this::<BoxedChannel>()?
+        .downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
     #[cfg(debug_assertions)]
     trace!("JsAsyncChannel.resolved {}", this.borrow()._id);
@@ -53,7 +55,9 @@ fn js_async_channel_resolve(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_async_channel_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    let this = cx.this().downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
+    let this = cx
+        .this::<BoxedChannel>()?
+        .downcast_or_throw::<BoxedChannel, _>(&mut cx)?;
 
     #[cfg(debug_assertions)]
     trace!("JsAsyncChannel.reject {}", this.borrow()._id);
@@ -241,6 +245,58 @@ where
     rx.await?
 }
 
+type ArgsCallback =
+    Box<dyn for<'a> FnOnce(&mut TaskContext<'a>) -> NeonResult<Vec<Handle<'a, JsValue>>> + Send>;
+
+type ResultFromJsValue<R> =
+    Box<dyn for<'a> FnOnce(&mut TaskContext<'a>, Handle<JsValue>) -> Result<R, CubeError> + Send>;
+
+pub async fn call_js_fn<R: Sized + Send + 'static>(
+    channel: Arc<Channel>,
+    js_fn: Arc<Root<JsFunction>>,
+    args_callback: ArgsCallback,
+    result_from_js_value: ResultFromJsValue<R>,
+    this: Arc<Root<JsObject>>,
+) -> Result<R, CubeError> {
+    let (tx, rx) = oneshot::channel::<Result<R, CubeError>>();
+
+    channel
+        .try_send(move |mut cx| {
+            // https://github.com/neon-bindings/neon/issues/672
+            let method = match Arc::try_unwrap(js_fn) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+            let this = match Arc::try_unwrap(this) {
+                Ok(v) => v.into_inner(&mut cx),
+                Err(v) => v.as_ref().to_inner(&mut cx),
+            };
+
+            let args: Vec<Handle<JsValue>> = args_callback(&mut cx)?;
+
+            let result = match method.call(&mut cx, this, args) {
+                Ok(v) => v,
+                Err(err) => {
+                    println!("Unable to call js function: {}", err);
+                    return Ok(());
+                }
+            };
+
+            if tx.send(result_from_js_value(&mut cx, result)).is_err() {
+                log::debug!(
+                    "AsyncChannel: Unable to send result from JS back to Rust, channel closed"
+                )
+            }
+
+            Ok(())
+        })
+        .map_err(|err| {
+            CubeError::internal(format!("Unable to send js call via channel, err: {}", err))
+        })?;
+
+    rx.await?
+}
+
 #[derive(Debug)]
 pub struct NodeSqlGenerator {
     channel: Arc<Channel>,
@@ -337,7 +393,7 @@ impl Drop for NodeSqlGenerator {
     fn drop(&mut self) {
         let channel = self.channel.clone();
         let sql_generator_obj = self.sql_generator_obj.take().unwrap();
-        let _ = channel.send(move |mut cx| {
+        channel.send(move |mut cx| {
             let _ = match Arc::try_unwrap(sql_generator_obj) {
                 Ok(v) => v.into_inner(&mut cx),
                 Err(_) => {

@@ -2,23 +2,26 @@
 import fs from 'fs-extra';
 import path from 'path';
 import * as YAML from 'yaml';
-import { getFixtures } from './getFixtures';
+
+import type { Fixture } from '../types/Fixture';
 
 /**
  * Returns docker compose file by data source type.
  */
-export function getComposePath(type: string, isLocal: boolean): [path: string, file: string] {
+export function getComposePath(type: string, fixture: Fixture, isLocal: boolean): [path: string, file: string] {
   const _path = path.resolve(process.cwd(), './.temp');
   const _file = `${type}-compose.yaml`;
-  const { cube, data } = getFixtures(type);
+
   const depends_on = ['store'];
-  if (cube.depends_on) {
-    depends_on.concat(cube.depends_on);
+  if (fixture.cube.depends_on) {
+    depends_on.concat(fixture.cube.depends_on);
   }
+
   const links = ['store'];
-  if (cube.links) {
-    depends_on.concat(cube.links);
+  if (fixture.cube.links) {
+    depends_on.concat(fixture.cube.links);
   }
+
   const volumes = [
     './cube.js:/cube/conf/cube.js',
     './package.json:/cube/conf/package.json',
@@ -29,7 +32,7 @@ export function getComposePath(type: string, isLocal: boolean): [path: string, f
     services: {
       ...(!isLocal ? {
         cube: {
-          ...cube,
+          ...fixture.cube,
           container_name: 'cube',
           image: 'cubejs/cube:testing-drivers',
           depends_on,
@@ -46,12 +49,14 @@ export function getComposePath(type: string, isLocal: boolean): [path: string, f
       }
     }
   };
-  if (data) {
+
+  if (fixture.data) {
     compose.services.data = {
-      ...data,
+      ...fixture.data,
       container_name: 'data',
     };
   }
+
   fs.writeFileSync(
     path.resolve(_path, _file),
     YAML.stringify(compose),

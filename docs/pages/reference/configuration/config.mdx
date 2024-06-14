@@ -834,6 +834,16 @@ module.exports = {
 
 </CodeTabs>
 
+This configuration option can be also set using the
+`CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` environment variable.
+
+<InfoBox>
+
+When query pushdown in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
+environment variable, this option is enabled as well for the best user experience.
+
+</InfoBox>
+
 ## APIs
 
 ### `base_path`
@@ -1362,4 +1372,4 @@ If not defined, Cube will lookup for environment variable
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
-[ref-ungrouped-query]: /product/data-modeling/queries#ungrouped-query
+[ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query

@@ -33,6 +33,14 @@ export class DatabricksQuery extends BaseQuery {
     return `hll_union_agg(${sql})`;
   }
 
+  public hllCardinality(sql: string): string {
+    return `hll_sketch_estimate(${sql})`;
+  }
+
+  public hllCardinalityMerge(sql: string): string {
+    return `hll_sketch_estimate(hll_union_agg(${sql}))`;
+  }
+
   public countDistinctApprox(sql: string) {
     return `approx_count_distinct(${sql})`;
   }
@@ -116,6 +124,8 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';

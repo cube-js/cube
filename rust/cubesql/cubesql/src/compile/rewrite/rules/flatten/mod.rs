@@ -2,12 +2,18 @@ mod column;
 mod pass_through;
 mod top_level;
 
-use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, rewriter::RewriteRules, LogicalPlanLanguage,
+use crate::{
+    compile::rewrite::{
+        analysis::LogicalPlanAnalysis, rewriter::RewriteRules, LogicalPlanLanguage,
+    },
+    config::ConfigObj,
 };
 use egg::Rewrite;
+use std::sync::Arc;
 
-pub struct FlattenRules;
+pub struct FlattenRules {
+    config_obj: Arc<dyn ConfigObj>,
+}
 
 impl RewriteRules for FlattenRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -22,7 +28,7 @@ impl RewriteRules for FlattenRules {
 }
 
 impl FlattenRules {
-    pub fn new() -> Self {
-        Self
+    pub fn new(config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self { config_obj }
     }
 }

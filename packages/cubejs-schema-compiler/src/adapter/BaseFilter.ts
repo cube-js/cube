@@ -1,15 +1,14 @@
 import inlection from 'inflection';
-import * as momentRange from 'moment-range';
+import moment from 'moment-timezone';
 import { contains, join, map } from 'ramda';
 import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { BaseDimension } from './BaseDimension';
 import type { BaseQuery } from './BaseQuery';
 
-const moment = momentRange.extendMoment(require('moment-timezone'));
-
 const DATE_OPERATORS = ['inDateRange', 'notInDateRange', 'onTheDate', 'beforeDate', 'beforeOrOnDate', 'afterDate', 'afterOrOnDate'];
 const dateTimeLocalMsRegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$/;
+const dateTimeLocalURegex = /^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$/;
 const dateRegex = /^\d\d\d\d-\d\d-\d\d$/;
 
 export class BaseFilter extends BaseDimension {
@@ -357,16 +356,31 @@ export class BaseFilter extends BaseDimension {
     return this.query.afterOrOnDateFilter(column, after);
   }
 
-  public formatFromDate(date) {
-    if (date && date.match(dateTimeLocalMsRegex)) {
-      return date;
+  public formatFromDate(date: string) {
+    if (date) {
+      if (this.query.timestampPrecision() === 3) {
+        if (date.match(dateTimeLocalMsRegex)) {
+          return date;
+        }
+      } else if (this.query.timestampPrecision() === 6) {
+        if (date.length === 23 && date.match(dateTimeLocalMsRegex)) {
+          return `${date}000`;
+        } else if (date.length === 26 && date.match(dateTimeLocalURegex)) {
+          return date;
+        }
+      } else {
+        throw new Error(`Unsupported timestamp precision: ${this.query.timestampPrecision()}`);
+      }
     }
+
     if (date && date.match(dateRegex)) {
-      return `${date}T00:00:00.000`;
+      return `${date}T00:00:00.${'0'.repeat(this.query.timestampPrecision())}`;
     }
+
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT00:00:00.000');
+      return moment.tz(date, this.query.timezone).format(`YYYY-MM-DDT00:00:00.${'0'.repeat(this.query.timestampPrecision())}`);
     }
+
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 
@@ -374,19 +388,39 @@ export class BaseFilter extends BaseDimension {
     if (date && (date === FROM_PARTITION_RANGE || date === TO_PARTITION_RANGE)) {
       return date;
     }
+
     return this.query.inDbTimeZone(this.formatFromDate(date));
   }
 
-  public formatToDate(date) {
-    if (date && date.match(dateTimeLocalMsRegex)) {
-      return date;
+  public formatToDate(date: string) {
+    if (date) {
+      if (this.query.timestampPrecision() === 3) {
+        if (date.match(dateTimeLocalMsRegex)) {
+          return date;
+        }
+      } else if (this.query.timestampPrecision() === 6) {
+        if (date.length === 23 && date.match(dateTimeLocalMsRegex)) {
+          if (date.endsWith('.999')) {
+            return `${date}999`;
+          }
+
+          return `${date}000`;
+        } else if (date.length === 26 && date.match(dateTimeLocalURegex)) {
+          return date;
+        }
+      } else {
+        throw new Error(`Unsupported timestamp precision: ${this.query.timestampPrecision()}`);
+      }
     }
+
     if (date && date.match(dateRegex)) {
-      return `${date}T23:59:59.999`;
+      return `${date}T23:59:59.${'9'.repeat(this.query.timestampPrecision())}`;
     }
+
     if (!date) {
-      return moment.tz(date, this.query.timezone).format('YYYY-MM-DDT23:59:59.999');
+      return moment.tz(date, this.query.timezone).format(`YYYY-MM-DDT23:59:59.${'9'.repeat(this.query.timestampPrecision())}`);
     }
+
     return moment.tz(date, this.query.timezone).format(moment.HTML5_FMT.DATETIME_LOCAL_MS);
   }
 

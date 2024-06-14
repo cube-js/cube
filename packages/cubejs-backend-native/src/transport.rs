@@ -134,6 +134,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: false,
         })?;
+
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
@@ -296,19 +297,6 @@ impl TransportService for NodeBridgeTransport {
             Some(extra),
         )
         .await?;
-
-        if let Some(error) = response.get("error").and_then(|e| e.as_str()) {
-            if let Some(stack) = response.get("stack").and_then(|e| e.as_str()) {
-                return Err(CubeError::user(format!(
-                    "Error during SQL generation: {}\n{}",
-                    error, stack
-                )));
-            }
-            return Err(CubeError::user(format!(
-                "Error during SQL generation: {}",
-                error
-            )));
-        }
 
         let sql = response
             .get("sql")

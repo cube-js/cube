@@ -7,21 +7,23 @@ use crate::{
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr, like_expr, limit,
-        literal_bool, literal_expr, literal_int, literal_string, measure_expr,
-        member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr,
+        like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int, literal_string,
+        measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
-        scalar_fun_expr_args, scalar_fun_expr_args_empty_tail, segment_member,
-        time_dimension_date_range_replacer, time_dimension_expr, transform_original_expr_to_alias,
-        transforming_chain_rewrite, transforming_rewrite, transforming_rewrite_with_root, udf_expr,
-        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated,
-        BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
-        CubeScanAliasToCube, CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues,
+        scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
+        time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
+        transforming_rewrite, transforming_rewrite_with_root, udf_expr, udf_expr_var_arg,
+        udf_fun_expr_args, udf_fun_expr_args_empty_tail, BetweenExprNegated, BinaryExprOp,
+        CastExprDataType, ChangeUserMemberValue, ColumnExprColumn, CubeScanAliasToCube,
+        CubeScanLimit, FilterMemberMember, FilterMemberOp, FilterMemberValues, FilterOpOp,
         FilterReplacerAliasToCube, FilterReplacerAliases, InListExprNegated, LikeExprEscapeChar,
-        LikeExprNegated, LimitFetch, LimitSkip, LiteralExprValue, LogicalPlanLanguage,
-        SegmentMemberMember, TimeDimensionDateRange, TimeDimensionDateRangeReplacerDateRange,
-        TimeDimensionDateRangeReplacerMember, TimeDimensionGranularity, TimeDimensionName,
+        LikeExprNegated, LimitFetch, LimitSkip, ListPattern, ListType, LiteralExprValue,
+        LogicalPlanLanguage, SegmentMemberMember, TimeDimensionDateRange,
+        TimeDimensionDateRangeReplacerDateRange, TimeDimensionDateRangeReplacerMember,
+        TimeDimensionGranularity, TimeDimensionName,
     },
+    config::ConfigObj,
     transport::{ext::V1CubeMetaExt, MemberType, MetaContext},
     var, var_iter,
 };
@@ -32,7 +34,7 @@ use chrono::{
         Numeric::{Day, Hour, Minute, Month, Second, Year},
         Pad::Zero,
     },
-    Duration, NaiveDateTime,
+    Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, Timelike, Weekday,
 };
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
@@ -44,10 +46,11 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Rewrite, Subst, Var};
-use std::{fmt::Display, ops::Index, sync::Arc};
+use std::{collections::HashSet, fmt::Display, ops::Index, sync::Arc};
 
 pub struct FilterRules {
     meta_context: Arc<MetaContext>,
+    config_obj: Arc<dyn ConfigObj>,
     eval_stable_functions: bool,
 }
 
@@ -326,7 +329,7 @@ impl RewriteRules for FilterRules {
                 "change-user-lower-equal-filter",
                 filter_replacer(
                     binary_expr(
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        self.fun_expr("Lower", vec![column_expr("?column")]),
                         "=",
                         literal_expr("?literal"),
                     ),
@@ -403,6 +406,33 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
+            ),
+            transforming_rewrite(
+                "filter-in-list-datetrunc",
+                filter_replacer(
+                    inlist_expr(
+                        self.fun_expr(
+                            "DateTrunc",
+                            vec!["?granularity".to_string(), column_expr("?column")],
+                        ),
+                        "?list",
+                        "?negated",
+                    ),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                "?new_filter".to_string(),
+                self.transform_filter_in_list_datetrunc(
+                    "?granularity",
+                    "?column",
+                    "?list",
+                    "?negated",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?new_filter",
+                ),
             ),
             rewrite(
                 "filter-in-place-filter-to-true-filter",
@@ -732,7 +762,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-replacer-lower-unwrap",
                 filter_replacer(
-                    binary_expr(fun_expr("Lower", vec!["?param"]), "?op", "?right"),
+                    binary_expr(self.fun_expr("Lower", vec!["?param"]), "?op", "?right"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -748,7 +778,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-lower-is-null-unwrap",
                 filter_replacer(
-                    is_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    is_null_expr(self.fun_expr("Lower", vec!["?expr"])),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -763,7 +793,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-lower-is-not-null-unwrap",
                 filter_replacer(
-                    is_not_null_expr(fun_expr("Lower", vec!["?expr"])),
+                    is_not_null_expr(self.fun_expr("Lower", vec!["?expr"])),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -779,7 +809,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-replacer-upper-unwrap",
                 filter_replacer(
-                    binary_expr(fun_expr("Upper", vec!["?param"]), "?op", "?right"),
+                    binary_expr(self.fun_expr("Upper", vec!["?param"]), "?op", "?right"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -795,7 +825,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-upper-is-null-unwrap",
                 filter_replacer(
-                    is_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    is_null_expr(self.fun_expr("Upper", vec!["?expr"])),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -810,7 +840,7 @@ impl RewriteRules for FilterRules {
             rewrite(
                 "filter-replacer-upper-is-not-null-unwrap",
                 filter_replacer(
-                    is_not_null_expr(fun_expr("Upper", vec!["?expr"])),
+                    is_not_null_expr(self.fun_expr("Upper", vec!["?expr"])),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
@@ -822,59 +852,11 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
             ),
-            transforming_rewrite(
-                "filter-replacer-date-trunc-equals",
-                filter_replacer(
-                    binary_expr(
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
-                        ),
-                        "=",
-                        fun_expr(
-                            "DateTrunc",
-                            vec![literal_expr("?granularity"), literal_expr("?date")],
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                filter_replacer(
-                    binary_expr(
-                        binary_expr(
-                            column_expr("?column"),
-                            ">=",
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), literal_expr("?date")],
-                            ),
-                        ),
-                        "AND",
-                        binary_expr(
-                            column_expr("?column"),
-                            "<",
-                            binary_expr(
-                                fun_expr(
-                                    "DateTrunc",
-                                    vec![literal_expr("?granularity"), literal_expr("?date")],
-                                ),
-                                "+",
-                                literal_expr("?interval"),
-                            ),
-                        ),
-                    ),
-                    "?alias_to_cube",
-                    "?members",
-                    "?filter_aliases",
-                ),
-                self.transform_granularity_to_interval("?granularity", "?interval"),
-            ),
             rewrite(
                 "filter-str-pos-to-like",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Strpos",
                             vec![column_expr("?column"), literal_expr("?value")],
                         ),
@@ -904,10 +886,10 @@ impl RewriteRules for FilterRules {
                 "filter-str-lower-to-column",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Strpos",
                             vec![
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                self.fun_expr("Lower", vec![column_expr("?column")]),
                                 literal_expr("?value"),
                             ],
                         ),
@@ -920,7 +902,7 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Strpos",
                             vec![column_expr("?column"), literal_expr("?value")],
                         ),
@@ -936,7 +918,7 @@ impl RewriteRules for FilterRules {
                 "filter-str-not-null-case-to-column",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Strpos",
                             vec![
                                 case_expr(
@@ -959,7 +941,7 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Strpos",
                             vec![column_expr("?column"), literal_expr("?value")],
                         ),
@@ -975,7 +957,7 @@ impl RewriteRules for FilterRules {
                 "filter-left",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Left",
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
@@ -1005,7 +987,7 @@ impl RewriteRules for FilterRules {
                 "filter-right",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Right",
                             vec!["?expr".to_string(), literal_expr("?literal_length")],
                         ),
@@ -1034,7 +1016,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-starts-with",
                 filter_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "StartsWith",
                         vec![column_expr("?column"), "?literal".to_string()],
                     ),
@@ -1059,7 +1041,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "filter-not-starts-with",
                 filter_replacer(
-                    not_expr(fun_expr(
+                    not_expr(self.fun_expr(
                         "StartsWith",
                         vec![column_expr("?column"), "?literal".to_string()],
                     )),
@@ -1139,10 +1121,10 @@ impl RewriteRules for FilterRules {
                             None,
                             vec![(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "Strpos",
                                         vec![
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "Substr",
                                                 vec!["?expr".to_string(), literal_int(1)],
                                             ),
@@ -1153,10 +1135,10 @@ impl RewriteRules for FilterRules {
                                     literal_int(0),
                                 ),
                                 alias_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "Strpos",
                                         vec![
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "Substr",
                                                 vec!["?expr".to_string(), literal_int(1)],
                                             ),
@@ -1201,7 +1183,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                self.fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
                         ">",
@@ -1233,7 +1215,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                self.fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
                         "<=",
@@ -1265,7 +1247,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                self.fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
                         "=",
@@ -1297,7 +1279,7 @@ impl RewriteRules for FilterRules {
                             "position",
                             vec![
                                 "?literal".to_string(),
-                                fun_expr("Lower", vec![column_expr("?column")]),
+                                self.fun_expr("Lower", vec![column_expr("?column")]),
                             ],
                         ),
                         "!=",
@@ -1328,10 +1310,10 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec!["?literal".to_string()]),
-                                fun_expr(
+                                self.fun_expr("Reverse", vec!["?literal".to_string()]),
+                                self.fun_expr(
                                     "Reverse",
-                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                    vec![self.fun_expr("Lower", vec![column_expr("?column")])],
                                 ),
                             ],
                         ),
@@ -1363,10 +1345,10 @@ impl RewriteRules for FilterRules {
                         udf_expr(
                             "position",
                             vec![
-                                fun_expr("Reverse", vec!["?literal".to_string()]),
-                                fun_expr(
+                                self.fun_expr("Reverse", vec!["?literal".to_string()]),
+                                self.fun_expr(
                                     "Reverse",
-                                    vec![fun_expr("Lower", vec![column_expr("?column")])],
+                                    vec![self.fun_expr("Lower", vec![column_expr("?column")])],
                                 ),
                             ],
                         ),
@@ -1397,18 +1379,18 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        self.fun_expr("Lower", vec![column_expr("?column")]),
                         binary_expr(
                             binary_expr(
                                 literal_string("%"),
                                 "||",
-                                fun_expr(
+                                self.fun_expr(
                                     "Replace",
                                     vec![
-                                        fun_expr(
+                                        self.fun_expr(
                                             "Replace",
                                             vec![
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "Replace",
                                                     vec![
                                                         literal_expr("?literal"),
@@ -1455,15 +1437,15 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        self.fun_expr("Lower", vec![column_expr("?column")]),
                         binary_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "Replace",
                                 vec![
-                                    fun_expr(
+                                    self.fun_expr(
                                         "Replace",
                                         vec![
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "Replace",
                                                 vec![
                                                     literal_expr("?literal"),
@@ -1509,17 +1491,17 @@ impl RewriteRules for FilterRules {
                     like_expr(
                         "LikeExprLikeType:Like",
                         "?negated",
-                        fun_expr("Lower", vec![column_expr("?column")]),
+                        self.fun_expr("Lower", vec![column_expr("?column")]),
                         binary_expr(
                             literal_string("%"),
                             "||",
-                            fun_expr(
+                            self.fun_expr(
                                 "Replace",
                                 vec![
-                                    fun_expr(
+                                    self.fun_expr(
                                         "Replace",
                                         vec![
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "Replace",
                                                 vec![
                                                     literal_expr("?literal"),
@@ -1597,9 +1579,9 @@ impl RewriteRules for FilterRules {
                 "extract-year-equals",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Trunc",
-                            vec![fun_expr(
+                            vec![self.fun_expr(
                                 "DatePart",
                                 vec![literal_string("YEAR"), column_expr("?column")],
                             )],
@@ -1627,7 +1609,7 @@ impl RewriteRules for FilterRules {
                 filter_replacer(
                     binary_expr(
                         binary_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![
                                     literal_expr("?granularity"),
@@ -1639,7 +1621,7 @@ impl RewriteRules for FilterRules {
                         ),
                         "<=",
                         binary_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                             ),
@@ -1657,7 +1639,7 @@ impl RewriteRules for FilterRules {
                         "<",
                         binary_expr(
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![literal_expr("?granularity"), "?literal_expr".to_string()],
                                 ),
@@ -1678,7 +1660,7 @@ impl RewriteRules for FilterRules {
                 "filter-binary-expr-date-trunc-column-with-literal",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
@@ -1693,7 +1675,7 @@ impl RewriteRules for FilterRules {
                     binary_expr(
                         column_expr("?column"),
                         "?new_op",
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![
                                 literal_expr("?granularity"),
@@ -1726,12 +1708,12 @@ impl RewriteRules for FilterRules {
                 ),
             ),
             transforming_rewrite(
-                "filter-date-trunc-eq-literal-date",
+                "filter-date-trunc-eq-literal",
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
-                            vec![literal_expr("?granularity"), column_expr("?column")],
+                            vec!["?granularity".to_string(), column_expr("?column")],
                         ),
                         "=",
                         "?date".to_string(),
@@ -1742,41 +1724,19 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        binary_expr(
-                            column_expr("?column"),
-                            ">=",
-                            fun_expr(
-                                "DateTrunc",
-                                vec![literal_expr("?granularity"), "?date".to_string()],
-                            ),
-                        ),
+                        binary_expr(column_expr("?column"), ">=", literal_expr("?start_date")),
                         "AND",
-                        binary_expr(
-                            column_expr("?column"),
-                            "<",
-                            fun_expr(
-                                "DateTrunc",
-                                vec![
-                                    literal_expr("?granularity"),
-                                    udf_expr(
-                                        "date_add",
-                                        vec![
-                                            "?date".to_string(),
-                                            literal_expr("?date_add_interval"),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                        ),
+                        binary_expr(column_expr("?column"), "<", literal_expr("?end_date")),
                     ),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_date_trunc_eq_literal_date(
+                self.transform_date_trunc_eq_literal(
                     "?granularity",
                     "?date",
-                    "?date_add_interval",
+                    "?start_date",
+                    "?end_date",
                 ),
             ),
             rewrite(
@@ -1799,7 +1759,7 @@ impl RewriteRules for FilterRules {
                 "between-unwrap-datetrunc",
                 filter_replacer(
                     between_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
@@ -1941,14 +1901,6 @@ impl RewriteRules for FilterRules {
                 "filter-simplify-scalar-fun-push-down",
                 filter_simplify_replacer(fun_expr_var_arg("?fun", "?args")),
                 fun_expr_var_arg("?fun", filter_simplify_replacer("?args")),
-            ),
-            rewrite(
-                "filter-simplify-scalar-args-push-down",
-                filter_simplify_replacer(scalar_fun_expr_args("?left", "?right")),
-                scalar_fun_expr_args(
-                    filter_simplify_replacer("?left"),
-                    filter_simplify_replacer("?right"),
-                ),
             ),
             rewrite(
                 "filter-simplify-scalar-args-empty-tail-push-down",
@@ -2192,7 +2144,7 @@ impl RewriteRules for FilterRules {
                 ),
                 filter_replacer(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_string("day"), column_expr("?column")],
                         ),
@@ -2447,23 +2399,48 @@ impl RewriteRules for FilterRules {
                 ),
             ),
         ];
+        if self.config_obj.push_down_pull_up_split() {
+            rules.push(list_rewrite(
+                "filter-simplify-scalar-args-push-down",
+                ListType::ScalarFunctionExprArgs,
+                ListPattern {
+                    pattern: filter_simplify_replacer("?args"),
+                    list_var: "?args".to_string(),
+                    elem: "?arg".to_string(),
+                },
+                ListPattern {
+                    pattern: "?new_args".to_string(),
+                    list_var: "?new_args".to_string(),
+                    elem: filter_simplify_replacer("?arg"),
+                },
+            ));
+        } else {
+            rules.push(rewrite(
+                "filter-simplify-scalar-args-push-down",
+                filter_simplify_replacer(fun_expr_args_legacy("?left", "?right")),
+                fun_expr_args_legacy(
+                    filter_simplify_replacer("?left"),
+                    filter_simplify_replacer("?right"),
+                ),
+            ));
+        }
         if self.eval_stable_functions {
             rules.extend(vec![
                 rewrite(
                     "filter-simplify-now",
-                    filter_simplify_replacer(fun_expr("Now", Vec::<String>::new())),
+                    filter_simplify_replacer(self.fun_expr("Now", Vec::<String>::new())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_now", Vec::<String>::new()),
                 ),
                 rewrite(
                     "filter-simplify-utc-timestamp",
-                    filter_simplify_replacer(fun_expr("UtcTimestamp", Vec::<String>::new())),
+                    filter_simplify_replacer(self.fun_expr("UtcTimestamp", Vec::<String>::new())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_utc_timestamp", Vec::<String>::new()),
                 ),
                 rewrite(
                     "filter-simplify-current-date",
-                    filter_simplify_replacer(fun_expr("CurrentDate", Vec::<String>::new())),
+                    filter_simplify_replacer(self.fun_expr("CurrentDate", Vec::<String>::new())),
                     // TODO alias to make it equivalent transformation
                     udf_expr("eval_current_date", Vec::<String>::new()),
                 ),
@@ -2474,11 +2451,20 @@ impl RewriteRules for FilterRules {
 }
 
 impl FilterRules {
-    pub fn new(meta_context: Arc<MetaContext>, eval_stable_functions: bool) -> Self {
+    pub fn new(
+        meta_context: Arc<MetaContext>,
+        config_obj: Arc<dyn ConfigObj>,
+        eval_stable_functions: bool,
+    ) -> Self {
         Self {
             meta_context,
+            config_obj,
             eval_stable_functions,
         }
+    }
+
+    fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
+        fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
     }
 
     fn push_down_filter(
@@ -2536,7 +2522,7 @@ impl FilterRules {
                 if let ScalarValue::Boolean(Some(false)) = literal_value {
                     subst.insert(
                         new_limit_var,
-                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(1)))),
+                        egraph.add(LogicalPlanLanguage::CubeScanLimit(CubeScanLimit(Some(0)))),
                     );
                     subst.insert(
                         new_limit_skip_var,
@@ -3893,43 +3879,57 @@ impl FilterRules {
         }
     }
 
-    fn transform_date_trunc_eq_literal_date(
+    fn transform_date_trunc_eq_literal(
         &self,
         granularity_var: &'static str,
         date_var: &'static str,
-        date_add_interval_var: &'static str,
+        start_date_var: &'static str,
+        end_date_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let date_var = var!(date_var);
-        let date_add_interval_var = var!(date_add_interval_var);
+        let start_date_var = var!(start_date_var);
+        let end_date_var = var!(end_date_var);
         move |egraph, subst| {
-            for granularity in var_iter!(egraph[subst[granularity_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(granularity)) = granularity {
-                    if let Some(date_add_interval) =
-                        utils::granularity_str_to_interval(&granularity)
-                    {
-                        if let Some(ConstantFolding::Scalar(date)) =
-                            &egraph[subst[date_var]].data.constant
-                        {
-                            if let ScalarValue::TimestampNanosecond(Some(date), None) = date {
-                                if let Some(true) =
-                                    utils::is_literal_date_trunced(*date, &granularity)
-                                {
-                                    subst.insert(
-                                        date_add_interval_var,
-                                        egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                                            LiteralExprValue(date_add_interval),
-                                        )),
-                                    );
+            let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
+                &egraph[subst[granularity_var]].data.constant
+            else {
+                return false;
+            };
 
-                                    return true;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            false
+            let Some(ConstantFolding::Scalar(date)) = &egraph[subst[date_var]].data.constant else {
+                return false;
+            };
+            let Some(Some(date)) = Self::scalar_dt_to_naive_datetime(date) else {
+                return false;
+            };
+
+            let Some((start_date, end_date)) =
+                Self::naive_datetime_to_range_by_granularity(date, granularity)
+            else {
+                return false;
+            };
+
+            let (Some(start_date), Some(end_date)) = (
+                start_date.timestamp_nanos_opt(),
+                end_date.timestamp_nanos_opt(),
+            ) else {
+                return false;
+            };
+
+            subst.insert(
+                start_date_var,
+                egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                    ScalarValue::TimestampNanosecond(Some(start_date), None),
+                ))),
+            );
+            subst.insert(
+                end_date_var,
+                egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                    ScalarValue::TimestampNanosecond(Some(end_date), None),
+                ))),
+            );
+            true
         }
     }
 
@@ -4407,6 +4407,262 @@ impl FilterRules {
 
             false
         }
+    }
+
+    fn transform_filter_in_list_datetrunc(
+        &self,
+        granularity_var: &'static str,
+        column_var: &'static str,
+        list_var: &'static str,
+        negated_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+        new_filter_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let granularity_var = var!(granularity_var);
+        let column_var = var!(column_var);
+        let list_var = var!(list_var);
+        let negated_var = var!(negated_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let new_filter_var = var!(new_filter_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let Some(list) = &egraph[subst[list_var]].data.constant_in_list else {
+                return false;
+            };
+            let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
+                &egraph[subst[granularity_var]].data.constant
+            else {
+                return false;
+            };
+
+            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) else {
+                    continue;
+                };
+
+                if !cube.contains_member(&member_name) {
+                    continue;
+                }
+
+                for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
+                    let Some(values) = list
+                        .into_iter()
+                        .map(|literal| Self::scalar_dt_to_naive_datetime(literal))
+                        .collect::<Option<HashSet<_>>>()
+                        .map(|values| {
+                            let mut values = values.into_iter().collect::<Vec<_>>();
+                            values.sort();
+                            values
+                        })
+                    else {
+                        continue;
+                    };
+
+                    let values = values.into_iter().filter_map(|value| {
+                        let Some(value) = value else {
+                            // TODO: NULL values are skipped for now as if they're not there
+                            return None;
+                        };
+                        Self::naive_datetime_to_range_by_granularity(value, granularity)
+                    });
+
+                    let mut dts: Vec<(NaiveDateTime, NaiveDateTime)> = vec![];
+                    let mut last_value: Option<(NaiveDateTime, NaiveDateTime)> = None;
+                    for (next_value_from, next_value_to) in values {
+                        let Some((last_value_from, last_value_to)) = last_value else {
+                            last_value = Some((next_value_from, next_value_to));
+                            continue;
+                        };
+                        if last_value_to == next_value_from {
+                            last_value = Some((last_value_from, next_value_to));
+                            continue;
+                        }
+                        dts.push((last_value_from, last_value_to));
+                        last_value = Some((next_value_from, next_value_to));
+                    }
+                    if let Some(last_value) = last_value {
+                        dts.push(last_value);
+                    }
+
+                    let format = "%Y-%m-%d %H:%M:%S%.3f";
+                    let dts = dts
+                        .into_iter()
+                        .map(|(dt, new_dt)| {
+                            let new_dt = new_dt
+                                .checked_sub_signed(Duration::milliseconds(1))
+                                .unwrap();
+                            (
+                                dt.format(format).to_string(),
+                                new_dt.format(format).to_string(),
+                            )
+                        })
+                        .collect::<Vec<_>>();
+                    let len = dts.len();
+                    if len < 1 {
+                        continue;
+                    }
+
+                    let member_op = if *negated {
+                        "notInDateRange"
+                    } else {
+                        "inDateRange"
+                    };
+
+                    let member = egraph.add(LogicalPlanLanguage::FilterMemberMember(
+                        FilterMemberMember(member_name.to_string()),
+                    ));
+                    let op = egraph.add(LogicalPlanLanguage::FilterMemberOp(FilterMemberOp(
+                        member_op.to_string(),
+                    )));
+                    if len == 1 {
+                        for (from, to) in dts.into_iter() {
+                            let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                                FilterMemberValues(vec![from, to]),
+                            ));
+                            let filter_member =
+                                egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                            subst.insert(new_filter_var, filter_member);
+                        }
+                        return true;
+                    }
+
+                    let mut filters = egraph.add(LogicalPlanLanguage::FilterOpFilters(vec![]));
+                    for (from, to) in dts.into_iter().rev() {
+                        let values = egraph.add(LogicalPlanLanguage::FilterMemberValues(
+                            FilterMemberValues(vec![from, to]),
+                        ));
+                        let filter_member =
+                            egraph.add(LogicalPlanLanguage::FilterMember([member, op, values]));
+                        filters = egraph.add(LogicalPlanLanguage::FilterOpFilters(vec![
+                            filter_member,
+                            filters,
+                        ]));
+                    }
+
+                    let op = egraph.add(LogicalPlanLanguage::FilterOpOp(FilterOpOp(
+                        "or".to_string(),
+                    )));
+
+                    subst.insert(
+                        new_filter_var,
+                        egraph.add(LogicalPlanLanguage::FilterOp([filters, op])),
+                    );
+                    return true;
+                }
+            }
+
+            false
+        }
+    }
+
+    // The outer Option's purpose is to signal when the type is incorrect
+    // or parsing couldn't interpret the value as a NativeDateTime.
+    // The inner Option is None when the ScalarValue is None.
+    fn scalar_dt_to_naive_datetime(literal: &ScalarValue) -> Option<Option<NaiveDateTime>> {
+        if let ScalarValue::TimestampNanosecond(ts, None) = literal {
+            let Some(ts) = ts else {
+                return Some(None);
+            };
+            let ts_seconds = *ts / 1_000_000_000;
+            let ts_nanos = (*ts % 1_000_000_000) as u32;
+            let dt = NaiveDateTime::from_timestamp_opt(ts_seconds, ts_nanos).map(|dt| Some(dt));
+            return dt;
+        };
+
+        let ScalarValue::Utf8(str) = literal else {
+            return None;
+        };
+        let Some(str) = str else {
+            return Some(None);
+        };
+        let dt = NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S%.f")
+            .or_else(|_| NaiveDateTime::parse_from_str(str, "%Y-%m-%d %H:%M:%S"))
+            .or_else(|_| {
+                NaiveDate::parse_from_str(str, "%Y-%m-%d")
+                    .map(|date| date.and_hms_opt(0, 0, 0).unwrap())
+            });
+        let Ok(dt) = dt else {
+            return None;
+        };
+        Some(Some(dt))
+    }
+
+    fn naive_datetime_to_range_by_granularity(
+        dt: NaiveDateTime,
+        granularity: &String,
+    ) -> Option<(NaiveDateTime, NaiveDateTime)> {
+        let granularity = granularity.to_lowercase();
+
+        // Validate that `dt` is indeed the earliest time of a granularity unit.
+        // If it's not, it will never match in `IN` with `DATE_TRUNC` as expr.
+        let is_earliest = match granularity.as_str() {
+            "year" => {
+                dt.month() == 1
+                    && dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "quarter" | "qtr" => {
+                matches!(dt.month(), 1 | 4 | 7 | 10)
+                    && dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "month" => {
+                dt.day() == 1
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "week" => {
+                dt.weekday() == Weekday::Mon
+                    && dt.hour() == 0
+                    && dt.minute() == 0
+                    && dt.second() == 0
+                    && dt.nanosecond() == 0
+            }
+            "day" => dt.hour() == 0 && dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0,
+            "hour" => dt.minute() == 0 && dt.second() == 0 && dt.nanosecond() == 0,
+            "minute" => dt.second() == 0 && dt.nanosecond() == 0,
+            "second" => dt.nanosecond() == 0,
+            _ => return None,
+        };
+        if !is_earliest {
+            return None;
+        }
+
+        let new_dt = dt.clone();
+        let new_dt = match granularity.as_str() {
+            "year" => new_dt.checked_add_months(Months::new(12)),
+            "quarter" | "qtr" => new_dt.checked_add_months(Months::new(3)),
+            "month" => new_dt.checked_add_months(Months::new(1)),
+            "week" => new_dt.checked_add_days(Days::new(7)),
+            "day" => new_dt.checked_add_days(Days::new(1)),
+            "hour" => new_dt.checked_add_signed(Duration::hours(1)),
+            "minute" => new_dt.checked_add_signed(Duration::minutes(1)),
+            "second" => new_dt.checked_add_signed(Duration::seconds(1)),
+            _ => return None,
+        }
+        .expect("Unable to add specified duration to new_dt");
+
+        Some((dt, new_dt))
     }
 
     fn rotate_filter_and_date_range(

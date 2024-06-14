@@ -494,6 +494,8 @@ pub trait ConfigObj: DIService {
 
     fn query_cache_max_capacity_bytes(&self) -> u64;
 
+    fn query_queue_cache_max_capacity(&self) -> u64;
+
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
     fn metadata_cache_max_capacity_bytes(&self) -> u64;
@@ -616,6 +618,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub query_cache_max_capacity_bytes: u64,
+    pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
@@ -907,6 +910,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn query_cache_max_capacity_bytes(&self) -> u64 {
         self.query_cache_max_capacity_bytes
+    }
+    fn query_queue_cache_max_capacity(&self) -> u64 {
+        self.query_queue_cache_max_capacity
     }
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
@@ -1443,6 +1449,10 @@ impl Config {
                     Some(16384 << 20),
                     Some(0),
                 ) as u64,
+                query_queue_cache_max_capacity: env_parse(
+                    "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
+                    10000,
+                ),
                 query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
                     None
                 } else {
@@ -1612,6 +1622,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,
+                query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
@@ -2143,6 +2154,7 @@ impl Config {
         let query_cache = Arc::new(SqlResultCache::new(
             self.config_obj.query_cache_max_capacity_bytes(),
             self.config_obj.query_cache_time_to_idle_secs(),
+            self.config_obj.query_queue_cache_max_capacity(),
         ));
 
         let query_cache_to_move = query_cache.clone();
