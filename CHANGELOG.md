@@ -3,6 +3,29 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
+
+
+### Bug Fixes
+
+* **client-react:** udpate td with a compare date range ([#8339](https://github.com/cube-js/cube/issues/8339)) ([9ef51f7](https://github.com/cube-js/cube/commit/9ef51f7b12c624873bfa79a302038db7e4b47a6a))
+* **cubesql:** Rollup don't work over subquery with asterisk projection ([#8354](https://github.com/cube-js/cube/issues/8354)) ([0bc0306](https://github.com/cube-js/cube/commit/0bc03066ac4bedec4ee2b85d381e36bb13e2edef))
+* use tablesSchema over direct information schema ([#8347](https://github.com/cube-js/cube/issues/8347)) ([a4ca555](https://github.com/cube-js/cube/commit/a4ca5553b07944dbed764bbc4b862feac793691e))
+
+
+### Features
+
+* **cubesql:** support `GREATEST`/`LEAST` SQL functions ([#8325](https://github.com/cube-js/cube/issues/8325)) ([c13a28e](https://github.com/cube-js/cube/commit/c13a28e21514c0e06e41c0ed14e97621bd777cf7))
+
+
+### Performance Improvements
+
+* **cubesql:** Use an incremental rule scheduler for egg ([5892df7](https://github.com/cube-js/cube/commit/5892df749edb0f290488a196804a5a060e5ea387))
+
+
+
+
+
 ## [0.35.47](https://github.com/cube-js/cube/compare/v0.35.46...v0.35.47) (2024-06-07)
 
 
