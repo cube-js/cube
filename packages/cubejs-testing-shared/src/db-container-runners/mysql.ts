@@ -2,12 +2,8 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type MySQLStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
-
 export class MysqlDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: MySQLStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_MYSQL_VERSION || options.version || '5.7';
 
     const builder = new GenericContainer(`mysql:${version}`)

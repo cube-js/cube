@@ -13,7 +13,7 @@
     "tsc": "tsc",
     "lint": "eslint src/* test/ --ext .ts",
     "lint:fix": "eslint --fix src/* test/ --ext .ts",
-    "image": "node dist/test/image",
+    "image": "node dist/test/buildCubeImage",
     "test-driver": "TZ=UTC jest --forceExit --runInBand --verbose",
     "athena-driver":            "yarn test-driver -i dist/test/athena-driver.test.js",
     "athena-core":              "yarn test-driver -i dist/test/athena-core.test.js",
