@@ -15,10 +15,10 @@ export const prepareCompiler = (content: any, options?: any) => originalPrepareC
 export abstract class QueryTestAbstract<T extends BaseDriver> {
   abstract getQueryClass(): any;
 
-  protected getQuery(a: any, b: any): BaseQuery {
+  protected getQuery(compilers: any, options: any): BaseQuery {
     const QueryClass = this.getQueryClass();
 
-    return new QueryClass(a, b);
+    return new QueryClass(compilers, options);
   }
 
   public async testRefreshKeyEveryDay(connection: T) {
@@ -107,7 +107,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     // eslint-disable-next-line prefer-const
     let [sql, params] = preAggregations[0].invalidateKeyQueries[0];
     // TODO Introduce full cycle testing through BaseDbRunner / QueryOrchestrator.
-    // TODO Internal structures shouldn't be never accessed in tests.
+    // TODO Internal structures shouldn't be ever accessed in tests.
     params = params.map((p: any) => (p === TO_PARTITION_RANGE ? '2017-01-05T00:00:00' : p));
 
     console.log('Executing ', [sql, params]);
@@ -161,7 +161,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     });
 
     const preAggregations: any = query.newPreAggregations().preAggregationsDescription();
-    
+
     const preAggregation = preAggregations[0];
 
     const columns = [
@@ -210,7 +210,7 @@ export abstract class QueryTestAbstract<T extends BaseDriver> {
     // eslint-disable-next-line prefer-const
     /* let [sql, params] = preAggregations[0].invalidateKeyQueries[0];
     // TODO Introduce full cycle testing through BaseDbRunner / QueryOrchestrator.
-    // TODO Internal structures shouldn't be never accessed in tests.
+    // TODO Internal structures shouldn't be ever accessed in tests.
     params = params.map((p: any) => (p === TO_PARTITION_RANGE ? '2017-01-05T00:00:00' : p));
 
     await connection.query(sql, params, {}); */

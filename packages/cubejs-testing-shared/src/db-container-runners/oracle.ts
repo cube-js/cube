@@ -3,12 +3,8 @@ import { isCI } from '@cubejs-backend/shared';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type OracleStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
-
 export class OracleDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: OracleStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_ORACLE_VERSION || options.version || '21.3.0';
 
     const container = new GenericContainer(`gvenzl/oracle-xe:${version}`)

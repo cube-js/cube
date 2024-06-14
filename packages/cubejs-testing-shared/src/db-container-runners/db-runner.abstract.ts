@@ -5,7 +5,8 @@ export interface ContainerVolumeDefinition {
 }
 
 export interface DBRunnerContainerOptions {
-  volumes?: ContainerVolumeDefinition[]
+  volumes?: ContainerVolumeDefinition[],
+  version?: string,
 }
 
 // @todo Finish with old one PR for it

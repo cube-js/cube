@@ -2,12 +2,8 @@ import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type CubeStoreStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
-
 export class CubeStoreDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: CubeStoreStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_CUBESTORE_VERSION || options.version || 'latest';
 
     const builder = new GenericContainer(`cubejs/cubestore:${version}`)

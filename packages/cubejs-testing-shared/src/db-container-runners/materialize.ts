@@ -2,12 +2,8 @@ import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type MaterializeStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
-
 export class MaterializeDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: MaterializeStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_MZSQL_VERSION || options.version || 'v0.88.0';
 
     const container = new GenericContainer(`materialize/materialized:${version}`)

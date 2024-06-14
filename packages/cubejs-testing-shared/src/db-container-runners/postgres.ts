@@ -3,12 +3,8 @@ import { execSync } from 'child_process';
 import { GenericContainer, StartedTestContainer } from 'testcontainers';
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type PostgresStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
-
 export class PostgresDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: PostgresStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_PGSQL_VERSION || options.version || '9.6.8';
 
     const container = new GenericContainer(`postgres:${version}`)
