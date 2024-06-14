@@ -10272,7 +10272,7 @@ Array [
 
 exports[`Queries with the @cubejs-backend/postgres-driver filtering ECommerce: startsWith + dimensions, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -10287,7 +10287,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -10312,9 +10312,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -10399,7 +10399,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -10494,9 +10494,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: endsWith filter + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -10511,7 +10511,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -10541,7 +10541,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/postgres-driver filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/postgres-driver pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
@@ -11656,7 +11656,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + limit 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -11701,7 +11701,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + order + limit + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + order + limit + total + offset 1`] = `
 Array [
   Object {
     "Customers.customerId": "GA-14725",
@@ -11746,7 +11746,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -11791,7 +11791,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + order + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + order + total + offset 1`] = `
 Array [
   Object {
     "Customers.customerId": "BS-11380",
@@ -11800,7 +11800,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + order 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -11969,7 +11969,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimentions + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Customers: dimensions + total 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -12912,7 +12912,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + limit 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -13067,7 +13067,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + order + limit + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + order + limit + total + offset 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -13222,7 +13222,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -13377,7 +13377,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + order + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + order + total + offset 1`] = `
 Array [
   Object {
     "ECommerce.category": "Office Supplies",
@@ -13397,7 +13397,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + order 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -14062,7 +14062,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimentions + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying ECommerce: dimensions + total 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -15222,7 +15222,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -15277,7 +15277,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimentions + order + limit 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimensions + order + limit 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -15332,7 +15332,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimentions + order + total 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimensions + order + total 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -15477,7 +15477,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/postgres-driver querying Products: dimensions + order 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",

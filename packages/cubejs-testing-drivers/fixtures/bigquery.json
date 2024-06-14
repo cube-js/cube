@@ -143,8 +143,8 @@
     "---------------------------------------",
     "Full tests                             ",
     "---------------------------------------",
-    "querying Customers: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
+    "querying Customers: dimensions + order + total + offset",
+    "querying ECommerce: dimensions + order + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",

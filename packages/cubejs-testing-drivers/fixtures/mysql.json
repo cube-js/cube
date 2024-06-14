@@ -114,8 +114,8 @@
   "skip": [
     "MySQL doesn't support offset wo limit",
     "---------------------------------------",
-    "querying ECommerce: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + total + offset",
+    "querying ECommerce: dimensions + order + total + offset",
+    "querying Customers: dimensions + order + total + offset",
     "SKIPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",

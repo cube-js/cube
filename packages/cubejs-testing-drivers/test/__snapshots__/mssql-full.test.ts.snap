@@ -1996,7 +1996,7 @@ Array [
 
 exports[`Queries with the @cubejs-backend/mssql-driver filtering ECommerce: startsWith + dimensions, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2011,7 +2011,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2036,9 +2036,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2123,7 +2123,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2218,9 +2218,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2235,7 +2235,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2265,7 +2265,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/mssql-driver pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
@@ -2898,7 +2898,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions + limit 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -2943,7 +2943,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions + order 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -3886,7 +3886,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimensions + limit 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -4041,7 +4041,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimensions + order 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -5136,7 +5136,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimentions + order + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimensions + order + limit 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -5191,7 +5191,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimensions + order 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
