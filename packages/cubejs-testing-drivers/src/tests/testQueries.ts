@@ -70,11 +70,21 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       }
     }
 
-    function executePg(name: string, test: () => Promise<void>) {
+    function executePg(name: string, test: (connection: PgClient) => Promise<void>) {
       if (!fixtures.cube.ports[1] || fixtures.skip && fixtures.skip.indexOf(name) >= 0) {
-        it.skip(name, test);
+        it.skip(name, () => {
+          // nothing to do
+        });
       } else {
-        it(name, test);
+        it(name, async () => {
+          const connection = await createPostgresClient();
+
+          try {
+            await test(connection);
+          } finally {
+            await connection.end();
+          }
+        });
       }
     }
 
@@ -150,6 +160,12 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       await buildPreaggs(env.cube.port, apiToken, {
         timezones: ['UTC'],
         preAggregations: ['BigECommerce.TAExternal'],
+        contexts: [{ securityContext: { tenant: 't1' } }],
+      });
+
+      await buildPreaggs(env.cube.port, apiToken, {
+        timezones: ['UTC'],
+        preAggregations: ['BigECommerce.MultiTimeDimForCountExternal'],
         contexts: [{ securityContext: { tenant: 't1' } }],
       });
 
@@ -1403,6 +1419,31 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying BigECommerce: partitioned pre-agg with multi time dimension', async () => {
+      const response = await client.load({
+        dimensions: [],
+        measures: [
+          'BigECommerce.count',
+        ],
+        timeDimensions: [
+          {
+            dimension: 'BigECommerce.completedDate',
+            granularity: 'day'
+          },
+          {
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'day'
+          }
+        ],
+        order: {
+          'BigECommerce.completedDate': 'asc',
+          'BigECommerce.orderDate': 'asc',
+          'BigECommerce.count': 'asc'
+        }
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('querying BigECommerce: partitioned pre-agg', async () => {
       const response = await client.load({
         dimensions: [
@@ -1494,6 +1535,50 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    if (includeHLLSuite) {
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 day', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Day',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 week', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Week',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+
+      execute('querying BigECommerce: rolling count_distinct_approx window by 2 month', async () => {
+        const response = await client.load({
+          measures: [
+            'BigECommerce.rollingCountApproxBy2Month',
+          ],
+          timeDimensions: [{
+            dimension: 'BigECommerce.orderDate',
+            granularity: 'month',
+            dateRange: ['2020-01-01', '2020-12-31'],
+          }],
+        });
+        expect(response.rawData()).toMatchSnapshot();
+      });
+    }
+
     execute('querying BigECommerce: totalProfitYearAgo', async () => {
       const response = await client.load({
         measures: [
@@ -1512,8 +1597,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }
 
-    executePg('SQL API: powerbi min max push down', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: powerbi min max push down', async (connection) => {
       const res = await connection.query(`
       select
   max("rows"."orderDate") as "a0",
@@ -1529,8 +1613,7 @@ from
       expect(res.rows).toMatchSnapshot('powerbi_min_max_push_down');
     });
 
-    executePg('SQL API: powerbi min max ungrouped flag', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: powerbi min max ungrouped flag', async (connection) => {
       const res = await connection.query(`
       select 
   count(distinct("rows"."totalSales")) + max( 
@@ -1552,8 +1635,7 @@ from
       expect(res.rows).toMatchSnapshot('powerbi_min_max_ungrouped_flag');
     });
 
-    executePg('SQL API: ungrouped pre-agg', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: ungrouped pre-agg', async (connection) => {
       const res = await connection.query(`
     select
       "productName",
@@ -1565,8 +1647,7 @@ from
       expect(res.rows).toMatchSnapshot('ungrouped_pre_agg');
     });
 
-    executePg('SQL API: post-aggregate percentage of total', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: post-aggregate percentage of total', async (connection) => {
       const res = await connection.query(`
     select
       sum("BigECommerce"."percentageOfTotalForStatus")
@@ -1576,8 +1657,7 @@ from
       expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
     });
 
-    executePg('SQL API: reuse params', async () => {
-      const connection = await createPostgresClient();
+    executePg('SQL API: reuse params', async (connection) => {
       const res = await connection.query(`
     select
       date_trunc('year', "orderDate") as "c0",
@@ -1596,6 +1676,134 @@ from
       date_trunc('year', "orderDate")
   `);
       expect(res.rows).toMatchSnapshot('reuse_params');
+    });
+
+    executePg('SQL API: Simple Rollup', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId, orderId, orderDate, sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('simple_rollup');
+    });
+
+    executePg('SQL API: Complex Rollup', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId, orderId, orderDate, city, sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2), 3, ROLLUP(4) 
+    order by 1, 2, 3, 4
+
+  `);
+      expect(res.rows).toMatchSnapshot('complex_rollup');
+    });
+
+    executePg('SQL API: Rollup with aliases', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId as "row", orderId as "order", orderDate as "orderData", city as "city", sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(rowId, 2), 3, ROLLUP(4) 
+    order by 1, 2, 3, 4
+
+  `);
+      expect(res.rows).toMatchSnapshot('rollup_with_aliases');
+    });
+
+    executePg('SQL API: Rollup over exprs', async (connection) => {
+      const res = await connection.query(`
+    select
+        rowId + sales * 2 as "order", orderDate as "orderData", city as "city", sum(count)
+    from
+      "ECommerce" as "ECommerce"
+    group by
+      ROLLUP(1, 2, 3) 
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('rollup_over_exprs');
+    });
+
+    executePg('SQL API: Nested Rollup', async (connection) => {
+      const res = await connection.query(`
+    select rowId, orderId, orderDate, sum(cnt)
+    from (
+        select
+            rowId, orderId, orderDate, sum(count) as cnt
+        from
+        "ECommerce" as "ECommerce"
+        group by 1, 2, 3
+
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup');
+    });
+
+    executePg('SQL API: Nested Rollup with aliases', async (connection) => {
+      const res = await connection.query(`
+    select rowId as "row", orderId as "order", orderDate as "date", sum(cnt)
+    from (
+        select
+            rowId, orderId, orderDate, sum(count) as cnt
+        from
+        "ECommerce" as "ECommerce"
+        group by 1, 2, 3
+
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup_with_aliases');
+    });
+    executePg('SQL API: Nested Rollup over asterisk', async (connection) => {
+      const res = await connection.query(`
+    select rowId as "row", orderId as "order", orderDate as "date", sum(count)
+    from (
+        select * 
+        from
+        "ECommerce" as "ECommerce"
+    ) a
+    group by
+      ROLLUP(1, 2, 3)
+    order by 1, 2, 3
+
+  `);
+      expect(res.rows).toMatchSnapshot('nested_rollup_over_asterisk');
+    });
+    executePg('SQL API: Extended nested Rollup over asterisk', async (connection) => {
+      const res = await connection.query(`
+    select * from (
+        select * from (
+            select rowId as "row", orderId as "order", sum(count)
+            from (
+                select * 
+                from
+                "ECommerce" as "ECommerce"
+            ) a
+            group by
+            ROLLUP(row, order)
+            ORDER BY "rowId" ASC NULLS FIRST, "orderId" ASC NULLS FIRST OFFSET 0 ROWS FETCH FIRST 100 ROWS ONLY
+        ) q1
+    ) q2 limit 100
+
+  `);
+      expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
     });
   });
 }

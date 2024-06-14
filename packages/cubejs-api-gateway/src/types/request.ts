@@ -52,6 +52,8 @@ interface Request extends ExpressRequest {
    */
   securityContext?: any,
 
+  requestStarted?: Date,
+
   /**
    * @deprecated
    */
@@ -87,6 +89,13 @@ type ExtendContextFn =
   (req: ExpressRequest) =>
     Promise<RequestExtension> | RequestExtension;
 
+type ErrorResponse = {
+  error: string,
+};
+
+type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
+
 /**
  * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
@@ -96,13 +105,8 @@ type ExtendContextFn =
  */
 type ResponseResultFn =
   (
-    message: Record<string, any> | Record<string, any>[],
+    message: (Record<string, any> | Record<string, any>[]) | ErrorResponse,
     extra?: { status: number }
-  ) => void;
-
-type MetaResponseResultFn =
-  (
-    message: { cubes: any[], compilerId?: string }
   ) => void;
 
 /**

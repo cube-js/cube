@@ -39,12 +39,19 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
+type GroupingSet = {
+    groupType: string,
+    id: number,
+    subId?: null | number
+};
+
 type MemberExpression = {
   expression: Function;
   cubeName: string;
   name: string;
   expressionName: string;
   definition: string;
+  groupingSet?: GroupingSet
 };
 
 /**

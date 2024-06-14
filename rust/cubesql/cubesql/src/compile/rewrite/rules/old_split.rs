@@ -1,15 +1,16 @@
 use super::utils;
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, aggr_aggr_expr, aggr_aggr_expr_empty_tail, aggr_group_expr,
-        aggr_group_expr_empty_tail, aggregate, alias_expr,
+        agg_fun_expr, aggr_aggr_expr_empty_tail, aggr_aggr_expr_legacy as aggr_aggr_expr,
+        aggr_group_expr_empty_tail, aggr_group_expr_legacy as aggr_group_expr, aggregate,
+        alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
         fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
         inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
         literal_float, literal_int, literal_string, original_expr_name,
         outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
-        projection_expr, projection_expr_empty_tail, rewrite,
+        projection_expr_empty_tail, projection_expr_legacy as projection_expr, rewrite,
         rewriter::RewriteRules,
         rules::members::MemberRules,
         transforming_chain_rewrite, transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
@@ -536,13 +537,13 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?rewritten_granularity"),
@@ -563,7 +564,7 @@ impl RewriteRules for OldSplitRules {
             transforming_chain_rewrite(
                 "split-push-down-date-part-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_expr("?granularity"), "?expr".to_string()],
                     ),
@@ -571,7 +572,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![("?expr", column_expr("?column"))],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?date_trunc_granularity"),
@@ -594,7 +595,7 @@ impl RewriteRules for OldSplitRules {
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
@@ -602,7 +603,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?date_trunc_granularity"),
@@ -611,7 +612,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?rewritten_granularity"),
@@ -633,7 +634,7 @@ impl RewriteRules for OldSplitRules {
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
@@ -641,7 +642,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?date_trunc_granularity"),
@@ -649,7 +650,7 @@ impl RewriteRules for OldSplitRules {
                         ],
                     ),
                 )],
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![
                         literal_expr("?date_part_granularity"),
@@ -669,7 +670,7 @@ impl RewriteRules for OldSplitRules {
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-and-cast-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
@@ -678,7 +679,7 @@ impl RewriteRules for OldSplitRules {
                 vec![(
                     "?expr",
                     cast_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![
                                 literal_expr("?date_trunc_granularity"),
@@ -689,7 +690,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?rewritten_granularity"),
@@ -712,7 +713,7 @@ impl RewriteRules for OldSplitRules {
             transforming_chain_rewrite(
                 "split-push-down-date-part-with-date-trunc-and-cast-outer-aggr-replacer",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_expr("?date_part_granularity"), "?expr".to_string()],
                     ),
@@ -721,7 +722,7 @@ impl RewriteRules for OldSplitRules {
                 vec![(
                     "?expr",
                     cast_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![
                                 literal_expr("?date_trunc_granularity"),
@@ -731,7 +732,7 @@ impl RewriteRules for OldSplitRules {
                         "?data_type",
                     ),
                 )],
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![
                         literal_expr("?date_part_granularity"),
@@ -778,7 +779,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -817,7 +818,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_string("dow"), column_expr("?outer_column")],
                     ),
@@ -847,7 +848,7 @@ impl RewriteRules for OldSplitRules {
                                         cast_expr_explicit(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![
                                                             literal_string("MONTH"),
@@ -868,7 +869,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("YEAR"),
@@ -879,7 +880,7 @@ impl RewriteRules for OldSplitRules {
                                                                 literal_int(100),
                                                             ),
                                                             "+",
-                                                            fun_expr(
+                                                            self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
                                                                     literal_string("MONTH"),
@@ -907,7 +908,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -933,7 +934,7 @@ impl RewriteRules for OldSplitRules {
                                         cast_expr_explicit(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![
                                                             literal_string("MONTH"),
@@ -954,7 +955,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("YEAR"),
@@ -965,7 +966,7 @@ impl RewriteRules for OldSplitRules {
                                                                 literal_int(100),
                                                             ),
                                                             "+",
-                                                            fun_expr(
+                                                            self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
                                                                     literal_string("MONTH"),
@@ -993,7 +994,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_string("doy"), column_expr("?outer_column")],
                     ),
@@ -1012,7 +1013,7 @@ impl RewriteRules for OldSplitRules {
                 vec![(
                     "?expr",
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
@@ -1021,7 +1022,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
@@ -1035,7 +1036,7 @@ impl RewriteRules for OldSplitRules {
                 vec![(
                     "?expr",
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
@@ -1045,7 +1046,7 @@ impl RewriteRules for OldSplitRules {
                 )],
                 alias_expr(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_expr("?granularity"), column_expr("?outer_column")],
                         ),
@@ -1069,7 +1070,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("MONTH"), column_expr("?column")],
                                 ),
@@ -1084,7 +1085,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("MONTH"), column_expr("?column")],
                     ),
@@ -1100,7 +1101,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("MONTH"), column_expr("?column")],
                                 ),
@@ -1118,7 +1119,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("MONTH"), column_expr("?outer_column")],
                                 ),
@@ -1148,7 +1149,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1158,11 +1159,11 @@ impl RewriteRules for OldSplitRules {
                             literal_string(","),
                         ),
                         "||",
-                        fun_expr(
+                        self.fun_expr(
                             "Lpad",
                             vec![
                                 cast_expr_explicit(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![literal_string("MONTH"), column_expr("?column")],
                                     ),
@@ -1175,7 +1176,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("month"), column_expr("?column")],
                     ),
@@ -1191,7 +1192,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1201,11 +1202,11 @@ impl RewriteRules for OldSplitRules {
                             literal_string(","),
                         ),
                         "||",
-                        fun_expr(
+                        self.fun_expr(
                             "Lpad",
                             vec![
                                 cast_expr_explicit(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![literal_string("MONTH"), column_expr("?column")],
                                     ),
@@ -1238,7 +1239,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1248,11 +1249,11 @@ impl RewriteRules for OldSplitRules {
                             literal_string(","),
                         ),
                         "||",
-                        fun_expr(
+                        self.fun_expr(
                             "Lpad",
                             vec![
                                 cast_expr_explicit(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![literal_string("MONTH"), column_expr("?column")],
                                     ),
@@ -1286,7 +1287,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1297,7 +1298,7 @@ impl RewriteRules for OldSplitRules {
                         ),
                         "||",
                         cast_expr_explicit(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_string("QUARTER"), column_expr("?column")],
                             ),
@@ -1306,7 +1307,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("quarter"), column_expr("?column")],
                     ),
@@ -1322,7 +1323,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1333,7 +1334,7 @@ impl RewriteRules for OldSplitRules {
                         ),
                         "||",
                         cast_expr_explicit(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_string("QUARTER"), column_expr("?column")],
                             ),
@@ -1362,7 +1363,7 @@ impl RewriteRules for OldSplitRules {
                     binary_expr(
                         binary_expr(
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![literal_string("YEAR"), column_expr("?column")],
                                 ),
@@ -1373,7 +1374,7 @@ impl RewriteRules for OldSplitRules {
                         ),
                         "||",
                         cast_expr_explicit(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_string("QUARTER"), column_expr("?column")],
                             ),
@@ -1402,7 +1403,7 @@ impl RewriteRules for OldSplitRules {
                         "to_char",
                         vec![
                             cast_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![
                                         literal_expr("?granularity"),
@@ -1430,7 +1431,7 @@ impl RewriteRules for OldSplitRules {
                         "to_char",
                         vec![
                             cast_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![
                                         literal_expr("?granularity"),
@@ -1457,13 +1458,13 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?rewritten_granularity"),
@@ -1490,7 +1491,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
@@ -1751,7 +1752,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 vec![("?arg", column_expr("?column"))],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -1981,13 +1982,13 @@ impl RewriteRules for OldSplitRules {
             // Floor
             rewrite(
                 "split-push-down-floor-inner-aggr-replacer",
-                inner_aggregate_split_replacer(fun_expr("Floor", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer(self.fun_expr("Floor", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
                 "split-push-down-floor-outer-aggr-replacer",
-                outer_aggregate_split_replacer(fun_expr("Floor", vec!["?expr"]), "?cube"),
-                fun_expr(
+                outer_aggregate_split_replacer(self.fun_expr("Floor", vec!["?expr"]), "?cube"),
+                self.fun_expr(
                     "Floor",
                     vec![outer_aggregate_split_replacer("?expr", "?cube")],
                 ),
@@ -2027,7 +2028,7 @@ impl RewriteRules for OldSplitRules {
             rewrite(
                 "split-push-down-substr-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr("Substr", vec!["?expr", "?from", "?to"]),
+                    self.fun_expr("Substr", vec!["?expr", "?from", "?to"]),
                     "?cube",
                 ),
                 inner_aggregate_split_replacer("?expr", "?cube"),
@@ -2037,14 +2038,14 @@ impl RewriteRules for OldSplitRules {
                 // Reaggregation may not be possible in all cases and won't change the final result
                 // for SUBSTRING(column, 1, 1234) issued by Metabase
                 outer_projection_split_replacer(
-                    fun_expr("Substr", vec![
+                    self.fun_expr("Substr", vec![
                         column_expr("?column"),
                         literal_int(1),
                         literal_int(1234),
                     ]),
                     "?alias_to_cube",
                 ),
-                fun_expr(
+                self.fun_expr(
                     "Substr",
                     vec![
                         outer_projection_split_replacer(column_expr("?column"), "?alias_to_cube"),
@@ -2094,13 +2095,13 @@ impl RewriteRules for OldSplitRules {
             // Trunc
             rewrite(
                 "split-push-down-trunc-inner-replacer",
-                inner_aggregate_split_replacer(fun_expr("Trunc", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer(self.fun_expr("Trunc", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
                 "split-push-down-trunc-outer-aggr-replacer",
-                outer_aggregate_split_replacer(fun_expr("Trunc", vec!["?expr"]), "?cube"),
-                fun_expr(
+                outer_aggregate_split_replacer(self.fun_expr("Trunc", vec!["?expr"]), "?cube"),
+                self.fun_expr(
                     "Trunc",
                     vec![outer_aggregate_split_replacer("?expr", "?cube")],
                 ),
@@ -2108,13 +2109,13 @@ impl RewriteRules for OldSplitRules {
             // Ceil
             rewrite(
                 "split-push-down-ceil-inner-replacer",
-                inner_aggregate_split_replacer(fun_expr("Ceil", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer(self.fun_expr("Ceil", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             rewrite(
                 "split-push-down-ceil-outer-aggr-replacer",
-                outer_aggregate_split_replacer(fun_expr("Ceil", vec!["?expr"]), "?cube"),
-                fun_expr(
+                outer_aggregate_split_replacer(self.fun_expr("Ceil", vec!["?expr"]), "?cube"),
+                self.fun_expr(
                     "Ceil",
                     vec![outer_aggregate_split_replacer("?expr", "?cube")],
                 ),
@@ -2134,14 +2135,14 @@ impl RewriteRules for OldSplitRules {
             // CharacterLength
             rewrite(
                 "split-push-down-char-length-inner-replacer",
-                inner_aggregate_split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
+                inner_aggregate_split_replacer(self.fun_expr("CharacterLength", vec!["?expr"]), "?cube"),
                 inner_aggregate_split_replacer("?expr", "?cube"),
             ),
             // Left
             rewrite(
                 "split-push-down-left-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "Left",
                         vec!["?expr".to_string(), literal_expr("?length")],
                     ),
@@ -2153,7 +2154,7 @@ impl RewriteRules for OldSplitRules {
             rewrite(
                 "split-push-down-right-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "Right",
                         vec!["?expr".to_string(), literal_expr("?length")],
                     ),
@@ -2165,7 +2166,7 @@ impl RewriteRules for OldSplitRules {
             rewrite(
                 "split-push-down-nullif-inner-replacer",
                 inner_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "NullIf",
                         vec!["?expr".to_string(), literal_expr("?literal")],
                     ),
@@ -2230,7 +2231,7 @@ impl RewriteRules for OldSplitRules {
             ),
             rewrite(
                 "split-push-up-datetrunc-event-notification-right",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         literal_expr("?granularity"),
@@ -2239,7 +2240,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 event_notification(
                     "?name",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), "?expr".to_string()],
                     ),
@@ -2250,7 +2251,7 @@ impl RewriteRules for OldSplitRules {
             transforming_rewrite(
                 "split-date-part-year-notification",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_string("YEAR"), column_expr("?column")],
                     ),
@@ -2259,7 +2260,7 @@ impl RewriteRules for OldSplitRules {
                 event_notification(
                     literal_string("split-date-part-or-trunc-year-notification"),
                     outer_aggregate_split_replacer(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_string("YEAR"), column_expr("?column")],
                         ),
@@ -2272,7 +2273,7 @@ impl RewriteRules for OldSplitRules {
             transforming_rewrite(
                 "split-date-part-month-notification",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![literal_string("MONTH"), column_expr("?column")],
                     ),
@@ -2281,7 +2282,7 @@ impl RewriteRules for OldSplitRules {
                 event_notification(
                     literal_string("split-date-part-or-trunc-month-notification"),
                     outer_aggregate_split_replacer(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_string("MONTH"), column_expr("?column")],
                         ),
@@ -2294,7 +2295,7 @@ impl RewriteRules for OldSplitRules {
             transforming_rewrite(
                 "split-datetrunc-year-notification",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("year"), column_expr("?column")],
                     ),
@@ -2303,7 +2304,7 @@ impl RewriteRules for OldSplitRules {
                 event_notification(
                     literal_string("split-date-part-or-trunc-year-notification"),
                     outer_aggregate_split_replacer(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_string("year"), column_expr("?column")],
                         ),
@@ -2316,7 +2317,7 @@ impl RewriteRules for OldSplitRules {
             transforming_rewrite(
                 "split-datetrunc-month-notification",
                 outer_aggregate_split_replacer(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("month"), column_expr("?column")],
                     ),
@@ -2325,7 +2326,7 @@ impl RewriteRules for OldSplitRules {
                 event_notification(
                     literal_string("split-date-part-or-trunc-month-notification"),
                     outer_aggregate_split_replacer(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_string("month"), column_expr("?column")],
                         ),
@@ -2414,13 +2415,13 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer(
                     aggr_group_expr(
                         binary_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_expr("?granularity"), column_expr("?left_column")],
                             ),
                             "<",
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![
                                         literal_expr("?granularity"),
@@ -2437,12 +2438,12 @@ impl RewriteRules for OldSplitRules {
                 ),
                 inner_aggregate_split_replacer(
                     aggr_group_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_expr("?granularity"), column_expr("?left_column")],
                         ),
                         aggr_group_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_expr("?granularity"), column_expr("?right_column")],
                             ),
@@ -2457,13 +2458,13 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer(
                     aggr_group_expr(
                         binary_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_expr("?granularity"), column_expr("?left_column")],
                             ),
                             "<",
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![
                                         literal_expr("?granularity"),
@@ -2481,7 +2482,7 @@ impl RewriteRules for OldSplitRules {
                 aggr_group_expr(
                     binary_expr(
                         outer_aggregate_split_replacer(
-                            fun_expr(
+                            self.fun_expr(
                                 "DatePart",
                                 vec![literal_expr("?granularity"), column_expr("?left_column")],
                             ),
@@ -2490,7 +2491,7 @@ impl RewriteRules for OldSplitRules {
                         "<",
                         binary_expr(
                             outer_aggregate_split_replacer(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![
                                         literal_expr("?granularity"),
@@ -2513,13 +2514,13 @@ impl RewriteRules for OldSplitRules {
                     aggr_group_expr(
                         binary_expr(
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?left_column")]),
+                                self.fun_expr("Lower", vec![column_expr("?left_column")]),
                                 "=",
                                 literal_expr("?left_literal"),
                             ),
                             "OR",
                             binary_expr(
-                                fun_expr("Lower", vec![column_expr("?right_column")]),
+                                self.fun_expr("Lower", vec![column_expr("?right_column")]),
                                 "=",
                                 literal_expr("?right_literal"),
                             ),
@@ -2541,13 +2542,13 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer(
                     binary_expr(
                         binary_expr(
-                            fun_expr("Lower", vec![column_expr("?left_column")]),
+                            self.fun_expr("Lower", vec![column_expr("?left_column")]),
                             "=",
                             literal_expr("?left_literal"),
                         ),
                         "OR",
                         binary_expr(
-                            fun_expr("Lower", vec![column_expr("?right_column")]),
+                            self.fun_expr("Lower", vec![column_expr("?right_column")]),
                             "=",
                             literal_expr("?right_literal"),
                         ),
@@ -2556,7 +2557,7 @@ impl RewriteRules for OldSplitRules {
                 ),
                 binary_expr(
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Lower",
                             vec![outer_aggregate_split_replacer(
                                 column_expr("?left_column"),
@@ -2568,7 +2569,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                     "OR",
                     binary_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "Lower",
                             vec![outer_aggregate_split_replacer(
                                 column_expr("?right_column"),
@@ -2654,11 +2655,11 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?column".to_string()],
                             ),
@@ -2666,7 +2667,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), "?column".to_string()],
                     ),
@@ -2679,11 +2680,11 @@ impl RewriteRules for OldSplitRules {
                 outer_projection_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?column".to_string()],
                             ),
@@ -2702,11 +2703,11 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?column".to_string()],
                             ),
@@ -2726,7 +2727,7 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             // Any granularity will do as long as our max is YEAR.
@@ -2738,7 +2739,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![
                                                             literal_string("YEAR"),
@@ -2765,7 +2766,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("year"), "?column".to_string()],
                     ),
@@ -2778,7 +2779,7 @@ impl RewriteRules for OldSplitRules {
                 outer_projection_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             // Any granularity will do as long as our max is YEAR.
@@ -2790,7 +2791,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![
                                                             literal_string("YEAR"),
@@ -2828,7 +2829,7 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             // Any granularity will do as long as our max is YEAR.
@@ -2840,7 +2841,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![
                                                             literal_string("YEAR"),
@@ -2894,7 +2895,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("MONTH"),
@@ -2924,7 +2925,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("YEAR"),
@@ -2935,7 +2936,7 @@ impl RewriteRules for OldSplitRules {
                                                                 literal_int(100),
                                                             ),
                                                             "+",
-                                                            fun_expr(
+                                                            self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
                                                                     literal_string("MONTH"),
@@ -2963,7 +2964,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -2991,7 +2992,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("MONTH"),
@@ -3021,7 +3022,7 @@ impl RewriteRules for OldSplitRules {
                                                     binary_expr(
                                                         binary_expr(
                                                             binary_expr(
-                                                                fun_expr(
+                                                                self.fun_expr(
                                                                     "DatePart",
                                                                     vec![
                                                                         literal_string("YEAR"),
@@ -3032,7 +3033,7 @@ impl RewriteRules for OldSplitRules {
                                                                 literal_int(100),
                                                             ),
                                                             "+",
-                                                            fun_expr(
+                                                            self.fun_expr(
                                                                 "DatePart",
                                                                 vec![
                                                                     literal_string("MONTH"),
@@ -3065,7 +3066,7 @@ impl RewriteRules for OldSplitRules {
                             "datediff",
                             vec![
                                 literal_string("day"),
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![literal_string("quarter"), column_expr("?outer_column")],
                                 ),
@@ -3095,7 +3096,7 @@ impl RewriteRules for OldSplitRules {
                                 binary_expr(
                                     binary_expr(
                                         binary_expr(
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "DatePart",
                                                 vec![
                                                     literal_string("YEAR"),
@@ -3120,7 +3121,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("year"), column_expr("?column")],
                     ),
@@ -3139,7 +3140,7 @@ impl RewriteRules for OldSplitRules {
                                 binary_expr(
                                     binary_expr(
                                         binary_expr(
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "DatePart",
                                                 vec![
                                                     literal_string("YEAR"),
@@ -3187,7 +3188,7 @@ impl RewriteRules for OldSplitRules {
                                 binary_expr(
                                     binary_expr(
                                         binary_expr(
-                                            fun_expr(
+                                            self.fun_expr(
                                                 "DatePart",
                                                 vec![
                                                     literal_string("YEAR"),
@@ -3234,7 +3235,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3254,7 +3255,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("year"), column_expr("?column")],
                     ),
@@ -3271,7 +3272,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3312,7 +3313,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3354,7 +3355,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3367,12 +3368,12 @@ impl RewriteRules for OldSplitRules {
                                 "||",
                                 binary_expr(
                                     binary_expr(
-                                        fun_expr(
+                                        self.fun_expr(
                                             "Floor",
                                             vec![
                                                 binary_expr(
                                                     binary_expr(
-                                                        fun_expr(
+                                                        self.fun_expr(
                                                             "DatePart",
                                                             vec![
                                                                 literal_string("MONTH"),
@@ -3383,7 +3384,7 @@ impl RewriteRules for OldSplitRules {
                                                         literal_int(1),
                                                     ),
                                                     "/",
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "NullIf",
                                                         vec![
                                                             literal_int(3),
@@ -3407,7 +3408,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("quarter"), column_expr("?column")],
                     ),
@@ -3424,7 +3425,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3437,12 +3438,12 @@ impl RewriteRules for OldSplitRules {
                                 "||",
                                 binary_expr(
                                     binary_expr(
-                                        fun_expr(
+                                        self.fun_expr(
                                             "Floor",
                                             vec![
                                                 binary_expr(
                                                     binary_expr(
-                                                        fun_expr(
+                                                        self.fun_expr(
                                                             "DatePart",
                                                             vec![
                                                                 literal_string("MONTH"),
@@ -3453,7 +3454,7 @@ impl RewriteRules for OldSplitRules {
                                                         literal_int(1),
                                                     ),
                                                     "/",
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "NullIf",
                                                         vec![
                                                             literal_int(3),
@@ -3498,7 +3499,7 @@ impl RewriteRules for OldSplitRules {
                         binary_expr(
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("YEAR"),
@@ -3511,12 +3512,12 @@ impl RewriteRules for OldSplitRules {
                                 "||",
                                 binary_expr(
                                     binary_expr(
-                                        fun_expr(
+                                        self.fun_expr(
                                             "Floor",
                                             vec![
                                                 binary_expr(
                                                     binary_expr(
-                                                        fun_expr(
+                                                        self.fun_expr(
                                                             "DatePart",
                                                             vec![
                                                                 literal_string("MONTH"),
@@ -3527,7 +3528,7 @@ impl RewriteRules for OldSplitRules {
                                                         literal_int(1),
                                                     ),
                                                     "/",
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "NullIf",
                                                         vec![
                                                             literal_int(3),
@@ -3582,7 +3583,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![literal_string("YEAR"), column_expr("?column")],
                                                     ),
@@ -3590,7 +3591,7 @@ impl RewriteRules for OldSplitRules {
                                                     literal_string("-"),
                                                 ),
                                                 "||",
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3604,7 +3605,7 @@ impl RewriteRules for OldSplitRules {
                                     binary_expr(
                                         binary_expr(
                                             binary_expr(
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3626,7 +3627,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -3657,7 +3658,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![literal_string("YEAR"), column_expr("?column")],
                                                     ),
@@ -3665,7 +3666,7 @@ impl RewriteRules for OldSplitRules {
                                                     literal_string("-"),
                                                 ),
                                                 "||",
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3679,7 +3680,7 @@ impl RewriteRules for OldSplitRules {
                                     binary_expr(
                                         binary_expr(
                                             binary_expr(
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3709,7 +3710,7 @@ impl RewriteRules for OldSplitRules {
                             ),
                             "-",
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![literal_string("year"), column_expr("?outer_column")],
                                 ),
@@ -3747,7 +3748,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![literal_string("YEAR"), column_expr("?column")],
                                                     ),
@@ -3755,7 +3756,7 @@ impl RewriteRules for OldSplitRules {
                                                     literal_string("-"),
                                                 ),
                                                 "||",
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3774,7 +3775,7 @@ impl RewriteRules for OldSplitRules {
                                                         binary_expr(
                                                             cast_expr(
                                                                 binary_expr(
-                                                                    fun_expr(
+                                                                    self.fun_expr(
                                                                         "DatePart",
                                                                         vec![literal_string("MONTH"), column_expr("?column")],
                                                                     ),
@@ -3810,7 +3811,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("day"), column_expr("?column")],
                     ),
@@ -3841,7 +3842,7 @@ impl RewriteRules for OldSplitRules {
                                         binary_expr(
                                             binary_expr(
                                                 binary_expr(
-                                                    fun_expr(
+                                                    self.fun_expr(
                                                         "DatePart",
                                                         vec![literal_string("YEAR"), column_expr("?column")],
                                                     ),
@@ -3849,7 +3850,7 @@ impl RewriteRules for OldSplitRules {
                                                     literal_string("-"),
                                                 ),
                                                 "||",
-                                                fun_expr(
+                                                self.fun_expr(
                                                     "DatePart",
                                                     vec![literal_string("MONTH"), column_expr("?column")],
                                                 ),
@@ -3868,7 +3869,7 @@ impl RewriteRules for OldSplitRules {
                                                         binary_expr(
                                                             cast_expr(
                                                                 binary_expr(
-                                                                    fun_expr(
+                                                                    self.fun_expr(
                                                                         "DatePart",
                                                                         vec![literal_string("MONTH"), column_expr("?column")],
                                                                     ),
@@ -3912,7 +3913,7 @@ impl RewriteRules for OldSplitRules {
                             ),
                             "-",
                             cast_expr_explicit(
-                                fun_expr(
+                                self.fun_expr(
                                     "DateTrunc",
                                     vec![literal_string("quarter"), column_expr("?outer_column")],
                                 ),
@@ -3937,7 +3938,7 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
@@ -3956,7 +3957,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?min_granularity"), column_expr("?column")],
                     ),
@@ -3979,7 +3980,7 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
@@ -3998,7 +3999,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?out_granularity"),
@@ -4139,12 +4140,12 @@ impl RewriteRules for OldSplitRules {
                 inner_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "Floor",
                         vec![
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("DAY"),
@@ -4191,7 +4192,7 @@ impl RewriteRules for OldSplitRules {
                                     literal_int(6),
                                 ),
                                 "/",
-                                fun_expr(
+                                self.fun_expr(
                                     "NullIf",
                                     vec![
                                         cast_expr_explicit(
@@ -4206,7 +4207,7 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("week"), column_expr("?column")],
                     ),
@@ -4223,12 +4224,12 @@ impl RewriteRules for OldSplitRules {
                 outer_aggregate_split_replacer("?expr", "?alias_to_cube"),
                 vec![(
                     "?expr",
-                    fun_expr(
+                    self.fun_expr(
                         "Floor",
                         vec![
                             binary_expr(
                                 binary_expr(
-                                    fun_expr(
+                                    self.fun_expr(
                                         "DatePart",
                                         vec![
                                             literal_string("DAY"),
@@ -4275,7 +4276,7 @@ impl RewriteRules for OldSplitRules {
                                     literal_int(6),
                                 ),
                                 "/",
-                                fun_expr(
+                                self.fun_expr(
                                     "NullIf",
                                     vec![
                                         cast_expr_explicit(
@@ -4290,11 +4291,11 @@ impl RewriteRules for OldSplitRules {
                     ),
                 )],
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "Ceil",
                         vec![
                             binary_expr(
-                                fun_expr(
+                                self.fun_expr(
                                     "DatePart",
                                     vec![
                                         literal_string("day"),
@@ -4347,7 +4348,7 @@ impl RewriteRules for OldSplitRules {
                 |_| {
                     vec![(
                         "?expr",
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_expr("?granularity"), column_expr("?column")],
                         ),
@@ -4389,7 +4390,7 @@ impl RewriteRules for OldSplitRules {
                 "split-push-down-date-part-replacer",
                 |split_replacer| {
                     split_replacer(
-                        fun_expr(
+                        self.fun_expr(
                             "DatePart",
                             vec![literal_expr("?granularity"), "?expr".to_string()],
                         ),
@@ -4398,7 +4399,7 @@ impl RewriteRules for OldSplitRules {
                 },
                 |_| vec![("?expr", column_expr("?column"))],
                 |_| {
-                    fun_expr(
+                    self.fun_expr(
                         "DatePart",
                         vec![
                             literal_expr("?granularity"),
@@ -4426,11 +4427,14 @@ impl RewriteRules for OldSplitRules {
             self.outer_aggr_group_expr_aggr_combinator_rewrite(
                 "split-push-down-substr-replacer",
                 |split_replacer| {
-                    split_replacer(fun_expr("Substr", vec!["?expr", "?from", "?to"]), "?cube")
+                    split_replacer(
+                        self.fun_expr("Substr", vec!["?expr", "?from", "?to"]),
+                        "?cube",
+                    )
                 },
                 |_| vec![],
                 |split_replacer| {
-                    fun_expr(
+                    self.fun_expr(
                         "Substr",
                         vec![
                             split_replacer("?expr".to_string(), "?cube"),
@@ -4452,11 +4456,11 @@ impl RewriteRules for OldSplitRules {
             self.outer_aggr_group_expr_aggr_combinator_rewrite(
                 "split-push-down-char-length-replacer",
                 |split_replacer| {
-                    split_replacer(fun_expr("CharacterLength", vec!["?expr"]), "?cube")
+                    split_replacer(self.fun_expr("CharacterLength", vec!["?expr"]), "?cube")
                 },
                 |_| vec![],
                 |split_replacer| {
-                    fun_expr(
+                    self.fun_expr(
                         "CharacterLength",
                         vec![split_replacer("?expr".to_string(), "?cube")],
                     )
@@ -4475,13 +4479,13 @@ impl RewriteRules for OldSplitRules {
                 "split-push-down-left-replacer",
                 |split_replacer| {
                     split_replacer(
-                        fun_expr("Left", vec!["?expr".to_string(), literal_expr("?length")]),
+                        self.fun_expr("Left", vec!["?expr".to_string(), literal_expr("?length")]),
                         "?cube",
                     )
                 },
                 |_| vec![],
                 |split_replacer| {
-                    fun_expr(
+                    self.fun_expr(
                         "Left",
                         vec![
                             split_replacer("?expr".to_string(), "?cube"),
@@ -4503,13 +4507,13 @@ impl RewriteRules for OldSplitRules {
                 "split-push-down-right-replacer",
                 |split_replacer| {
                     split_replacer(
-                        fun_expr("Right", vec!["?expr".to_string(), literal_expr("?length")]),
+                        self.fun_expr("Right", vec!["?expr".to_string(), literal_expr("?length")]),
                         "?cube",
                     )
                 },
                 |_| vec![],
                 |split_replacer| {
-                    fun_expr(
+                    self.fun_expr(
                         "Right",
                         vec![
                             split_replacer("?expr".to_string(), "?cube"),
@@ -4562,13 +4566,13 @@ impl RewriteRules for OldSplitRules {
                 "split-push-down-nullif-replacer",
                 |split_replacer| {
                     split_replacer(
-                        fun_expr("NullIf", vec!["?expr".to_string(), literal_expr("?else")]),
+                        self.fun_expr("NullIf", vec!["?expr".to_string(), literal_expr("?else")]),
                         "?cube",
                     )
                 },
                 |_| vec![],
                 |split_replacer| {
-                    fun_expr(
+                    self.fun_expr(
                         "NullIf",
                         vec![
                             split_replacer("?expr".to_string(), "?cube"),
@@ -4625,6 +4629,10 @@ impl OldSplitRules {
             meta_context,
             config_obj,
         }
+    }
+
+    fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
+        fun_expr(fun_name, args, false)
     }
 
     /// Returns a vec with rules for outer aggregate, group expr and group aggregate split replacers.

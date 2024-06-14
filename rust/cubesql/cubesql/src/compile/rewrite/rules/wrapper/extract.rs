@@ -1,7 +1,6 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, fun_expr, fun_expr_var_arg, literal_expr,
-        rules::wrapper::WrapperRules, scalar_fun_expr_args, scalar_fun_expr_args_empty_tail,
+        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, LogicalPlanLanguage,
         WrapperPullupReplacerAliasToCube,
     },
@@ -16,9 +15,9 @@ impl WrapperRules {
     ) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-pull-up-extract",
-            fun_expr_var_arg(
+            self.fun_expr(
                 "DatePart",
-                scalar_fun_expr_args(
+                vec![
                     wrapper_pullup_replacer(
                         literal_expr("?date_part"),
                         "?alias_to_cube",
@@ -26,26 +25,17 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
-                    scalar_fun_expr_args(
-                        wrapper_pullup_replacer(
-                            "?date",
-                            "?alias_to_cube",
-                            "?ungrouped",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
-                        wrapper_pullup_replacer(
-                            scalar_fun_expr_args_empty_tail(),
-                            "?alias_to_cube",
-                            "?ungrouped",
-                            "?in_projection",
-                            "?cube_members",
-                        ),
+                    wrapper_pullup_replacer(
+                        "?date",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
                     ),
-                ),
+                ],
             ),
             wrapper_pullup_replacer(
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![literal_expr("?date_part"), "?date".to_string()],
                 ),

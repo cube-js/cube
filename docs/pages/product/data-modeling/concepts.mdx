@@ -89,8 +89,16 @@ designed to accelerate queries to cubes.
 
 Note that cubes support [extension][ref-extending-cubes],
 [polymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
-Also, cubes may not only be defined statically; you can actually build
+Also, cubes should not necessarily be defined statically; you can actually build
 [dynamic data models][ref-dynamic-data-models].
+
+<InfoBox>
+
+Cube supports data models that consist of thousands of cubes and views.
+For massive [multi-tenancy][ref-multitenancy] configurations, e.g., with more than
+1,000 tenants, consider using a [multi-cluster deployment][ref-pmc].
+
+</InfoBox>
 
 ## Views
 
@@ -707,3 +715,5 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-syntax-references]: /product/data-modeling/syntax#references
 [ref-syntax-references-column]: /product/data-modeling/syntax#column
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster

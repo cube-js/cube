@@ -43,6 +43,7 @@ pub struct CubePlanCost {
     member_errors: i64,
     // TODO if pre-aggregation can be used for window functions, then it'd be suboptimal
     non_pushed_down_window: i64,
+    non_pushed_down_grouping_sets: i64,
     ungrouped_aggregates: usize,
     wrapper_nodes: i64,
     wrapped_select_ungrouped_scan: usize,
@@ -127,6 +128,8 @@ impl CubePlanCost {
             }) + other.non_detected_cube_scans,
             filter_members: self.filter_members + other.filter_members,
             non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
+            non_pushed_down_grouping_sets: self.non_pushed_down_grouping_sets
+                + other.non_pushed_down_grouping_sets,
             member_errors: self.member_errors + other.member_errors,
             cube_members: self.cube_members + other.cube_members,
             errors: self.errors + other.errors,
@@ -165,6 +168,11 @@ impl CubePlanCost {
             filter_members: self.filter_members,
             member_errors: self.member_errors,
             non_pushed_down_window: self.non_pushed_down_window,
+            non_pushed_down_grouping_sets: match state {
+                CubePlanState::Wrapped => 0,
+                CubePlanState::Unwrapped(_) => self.non_pushed_down_grouping_sets,
+                CubePlanState::Wrapper => 0,
+            },
             cube_members: self.cube_members,
             errors: self.errors,
             structure_points: self.structure_points,
@@ -250,6 +258,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
 
         let non_pushed_down_window = match enode {
             LogicalPlanLanguage::Window(_) => 1,
+            _ => 0,
+        };
+
+        let non_pushed_down_grouping_sets = match enode {
+            LogicalPlanLanguage::GroupingSetExpr(_) => 1,
             _ => 0,
         };
 
@@ -395,6 +408,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 non_detected_cube_scans,
                 member_errors,
                 non_pushed_down_window,
+                non_pushed_down_grouping_sets,
                 cube_members,
                 errors: this_errors,
                 time_dimensions_used_as_dimensions,

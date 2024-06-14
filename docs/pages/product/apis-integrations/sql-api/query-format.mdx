@@ -1,0 +1,434 @@
+# Query format in the SQL API
+
+SQL API runs queries in the Postgres dialect that can
+reference those tables and columns.
+
+By default, the SQL API executes only [regular queries][ref-regular-queries] and
+[queries with post-processing][ref-queries-wpp]. You can also
+[configure][ref-sql-api-conf-query-plan] it to execute [queries with
+pushdown][ref-queries-wpd]. This page explains their format and details if they
+are handled differently by the SQL API.
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+## Data model mapping
+
+In the SQL API, each cube or view from the [data model][ref-data-model-concepts]
+is represented as a table. Measures, dimensions, and segments are represented as
+columns in these tables. 
+
+### Cubes and views
+
+Given that you have a cube or a view called `orders`, you can query it as if it's
+a table:
+
+```sql
+SELECT * FROM orders;
+```
+### Dimensions
+
+Given that your cube or view has a dimension called `status`, you can reference it
+as a column in the `SELECT` clause. Note that you'll also have to add it to the
+`GROUP BY` clause:
+
+```sql
+SELECT status
+FROM orders
+GROUP BY 1;
+```
+
+### Measures
+
+Given that your cube or view has a measure called `count`, you can reference it
+by wrapping with the `MEASURE` aggregate function:
+
+```sql
+SELECT MEASURE(count)
+FROM orders;
+```
+
+The SQL API allows aggregate functions on measures as long as they match measure types.
+
+#### Aggregate functions
+
+The special `MEASURE` function works with measures of any type.
+Measure columns can also be aggregated with the following aggregate functions that
+correspond to [measure types][ref-measure-types]:
+
+| Measure type in Cube | Aggregate function in an aggregated query |
+| --- | --- |
+| [`avg`](/reference/data-model/types-and-formats#avg) | `MEASURE` or `AVG` | 
+| [`boolean`](/reference/data-model/types-and-formats#boolean) | `MEASURE` |
+| [`count`](/reference/data-model/types-and-formats#count) | `MEASURE` or `COUNT` |
+| [`count_distinct`](/reference/data-model/types-and-formats#count_distinct) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx) | `MEASURE` or `COUNT(DISTINCT …)` |
+| [`max`](/reference/data-model/types-and-formats#max) | `MEASURE` or `MAX` |
+| [`min`](/reference/data-model/types-and-formats#min) | `MEASURE` or `MIN` |
+| [`number`](/reference/data-model/types-and-formats#number) | `MEASURE` or any other function from this table |
+| [`string`](/reference/data-model/types-and-formats#string) | `MEASURE` or `STRING_AGG` |
+| [`sum`](/reference/data-model/types-and-formats#sum) | `MEASURE` or `SUM` |
+| [`time`](/reference/data-model/types-and-formats#time) | `MEASURE` or `MAX` or `MIN` |
+
+<WarningBox>
+
+If an aggregate function doesn't match the measure type, the following error
+will be thrown: `Measure aggregation type doesn't match`.
+
+</WarningBox>
+
+### Segments
+
+Segments are exposed as columns of the [`boolean` type][link-postgres-boolean].
+Given that your cube or view has a segment called `is_completed`, you can reference it
+as a column in the `WHERE` clause:
+
+```sql
+SELECT *
+FROM orders
+WHERE is_completed IS TRUE;
+```
+
+### Joins
+
+Please [refer to this page](/product/apis-integrations/sql-api/joins) for details
+on joins.
+
+## Post-processing and pushdown
+
+By default, the SQL API executes only [regular queries][ref-regular-queries] and
+[queries with post-processing][ref-queries-wpp]. You can also
+[configure][ref-sql-api-conf-query-plan] it to execute [queries with
+pushdown][ref-queries-wpd].
+
+### Query post-processing
+
+The following query is performing a `SELECT` from the `orders` cube:
+
+```sql
+SELECT
+  city,
+  SUM(amount)
+FROM orders
+WHERE status = 'shipped'
+GROUP BY 1
+```
+
+For this query, the SQL API would transform `SELECT` query fragments into a [regular
+query][ref-regular-queries]. It can be represented as follows in the REST API query
+format:
+
+```json
+{
+  "dimensions": [
+    "orders.city"
+  ],
+  "measures": [
+    "orders.amount"
+  ],
+  "filters": [
+    {
+      "member": "orders.status",
+      "operator": "equals",
+      "values": [
+        "shipped"
+      ]
+    }
+  ]
+}
+```
+
+Because of this transformation, not all functions and expressions are supported
+in query fragments performing `SELECT` from cube tables. Please refer to the
+[reference](/reference/sql-api) to see whether a specific expression or function
+is supported.
+
+For example, the following query won't work because the SQL API can't push down the
+`CASE` expression to Cube for processing. It is not possible to translate `CASE`
+expressions in measures.
+
+```sql
+SELECT
+  city,
+  MAX(CASE
+    WHEN status = 'shipped'
+    THEN '2-done'
+    ELSE '1-in-progress'
+  END) AS real_status,
+  SUM(number)
+FROM orders
+CROSS JOIN users
+GROUP BY 1;
+```
+
+You can leverage nested queries in cases like this. You can wrap your `SELECT`
+statement from a cube table into another `SELECT` statement to perform
+calculations with expressions like `CASE`. This outer select is **not** part of
+the SQL query that being rewritten and thus allows you to use more SQL
+functions, operators and expressions. You can rewrite the above query as
+follows, making sure to wrap the original `SELECT` statement:
+
+```sql
+SELECT
+  city,
+  MAX(CASE
+    WHEN status = 'shipped' THEN '2-done'
+    ELSE '1-in-progress'
+  END) real_status,
+  SUM(amount) AS total
+FROM (
+  SELECT
+    users.city AS city,
+    SUM(number) AS amount,
+    orders.status
+  FROM orders
+  CROSS JOIN users
+  GROUP BY 1, 3
+) AS inner
+GROUP BY 1, 2
+ORDER BY 1;
+--- You can also use CTEs to achieve the same result
+```
+
+The above query works because the `CASE` expression is supported in `SELECT`
+queries **not** querying cube tables.
+
+### Query pushdown
+
+<WarningBox heading={`🐣  Preview`}>
+
+  Query pushdown is currently in public preview, and the API and behavior may
+  change in future versions.
+  
+  Query pushdown is disabled by default and is controlled by
+  `CUBESQL_SQL_PUSH_DOWN` environment variable.
+  In future versions, `CUBESQL_SQL_PUSH_DOWN` will be enabled by default.
+
+</WarningBox>
+
+Query pushdown provides a safe net for queries that can't be rewritten
+into combination of a [regular query][ref-regular-queries] and post-processing.
+Such queries' SQL would be transpiled to target database query leveraging
+all target database capabilities for data processing.
+
+During the rewrite process, Cube validates that the target database would support transpired SQL queries.
+If direct conversion is not possible, different SQL transformation rewrite rules can be applied to achieve successful translation.
+Please refer to [SQL API reference](/reference/sql-api) for the list of supported SQL functions and clauses.
+Support varies based on the target database.
+
+## Top-down and bottom-up evaluation
+
+Fundamentally, every SQL operation results in a tabular data set.
+This is usually referred to as SQL operational closure or bottom-up SQL evaluation.
+However, for OLAP queries, most of the time, top-down evaluation is required.
+Top-down evaluation is whenever the outermost sub-query operation decides on how measures would be actually evaluated as opposed to
+innermost sub-query in case of standard SQL behavior.
+
+To balance between SQL guarantees and OLAP requirements, Cube
+- uses top-down evaluation from the innermost aggregation operation down to all ungrouped sub-queries,
+- uses bottom-up evaluation from the innermost aggregation tabular result set up to the outermost sub-query.
+
+<WarningBox>
+
+  This behavior is enabled whenever query pushdown is enabled.
+  In future versions it'd become default behavior.
+
+</WarningBox>
+
+To drill-down on how this works, let's consider following example date model
+
+```yaml
+cubes:
+  - name: orders
+    sql_table: ECOM.ORDERS
+
+    dimensions:
+      - name: id
+        sql: ID
+        type: number
+        primary_key: true
+
+      - name: status
+        sql: STATUS
+        type: string
+        description: The status of the order (completed etc)
+
+      - name: created_at
+        sql: "{CUBE}.CREATED_AT"
+        type: time
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.STATUS = 'completed'"
+
+      - name: completed_percentage
+        type: number
+        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        format: percent
+```
+
+And the query to the SQL API:
+
+```sql
+SELECT id, status, created_at, completed_percentage FROM orders
+```
+
+Such a query is considered an ungrouped query and would result in the following result set:
+
+| id       | status    | created_at |  completed_percentage |
+| -------- | --------- | ---------- | --------------------- |
+| 1        | shipped   | 2024-01-01 | 0.0                   |
+| 2        | completed | 2024-01-01 | 100.0                 |
+| 3        | completed | 2024-01-02 | 100.0                 |
+
+On the other hand, a typical query that various BI tools generate:
+
+```sql
+SELECT date_trunc('day', created_at), MEASURE(completed_percentage)
+FROM (
+  SELECT id, status, created_at, completed_percentage FROM orders
+) inner_query
+GROUP BY 1
+```
+
+...would still yield correct results
+
+| date_trunc('day', created_at) |  completed_percentage |
+| ----------------------------- | --------------------- |
+| 2024-01-01                    | 50.0                  |
+| 2024-01-02                    | 100.0                 |
+
+For this particular query, `inner_query` won't be evaluated as a table.
+Instead, Cube would postpone its execution until wrapping `GROUP BY` and would use only `date_trunc('day', created_at)` as a dimension to evaluate `completed_percentage` measure instead of full set of `inner_query` columns `id`,`status` and `created_at`.
+To make it possible, Cube keeps track of ungrouped queries and evaluates them only on the first occurrence of a `GROUP BY` query in case there's one.
+
+## Aggregated and non-aggregated queries
+
+SQL API supports two types of queries against *cube tables*: aggregated
+(those with `GROUP BY` statement) and non-aggregated (those without).
+
+<InfoBox>
+
+Without query pushdown, queries that Cube runs against your database will always be aggregated,
+regardless of whether you use aggregated (with `GROUP BY`) or non-aggregated
+queries with the SQL API.
+Whenever you enable query pushdown, queries which do not contain `GROUP BY` clause will be executed as ungrouped queries.
+
+</InfoBox>
+
+A non-aggregated query would only include bare column names in SQL:
+
+```sql
+SELECT
+  status,  -- dimension
+  count    -- measure
+FROM orders
+```
+
+With query pushdown disabled, Cube will still use `GROUP BY` to execute such a query.
+
+<WarningBox>
+
+In future versions automatic use of `GROUP BY` for every query would be deprecated and disabled by default.
+
+</WarningBox>
+
+Whenever query pushdown is enabled, such query would run as ungrouped query.
+As with REST API such queries do not use `GROUP BY` and render measures as if those would be grouped by primary key of a cube.
+
+<WarningBox>
+
+If query pushdown is enabled, calculated `number`, `string` or `time` measures queried by SQL API can't use aggregation function definitions with it's `sql` paremeter.
+Such measures can still reference other aggregate type measures though.
+
+</WarningBox>
+
+Aggregated query must aggregate all measure columns and group by
+all dimension columns. You can use the special `MEASURE` aggregate function
+for measures of [any type][ref-measure-types]. This is quite convenient, especially
+in case you're manually writing ad-hoc queries:
+
+```sql
+SELECT
+  status,         -- dimension
+  MEASURE(count)  -- measure
+FROM orders
+GROUP BY 1
+```
+
+<WarningBox>
+
+If any measure columns are not aggregated or any dimension columns aren't included
+in `GROUP BY`, the following error will be thrown: `Projection references
+non-aggregate values`. This is a standard SQL consistency check for the `GROUP BY`
+operation, and it's enforced by the SQL API as well. 
+
+</WarningBox>
+
+## Filtering
+
+Without query pushdown, Cube supports most simple equality operators like
+`=`, `<>`, `<`, `<=`, `>`, `>=` as well as `IN` and `LIKE` operators.
+Cube tries to push down all filters into a [regular query][ref-regular-queries].
+In some cases, filtering can only be done during [post-processing][ref-queries-wpp].
+Time dimension filters will be converted to time dimension date ranges whenever
+it's possible.
+
+## Ordering
+
+Without query pushdown, Cube tries to push down all `ORDER BY` statements into
+a [regular query][ref-regular-queries].
+
+### Row limit edge case
+
+If the `ORDER BY` statement can't be pushed down, ordering would be performed during
+[post-processing][ref-queries-wpp]. If there are more than [50,000 rows][ref-query-default-limit]
+in the result set, this can yield incorrect results.
+
+However, given that queries to Cube are usually aggregated, this is a very rare case;
+anyway, please keep this limitation in mind when designing your queries.
+
+Consider the following query. Because of the `SUM(total_value) + 2` expression
+in the projection of the outer query, thr SQL API can't push down `ORDER BY`:
+
+```sql
+SELECT
+  status,
+  SUM(total_value) + 2 AS transformed_amount
+FROM (
+  SELECT * FROM orders
+) AS orders
+GROUP BY status
+ORDER BY status DESC
+LIMIT 100;
+```
+
+You can use `EXPLAIN` against the above query to look at the query plan.
+As you can see, the sorting operation is done after the regular query and the projection:
+
+```bash
++ GlobalLimitExec: skip=None, fetch=100
++- SortExec: [transformed_amount@1 DESC]
++-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
++--- CubeScanExecutionPlan
+```
+
+
+[ref-sql-api-conf-query-plan]: /product/apis-integrations/sql-api#query-planning
+[ref-regular-queries]: /product/apis-integrations/queries#regular-query
+[ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
+[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
+[ref-data-model-concepts]: /product/data-modeling/concepts
+[ref-measure-types]: /reference/data-model/types-and-formats#measure-types
+[ref-query-default-limit]: /product/apis-integrations/queries#row-limit
+[link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html

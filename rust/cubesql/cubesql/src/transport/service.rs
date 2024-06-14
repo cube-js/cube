@@ -25,7 +25,10 @@ use uuid::Uuid;
 
 use crate::{
     compile::{
-        engine::df::{scan::MemberField, wrapper::SqlQuery},
+        engine::df::{
+            scan::MemberField,
+            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
+        },
         MetaContext,
     },
     sql::{AuthContextRef, HttpAuthContext},
@@ -386,6 +389,7 @@ impl SqlTemplates {
         from: String,
         projection: Vec<AliasedColumn>,
         group_by: Vec<AliasedColumn>,
+        group_descs: Vec<Option<GroupingSetDesc>>,
         aggregate: Vec<AliasedColumn>,
         alias: String,
         filter: Option<String>,
@@ -406,12 +410,21 @@ impl SqlTemplates {
             .map(|c| c.clone())
             .collect::<Vec<_>>();
         let quoted_from_alias = self.quote_identifier(&alias)?;
+        let has_grouping_sets = group_descs.iter().any(|d| d.is_some());
+        let group_by_expr = if has_grouping_sets {
+            self.group_by_with_grouping_sets(&group_by, &group_descs)?
+        } else {
+            self.render_template(
+                "statements/group_by_exprs",
+                context! { group_by => group_by },
+            )?
+        };
         self.render_template(
             "statements/select",
             context! {
                 from => from,
                 select_concat => select_concat,
-                group_by => group_by,
+                group_by => group_by_expr,
                 aggregate => aggregate,
                 projection => projection,
                 order_by => order_by,
@@ -422,6 +435,43 @@ impl SqlTemplates {
                 distinct => distinct,
             },
         )
+    }
+
+    fn group_by_with_grouping_sets(
+        &self,
+        group_by: &Vec<TemplateColumn>,
+        group_descs: &Vec<Option<GroupingSetDesc>>,
+    ) -> Result<String, CubeError> {
+        let mut parts = Vec::new();
+        let mut curr_set = Vec::new();
+        let mut curr_set_desc = None;
+        for (col, desc) in group_by.iter().zip(group_descs.iter()) {
+            if desc != &curr_set_desc {
+                if let Some(curr_desc) = &curr_set_desc {
+                    let part_expr = match curr_desc.group_type {
+                        GroupingSetType::Rollup => self.rollup_expr(curr_set)?,
+                        GroupingSetType::Cube => self.cube_expr(curr_set)?,
+                    };
+                    parts.push(part_expr);
+                }
+                curr_set_desc = desc.clone();
+                curr_set = Vec::new();
+            }
+            if desc.is_some() {
+                curr_set.push(col.index.to_string());
+            } else {
+                parts.push(col.index.to_string())
+            }
+        }
+        if let Some(curr_desc) = &curr_set_desc {
+            let part_expr = match curr_desc.group_type {
+                GroupingSetType::Rollup => self.rollup_expr(curr_set)?,
+                GroupingSetType::Cube => self.cube_expr(curr_set)?,
+            };
+            parts.push(part_expr);
+        }
+
+        Ok(parts.join(", "))
     }
 
     fn to_template_columns(
@@ -694,6 +744,26 @@ impl SqlTemplates {
                 in_exprs_concat => in_exprs_concat,
                 in_exprs => in_exprs,
                 negated => negated
+            },
+        )
+    }
+
+    pub fn rollup_expr(&self, exprs: Vec<String>) -> Result<String, CubeError> {
+        let exprs_concat = exprs.join(", ");
+        self.render_template(
+            "expressions/rollup",
+            context! {
+                exprs_concat => exprs_concat,
+            },
+        )
+    }
+
+    pub fn cube_expr(&self, exprs: Vec<String>) -> Result<String, CubeError> {
+        let exprs_concat = exprs.join(", ");
+        self.render_template(
+            "expressions/cube",
+            context! {
+                exprs_concat => exprs_concat,
             },
         )
     }

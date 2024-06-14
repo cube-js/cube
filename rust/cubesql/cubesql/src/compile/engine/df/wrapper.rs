@@ -1,7 +1,7 @@
 use crate::{
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
-        rewrite::WrappedSelectType,
+        rewrite::{extract_exprlist_from_groupping_set, WrappedSelectType},
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -16,8 +16,8 @@ use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
-        UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet,
+        LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -26,7 +26,7 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
 use std::{
-    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, pin::Pin, result,
+    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, iter, pin::Pin, result,
     sync::Arc,
 };
 
@@ -42,6 +42,64 @@ struct UngrouppedMemberDef {
     alias: String,
     cube_params: Vec<String>,
     expr: String,
+    grouping_set: Option<GroupingSetDesc>,
+}
+
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub enum GroupingSetType {
+    Rollup,
+    Cube,
+}
+
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub struct GroupingSetDesc {
+    pub group_type: GroupingSetType,
+    pub id: u64,
+    pub sub_id: Option<u64>,
+}
+
+impl GroupingSetDesc {
+    pub fn new(group_type: GroupingSetType, id: u64) -> Self {
+        Self {
+            group_type,
+            id,
+            sub_id: None,
+        }
+    }
+}
+
+fn extract_group_type_from_groupping_set(
+    exprs: &Vec<Expr>,
+) -> Result<Vec<Option<GroupingSetDesc>>> {
+    let mut result = Vec::new();
+    let mut id = 0;
+    for expr in exprs {
+        match expr {
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(exprs) => {
+                    result.extend(
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
+                }
+                GroupingSet::Cube(exprs) => {
+                    result.extend(
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Cube, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
+                }
+                GroupingSet::GroupingSets(_) => {
+                    return Err(DataFusionError::Internal(format!(
+                        "SQL generation for GroupingSet is not supported"
+                    )))
+                }
+            },
+            _ => result.push(None),
+        }
+    }
+    Ok(result)
 }
 
 impl SqlQuery {
@@ -569,10 +627,11 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
+                            let flat_group_expr = extract_exprlist_from_groupping_set(&group_expr);
                             let (group_by, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                group_expr.clone(),
+                                flat_group_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
@@ -583,6 +642,7 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
+                            let group_descs = extract_group_type_from_groupping_set(&group_expr)?;
                             let (aggregate, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
@@ -673,10 +733,12 @@ impl CubeScanWrapperNode {
                                 load_request.dimensions = Some(
                                     group_by
                                         .iter()
-                                        .map(|m| {
-                                            Self::ungrouped_member_def(
+                                        .zip(group_descs.iter())
+                                        .map(|(m, t)| {
+                                            Self::dimension_member_def(
                                                 m,
                                                 &ungrouped_scan_node.used_cubes,
+                                                t,
                                             )
                                         })
                                         .collect::<Result<_>>()?,
@@ -718,7 +780,7 @@ impl CubeScanWrapperNode {
                                                                     projection[i].clone()
                                                                 })
                                                         }).or_else(|| {
-                                                            group_expr
+                                                            flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
                                                                     expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
@@ -730,7 +792,7 @@ impl CubeScanWrapperNode {
                                                                 col_name,
                                                                 projection_expr,
                                                                 aggr_expr,
-                                                                group_expr
+                                                                flat_group_expr
                                                             ))
                                                         })?;
                                                     Ok(vec![
@@ -792,6 +854,7 @@ impl CubeScanWrapperNode {
                                         sql.sql.to_string(),
                                         projection,
                                         group_by,
+                                        group_descs,
                                         aggregate,
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
@@ -989,7 +1052,10 @@ impl CubeScanWrapperNode {
         Ok((aliased_columns, sql))
     }
 
-    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
+    fn make_member_def(
+        column: &AliasedColumn,
+        used_cubes: &Vec<String>,
+    ) -> Result<UngrouppedMemberDef> {
         let res = UngrouppedMemberDef {
             cube_name: used_cubes
                 .iter()
@@ -1004,7 +1070,23 @@ impl CubeScanWrapperNode {
             alias: column.alias.clone(),
             cube_params: used_cubes.clone(),
             expr: column.expr.clone(),
+            grouping_set: None,
         };
+        Ok(res)
+    }
+
+    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
+        let res = Self::make_member_def(column, used_cubes)?;
+        Ok(serde_json::json!(res).to_string())
+    }
+
+    fn dimension_member_def(
+        column: &AliasedColumn,
+        used_cubes: &Vec<String>,
+        grouping_type: &Option<GroupingSetDesc>,
+    ) -> Result<String> {
+        let mut res = Self::make_member_def(column, used_cubes)?;
+        res.grouping_set = grouping_type.clone();
         Ok(serde_json::json!(res).to_string())
     }
 
@@ -1770,6 +1852,70 @@ impl CubeScanWrapperNode {
                         sql_query,
                     ))
                 }
+                Expr::GroupingSet(grouping_set) => match grouping_set {
+                    datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .rollup_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::Cube(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .cube_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::GroupingSets(_) => {
+                        Err(DataFusionError::Internal(format!(
+                            "SQL generation for GroupingSet is not supported"
+                        )))
+                    }
+                },
+
                 Expr::WindowFunction {
                     fun,
                     args,

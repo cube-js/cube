@@ -3,6 +3,33 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
+
+**Note:** Version bump only for package @cubejs-backend/sqlite-driver
+
+
+
+
+
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/sqlite-driver
+
+
+
+
+
+## [0.35.38](https://github.com/cube-js/cube/compare/v0.35.37...v0.35.38) (2024-05-22)
+
+
+### Bug Fixes
+
+* **bigquery-driver:** Transform numeric value (big.js) to string ([#8290](https://github.com/cube-js/cube/issues/8290)) ([65c3f55](https://github.com/cube-js/cube/commit/65c3f5541fa4f1ced5813ae642d53c4d9bb80af5))
+
+
+
+
+
 ## [0.35.33](https://github.com/cube-js/cube/compare/v0.35.32...v0.35.33) (2024-05-15)
 
 **Note:** Version bump only for package @cubejs-backend/sqlite-driver

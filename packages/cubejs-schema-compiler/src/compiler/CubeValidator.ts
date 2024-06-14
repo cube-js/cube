@@ -280,7 +280,7 @@ const OriginalSqlSchema = condition(
 const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
 
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
-const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments'];
+const NonReferencesFields = ['timeDimension', 'timeDimensions', 'rollups', 'measures', 'dimensions', 'segments'];
 
 function hasAnyField(fields, s) {
   return !fields.every((f) => !defined(s[f]));
@@ -373,7 +373,7 @@ const RollupLambdaSchema = condition(
 );
 
 const RollUpSchema = condition(
-  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
+  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensions) || defined(s.timeDimensionReference),
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
@@ -385,16 +385,31 @@ const RollUpSchema = condition(
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
     }),
-    // Rollup without References postfix
-    inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      timeDimension: Joi.func().required(),
-      allowNonStrictDateRangeMatch: Joi.bool(),
-      granularity: GranularitySchema,
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-    })
+    condition(
+      (s) => defined(s.timeDimension),
+      // Rollup without References postfix
+      inherit(BasePreAggregation, {
+        type: Joi.any().valid('rollup').required(),
+        timeDimension: Joi.func().required(),
+        allowNonStrictDateRangeMatch: Joi.bool(),
+        granularity: GranularitySchema,
+        measures: Joi.func(),
+        dimensions: Joi.func(),
+        segments: Joi.func(),
+      }),
+      // Rollup with multiple time dimensions
+      inherit(BasePreAggregation, {
+        type: Joi.any().valid('rollup').required(),
+        timeDimensions: Joi.array().items(Joi.object().keys({
+          dimension: Joi.func(),
+          granularity: GranularitySchema,
+        })),
+        allowNonStrictDateRangeMatch: Joi.bool(),
+        measures: Joi.func(),
+        dimensions: Joi.func(),
+        segments: Joi.func(),
+      })
+    )
   ),
   Joi.alternatives().try(
     inherit(BasePreAggregation, {

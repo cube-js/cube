@@ -353,10 +353,14 @@ FROM (
   {{ from | indent(2) }}
 ) AS {{ from_alias }} {% endif %} {% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
-GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}{% if order_by %}
+GROUP BY {{ group_by }}{% endif %}{% if order_by %}
 ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
 LIMIT {{ limit }}{% endif %}{% if offset %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
+                    ),
+                    (
+                        "statements/group_by_exprs".to_string(),
+                        "{{ group_by | map(attribute='index') | join(', ') }}".to_string(),
                     ),
                     (
                         "expressions/column_aliased".to_string(),
@@ -373,6 +377,8 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/in_list".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})".to_string()),
                     ("expressions/subquery".to_string(), "({{ expr }})".to_string()),
                     ("expressions/in_subquery".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}".to_string()),
+                    ("expressions/rollup".to_string(), "ROLLUP({{ exprs_concat }})".to_string()),
+                    ("expressions/cube".to_string(), "CUBE({{ exprs_concat }})".to_string()),
                     ("expressions/negative".to_string(), "-({{ expr }})".to_string()),
                     ("expressions/not".to_string(), "NOT ({{ expr }})".to_string()),
                     ("expressions/true".to_string(), "TRUE".to_string()),
