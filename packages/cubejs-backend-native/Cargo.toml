@@ -9,6 +9,9 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 exclude = ["index.node"]
 
+[profile.dev]
+opt-level = 1
+
 [lib]
 crate-type = ["cdylib", "lib"]
 
