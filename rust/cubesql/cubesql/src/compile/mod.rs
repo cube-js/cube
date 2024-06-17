@@ -1177,6 +1177,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
         ctx.register_udf(create_isnull_udf());
         ctx.register_udf(create_if_udf());
         ctx.register_udf(create_least_udf());
+        ctx.register_udf(create_greatest_udf());
         ctx.register_udf(create_convert_tz_udf());
         ctx.register_udf(create_timediff_udf());
         ctx.register_udf(create_time_format_udf());
@@ -6059,6 +6060,227 @@ limit
     }
 
     #[tokio::test]
+    async fn test_date_minus_date_postgres() {
+        async fn check_date_minus_date(left: &str, right: &str, expected: &str) {
+            let column_name = "result";
+            assert_eq!(
+                execute_query(
+                    format!(
+                        r#"SELECT (CAST('{left}' AS TIMESTAMP) -
+                     CAST('{right}' AS TIMESTAMP)) AS "{column_name}""#
+                    ),
+                    DatabaseProtocol::PostgreSQL
+                )
+                .await
+                .unwrap(),
+                format!(
+                    "+-{empty:-<width$}-+\
+                    \n| {column_name:width$} |\
+                    \n+-{empty:-<width$}-+\
+                    \n| {expected:width$} |\
+                    \n+-{empty:-<width$}-+",
+                    empty = "",
+                    width = expected.len().max(column_name.len())
+                )
+            );
+        }
+
+        // TODO: Postgres output: "28 days 00:34:56.123457" here and below.
+        check_date_minus_date(
+            "2021-03-02 12:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 28 days 0 hours 34 mins 56.123457 secs",
+        )
+        .await;
+
+        // TODO: The formatting of this fractional seconds value is incorrect (with its negative sign).
+        // Postgres output: "-28 days -00:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2021-03-02 12:34:56.123456789",
+            "0 years 0 mons -28 days 0 hours -34 mins -56.123457 secs",
+        )
+        .await;
+
+        // Postgres output: "89 days 01:34:56.123457"
+        check_date_minus_date(
+            "2021-05-02 13:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 89 days 1 hours 34 mins 56.123457 secs",
+        )
+        .await;
+
+        // Postgres output: "-89 days -01:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2021-05-02 13:34:56.123456789",
+            "0 years 0 mons -89 days -1 hours -34 mins -56.123457 secs",
+        )
+        .await;
+
+        // Postgres output: "819 days 01:34:56.123457"
+        check_date_minus_date(
+            "2023-05-02 13:34:56.123456789",
+            "2021-02-02 12:00:00.000",
+            "0 years 0 mons 819 days 1 hours 34 mins 56.123457 secs",
+        )
+        .await;
+
+        // Postgres output: "-819 days -01:34:56.123457"
+        check_date_minus_date(
+            "2021-02-02 12:00:00.000",
+            "2023-05-02 13:34:56.123456789",
+            "0 years 0 mons -819 days -1 hours -34 mins -56.123457 secs",
+        )
+        .await;
+
+        // Check the result being zero, of course.
+        // Postgres output: "00:00:00"
+        check_date_minus_date(
+            "2021-02-02 12:34:56",
+            "2021-02-02 12:34:56.000",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+        check_date_minus_date(
+            "2021-02-02 12:34:56.789112358",
+            "2021-02-02 12:34:56.789112358",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Postgres treats 60 seconds the same here.
+        check_date_minus_date(
+            "2001-02-04 00:00:00.000",
+            "2001-02-03 23:59:60.000",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Perhaps out of scope for this test, document pluralizaton of interval rendering.
+        // Postgres output: "1 day 01:01:01"
+        // Note the lack of pluralization.
+        check_date_minus_date(
+            "2000-02-29 01:01:01.000",
+            "2000-02-28 00:00:00.000",
+            "0 years 0 mons 1 days 1 hours 1 mins 1.00 secs",
+        )
+        .await;
+
+        // Postgres output: "-1 days -01:01:01"
+        check_date_minus_date(
+            "2000-02-28 00:00:00.000",
+            "2000-02-29 01:01:01.000",
+            "0 years 0 mons -1 days -1 hours -1 mins -1.00 secs",
+        )
+        .await;
+
+        // Postgres output: 00:00:00.001
+        check_date_minus_date(
+            "2000-02-29 00:00:00.000",
+            "2000-02-28 23:59:59.999",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.001000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000",
+            "2000-02-25 13:59:59.999",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.001000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000",
+            "2000-02-25 13:59:59.900",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000123956",
+            "2000-02-25 13:59:59.900123456",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 14:00:00.000124956",
+            "2000-02-25 13:59:59.900123456",
+            "0 years 0 mons 0 days 0 hours 0 mins 0.100002 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 13:59:59.900123456",
+            "2000-02-25 14:00:00.000123956",
+            "0 years 0 mons 0 days 0 hours 0 mins -0.100000 secs",
+        )
+        .await;
+
+        check_date_minus_date(
+            "2000-02-25 13:59:59.900123456",
+            "2000-02-25 14:00:00.000124956",
+            "0 years 0 mons 0 days 0 hours 0 mins -0.100002 secs",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_extract_epoch_from_interval() {
+        // Note that we haven't implemented any other extract fields on intervals, aside from epoch.
+        async fn check_extract_epoch(timestamp: &str, expected: &str) {
+            let column_name = "result";
+            assert_eq!(
+                execute_query(
+                    format!(r#"SELECT EXTRACT(EPOCH FROM CAST('{timestamp}' AS INTERVAL)) AS "{column_name}""#),
+                    DatabaseProtocol::PostgreSQL
+                ).await.unwrap(),
+                format!("+-{empty:-<width$}-+\
+                    \n| {column_name:width$} |\
+                    \n+-{empty:-<width$}-+\
+                    \n| {expected:width$} |\
+                    \n+-{empty:-<width$}-+",
+                    empty = "",
+                    width = expected.len().max(column_name.len())
+                )
+            );
+        }
+
+        // Postgres is rendered: "5.000000"
+        check_extract_epoch("5 seconds", "5").await;
+        check_extract_epoch("0 seconds", "0").await;
+        check_extract_epoch("1 day", "86400").await;
+        check_extract_epoch("1 day 25 seconds", "86425").await;
+        for i in 0..11 {
+            check_extract_epoch(&format!("{} month", i), &(86400 * 30 * i).to_string()).await;
+            check_extract_epoch(
+                &format!("{} month 1 day", i),
+                &(86400 * (30 * i + 1)).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} month 32 day", i),
+                &(86400 * (30 * i + 32)).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} months", i + 12),
+                &(86400 * (365 + 30 * i) + 86400 / 4).to_string(),
+            )
+            .await;
+            check_extract_epoch(
+                &format!("{} months 32 days", i + 12),
+                &(86400 * (365 + 30 * i + 32) + 86400 / 4).to_string(),
+            )
+            .await;
+        }
+
+        // TODO: Postgres surely does 5.123457.
+        check_extract_epoch("5.123456789 seconds", "5.123456789").await;
+    }
+
+    #[tokio::test]
     async fn test_date_add_sub_postgres() {
         async fn check_fun(op: &str, t: &str, i: &str, expected: &str) {
             assert_eq!(
@@ -7277,24 +7499,133 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_least() -> Result<(), CubeError> {
+    async fn test_least_single_row() -> Result<(), CubeError> {
         assert_eq!(
             execute_query(
                 "select \
+                least(100) as r0, \
                 least(1, 2) as r1, \
                 least(2, 1) as r2, \
-                least(null, 1) as r3, \
-                least(1, null) as r4
+                least(1.5, 2) as r3, \
+                least(2, 1.5) as r4, \
+                least(2.5, 2) as r5, \
+                least(2, 2.5) as r6, \
+                least(null, 1.5) as r7, \
+                least(-1.23, 3.44, 50) as r8, \
+                least(-1.23, 3.44, 4, 10, null, -5) as r9, \
+                least(null, null, null) as r10
             "
                 .to_string(),
-                DatabaseProtocol::MySQL
+                DatabaseProtocol::PostgreSQL
             )
             .await?,
-            "+----+----+------+------+\n\
-            | r1 | r2 | r3   | r4   |\n\
-            +----+----+------+------+\n\
-            | 1  | 1  | NULL | NULL |\n\
-            +----+----+------+------+"
+            "+-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
+            | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10  |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
+            | 100 | 1  | 1  | 1.5 | 1.5 | 2  | 2  | 1.5 | -1.23 | -5 | NULL |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_least_table() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                least(t.a, t.b, t.c) as r1 FROM ( \
+                    SELECT 1 as a, 2 as b, 3 as c \
+                        UNION ALL \
+                    SELECT 2, 1.5, null \
+                        UNION ALL \
+                    SELECT 0.72, -3.14, 25.5 \
+                        UNION ALL \
+                    SELECT 3.14159, -5.72, -25 \
+                        UNION ALL \
+                    SELECT null as a, null as b, null as c \
+                ) as t
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-------+\n\
+            | r1    |\n\
+            +-------+\n\
+            | 1     |\n\
+            | 1.5   |\n\
+            | -3.14 |\n\
+            | -25   |\n\
+            | NULL  |\n\
+            +-------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_greatest_single_row() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                greatest(100) as r0, \
+                greatest(1, 2) as r1, \
+                greatest(2, 3) as r2, \
+                greatest(1, 2.5) as r3, \
+                greatest(3.2, 1) as r4, \
+                greatest(2.5, 4) as r5, \
+                greatest(5, 2.5) as r6, \
+                greatest(null, 1.5) as r7, \
+                greatest(-1.23, -3.44) as r8, \
+                greatest(1, 2.0, null, 25) as r9, \
+                greatest(null, 1.5, null, 2.7, null, 3.1, null, -5, null, 10) as r10, \
+                greatest(null, null, null) as r11
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
+            | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10 | r11  |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
+            | 100 | 2  | 3  | 2.5 | 3.2 | 4  | 5  | 1.5 | -1.23 | 25 | 10  | NULL |\n\
+            +-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_greatest_table() -> Result<(), CubeError> {
+        assert_eq!(
+            execute_query(
+                "select \
+                greatest(t.a, t.b, t.c) as r1 FROM ( \
+                    SELECT 1 as a, 2 as b, 3 as c \
+                        UNION ALL \
+                    SELECT 1, 2.0, null \
+                        UNION ALL \
+                    SELECT -3.14, .72, 25.5 \
+                        UNION ALL \
+                    SELECT -3.14, -5.72, -25 \
+                        UNION ALL \
+                    SELECT null as a, null as b, null as c \
+                ) as t
+            "
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?,
+            "+-------+\n\
+            | r1    |\n\
+            +-------+\n\
+            | 3     |\n\
+            | 2     |\n\
+            | 25.5  |\n\
+            | -3.14 |\n\
+            | NULL  |\n\
+            +-------+"
         );
 
         Ok(())
@@ -20035,6 +20366,31 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql;
         assert!(sql.contains("ROLLUP(1, 2)"));
+
+        let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_group_by_rollup_nested_from_asterisk() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            "SELECT customer_gender, notes, avg(avgPrice) from (SELECT * FROM KibanaSampleDataEcommerce) b GROUP BY ROLLUP(1, 2) ORDER BY 1"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("Rollup"));
 
         let _physical_plan = query_plan.as_physical_plan().await.unwrap();
     }

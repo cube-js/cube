@@ -635,7 +635,6 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "arrow",
  "chrono",
@@ -744,7 +743,6 @@ dependencies = [
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -777,7 +775,6 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -788,7 +785,6 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "async-trait",
  "chrono",
@@ -801,7 +797,6 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -812,7 +807,6 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3#1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3"
 dependencies = [
  "ahash 0.7.7",
  "arrow",
@@ -859,7 +853,7 @@ checksum = "4bb454f0228b18c7f4c3b0ebbee346ed9c52e7443b0999cd543ff3571205701d"
 [[package]]
 name = "egg"
 version = "0.9.5"
-source = "git+https://github.com/cube-js/egg.git?rev=58c2586473360f0821e91ef196b55070ac1afedc#58c2586473360f0821e91ef196b55070ac1afedc"
+source = "git+https://github.com/cube-js/egg.git?rev=952f8c2a1033e5da097d23c523b0d8e392eb532b#952f8c2a1033e5da097d23c523b0d8e392eb532b"
 dependencies = [
  "env_logger",
  "fxhash",

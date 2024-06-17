@@ -10,7 +10,7 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "1cc8eea44c5bb9359df97d1b24ad3aeabadbe1a3", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "e61a28ad884aa7674150a410576437dd313808f6", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
@@ -48,7 +48,7 @@ nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = { rev = "58c2586473360f0821e91ef196b55070ac1afedc", git = "https://github.com/cube-js/egg.git" }
+egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git" }
 paste = "1.0.6"
 csv = "1.1.6"
 tracing = { version = "0.1.40", features = ["async-await"] }

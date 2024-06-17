@@ -560,6 +560,7 @@ pub fn batch_to_dataframe(
                             let milliseconds_part: i32 = (value & 0xFFFFFFFF) as i32;
 
                             let secs = milliseconds_part / 1000;
+                            let milliseconds_remainder = milliseconds_part % 1000;
                             let mins = secs / 60;
                             let hours = mins / 60;
 
@@ -572,7 +573,7 @@ pub fn batch_to_dataframe(
                                 hours,
                                 mins,
                                 secs,
-                                milliseconds_part % 1000,
+                                milliseconds_remainder * 1000,
                             )));
                         }
                     }
@@ -612,12 +613,29 @@ pub fn batch_to_dataframe(
                             let days: i32 = ((value & 0xFFFFFFFF0000000000000000) >> 64) as i32;
                             let nanoseconds_part: i64 = (value & 0xFFFFFFFFFFFFFFFF) as i64;
 
-                            let secs = nanoseconds_part / 1000000000;
+                            let secs = nanoseconds_part / 1_000_000_000;
+                            let secs_nano_fraction = (nanoseconds_part % 1_000_000_000) as i32;
+
                             let mins = secs / 60;
                             let hours = mins / 60;
 
                             let secs = secs - (mins * 60);
                             let mins = mins - (hours * 60);
+
+                            let whole_usecs = secs_nano_fraction / 1000;
+                            let nanos_remainder = secs_nano_fraction % 1000;
+
+                            // Postgres supposedly believes in rounding to even.  Supposedly because they
+                            // might also mix up fractional seconds with base-2 floating point, affecting
+                            // microsecond rounding.
+                            let usecs: i32;
+                            if secs_nano_fraction < 0 {
+                                usecs = whole_usecs
+                                    - (nanos_remainder - (whole_usecs & 1) < -500) as i32;
+                            } else {
+                                usecs = whole_usecs
+                                    + (nanos_remainder + (whole_usecs & 1) > 500) as i32;
+                            }
 
                             rows[i].push(TableValue::Interval(IntervalValue::new(
                                 months,
@@ -625,7 +643,7 @@ pub fn batch_to_dataframe(
                                 hours as i32,
                                 mins as i32,
                                 secs as i32,
-                                (nanoseconds_part % 1000000000) as i32,
+                                usecs,
                             )));
                         }
                     }

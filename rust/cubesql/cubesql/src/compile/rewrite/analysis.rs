@@ -29,12 +29,13 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{Analysis, DidMerge, EGraph, Id};
-use std::{fmt::Debug, ops::Index, sync::Arc};
+use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
+    pub time: usize,
     pub original_expr: Option<OriginalExpr>,
     pub member_name_to_expr: Option<Vec<MemberNameToExpr>>,
     pub trivial_push_down: Option<usize>,
@@ -221,6 +222,7 @@ impl Member {
 
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
+    pub time: usize,
     cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
@@ -252,6 +254,7 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
 impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
+            time: 0,
             cube_context,
             planner,
         }
@@ -1233,6 +1236,17 @@ impl LogicalPlanAnalysis {
 
         res
     }
+
+    fn merge_max_field<T: Ord>(&mut self, a: &mut T, mut b: T) -> DidMerge {
+        match Ord::cmp(a, &mut b) {
+            Ordering::Less => {
+                *a = b;
+                DidMerge(true, false)
+            }
+            Ordering::Equal => DidMerge(false, false),
+            Ordering::Greater => DidMerge(false, true),
+        }
+    }
 }
 
 impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
@@ -1243,6 +1257,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         enode: &LogicalPlanLanguage,
     ) -> Self::Data {
         LogicalPlanData {
+            time: egraph.analysis.time,
             original_expr: Self::make_original_expr(egraph, enode),
             member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),
             trivial_push_down: Self::make_trivial_push_down(egraph, enode),
@@ -1282,6 +1297,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
+            | self.merge_max_field(&mut a.time, b.time)
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
@@ -1311,6 +1327,9 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                 )));
                 let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
                 egraph.union(id, alias_expr);
+                // egraph[id]
+                //     .nodes
+                //     .retain(|n| matches!(n, LogicalPlanLanguage::AliasExpr(_)));
             }
         }
     }

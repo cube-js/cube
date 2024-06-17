@@ -8,6 +8,7 @@ module.exports = {
   "hashboard": "Hashboard",
   "hex": "Hex",
   "jupyter": "Jupyter",
+  "klipfolio": "Klipfolio",
   "langchain": "LangChain",
   "metabase": "Metabase",
   "observable": "Observable",
