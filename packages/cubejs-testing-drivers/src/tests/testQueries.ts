@@ -354,6 +354,22 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('filtering Products: contains with special chars + dimensions', async () => {
+      const response = await client.load({
+        dimensions: [
+          'Products.productName'
+        ],
+        filters: [
+          {
+            member: 'Products.productName',
+            operator: 'contains',
+            values: ['di_Novo'],
+          },
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     execute('filtering Customers: endsWith filter + dimensions, first', async () => {
       const response = await client.load({
         dimensions: [
