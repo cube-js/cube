@@ -1713,31 +1713,45 @@ class ApiGateway {
             resType,
           );
         })
-      );
-
-      this.log(
-        {
-          type: 'Load Request Success',
-          query,
-          duration: this.duration(requestStarted),
-          apiType,
-          isPlayground: Boolean(
-            context.signedWithPlaygroundAuthSecret
-          ),
-          memberNames,
-          queries: results.length,
-          queriesWithPreAggregations:
-            results.filter(
-              (r: any) => Object.keys(
-                r.usedPreAggregations || {}
-              ).length
-            ).length,
-          queriesWithData:
-            results.filter((r: any) => r.data?.length).length,
-          dbType: results.map(r => r.dbType),
-        },
-        context,
-      );
+      ).then(resultsInternal => {
+        this.log(
+          {
+            type: 'Load Request Success',
+            query,
+            duration: this.duration(requestStarted),
+            apiType,
+            isPlayground: Boolean(
+              context.signedWithPlaygroundAuthSecret
+            ),
+            memberNames,
+            queries: resultsInternal.length,
+            queriesWithPreAggregations:
+              resultsInternal.filter(
+                (r: any) => Object.keys(
+                  r.usedPreAggregations || {}
+                ).length
+              ).length,
+            queriesWithData:
+              resultsInternal.filter((r: any) => r.data?.length).length,
+            dbType: resultsInternal.map(r => r.dbType),
+          },
+          context,
+        );
+        return resultsInternal;
+      }).catch(e => {
+        this.log(
+          {
+            type: 'Load Request Failed',
+            query,
+            duration: this.duration(requestStarted),
+            apiType,
+            isPlayground: Boolean(context.signedWithPlaygroundAuthSecret),
+            memberNames,
+          },
+          context,
+        );
+        throw e;
+      });
 
       if (
         queryType !== QueryTypeEnum.REGULAR_QUERY &&
