@@ -557,6 +557,14 @@ Array [
 
 exports[`Queries with the @cubejs-backend/clickhouse-driver filtering Customers: contains + dimensions, third 1`] = `Array []`;
 
+exports[`Queries with the @cubejs-backend/clickhouse-driver filtering Products: contains with special chars + dimensions 1`] = `
+Array [
+  Object {
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/clickhouse-driver filtering Customers: endsWith filter + dimensions, first 1`] = `
 Array [
   Object {
