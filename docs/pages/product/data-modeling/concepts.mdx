@@ -278,9 +278,13 @@ cubes:
 
 </CodeTabs>
 
-Dimensions can have [different types][ref-schema-dimension-types]. Also,
-[subquery dimensions][ref-subquery-dimensions] can be used to join cubes
+Also, [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
 implicitly.
+
+### Dimension types
+
+Dimensions can be of different types. See the [dimension type
+reference][ref-schema-dimension-types] for details.
 
 Time-based properties should be modeled as dimensions of the `time` type.
 Time dimensions allow grouping the result set by a unit of time (e.g. hours,
@@ -705,7 +709,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
-[ref-subquery-dimensions]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery-dimensions]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
 [self-dimensions]: #dimensions
 [self-measures]: #measures

@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/fundamentals/additional-concepts",
     "destination": "/product/data-modeling/concepts/subquery-dimensions",
     "permanent": true
