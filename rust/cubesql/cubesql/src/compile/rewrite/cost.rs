@@ -32,6 +32,7 @@ impl BestCubePlan {
 /// - `member_errors` > `cube_members` - extra cube members may be required (e.g. CASE)
 /// - `member_errors` > `wrapper_nodes` - use SQL push down where possible if cube scan can't be detected
 /// - `non_pushed_down_window` > `wrapper_nodes` - prefer to always push down window functions
+/// - `non_pushed_down_limit_sort` > `wrapper_nodes` - prefer to always push down limit-sort expressions
 /// - match errors by priority - optimize for more specific errors
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct CubePlanCost {
@@ -41,10 +42,11 @@ pub struct CubePlanCost {
     non_detected_cube_scans: i64,
     unwrapped_subqueries: usize,
     member_errors: i64,
+    ungrouped_aggregates: usize,
     // TODO if pre-aggregation can be used for window functions, then it'd be suboptimal
     non_pushed_down_window: i64,
     non_pushed_down_grouping_sets: i64,
-    ungrouped_aggregates: usize,
+    non_pushed_down_limit_sort: i64,
     wrapper_nodes: i64,
     wrapped_select_ungrouped_scan: usize,
     ast_size_outside_wrapper: usize,
@@ -81,9 +83,27 @@ impl CubePlanState {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
+pub enum SortState {
+    None,
+    Current,
+    DirectChild,
+}
+
+impl SortState {
+    pub fn add_child(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Current, _) => Self::Current,
+            (_, Self::Current) | (Self::DirectChild, _) => Self::DirectChild,
+            _ => Self::None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CubePlanCostAndState {
     pub cost: CubePlanCost,
     pub state: CubePlanState,
+    pub sort_state: SortState,
 }
 
 impl PartialOrd for CubePlanCostAndState {
@@ -100,17 +120,18 @@ impl Ord for CubePlanCostAndState {
 
 impl CubePlanCostAndState {
     pub fn add_child(&self, other: &Self) -> Self {
-        let state = self.state.add_child(&other.state);
         Self {
             cost: self.cost.add_child(&other.cost),
-            state,
+            state: self.state.add_child(&other.state),
+            sort_state: self.sort_state.add_child(&other.sort_state),
         }
     }
 
     pub fn finalize(&self, enode: &LogicalPlanLanguage) -> Self {
         Self {
-            cost: self.cost.finalize(&self.state, enode),
+            cost: self.cost.finalize(&self.state, &self.sort_state, enode),
             state: self.state.clone(),
+            sort_state: self.sort_state.clone(),
         }
     }
 }
@@ -130,6 +151,8 @@ impl CubePlanCost {
             non_pushed_down_window: self.non_pushed_down_window + other.non_pushed_down_window,
             non_pushed_down_grouping_sets: self.non_pushed_down_grouping_sets
                 + other.non_pushed_down_grouping_sets,
+            non_pushed_down_limit_sort: self.non_pushed_down_limit_sort
+                + other.non_pushed_down_limit_sort,
             member_errors: self.member_errors + other.member_errors,
             cube_members: self.cube_members + other.cube_members,
             errors: self.errors + other.errors,
@@ -155,7 +178,12 @@ impl CubePlanCost {
         }
     }
 
-    pub fn finalize(&self, state: &CubePlanState, enode: &LogicalPlanLanguage) -> Self {
+    pub fn finalize(
+        &self,
+        state: &CubePlanState,
+        sort_state: &SortState,
+        enode: &LogicalPlanLanguage,
+    ) -> Self {
         Self {
             replacers: self.replacers,
             table_scans: self.table_scans,
@@ -172,6 +200,10 @@ impl CubePlanCost {
                 CubePlanState::Wrapped => 0,
                 CubePlanState::Unwrapped(_) => self.non_pushed_down_grouping_sets,
                 CubePlanState::Wrapper => 0,
+            },
+            non_pushed_down_limit_sort: match sort_state {
+                SortState::DirectChild => self.non_pushed_down_limit_sort,
+                _ => 0,
             },
             cube_members: self.cube_members,
             errors: self.errors,
@@ -263,6 +295,11 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
 
         let non_pushed_down_grouping_sets = match enode {
             LogicalPlanLanguage::GroupingSetExpr(_) => 1,
+            _ => 0,
+        };
+
+        let non_pushed_down_limit_sort = match enode {
+            LogicalPlanLanguage::Limit(_) => 1,
             _ => 0,
         };
 
@@ -409,6 +446,7 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 member_errors,
                 non_pushed_down_window,
                 non_pushed_down_grouping_sets,
+                non_pushed_down_limit_sort,
                 cube_members,
                 errors: this_errors,
                 time_dimensions_used_as_dimensions,
@@ -432,6 +470,10 @@ impl CostFunction<LogicalPlanLanguage> for BestCubePlan {
                 }
                 LogicalPlanLanguage::CubeScanWrapper(_) => CubePlanState::Wrapper,
                 _ => CubePlanState::Unwrapped(ast_size_outside_wrapper),
+            },
+            sort_state: match enode {
+                LogicalPlanLanguage::Sort(_) => SortState::Current,
+                _ => SortState::None,
             },
         };
         let res = enode

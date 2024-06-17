@@ -26,8 +26,8 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
 use std::{
-    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, iter, pin::Pin, result,
-    sync::Arc,
+    any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
+    pin::Pin, result, sync::Arc,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -373,13 +373,20 @@ impl CubeScanWrapperNode {
                     .cloned();
                 if let Some(node) = cube_scan_node {
                     let mut new_node = node.clone();
-                    new_node.request.limit = Some(query_limit);
+                    new_node.request.limit = Some(
+                        new_node
+                            .request
+                            .limit
+                            .map_or(query_limit, |limit| min(limit, query_limit)),
+                    );
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
                 } else if let Some(node) = wrapped_select_node {
                     let mut new_node = node.clone();
-                    new_node.limit = Some(query_limit as usize);
+                    new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
+                        min(limit, query_limit as usize)
+                    }));
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))

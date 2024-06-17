@@ -1,6 +1,6 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cast_expr, is_not_null_expr, is_null_expr, literal_expr,
-    negative_expr, rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
+    analysis::LogicalPlanAnalysis, is_not_null_expr, is_null_expr, literal_expr, negative_expr,
+    rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -9,12 +9,6 @@ impl SplitRules {
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
-        self.single_arg_pass_through_rules(
-            "cast",
-            |expr| cast_expr(expr, "?data_type"),
-            false,
-            rules,
-        );
         self.single_arg_pass_through_rules(
             "trunc",
             |expr| self.fun_expr("Trunc", vec![expr]),
