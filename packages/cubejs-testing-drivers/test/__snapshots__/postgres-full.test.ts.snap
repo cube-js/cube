@@ -8102,7 +8102,7 @@ Array [
     "totalSales": 2399.96,
   },
   Object {
-    "productName": "Logitech diNovo Edge Keyboard",
+    "productName": "Logitech di_Novo Edge Keyboard",
     "totalSales": 2249.91,
   },
   Object {
@@ -10363,7 +10363,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -10458,7 +10458,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -10758,7 +10758,7 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "BigECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "BigECommerce.totalQuantity": "9",
   },
   Object {
@@ -12572,7 +12572,7 @@ Array [
     "ECommerce.discount": "0.00000",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.47930",
     "ECommerce.quantity": 9,
     "ECommerce.rowId": 4882,
@@ -13722,7 +13722,7 @@ Array [
     "ECommerce.discount": "0.00000",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.47930",
     "ECommerce.quantity": 9,
     "ECommerce.rowId": 4882,
@@ -14387,7 +14387,7 @@ Array [
     "ECommerce.discount": "0.00000",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.47930",
     "ECommerce.quantity": 9,
     "ECommerce.rowId": 4882,
@@ -14918,7 +14918,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-11-01T00:00:00.000",
     "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -15091,7 +15091,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-01-01T00:00:00.000",
     "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -15431,7 +15431,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -15576,7 +15576,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
