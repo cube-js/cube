@@ -35,7 +35,7 @@ pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
-    pub time: usize,
+    pub iteration_timestamp: usize,
     pub original_expr: Option<OriginalExpr>,
     pub member_name_to_expr: Option<Vec<MemberNameToExpr>>,
     pub trivial_push_down: Option<usize>,
@@ -222,7 +222,9 @@ impl Member {
 
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
-    pub time: usize,
+    /* This is 0, when creating the EGraph.  It's set to 1 before iteration 0,
+    2 before the iteration 1, etc. */
+    pub iteration_timestamp: usize,
     cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
@@ -254,7 +256,7 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
 impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
-            time: 0,
+            iteration_timestamp: 0,
             cube_context,
             planner,
         }
@@ -1257,7 +1259,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
         enode: &LogicalPlanLanguage,
     ) -> Self::Data {
         LogicalPlanData {
-            time: egraph.analysis.time,
+            iteration_timestamp: egraph.analysis.iteration_timestamp,
             original_expr: Self::make_original_expr(egraph, enode),
             member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),
             trivial_push_down: Self::make_trivial_push_down(egraph, enode),
@@ -1297,7 +1299,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
-            | self.merge_max_field(&mut a.time, b.time)
+            | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
