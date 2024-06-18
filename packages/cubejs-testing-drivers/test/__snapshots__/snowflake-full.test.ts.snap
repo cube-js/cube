@@ -43,7 +43,7 @@ Array [
     "totalSales": 2399.96,
   },
   Object {
-    "productName": "Logitech diNovo Edge Keyboard",
+    "productName": "Logitech di_Novo Edge Keyboard",
     "totalSales": 2249.91,
   },
   Object {
@@ -2213,7 +2213,7 @@ Array [
 
 exports[`Queries with the @cubejs-backend/snowflake-driver filtering ECommerce: startsWith + dimensions, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2228,7 +2228,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2253,9 +2253,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2304,7 +2304,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -2340,7 +2340,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2399,7 +2399,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -2435,9 +2435,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: endsWith filter + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2452,7 +2452,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2482,7 +2482,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/snowflake-driver filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/snowflake-driver pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
@@ -2683,7 +2683,7 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "BigECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "BigECommerce.totalQuantity": "9",
   },
   Object {
@@ -3115,7 +3115,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + limit 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -3160,7 +3160,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order + limit + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + order + limit + total + offset 1`] = `
 Array [
   Object {
     "Customers.customerId": "GA-14725",
@@ -3205,7 +3205,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -3250,7 +3250,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + order + total + offset 1`] = `
 Array [
   Object {
     "Customers.customerId": "BS-11380",
@@ -3259,7 +3259,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + order 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -3428,7 +3428,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimentions + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Customers: dimensions + total 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -4031,7 +4031,7 @@ Array [
     "ECommerce.discount": "0.0",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.4793",
     "ECommerce.quantity": "9",
     "ECommerce.rowId": "4882",
@@ -4371,7 +4371,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + limit 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -4526,7 +4526,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + order + limit + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + order + limit + total + offset 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -4681,7 +4681,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -4836,7 +4836,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + order + total + offset 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + order + total + offset 1`] = `
 Array [
   Object {
     "ECommerce.category": "Office Supplies",
@@ -4856,7 +4856,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + order 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -5181,7 +5181,7 @@ Array [
     "ECommerce.discount": "0.0",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.4793",
     "ECommerce.quantity": "9",
     "ECommerce.rowId": "4882",
@@ -5521,7 +5521,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimentions + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying ECommerce: dimensions + total 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -5846,7 +5846,7 @@ Array [
     "ECommerce.discount": "0.0",
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": "517.4793",
     "ECommerce.quantity": "9",
     "ECommerce.rowId": "4882",
@@ -6377,7 +6377,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-11-01T00:00:00.000",
     "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -6550,7 +6550,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-01-01T00:00:00.000",
     "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -6616,7 +6616,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimentions + order + limit + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimensions + order + limit + total 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -6671,7 +6671,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimentions + order + limit 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimensions + order + limit 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -6726,7 +6726,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimentions + order + total 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimensions + order + total 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -6825,7 +6825,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -6871,7 +6871,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/snowflake-driver querying Products: dimensions + order 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -6970,7 +6970,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {

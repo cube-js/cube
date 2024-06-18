@@ -206,7 +206,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Customers: dimentions + order', async () => {
+    execute('querying Customers: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -219,7 +219,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Customers: dimentions + limit', async () => {
+    execute('querying Customers: dimensions + limit', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -231,7 +231,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying Customers: dimentions + total', async () => {
+    execute('querying Customers: dimensions + total', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -245,7 +245,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + limit + total', async () => {
+    execute('querying Customers: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -264,7 +264,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + total + offset', async () => {
+    execute('querying Customers: dimensions + order + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -283,7 +283,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(41);
     });
 
-    execute('querying Customers: dimentions + order + limit + total + offset', async () => {
+    execute('querying Customers: dimensions + order + limit + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'Customers.customerId',
@@ -569,7 +569,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Products: dimentions + order', async () => {
+    execute('querying Products: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -585,7 +585,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying Products: dimentions + order + limit', async () => {
+    execute('querying Products: dimensions + order + limit', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -603,7 +603,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying Products: dimentions + order + total', async () => {
+    execute('querying Products: dimensions + order + total', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -623,7 +623,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(28);
     });
 
-    execute('querying Products: dimentions + order + limit + total', async () => {
+    execute('querying Products: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -645,7 +645,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(28);
     });
 
-    execute('filtering Products: contains + dimentions + order, first', async () => {
+    execute('filtering Products: contains + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -668,7 +668,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: contains + dimentions + order, second', async () => {
+    execute('filtering Products: contains + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -691,7 +691,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: contains + dimentions + order, third', async () => {
+    execute('filtering Products: contains + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -714,7 +714,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, first', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -737,7 +737,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, second', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -760,7 +760,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: startsWith filter + dimentions + order, third', async () => {
+    execute('filtering Products: startsWith filter + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -783,7 +783,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, first', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, first', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -806,7 +806,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, second', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, second', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -829,7 +829,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('filtering Products: endsWith filter + dimentions + order, third', async () => {
+    execute('filtering Products: endsWith filter + dimensions + order, third', async () => {
       const response = await client.load({
         dimensions: [
           'Products.category',
@@ -873,7 +873,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying ECommerce: dimentions + order', async () => {
+    execute('querying ECommerce: dimensions + order', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -897,7 +897,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
-    execute('querying ECommerce: dimentions + limit', async () => {
+    execute('querying ECommerce: dimensions + limit', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -920,7 +920,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData().length).toEqual(10);
     });
 
-    execute('querying ECommerce: dimentions + total', async () => {
+    execute('querying ECommerce: dimensions + total', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -945,7 +945,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + limit + total', async () => {
+    execute('querying ECommerce: dimensions + order + limit + total', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -975,7 +975,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + total + offset', async () => {
+    execute('querying ECommerce: dimensions + order + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -1005,7 +1005,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       ).toEqual(44);
     });
 
-    execute('querying ECommerce: dimentions + order + limit + total + offset', async () => {
+    execute('querying ECommerce: dimensions + order + limit + total + offset', async () => {
       const response = await client.load({
         dimensions: [
           'ECommerce.rowId',
@@ -1775,7 +1775,7 @@ from
       const res = await connection.query(`
     select rowId as "row", orderId as "order", orderDate as "date", sum(count)
     from (
-        select * 
+        select *
         from
         "ECommerce" as "ECommerce"
     ) a
@@ -1792,7 +1792,7 @@ from
         select * from (
             select rowId as "row", orderId as "order", sum(count)
             from (
-                select * 
+                select *
                 from
                 "ECommerce" as "ECommerce"
             ) a
