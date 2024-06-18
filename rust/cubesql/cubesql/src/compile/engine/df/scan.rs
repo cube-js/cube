@@ -49,7 +49,7 @@ use datafusion::{
     logical_plan::JoinType,
     scalar::ScalarValue,
 };
-use serde_json::{json, Value};
+use serde_json::{json, Map, Value};
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum MemberField {
@@ -443,7 +443,8 @@ struct CubeScanExecutionPlan {
 }
 
 #[derive(Debug)]
-pub enum FieldValue {
+pub enum FieldValue<'s> {
+    StringRef(&'s String),
     String(String),
     Number(f64),
     Bool(bool),
@@ -465,38 +466,33 @@ impl JsonValueObject {
     pub fn new(rows: Vec<Value>) -> Self {
         JsonValueObject { rows }
     }
-}
 
-impl ValueObject for JsonValueObject {
-    fn len(&mut self) -> std::result::Result<usize, CubeError> {
-        Ok(self.rows.len())
-    }
-
-    fn get<'a>(
-        &'a mut self,
+    // Implementation moved to separate method to lose mut on self
+    fn get_impl(
+        &self,
         index: usize,
         field_name: &str,
     ) -> std::result::Result<FieldValue, CubeError> {
-        let option = self.rows[index].as_object_mut();
-        let as_object = if let Some(as_object) = option {
-            as_object
-        } else {
-            return Err(CubeError::user(format!(
-                "Unexpected response from Cube, row is not an object: {:?}",
-                self.rows[index]
-            )));
+        let option = self.rows[index].as_object();
+
+        let as_object = match option {
+            Some(r) => r,
+            None => {
+                return Err(CubeError::user(format!(
+                    "Unexpected response from Cube, row is not an object: {:?}",
+                    self.rows[index]
+                )));
+            }
         };
-        let value = as_object
-            .get(field_name)
-            .unwrap_or(&Value::Null)
-            // TODO expose strings as references to avoid clonning
-            .clone();
+
+        let value = as_object.get(field_name).unwrap_or(&Value::Null);
+
         Ok(match value {
-            Value::String(s) => FieldValue::String(s),
+            Value::String(s) => FieldValue::StringRef(s),
             Value::Number(n) => FieldValue::Number(n.as_f64().ok_or(
                 DataFusionError::Execution(format!("Can't convert {:?} to float", n)),
             )?),
-            Value::Bool(b) => FieldValue::Bool(b),
+            Value::Bool(b) => FieldValue::Bool(*b),
             Value::Null => FieldValue::Null,
             x => {
                 return Err(CubeError::user(format!(
@@ -505,6 +501,20 @@ impl ValueObject for JsonValueObject {
                 )));
             }
         })
+    }
+}
+
+impl ValueObject for JsonValueObject {
+    fn len(&mut self) -> std::result::Result<usize, CubeError> {
+        Ok(self.rows.len())
+    }
+
+    fn get(
+        &mut self,
+        index: usize,
+        field_name: &str,
+    ) -> std::result::Result<FieldValue, CubeError> {
+        self.get_impl(index, field_name)
     }
 }
 
@@ -941,7 +951,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(v), builder) => builder.append_value(v)?,
+                        (FieldValue::StringRef(v) | FieldValue::String(ref v), builder) => builder.append_value(v)?,
                         (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
                         (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
                     },
@@ -958,7 +968,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i16>() {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => match s.parse::<i16>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -983,7 +993,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i32>() {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => match s.parse::<i32>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1008,7 +1018,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
-                        (FieldValue::String(s), builder) => match s.parse::<i64>() {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => match s.parse::<i64>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1033,7 +1043,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number)?,
-                        (FieldValue::String(s), builder) => match s.parse::<f64>() {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => match s.parse::<f64>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1080,7 +1090,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(s), builder) => {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => {
                             let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
@@ -1116,7 +1126,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(s), builder) => {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => {
                             let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
@@ -1152,7 +1162,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(s), builder) => {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => {
                             let date = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
                                 // FIXME: temporary solution for cases when expected type is Date32
                                 // but underlying data is a Timestamp
@@ -1196,7 +1206,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(s), builder) => {
+                        (FieldValue::StringRef(s), builder) | (FieldValue::String(ref s), builder) => {
                             let mut parts = s.split(".");
                             match parts.next() {
                                 None => builder.append_null()?,
