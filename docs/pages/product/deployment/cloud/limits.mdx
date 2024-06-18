@@ -38,6 +38,7 @@ types][ref-deployment-types] and [pricing tiers][ref-pricing]:
 | Queries per day for each [production cluster][ref-prod-cluster]                     |     —     |  50,000   | Unlimited | Unlimited  | Unlimited                     |
 | Queries processed by [Query History][ref-query-history] per day for each deployment |   1,000   |  Depends on [Query History tier][ref-query-history-tiers]   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
 | Data retained by [Query History][ref-query-history]                                 |   1 day   |   Depends on [Query History tier][ref-query-history-tiers]   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
+| Events per year collected by [Audit Log][ref-audit-log]                             |     —     |     —     |     —     |     —      | 50,000                        |
 
 ### Number of deployments
 
@@ -73,6 +74,11 @@ support][cube-contact-us] for further assistance.
 This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
 for all deployments within an account.
 
+### Events per year collected by Audit Log
+
+This is a hard limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account.
+
 ## Quotas
 
 The [REST][ref-rest-api] and [GraphQL][ref-gql-api] APIs both have a standard
@@ -94,3 +100,4 @@ response.
   /product/deployment/cloud/deployment-types#production-cluster
 [cube-contact-us]: https://cube.dev/contact
 [ref-query-history-tiers]: /product/deployment/cloud/pricing#query-history-tiers
+[ref-audit-log]: /product/workspace/audit-log
