@@ -162,7 +162,7 @@ export class CompilerApi {
       rollupMatchResults: includeDebugInfo ?
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
       canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
-      memberNames: R.flatten(sqlGenerator.collectFromMembers(false, sqlGenerator.collectMemberNamesFor.bind(sqlGenerator), 'collectMemberNamesFor'))
+      memberNames: sqlGenerator.collectAllMemberNames(),
     }));
 
     if (this.sqlCache) {
