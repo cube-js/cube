@@ -143,7 +143,31 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       {
         key: 's3_session_token',
         value: getEnv('duckdbS3SessionToken', this.config),
-      }
+      },
+      {
+        key: 'azure_read_transfer_concurrency',
+        value: getEnv('duckdbAzureReadTransferConcurrency', this.config),
+      },
+      {
+        key: 'azure_read_transfer_chunk_size',
+        value: getEnv('duckdbAzureReadTransferChunkSize', this.config),
+      },
+      {
+        key: 'azure_read_buffer_size',
+        value: getEnv('duckdbAzureReadBufferSize', this.config),
+      },
+      {
+        key: 'azure_transport_option_type',
+        value: getEnv('duckdbAzureTransportOptionType', this.config),
+      },
+      {
+        key: 'azure_context_caching',
+        value: getEnv('duckdbAzureContextCaching', this.config),
+      },
+      {
+        key: 'azure_storage_connection_string',
+        value: getEnv('duckdbAzureStorageConnectionString', this.config),
+      },
     ];
     
     for (const { key, value } of configuration) {

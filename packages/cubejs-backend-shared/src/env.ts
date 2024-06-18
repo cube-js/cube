@@ -1537,7 +1537,65 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
     ]
   ),
-  
+
+  duckdbAzureReadTransferConcurrency: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_READ_TRANSFER_CONCURRENCY', dataSource)
+    ]
+  ),
+
+  duckdbAzureReadTransferChunkSize: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_READ_TRANSFER_CHUNK_SIZE', dataSource)
+    ]
+  ),
+
+  duckdbAzureReadBufferSize: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_READ_BUFFER_SIZE', dataSource)
+    ]
+  ),
+
+  duckdbAzureTransportOptionType: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_TRANSPORT_OPTION_TYPE', dataSource)
+    ]
+  ),
+
+  duckdbAzureContextCaching: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_CONTEXT_CACHING', dataSource)
+    ]
+  ),
+    duckdbAzureStorageConnectionString: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_AZURE_STORAGE_CONNECTION_STRING', dataSource)
+    ]
+  ),
   /**
    * Presto catalog.
    */
