@@ -11,6 +11,7 @@ module.exports = {
   "performance": "Performance Insights",
   "access-control": "Access Control",
   "sso": "Single Sign-on",
+  "audit-log": "Audit Log",
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI"

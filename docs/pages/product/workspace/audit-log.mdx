@@ -1,0 +1,86 @@
+# Audit Log
+
+Audit Log collects, stores, and displays security-related events within a Cube Cloud
+account, across all deployments. You can use it to maintain and review a historical
+record of activity for compliance purposes.
+
+<SuccessBox>
+
+Audit Log is available in Cube Cloud on the
+[Enterprise Premier](https://cube.dev/pricing) tier.
+[Contact us](https://cube.dev/contact) for details.
+
+</SuccessBox>
+
+Read below about [collected events](#event-types). Also, see how you can [enable](#configuration)
+Audit Log, [view events](#viewing-events), and [download](#downloading-events) them.
+
+## Configuration
+
+To enable Audit Log, navigate to the <Btn>Team & Security</Btn> page, open the
+<Btn>Audit Log</Btn> tab, and turn the <Btn>Enable Audit Log</Btn> switch on.
+
+<InfoBox>
+
+If you choose to disable Audit Log, your account will be billed for using it until the
+end of the month.
+
+</InfoBox>
+
+## Viewing events
+
+### Table view
+
+Audit Log displays events in a table with the following information for each event:
+- Event timestamp in your local time zone.
+- User email, if applicable to a particular event.
+- Event name (see [event types](#event-types) for the full list).
+- Deployment name, if applicable to a particular event.
+
+<Screenshot src="https://ucarecdn.com/93cec1af-4307-402e-826e-930f39626071/" />
+
+### Extended view
+
+You can click on any event to view extended information:
+- IP address from which an event was initiated.
+- Event-specific attributes with sensitive information (e.g., passwords and tokens)
+sanitized.
+
+<Screenshot src="https://ucarecdn.com/43f0d225-0cde-40dd-867b-8705f3ee0ff2/" />
+
+### Filters
+
+You can also customize the table view with filters on the top and in the right sidebar:
+- Text input for full-text search.
+- Date range filter.
+- Filters to narrow the view down to a specific user, event, or deployment.
+
+<Screenshot
+  src="https://ucarecdn.com/794dcf79-4268-46ad-8077-f2675dede9d0/"
+  highlight="inset(1% 0.5% 49% 52.5% round 10px)"
+/>
+
+## Downloading events
+
+You can use the <Btn>↓ CSV</Btn> button to download a CSV file with all events in the
+current view:
+
+<Screenshot
+  src="https://ucarecdn.com/794dcf79-4268-46ad-8077-f2675dede9d0/"
+  highlight="inset(1% 50% 92% 43% round 10px)"
+/>
+
+## Event types
+
+Audit Log collects the following types of events:
+
+| Category | Event type |
+| --- | --- |
+| Users | `Created user`<br/>`Deleted user`<br/>`Invited user`<br/>`Updated user profile`<br/>`Requested password reset`<br/>`Changed password` |
+| [Access control](/product/workspace/access-control) | `Created role`<br/>`Deleted role`<br/>`Updated role`<br/>`Assigned role to user`<br/>`Assigned roles to user`<br/>`Removed role from user` |
+| Authentication | `Logged in`<br/>`Logged out`<br/>`Redirected to SAML provider for login`<br/>`Logged in via SAML` |
+| Account and [single sign-on](/product/workspace/sso) | `Updated account settings`<br/>`Updated account authentication configuration`<br/>`Updated account SAML configuration`<br/>`Uploaded identity provider metadata file` |
+| [Deployments](/product/deployment/cloud/deployments) | `Created deployment`<br/>`Deleted deployment`<br/>`Updated deployment configuration`<br/>`Enabled SQL API for deployment`<br/>`Generated data model` |
+| Branches and [dev mode](/product/workspace/dev-mode) | `Created Git branch`<br/>`Deleted Git branch`<br/>`Entered dev mode`<br/>`Exited dev mode`<br/>`Pulled changes to data model`<br/>`Committed and merged changes to data model`<br/>`Merged changes to data model`<br/>`Reverted changes to data model in branch` |
+| [Continuous deployment](/product/deployment/cloud/continuous-deployment) | `Requested connection of GitHub account`<br/>`Connected deployment to GitHub repository`<br/>`Generated SSH key for deployment`<br/>`Connected deployment to Git upstream`<br/>`Generated Git credentials for Cube Cloud repository`<br/>`Generated webhook token for Git repository`<br/>`Triggered new build` |
+| [Budgets](/product/workspace/budgets) | `Created budget`<br/>`Deleted budget`<br/>`Updated budget` |
