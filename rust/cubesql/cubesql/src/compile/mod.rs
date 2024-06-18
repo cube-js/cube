@@ -6281,6 +6281,65 @@ limit
     }
 
     #[tokio::test]
+    async fn test_ts_minus_date_postgres() {
+        async fn check_ts_minus_date(left: &str, right: &str, expected: &str) {
+            let column_name = "result";
+            assert_eq!(
+                execute_query(
+                    format!(
+                        r#"SELECT (CAST('{left}' AS TIMESTAMP) -
+                     CAST('{right}' AS DATE)) AS "{column_name}""#
+                    ),
+                    DatabaseProtocol::PostgreSQL
+                )
+                .await
+                .unwrap(),
+                format!(
+                    "+-{empty:-<width$}-+\
+                    \n| {column_name:width$} |\
+                    \n+-{empty:-<width$}-+\
+                    \n| {expected:width$} |\
+                    \n+-{empty:-<width$}-+",
+                    empty = "",
+                    width = expected.len().max(column_name.len())
+                )
+            );
+        }
+
+        // Postgres output: "5 days 12:00:00"
+        check_ts_minus_date(
+            "2020-02-20 12:00:00.000",
+            "2020-02-15",
+            "0 years 0 mons 5 days 12 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Postgres output: "-5 days -12:00:00"
+        check_ts_minus_date(
+            "2020-02-20 12:00:00.000",
+            "2020-02-26",
+            "0 years 0 mons -5 days -12 hours 0 mins 0.00 secs",
+        )
+        .await;
+
+        // Postgres output: "5 days 12:34:56.123"
+        check_ts_minus_date(
+            "2020-02-20 12:34:56.123",
+            "2020-02-15",
+            "0 years 0 mons 5 days 12 hours 34 mins 56.123000 secs",
+        )
+        .await;
+
+        // Postgres output: "-5 days -11:25:03.877"
+        check_ts_minus_date(
+            "2020-02-20 12:34:56.123",
+            "2020-02-26",
+            "0 years 0 mons -5 days -11 hours -25 mins -3.877000 secs",
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn test_date_add_sub_postgres() {
         async fn check_fun(op: &str, t: &str, i: &str, expected: &str) {
             assert_eq!(
