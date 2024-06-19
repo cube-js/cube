@@ -1469,7 +1469,7 @@ class ApiGateway {
             type: 'Load Request SQL',
             duration: this.duration(loadRequestSQLStarted),
             query: normalizedQueries[index],
-            sqlQuery,
+            sqlQuery
           }, context);
 
           return sqlQuery;
