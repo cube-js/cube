@@ -247,6 +247,5 @@ describe('pre-aggregations', () => {
     console.log(JSON.stringify(preAggregationsDescription[0].indexesSql[0], null, 2));
     expect(indexesSql[0].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_regular_index');
     expect(indexesSql[1].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_agg_index');
-
   });
 });
