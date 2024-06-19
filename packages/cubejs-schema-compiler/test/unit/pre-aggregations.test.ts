@@ -51,20 +51,6 @@ describe('pre-aggregations', () => {
               dimensions: [Users.name],
               rollups: [Users.usersRollup, CUBE.ordersRollup],
             },
-            ordersRollupWithIndexes: {
-              measures: [CUBE.count],
-              dimensions: [CUBE.id, CUBE.status],
-              indexes: {
-                  regular_index: {
-                      columns: [status, id]
-                  },
-                  agg_index: {
-                      columns: [status],
-                      type: \`aggregate\`
-
-                  }
-              },
-            },
           },
         
           joins: {
