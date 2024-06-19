@@ -51,6 +51,20 @@ describe('pre-aggregations', () => {
               dimensions: [Users.name],
               rollups: [Users.usersRollup, CUBE.ordersRollup],
             },
+            ordersRollupWithIndexes: {
+              measures: [CUBE.count],
+              dimensions: [CUBE.id, CUBE.status],
+              indexes: {
+                  regular_index: {
+                      columns: [status, id]
+                  },
+                  agg_index: {
+                      columns: [status],
+                      type: \`aggregate\`
+
+                  }
+              },
+            },
           },
         
           joins: {
@@ -205,5 +219,34 @@ describe('pre-aggregations', () => {
       '2023-01-01T00:00:00.000',
       '2023-01-10T23:59:59.999'
     ]);
+  });
+
+  it('pre-aggregation with indexes descriptions', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml(createECommerceSchema())
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders_indexes.count'
+      ],
+      timeDimensions: [{
+        dimension: 'orders_indexes.created_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      dimensions: ['orders_indexes.status']
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+    const { indexesSql } = preAggregationsDescription[0];
+    expect(indexesSql.length).toEqual(2);
+    console.log(JSON.stringify(preAggregationsDescription[0].indexesSql[0], null, 2));
+    expect(indexesSql[0].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_regular_index');
+    expect(indexesSql[1].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_agg_index');
+
   });
 });
