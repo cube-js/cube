@@ -204,7 +204,7 @@ jobs:
             # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
             # Please use minimal possible version of macOS, because it produces constraint on libstdc++
-          - os: macos-11
+          - os: macos-12
             target: x86_64-apple-darwin
             executable_name: cubestored
             strip: true
