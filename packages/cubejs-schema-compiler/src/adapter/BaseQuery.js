@@ -260,12 +260,7 @@ export class BaseQuery {
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.preAggregationsSchemaOption =
-      this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
-
-    if (this.order.length === 0) {
-      this.order = this.defaultOrder();
-    }
+    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
 
     this.externalQueryClass = this.options.externalQueryClass;
     this.initUngrouped();
@@ -399,12 +394,7 @@ export class BaseQuery {
       });
     } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
-
-      let id = firstMeasure.measure;
-
-      if (firstMeasure.expressionName) {
-        id = firstMeasure.expressionName;
-      }
+      const id = firstMeasure.expressionName ?? firstMeasure.measure;
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
