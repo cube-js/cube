@@ -96,7 +96,7 @@ interface NormalizedQueryFilter extends QueryFilter {
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
-  order?: [{ id: string; desc: boolean }];
+  order?: { id: string; desc: boolean }[];
 }
 
 export {
