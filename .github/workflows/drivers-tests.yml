@@ -92,17 +92,22 @@ jobs:
       image: cubejs/rust-cross:${{ matrix.target }}-02042024
 
     steps:
+      - name: install Curl
+        run: |
+          apt-get update
+          apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -123,7 +128,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v3.0.0
+        uses: allenevans/set-env@v4.0.0
         with:
           PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
@@ -183,7 +188,7 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     strategy:
       matrix:
-        node: 
+        node:
           - 18.x
         database:
           - athena
@@ -202,7 +207,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
 
@@ -215,7 +220,7 @@ jobs:
         shell: bash
       - name: Restore yarn cache
         # We don't want to save it on finish, restore only!
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -223,7 +228,7 @@ jobs:
             ${{ runner.os }}-yarn-
 
       - name: Install dependencies
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

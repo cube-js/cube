@@ -41,13 +41,18 @@ jobs:
           sudo rm -rf /opt/hostedtoolcache/CodeQL
           echo "After"
           df -h
+      - name: Install cUrl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
@@ -101,7 +106,7 @@ jobs:
         with:
           version: v0.9.1
       - name: Cache Docker layers
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ github.sha }}
@@ -166,7 +171,7 @@ jobs:
         if: ${{ startsWith(matrix.os, 'windows') }}
         run: choco install -y --force llvm --version 18.1.2
       - name: Set Env Variables for Windows
-        uses: allenevans/set-env@v3.0.0
+        uses: allenevans/set-env@v4.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
         with:
           OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
@@ -196,7 +201,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
@@ -236,13 +241,18 @@ jobs:
     container:
       image: cubejs/rust-cross:${{ matrix.target }}-02042024
     steps:
+      - name: install Curl
+        run: |
+          apt-get update
+          apt-get install -y curl
       - uses: actions/checkout@v4
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
@@ -268,7 +278,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz

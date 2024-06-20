@@ -34,11 +34,11 @@ jobs:
         if: contains(runner.os, 'windows')
         shell: bash
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -52,7 +52,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -95,11 +95,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -113,7 +113,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -158,11 +158,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -176,7 +176,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

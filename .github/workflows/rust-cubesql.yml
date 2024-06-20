@@ -21,13 +21,18 @@ jobs:
     name: Check fmt/clippy
 
     steps:
+      - name: install Curl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
@@ -107,13 +112,18 @@ jobs:
       image: cubejs/rust-cross:${{ matrix.target }}-02042024
 
     steps:
+      - name: install Curl
+        run: |
+          apt-get update
+          apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
@@ -122,7 +132,7 @@ jobs:
           key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
           shared-key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -133,14 +143,14 @@ jobs:
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -159,7 +169,7 @@ jobs:
         run: yarn run native:build-debug
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v3.0.0
+        uses: allenevans/set-env@v4.0.0
         with:
           PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
@@ -214,10 +224,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
@@ -226,7 +237,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
@@ -236,14 +247,14 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -296,10 +307,11 @@ jobs:
         run: rustup set auto-self-update disable
         shell: bash
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
@@ -307,7 +319,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
@@ -317,14 +329,14 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

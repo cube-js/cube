@@ -54,13 +54,14 @@ jobs:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -68,7 +69,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -77,7 +78,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -106,16 +107,21 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     steps:
+      - name: Install cUrl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -123,7 +129,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -132,7 +138,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -153,16 +159,21 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
 
     steps:
+      - name: Install cUrl
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -170,7 +181,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -179,7 +190,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -232,7 +243,7 @@ jobs:
           cd rust/cubestore
           cargo build --release -j 4
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cubestored-x86_64-unknown-linux-gnu-release
           path: ./rust/cubestore/target/release/cubestored
@@ -269,7 +280,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -277,7 +288,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -286,7 +297,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -298,7 +309,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: ./rust/cubestore/target/release/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -330,13 +341,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -344,7 +356,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -353,7 +365,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -399,7 +411,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -407,7 +419,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -416,7 +428,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -432,7 +444,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: rust/cubestore/downloaded/latest/bin/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -537,7 +549,7 @@ jobs:
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -545,7 +557,7 @@ jobs:
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
         shell: bash
       - name: Restore yarn cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -554,7 +566,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-invision/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -625,7 +637,7 @@ jobs:
           yarn run cypress:install
           yarn run cypress:birdbox
       - name: Upload screenshots on failure
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
