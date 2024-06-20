@@ -396,7 +396,7 @@ export class BaseQuery {
         id: granularity.dimension,
         desc: false,
       });
-    } else if (this.measures.length > 0) {
+    } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
       const id = firstMeasure.expressionName ?? firstMeasure.measure;
 
