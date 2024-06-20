@@ -2388,7 +2388,7 @@ export class BaseQuery {
   }
 
   collectAllMemberNames() {
-    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectMemberNamesFor'));
+    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
   }
 
   collectMultipliedMeasures(context) {
