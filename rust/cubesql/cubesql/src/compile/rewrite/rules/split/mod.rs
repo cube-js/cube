@@ -2,6 +2,7 @@ pub mod aggregate_function;
 pub mod alias;
 pub mod binary_expr;
 pub mod case;
+pub mod cast;
 pub mod column;
 pub mod dates;
 pub mod functions;
@@ -45,6 +46,7 @@ impl RewriteRules for SplitRules {
         self.granularity_rules(&mut rules);
         self.binary_expr_rules(&mut rules);
         self.case_rules(&mut rules);
+        self.cast_rules(&mut rules);
 
         rules
     }

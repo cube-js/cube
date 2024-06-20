@@ -1,0 +1,22 @@
+import { GenericContainer } from 'testcontainers';
+
+import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
+
+export class QuestDBRunner extends DbRunnerAbstract {
+  public static startContainer(options: DBRunnerContainerOptions) {
+    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '7.2';
+
+    const container = new GenericContainer(`questdb/questdb:${version}`)
+      .withExposedPorts(8812)
+      .withStartupTimeout(10 * 1000);
+
+    if (options.volumes) {
+      // eslint-disable-next-line no-restricted-syntax
+      for (const { source, target, bindMode } of options.volumes) {
+        container.withBindMount(source, target, bindMode);
+      }
+    }
+
+    return container.start();
+  }
+}

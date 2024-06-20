@@ -1,0 +1,403 @@
+# Calculated measures and dimensions
+
+Often, dimensions are mapped to table columns and measures are defined as
+aggregations of top of table columns. However, measures and dimensions can also
+[reference][ref-references] other members of the same or other cubes, use [SQL
+expressions][ref-sql-expressions], and perform calculations involving other measures
+and dimensions.
+
+Most common patterns are known as [calculated measures](#calculated-measures),
+[proxy dimensions](#proxy-dimensions), and [subquery dimensions](#subquery-dimensions).
+
+## Calculated measures
+
+**Calculated measures perform calculations on other measures using SQL functions and
+operators.** They provide a way to decompose complex measures (e.g., ratios or percents)
+into formulas that involve simpler measures. Also, calculated measures [can
+help][ref-decomposition-recipe] to use [non-additive][ref-non-additive] measures with
+pre-aggregations.
+
+In the following example, the `completed_ratio` measure is calculated as a division of
+`completed_count` by total `count`. Note that the result is also multiplied by `1.0`
+since [integer division in SQL][link-postgres-division] would otherwise produce an
+integer value.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 'processing' AS status UNION ALL
+      SELECT 2 AS id, 'completed'  AS status UNION ALL
+      SELECT 3 AS id, 'completed'  AS status
+
+    measures:
+      - name: count
+        type: count
+
+      - name: completed_count
+        type: count
+        filters:
+          - sql: "{CUBE}.status = 'completed'"
+
+      - name: completed_ratio
+        sql: "1.0 * {completed_count} / {count}"
+        type: number
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 'processing' AS status UNION ALL
+    SELECT 2 AS id, 'completed'  AS status UNION ALL
+    SELECT 3 AS id, 'completed'  AS status
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    completed_count: {
+      type: `count`,
+      filters: [{
+        sql: `${CUBE}.status = 'completed'`
+      }]
+    },
+
+    completed_ratio: {
+      sql: `1.0 * ${completed_count} / ${count}`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If you query for `completed_ratio`, Cube will generate the following SQL:
+
+```sql
+SELECT
+  1.0 * COUNT(
+    CASE WHEN ("orders".status = 'completed') THEN 1 END
+  ) / COUNT(*) "orders__completed_ratio"
+FROM (
+  SELECT 1 AS id, 'processing' AS status UNION ALL
+  SELECT 2 AS id, 'completed'  AS status UNION ALL
+  SELECT 3 AS id, 'completed'  AS status
+) AS "orders"
+```
+
+## Proxy dimensions
+
+**Proxy dimensions reference dimensions from other cubes.** Proxy dimensions provide
+a way to reference some dimensions as if they were defined in multiple cubes.
+
+If you have `first_cube` that is [joined][ref-joins] to `second_cube`, you can use a
+proxy dimension to bring `second_cube.dimension` to `first_cube` as `dimension` (or
+under a different name). When you query for a proxy dimension, Cube will transparently
+generate SQL with necessary joins.
+
+In the following example, `orders.user_name` is a proxy dimension that brings the
+`users.name` dimension to `orders`. You can also see that there's a join relationship
+between `orders` and `users`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 1 AS user_id UNION ALL
+      SELECT 2 AS id, 1 AS user_id UNION ALL
+      SELECT 3 AS id, 2 AS user_id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: user_name
+        sql: "{users.name}"
+        type: string
+
+    measures:
+      - name: count
+        type: count
+
+    joins:
+      - name: users
+        sql: "{users}.id = {orders}.user_id"
+        relationship: one_to_many
+
+  - name: users
+    sql: >
+      SELECT 1 AS id, 'Alice' AS name UNION ALL
+      SELECT 2 AS id, 'Bob'   AS name
+
+    dimensions:
+      - name: name
+        sql: name
+        type: string
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 1 AS user_id UNION ALL
+    SELECT 2 AS id, 1 AS user_id UNION ALL
+    SELECT 3 AS id, 2 AS user_id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    user_name: {
+      sql: `${users.name}`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  joins: {
+    users: {
+      sql: `${users}.id = ${orders}.user_id`,
+      relationship: `one_to_many`
+    }
+  }
+})
+
+cube(`users`, {
+  sql: `
+    SELECT 1 AS id, 'Alice' AS name UNION ALL
+    SELECT 2 AS id, 'Bob'   AS name
+  `,
+
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If you query for `orders.user_name` and `orders.count`, Cube will generate the
+following SQL:
+
+```sql
+SELECT
+  "users".name "orders__user_name",
+  COUNT(DISTINCT "orders".id) "orders__count"
+FROM (
+  SELECT 1 AS id, 1 AS user_id UNION ALL
+  SELECT 2 AS id, 1 AS user_id UNION ALL
+  SELECT 3 AS id, 2 AS user_id
+) AS "orders"
+LEFT JOIN (
+  SELECT 1 AS id, 'Alice' AS name UNION ALL
+  SELECT 2 AS id, 'Bob'   AS name
+) AS "users" ON "users".id = "orders".user_id
+GROUP BY 1
+```
+
+Note that if you query for `orders.user_name` only, Cube will figure out that it's
+equivalent to querying just `users.name` and there's no need to generate a join in SQL:
+
+```sql
+SELECT
+  "users".name "orders__user_name"
+FROM (
+  SELECT 1 AS id, 'Alice' AS name UNION ALL
+  SELECT 2 AS id, 'Bob'   AS name
+) AS "users"
+GROUP BY 1
+```
+
+## Subquery dimensions
+
+**Subquery dimensions reference measures from other cubes.** Subquery dimensions
+provide a way to define measures that aggregate values of other measures. They can be
+useful to calculate [nested aggregates][ref-nested-aggregates-recipe].
+
+If you have `first_cube` that is [joined][ref-joins] to `second_cube`, you can use a
+subquery dimension to bring `second_cube.measure` to `first_cube` as `dimension` (or
+under a different name). When you query for a subquery dimension, Cube will
+transparently generate SQL with necessary joins. It works as a [correlated
+subquery][wiki-correlated-subquery] but is implemented via joins for optimal
+performance and portability.
+
+In the following example, `users.order_count` is a subquery dimension that brings the
+`orders.count` measure to `users`. Note that the [`sub_query` parameter][ref-ref-subquery]
+is set to `true` on `users.order_count`. You can also see that there's a join
+relationship between `orders` and `users`:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT 1 AS id, 1 AS user_id UNION ALL
+      SELECT 2 AS id, 1 AS user_id UNION ALL
+      SELECT 3 AS id, 2 AS user_id
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+
+    joins:
+      - name: users
+        sql: "{users}.id = {orders}.user_id"
+        relationship: one_to_many
+
+  - name: users
+    sql: >
+      SELECT 1 AS id, 'Alice' AS name UNION ALL
+      SELECT 2 AS id, 'Bob'   AS name
+
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+
+      - name: name
+        sql: name
+        type: string
+
+      - name: order_count
+        sql: "{orders.count}"
+        type: number
+        sub_query: true
+
+    measures:
+      - name: avg_order_count
+        sql: "{order_count}"
+        type: avg
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, 1 AS user_id UNION ALL
+    SELECT 2 AS id, 1 AS user_id UNION ALL
+    SELECT 3 AS id, 2 AS user_id
+  `,
+
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    user_name: {
+      sql: `${users.name}`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  },
+
+  joins: {
+    users: {
+      sql: `${users}.id = ${orders}.user_id`,
+      relationship: `one_to_many`
+    }
+  }
+})
+
+cube(`users`, {
+  sql: `
+    SELECT 1 AS id, 'Alice' AS name UNION ALL
+    SELECT 2 AS id, 'Bob'   AS name
+  `,
+
+  dimensions: {
+    name: {
+      sql: `name`,
+      type: `string`
+    }
+  },
+
+  measures: {
+    name: `avg_order_count`,
+    sql: `${order_count}`,
+    type: `avg`
+  }
+})
+```
+
+</CodeTabs>
+
+You can reference subquery dimensions in measures just like usual dimensions. In the
+example above, the `avg_order_count` measure performs an aggregation on `order_count`.
+
+If you query for `users.name` and `users.order_count`, Cube will generate the
+following SQL:
+
+```sql
+SELECT
+  "users".name "users__name",
+  "users__order_count" "users__order_count"
+FROM (
+  SELECT 1 AS id, 'Alice' AS name UNION ALL
+  SELECT 2 AS id, 'Bob' AS name
+) AS "users"
+LEFT JOIN (
+  SELECT
+    "users_order_count_subquery__users".id "users__id",
+    count(distinct "users_order_count_subquery__orders".id) "users__order_count"
+  FROM (
+    SELECT 1 AS id, 1 AS user_id UNION ALL
+    SELECT 2 AS id, 1 AS user_id UNION ALL
+    SELECT 3 AS id, 2 AS user_id
+  ) AS "users_order_count_subquery__orders"
+  LEFT JOIN (
+    SELECT 1 AS id, 'Alice' AS name UNION ALL
+    SELECT 2 AS id, 'Bob' AS name
+  ) AS "users_order_count_subquery__users" ON "users_order_count_subquery__users".id = "users_order_count_subquery__orders".user_id
+  GROUP BY 1
+) AS "users_order_count_subquery" ON "users_order_count_subquery"."users__id" = "users".id
+GROUP BY 1, 2
+```
+
+
+[ref-references]: /product/data-modeling/syntax#references
+[ref-sql-expressions]: /product/data-modeling/syntax#sql-expressions
+[ref-joins]: /product/data-modeling/concepts/working-with-joins
+[ref-ref-subquery]: /reference/data-model/dimensions#sub_query
+[ref-schema-ref-measures]: /reference/data-model/measures
+[ref-schema-ref-dimensions]: /reference/data-model/dimensions
+[ref-schema-ref-joins]: /reference/data-model/joins
+[ref-decomposition-recipe]: /guides/recipes/query-acceleration/non-additivity#decomposing-into-a-formula-with-additive-measures
+[ref-nested-aggregates-recipe]: /guides/recipes/data-modeling/nested-aggregates
+[ref-non-additive]: /product/data-modeling/concepts#measure-additivity
+
+[link-postgres-division]: https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH
+[wiki-correlated-subquery]: https://en.wikipedia.org/wiki/Correlated_subquery

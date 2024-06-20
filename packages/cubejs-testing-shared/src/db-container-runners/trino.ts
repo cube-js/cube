@@ -2,15 +2,11 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type PrestoStartOptions = DBRunnerContainerOptions & {
-    version?: string,
-};
+export class TrinoDBRunner extends DbRunnerAbstract {
+  public static startContainer(options: DBRunnerContainerOptions) {
+    const version = process.env.TEST_TRINO_VERSION || options.version || '403';
 
-export class PrestoDbRunner extends DbRunnerAbstract {
-  public static startContainer(options: PrestoStartOptions) {
-    const version = process.env.TEST_PRESTO_VERSION || options.version || '0.281';
-
-    const container = new GenericContainer(`ahanaio/prestodb-sandbox:${version}`)
+    const container = new GenericContainer(`trinodb/trino:${version}`)
       .withExposedPorts(8080)
       .withWaitStrategy(Wait.forLogMessage('======== SERVER STARTED ========'))
       .withStartupTimeout(30 * 1000);
