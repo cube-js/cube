@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.51](https://github.com/cube-js/cube/compare/v0.35.50...v0.35.51) (2024-06-20)
+
+
+### Bug Fixes
+
+* **cube:** Rebuild of PreAggregations with aggregating indexes ([#8326](https://github.com/cube-js/cube/issues/8326)) ([cc1de4f](https://github.com/cube-js/cube/commit/cc1de4f3f71bb32f71e88a6db36a59c5cc8f9571))
+* **cubesql:** Support `CAST` projection split ([bcbe47b](https://github.com/cube-js/cube/commit/bcbe47b498ee47d563c3354d52db5bca886b0b65))
+* **schema-compiler:** add escape sequence to Snowflake QueryFilter ([13d10f6](https://github.com/cube-js/cube/commit/13d10f69bfe1569a61ab091ca917a6dbcab8644a))
+
+
+### Features
+
+* **cubesql:** support timestamp subtract date in SQL API, tests ([#8372](https://github.com/cube-js/cube/issues/8372)) ([1db6a5c](https://github.com/cube-js/cube/commit/1db6a5c9bc912e52e5874a1ad01a8636523cc2ab))
+* **duckdb-driver:** Upgrade to DuckDB 1.0.0 ([#8373](https://github.com/cube-js/cube/issues/8373)) ([e41fa9f](https://github.com/cube-js/cube/commit/e41fa9fda7a4a593baf8e514aa9083e4ee1edb6a))
+
+
+### Performance Improvements
+
+* **cubesql:** Make incremental rule scheduler distinguish between generation 0 and 1 ([719d8cf](https://github.com/cube-js/cube/commit/719d8cf862be7743355224f7f1737e5ea7a8c788))
+
+
+
+
+
 ## [0.35.50](https://github.com/cube-js/cube/compare/v0.35.49...v0.35.50) (2024-06-17)
 
 

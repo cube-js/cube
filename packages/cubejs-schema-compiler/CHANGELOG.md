@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.51](https://github.com/cube-js/cube/compare/v0.35.50...v0.35.51) (2024-06-20)
+
+
+### Bug Fixes
+
+* **cube:** Rebuild of PreAggregations with aggregating indexes ([#8326](https://github.com/cube-js/cube/issues/8326)) ([cc1de4f](https://github.com/cube-js/cube/commit/cc1de4f3f71bb32f71e88a6db36a59c5cc8f9571))
+* **schema-compiler:** add escape sequence to Snowflake QueryFilter ([13d10f6](https://github.com/cube-js/cube/commit/13d10f69bfe1569a61ab091ca917a6dbcab8644a))
+
+
+
+
+
 ## [0.35.50](https://github.com/cube-js/cube/compare/v0.35.49...v0.35.50) (2024-06-17)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
