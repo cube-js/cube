@@ -765,7 +765,7 @@ export class PreAggregations {
   // eslint-disable-next-line no-unused-vars
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   getCubeLattice(cube, preAggregationName, preAggregation) {
-    throw new UserError('Auto rollups supported only in Enterprise version');
+    throw new UserError('Auto rollups are not supported now. We are exploring how to add this in the future.');
   }
 
   /**
