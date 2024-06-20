@@ -2387,6 +2387,10 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
+  collectAllMemberNames() {
+    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+  }
+
   collectMultipliedMeasures(context) {
     return (fn) => {
       const foundCompositeCubeMeasures = {};
