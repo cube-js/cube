@@ -1,0 +1,50 @@
+# Integrating with services on GCP
+
+Cube Cloud works with numerious services available on
+[Google Cloud Platform](https://cloud.google.com) (GCP).
+This page provides a non-exhaustive lists of these services.
+
+<InfoBox>
+
+[Contact us](https://cube.dev/contact) if you have questions about Cube Cloud integration with a particular service.
+
+</InfoBox>
+
+## Data sources
+
+Cube Cloud integrates with the following [data sources](/product/configuration/data-sources):
+
+- [Google BigQuery](/product/configuration/data-sources/google-bigquery)
+- [Postgres](/product/configuration/data-sources/postgres), [Microsoft SQL Server](/product/configuration/data-sources/ms-sql), [MySQL](/product/configuration/data-sources/mysql) on [Google Cloud SQL](https://cloud.google.com/sql)
+- [Hive / SparkSQL](/product/configuration/data-sources/hive), [Presto](/product/configuration/data-sources/presto), and [Trino](/product/configuration/data-sources/trino) on [Google Dataproc](https://cloud.google.com/dataproc)
+- [Parquet, CSV, and JSON files](/product/configuration/data-sources/duckdb) on [Google Cloud Storage](https://cloud.google.com/storage)
+
+## Data visualization tools
+
+Cube Cloud integrates with the following [data visualization tools](/product/configuration/visualization-tools):
+
+- [Looker Studio](https://cloud.google.com/looker-studio) via [SQL API](/product/apis-integrations/sql-api)
+
+## Storage
+
+[Google Cloud Storage](https://cloud.google.com/storage) can be used as storage for [export buckets](/product/caching/using-pre-aggregations#export-bucket) and [pre-aggregations](/product/caching/using-pre-aggregations).
+
+## Compute
+
+[Google Compute Engine](https://cloud.google.com/products/compute) can be used as compute for [deployments](/product/deployment/cloud/deployments).
+
+## Authentication
+
+[Google Identity Platform](https://cloud.google.com/security/products/identity-platform) can be used for authentication of API requests.
+
+## Single sign-on
+
+[Google Workspace](https://workspace.google.com) can be used for [single sign-on](/product/workspace/sso/google-workspace).
+
+## Monitoring
+
+[Google Cloud Logging](https://cloud.google.com/logging), [Google Cloud Monitoring](https://cloud.google.com/monitoring), and [Google Cloud Storage](https://cloud.google.com/storage) can be used as destinations for [monitoring integrations](/product/monitoring/integrations).
+
+## Networking
+
+[Google VPC](https://cloud.google.com/vpc) can be used for [secure networking](/product/deployment/cloud/vpc/gcp).

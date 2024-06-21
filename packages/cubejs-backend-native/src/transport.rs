@@ -134,6 +134,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: false,
         })?;
+
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
@@ -369,12 +370,18 @@ impl TransportService for NodeBridgeTransport {
                 streaming: false,
             })?;
 
-            let response: serde_json::Value = call_js_with_channel_as_callback(
+            let result = call_js_with_channel_as_callback(
                 self.channel.clone(),
                 self.on_sql_api_load.clone(),
                 Some(extra),
             )
-            .await?;
+            .await;
+            if let Err(e) = &result {
+                if e.message.to_lowercase().contains("continue wait") {
+                    continue;
+                }
+            }
+            let response: serde_json::Value = result?;
             #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
             #[cfg(not(debug_assertions))]

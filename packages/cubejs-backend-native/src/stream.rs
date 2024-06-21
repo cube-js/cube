@@ -1,20 +1,92 @@
 use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
+
+use std::cell::RefCell;
 use std::future::Future;
+
 use std::sync::{Arc, Mutex};
 
+use std::vec;
+
+use crate::channel::call_js_fn;
+
 use cubesql::CubeError;
+
+use neon::prelude::*;
+use tokio::sync::{oneshot, Semaphore};
+
 #[cfg(build = "debug")]
 use log::trace;
-use neon::prelude::*;
+
+use neon::types::JsDate;
 
 use crate::utils::bind_method;
 
 use tokio::sync::mpsc::{channel as mpsc_channel, Receiver, Sender};
-use tokio::sync::oneshot;
 
 type Chunk = Option<Result<RecordBatch, CubeError>>;
+
+fn handle_on_drain(mut cx: FunctionContext) -> JsResult<JsUndefined> {
+    let this = cx
+        .this::<JsBox<RefCell<OnDrainHandler>>>()?
+        .downcast_or_throw::<JsBox<RefCell<OnDrainHandler>>, _>(&mut cx)?;
+    this.borrow().on_drain();
+
+    Ok(cx.undefined())
+}
+
+#[derive(Clone)]
+pub struct OnDrainHandler {
+    channel: Arc<Channel>,
+    js_stream: Arc<Root<JsObject>>,
+    semaphore: Arc<Semaphore>,
+}
+
+unsafe impl Sync for OnDrainHandler {}
+
+impl Finalize for OnDrainHandler {}
+
+impl OnDrainHandler {
+    pub fn new(
+        channel: Arc<Channel>,
+        js_stream: Arc<Root<JsObject>>,
+        semaphore: Arc<Semaphore>,
+    ) -> Self {
+        Self {
+            channel,
+            js_stream,
+            semaphore,
+        }
+    }
+
+    pub async fn handle(&self, js_stream_on_fn: Arc<Root<JsFunction>>) -> Result<(), CubeError> {
+        let js_stream_obj = self.js_stream.clone();
+        let this = RefCell::new(self.clone());
+
+        call_js_fn(
+            self.channel.clone(),
+            js_stream_on_fn,
+            Box::new(|cx| {
+                let on_drain_fn = JsFunction::new(cx, handle_on_drain)?;
+
+                let this = cx.boxed(this).upcast::<JsValue>();
+                let on_drain_fn = bind_method(cx, on_drain_fn, this)?;
+
+                let event_arg = cx.string("drain").upcast::<JsValue>();
+
+                Ok(vec![event_arg, on_drain_fn.upcast::<JsValue>()])
+            }),
+            Box::new(|_, _| Ok(())),
+            js_stream_obj,
+        )
+        .await
+    }
+
+    fn on_drain(&self) {
+        self.semaphore.add_permits(1);
+    }
+}
 
 pub struct JsWriteStream {
     sender: Sender<Chunk>,
@@ -148,6 +220,17 @@ impl ValueObject for JsValueObject<'_> {
             || value.downcast::<JsNull, _>(&mut self.cx).is_ok()
         {
             Ok(FieldValue::Null)
+        } else if let Ok(b) = value.downcast::<JsArray, _>(&mut self.cx) {
+            Err(CubeError::user(format!(
+                "Expected primitive value but found JsArray({:?})",
+                b
+            )))
+        } else if let Ok(b) = value.downcast::<JsDate, _>(&mut self.cx) {
+            // TODO: Support it?
+            Err(CubeError::user(format!(
+                "Expected primitive value but found JsDate({:?})",
+                b
+            )))
         } else {
             Err(CubeError::user(format!(
                 "Expected primitive value but found: {:?}",
@@ -162,7 +245,7 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.push_chunk");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let chunk_array = cx.argument::<JsArray>(0)?;
     let callback = cx.argument::<JsFunction>(1)?.root(&mut cx);
@@ -188,7 +271,7 @@ fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.start");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     this.start();
 
@@ -200,7 +283,7 @@ fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.end");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let future = this.end();
     let callback = cx.argument::<JsFunction>(0)?.root(&mut cx);
@@ -214,7 +297,7 @@ fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     trace!("JsWriteStream.reject");
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<JsBox<JsWriteStream>, _>(&mut cx)?;
     let result = cx.argument::<JsString>(0)?;
     this.reject(result.value(&mut cx));

@@ -2,6 +2,7 @@ import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
+import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
 describe('SQL Generation', () => {
   describe('Common - Yaml - syntax sugar', () => {
@@ -59,7 +60,54 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with different granularity', async () => {
+    it('Test time series with 6 digits timestamp presicion - bigquery', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BigqueryQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000000', '2021-01-01T23:59:59.999999'],
+          ['2021-01-02T00:00:00.000000', '2021-01-02T23:59:59.999999']
+        ]);
+      }
+
+      const timeDimension = query.newTimeDimension({
+        dimension: 'cards.createdAt',
+        granularity: 'day',
+        dateRange: ['2021-01-01', '2021-01-02']
+      });
+
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+      expect(timeDimension.formatFromDate('2021-01-01T00:00:00.000000')).toEqual(
+        '2021-01-01T00:00:00.000000'
+      );
+
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.998')).toEqual(
+        '2021-01-01T23:59:59.998000'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+      expect(timeDimension.formatToDate('2021-01-01T23:59:59.999999')).toEqual(
+        '2021-01-01T23:59:59.999999'
+      );
+    });
+
+    it('Test time series with different granularity - postgres', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -643,7 +691,7 @@ describe('SQL Generation', () => {
         ],
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where type = \$\d\$\)/);
+      expect(cubeSQL).toContain('where ((type = $0$))');
     });
 
     it('inserts "or" filter', async () => {
@@ -668,7 +716,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) OR (type = $1$)))');
     });
 
     it('inserts "and" filter', async () => {
@@ -693,7 +741,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)/);
+      expect(cubeSQL).toContain('where (((type = $0$) AND (type = $1$)))');
     });
 
     it('inserts "or + and" filter', async () => {
@@ -736,10 +784,10 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*\(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)\s*OR\s*\(\s*type\s*=\s*\$\d\$\s*AND\s*type\s*=\s*\$\d\$\s*\)\s*\)/);
+      expect(cubeSQL).toContain('where ((((type = $0$) AND (type = $1$)) OR ((type = $2$) AND (type = $3$))))');
     });
 
-    fit('inserts "and + or" filter', async () => {
+    it('inserts "and + or" filter', async () => {
       await compilers.compiler.compile();
       const query = new BaseQuery(compilers, {
         measures: ['Order.count'],
@@ -779,7 +827,7 @@ describe('SQL Generation', () => {
         ]
       });
       const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toMatch(/where \(\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*AND\s*\(\s*type\s*=\s*\$\d\$\s*OR\s*type\s*=\s*\$\d\$\s*\)\s*\)/);
+      expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
   });
 });

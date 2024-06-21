@@ -3,6 +3,7 @@ use crate::rows::{rows, NULL};
 use crate::SqlClient;
 use async_compression::tokio::write::GzipEncoder;
 use cubestore::metastore::{Column, ColumnType};
+use cubestore::queryplanner::physical_plan_flags::PhysicalPlanFlags;
 use cubestore::queryplanner::pretty_printers::{pp_phys_plan, pp_phys_plan_ext, PPOptions};
 use cubestore::queryplanner::MIN_TOPK_STREAM_ROWS;
 use cubestore::sql::{timestamp_from_string, InlineTable, SqlQueryContext};
@@ -132,6 +133,12 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("hyperloglog_inplace_group_by", hyperloglog_inplace_group_by),
         t("hyperloglog_postgres", hyperloglog_postgres),
         t("hyperloglog_snowflake", hyperloglog_snowflake),
+        t("hyperloglog_databricks", hyperloglog_databricks),
+        t(
+            "aggregate_index_hll_databricks",
+            aggregate_index_hll_databricks,
+        ),
+        t("physical_plan_flags", physical_plan_flags),
         t("planning_inplace_aggregate", planning_inplace_aggregate),
         t("planning_hints", planning_hints),
         t("planning_inplace_aggregate2", planning_inplace_aggregate2),
@@ -174,6 +181,10 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_extra_aggregate,
         ),
         t(
+            "rolling_window_extra_aggregate_addon",
+            rolling_window_extra_aggregate_addon,
+        ),
+        t(
             "rolling_window_extra_aggregate_timestamps",
             rolling_window_extra_aggregate_timestamps,
         ),
@@ -186,6 +197,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
             rolling_window_one_quarter_interval,
         ),
         t("rolling_window_offsets", rolling_window_offsets),
+        t("rolling_window_filtered", rolling_window_filtered),
         t("decimal_index", decimal_index),
         t("decimal_order", decimal_order),
         t("float_index", float_index),
@@ -239,6 +251,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("cache_compaction", cache_compaction),
         t("cache_set_nx", cache_set_nx),
         t("cache_prefix_keys", cache_prefix_keys),
+        t("queue_list_v1", queue_list_v1),
         t("queue_full_workflow_v1", queue_full_workflow_v1),
         t("queue_full_workflow_v2", queue_full_workflow_v2),
         t("queue_latest_result_v1", queue_latest_result_v1),
@@ -2767,6 +2780,124 @@ async fn hyperloglog_snowflake(service: Box<dyn SqlClient>) {
         .unwrap_err();
 }
 
+async fn hyperloglog_databricks(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.hlls(id int, hll HLL_DATASKETCHES)")
+        .await
+        .unwrap();
+
+    service.exec_query("INSERT INTO s.hlls(id, hll) VALUES \
+        (1, X'0201070c03000408067365047b65c3a608c39b17c29a0ac383c2b0380400000000000000000000000000000000'), \
+        (2, X'0201070c03000408c39b17c29a0ac383c2b03804067365047b65c3a60800000000000000000000000000000000'), \
+        (3, X'0301070c05000009140000000000000021c3b23905c2a1c38d490ac283c2b711071bc2a1c3961200000000000000000000000008c29bc39904497ac39908000000002bc3b2c3bb062c45670ac3adc29e24074bc298c2a6086f2c7f050000000000000000c392c295c2900dc3b3c28bc38106c38dc3884607c2b50dc3b70600000000c3b762c28207c398c393350f00000000000000001b27c2b20b00000000c29dc28a7210000000003fc3b95b0f')"
+    ).await.unwrap();
+
+    let r = service
+        .exec_query("SELECT id, cardinality(hll) FROM s.hlls ORDER BY id")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(1, 4), (2, 4), (3, 20)]));
+}
+
+async fn aggregate_index_hll_databricks(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Orders(a int, b int, a_hll HLL_DATASKETCHES)
+                     AGGREGATIONS(merge(a_hll))
+                     AGGREGATE INDEX aggr_index (a, b)
+                     ",
+        )
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Orders (a, b, a_hll) VALUES \
+                    (1, 10, X'0201070c03000408067365047b65c3a608c39b17c29a0ac383c2b0380400000000000000000000000000000000'), \
+                    (1, 20, X'0201070c03000408067365047b65c3a608c39b17c29a0ac383c2b0380400000000000000000000000000000000'), \
+                    (1, 10, X'0201070c03000408067365047b65c3a608c39b17c29a0ac383c2b0380400000000000000000000000000000000'), \
+                    (1, 20, X'0201070c03000408067365047b65c3a608c39b17c29a0ac383c2b0380400000000000000000000000000000000')
+           ",
+        )
+        .await
+        .unwrap();
+
+    let res = service
+        .exec_query("SELECT a, b, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1, 2 ORDER BY 1, 2")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&res),
+        [
+            [TableValue::Int(1), TableValue::Int(10), TableValue::Int(4)],
+            [TableValue::Int(1), TableValue::Int(20), TableValue::Int(4)],
+        ]
+    );
+
+    let res = service
+        .exec_query("SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders WHERE b = 20 GROUP BY 1 ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(4)],]);
+
+    let res = service
+        .exec_query(
+            "SELECT a, cardinality(merge(a_hll)) as hll FROM s.Orders GROUP BY 1 ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&res), [[TableValue::Int(1), TableValue::Int(4)],]);
+}
+
+async fn physical_plan_flags(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE PARTITIONED INDEX s.ind(url text, day text, category text)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.Data(url text, day text, category text, hits int, clicks int) \
+            ADD TO PARTITIONED INDEX s.ind(url, day, category)",
+        )
+        .await
+        .unwrap();
+
+    // (query, is_optimal)
+    let cases = vec![
+        ("SELECT SUM(hits) FROM s.Data", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR category = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test' AND category = 'test')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day = 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
+        ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
+        ("SELECT SUM(hits), url, day FROM s.Data GROUP BY url, day", true),
+        ("SELECT SUM(hits), day FROM s.Data GROUP BY day", false),
+        ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false),
+    ];
+
+    for (query, expected_optimal) in cases {
+        let p = service.plan_query(query).await.unwrap();
+        let flags = PhysicalPlanFlags::with_execution_plan(p.router.as_ref());
+        assert_eq!(
+            flags.is_suboptimal_query(),
+            !expected_optimal,
+            "Query failed: {}",
+            query
+        );
+    }
+}
+
 async fn planning_inplace_aggregate(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5032,6 +5163,49 @@ async fn rolling_window_extra_aggregate(service: Box<dyn SqlClient>) {
         .unwrap_err();
 }
 
+async fn rolling_window_extra_aggregate_addon(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.Data(day int, name text, n int)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.Data(day, name, n) VALUES (11, 'john', 10), \
+                                                     (11, 'sara', 7), \
+                                                     (13, 'sara', 3), \
+                                                     (13, 'john', 9), \
+                                                     (13, 'john', 11), \
+                                                     (15, 'timmy', 5)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "SELECT day, ROLLING(SUM(n) RANGE 1 PRECEDING), SUM(n) \
+             FROM (SELECT day, SUM(n) as n FROM s.Data GROUP BY 1) \
+             ROLLING_WINDOW DIMENSION day \
+             GROUP BY DIMENSION day \
+             FROM 9 TO 15 EVERY 1 \
+             ORDER BY 1",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (9, None, None),
+            (10, None, None),
+            (11, Some(17), Some(17)),
+            (12, Some(17), None),
+            (13, Some(23), Some(23)),
+            (14, Some(23), None),
+            (15, Some(5), Some(5))
+        ])
+    );
+}
+
 async fn rolling_window_extra_aggregate_timestamps(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -5215,6 +5389,89 @@ async fn rolling_window_offsets(service: Box<dyn SqlClient>) {
             (6, None),
             (8, Some(9)),
             (10, None)
+        ])
+    );
+}
+
+async fn rolling_window_filtered(service: Box<dyn SqlClient>) {
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query(
+            "CREATE TABLE s.data(category text, day timestamp, count int, claimed_count int)",
+        )
+        .await
+        .unwrap();
+
+    service
+        .exec_query(
+            "INSERT INTO s.data(category, day, count, claimed_count)\
+                        VALUES \
+                         ('eth', '2023-12-12T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-08T00:00:00.000Z', 1, 1), \
+                         ('github', '2023-12-06T00:00:00.000Z', 2, 2), \
+                         ('starkex', '2023-12-05T00:00:00.000Z', 0, 0), \
+                         ('starkex', '2023-12-07T00:00:00.000Z', 1, 1)",
+        )
+        .await
+        .unwrap();
+
+    let r = service
+        .exec_query(
+            "
+                SELECT \
+                `day`, \
+                ROLLING( \
+                    sum( \
+                    `claimed_count` \
+                    ) RANGE UNBOUNDED PRECEDING OFFSET end \
+                ) `claimed_count`, \
+                sum( \
+                `count` \
+                ) `count` \
+                FROM \
+                ( \
+                    SELECT \
+                    `day` `day`, \
+                    sum( \
+                        `count` \
+                    ) `count`, \
+                    sum( \
+                        `claimed_count` \
+                    ) `claimed_count`
+                    FROM \
+                    ( \
+                        SELECT \
+                        * \
+                        FROM \
+                        s.data \
+                         \
+                    ) AS `starknet_test_provisions__eth_cumulative` \
+                    WHERE `starknet_test_provisions__eth_cumulative`.category = 'github'
+                    GROUP BY \
+                    1 \
+                ) `base` ROLLING_WINDOW DIMENSION `day` \
+                GROUP BY \
+                DIMENSION `day` \
+                FROM \
+                date_trunc('day', to_timestamp('2023-12-04T00:00:00.000')) TO date_trunc('day', to_timestamp('2023-12-10T13:41:12.000')) EVERY INTERVAL '1 day'
+                ORDER BY 1
+            ",
+        )
+        .await
+        .unwrap();
+    let days = (4..=10)
+        .map(|d| timestamp_from_string(&format!("2023-12-{:02}T00:00:00.000Z", d)).unwrap())
+        .collect_vec();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            (days[0], None, None),
+            (days[1], None, None),
+            (days[2], Some(2), Some(2)),
+            (days[3], Some(2), None),
+            (days[4], Some(3), Some(1)),
+            (days[5], Some(3), None),
+            (days[6], Some(3), None),
         ])
     );
 }
@@ -6603,7 +6860,7 @@ async fn assert_limit_pushdown(
 async fn cache_incr(service: Box<dyn SqlClient>) {
     let query = r#"CACHE INCR "prefix:key""#;
 
-    let r = service.exec_query(query.clone()).await.unwrap();
+    let r = service.exec_query(query).await.unwrap();
 
     assert_eq!(
         r.get_rows(),
@@ -8302,6 +8559,104 @@ async fn queue_latest_result_v1(service: Box<dyn SqlClient>) {
             ]),]
         );
     }
+}
+
+async fn queue_list_v1(service: Box<dyn SqlClient>) {
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_1" "payload1";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    let add_response = service
+        .exec_query(r#"QUEUE ADD PRIORITY 1 "STANDALONE#queue:queue_key_2" "payload2";"#)
+        .await
+        .unwrap();
+    assert_queue_add_columns(&add_response);
+
+    {
+        let retrieve_response = service
+            .exec_query(r#"QUEUE RETRIEVE CONCURRENCY 1 "STANDALONE#queue:queue_key_1""#)
+            .await
+            .unwrap();
+        assert_queue_retrieve_columns(&retrieve_response);
+        assert_eq!(
+            retrieve_response.get_rows(),
+            &vec![Row::new(vec![
+                TableValue::String("payload1".to_string()),
+                TableValue::Null,
+                TableValue::Int(1),
+                // list of active keys
+                TableValue::String("queue_key_1".to_string()),
+                TableValue::String("1".to_string()),
+            ]),]
+        );
+    }
+
+    let list_response = service
+        .exec_query(r#"QUEUE LIST "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(
+        list_response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("queue_id".to_string(), ColumnType::String, 1),
+            Column::new("status".to_string(), ColumnType::String, 2),
+            Column::new("extra".to_string(), ColumnType::String, 3),
+        ]
+    );
+    assert_eq!(
+        list_response.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("queue_key_1".to_string()),
+                TableValue::String("1".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null
+            ]),
+            Row::new(vec![
+                TableValue::String("queue_key_2".to_string()),
+                TableValue::String("2".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null
+            ])
+        ]
+    );
+
+    let list_response = service
+        .exec_query(r#"QUEUE LIST WITH_PAYLOAD "STANDALONE#queue";"#)
+        .await
+        .unwrap();
+    assert_eq!(
+        list_response.get_columns(),
+        &vec![
+            Column::new("id".to_string(), ColumnType::String, 0),
+            Column::new("queue_id".to_string(), ColumnType::String, 1),
+            Column::new("status".to_string(), ColumnType::String, 2),
+            Column::new("extra".to_string(), ColumnType::String, 3),
+            Column::new("payload".to_string(), ColumnType::String, 4),
+        ]
+    );
+    assert_eq!(
+        list_response.get_rows(),
+        &vec![
+            Row::new(vec![
+                TableValue::String("queue_key_1".to_string()),
+                TableValue::String("1".to_string()),
+                TableValue::String("active".to_string()),
+                TableValue::Null,
+                TableValue::String("payload1".to_string())
+            ]),
+            Row::new(vec![
+                TableValue::String("queue_key_2".to_string()),
+                TableValue::String("2".to_string()),
+                TableValue::String("pending".to_string()),
+                TableValue::Null,
+                TableValue::String("payload2".to_string())
+            ])
+        ]
+    );
 }
 
 async fn queue_full_workflow_v1(service: Box<dyn SqlClient>) {

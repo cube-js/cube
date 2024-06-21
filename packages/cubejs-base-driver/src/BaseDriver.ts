@@ -16,14 +16,15 @@ import {
 } from '@cubejs-backend/shared';
 import { reduce } from 'ramda';
 import fs from 'fs';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
+
 import { cancelCombinator } from './utils';
 import {
   ExternalCreateTableOptions,
   DownloadQueryResultsOptions,
   DownloadQueryResultsResult,
-  DownloadTableCSVData,
   DownloadTableData,
-  DownloadTableMemoryData,
   DriverInterface,
   ExternalDriverCompatibilities,
   IndexesSQL,
@@ -37,7 +38,10 @@ import {
   DriverCapabilities,
   QuerySchemasResult,
   QueryTablesResult,
-  QueryColumnsResult
+  QueryColumnsResult,
+  TableMemoryData,
+  PrimaryKeysQueryResult,
+  ForeignKeysQueryResult,
 } from './driver.interface';
 
 const sortByKeys = (unordered: any) => {
@@ -150,7 +154,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -158,7 +162,7 @@ export abstract class BaseDriver implements DriverInterface {
     return `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
       GROUP BY table_schema
     `;
   }
@@ -167,7 +171,7 @@ export abstract class BaseDriver implements DriverInterface {
     const query = `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')},
             table_name as ${this.quoteIdentifier('table_name')}
-      FROM information_schema.tables
+      FROM information_schema.tables as columns
       WHERE table_schema IN (${schemasPlaceholders})
     `;
     return query;
@@ -179,18 +183,65 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_name as ${this.quoteIdentifier('table_name')},
              columns.table_schema as ${this.quoteIdentifier('schema_name')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
-      FROM information_schema.columns
+      FROM information_schema.columns as columns
       WHERE ${conditionString}
     `;
+
     return query;
   }
 
+  protected primaryKeysQuery(_?: string): string | null {
+    return null;
+  }
+
+  protected foreignKeysQuery(_?: string): string | null {
+    return null;
+  }
+
+  protected async primaryKeys(conditionString?: string, params?: string[]): Promise<PrimaryKeysQueryResult[]> {
+    const query = this.primaryKeysQuery(conditionString);
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query<PrimaryKeysQueryResult>(query, params));
+    } catch (error: any) {
+      if (this.logger) {
+        this.logger('Primary Keys Query failed. Primary Keys will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
+      return [];
+    }
+  }
+
+  protected async foreignKeys(conditionString?: string, params?: string[]): Promise<ForeignKeysQueryResult[]> {
+    const query = this.foreignKeysQuery(conditionString);
+
+    if (!query) {
+      return [];
+    }
+
+    try {
+      return (await this.query<ForeignKeysQueryResult>(query, params));
+    } catch (error: any) {
+      if (this.logger) {
+        this.logger('Foreign Keys Query failed. Joins will be defined by heuristics', {
+          error: (error.stack || error).toString()
+        });
+      }
+      return [];
+    }
+  }
+
   protected getColumnNameForSchemaName() {
-    return 'table_schema';
+    return 'columns.table_schema';
   }
 
   protected getColumnNameForTableName() {
-    return 'table_name';
+    return 'columns.table_name';
   }
 
   protected getSslOptions(dataSource: string): TLSConnectionOptions | undefined {
@@ -314,7 +365,11 @@ export abstract class BaseDriver implements DriverInterface {
     let schema = (result[i.table_schema] || {});
     const tables = (schema[i.table_name] || []);
 
-    tables.push({ name: i.column_name, type: i.data_type, attributes: i.key_type ? ['primaryKey'] : [] });
+    tables.push({
+      name: i.column_name,
+      type: i.data_type,
+      attributes: i.key_type ? ['primaryKey'] : []
+    });
 
     tables.sort();
     schema[i.table_name] = tables;
@@ -328,6 +383,39 @@ export abstract class BaseDriver implements DriverInterface {
     const query = this.informationSchemaQuery();
 
     return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+  }
+
+  // Extended version of tablesSchema containing primary and foreign keys
+  public async tablesSchemaV2() {
+    const tablesSchema = await this.tablesSchema();
+    const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
+
+    for (const pk of primaryKeys) {
+      if (Array.isArray(tablesSchema?.[pk.table_schema]?.[pk.table_name])) {
+        tablesSchema[pk.table_schema][pk.table_name] = tablesSchema[pk.table_schema][pk.table_name].map((it: any) => {
+          if (it.name === pk.column_name) {
+            it.attributes = ['primaryKey'];
+          }
+          return it;
+        });
+      }
+    }
+
+    for (const foreignKey of foreignKeys) {
+      if (Array.isArray(tablesSchema?.[foreignKey.table_schema]?.[foreignKey.table_name])) {
+        tablesSchema[foreignKey.table_schema][foreignKey.table_name] = tablesSchema[foreignKey.table_schema][foreignKey.table_name].map((it: any) => {
+          if (it.name === foreignKey.column_name) {
+            it.foreign_keys = [...(it.foreign_keys || []), {
+              target_table: foreignKey.target_table,
+              target_column: foreignKey.target_column
+            }];
+          }
+          return it;
+        });
+      }
+    }
+
+    return tablesSchema;
   }
 
   public async createSchemaIfNotExists(schemaName: string): Promise<void> {
@@ -354,7 +442,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.query<QueryTablesResult>(query, schemaNames);
   }
 
-  public getColumnsForSpecificTables(tables: QueryTablesResult[]) {
+  public async getColumnsForSpecificTables(tables: QueryTablesResult[]) {
     const groupedBySchema: Record<string, string[]> = {};
     tables.forEach((t) => {
       if (!groupedBySchema[t.schema_name]) {
@@ -379,8 +467,26 @@ export abstract class BaseDriver implements DriverInterface {
     const conditionString = conditions.join(' OR ');
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
+    
+    const [primaryKeys, foreignKeys] = await Promise.all([
+      this.primaryKeys(conditionString, parameters),
+      this.foreignKeys(conditionString, parameters)
+    ]);
 
-    return this.query<QueryColumnsResult>(query, parameters);
+    const columns = await this.query<QueryColumnsResult>(query, parameters);
+
+    for (const column of columns) {
+      if (primaryKeys.some(pk => pk.table_schema === column.schema_name && pk.table_name === column.table_name && pk.column_name === column.column_name)) {
+        column.attributes = ['primaryKey'];
+      }
+
+      column.foreign_keys = foreignKeys.filter(fk => fk.table_schema === column.schema_name && fk.table_name === column.table_name && fk.column_name === column.column_name).map(fk => ({
+        target_table: fk.target_table,
+        target_column: fk.target_column
+      }));
+    }
+
+    return columns;
   }
 
   public getTablesQuery(schemaName: string) {
@@ -406,7 +512,7 @@ export abstract class BaseDriver implements DriverInterface {
     return this.testConnectionTimeoutValue;
   }
 
-  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<DownloadTableMemoryData | DownloadTableCSVData> {
+  public async downloadTable(table: string, _options: ExternalDriverCompatibilities): Promise<TableMemoryData> {
     return { rows: await this.query(`SELECT * FROM ${table}`) };
   }
 
@@ -463,7 +569,7 @@ export abstract class BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public async queryColumnTypes(sql: string, params?: unknown[]): Promise<{ name: any; type: string; }[]> {
+  public async queryColumnTypes(sql: string, params: unknown[]): Promise<{ name: any; type: string; }[]> {
     return [];
   }
 
@@ -531,5 +637,39 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  /**
+   * Returns an array of signed AWS S3 URLs of the unloaded csv files.
+   */
+  protected async extractUnloadedFilesFromS3(
+    clientOptions: S3ClientConfig,
+    bucketName: string,
+    prefix: string
+  ): Promise<string[]> {
+    const storage = new S3(clientOptions);
+
+    const list = await storage.listObjectsV2({
+      Bucket: bucketName,
+      Prefix: prefix,
+    });
+    if (list) {
+      if (!list.Contents) {
+        return [];
+      } else {
+        const csvFile = await Promise.all(
+          list.Contents.map(async (file) => {
+            const command = new GetObjectCommand({
+              Bucket: bucketName,
+              Key: file.Key,
+            });
+            return getSignedUrl(storage, command, { expiresIn: 3600 });
+          })
+        );
+        return csvFile;
+      }
+    }
+
+    throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
   }
 }

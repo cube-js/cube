@@ -127,6 +127,17 @@ cube(`students`, {
 
 </CodeTabs>
 
+<ReferenceBox>
+
+Currently, `{cube.sql()}` is not supported in YAML data models.
+Please [track this issue](https://github.com/cube-js/cube/issues/7484).
+
+As a workaround, you can use JavaScript data models, put a SQL query in a
+[Jinja](/product/data-modeling/dynamic/jinja#jinja) variable, or load it from
+the [template context](/reference/python/cube#templatecontext-class).
+
+</ReferenceBox>
+
 Once we have those cubes, we can define correct joins from the `lessons` cube:
 
 <CodeTabs>

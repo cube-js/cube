@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9930
+expression: "execute_query(\"SELECT\n                    relname,\n                    has_table_privilege(relname, 'select') \\\"select\\\",\n                    has_table_privilege(relname, 'insert') \\\"insert\\\",\n                    has_table_privilege(relname, 'delete') \\\"delete\\\"\n                FROM pg_class\n                ORDER BY relname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+--------+--------+--------+
+| relname                   | select | insert | delete |
++---------------------------+--------+--------+--------+
+| KibanaSampleDataEcommerce | true   | false  | false  |
+| Logs                      | true   | false  | false  |
+| NumberCube                | true   | false  | false  |
+| WideCube                  | true   | false  | false  |
++---------------------------+--------+--------+--------+

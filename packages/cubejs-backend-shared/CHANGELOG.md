@@ -3,6 +3,99 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Features
+
+* **bigquery-driver:** Use 6 digits precision for timestamps ([#8308](https://github.com/cube-js/cube/issues/8308)) ([568bfe3](https://github.com/cube-js/cube/commit/568bfe34bc6aca136b580acb8873d208b522a2f3))
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube.js/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+
+### Features
+
+* **firebolt:** Switch to the new auth method ([#8182](https://github.com/cube-js/cube.js/issues/8182)) ([e559114](https://github.com/cube-js/cube.js/commit/e55911478d0b3ba916d44f1fa4c04697d7ca7dfb))
+
+
+
+
+
+## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
+
+
+### Features
+
+* **query-orchestrator:** Queue - improve performance ([#7983](https://github.com/cube-js/cube/issues/7983)) ([56d48fb](https://github.com/cube-js/cube/commit/56d48fb2bad6210f38cfcc6189b683dd2ead62c2))
+
+
+
+
+
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube.js/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* Bump max connect retries for Cube Store ([00a6ec0](https://github.com/cube-js/cube.js/commit/00a6ec034c2d5dff8c66647b7ec6cae39c0237ba))
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube.js/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+
+### Features
+
+* **materialize-driver:** Add cluster option to Materialize driver ([#7773](https://github.com/cube-js/cube.js/issues/7773)) Thanks [@bobbyiliev](https://github.com/bobbyiliev)! ([917004e](https://github.com/cube-js/cube.js/commit/917004ebccfeb6509a08e5b9b51e1ae8542cf0af))
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube.js/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+
+### Features
+
+* **duckdb-driver:** Add support for local fs duckdb database path ([#7799](https://github.com/cube-js/cube.js/issues/7799)) ([77cc883](https://github.com/cube-js/cube.js/commit/77cc883a3d73d37730a82ecf9128b8929abb2ca3))
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube.js/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+
+### Bug Fixes
+
+* Cannot read properties of null (reading 'includes') ([9b50382](https://github.com/cube-js/cube.js/commit/9b503827a8f4cf18b926dfec4e65a0dce0de0b70))
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube.js/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
 ## [0.34.47](https://github.com/cube-js/cube.js/compare/v0.34.46...v0.34.47) (2024-01-23)
 
 

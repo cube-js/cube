@@ -45,11 +45,13 @@ impl WrapperRules {
                         ),
                         "?alias_to_cube_out",
                         "?ungrouped_out",
+                        "WrapperPullupReplacerInProjection:false",
                         "?members",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
                 self.transform_wrap_cube_scan(
+                    "?members",
                     "?alias_to_cube",
                     "?ungrouped",
                     "?alias_to_cube_out",
@@ -63,6 +65,7 @@ impl WrapperRules {
                         "?cube_scan_input",
                         "?alias_to_cube",
                         "?ungrouped",
+                        "?in_projection",
                         "?cube_members",
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -74,37 +77,42 @@ impl WrapperRules {
 
     fn transform_wrap_cube_scan(
         &self,
+        members_var: &'static str,
         alias_to_cube_var: &'static str,
         ungrouped_cube_var: &'static str,
         alias_to_cube_var_out: &'static str,
         ungrouped_cube_var_out: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let members_var = var!(members_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let ungrouped_cube_var = var!(ungrouped_cube_var);
         let alias_to_cube_var_out = var!(alias_to_cube_var_out);
         let ungrouped_cube_var_out = var!(ungrouped_cube_var_out);
         move |egraph, subst| {
-            for alias_to_cube in
-                var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
-            {
-                for ungrouped in
-                    var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
+            if let Some(_) = egraph[subst[members_var]].data.member_name_to_expr {
+                for alias_to_cube in
+                    var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
                 {
-                    subst.insert(
-                        ungrouped_cube_var_out,
-                        egraph.add(LogicalPlanLanguage::WrapperPullupReplacerUngrouped(
-                            WrapperPullupReplacerUngrouped(ungrouped),
-                        )),
-                    );
-                    subst.insert(
-                        alias_to_cube_var_out,
-                        egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
-                            WrapperPullupReplacerAliasToCube(alias_to_cube),
-                        )),
-                    );
-                    return true;
+                    for ungrouped in
+                        var_iter!(egraph[subst[ungrouped_cube_var]], CubeScanUngrouped).cloned()
+                    {
+                        subst.insert(
+                            ungrouped_cube_var_out,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerUngrouped(
+                                WrapperPullupReplacerUngrouped(ungrouped),
+                            )),
+                        );
+                        subst.insert(
+                            alias_to_cube_var_out,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerAliasToCube(
+                                WrapperPullupReplacerAliasToCube(alias_to_cube),
+                            )),
+                        );
+                        return true;
+                    }
                 }
             }
+
             false
         }
     }

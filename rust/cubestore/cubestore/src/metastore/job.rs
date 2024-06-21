@@ -61,6 +61,7 @@ pub enum JobStatus {
     Completed,
     Timeout,
     Error(String),
+    Orphaned,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug, Hash)]

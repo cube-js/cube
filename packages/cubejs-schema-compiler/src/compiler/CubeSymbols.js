@@ -5,12 +5,14 @@ import { camelize } from 'inflection';
 import { UserError } from './UserError';
 import { DynamicReference } from './DynamicReference';
 import { camelizeCube } from './utils';
+import { BaseQuery } from '../adapter';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
   USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
+  FILTER_GROUP: 'filterGroup',
   SQL_UTILS: 'sqlUtils'
 };
 
@@ -234,6 +236,15 @@ export class CubeSymbols {
 
       const includeMembers = this.generateIncludeMembers(finalIncludes, cube.name, type);
       this.applyIncludeMembers(includeMembers, cube, type, errorReporter);
+
+      cube.includedMembers = [...(cube.includedMembers || []), ...Array.from(new Set(finalIncludes.map((it) => {
+        const split = it.member.split('.');
+        const memberPath = this.pathFromArray([split[split.length - 2], split[split.length - 1]]);
+        return {
+          memberPath,
+          name: it.name
+        };
+      })))];
     }
   }
 
@@ -366,13 +377,12 @@ export class CubeSymbols {
       if (type === 'measures') {
         memberDefinition = {
           sql,
-          type: 'number',
+          type: BaseQuery.toMemberDataType(resolvedMember.type),
           aggType: resolvedMember.type,
           meta: resolvedMember.meta,
           title: resolvedMember.title,
           description: resolvedMember.description,
           format: resolvedMember.format,
-          drillMembers: resolvedMember.drillMembers,
         };
       } else if (type === 'dimensions') {
         memberDefinition = {

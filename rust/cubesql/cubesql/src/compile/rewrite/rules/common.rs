@@ -2,19 +2,21 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
-        binary_expr, column_expr, AliasExprAlias, LogicalPlanLanguage,
+        binary_expr, column_expr, fun_expr,
+        rewriter::{RewriteRules, Rewriter},
+        transform_original_expr_to_alias, transforming_rewrite_with_root, udf_expr, AliasExprAlias,
+        LogicalPlanLanguage,
     },
+    config::ConfigObj,
     var,
 };
 use datafusion::{logical_plan::DFSchema, scalar::ScalarValue};
 use egg::{EGraph, Id, Rewrite, Subst};
+use std::{fmt::Display, sync::Arc};
 
-use crate::compile::rewrite::{
-    rewriter::{RewriteRules, Rewriter},
-    transforming_rewrite_with_root,
-};
-
-pub struct CommonRules {}
+pub struct CommonRules {
+    config_obj: Arc<dyn ConfigObj>,
+}
 
 impl RewriteRules for CommonRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -57,13 +59,30 @@ impl RewriteRules for CommonRules {
             ));
         }
 
+        rules.extend(vec![
+            // Redshift CHARINDEX to STRPOS
+            transforming_rewrite_with_root(
+                "redshift-charindex-to-strpos",
+                udf_expr("charindex", vec!["?substring", "?string"]),
+                alias_expr(
+                    self.fun_expr("Strpos", vec!["?string", "?substring"]),
+                    "?alias",
+                ),
+                transform_original_expr_to_alias("?alias"),
+            ),
+        ]);
+
         rules
     }
 }
 
 impl CommonRules {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self { config_obj }
+    }
+
+    fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
+        fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
     }
 
     fn transform_aggregate_binary_unwrap(

@@ -3,6 +3,318 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.46](https://github.com/cube-js/cube/compare/v0.35.45...v0.35.46) (2024-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.44](https://github.com/cube-js/cube/compare/v0.35.43...v0.35.44) (2024-06-04)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Range intersection for 6 digits timestamp, fix [#8320](https://github.com/cube-js/cube/issues/8320) ([#8322](https://github.com/cube-js/cube/issues/8322)) ([667e95b](https://github.com/cube-js/cube/commit/667e95bd9933d67f84409c09f61d47b28156f0c2))
+
+
+
+
+
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Features
+
+* **bigquery-driver:** Use 6 digits precision for timestamps ([#8308](https://github.com/cube-js/cube/issues/8308)) ([568bfe3](https://github.com/cube-js/cube/commit/568bfe34bc6aca136b580acb8873d208b522a2f3))
+
+
+
+
+
+## [0.35.34](https://github.com/cube-js/cube/compare/v0.35.33...v0.35.34) (2024-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.31](https://github.com/cube-js/cube/compare/v0.35.30...v0.35.31) (2024-05-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.17](https://github.com/cube-js/cube/compare/v0.35.16...v0.35.17) (2024-04-16)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.9](https://github.com/cube-js/cube/compare/v0.35.8...v0.35.9) (2024-04-08)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.8](https://github.com/cube-js/cube/compare/v0.35.7...v0.35.8) (2024-04-05)
+
+
+### Features
+
+* **cubestore:** Queue - optimize list/pending operations ([#7998](https://github.com/cube-js/cube/issues/7998)) ([815be2f](https://github.com/cube-js/cube/commit/815be2fb90bf84d095f2ab6b208167b8cc8433e7))
+
+
+
+
+
+## [0.35.7](https://github.com/cube-js/cube/compare/v0.35.6...v0.35.7) (2024-04-03)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.5](https://github.com/cube-js/cube/compare/v0.35.4...v0.35.5) (2024-03-28)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.35.4](https://github.com/cube-js/cube/compare/v0.35.3...v0.35.4) (2024-03-27)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Missing dataSource in pre-aggregation preview query ([#7989](https://github.com/cube-js/cube/issues/7989)) ([d3012c8](https://github.com/cube-js/cube/commit/d3012c8075382a4bf66156cb56765f0483d111dc))
+
+
+
+
+
+## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
+
+
+### Features
+
+* **query-orchestrator:** Queue - improve performance ([#7983](https://github.com/cube-js/cube/issues/7983)) ([56d48fb](https://github.com/cube-js/cube/commit/56d48fb2bad6210f38cfcc6189b683dd2ead62c2))
+
+
+
+
+
+## [0.35.1](https://github.com/cube-js/cube/compare/v0.35.0...v0.35.1) (2024-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+
+### Bug Fixes
+
+* **query-orchestrator:** Job API - builds are not triggered, fix [#7726](https://github.com/cube-js/cube/issues/7726) ([#7909](https://github.com/cube-js/cube/issues/7909)) ([738dbde](https://github.com/cube-js/cube/commit/738dbde3ab3767d935f733ab8770aaa8cba9c631))
+
+
+
+
+
+## [0.34.61](https://github.com/cube-js/cube/compare/v0.34.60...v0.34.61) (2024-03-11)
+
+
+### Features
+
+* **query-orchestrator:** Support unload (export bucket) for readOnly drivers ([76ce7ed](https://github.com/cube-js/cube/commit/76ce7ed176e0c8097bc8024a7e5e82bbb48d5d1c))
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+**Note:** Version bump only for package @cubejs-backend/query-orchestrator
+
+
+
+
+
+## [0.34.50](https://github.com/cube-js/cube/compare/v0.34.49...v0.34.50) (2024-01-31)
+
+
+### Bug Fixes
+
+* Merge streaming methods to one interface to allow SQL API use batching and Databricks batching implementation ([#7695](https://github.com/cube-js/cube/issues/7695)) ([73ad72d](https://github.com/cube-js/cube/commit/73ad72dd8a104651cf5ef23a60e8b4c116c97eed))
+
+
+
+
+
 ## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/query-orchestrator

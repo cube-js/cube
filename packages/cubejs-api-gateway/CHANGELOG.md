@@ -3,6 +3,419 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.51](https://github.com/cube-js/cube/compare/v0.35.50...v0.35.51) (2024-06-20)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.50](https://github.com/cube-js/cube/compare/v0.35.49...v0.35.50) (2024-06-17)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.49](https://github.com/cube-js/cube/compare/v0.35.48...v0.35.49) (2024-06-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.47](https://github.com/cube-js/cube/compare/v0.35.46...v0.35.47) (2024-06-07)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.46](https://github.com/cube-js/cube/compare/v0.35.45...v0.35.46) (2024-06-06)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.45](https://github.com/cube-js/cube/compare/v0.35.44...v0.35.45) (2024-06-05)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.44](https://github.com/cube-js/cube/compare/v0.35.43...v0.35.44) (2024-06-04)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Features
+
+* sql api over http ([#8254](https://github.com/cube-js/cube/issues/8254)) ([4c18954](https://github.com/cube-js/cube/commit/4c18954452bf14268a2f368960a72fec45f274dc))
+
+
+
+
+
+## [0.35.42](https://github.com/cube-js/cube/compare/v0.35.41...v0.35.42) (2024-05-30)
+
+
+### Features
+
+* **cubesql:** Group By Rollup support ([#8281](https://github.com/cube-js/cube/issues/8281)) ([e563798](https://github.com/cube-js/cube/commit/e5637980489608e374f3b89cc219207973a08bbb))
+
+
+
+
+
+## [0.35.40](https://github.com/cube-js/cube/compare/v0.35.39...v0.35.40) (2024-05-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Propagate error from api-gateway to SQL API ([#8297](https://github.com/cube-js/cube/issues/8297)) ([1a93d3d](https://github.com/cube-js/cube/commit/1a93d3d85de5099a0325750e4d3e203693b50109))
+
+
+
+
+
+## [0.35.39](https://github.com/cube-js/cube/compare/v0.35.38...v0.35.39) (2024-05-24)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.37](https://github.com/cube-js/cube/compare/v0.35.36...v0.35.37) (2024-05-20)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.36](https://github.com/cube-js/cube/compare/v0.35.35...v0.35.36) (2024-05-17)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.35](https://github.com/cube-js/cube/compare/v0.35.34...v0.35.35) (2024-05-17)
+
+
+### Features
+
+* **cubesql:** Send expressions as objects ([#8216](https://github.com/cube-js/cube/issues/8216)) ([4deee84](https://github.com/cube-js/cube/commit/4deee845a51e3999f3a75b121e14b570a124ad3a))
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.32](https://github.com/cube-js/cube/compare/v0.35.31...v0.35.32) (2024-05-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.31](https://github.com/cube-js/cube/compare/v0.35.30...v0.35.31) (2024-05-13)
+
+
+### Features
+
+* Support probing `LIMIT 0` queries ([117f332](https://github.com/cube-js/cube/commit/117f3324a4db75c596d6e4b0a1cafffc76aab068))
+
+
+
+
+
+## [0.35.30](https://github.com/cube-js/cube/compare/v0.35.29...v0.35.30) (2024-05-10)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.26](https://github.com/cube-js/cube/compare/v0.35.25...v0.35.26) (2024-05-02)
+
+
+### Bug Fixes
+
+* **gateway:** Don't process meta with `onlyCompilerId` flag set ([76ae23e](https://github.com/cube-js/cube/commit/76ae23edbe0adc101c788f671b2f9760dd7c032d))
+* **gateway:** missed v1 graphql-to-json endpoint ([a24d69b](https://github.com/cube-js/cube/commit/a24d69bd1db5da3b2773ad2f1a512cd72192c031))
+* **gateway:** Optimize `filterVisibleItemsInMeta` performance ([b0fdbd3](https://github.com/cube-js/cube/commit/b0fdbd30d327c0a681a594fbf4ef063ef7a91f58))
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Features
+
+* **api-gateway:** graphql json query conversion ([#8189](https://github.com/cube-js/cube/issues/8189)) ([55ea7c8](https://github.com/cube-js/cube/commit/55ea7c86f49163b6c65fb277966a0e8b572a5fd5))
+
+
+
+
+
+## [0.35.21](https://github.com/cube-js/cube/compare/v0.35.20...v0.35.21) (2024-04-19)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.19](https://github.com/cube-js/cube/compare/v0.35.18...v0.35.19) (2024-04-18)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.14](https://github.com/cube-js/cube/compare/v0.35.13...v0.35.14) (2024-04-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.11](https://github.com/cube-js/cube/compare/v0.35.10...v0.35.11) (2024-04-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.10](https://github.com/cube-js/cube/compare/v0.35.9...v0.35.10) (2024-04-09)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.6](https://github.com/cube-js/cube/compare/v0.35.5...v0.35.6) (2024-04-02)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.5](https://github.com/cube-js/cube/compare/v0.35.4...v0.35.5) (2024-03-28)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down of ORDER BY causes Invalid query format: "order[0][0]" with value fails to match the required pattern: /^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/ ([#8032](https://github.com/cube-js/cube/issues/8032)) ([0681725](https://github.com/cube-js/cube/commit/0681725c921ea62f7ef813562be0202e93928889))
+
+
+
+
+
+## [0.35.4](https://github.com/cube-js/cube/compare/v0.35.3...v0.35.4) (2024-03-27)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.35.1](https://github.com/cube-js/cube/compare/v0.35.0...v0.35.1) (2024-03-18)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.62](https://github.com/cube-js/cube/compare/v0.34.61...v0.34.62) (2024-03-13)
+
+
+### Bug Fixes
+
+* Job API - correct handling on missed pre_aggregation ([#7907](https://github.com/cube-js/cube/issues/7907)) ([6fcaff4](https://github.com/cube-js/cube/commit/6fcaff4a9626f917c5efb2f837178c4244d75ff8))
+* Job API - correct handling when job is not_found ([#7894](https://github.com/cube-js/cube/issues/7894)) ([cae1866](https://github.com/cube-js/cube/commit/cae1866dabd1bd13829221f6576a649117bcd142))
+
+
+
+
+
+## [0.34.61](https://github.com/cube-js/cube/compare/v0.34.60...v0.34.61) (2024-03-11)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* **cubesql:** Remove excessive limit on inner wrapped queries ([#7864](https://github.com/cube-js/cube/issues/7864)) ([b97268f](https://github.com/cube-js/cube/commit/b97268fe5caf55c5b7806c597b9f7b75410f6ba4))
+
+
+
+
+
+## [0.34.59](https://github.com/cube-js/cube/compare/v0.34.58...v0.34.59) (2024-02-28)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.58](https://github.com/cube-js/cube/compare/v0.34.57...v0.34.58) (2024-02-27)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.57](https://github.com/cube-js/cube/compare/v0.34.56...v0.34.57) (2024-02-26)
+
+
+### Features
+
+* **cubesql:** `WHERE` SQL push down ([#7808](https://github.com/cube-js/cube/issues/7808)) ([98b5709](https://github.com/cube-js/cube/commit/98b570946905586f16a502f83b0a1cf8e4aa92a6))
+
+
+
+
+
+## [0.34.56](https://github.com/cube-js/cube/compare/v0.34.55...v0.34.56) (2024-02-20)
+
+
+### Bug Fixes
+
+* **cubesql:** Streaming still applies default limit ([a96831d](https://github.com/cube-js/cube/commit/a96831dc7157cf48ae4dc0cd3a81d9f44557e47e))
+
+
+
+
+
+## [0.34.55](https://github.com/cube-js/cube/compare/v0.34.54...v0.34.55) (2024-02-15)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.54](https://github.com/cube-js/cube/compare/v0.34.53...v0.34.54) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.53](https://github.com/cube-js/cube/compare/v0.34.52...v0.34.53) (2024-02-13)
+
+
+### Bug Fixes
+
+* **cubesql:** SQL push down can be incorrectly routed to Cube Store pre-aggregations ([#7752](https://github.com/cube-js/cube/issues/7752)) ([1a6451c](https://github.com/cube-js/cube/commit/1a6451c2c0bef6f5efbba2870ec0a11238b1addb))
+
+
+
+
+
+## [0.34.52](https://github.com/cube-js/cube/compare/v0.34.51...v0.34.52) (2024-02-13)
+
+**Note:** Version bump only for package @cubejs-backend/api-gateway
+
+
+
+
+
+## [0.34.51](https://github.com/cube-js/cube/compare/v0.34.50...v0.34.51) (2024-02-11)
+
+
+### Features
+
+* Add `ungrouped` flag to GraphQL API ([#7746](https://github.com/cube-js/cube/issues/7746)) ([6111fbb](https://github.com/cube-js/cube/commit/6111fbbffb8486a1a19ef0846967abe3fa285ad3))
+
+
+
+
+
 ## [0.34.48](https://github.com/cube-js/cube/compare/v0.34.47...v0.34.48) (2024-01-25)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

@@ -14,15 +14,12 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::{CubeRunner, LogicalPlanToLanguageConverter},
-            rewriter::RewriteRules,
-            rules::{
-                dates::DateRules, filters::FilterRules, members::MemberRules, order::OrderRules,
-                split::SplitRules,
-            },
+            rewriter::Rewriter,
             LogicalPlanLanguage,
         },
         rewrite_statement, QueryPlanner,
     },
+    config::{ConfigObj, ConfigObjImpl},
     sql::session::DatabaseProtocol,
 };
 
@@ -52,7 +49,9 @@ pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPla
 }
 
 pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunner {
-    let mut converter = LogicalPlanToLanguageConverter::new(context);
+    let config_obj = ConfigObjImpl::default();
+    let flat_list = config_obj.push_down_pull_up_split();
+    let mut converter = LogicalPlanToLanguageConverter::new(context, flat_list);
     converter.add_logical_plan(&plan).unwrap();
 
     converter.take_runner()
@@ -61,23 +60,9 @@ pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunne
 pub fn rewrite_rules(
     cube_context: Arc<CubeContext>,
 ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
-    let rules: Vec<Box<dyn RewriteRules>> = vec![
-        Box::new(MemberRules::new(
-            cube_context.meta.clone(),
-            cube_context.sessions.server.config_obj.clone(),
-            false,
-        )),
-        Box::new(FilterRules::new(cube_context.meta.clone(), true)),
-        Box::new(DateRules::new()),
-        Box::new(OrderRules::new()),
-        Box::new(SplitRules::new(
-            cube_context.meta.clone(),
-            cube_context.sessions.server.config_obj.clone(),
-        )),
-    ];
-    let mut rewrites = Vec::new();
-    for r in rules {
-        rewrites.extend(r.rewrite_rules());
-    }
-    rewrites
+    Rewriter::rewrite_rules(
+        cube_context.meta.clone(),
+        cube_context.sessions.server.config_obj.clone(),
+        true,
+    )
 }

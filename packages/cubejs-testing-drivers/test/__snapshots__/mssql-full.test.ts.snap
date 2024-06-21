@@ -340,6 +340,14 @@ Array [
 
 exports[`Queries with the @cubejs-backend/mssql-driver filtering Customers: contains + dimensions, third 1`] = `Array []`;
 
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains with special chars + dimensions 1`] = `
+Array [
+  Object {
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/mssql-driver filtering Customers: endsWith filter + dimensions, first 1`] = `
 Array [
   Object {
@@ -1996,7 +2004,7 @@ Array [
 
 exports[`Queries with the @cubejs-backend/mssql-driver filtering ECommerce: startsWith + dimensions, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2011,7 +2019,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2036,9 +2044,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: contains + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2087,7 +2095,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -2123,7 +2131,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -2182,7 +2190,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {
@@ -2218,9 +2226,9 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: endsWith filter + dimensions + order, third 1`] = `Array []`;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, first 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, first 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2235,7 +2243,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, second 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, second 1`] = `
 Array [
   Object {
     "Products.category": "Office Supplies",
@@ -2265,7 +2273,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimentions + order, third 1`] = `Array []`;
+exports[`Queries with the @cubejs-backend/mssql-driver filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/mssql-driver pre-aggregations Customers: running total without time dimension 1`] = `
 Array [
@@ -2466,7 +2474,7 @@ Array [
   Object {
     "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
     "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "BigECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "BigECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "BigECommerce.totalQuantity": "90000",
   },
   Object {
@@ -2531,6 +2539,203 @@ Array [
   },
 ]
 `;
+
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: rolling window by 2 day 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": 10000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Day": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: rolling window by 2 month 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 20000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 60000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 120000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 70000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 60000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 100000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 130000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Month": 160000,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: rolling window by 2 week 1`] = `
+Array [
+  Object {
+    "BigECommerce.orderDate": "2020-01-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-01-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 10000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-02-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-02-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 10000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-03-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-03-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 10000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-04-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-04-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-05-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-05-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 20000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-06-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-06-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-07-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-07-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-08-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-08-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": null,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-09-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-09-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-10-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-10-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 30000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-11-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-11-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 20000,
+  },
+  Object {
+    "BigECommerce.orderDate": "2020-12-01T00:00:00.000",
+    "BigECommerce.orderDate.month": "2020-12-01T00:00:00.000",
+    "BigECommerce.rollingCountBy2Week": 20000,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/mssql-driver querying BigECommerce: totalProfitYearAgo 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions 1`] = `
 Array [
@@ -2701,7 +2906,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions + limit 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -2746,7 +2951,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Customers: dimensions + order 1`] = `
 Array [
   Object {
     "Customers.customerId": "AH-10465",
@@ -3349,7 +3554,7 @@ Array [
     "ECommerce.discount": 0,
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": 517.4793,
     "ECommerce.quantity": 9,
     "ECommerce.rowId": 4882,
@@ -3689,7 +3894,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimentions + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimensions + limit 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -3844,7 +4049,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying ECommerce: dimensions + order 1`] = `
 Array [
   Object {
     "ECommerce.category": "Furniture",
@@ -4169,7 +4374,7 @@ Array [
     "ECommerce.discount": 0,
     "ECommerce.orderDate": "2020-11-02T00:00:00.000",
     "ECommerce.orderId": "CA-2017-143567",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.profit": 517.4793,
     "ECommerce.quantity": 9,
     "ECommerce.rowId": 4882,
@@ -4700,7 +4905,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-11-01T00:00:00.000",
     "ECommerce.orderDate.month": "2020-11-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -4873,7 +5078,7 @@ Array [
   Object {
     "ECommerce.orderDate": "2020-01-01T00:00:00.000",
     "ECommerce.orderDate.year": "2020-01-01T00:00:00.000",
-    "ECommerce.productName": "Logitech diNovo Edge Keyboard",
+    "ECommerce.productName": "Logitech di_Novo Edge Keyboard",
     "ECommerce.totalQuantity": "9",
   },
   Object {
@@ -4939,7 +5144,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimentions + order + limit 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimensions + order + limit 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -4994,7 +5199,7 @@ Array [
 ]
 `;
 
-exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimentions + order 1`] = `
+exports[`Queries with the @cubejs-backend/mssql-driver querying Products: dimensions + order 1`] = `
 Array [
   Object {
     "Products.category": "Furniture",
@@ -5093,7 +5298,7 @@ Array [
   },
   Object {
     "Products.category": "Technology",
-    "Products.productName": "Logitech diNovo Edge Keyboard",
+    "Products.productName": "Logitech di_Novo Edge Keyboard",
     "Products.subCategory": "Accessories",
   },
   Object {

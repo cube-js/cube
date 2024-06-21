@@ -240,12 +240,20 @@ export class ClickHouseQuery extends BaseQuery {
     return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
+  public countDistinctApprox(sql: string): string {
+    return `uniq(${sql})`;
+  }
+
   public createIndexSql(indexName, tableName, escapedColumns) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
+    // https://github.com/ClickHouse/ClickHouse/issues/19351
+    templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     return templates;

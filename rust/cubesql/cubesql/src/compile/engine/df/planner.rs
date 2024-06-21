@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use crate::config::ConfigObj;
 use async_trait::async_trait;
 use datafusion::{
     error::Result,
@@ -15,11 +16,20 @@ use super::scan::CubeScanExtensionPlanner;
 pub struct CubeQueryPlanner {
     pub transport: Arc<dyn TransportService>,
     pub meta: LoadRequestMeta,
+    pub config_obj: Arc<dyn ConfigObj>,
 }
 
 impl CubeQueryPlanner {
-    pub fn new(transport: Arc<dyn TransportService>, meta: LoadRequestMeta) -> Self {
-        Self { transport, meta }
+    pub fn new(
+        transport: Arc<dyn TransportService>,
+        meta: LoadRequestMeta,
+        config_obj: Arc<dyn ConfigObj>,
+    ) -> Self {
+        Self {
+            transport,
+            meta,
+            config_obj,
+        }
     }
 }
 
@@ -36,6 +46,7 @@ impl QueryPlanner for CubeQueryPlanner {
             CubeScanExtensionPlanner {
                 transport: self.transport.clone(),
                 meta: self.meta.clone(),
+                config_obj: self.config_obj.clone(),
             },
         )]);
         // Delegate most work of physical planning to the default physical planner

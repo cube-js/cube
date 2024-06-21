@@ -25,6 +25,26 @@ export class DatabricksQuery extends BaseQuery {
     return new DatabricksFilter(this, filter);
   }
 
+  public hllInit(sql: string) {
+    return `hll_sketch_agg(${sql})`;
+  }
+
+  public hllMerge(sql: string) {
+    return `hll_union_agg(${sql})`;
+  }
+
+  public hllCardinality(sql: string): string {
+    return `hll_sketch_estimate(${sql})`;
+  }
+
+  public hllCardinalityMerge(sql: string): string {
+    return `hll_sketch_estimate(hll_union_agg(${sql}))`;
+  }
+
+  public countDistinctApprox(sql: string) {
+    return `approx_count_distinct(${sql})`;
+  }
+
   public convertTz(field: string) {
     return `from_utc_timestamp(${field}, '${this.timezone}')`;
   }
@@ -103,8 +123,12 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
     templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
-    // Databricks has a DATEDIFF function but produces values different from Redshift
-    delete templates.functions.DATEDIFF;
+    templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '``';
     return templates;
   }
 }

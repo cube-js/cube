@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/fundamentals/additional-concepts",
     "destination": "/product/data-modeling/concepts/subquery-dimensions",
     "permanent": true
@@ -596,22 +601,22 @@
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc",
-    "destination": "/product/configuration/vpc",
+    "destination": "/product/deployment/cloud/vpc",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/gcp",
-    "destination": "/product/configuration/vpc/gcp",
+    "destination": "/product/deployment/cloud/vpc/gcp",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/azure",
-    "destination": "/product/configuration/vpc/azure",
+    "destination": "/product/deployment/cloud/vpc/azure",
     "permanent": true
   },
   {
     "source": "/cloud/configuration/connecting-with-a-vpc/aws",
-    "destination": "/product/configuration/vpc/aws",
+    "destination": "/product/deployment/cloud/vpc/aws",
     "permanent": true
   },
   {

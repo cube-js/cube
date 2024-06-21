@@ -1,0 +1,106 @@
+---
+redirect_from:
+  - /cloud/configuration/connecting-with-a-vpc/azure
+---
+
+# Connecting with a VPC on Azure
+
+## Prerequisites
+
+To allow Cube Cloud to connect to a Virtual Network on Azure, the following
+information is required:
+
+- **Virtual Network Name:** This can be found in the Virtual Networks section of
+  the [Azure Portal][azure-console].
+- **Tenant ID:** This can be found under&nbsp;<Btn>Azure Active Directory</Btn>
+  →&nbsp;<Btn>Properties</Btn> →&nbsp;<Btn>Tenant ID</Btn> in the [Azure Portal][azure-console].
+
+## Setup
+
+For cross-tenant peering in Azure, you are supposed to assign the peering role
+to the service principal of the peering party.
+
+Using the steps outlined below, you would register Cube Cloud tenant at your
+organization and grant peering access to Cube Cloud service principal.
+
+### Add Cube tenant to your organization
+
+First you should add the Cube Cloud tenant to your organization. To do this,
+open the [Azure Portal][azure-console] and go to&nbsp;<Btn>Azure Active
+Directory</Btn> →&nbsp;<Btn>External Identities</Btn> →&nbsp;<Btn>Cross-tenant
+access settings</Btn> →&nbsp;<Btn>Organizational Settings</Btn>
+→&nbsp;<Btn>Add Organization</Btn>.
+
+For Tenant ID, enter `197e5263-87f4-4ce1-96c4-351b0c0c714a`.
+
+Make sure that&nbsp;<Btn>B2B Collaboration</Btn> →&nbsp;<Btn>Inbound Access</Btn>
+→&nbsp;<Btn>Applications</Btn> is set to&nbsp;<Btn>Allows access</Btn>.
+
+### Register Cube Cloud service principal at your organization
+
+To register the Cube Cloud service principal for your organization, follow these
+steps:
+
+1.  Log in with an account that has permissions to register Enterprise
+    applications.
+2.  Open a browser tab and go to the following URL, replacing `<TENANT_ID>` with
+    your tenant ID:
+    `https://login.microsoftonline.com/<TENANT_ID>/oauth2/authorize?client_id=0c5d0d4b-6cee-402e-9a08-e5b79f199481&response_type=code&redirect_uri=https%3A%2F%2Fwww.microsoft.com%2F`
+3.  The Cube Cloud service principal has specific credentials. Check that the
+    following details match exactly what you see on the dialog box that pops up:
+
+- Client ID: `7f3afcf3-e061-4e1b-8261-f396646d7fc7`
+- Name: `cube-dedicated-infra-peering-sp`
+
+Once you have confirmed that all the information is correct,
+select&nbsp;<Btn>Consent on behalf of your organization</Btn> and
+click&nbsp;<Btn>Accept</Btn>.
+
+### Grant peering permissions to Cube Cloud service principal on your `Virtual Network`
+
+As `peering role` you can use built-in `Network Contributor` or create custom
+role (e.g. `cube-peering-role`) with the following permissions:
+
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/write`
+- `Microsoft.Network/virtualNetworks/peer/action`
+- `Microsoft.ClassicNetwork/virtualNetworks/peer/action`
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/read`
+- `Microsoft.Network/virtualNetworks/virtualNetworkPeerings/delete`
+
+On the [Azure Portal][azure-console], go to&nbsp;<Btn>Virtual networks</Btn>
+→ _Virtual Network Name_ →&nbsp;<Btn>Access Control (IAM)</Btn>
+→&nbsp;<Btn>Add</Btn> →&nbsp;<Btn>Add role assignment</Btn> and fill
+in the following details:
+
+- Role: `Network Contributor` or `cube-peering-role`
+- Members: `cube-dedicated-infra-peering-sp`
+
+### Firewall
+
+Make sure that your firewall rules allow inbound and outbound traffic to IP/port
+your database is listening at.
+
+## Information required by Cube Cloud support
+
+When you are reaching out Cube Cloud support please provide following
+information:
+
+- **Virtual Network ID:** You can find it at&nbsp;<Btn>Virtual Networks</Btn>
+  → _Virtual Network Name_ →&nbsp;<Btn>Overview</Btn> →&nbsp;<Btn>JSON
+  view</Btn> →&nbsp;<Btn>Resource ID</Btn> on [Azure
+  Portal][azure-console].
+- **Virtual Network Address Spaces:** You can find it at&nbsp;<Btn>Virtual
+  Networks</Btn> → _Virtual Network Name_ →&nbsp;<Btn>Overview</Btn>
+  →&nbsp;<Btn>JSON view</Btn> →&nbsp;<Btn>properties</Btn>
+  →&nbsp;<Btn>addressSpace</Btn> on [Azure Portal][azure-console].
+- **Tenant ID:** You can find it in&nbsp;<Btn>Azure Active Directory</Btn>
+  →&nbsp;<Btn>Properties</Btn> →&nbsp;<Btn>Tenant ID</Btn> section of
+  [Azure Portal][azure-console].
+
+## Supported Regions
+
+We support all general-purpose regions. Cube Store is currently located only in
+`US Central` so pre-aggregations performance might depend on geographical
+proximity to it.
+
+[azure-console]: https://portal.azure.com

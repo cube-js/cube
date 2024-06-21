@@ -57,8 +57,26 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
 
   protected async init(): Promise<InitPromise> {
     const token = getEnv('duckdbMotherDuckToken', this.config);
+    const dbPath = getEnv('duckdbDatabasePath', this.config);
+    
+    // Determine the database URL based on the provided db_path or token
+    let dbUrl: string;
+    if (dbPath) {
+      dbUrl = dbPath;
+    } else if (token) {
+      dbUrl = `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}`;
+    } else {
+      dbUrl = ':memory:';
+    }
 
-    const db = new Database(token ? `md:?motherduck_token=${token}&custom_user_agent=Cube/${version}` : ':memory:');
+    let dbOptions;
+    if (token) {
+      dbOptions = { custom_user_agent: `Cube/${version}` };
+    }
+
+    // Create a new Database instance with the determined URL and custom user agent
+    const db = new Database(dbUrl, dbOptions);
+
     // Under the hood all methods of Database uses internal default connection, but there is no way to expose it
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;

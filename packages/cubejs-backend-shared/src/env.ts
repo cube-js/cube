@@ -152,7 +152,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('false')
     .asBoolStrict(),
   schemaPath: () => get('CUBEJS_SCHEMA_PATH')
-    .default('schema')
+    .default('model')
     .asString(),
   refreshWorkerMode: () => {
     const refreshWorkerMode = get('CUBEJS_REFRESH_WORKER').asBool();
@@ -624,7 +624,7 @@ const variables: Record<string, (...args: any) => any> = {
    * This will eventually default to true.
    */
   fetchColumnsByOrdinalPosition: (): boolean => get('CUBEJS_DB_FETCH_COLUMNS_BY_ORDINAL_POSITION')
-    .default('false')
+    .default('true')
     .asBoolStrict(),
 
   /** ****************************************************************
@@ -1167,6 +1167,19 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+  /**
+   * Firebolt account name.
+   */
+  fireboltAccount: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_FIREBOLT_ACCOUNT', dataSource)
+    ]
+  ),
+
   /** ****************************************************************
    * Hive Driver                                                     *
    ***************************************************************** */
@@ -1267,6 +1280,23 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_REDSHIFT_ARN', dataSource)
+    ]
+  ),
+
+  /** ****************************************************************
+   * Materialize Driver                                              *
+   ***************************************************************** */
+
+  /**
+   * Materialize cluster.
+   */
+  materializeCluster: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_MATERIALIZE_CLUSTER', dataSource)
     ]
   ),
 
@@ -1447,6 +1477,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
   
+  duckdbDatabasePath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_DUCKDB_DATABASE_PATH', dataSource)
+    ]
+  ),
+
   duckdbS3Region: ({
     dataSource
   }: {
@@ -1563,7 +1603,7 @@ const variables: Record<string, (...args: any) => any> = {
   cubeStorePass: () => get('CUBEJS_CUBESTORE_PASS')
     .asString(),
   cubeStoreMaxConnectRetries: () => get('CUBEJS_CUBESTORE_MAX_CONNECT_RETRIES')
-    .default('10')
+    .default('20')
     .asInt(),
   cubeStoreNoHeartBeatTimeout: () => get('CUBEJS_CUBESTORE_NO_HEART_BEAT_TIMEOUT')
     .default('30')
@@ -1583,7 +1623,7 @@ const variables: Record<string, (...args: any) => any> = {
     .default('5000')
     .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default('false')
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
     .asBoolStrict(),
   redisPassword: () => {
     const redisPassword = get('CUBEJS_REDIS_PASSWORD')

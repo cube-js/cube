@@ -70,7 +70,7 @@ export function QueryBuilderContainer(props: QueryBuilderContainerProps) {
   }
 
   return (
-    <CubeProvider cubejsApi={cubejsApi}>
+    <CubeProvider cubeApi={cubejsApi}>
       <RollupDesignerContext apiUrl={apiUrl!}>
         <ChartRendererStateProvider>
           <StyledCard bordered={false}>

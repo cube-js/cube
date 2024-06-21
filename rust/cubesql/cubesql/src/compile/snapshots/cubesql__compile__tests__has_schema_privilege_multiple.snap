@@ -1,0 +1,12 @@
+---
+source: cubesql/src/compile/mod.rs
+assertion_line: 9918
+expression: "execute_query(\"SELECT\n                    nspname,\n                    has_schema_privilege(nspname, 'create,usage') create_usage,\n                    has_schema_privilege(nspname, 'usage,create') usage_create\n                FROM pg_namespace\n                ORDER BY nspname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
+---
++--------------------+--------------+--------------+
+| nspname            | create_usage | usage_create |
++--------------------+--------------+--------------+
+| information_schema | false        | false        |
+| pg_catalog         | false        | false        |
+| public             | false        | false        |
++--------------------+--------------+--------------+

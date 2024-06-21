@@ -7,14 +7,14 @@ RUN apt-get update \
     && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-18 main"  \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # python3 on x86 is required for cross compiling python :D
     && DEBIAN_FRONTEND=noninteractive apt-get install -y python3.12 python3.11 python3.10 python3.9 \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 \
         make cmake libsasl2-dev \
         libc6 libc6-dev libc6-arm64-cross libc6-dev-arm64-cross \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
@@ -22,11 +22,11 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*;
 
 # CLang
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-14 100
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 100
-RUN update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-14 100
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-14 100
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-14 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-18 100
+RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 100
+RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100
 # Python
 RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
 RUN update-alternatives --install /usr/bin/python3 python /usr/bin/python3.11 1
@@ -40,7 +40,7 @@ ENV ARCH=arm \
     CPP=aarch64-linux-gnu-cpp \
     LD=aarch64-linux-gnu-ld
 
-ENV ZLIB_VERSION=1.3
+ENV ZLIB_VERSION=1.3.1
 RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd zlib-${ZLIB_VERSION} && \
     ./configure --prefix=/usr/aarch64-linux-gnu && \
@@ -49,7 +49,7 @@ RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
     cd .. && rm -rf zlib-${ZLIB_VERSION};
 
 # https://www.openssl.org/source/old/1.1.1/
-ENV OPENSSL_VERSION=1.1.1q
+ENV OPENSSL_VERSION=1.1.1w
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 && \

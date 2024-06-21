@@ -3,6 +3,36 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.23](https://github.com/cube-js/cube/compare/v0.35.22...v0.35.23) (2024-04-25)
+
+
+### Bug Fixes
+
+* **client-core:** castNumerics option for CubeApi ([#8186](https://github.com/cube-js/cube/issues/8186)) ([6ff2208](https://github.com/cube-js/cube/commit/6ff22088ede88521c6c5a5e8cb1a77c819301ad4))
+
+
+
+
+
+# [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
+
+**Note:** Version bump only for package @cubejs-client/core
+
+
+
+
+
+## [0.34.60](https://github.com/cube-js/cube/compare/v0.34.59...v0.34.60) (2024-03-02)
+
+
+### Bug Fixes
+
+* **client-core:** incorrect index in movePivotItem ([#6684](https://github.com/cube-js/cube/issues/6684)) Thanks to [@telunc](https://github.com/telunc)! ([82217b2](https://github.com/cube-js/cube/commit/82217b28a012158cd8a978fd2e1ad15746ddeae0))
+
+
+
+
+
 ## [0.34.37](https://github.com/cube-js/cube/compare/v0.34.36...v0.34.37) (2023-12-19)
 
 

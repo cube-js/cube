@@ -123,10 +123,12 @@ export class QueryQueue {
       processUid: this.processUid,
     };
 
+    const queueDriverFactory = options.queueDriverFactory || factoryQueueDriver;
+
     /**
      * @type {QueueDriverInterface}
      */
-    this.queueDriver = factoryQueueDriver(options.cacheAndQueueDriver, queueDriverOptions);
+    this.queueDriver = queueDriverFactory(options.cacheAndQueueDriver, queueDriverOptions);
     /**
      * @protected
      * @type {boolean}
@@ -264,6 +266,15 @@ export class QueryQueue {
       );
 
       if (added > 0) {
+        waitingContext = {
+          queueId,
+          spanId: options.spanId,
+          queryKey,
+          queuePrefix: this.redisQueuePrefix,
+          requestId: options.requestId,
+          waitingForRequestId: options.requestId
+        };
+
         this.logger('Added to queue', {
           queueId,
           spanId: options.spanId,
@@ -284,28 +295,30 @@ export class QueryQueue {
 
       await this.reconcileQueue();
 
-      const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+      if (!added) {
+        const queryDef = await queueConnection.getQueryDef(queryKeyHash, queueId);
+        if (queryDef) {
+          waitingContext = {
+            queueId,
+            spanId: options.spanId,
+            queryKey: queryDef.queryKey,
+            queuePrefix: this.redisQueuePrefix,
+            requestId: options.requestId,
+            waitingForRequestId: queryDef.requestId
+          };
+        }
+      }
+
       const [active, toProcess] = await queueConnection.getQueryStageState(true);
 
-      if (queryDef) {
-        waitingContext = {
-          queueId,
-          spanId: options.spanId,
-          queryKey: queryDef.queryKey,
-          queuePrefix: this.redisQueuePrefix,
-          requestId: options.requestId,
-          waitingForRequestId: queryDef.requestId
-        };
-
-        this.logger('Waiting for query', {
-          ...waitingContext,
-          queueSize,
-          activeQueryKeys: active,
-          toProcessQueryKeys: toProcess,
-          active: active.indexOf(queryKeyHash) !== -1,
-          queueIndex: toProcess.indexOf(queryKeyHash),
-        });
-      }
+      this.logger('Waiting for query', {
+        ...waitingContext,
+        queueSize,
+        activeQueryKeys: active,
+        toProcessQueryKeys: toProcess,
+        active: active.indexOf(queryKeyHash) !== -1,
+        queueIndex: toProcess.indexOf(queryKeyHash),
+      });
 
       // Stream processing goes here under assumption there's no way of a stream close just after it was added to the `streams` map.
       // Otherwise `streamStarted` event listener should go before the `reconcileQueue` call.

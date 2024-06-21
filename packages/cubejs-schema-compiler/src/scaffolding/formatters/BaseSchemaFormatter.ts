@@ -100,7 +100,7 @@ export abstract class BaseSchemaFormatter {
   }
 
   protected eligibleIdentifier(name: string) {
-    return !!name.match(/^[a-z0-9_]+$/i);
+    return !!name.match(/^[a-z0-9_]+$/);
   }
 
   public schemaDescriptorForTable(tableSchema: TableSchema, schemaContext: SchemaContext = {}) {

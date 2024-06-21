@@ -5,10 +5,17 @@ redirect_from:
 
 # Tableau
 
-You can connect to Cube from Tableau, a visual analytics platform, using the
-[Cube SQL API][ref-sql-api].
+[Tableau](https://www.tableau.com) is a popular visual analytics platform.
 
-## Enable Cube SQL API
+## Semantic Layer Sync
+
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
+Tableau. It automatically synchronizes the [data model][ref-data-model] between
+Cube and Tableau.
+
+## SQL API
+
+You can also use the [SQL API][ref-sql-api] to connect Cube to Tableau.
 
 ### Cube Cloud
 
@@ -62,5 +69,6 @@ are columns.
 [ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
-
+[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-data-model]: /product/data-modeling/overview
 [link-tableau-extracts]: https://help.tableau.com/current/pro/desktop/en-us/extracting_data.htm

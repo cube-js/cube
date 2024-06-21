@@ -1,21 +1,19 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { DatePicker, Menu } from 'antd';
-import moment from 'moment';
-import { useState, Fragment } from 'react';
+import { Menu } from 'antd';
+import { Fragment, useState } from 'react';
 import styled from 'styled-components';
 
+import { SectionRow } from '../components';
 import { ButtonDropdown } from './ButtonDropdown';
 import MemberDropdown from './MemberDropdown';
-import RemoveButtonGroup from './RemoveButtonGroup';
 import MissingMemberTooltip from './MissingMemberTooltip';
-import { SectionRow } from '../components';
+import RemoveButtonGroup from './RemoveButtonGroup';
+import { TimeDateRangeSelector } from './TimeRangeSelector';
 
 const Label = styled.div`
   color: var(--dark-04-color);
   line-height: 32px;
 `;
-
-const { RangePicker } = DatePicker;
 
 const DateRanges = [
   { title: 'Custom', value: 'custom' },
@@ -52,7 +50,7 @@ const TimeGroup = ({
     if (dateRange && !dateRange.some((d) => !d)) {
       updateMethods.update(m, {
         ...m,
-        dateRange: dateRange.map((dateTime) => dateTime.format('YYYY-MM-DD')),
+        dateRange,
       });
     }
   }
@@ -62,7 +60,11 @@ const TimeGroup = ({
       <Menu className="ant-dropdown-menu ant-dropdown-menu-root">
         {member.granularities.length ? (
           member.granularities.map((m) => (
-            <Menu.Item key={m.title} className="ant-dropdown-menu-item" onClick={() => onClick(m)}>
+            <Menu.Item
+              key={m.title}
+              className="ant-dropdown-menu-item"
+              onClick={() => onClick(m)}
+            >
               {m.title}
             </Menu.Item>
           ))
@@ -147,13 +149,11 @@ const TimeGroup = ({
             </ButtonDropdown>
 
             {isRangePickerVisible || isCustomDateRange ? (
-              <RangePicker
-                disabled={disabled}
-                format="YYYY-MM-DD"
-                defaultValue={(parsedDateRange || []).map((date) =>
-                  moment(date)
-                )}
-                onChange={(dateRange) => onDateRangeSelect(m, dateRange)}
+              <TimeDateRangeSelector
+                value={parsedDateRange || []}
+                onChange={(dateRange) => {
+                  onDateRangeSelect(m, dateRange);
+                }}
               />
             ) : null}
 

@@ -12,7 +12,7 @@ use chrono::format::Item::{Fixed, Literal, Numeric, Space};
 use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
-use chrono::{DateTime, ParseResult, TimeZone, Utc};
+use chrono::{ParseResult, TimeZone, Utc};
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -36,18 +36,16 @@ use cubehll::HllSketch;
 use parser::Statement as CubeStoreStatement;
 
 use crate::cachestore::CacheStore;
-use crate::cluster::{Cluster, JobEvent, JobResultListener};
+use crate::cluster::Cluster;
 use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::limits::ConcurrencyLimits;
 use crate::import::{parse_space_separated_binstring, ImportService, Ingestion};
-use crate::metastore::job::JobType;
 use crate::metastore::multi_index::MultiIndex;
 use crate::metastore::source::SourceCredentials;
-use crate::metastore::table::StreamOffset;
 use crate::metastore::{
-    is_valid_plain_binary_hll, table::Table, HllFlavour, IdRow, ImportFormat, Index, IndexDef,
-    IndexType, MetaStoreTable, RowKey, Schema, TableId,
+    is_valid_plain_binary_hll, HllFlavour, IdRow, ImportFormat, Index, IndexDef, IndexType,
+    MetaStoreTable, Schema,
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
@@ -56,12 +54,9 @@ use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::parser::{
-    CubeStoreParser, DropCommand, MetaStoreCommand, PartitionedIndexRef, SystemCommand,
-};
+use crate::sql::parser::{CubeStoreParser, DropCommand, MetaStoreCommand, SystemCommand};
 use crate::store::ChunkDataStore;
 use crate::table::{data, Row, TableValue, TimestampValue};
-use crate::telemetry::incoming_traffic_agent_event;
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::strings::path_to_string;
 use crate::CubeError;
@@ -74,16 +69,17 @@ use data::create_array_builder;
 use datafusion::cube_ext::catch_unwind::async_try_with_catch_unwind;
 use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
 use deepsize::DeepSizeOf;
-use std::mem::take;
 
 pub mod cache;
 pub mod cachestore;
 pub mod parser;
+mod table_creator;
 
 use crate::cluster::rate_limiter::ProcessRateLimiter;
 use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
+use table_creator::{convert_columns_type, TableCreator};
 
 #[automock]
 #[async_trait]
@@ -171,12 +167,11 @@ pub struct SqlServiceImpl {
     query_planner: Arc<dyn QueryPlanner>,
     query_executor: Arc<dyn QueryExecutor>,
     cluster: Arc<dyn Cluster>,
-    import_service: Arc<dyn ImportService>,
     config_obj: Arc<dyn ConfigObj>,
     rows_per_chunk: usize,
     query_timeout: Duration,
-    create_table_timeout: Duration,
     cache: Arc<SqlResultCache>,
+    table_creator: Arc<TableCreator>,
 }
 
 crate::di_service!(SqlServiceImpl, [SqlService]);
@@ -206,17 +201,23 @@ impl SqlServiceImpl {
                 query_planner.clone(),
                 process_rate_limiter,
             ),
+            table_creator: TableCreator::new(
+                db.clone(),
+                cluster.clone(),
+                import_service,
+                config_obj.clone(),
+                create_table_timeout,
+                cache.clone(),
+            ),
             db,
             chunk_store,
             limits,
             query_planner,
             query_executor,
             cluster,
-            import_service,
             config_obj,
             rows_per_chunk,
             query_timeout,
-            create_table_timeout,
             remote_fs,
             cache,
         })
@@ -230,249 +231,6 @@ impl SqlServiceImpl {
         self.db.create_schema(name, if_not_exists).await
     }
 
-    async fn create_table(
-        &self,
-        schema_name: String,
-        table_name: String,
-        columns: &Vec<ColumnDef>,
-        external: bool,
-        locations: Option<Vec<String>>,
-        import_format: Option<ImportFormat>,
-        build_range_end: Option<DateTime<Utc>>,
-        seal_at: Option<DateTime<Utc>>,
-        select_statement: Option<String>,
-        source_table: Option<String>,
-        stream_offset: Option<String>,
-        indexes: Vec<Statement>,
-        unique_key: Option<Vec<Ident>>,
-        aggregates: Option<Vec<(Ident, Ident)>>,
-        partitioned_index: Option<PartitionedIndexRef>,
-        trace_obj: &Option<String>,
-    ) -> Result<IdRow<Table>, CubeError> {
-        let columns_to_set = convert_columns_type(columns)?;
-        let mut indexes_to_create = Vec::new();
-        if let Some(mut p) = partitioned_index {
-            let part_index_name = match p.name.0.as_mut_slice() {
-                &mut [ref schema, ref mut name] => {
-                    if schema.value != schema_name {
-                        return Err(CubeError::user(format!("CREATE TABLE in schema '{}' cannot reference PARTITIONED INDEX from schema '{}'", schema_name, schema)));
-                    }
-                    take(&mut name.value)
-                }
-                &mut [ref mut name] => take(&mut name.value),
-                _ => {
-                    return Err(CubeError::user(format!(
-                        "PARTITIONED INDEX must consist of 1 or 2 identifiers, got '{}'",
-                        p.name
-                    )))
-                }
-            };
-
-            let mut columns = Vec::new();
-            for mut c in p.columns {
-                columns.push(take(&mut c.value));
-            }
-
-            indexes_to_create.push(IndexDef {
-                name: "#mi0".to_string(),
-                columns,
-                multi_index: Some(part_index_name),
-                index_type: IndexType::Regular,
-            });
-        }
-
-        for index in indexes.iter() {
-            if let Statement::CreateIndex {
-                name,
-                columns,
-                unique,
-                ..
-            } = index
-            {
-                indexes_to_create.push(IndexDef {
-                    name: name.to_string(),
-                    multi_index: None,
-                    columns: columns
-                        .iter()
-                        .map(|c| {
-                            if let Expr::Identifier(ident) = &c.expr {
-                                Ok(ident.value.to_string())
-                            } else {
-                                Err(CubeError::internal(format!(
-                                    "Unexpected column expression: {:?}",
-                                    c.expr
-                                )))
-                            }
-                        })
-                        .collect::<Result<Vec<_>, _>>()?,
-                    index_type: if *unique {
-                        IndexType::Aggregate
-                    } else {
-                        IndexType::Regular
-                    },
-                });
-            }
-        }
-
-        let stream_offset = if let Some(s) = &stream_offset {
-            Some(match s.as_str() {
-                "earliest" => StreamOffset::Earliest,
-                "latest" => StreamOffset::Latest,
-                x => {
-                    return Err(CubeError::user(format!(
-                        "Unexpected stream offset: {}. Only earliest and latest are allowed.",
-                        x
-                    )))
-                }
-            })
-        } else {
-            None
-        };
-
-        let max_disk_space = self.config_obj.max_disk_space();
-        if max_disk_space > 0 {
-            let used_space = self.db.get_used_disk_space_out_of_queue(None).await?;
-            if max_disk_space < used_space {
-                return Err(CubeError::user(format!(
-                    "Exceeded available storage space: {:.3} GB out of {} GB allowed. Please consider changing pre-aggregations build range, reducing index count or pre-aggregations granularity.",
-                    used_space as f64 / 1024. / 1024. / 1024.,
-                    max_disk_space as f64 / 1024. / 1024. / 1024.
-                )));
-            }
-        }
-
-        if !external {
-            return self
-                .db
-                .create_table(
-                    schema_name,
-                    table_name,
-                    columns_to_set,
-                    None,
-                    None,
-                    indexes_to_create,
-                    true,
-                    build_range_end,
-                    seal_at,
-                    select_statement,
-                    None,
-                    stream_offset,
-                    unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
-                    aggregates.map(|keys| {
-                        keys.iter()
-                            .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
-                            .collect()
-                    }),
-                    None,
-                    None,
-                )
-                .await;
-        }
-
-        let listener = self.cluster.job_result_listener();
-        if let Some(locations) = locations.as_ref() {
-            self.import_service
-                .validate_locations_size(locations)
-                .await?;
-        }
-
-        let partition_split_threshold = if let Some(locations) = locations.as_ref() {
-            let size = join_all(
-                locations
-                    .iter()
-                    .map(|location| {
-                        let location = location.to_string();
-                        let import_service = self.import_service.clone();
-                        return async move {
-                            import_service.estimate_location_row_count(&location).await
-                        };
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .sum::<u64>();
-
-            let mut sel_workers_count = self.config_obj.select_workers().len() as u64;
-            if sel_workers_count == 0 {
-                sel_workers_count = 1;
-            }
-            let threshold = (size / sel_workers_count)
-                .min(self.config_obj.max_partition_split_threshold())
-                .max(self.config_obj.partition_split_threshold());
-
-            Some(threshold)
-        } else {
-            None
-        };
-
-        let trace_obj_to_save = trace_obj.clone();
-
-        let source_columns = if let Some(source_table) = source_table {
-            let mut parser = CubeStoreParser::new(&source_table)?;
-            let cols = parser
-                .parse_streaming_source_table()
-                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
-            let res = convert_columns_type(&cols)
-                .map_err(|e| CubeError::user(format!("Unexpected source_table param: {}", e)))?;
-            Some(res)
-        } else {
-            None
-        };
-
-        let table = self
-            .db
-            .create_table(
-                schema_name,
-                table_name,
-                columns_to_set,
-                locations,
-                import_format,
-                indexes_to_create,
-                false,
-                build_range_end,
-                seal_at,
-                select_statement,
-                source_columns,
-                stream_offset,
-                unique_key.map(|keys| keys.iter().map(|c| c.value.to_string()).collect()),
-                aggregates.map(|keys| {
-                    keys.iter()
-                        .map(|c| (c.0.value.to_string(), c.1.value.to_string()))
-                        .collect()
-                }),
-                partition_split_threshold,
-                trace_obj_to_save,
-            )
-            .await?;
-
-        let finalize_res = tokio::time::timeout(
-            self.create_table_timeout,
-            self.finalize_external_table(&table, listener, trace_obj),
-        )
-        .await
-        .map_err(|_| {
-            CubeError::internal(format!(
-                "Timeout during create table finalization: {:?}",
-                table
-            ))
-        })
-        .flatten();
-        if let Err(e) = finalize_res {
-            if let Err(inner) = self.db.drop_table(table.get_id()).await {
-                log::error!(
-                    "Drop table ({}) after error failed: {}",
-                    table.get_id(),
-                    inner
-                );
-            }
-            return Err(e);
-        }
-        Ok(table)
-    }
-
     async fn create_partitioned_index(
         &self,
         schema: String,
@@ -484,70 +242,6 @@ impl SqlServiceImpl {
         self.db
             .create_partitioned_index(schema, name, columns, if_not_exists)
             .await
-    }
-
-    async fn finalize_external_table(
-        &self,
-        table: &IdRow<Table>,
-        listener: JobResultListener,
-        trace_obj: &Option<String>,
-    ) -> Result<(), CubeError> {
-        let wait_for = table
-            .get_row()
-            .locations()
-            .unwrap()
-            .iter()
-            .filter(|&l| !Table::is_stream_location(l))
-            .map(|&l| {
-                (
-                    RowKey::Table(TableId::Tables, table.get_id()),
-                    JobType::TableImportCSV(l.clone()),
-                )
-            })
-            .collect();
-        for stream_location in table
-            .get_row()
-            .locations()
-            .unwrap()
-            .iter()
-            .filter(|&l| Table::is_stream_location(l))
-        {
-            self.import_service
-                .validate_table_location(table.get_id(), stream_location)
-                .await?;
-        }
-        let imports = listener.wait_for_job_results(wait_for).await?;
-        for r in imports {
-            if let JobEvent::Error(_, _, e) = r {
-                return Err(CubeError::user(format!("Create table failed: {}", e)));
-            }
-        }
-
-        let mut futures = Vec::new();
-        let indexes = self.db.get_table_indexes(table.get_id()).await?;
-        let partitions = self
-            .db
-            .get_active_partitions_and_chunks_by_index_id_for_select(
-                indexes.iter().map(|i| i.get_id()).collect(),
-            )
-            .await?;
-        // Omit warming up chunks as those shouldn't affect select times much however will affect
-        // warming up time a lot in case of big tables when a lot of chunks pending for repartition
-        for (partition, _) in partitions.into_iter().flatten() {
-            futures.push(self.cluster.warmup_partition(partition, Vec::new()));
-        }
-        join_all(futures)
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let ready_table = self.db.table_ready(table.get_id(), true).await?;
-
-        if let Some(trace_obj) = trace_obj.as_ref() {
-            incoming_traffic_agent_event(trace_obj, ready_table.get_row().total_download_size())?;
-        }
-
-        Ok(())
     }
 
     async fn create_index(
@@ -967,6 +661,7 @@ impl SqlService for SqlServiceImpl {
                         columns,
                         external,
                         with_options,
+                        if_not_exists,
                         ..
                     },
                 indexes,
@@ -1117,11 +812,14 @@ impl SqlService for SqlServiceImpl {
                     })?;
 
                 let res = self
+                    .table_creator
+                    .clone()
                     .create_table(
                         schema_name.clone(),
                         table_name.clone(),
                         &columns,
                         external,
+                        if_not_exists,
                         locations,
                         Some(import_format),
                         build_range_end,
@@ -1504,97 +1202,6 @@ impl SqlService for SqlServiceImpl {
     }
 }
 
-fn convert_columns_type(columns: &Vec<ColumnDef>) -> Result<Vec<Column>, CubeError> {
-    let mut rolupdb_columns = Vec::new();
-
-    for (i, col) in columns.iter().enumerate() {
-        let cube_col = Column::new(
-            col.name.value.clone(),
-            match &col.data_type {
-                DataType::Date
-                | DataType::Time
-                | DataType::Char(_)
-                | DataType::Varchar(_)
-                | DataType::Clob(_)
-                | DataType::Text
-                | DataType::String => ColumnType::String,
-                DataType::Uuid
-                | DataType::Binary(_)
-                | DataType::Varbinary(_)
-                | DataType::Blob(_)
-                | DataType::Bytea
-                | DataType::Array(_) => ColumnType::Bytes,
-                DataType::Decimal(precision, scale) => {
-                    let (precision, scale) = proper_decimal_args(precision, scale);
-                    if precision > 18 {
-                        ColumnType::Decimal96 {
-                            precision: precision as i32,
-                            scale: scale as i32,
-                        }
-                    } else {
-                        ColumnType::Decimal {
-                            precision: precision as i32,
-                            scale: scale as i32,
-                        }
-                    }
-                }
-                DataType::SmallInt | DataType::Int | DataType::BigInt | DataType::Interval => {
-                    ColumnType::Int
-                }
-                DataType::Boolean => ColumnType::Boolean,
-                DataType::Float(_) | DataType::Real | DataType::Double => ColumnType::Float,
-                DataType::Timestamp => ColumnType::Timestamp,
-                DataType::Custom(custom) => {
-                    let custom_type_name = custom.to_string().to_lowercase();
-                    match custom_type_name.as_str() {
-                        "tinyint" | "mediumint" => ColumnType::Int,
-                        "decimal96" => ColumnType::Decimal96 {
-                            scale: 5,
-                            precision: 27,
-                        },
-                        "int96" => ColumnType::Int96,
-                        "bytes" => ColumnType::Bytes,
-                        "varbinary" => ColumnType::Bytes,
-                        "hyperloglog" => ColumnType::HyperLogLog(HllFlavour::Airlift),
-                        "hyperloglogpp" => ColumnType::HyperLogLog(HllFlavour::ZetaSketch),
-                        "hll_snowflake" => ColumnType::HyperLogLog(HllFlavour::Snowflake),
-                        "hll_postgres" => ColumnType::HyperLogLog(HllFlavour::Postgres),
-                        _ => {
-                            return Err(CubeError::user(format!(
-                                "Custom type '{}' is not supported",
-                                custom
-                            )))
-                        }
-                    }
-                }
-                DataType::Regclass => {
-                    return Err(CubeError::user(
-                        "Type 'RegClass' is not suppored.".to_string(),
-                    ));
-                }
-            },
-            i,
-        );
-        rolupdb_columns.push(cube_col);
-    }
-    Ok(rolupdb_columns)
-}
-
-fn proper_decimal_args(precision: &Option<u64>, scale: &Option<u64>) -> (i32, i32) {
-    let mut precision = precision.unwrap_or(18);
-    let mut scale = scale.unwrap_or(5);
-    if precision > 27 {
-        precision = 27;
-    }
-    if scale > 5 {
-        scale = 10;
-    }
-    if scale > precision {
-        precision = scale;
-    }
-    (precision as i32, scale as i32)
-}
-
 fn parse_chunk(chunk: &[Vec<Expr>], column: &Vec<&Column>) -> Result<Vec<ArrayRef>, CubeError> {
     let mut buffer = Vec::new();
     let mut builders = column
@@ -1652,6 +1259,11 @@ fn parse_hyper_log_log<'a>(
             Ok(buffer)
         }
         HllFlavour::Airlift | HllFlavour::ZetaSketch => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
+            Ok(bytes)
+        }
+        HllFlavour::DataSketches => {
             let bytes = parse_binary_string(buffer, v)?;
             is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
@@ -2043,21 +1655,22 @@ mod tests {
     use std::time::Duration;
     use std::{env, fs};
 
+    use crate::metastore::job::JobType;
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
+    use cuberockstore::rocksdb::{Options, DB};
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use rocksdb::{Options, DB};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
     use crate::cluster::MockCluster;
     use crate::config::{Config, FileStoreProvider};
     use crate::import::MockImportService;
-    use crate::metastore::{BaseRocksStoreFs, RocksMetaStore};
+    use crate::metastore::{BaseRocksStoreFs, RocksMetaStore, RowKey, TableId};
     use crate::queryplanner::query_executor::MockQueryExecutor;
     use crate::queryplanner::MockQueryPlanner;
     use crate::remotefs::{LocalDirRemoteFs, RemoteFile, RemoteFs};
@@ -2082,7 +1695,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -2130,6 +1743,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2158,7 +1772,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -2206,6 +1820,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2264,7 +1879,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -2312,6 +1927,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -2425,6 +2041,36 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn create_table_if_not_exists() {
+        Config::test("create_table_if_not_exists").start_with_injector_override(async move |injector| {
+            injector.register_typed::<dyn RemoteFs, _, _, _>(async move |injector| {
+                Arc::new(FailingRemoteFs(
+                    injector.get_service_typed::<QueueRemoteFs>().await,
+                ))
+            })
+                .await
+        }, async move |services| {
+            let service = services.sql_service;
+
+            let _ = service.exec_query("CREATE SCHEMA foo").await.unwrap();
+
+            let created_table = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await.unwrap();
+            let res = service
+                .exec_query("CREATE TABLE foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await;
+            assert!(res.is_err());
+            let res = service
+                .exec_query("CREATE TABLE IF NOT EXISTS foo.values (id int, dec_value decimal, dec_value_1 decimal(18, 2))")
+                .await;
+            assert_eq!(res.unwrap(), created_table);
+
+
+        })
+            .await;
+    }
     #[tokio::test]
     async fn failed_upload_drop() {
         Config::test("failed_upload_drop").start_with_injector_override(async move |injector| {
@@ -4642,6 +4288,45 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
+            })
+            .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[tokio::test]
+    async fn total_count_over_single_row() {
+        Config::test("total_count_over_single_row")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE test.test (idd int, value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.test (idd, value) values \
+                            (1, 10)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 sum(value) as s
+                                 from test.test
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
             })
             .await;
 

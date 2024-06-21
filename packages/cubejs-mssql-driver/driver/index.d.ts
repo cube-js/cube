@@ -1,9 +1,9 @@
 import { BaseDriver } from "@cubejs-backend/query-orchestrator";
-import { ConnectionConfig } from "mysql";
+import { config } from "mssql";
 
-declare module "@cubejs-backend/mysql-driver" {
-  export default class MySqlDriver extends BaseDriver {
-    constructor(options?: ConnectionConfig);
+declare module "@cubejs-backend/mssql-driver" {
+  export default class MSSqlDriver extends BaseDriver {
+    constructor(options?: config);
     release(): Promise<void>
   }
 }

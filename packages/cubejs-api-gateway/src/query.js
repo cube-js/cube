@@ -39,6 +39,7 @@ const getPivotQuery = (queryType, queries) => {
 };
 
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
+const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
 const memberExpression = Joi.object().keys({
   expression: Joi.func().required(),
@@ -46,6 +47,11 @@ const memberExpression = Joi.object().keys({
   name: Joi.string().required(),
   expressionName: Joi.string(),
   definition: Joi.string(),
+  groupingSet: Joi.object().keys({
+    groupType: Joi.valid('Rollup', 'Cube').required(),
+    id: Joi.number().required(),
+    subId: Joi.number()
+  })
 });
 
 const operators = [
@@ -102,12 +108,12 @@ const querySchema = Joi.object().keys({
     compareDateRange: Joi.array()
   }).oxor('dateRange', 'compareDateRange')),
   order: Joi.alternatives(
-    Joi.object().pattern(id, Joi.valid('asc', 'desc')),
-    Joi.array().items(Joi.array().min(2).ordered(id, Joi.valid('asc', 'desc')))
+    Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
+    Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(id),
+  segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
   timezone: Joi.string(),
-  limit: Joi.number().integer().min(1),
+  limit: Joi.number().integer().min(0),
   offset: Joi.number().integer().min(0),
   total: Joi.boolean(),
   renewQuery: Joi.boolean(),

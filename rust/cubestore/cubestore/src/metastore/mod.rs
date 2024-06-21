@@ -22,8 +22,8 @@ pub use rocks_table::*;
 use crate::cluster::node_name_by_partition;
 use crate::metastore::partition::partition_file_name;
 use async_trait::async_trait;
+use cuberockstore::rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use log::info;
-use rocksdb::{BlockBasedOptions, Cache, Env, MergeOperands, Options, DB};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 use std::{env, io::Cursor, sync::Arc};
@@ -61,6 +61,7 @@ use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
 use core::fmt;
 use cubehll::HllSketch;
+use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions};
 use cubezetasketch::HyperLogLogPlusPlus;
 use datafusion::cube_ext;
 use futures_timer::Delay;
@@ -72,7 +73,6 @@ use parquet::basic::{ConvertedType, Repetition};
 use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
-use rocksdb::backup::{BackupEngine, BackupEngineOptions};
 
 use schema::{SchemaRocksIndex, SchemaRocksTable};
 use smallvec::alloc::fmt::Formatter;
@@ -84,8 +84,11 @@ use std::mem::take;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::cachestore::{CacheItem, QueueItem, QueueItemStatus, QueueResult, QueueResultAckEvent};
+use crate::cachestore::{
+    CacheItem, QueueItem, QueueItemPayload, QueueItemStatus, QueueResult, QueueResultAckEvent,
+};
 use crate::remotefs::LocalDirRemoteFs;
+use cubedatasketches::HLLDataSketch;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
 use std::time::{Duration, SystemTime};
@@ -340,10 +343,11 @@ impl DataFrameValue<String> for Option<Vec<AggregateFunction>> {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub enum HllFlavour {
-    Airlift,    // Compatible with Presto, Athena, etc.
-    Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
-    Postgres,   // Same storage as Airlift, imports from HLL Storage Specification.
-    ZetaSketch, // Compatible with BigQuery.
+    Airlift,      // Compatible with Presto, Athena, etc.
+    Snowflake,    // Same storage as Airlift, imports from Snowflake JSON.
+    Postgres,     // Same storage as Airlift, imports from HLL Storage Specification.
+    ZetaSketch,   // Compatible with BigQuery.
+    DataSketches, // Compatible with DataBricks.
 }
 
 pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
@@ -357,6 +361,9 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
         }
         HllFlavour::Postgres | HllFlavour::Snowflake => {
             panic!("string formats should be handled separately")
+        }
+        HllFlavour::DataSketches => {
+            HLLDataSketch::read(data)?;
         }
     }
     return Ok(());
@@ -389,6 +396,7 @@ impl Display for ColumnType {
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "hyperloglogpp",
             ColumnType::HyperLogLog(HllFlavour::Postgres) => "hll_postgres",
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => "hll_snowflake",
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => "hll_datasketches",
             ColumnType::Timestamp => "timestamp",
             ColumnType::Float => "float",
             ColumnType::Boolean => "boolean",
@@ -434,6 +442,7 @@ impl ColumnType {
                 "hyperloglogpp" => Ok(ColumnType::HyperLogLog(HllFlavour::ZetaSketch)),
                 "hll_postgres" => Ok(ColumnType::HyperLogLog(HllFlavour::Postgres)),
                 "hll_snowflake" => Ok(ColumnType::HyperLogLog(HllFlavour::Snowflake)),
+                "hll_datasketches" => Ok(ColumnType::HyperLogLog(HllFlavour::DataSketches)),
                 "timestamp" => Ok(ColumnType::Timestamp),
                 "float" => Ok(ColumnType::Float),
                 "boolean" => Ok(ColumnType::Boolean),
@@ -595,6 +604,7 @@ impl fmt::Display for Column {
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "HYPERLOGLOGPP".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Postgres) => "HLL_POSTGRES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => "HLL_SNOWFLAKE".to_string(),
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => "HLL_DATASKETCHES".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
@@ -845,6 +855,7 @@ pub trait MetaStore: DIService + Send + Sync {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
@@ -1230,6 +1241,9 @@ pub enum MetaStoreEvent {
 
     UpdateQueueResult(IdRow<QueueResult>, IdRow<QueueResult>),
     DeleteQueueResult(IdRow<QueueResult>),
+
+    UpdateQueueItemPayload(IdRow<QueueItemPayload>, IdRow<QueueItemPayload>),
+    DeleteQueueItemPayload(IdRow<QueueItemPayload>),
 }
 
 fn meta_store_merge(
@@ -1257,7 +1271,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
         opts.create_if_missing(true);
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
         opts.set_merge_operator_associative("meta_store merge", meta_store_merge);
         // TODO(ovr): Decrease after additional fix for get_updates_since
         opts.set_wal_ttl_seconds(
@@ -1290,7 +1306,9 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
     fn open_readonly_db(&self, path: &Path, config: &Arc<dyn ConfigObj>) -> Result<DB, CubeError> {
         let rocksdb_config = config.metastore_rocksdb_config();
         let mut opts = Options::default();
-        opts.set_prefix_extractor(rocksdb::SliceTransform::create_fixed_prefix(13));
+        opts.set_prefix_extractor(cuberockstore::rocksdb::SliceTransform::create_fixed_prefix(
+            13,
+        ));
 
         let block_opts = {
             let mut block_opts = BlockBasedOptions::default();
@@ -1333,6 +1351,10 @@ impl RocksStoreDetails for RocksMetaStoreDetails {
 
     fn get_name(&self) -> &'static str {
         &"metastore"
+    }
+
+    fn log_enabled(&self) -> bool {
+        true
     }
 }
 
@@ -1490,6 +1512,37 @@ impl RocksMetaStore {
     {
         self.store.write_operation(f).await
     }
+
+    fn drop_table_impl(
+        table_id: u64,
+        db_ref: DbTableRef,
+        batch_pipe: &mut BatchPipe,
+    ) -> Result<IdRow<Table>, CubeError> {
+        let tables_table = TableRocksTable::new(db_ref.clone());
+        let indexes_table = IndexRocksTable::new(db_ref.clone());
+        let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
+        let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
+        let indexes = indexes_table
+            .get_row_ids_by_index(&IndexIndexKey::TableId(table_id), &IndexRocksIndex::TableID)?;
+        let trace_objects = trace_objects_table.get_rows_by_index(
+            &TraceObjectIndexKey::ByTableId(table_id),
+            &TraceObjectRocksIndex::ByTableId,
+        )?;
+        for trace_object in trace_objects {
+            trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
+        }
+        let replay_handles = replay_handles_table.get_rows_by_index(
+            &ReplayHandleIndexKey::ByTableId(table_id),
+            &ReplayHandleRocksIndex::ByTableId,
+        )?;
+        for replay_handle in replay_handles {
+            replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
+        }
+        for index in indexes {
+            RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
+        }
+        Ok(tables_table.delete(table_id, batch_pipe)?)
+    }
 }
 
 impl RocksMetaStore {
@@ -1588,7 +1641,7 @@ impl RocksMetaStore {
                 }
 
                 taken[i] = true;
-                index_columns.push(c.clone().replace_index(index_columns.len()));
+                index_columns.push(c.replace_index(index_columns.len()));
             }
 
             let seq_column = table_id.get_row().seq_column().ok_or_else(|| {
@@ -2033,9 +2086,15 @@ impl MetaStore for RocksMetaStore {
         aggregates: Option<Vec<(String, String)>>,
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
+        drop_if_exists: bool,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
+            if drop_if_exists {
+                if let Ok(exists_table) = get_table_impl(db_ref.clone(), schema_name.clone(), table_name.clone()) {
+                    RocksMetaStore::drop_table_impl(exists_table.get_id(), db_ref.clone(), batch_pipe)?;
+                }
+            }
             let rocks_table = TableRocksTable::new(db_ref.clone());
             let rocks_index = IndexRocksTable::new(db_ref.clone());
             let rocks_schema = SchemaRocksTable::new(db_ref.clone());
@@ -2379,32 +2438,7 @@ impl MetaStore for RocksMetaStore {
     async fn drop_table(&self, table_id: u64) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
-            let tables_table = TableRocksTable::new(db_ref.clone());
-            let indexes_table = IndexRocksTable::new(db_ref.clone());
-            let replay_handles_table = ReplayHandleRocksTable::new(db_ref.clone());
-            let trace_objects_table = TraceObjectRocksTable::new(db_ref.clone());
-            let indexes = indexes_table.get_row_ids_by_index(
-                &IndexIndexKey::TableId(table_id),
-                &IndexRocksIndex::TableID,
-            )?;
-            let trace_objects = trace_objects_table.get_rows_by_index(
-                &TraceObjectIndexKey::ByTableId(table_id),
-                &TraceObjectRocksIndex::ByTableId,
-            )?;
-            for trace_object in trace_objects {
-                trace_objects_table.delete(trace_object.get_id(), batch_pipe)?;
-            }
-            let replay_handles = replay_handles_table.get_rows_by_index(
-                &ReplayHandleIndexKey::ByTableId(table_id),
-                &ReplayHandleRocksIndex::ByTableId,
-            )?;
-            for replay_handle in replay_handles {
-                replay_handles_table.delete(replay_handle.get_id(), batch_pipe)?;
-            }
-            for index in indexes {
-                RocksMetaStore::drop_index(db_ref.clone(), batch_pipe, index, true)?;
-            }
-            Ok(tables_table.delete(table_id, batch_pipe)?)
+            RocksMetaStore::drop_table_impl(table_id, db_ref, batch_pipe)
         })
         .await
     }
@@ -4857,10 +4891,10 @@ fn swap_active_partitions_impl(
 mod tests {
     use super::table::AggregateColumn;
     use super::*;
-    use crate::config::Config;
+    use crate::config::{init_test_logger, Config};
     use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
+    use cuberockstore::rocksdb::IteratorMode;
     use futures_timer::Delay;
-    use rocksdb::IteratorMode;
     use std::thread::sleep;
     use std::time::Duration;
     use std::{env, fs};
@@ -5108,6 +5142,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5130,6 +5165,7 @@ mod tests {
                 None,
                 None,
                 None,
+                false,
             )
             .await
             .unwrap();
@@ -5197,6 +5233,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_test");
         let store_path = env::current_dir().unwrap().join("test-table-local");
         let remote_store_path = env::current_dir().unwrap().join("test-table-remote");
@@ -5251,6 +5289,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5275,6 +5314,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5305,6 +5345,8 @@ mod tests {
     }
     #[tokio::test]
     async fn default_index_field_positions_test() {
+        init_test_logger().await;
+
         let config = Config::test("default_index_field_positions_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5363,6 +5405,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5395,6 +5438,8 @@ mod tests {
 
     #[tokio::test]
     async fn table_with_aggregate_index_test() {
+        init_test_logger().await;
+
         let config = Config::test("table_with_aggregate_index_test");
         let store_path = env::current_dir()
             .unwrap()
@@ -5452,6 +5497,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -5524,6 +5570,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5546,6 +5593,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5571,6 +5619,7 @@ mod tests {
                     ]),
                     None,
                     None,
+                    false,
                 )
                 .await
                 .is_err());
@@ -5581,6 +5630,8 @@ mod tests {
 
     #[tokio::test]
     async fn cold_start_test() {
+        init_test_logger().await;
+
         {
             let config = Config::test("cold_start_test");
 
@@ -5627,7 +5678,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5650,6 +5701,7 @@ mod tests {
                 .get_schema("bar".to_string())
                 .await
                 .unwrap();
+
             fs::remove_dir_all(config.local_dir()).unwrap();
             fs::remove_dir_all(config.remote_dir()).unwrap();
         }
@@ -5742,7 +5794,7 @@ mod tests {
             assert!(snapshots[2].current);
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5767,6 +5819,8 @@ mod tests {
     }
     #[tokio::test]
     async fn set_current_snapshot() {
+        init_test_logger().await;
+
         {
             let config = Config::test("set_current_snapshot");
 
@@ -5840,7 +5894,7 @@ mod tests {
 
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -5879,7 +5933,7 @@ mod tests {
                 .set_current_snapshot(snapshots[2].id)
                 .await;
             assert!(res.is_ok());
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6000,6 +6054,8 @@ mod tests {
 
     #[tokio::test]
     async fn log_replay_ordering() {
+        init_test_logger().await;
+
         {
             let config = Config::test("log_replay_ordering");
 
@@ -6047,6 +6103,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        false,
                     )
                     .await
                     .unwrap();
@@ -6083,8 +6140,7 @@ mod tests {
                     .unwrap();
             }
             services.stop_processing_loops().await.unwrap();
-
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await;
             fs::remove_dir_all(config.local_dir()).unwrap();
         }
 
@@ -6181,7 +6237,7 @@ mod tests {
                 .unwrap();
             services.stop_processing_loops().await.unwrap();
 
-            Delay::new(Duration::from_millis(1000)).await; // TODO logger init conflict
+            Delay::new(Duration::from_millis(2000)).await; // TODO logger init conflict
             fs::remove_dir_all(config.local_dir()).unwrap();
             let list = LocalDirRemoteFs::list_recursive(
                 config.remote_dir().clone(),
@@ -6269,6 +6325,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();
@@ -6409,6 +6466,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    false,
                 )
                 .await
                 .unwrap();

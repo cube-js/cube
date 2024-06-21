@@ -1,5 +1,6 @@
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'DAY',
@@ -59,15 +60,23 @@ export class BigqueryQuery extends BaseQuery {
     return new BigqueryFilter(this, filter);
   }
 
-  public dateSeriesSql(timeDimension) {
+  public dateSeriesSql(timeDimension: BaseTimeDimension) {
     return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
+  }
+
+  public timestampFormat() {
+    return 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]';
+  }
+
+  public timestampPrecision(): number {
+    return 6;
   }
 
   public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
@@ -160,6 +169,7 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
+    templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
     return templates;
   }
 }

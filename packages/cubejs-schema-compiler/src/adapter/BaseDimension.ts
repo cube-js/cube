@@ -17,6 +17,7 @@ export class BaseDimension {
     if (dimension && dimension.expression) {
       this.expression = dimension.expression;
       this.expressionCubeName = dimension.cubeName;
+      // In case of SQL push down expressionName doesn't contain cube name. It's just a column name.
       this.expressionName = dimension.expressionName || `${dimension.cubeName}.${dimension.name}`;
       this.isMemberExpression = !!dimension.definition;
     }
@@ -44,6 +45,7 @@ export class BaseDimension {
     return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
   }
 
+  // We need this for dimensions however we don't for filters for performance reasons
   public convertTzForRawTimeDimensionIfNeeded(sql) {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {
@@ -60,6 +62,13 @@ export class BaseDimension {
 
   public getMembers() {
     return [this];
+  }
+
+  public isPostAggregate() {
+    if (this.expression) { // TODO
+      return false;
+    }
+    return this.definition().postAggregate;
   }
 
   public cube() {

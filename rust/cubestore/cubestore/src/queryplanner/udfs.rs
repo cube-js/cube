@@ -1,5 +1,5 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
-use crate::queryplanner::hll::Hll;
+use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::CubeError;
 use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
 use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
@@ -353,7 +353,7 @@ impl CubeAggregateUDF for HllMergeUDF {
 struct HllMergeAccumulator {
     // TODO: store sketch for empty set from the start.
     //       this requires storing index_bit_len in the type.
-    acc: Option<Hll>,
+    acc: Option<HllUnion>,
 }
 
 impl Accumulator for HllMergeAccumulator {
@@ -421,7 +421,7 @@ impl Accumulator for HllMergeAccumulator {
 impl HllMergeAccumulator {
     fn merge_sketch(&mut self, s: Hll) -> Result<(), DataFusionError> {
         if self.acc.is_none() {
-            self.acc = Some(s);
+            self.acc = Some(HllUnion::new(s)?);
             return Ok(());
         } else if let Some(acc_s) = &mut self.acc {
             if !acc_s.is_compatible(&s) {
@@ -430,7 +430,7 @@ impl HllMergeAccumulator {
                 )
                 .into());
             }
-            acc_s.merge_with(&s)?;
+            acc_s.merge_with(s)?;
         } else {
             unreachable!("impossible");
         }

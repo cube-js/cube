@@ -1094,6 +1094,23 @@ describe('Single datasources', () => {
     expect(getEnv('fireboltEngineEndpoint', { dataSource: 'wrong' })).toBeUndefined();
   });
 
+  test('getEnv("fireboltAccount")', () => {
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default1";
+    expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default1');
+    expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default1');
+    expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default1');
+
+    process.env.CUBEJS_FIREBOLT_ACCOUNT = "default2";
+    expect(getEnv('fireboltAccount', { dataSource: 'default' })).toEqual('default2');
+    expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toEqual('default2');
+    expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toEqual('default2');
+
+    delete process.env.CUBEJS_FIREBOLT_ACCOUNT;
+    expect(getEnv('fireboltAccount', { dataSource: 'default' })).toBeUndefined();
+    expect(getEnv('fireboltAccount', { dataSource: 'postgres' })).toBeUndefined();
+    expect(getEnv('fireboltAccount', { dataSource: 'wrong' })).toBeUndefined();
+  });
+
   test('getEnv("hiveType")', () => {
     process.env.CUBEJS_DB_HIVE_TYPE = 'default1';
     expect(getEnv('hiveType', { dataSource: 'default' })).toEqual('default1');

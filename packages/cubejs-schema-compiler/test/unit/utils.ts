@@ -125,6 +125,11 @@ export function createECommerceSchema() {
           type: 'time',
         },
         {
+          name: 'updated_at',
+          sql: '{created_at}',
+          type: 'time',
+        },
+        {
           name: 'status',
           sql: 'status',
           type: 'string',
@@ -159,13 +164,63 @@ export function createECommerceSchema() {
           },
         }
       ]
-    }],
+    },
+    {
+      name: 'orders_indexes',
+      sql_table: 'orders',
+      measures: [{
+        name: 'count',
+        type: 'count',
+      }],
+      dimensions: [
+        {
+          name: 'created_at',
+          sql: 'created_at',
+          type: 'time',
+        },
+        {
+          name: 'status',
+          sql: 'status',
+          type: 'string',
+        }
+      ],
+      preAggregations: [
+        {
+          name: 'orders_by_day_with_day_by_status',
+          measures: ['count'],
+          dimensions: ['status'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
+          indexes: [
+            {
+              name: 'regular_index',
+              columns: ['created_at', 'status']
+            },
+            {
+              name: 'agg_index',
+              columns: ['status'],
+              type: 'aggregate'
+            }
+
+          ]
+        }
+      ]
+    },
+    ],
     views: [{
       name: 'orders_view',
       cubes: [{
         join_path: 'orders',
         includes: [
           'created_at',
+          'updated_at',
           'count',
           'status',
         ]

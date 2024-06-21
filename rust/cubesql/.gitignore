@@ -7,5 +7,7 @@ dist
 node_modules
 .vscode
 /cubesql/egraph-debug
+/cubesql/egraph-debug-final
+/cubesql/egraph-debug-intermediate
 egraph-debug
 /cubesql/debug-qtrace

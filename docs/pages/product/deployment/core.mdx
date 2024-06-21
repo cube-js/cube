@@ -14,6 +14,18 @@ can vary significantly depending on desired performance and scale.
 
 </WarningBox>
 
+<InfoBox>
+
+If you'd like to deploy Cube to [Kubernetes](https://kubernetes.io), please
+refer to the following resources with Helm charts:
+[`gadsme/charts`](https://github.com/gadsme/charts) or
+[`OpstimizeIcarus/cubejs-helm-charts-kubernetes`](https://github.com/OpstimizeIcarus/cubejs-helm-charts-kubernetes/tree/release-v0.1).
+
+These resources are community-maintained, and they are not maintained by the
+Cube team. Please direct questions related to these resources to their authors.
+
+</InfoBox>
+
 ## Prerequisites
 
 - [Docker Desktop][link-docker-app]
@@ -37,18 +49,25 @@ Using macOS or Windows? Use `CUBEJS_DB_HOST=host.docker.internal` instead of
 
 </InfoBox>
 
+<InfoBox>
+
+Note that it's a best practice to use specific locked versions, e.g.,
+`cubejs/cube:v0.34.56`, instead of `cubejs/cube:latest` in production.
+
+</InfoBox>
+
 ```yaml
 version: "2.2"
 
 services:
   cube_api:
     restart: always
-    image: cubejs/cube:v%CURRENT_VERSION
+    image: cubejs/cube:latest
     ports:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -63,10 +82,10 @@ services:
 
   cube_refresh_worker:
     restart: always
-    image: cubejs/cube:v%CURRENT_VERSION
+    image: cubejs/cube:latest
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -77,7 +96,7 @@ services:
 
   cubestore_router:
     restart: always
-    image: cubejs/cubestore:v%CURRENT_VERSION
+    image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_REMOTE_DIR=/cube/data
@@ -88,7 +107,7 @@ services:
 
   cubestore_worker_1:
     restart: always
-    image: cubejs/cubestore:v%CURRENT_VERSION
+    image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_1:10001
@@ -102,7 +121,7 @@ services:
 
   cubestore_worker_2:
     restart: always
-    image: cubejs/cubestore:v%CURRENT_VERSION
+    image: cubejs/cubestore:latest
     environment:
       - CUBESTORE_WORKERS=cubestore_worker_1:10001,cubestore_worker_2:10002
       - CUBESTORE_SERVER_NAME=cubestore_worker_2:10002
@@ -196,12 +215,12 @@ can correctly create pre-aggregations.
 ```yaml
 services:
   cube_api:
-    image: cubejs/cube:v%CURRENT_VERSION
+    image: cubejs/cube:latest
     ports:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router
@@ -245,28 +264,28 @@ cubestore_router_1    | 2021-06-02 15:03:20,915 INFO  [cubestore::metastore] Cre
 cubestore_router_1    | 2021-06-02 15:03:20,950 INFO  [cubestore::cluster] Meta store port open on 0.0.0.0:9999
 cubestore_router_1    | 2021-06-02 15:03:20,951 INFO  [cubestore::mysql] MySQL port open on 0.0.0.0:3306
 cubestore_router_1    | 2021-06-02 15:03:20,952 INFO  [cubestore::http] Http Server is listening on 0.0.0.0:3030
-cube_1                | 🚀 Cube API server (%CURRENT_VERSION) is listening on 4000
+cube_1                | 🚀 Cube API server (vX.XX.XX) is listening on 4000
 cubestore_worker_2_1  | 2021-06-02 15:03:24,945 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 cubestore_worker_1_1  | 2021-06-02 15:03:24,830 INFO  [cubestore::cluster] Worker port open on 0.0.0.0:9001
 ```
 
 ## Update to the latest version
 
-Find the latest stable release version (currently `v%CURRENT_VERSION`) [from
+Find the latest stable release version [from
 Docker Hub][link-cubejs-docker]. Then update your `docker-compose.yml` to use
-the tag:
+a specific tag instead of `latest`:
 
 ```yaml
 version: "2.2"
 
 services:
   cube_api:
-    image: cubejs/cube:v%CURRENT_VERSION
+    image: cubejs/cube:v0.34.56
     ports:
       - 4000:4000
     environment:
       - CUBEJS_DB_TYPE=bigquery
-      - CUBEJS_DB_BQ_PROJECT_ID=cubejs-bq-cluster
+      - CUBEJS_DB_BQ_PROJECT_ID=cube-bq-cluster
       - CUBEJS_DB_BQ_CREDENTIALS=<BQ-KEY>
       - CUBEJS_DB_EXPORT_BUCKET=cubestore
       - CUBEJS_CUBESTORE_HOST=cubestore_router

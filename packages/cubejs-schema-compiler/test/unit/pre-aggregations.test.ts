@@ -125,6 +125,38 @@ describe('pre-aggregations', () => {
     ]);
   });
 
+  it('view and pre-aggregation granularity two level', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml(createECommerceSchema())
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders_view.count'
+      ],
+      timeDimensions: [{
+        dimension: 'orders_view.updated_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      timezone: 'America/Los_Angeles'
+    });
+
+    const queryAndParams = query.buildSqlAndParams();
+    console.log(queryAndParams);
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    console.log(JSON.stringify(preAggregationsDescription, null, 2));
+
+    expect(preAggregationsDescription[0].preAggregationId).toEqual('orders.orders_by_day_with_day');
+    expect(preAggregationsDescription[0].matchedTimeDimensionDateRange).toEqual([
+      '2023-01-01T00:00:00.000',
+      '2023-01-10T23:59:59.999'
+    ]);
+  });
+
   it('view and pre-aggregation granularity with additional filters test', async () => {
     const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
       createSchemaYaml(createECommerceSchema())
@@ -173,5 +205,31 @@ describe('pre-aggregations', () => {
       '2023-01-01T00:00:00.000',
       '2023-01-10T23:59:59.999'
     ]);
+  });
+
+  it('pre-aggregation with indexes descriptions', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml(createECommerceSchema())
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders_indexes.count'
+      ],
+      timeDimensions: [{
+        dimension: 'orders_indexes.created_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      dimensions: ['orders_indexes.status']
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    const { indexesSql } = preAggregationsDescription[0];
+    expect(indexesSql.length).toEqual(2);
+    expect(indexesSql[0].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_regular_index');
+    expect(indexesSql[1].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_agg_index');
   });
 });

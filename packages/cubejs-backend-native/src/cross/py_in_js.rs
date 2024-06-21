@@ -31,7 +31,7 @@ pub fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromis
     let (deferred, promise) = cx.promise();
 
     let this = cx
-        .this()
+        .this::<JsValue>()?
         .downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(&mut cx)?;
 
     let mut arguments = Vec::with_capacity(cx.len() as usize);

@@ -3,6 +3,7 @@ use crate::{
     sql::{
         dataframe::{batch_to_dataframe, DataFrame, TableValue},
         statement::PostgresStatementParamsBinder,
+        temp_tables::TempTable,
         writer::BatchWriter,
     },
     CubeError,
@@ -19,7 +20,7 @@ use datafusion::{
     physical_plan::SendableRecordBatchStream,
 };
 use futures::*;
-use pg_srv::protocol::{PortalCompletion, PortalSuspended};
+use pg_srv::protocol::{CommandComplete, PortalCompletion, PortalSuspended};
 
 use crate::transport::SpanId;
 use async_stream::stream;
@@ -344,7 +345,7 @@ impl Portal {
         for row in frame.to_rows().into_iter() {
             for value in row.to_values() {
                 match value {
-                    TableValue::Null => writer.write_value::<Option<bool>>(None)?,
+                    TableValue::Null => writer.write_value::<Option<String>>(None)?,
                     TableValue::String(v) => writer.write_value(v)?,
                     TableValue::Int16(v) => writer.write_value(v)?,
                     TableValue::Int32(v) => writer.write_value(v)?,
@@ -509,6 +510,30 @@ impl Portal {
                                 }
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
+                        }
+                        QueryPlan::CreateTempTable(_, plan, ctx, name, temp_tables) => {
+                            let df = DFDataFrame::new(ctx.state.clone(), &plan);
+                            let record_batch = df.collect();
+                            let row_count = match record_batch.await {
+                                Ok(record_batch) => {
+                                    let row_count: u32 = record_batch.iter().map(|batch| batch.num_rows() as u32).sum();
+                                    let temp_table = TempTable::new(Arc::clone(plan.schema()), vec![record_batch]);
+                                    let save_result = tokio::task::spawn_blocking(move || {
+                                        temp_tables.save(&name.to_ascii_lowercase(), temp_table)
+                                    }).await?;
+                                    if let Err(err) = save_result {
+                                        return yield Err(err.into())
+                                    };
+                                    row_count
+                                }
+                                Err(err) => return yield Err(CubeError::panic(Box::new(err)).into()),
+                            };
+
+                            self.state = Some(PortalState::Finished(FinishedState { description }));
+
+                            return yield Ok(PortalBatch::Completion(PortalCompletion::Complete(
+                                CommandComplete::Select(row_count),
+                            )));
                         }
                     }
                 }

@@ -8,14 +8,18 @@
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
       "CUBEJS_DB_USER": "test",
-      "CUBEJS_DB_PASS": "test"
+      "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
-    "image": "postgres:13",
+    "image": "hbontempo/postgres-hll:16-v2.18",
     "environment": [
       "POSTGRES_PASSWORD=test",
       "POSTGRES_USER=test",
@@ -70,6 +74,34 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
       }
     ],
     "BigECommerce": [
@@ -85,6 +117,34 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "dimensions": [],
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
       }
     ]
   },
@@ -93,12 +153,6 @@
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
-    "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
-    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
-    "querying ECommerce: partitioned pre-agg",
-    "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg",
-    "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test"
   ]
 }

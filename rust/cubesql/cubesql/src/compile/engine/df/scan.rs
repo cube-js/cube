@@ -10,8 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int32Builder,
-            Int64Builder, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int16Builder,
+            Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -34,6 +34,7 @@ use crate::{
         find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
     },
+    config::ConfigObj,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, SpanId, TransportService},
     CubeError,
@@ -145,6 +146,7 @@ pub struct WrappedSelectNode {
     pub schema: DFSchemaRef,
     pub select_type: WrappedSelectType,
     pub projection_expr: Vec<Expr>,
+    pub subqueries: Vec<Arc<LogicalPlan>>,
     pub group_expr: Vec<Expr>,
     pub aggr_expr: Vec<Expr>,
     pub window_expr: Vec<Expr>,
@@ -156,6 +158,7 @@ pub struct WrappedSelectNode {
     pub offset: Option<usize>,
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
+    pub distinct: bool,
     pub ungrouped: bool,
 }
 
@@ -164,6 +167,7 @@ impl WrappedSelectNode {
         schema: DFSchemaRef,
         select_type: WrappedSelectType,
         projection_expr: Vec<Expr>,
+        subqueries: Vec<Arc<LogicalPlan>>,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
         window_expr: Vec<Expr>,
@@ -175,12 +179,14 @@ impl WrappedSelectNode {
         offset: Option<usize>,
         order_expr: Vec<Expr>,
         alias: Option<String>,
+        distinct: bool,
         ungrouped: bool,
     ) -> Self {
         Self {
             schema,
             select_type,
             projection_expr,
+            subqueries,
             group_expr,
             aggr_expr,
             window_expr,
@@ -192,6 +198,7 @@ impl WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            distinct,
             ungrouped,
         }
     }
@@ -228,7 +235,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
             self.select_type,
             self.projection_expr,
             self.group_expr,
@@ -242,6 +249,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.offset,
             self.order_expr,
             self.alias,
+            self.distinct,
         )
     }
 
@@ -315,6 +323,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.schema.clone(),
             self.select_type.clone(),
             projection_expr,
+            self.subqueries.clone(),
             group_expr,
             aggregate_expr,
             window_expr,
@@ -331,6 +340,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            self.distinct,
             self.ungrouped,
         ))
     }
@@ -341,6 +351,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
 pub struct CubeScanExtensionPlanner {
     pub transport: Arc<dyn TransportService>,
     pub meta: LoadRequestMeta,
+    pub config_obj: Arc<dyn ConfigObj>,
 }
 
 impl ExtensionPlanner for CubeScanExtensionPlanner {
@@ -369,6 +380,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
                     span_id: scan_node.span_id.clone(),
+                    config_obj: self.config_obj.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
                 // TODO
@@ -404,6 +416,7 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
                     span_id: scan_node.span_id.clone(),
+                    config_obj: self.config_obj.clone(),
                 }))
             } else {
                 None
@@ -426,6 +439,7 @@ struct CubeScanExecutionPlan {
     // injected by extension planner
     meta: LoadRequestMeta,
     span_id: Option<Arc<SpanId>>,
+    config_obj: Arc<dyn ConfigObj>,
 }
 
 #[derive(Debug)]
@@ -582,14 +596,8 @@ impl ExecutionPlan for CubeScanExecutionPlan {
         _context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         // TODO: move envs to config
-        let stream_mode = std::env::var("CUBESQL_STREAM_MODE")
-            .ok()
-            .map(|v| v.parse::<bool>().unwrap())
-            .unwrap_or(false);
-        let query_limit = std::env::var("CUBEJS_DB_QUERY_LIMIT")
-            .ok()
-            .map(|v| v.parse::<i32>().unwrap())
-            .unwrap_or(50000);
+        let stream_mode = self.config_obj.stream_mode();
+        let query_limit = self.config_obj.non_streaming_query_max_row_limit();
 
         let stream_mode = match (stream_mode, self.request.limit) {
             (true, None) => true,
@@ -942,6 +950,31 @@ pub fn transform_response<V: ValueObject>(
                     }
                 )
             }
+            DataType::Int16 => {
+                build_column!(
+                    DataType::Int16,
+                    Int16Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
+                        (FieldValue::String(s), builder) => match s.parse::<i16>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as i16: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Int16(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
             DataType::Int32 => {
                 build_column!(
                     DataType::Int32,
@@ -1048,9 +1081,15 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                                .or_else(|_| {
+                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                        date.and_hms_opt(0, 0, 0).unwrap()
+                                    })
+                                })
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",
@@ -1078,9 +1117,15 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                                .or_else(|_| {
+                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                        date.and_hms_opt(0, 0, 0).unwrap()
+                                    })
+                                })
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",
@@ -1187,6 +1232,11 @@ pub fn transform_response<V: ValueObject>(
                         },
                     }
                 )
+            }
+            DataType::Null => {
+                let len = response.len()?;
+                let array = NullArray::new(len);
+                Arc::new(array)
             }
             t => {
                 return Err(CubeError::user(format!(
@@ -1399,6 +1449,7 @@ mod tests {
             transport: get_test_transport(),
             meta: get_test_load_meta(DatabaseProtocol::PostgreSQL),
             span_id: None,
+            config_obj: crate::config::Config::test().config_obj(),
         };
 
         let runtime = Arc::new(

@@ -546,19 +546,27 @@ module.exports = {
 
 ### `pre_aggregations_schema`
 
-Schema name to use for storing pre-aggregations. Either string or function
-could be passed. Providing a function allows to dynamically set the
-pre-aggregation schema name depending on the security context.
+Database schema name to use for storing pre-aggregations.
+
+Either string or function can be passed. Providing a function allows to set
+the schema name dynamically depending on the security context.
 
 Defaults to `dev_pre_aggregations` in [development mode][ref-development-mode]
 and `prod_pre_aggregations` in production.
 
-Can be also set via environment variable `CUBEJS_PRE_AGGREGATIONS_SCHEMA`.
+Can be also set via the `CUBEJS_PRE_AGGREGATIONS_SCHEMA` environment variable.
 
 <WarningBox>
 
-We **strongly** recommend using different pre-aggregation schemas in development
-and production environments to avoid pre-aggregation tables clashes.
+It's **strongly** recommended to use different pre-aggregation schemas in
+development and production environments to avoid pre-aggregation table clashes.
+
+</WarningBox>
+
+<WarningBox>
+
+Cube will wipe out the contents of this database schema before use. It shall
+be used exclusively by Cube and shall not be shared with any application.
 
 </WarningBox>
 
@@ -629,11 +637,8 @@ module.exports = {
 
 </CodeTabs>
 
-Learn more about [scheduled refreshes here][ref-caching-up-to-date].
-
 Best practice is to run `scheduled_refresh_timer` in a separate worker Cube
-instance. For Serverless deployments, [REST API][ref-rest-api-sched-refresh]
-should be used instead.
+instance.
 
 You may also need to configure
 [`scheduledRefreshTimeZones`][self-opts-sched-refresh-tz] and
@@ -641,11 +646,11 @@ You may also need to configure
 
 ### `scheduled_refresh_time_zones`
 
-All time-based calculations performed within Cube are timezone-aware. Using this
-property you can specify multiple timezones in [TZ Database Name][link-wiki-tz]
-format e.g. `America/Los_Angeles`. The default value is `UTC`.
+This option specifies a list of time zones that pre-aggregations will be built
+for. It has impact on [pre-aggregation matching][ref-matching-preaggs].
 
-You can define one or multiple timezones:
+You can specify multiple timezones in the [TZ Database Name][link-wiki-tz]
+format, e.g., `America/Los_Angeles`:
 
 <CodeTabs>
 
@@ -669,14 +674,10 @@ module.exports = {
 
 </CodeTabs>
 
-This configuration option can be also set using the
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. You can set a
-comma-separated list of timezones to refresh in
-`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable. For example:
+The default value is a list of a single time zone. `UTC`.
 
-```dotenv
-CUBEJS_SCHEDULED_REFRESH_TIMEZONES=America/Los_Angeles,UTC
-```
+This configuration option can be also set using the
+`CUBEJS_SCHEDULED_REFRESH_TIMEZONES` environment variable.
 
 ### `scheduled_refresh_contexts`
 
@@ -778,22 +779,44 @@ module.exports = {
       query.filters.push({
         member: 'regions.id',
         operator: 'equals',
-        values: [securityContext.region_id],
-      });
+        values: [securityContext.region_id]
+      })
     }
-    return query;
-  },
-};
+    return query
+  }
+}
 
 
 ```
 
 </CodeTabs>
 
+Raising an exception would prevent a query from running:
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('query_rewrite')
+def query_rewrite(query: dict, ctx: dict) -> dict:
+  raise Exception('You shall not pass! 🧙')
+```
+
+```javascript
+module.exports = {
+  queryRewrite: (query, { securityContext }) => {
+    throw new Error('You shall not pass! 🧙')
+  }
+}
+```
+
+</CodeTabs>
+
 ### `allow_ungrouped_without_primary_key`
 
-Setting `allow_ungrouped_without_primary_key` to `True` disables primary key inclusion
-check for `ungrouped` queries.
+Setting `allow_ungrouped_without_primary_key` to `True` disables the primary
+key inclusion check for [ungrouped queries][ref-ungrouped-query].
 
 <CodeTabs>
 
@@ -810,6 +833,16 @@ module.exports = {
 ```
 
 </CodeTabs>
+
+This configuration option can be also set using the
+`CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY` environment variable.
+
+<InfoBox>
+
+When query pushdown in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
+environment variable, this option is enabled as well for the best user experience.
+
+</InfoBox>
 
 ## APIs
 
@@ -1013,6 +1046,8 @@ cube(`Users`, {
 
 Used in both REST and WebSockets API.
 
+Called on each request.
+
 Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization`
 header and sets payload to `securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
@@ -1020,7 +1055,12 @@ information on how to generate these tokens is [here][ref-sec-ctx].
 You can set `securityContext = userContextObj` inside the middleware if you
 want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
-Called on each request.
+<ReferenceBox>
+
+Currently, assigning to security context doesn't work in Python.
+Please [track this issue](https://github.com/cube-js/cube/issues/8133).
+
+</ReferenceBox>
 
 You can use empty `check_auth` function to disable built-in security or
 raise an exception to fail the authentication check.
@@ -1054,6 +1094,14 @@ module.exports = {
 ```
 
 </CodeTabs>
+
+<ReferenceBox>
+
+Currently, raising an exception would result in an HTTP response with the
+status code 500 for Cube Core and 403 for Cube Cloud.
+Please [track this issue](https://github.com/cube-js/cube/issues/8136).
+
+</ReferenceBox>
 
 ### `jwt`
 
@@ -1149,7 +1197,7 @@ using `check_sql_auth` to authenticate requests to the SQL API with LDAP.
 ### `can_switch_sql_user`
 
 Used in the [SQL API][ref-sql-api],. Default
-implementation depends on `CUBEJS_SQL_SUPERUSER` and return `true` when it's
+implementation depends on `CUBEJS_SQL_SUPER_USER` and return `true` when it's
 equal to session's user.
 
 Called on each change request from Cube SQL API.
@@ -1250,31 +1298,6 @@ module.exports = {
 
 ## Deprecated
 
-### `initApp`
-
-<WarningBox>
-
-`initApp` is deprecated and will be removed in a future release.
-
-</WarningBox>
-
-This function allows you to extend the Cube API server with custom Express
-middleware. This is especially useful for adding monitoring and observability
-solutions.
-
-```typescript
-const myCustomMiddleware = (req, res, next) => {
-  req.foo = "bar";
-  next();
-};
-
-module.exports = {
-  initApp: (app) => {
-    app.use(myCustomMiddleware);
-  },
-};
-```
-
 ### `dbType`
 
 <WarningBox>
@@ -1313,42 +1336,40 @@ If not defined, Cube will lookup for environment variable
 [link-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
 [link-jwt-ref-aud]: https://tools.ietf.org/html/rfc7519#section-4.1.3
 [link-wiki-tz]: https://en.wikipedia.org/wiki/Tz_database
-[ref-caching-up-to-date]: /product/caching#keeping-cache-up-to-date
 [ref-development-mode]: /product/configuration#development-mode
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-rest-api]: /reference/rest-api
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-rest-api-sched-refresh]: /reference/rest-api#v1run-scheduled-refresh
 [ref-pre-aggregations-refresh-key]:
   /reference/data-model/pre-aggregations#refresh_key
 [ref-schema-cube-ref-refresh-key]:
   /reference/data-model/cube#refresh_key
-[ref-schema-cube-ref-ctx-sec-ctx]:
-  /reference/data-model/cube#security-context
+[ref-schema-cube-ref-ctx-sec-ctx]: /reference/data-model/context-variables#security_context
 [ref-schema-ref-preaggs-rollup]:
   /reference/data-model/pre-aggregations#rollup
 [ref-sec]: /product/auth
 [ref-sec-ctx]: /product/auth/context
 [self-opts-req-ctx]: #requestcontext
 [self-opts-checkauth]: #checkauth
-[self-pre-aggregations-schema]: #preaggregationsschema
-[self-opts-ctx-to-appid]: #contexttoappid
-[self-driver-factory]: #driverfactory
+[self-pre-aggregations-schema]: #pre_aggregations_schema
+[self-opts-ctx-to-appid]: #context_to_app_id
+[self-driver-factory]: #driver_factory
 [ref-schema-ref-datasource]: /reference/data-model/cube#data_source
-[self-opts-sched-refresh-ctxs]: #scheduledrefreshcontexts
-[self-opts-sched-refresh-tz]: #scheduledrefreshtimezones
-[self-repofactory]: #repositoryfactory
-[self-schemafilerepo]: #schemafilerepository
-[self-schemapath]: #schemaPath
+[self-opts-sched-refresh-ctxs]: #scheduled_refresh_contexts
+[self-opts-sched-refresh-tz]: #scheduled_refresh_time_zones
+[self-repofactory]: #repository_factory
+[self-schemafilerepo]: #schema_file_repository
+[self-schemapath]: #schema_path
 [ref-exec-environment-globals]:
-  /product/data-modeling/dynamic/schema-execution-environment#node-js-globals-process-env-console-log-and-others
+  /product/data-modeling/dynamic/schema-execution-environment#nodejs-globals-processenv-consolelog-and-others
 [ref-environment-variables]: /reference/configuration/environment-variables
-[ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
+[ref-rest-scopes]: /product/apis-integrations/rest-api#api-scopes
 [ref-config-options]: /product/configuration#configuration-options
-[self-orchestrator-id]: #contexttoorchestratorid
+[self-orchestrator-id]: #context_to_orchestrator_id
 [ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
 [ref-websockets]: /product/apis-integrations/rest-api/real-time-data-fetch
-
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations
 [link-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [link-camel-case]: https://en.wikipedia.org/wiki/Camel_case
 [link-github-cube-drivers]: https://github.com/cube-js/cube/tree/master/packages
+[ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query

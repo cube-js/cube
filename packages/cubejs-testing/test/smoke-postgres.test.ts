@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import { StartedTestContainer } from 'testcontainers';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
-import cubejs, { CubejsApi, Query } from '@cubejs-client/core';
+import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
 import { BirdBox, getBirdbox } from '../src';
 import {
@@ -16,7 +16,7 @@ describe('postgres pa', () => {
   jest.setTimeout(60 * 5 * 1000);
   let db: StartedTestContainer;
   let birdbox: BirdBox;
-  let client: CubejsApi;
+  let client: CubeApi;
 
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});

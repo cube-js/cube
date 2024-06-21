@@ -1,5 +1,6 @@
 import { testQueries } from '../src/tests/testQueries';
-import { testIncrementalSchemaLoading } from '../src/tests/testIncrementalSchemaLoading';
 
-testIncrementalSchemaLoading('postgres');
-testQueries('postgres');
+testQueries('postgres', {
+  includeIncrementalSchemaSuite: true,
+  includeHLLSuite: true,
+});

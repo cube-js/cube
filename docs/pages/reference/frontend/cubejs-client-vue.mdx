@@ -13,7 +13,7 @@ props technique.
 
 | Name                   | Type                                                                                                                                          | Description                                                                                                                                                                                                                        |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cubejsApi              | [CubejsApi](/reference/frontend/cubejs-client-core#cubejsapi)                                                                                 | `CubejsApi` instance to use                                                                                                                                                                                                        |
+| cubeApi                | [CubeApi](/reference/frontend/cubejs-client-core#cubeapi)                                                                                     | `CubeApi` instance to use                                                                                                                                                                                                          |
 | initialChartType?      | [ChartType](#types-chart-type)                                                                                                                | The type of chart to display initially. Default is `line`.                                                                                                                                                                         |
 | disableHeuristics?     | boolean                                                                                                                                       | Defaults to `false`. This means that the default heuristics will be applied. For example: when the query is empty and you select a measure that has a default time dimension it will be pushed to the query.                       |
 | query?                 | Query                                                                                                                                         | Query parameters ([learn more about the format](/product/apis-integrations/rest-api/query-format)). This property is reactive - if you change the object here, the internal query values will be overwritten. This is not two-way. |
@@ -84,7 +84,7 @@ rendering.
 
 ```html
 <template>
-  <query-builder :cubejs-api="cubejsApi" :query="query">
+  <query-builder :cube-api="cubeApi" :query="query">
     <template #builder="{ measures, setMeasures, availableMeasures }">
       <multiselect
         placeholder="Please Select"
@@ -107,17 +107,17 @@ rendering.
 </template>
 
 <script>
-  import cubejs from "@cubejs-client/core";
+  import cube from "@cubejs-client/core";
   import Multiselect from "vue-multiselect";
   import { QueryBuilder } from "@cubejs-client/vue";
   import ChartRenderer from "./ChartRenderer.vue";
 
   const API_URL =
     "https://awesome-ecom.gcp-us-central1.cubecloudapp.dev/cubejs-api/v1";
-  const CUBEJS_TOKEN =
+  const CUBE_TOKEN =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE1OTQ2NjY4OTR9.0fdi5cuDZ2t3OSrPOMoc3B1_pwhnWj4ZmM3FHEX7Aus";
 
-  const cubejsApi = cubejs(CUBEJS_TOKEN, { apiUrl: API_URL });
+  const cubeApi = cube(CUBE_TOKEN, { apiUrl: API_URL });
 
   export default {
     name: "QueryBuilderExample",
@@ -138,7 +138,7 @@ rendering.
       };
 
       return {
-        cubejsApi,
+        cubeApi,
         selected: undefined,
         query,
       };
@@ -162,12 +162,12 @@ uses the slot scoped props to render the resulting data.
 
 ### Props
 
-| Name      | Type                  | Description                                                                                                                                                                                                                                                                                                                                         |
-| --------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cubejsApi | CubejsApi             | `CubejsApi` instance to use                                                                                                                                                                                                                                                                                                                         |
-| loadSql?  | "only" &#124; boolean | Indicates whether the generated by Cube SQL Code should be requested. See [rest-api#sql](/reference/rest-api#v1sql). When set to `only` then only the request to [/v1/sql](/reference/rest-api#v1sql) will be performed. When set to `true` the sql request will be performed along with the query request. Will not be performed if set to `false` |
-| queries?  | object                | -                                                                                                                                                                                                                                                                                                                                                   |
-| query     | Query                 | Analytic query. [Learn more about it's format](/product/apis-integrations/rest-api/query-format)                                                                                                                                                                                                                                                    |
+| Name     | Type                  | Description                                                                                                                                                                                                                                                                                                                                         |
+| -------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cubeApi  | CubeApi               | `CubeApi` instance to use                                                                                                                                                                                                                                                                                                                           |
+| loadSql? | "only" &#124; boolean | Indicates whether the generated by Cube SQL Code should be requested. See [rest-api#sql](/reference/rest-api#v1sql). When set to `only` then only the request to [/v1/sql](/reference/rest-api#v1sql) will be performed. When set to `true` the sql request will be performed along with the query request. Will not be performed if set to `false` |
+| queries? | object                | -                                                                                                                                                                                                                                                                                                                                                   |
+| query    | Query                 | Analytic query. [Learn more about it's format](/product/apis-integrations/rest-api/query-format)                                                                                                                                                                                                                                                    |
 
 ### Slots
 
@@ -198,7 +198,7 @@ rendering.
 
 ```html
 <template>
-  <query-renderer :cubejs-api="cubejsApi" :query="query" v-if="cubejsApi">
+  <query-renderer :cube-api="cubeApi" :query="query" v-if="cubeApi">
     <template #default="{ resultSet }"> </template>
 
     <template #empty> Loading... </template>
@@ -206,10 +206,10 @@ rendering.
 </template>
 
 <script>
-  import cubejs from "@cubejs-client/core";
+  import cube from "@cubejs-client/core";
   import { QueryRenderer } from "@cubejs-client/vue";
 
-  const cubejsApi = cubejs("YOUR-CUBEJS-API-TOKEN", {
+  const cubeApi = cube("YOUR-CUBE-API-TOKEN", {
     apiUrl: "http://localhost:4000/cubejs-api/v1",
   });
 
@@ -230,7 +230,7 @@ rendering.
       };
 
       return {
-        cubejsApi,
+        cubeApi,
         query,
       };
     },

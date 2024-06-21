@@ -2,10 +2,11 @@ module.exports = {
   "configuration": "Configuration",
   "data-model": "Data modeling",
   "python": "Python packages",
-  "frontend": "JavaScript SDK",
+  "sql-api": "SQL API",
   "rest-api": "REST API",
   "graphql-api": "GraphQL API",
-  "sql-api": "SQL API",
+  "ai-api": "AI API",
+  "frontend": "JavaScript SDK",
   "cli": "CLI",
   "errors": "Error messages"
 }

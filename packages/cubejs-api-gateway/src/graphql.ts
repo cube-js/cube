@@ -30,6 +30,7 @@ import {
   DateTimeResolver,
 } from 'graphql-scalars';
 
+import gql from 'graphql-tag';
 import { QueryType, MemberType } from './types/enums';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
@@ -214,7 +215,7 @@ function getFieldNodeChildren(node: FieldNode, infos: GraphQLResolveInfo) {
   )) || []) as FieldNode[];
 }
 
-function parseArgumentValue(value: ValueNode) {
+function parseArgumentValue(value: ValueNode, variables?: Record<string, any>) {
   switch (value.kind) {
     case 'BooleanValue':
     case 'IntValue':
@@ -223,12 +224,18 @@ function parseArgumentValue(value: ValueNode) {
     case 'EnumValue':
       return value.value;
     case 'ListValue':
-      return value.values.map(v => parseArgumentValue(v));
+      return value.values.map(v => parseArgumentValue(v, variables));
     case 'ObjectValue':
       return value.fields.reduce((obj, v) => ({
         ...obj,
-        [v.name.value]: parseArgumentValue(v.value),
+        [v.name.value]: parseArgumentValue(v.value, variables),
       }), {});
+    case 'Variable':
+      if (variables?.[value.name.value] === undefined) {
+        throw new Error(`Variable "${value.name.value}" is not defined`);
+      }
+
+      return variables[value.name.value];
     default:
       return undefined;
   }
@@ -245,7 +252,7 @@ function getArgumentValue(node: FieldNode, argName: string, variables: Record<st
     return variables[argument.name.value];
   }
 
-  return argument ? parseArgumentValue(argument) : argument;
+  return argument ? parseArgumentValue(argument, variables) : argument;
 }
 
 function getMemberType(metaConfig: any, cubeName: string, memberName: string) {
@@ -353,6 +360,135 @@ function parseDates(result: any) {
       return row;
     });
   });
+}
+
+export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: GraphQLResolveInfo) {
+  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped } = args;
+
+  const measures: string[] = [];
+  const dimensions: string[] = [];
+  const timeDimensions: any[] = [];
+  let filters: any[] = [];
+  const order: [string, 'asc' | 'desc'][] = [];
+
+  if (where) {
+    filters = whereArgToQueryFilters(where, undefined, metaConfig);
+  }
+
+  if (orderBy) {
+    Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
+      Object.entries<any>(members).forEach(([member, value]) => {
+        order.push([`${capitalize(cubeName)}.${member}`, value]);
+      });
+    });
+  }
+
+  getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
+    const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
+      
+    const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
+    const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
+    // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
+    if (orderByArg) {
+      Object.keys(orderByArg).forEach(key => {
+        order.push([`${cubeName}.${key}`, orderByArg[key]]);
+      });
+    }
+
+    const whereArg = getArgumentValue(cubeNode, 'where', infos.variableValues);
+    if (whereArg) {
+      filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
+    }
+
+    // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
+    const dateRangeFilters = {};
+    filters = filters.filter((f) => {
+      if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
+        dateRangeFilters[f.member] = f.values;
+        return false;
+      }
+
+      return true;
+    });
+
+    getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
+      const memberName = memberNode.name.value;
+      const memberType = getMemberType(metaConfig, cubeName, memberName);
+      const key = `${cubeName}.${memberName}`;
+
+      if (memberType === MemberType.MEASURES) {
+        measures.push(key);
+      } else if (memberType === MemberType.DIMENSIONS) {
+        const granularityNodes = getFieldNodeChildren(memberNode, infos);
+        if (granularityNodes.length > 0) {
+          granularityNodes.forEach(granularityNode => {
+            const granularityName = granularityNode.name.value;
+            if (granularityName === 'value') {
+              dimensions.push(key);
+            } else {
+              timeDimensions.push({
+                dimension: key,
+                granularity: granularityName,
+                ...(dateRangeFilters[key] ? {
+                  dateRange: dateRangeFilters[key],
+                } : null)
+              });
+            }
+          });
+        } else {
+          dimensions.push(`${cubeName}.${memberName}`);
+        }
+      }
+    });
+
+    if (Object.keys(dateRangeFilters).length && !timeDimensions.length) {
+      Object.entries(dateRangeFilters).forEach(([dimension, dateRange]) => {
+        timeDimensions.push({
+          dimension,
+          dateRange
+        });
+      });
+    }
+  });
+
+  return {
+    ...(measures.length && { measures }),
+    ...(dimensions.length && { dimensions }),
+    ...(timeDimensions.length && { timeDimensions }),
+    ...(Object.keys(order).length && { order }),
+    ...(limit && { limit }),
+    ...(offset && { offset }),
+    ...(timezone && { timezone }),
+    ...(filters.length && { filters }),
+    ...(renewQuery && { renewQuery }),
+    ...(ungrouped && { ungrouped }),
+  };
+}
+
+export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, variableValues: Record<string, any> = {}) {
+  const ast = gql(query);
+
+  const operation: any = ast.definitions.find(
+    ({ kind }) => kind === 'OperationDefinition'
+  );
+  
+  const fieldNodes = operation?.selectionSet.selections;
+
+  let args = {};
+  for (const argument of fieldNodes[0].arguments) {
+    args = { ...args, [argument.name.value]: parseArgumentValue(argument.value, variableValues) };
+  }
+
+  const resolveInfo: any = {
+    fieldName: fieldNodes[0]?.name.value || '',
+    fieldNodes,
+    rootValue: {},
+    operation,
+    variableValues,
+    fragments: {},
+  };
+  
+  return getJsonQuery(metaConfig, args, resolveInfo);
 }
 
 export function makeSchema(metaConfig: any): GraphQLSchema {
@@ -503,108 +639,13 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          ungrouped: booleanArg(),
           orderBy: arg({
             type: 'RootOrderByInput'
           }),
         },
-        resolve: async (_, { where, limit, offset, timezone, orderBy, renewQuery }, { req, apiGateway }, infos) => {
-          const measures: string[] = [];
-          const dimensions: string[] = [];
-          const timeDimensions: any[] = [];
-          let filters: any[] = [];
-          const order: [string, 'asc' | 'desc'][] = [];
-
-          if (where) {
-            filters = whereArgToQueryFilters(where, undefined, metaConfig);
-          }
-
-          if (orderBy) {
-            Object.entries<any>(orderBy).forEach(([cubeName, members]) => {
-              Object.entries<any>(members).forEach(([member, value]) => {
-                order.push([`${capitalize(cubeName)}.${member}`, value]);
-              });
-            });
-          }
-
-          getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
-            const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
-            
-            const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
-            const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
-            // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
-            if (orderByArg) {
-              Object.keys(orderByArg).forEach(key => {
-                order.push([`${cubeName}.${key}`, orderByArg[key]]);
-              });
-            }
-
-            const whereArg = getArgumentValue(cubeNode, 'where', infos.variableValues);
-            if (whereArg) {
-              filters = whereArgToQueryFilters(whereArg, cubeName).concat(filters);
-            }
-
-            // Push down all inDateRange filters to time dimensions to leverage pre-aggregations
-            const dateRangeFilters = {};
-            filters = filters.filter((f) => {
-              if (f.operator === 'inDateRange' && !dateRangeFilters[f.member]) {
-                dateRangeFilters[f.member] = f.values;
-                return false;
-              }
-
-              return true;
-            });
-
-            getFieldNodeChildren(cubeNode, infos).forEach(memberNode => {
-              const memberName = memberNode.name.value;
-              const memberType = getMemberType(metaConfig, cubeName, memberName);
-              const key = `${cubeName}.${memberName}`;
-
-              if (memberType === MemberType.MEASURES) {
-                measures.push(key);
-              } else if (memberType === MemberType.DIMENSIONS) {
-                const granularityNodes = getFieldNodeChildren(memberNode, infos);
-                if (granularityNodes.length > 0) {
-                  granularityNodes.forEach(granularityNode => {
-                    const granularityName = granularityNode.name.value;
-                    if (granularityName === 'value') {
-                      dimensions.push(key);
-                    } else {
-                      timeDimensions.push({
-                        dimension: key,
-                        granularity: granularityName,
-                        ...(dateRangeFilters[key] ? {
-                          dateRange: dateRangeFilters[key],
-                        } : null)
-                      });
-                    }
-                  });
-                } else {
-                  dimensions.push(`${cubeName}.${memberName}`);
-                }
-              }
-            });
-
-            if (Object.keys(dateRangeFilters).length && !timeDimensions.length) {
-              Object.entries(dateRangeFilters).forEach(([dimension, dateRange]) => {
-                timeDimensions.push({
-                  dimension,
-                  dateRange
-                });
-              });
-            }
-          });
-
-          const query = {
-            ...(measures.length && { measures }),
-            ...(dimensions.length && { dimensions }),
-            ...(timeDimensions.length && { timeDimensions }),
-            ...(Object.keys(order).length && { order }),
-            ...(limit && { limit }),
-            ...(offset && { offset }),
-            ...(timezone && { timezone }),
-            ...(filters.length && { filters }),
-            ...(renewQuery && { renewQuery }),
-          };
+        resolve: async (_, args, { req, apiGateway }, info) => {
+          const query = getJsonQuery(metaConfig, args, info);
 
           const results = await new Promise<any>((resolve, reject) => {
             apiGateway.load({
