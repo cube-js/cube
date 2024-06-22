@@ -23,6 +23,7 @@ import { QueryStream } from './QueryStream';
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  int: 'int8',
   // Revert mapping for internal pre-aggregations
   HLL_POSTGRES: 'hll',
 };
