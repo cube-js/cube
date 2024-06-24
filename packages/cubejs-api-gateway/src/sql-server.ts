@@ -1,6 +1,7 @@
 import {
   setupLogger,
   registerInterface,
+  shutdownInterface,
   execSql,
   SqlInterfaceInstance,
   Request as NativeRequest,
@@ -329,5 +330,9 @@ export class SQLServer {
 
   public async close(): Promise<void> {
     // @todo Implement
+  }
+
+  public async shutdown(): Promise<void> {
+    await shutdownInterface(this.sqlInterfaceInstance!);
   }
 }

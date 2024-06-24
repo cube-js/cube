@@ -5,6 +5,7 @@ use tokio::{
     net::TcpListener,
     sync::{oneshot, watch, RwLock},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
     config::processing_loop::ProcessingLoop,
@@ -33,6 +34,8 @@ impl ProcessingLoop for PostgresServer {
 
         println!("🔗 Cube SQL (pg) is listening on {}", self.address);
 
+        let shim_cancellation_token = CancellationToken::new();
+
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
             let (socket, _) = tokio::select! {
@@ -40,6 +43,7 @@ impl ProcessingLoop for PostgresServer {
                     if res.is_err() || *stop_receiver.borrow() {
                         trace!("[pg] Stopping processing_loop via channel");
 
+                        shim_cancellation_token.cancel();
                         return Ok(());
                     } else {
                         continue;
@@ -85,8 +89,14 @@ impl ProcessingLoop for PostgresServer {
                 session_manager.drop_session(connection_id).await;
             });
 
+            let connection_interruptor = shim_cancellation_token.clone();
             tokio::spawn(async move {
-                let handler = AsyncPostgresShim::run_on(socket, session.clone(), logger.clone());
+                let handler = AsyncPostgresShim::run_on(
+                    connection_interruptor,
+                    socket,
+                    session.clone(),
+                    logger.clone(),
+                );
                 if let Err(e) = handler.await {
                     logger.error(
                         format!("Error during processing PostgreSQL connection: {}", e).as_str(),

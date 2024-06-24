@@ -229,6 +229,12 @@ export class CubejsServer {
         );
       }
 
+      if (this.sqlServer) {
+        locks.push(
+          this.sqlServer.shutdown()
+        );
+      }
+
       if (this.server) {
         locks.push(
           this.server.stop(
