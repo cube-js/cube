@@ -106,7 +106,7 @@ jobs:
         with:
           version: v0.9.1
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ github.sha }}
@@ -201,7 +201,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v2
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
@@ -278,7 +278,7 @@ jobs:
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
           tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v2
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
