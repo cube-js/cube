@@ -11,7 +11,7 @@ runs:
       with:
         node-version: ${{ inputs.node }}
     - name: Cache node modules
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         # npm cache files are stored in `~/.npm` on Linux/macOS
         path: ~/.npm
