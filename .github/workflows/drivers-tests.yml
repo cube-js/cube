@@ -70,7 +70,7 @@ jobs:
         env:
           SHA: ${{ github.sha }}
       - id: get-tag
-        run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "sha=$(git rev-list -n 1 $(git tag --contains $SHA))" >> $GITHUB_OUTPUT
         env:
           SHA: ${{ github.sha }}
       - id: get-tag-out
