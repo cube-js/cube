@@ -60,7 +60,7 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -115,7 +115,7 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -162,7 +162,7 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -269,7 +269,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -336,7 +336,7 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -399,7 +399,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -537,7 +537,7 @@ jobs:
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
       - name: Use Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path

@@ -122,7 +122,7 @@ jobs:
           key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
           shared-key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -226,7 +226,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
@@ -307,7 +307,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
