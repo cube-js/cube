@@ -57,7 +57,7 @@ jobs:
         with:
           version: v0.9.1
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: ./
           file: ./packages/cubejs-docker/dev.Dockerfile

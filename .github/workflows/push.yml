@@ -540,7 +540,7 @@ jobs:
           version: v0.9.1
           driver-opts: network=host
       - name: Build image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         timeout-minutes: 30
         with:
           context: .

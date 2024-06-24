@@ -45,7 +45,7 @@ jobs:
         with:
           path: rust/cubestore/cross/
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: ./
           file: ./rust/cubestore/cross/${{ matrix.target }}.Dockerfile
