@@ -22,7 +22,7 @@ jobs:
           override: true
           components: rustfmt
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Get yarn cache directory path
@@ -97,7 +97,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -213,7 +213,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
@@ -308,7 +308,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path

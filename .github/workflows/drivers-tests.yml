@@ -102,7 +102,7 @@ jobs:
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
@@ -183,7 +183,7 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     strategy:
       matrix:
-        node: 
+        node:
           - 18.x
         database:
           - athena
@@ -202,7 +202,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
 

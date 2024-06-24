@@ -69,7 +69,7 @@ jobs:
         if: contains(runner.os, 'windows')
         shell: bash
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Get yarn cache directory path
