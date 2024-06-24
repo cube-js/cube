@@ -332,8 +332,6 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
   const native = loadNative();
 
   await native.shutdownInterface(instance);
-
-  await new Promise((resolve) => setTimeout(resolve, 2000));
 };
 
 export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {

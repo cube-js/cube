@@ -123,8 +123,10 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
                 Ok(())
             }));
-
-            CubeServices::wait_loops(loops).await.unwrap();
+            {
+                let mut w = services.processing_loop_handles.write().await;
+                *w = loops;
+            }
         });
     });
 
@@ -140,13 +142,32 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let services = interface.services.clone();
     let runtime = tokio_runtime_node(&mut cx)?;
 
-    runtime.block_on(async move {
-        let _ = services
-            .stop_processing_loops()
-            .await
-            .or_else(|err| cx.throw_error(err.to_string()));
+    runtime.spawn(async move {
+        match services.stop_processing_loops().await {
+            Ok(_) => {
+                let mut handles = Vec::new();
+                {
+                    let mut w = services.processing_loop_handles.write().await;
+                    std::mem::swap(&mut *w, &mut handles);
+                }
+                for h in handles {
+                    let _ = h.await;
+                }
+
+                deferred
+                    .settle_with(&channel, move |mut cx| Ok(cx.undefined()))
+                    .await
+                    .unwrap();
+            }
+            Err(err) => {
+                channel.send(move |mut cx| {
+                    let err = JsError::error(&mut cx, err.to_string()).unwrap();
+                    deferred.reject(&mut cx, err);
+                    Ok(())
+                });
+            }
+        };
     });
-    deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined()));
 
     Ok(promise)
 }
