@@ -223,7 +223,7 @@ jobs:
             ${{ runner.os }}-yarn-
 
       - name: Install dependencies
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

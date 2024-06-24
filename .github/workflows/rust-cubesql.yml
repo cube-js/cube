@@ -140,7 +140,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -243,7 +243,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -324,7 +324,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

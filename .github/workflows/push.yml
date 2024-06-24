@@ -77,7 +77,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -132,7 +132,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -179,7 +179,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -286,7 +286,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -353,7 +353,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -416,7 +416,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -554,7 +554,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
