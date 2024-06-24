@@ -24,6 +24,7 @@ What about the following?
 - https://www.postgresql.org/docs/16/functions-string.html (`format` and `||`)
 - https://www.postgresql.org/docs/current/functions-datetime.html#OPERATORS-DATETIME-TABLE
 - DATEDIFF and DATE
+- \d and similar
 
 */}
 
@@ -39,8 +40,8 @@ of the PostgreSQL documentation.
 
 | Function | Description | Support |
 | --- | --- | --- |
-| `IS NULL` | Test whether value is null |  |
-| `IS NOT NULL` | Test whether value is not null |  |
+| `IS NULL` | Test whether value is `NULL` |  |
+| `IS NOT NULL` | Test whether value is not `NULL` |  |
 
 ### Mathematical functions
 
@@ -191,12 +192,12 @@ of the PostgreSQL documentation.
 
 | Function | Description | Support |
 | --- | --- | --- |
-| `AVG` | Computes the average (arithmetic mean) of all the non-null input values |  |
-| `COUNT` | Computes the number of input rows in which the input value is not null |  |
+| `AVG` | Computes the average (arithmetic mean) of all the non-`NULL` input values |  |
+| `COUNT` | Computes the number of input rows in which the input value is not `NULL` |  |
 | `COUNT(DISTINCT)` | Computes the number of input rows containing unique input values |  |
-| `MAX` | Computes the maximum of the non-null input values |  |
-| `MIN` | Computes the minimum of the non-null input values |  |
-| `SUM` | Computes the sum of the non-null input values |  |
+| `MAX` | Computes the maximum of the non-`NULL` input values |  |
+| `MIN` | Computes the minimum of the non-`NULL` input values |  |
+| `SUM` | Computes the sum of the non-`NULL` input values |  |
 
 ### Aggregate functions for statistics
 
@@ -217,6 +218,50 @@ of the PostgreSQL documentation.
 | `VAR_POP` | Computes the population variance of the input values |  |
 | `VAR_SAMP` | Computes the sample variance of the input values |  |
 
+### Row and array comparisons
+
+<InfoBox>
+
+You can learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-comparisons.html)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+| Function | Description | [Pushdown][ref-qpd] | <nobr>[Post-processing][ref-qpp]</nobr> |
+| --- | --- | --- | --- |
+| `IN` |  | ❓ | ✅ Selections |
+| `NOT IN` | Returns `TRUE` if a left-side value matches **none** of right-side values |  |  |
+
+#### `IN`
+
+Returns `TRUE` if a left-side value matches **any** of right-side values.
+
+|  | Support |
+| --- | --- |
+| [Pushdown][ref-qpd] | ❓ |
+| [Post-processing][ref-qpd] (inner query) | ✅ Selections<br/>❌ Projections |
+| [Post-processing][ref-qpd] (outer query) | ✅ Yes |
+
+|  | Support |
+| --- | --- |
+| [Pushdown][ref-qpd] | ❓ |
+| [Post-processing][ref-qpd] (inner query) | ✅ Selections<br/>❌ Projections |
+| [Post-processing][ref-qpd] (outer query) | ✅ Yes |
+
+<InfoBox>
+
+You can learn more in the
+[relevant section](https://www.postgresql.org/docs/current/functions-comparisons.html#FUNCTIONS-COMPARISONS-IN-SCALAR)
+of the PostgreSQL documentation.
+
+</InfoBox>
+
+#### `NOT IN`
+
+
+[ref-qpd]: #
+[ref-qpp]: #
 
 [link-postgres-funcs]: https://www.postgresql.org/docs/16/functions.html
 [link-github-sql-api]: https://github.com/cube-js/cube/issues?q=is%3Aopen+is%3Aissue+label%3Aapi%3Asql
