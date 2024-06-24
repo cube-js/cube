@@ -1985,11 +1985,7 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.order = if query_order.len() > 0 {
-                            Some(query_order)
-                        } else {
-                            None
-                        };
+
                         let cube_scan_query_limit = self
                             .cube_context
                             .sessions
@@ -2047,6 +2043,17 @@ impl LanguageToLogicalPlanConverter {
                         if ungrouped {
                             query.ungrouped = Some(true);
                         }
+
+                        query.order = if !query_order.is_empty() {
+                            Some(query_order)
+                        } else {
+                            // for ungrouped queries we need to return empty array so
+                            // the processing in BaseQuery.js won't automatically add default order
+                            match query.ungrouped {
+                                Some(true) => Some(vec![]),
+                                _ => None,
+                            }
+                        };
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 
