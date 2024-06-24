@@ -169,7 +169,7 @@ jobs:
           path: packages/cubejs-backend-native/
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           version: v0.10.3
 
