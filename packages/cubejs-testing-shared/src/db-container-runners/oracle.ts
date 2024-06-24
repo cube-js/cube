@@ -5,9 +5,9 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class OracleDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_ORACLE_VERSION || options.version || '21.3.0';
+    const version = process.env.TEST_ORACLE_VERSION || options.version || '23.4.0';
 
-    const container = new GenericContainer(`gvenzl/oracle-xe:${version}`)
+    const container = new GenericContainer(`gvenzl/oracle-free:${version}`)
       .withEnv('ORACLE_PASSWORD', 'test')
       .withWaitStrategy(Wait.forLogMessage('DATABASE IS READY TO USE'))
       .withExposedPorts(1521);
