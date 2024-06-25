@@ -52,6 +52,7 @@ pub fn create_logger(log_level: log::Level) -> SimpleLogger {
         .with_module_level("pg_srv", log::Level::Warn.to_level_filter())
 }
 
+#[cfg(feature = "neon-entrypoint")]
 #[neon::main]
 fn main(cx: ModuleContext) -> NeonResult<()> {
     // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
