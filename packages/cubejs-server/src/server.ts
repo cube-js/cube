@@ -245,12 +245,15 @@ export class CubejsServer {
       }
 
       let shutdown_all = async () => {
-        if (graceful) {
-          // Await before all connections/refresh scheduler will end jobs
-          await Promise.all(locks);
+        try {
+          if (graceful) {
+            // Await before all connections/refresh scheduler will end jobs
+            await Promise.all(locks);
+          }
+          await this.core.shutdown();
+        } finally {
+          timeoutKiller.cancel();
         }
-        await this.core.shutdown();
-        timeoutKiller.cancel();
       };
 
       await Promise.any([shutdown_all(), timeoutKiller]);
