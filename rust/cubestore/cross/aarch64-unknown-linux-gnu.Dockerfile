@@ -5,7 +5,7 @@ FROM cubejs/cross-aarch64-unknown-linux-gnu:31122022
 
 RUN apt-get update \
     && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-18 main"  \
     && add-apt-repository -y ppa:deadsnakes/ppa \
@@ -63,7 +63,7 @@ ENV PYO3_CROSS_PYTHON_VERSION=3.11 \
     PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
     PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib
 
-ENV PYTHON_VERSION=3.12.0
+ENV PYTHON_VERSION=3.12.4
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz && \
     cd Python-${PYTHON_VERSION} && \
     touch config.site-aarch64 && \
