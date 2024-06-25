@@ -8,9 +8,9 @@ description = "Native module for Cube.js (binding to Rust codebase)"
 documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 exclude = ["index.node"]
-#
-#[lib]
-#crate-type = ["cdylib"]
+
+[lib]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 cubesql = { path = "../../rust/cubesql/cubesql" }
