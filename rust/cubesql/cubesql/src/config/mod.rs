@@ -24,7 +24,6 @@ use std::sync::Arc;
 use crate::sql::compiler_cache::{CompilerCache, CompilerCacheImpl};
 use tokio::task::JoinHandle;
 
-#[derive(Clone)]
 pub struct CubeServices {
     pub injector: Arc<Injector>,
 }
