@@ -57,9 +57,9 @@ impl CubeServices {
         let mut futures = Vec::new();
 
         if self.injector.has_service_typed::<PostgresServer>().await {
-            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
+            let postgres_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
-                if let Err(e) = mysql_server.processing_loop().await {
+                if let Err(e) = postgres_server.processing_loop().await {
                     error!("{}", e.to_string());
                 };
 
