@@ -3,7 +3,7 @@ use cubesql::config::ConfigObj;
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
 use futures::StreamExt;
-use once_cell::sync::OnceCell;
+
 use serde_json::Map;
 use tokio::sync::Semaphore;
 
@@ -17,15 +17,13 @@ use crate::config::NodeConfig;
 use crate::cross::CLRepr;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
+use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::batch_to_rows;
-use crate::{create_logger, tokio_runtime_node};
-use cubesql::telemetry::LocalReporter;
+
 use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
-use log::Level;
+
 use neon::prelude::*;
-use simple_logger::SimpleLogger;
-use tokio::runtime::{Builder, Runtime};
 
 struct SQLInterface {
     services: Arc<CubeServices>,

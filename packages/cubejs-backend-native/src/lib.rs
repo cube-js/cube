@@ -18,7 +18,6 @@ pub mod template;
 pub mod transport;
 pub mod utils;
 
-use crate::logger::NodeBridgeLogger;
 use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use cubesql::CubeError;
 use neon::prelude::*;
@@ -54,7 +53,7 @@ pub fn create_logger(log_level: log::Level) -> SimpleLogger {
 }
 
 #[neon::main]
-fn main(mut cx: ModuleContext) -> NeonResult<()> {
+fn main(cx: ModuleContext) -> NeonResult<()> {
     // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
     log_reroute::init().unwrap();
 
