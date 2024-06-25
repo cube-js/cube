@@ -1,17 +1,21 @@
-FROM rust:1-bullseye as builder
+FROM rust:1-bookworm as builder
 
 RUN rustup update && \
     rustup default nightly-2024-01-10 && \
     rustup component add --toolchain nightly-2024-01-10 rustfmt;
 
 RUN apt update \
-	&& apt upgrade -y \
-	&& DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
-	&& wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-	&& add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main"  \
-	&& apt update \
-	&& apt install -y git llvm-18 clang-18 libclang-18-dev clang-18 cmake \
-	&& rm -rf /var/lib/apt/lists/*;
+    && apt upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
+    && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
+    # https://github.com/llvm/llvm-project/issues/62475 \
+    # add it twice to workaround:
+    && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main" \
+    && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-18 main" \
+    && sleep 5 \
+    && apt update \
+    && apt install -y git llvm-18 clang-18 libclang-18-dev clang-18 cmake \
+    && rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
 RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
@@ -35,21 +39,21 @@ RUN mkdir -p cubestore/src/bin && \
 
 ARG WITH_AVX2=1
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
-	 cargo build --release -p cubestore
+    cargo build --release -p cubestore
 
 # Cube Store get version from his own package
 COPY package.json package.json
 COPY cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
-	cargo build --release -p cubestore
+    cargo build --release -p cubestore
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 WORKDIR /cube
 
 RUN set -ex; \
-	apt-get update; \
-	apt-get install -y libssl1.1 curl
+    apt-get update; \
+    apt-get install -y libssl3 curl
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 
