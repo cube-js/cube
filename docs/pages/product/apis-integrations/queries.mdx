@@ -279,9 +279,11 @@ However, unlike regular queries, they provide a convenient way to retrieve
 measure values for *more than one date range* for a time dimension.
 
 You can make a compare date range query by using the `compareDateRange`
-option with the [REST API][ref-rest-api-query-format-options-tdf].
+option with the [REST API][ref-rest-api-query-format-options-tdf]. Note that
+you also need to set the `queryType` parameter of the [`/v1/load`
+endpoint][ref-rest-api-load] to `regular`.
 
-### Example
+#### Example
 
 ```json
 {
@@ -306,8 +308,6 @@ option with the [REST API][ref-rest-api-query-format-options-tdf].
   "limit": 100
 }
 ```
-
-**NOTE:** `compareDateRange` queries may require to set `queryType` to be run.
 
 See [this blog post][blog-compare-date-range] for more details and examples.
 
@@ -359,6 +359,7 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-apis]: /product/apis-integrations
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
+[ref-rest-api-load]: /reference/rest-api#v1load
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-data-sources]: /product/configuration/data-sources
 [ref-rest-api-query-format-options]: /product/apis-integrations/rest-api/query-format#query-properties
