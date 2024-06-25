@@ -118,6 +118,7 @@ impl ProcessingLoop for PostgresServer {
 
     async fn stop_processing(&self) -> Result<(), CubeError> {
         self.close_socket_tx.send(true)?;
+        tokio::time::sleep(tokio::time::Duration::from_secs(25)).await;
         Ok(())
     }
 }

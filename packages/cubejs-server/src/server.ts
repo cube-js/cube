@@ -204,6 +204,7 @@ export class CubejsServer {
   }
 
   public async shutdown(signal: string, graceful: boolean = true) {
+    console.log("inside server.shutdown");
     try {
       const timeoutKiller = withTimeout(
         () => {
@@ -243,13 +244,16 @@ export class CubejsServer {
         );
       }
 
-      if (graceful) {
-        // Await before all connections/refresh scheduler will end jobs
-        await Promise.all(locks);
-      }
+      let shutdown_all = async () => {
+        if (graceful) {
+          // Await before all connections/refresh scheduler will end jobs
+          await Promise.all(locks);
+        }
+        await this.core.shutdown();
+        timeoutKiller.cancel();
+      };
 
-      await this.core.shutdown();
-      await timeoutKiller.cancel();
+      await Promise.any([shutdown_all(), timeoutKiller]);
 
       return 0;
     } catch (e: any) {
