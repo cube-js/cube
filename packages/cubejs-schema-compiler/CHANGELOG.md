@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.54](https://github.com/cube-js/cube/compare/v0.35.53...v0.35.54) (2024-06-26)
+
+
+### Features
+
+* `to_date` rolling window type syntax ([#8399](https://github.com/cube-js/cube/issues/8399)) ([eb7755d](https://github.com/cube-js/cube/commit/eb7755d997f67722daf200040e4e0f3c2814132a))
+* **cubesql:** `Interval(MonthDayNano)` multiplication and decomposition ([576f7f7](https://github.com/cube-js/cube/commit/576f7f7de9190a4d466a58f619cb5cf8d6bc6a59))
+
+
+
+
+
 ## [0.35.53](https://github.com/cube-js/cube/compare/v0.35.52...v0.35.53) (2024-06-26)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
