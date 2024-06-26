@@ -66,11 +66,11 @@ jobs:
       - id: git-log
         run: git log HEAD~30..HEAD
       - id: get-tag-test
-        run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "$SHA $(git rev-list -n 1 "$(git tag --contains "$SHA")")"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag
-        run: echo "sha=$(git rev-list -n 1 $(git tag --contains $SHA))" >> $GITHUB_OUTPUT
+        run: echo "sha=$(git rev-list -n 1 "$(git tag --contains "$SHA")")" >> "$GITHUB_OUTPUT"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag-out
@@ -212,7 +212,7 @@ jobs:
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         # We don't want to save it on finish, restore only!
