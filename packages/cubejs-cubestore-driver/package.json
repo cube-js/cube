@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/cubestore-driver",
   "description": "Cube Store driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.48",
+  "version": "0.35.53",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.48",
-    "@cubejs-backend/cubestore": "^0.35.46",
+    "@cubejs-backend/cubestore": "^0.35.53",
     "@cubejs-backend/shared": "^0.35.43",
     "csv-write-stream": "^2.0.0",
     "flatbuffers": "23.3.3",

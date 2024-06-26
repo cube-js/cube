@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.53](https://github.com/cube-js/cube/compare/v0.35.52...v0.35.53) (2024-06-26)
+
+
+### Features
+
+* **cubesql:** Decimal128 i.e. NUMERIC(_,_) literal generation for SQL push down ([43e29f9](https://github.com/cube-js/cube/commit/43e29f9f49a683d148b31ea1bcccd28a7c99034e))
+* **cubestore:** Docker - upgrade to bookworm ([bfd560c](https://github.com/cube-js/cube/commit/bfd560c5532c2a6c88546853cd7294a9ca1ce1db))
+* **cubestore:** Support openssl 3 (upgrade rdkafka) ([f4874d6](https://github.com/cube-js/cube/commit/f4874d64c1bbf9989735bbdc35b504a2e451470e))
+
+
+
+
+
 ## [0.35.52](https://github.com/cube-js/cube/compare/v0.35.51...v0.35.52) (2024-06-20)
 
 **Note:** Version bump only for package cubejs
