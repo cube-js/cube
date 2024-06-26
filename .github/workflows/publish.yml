@@ -680,9 +680,6 @@ jobs:
           workspaces: ./rust/cubestore -> target
           prefix-key: v0-rust-cubestore-cross
           key: target-${{ matrix.target }}
-      - run: source .github/actions/${{ matrix.before_script }}.sh
-        if: ${{ matrix.before_script }}
-        shell: bash
       - name: Build with Cargo
         run: |
           cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
@@ -760,9 +757,6 @@ jobs:
           workspaces: ./rust/cubestore -> target
           prefix-key: v0-rust-cubestore-cross
           key: target-${{ matrix.target }}
-      - run: source .github/actions/${{ matrix.before_script }}.sh
-        if: ${{ matrix.before_script }}
-        shell: bash
       - uses: ilammy/msvc-dev-cmd@v1
         if: ${{ startsWith(matrix.os, 'windows') }}
       - name: Install OpenSSL for Windows
