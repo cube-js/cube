@@ -41,7 +41,7 @@ jobs:
           version: v0.9.1
           driver-opts: network=host
       - name: Load .cross file
-        uses: xom9ikk/dotenv@v2
+        uses: xom9ikk/dotenv@v2.3.0
         with:
           path: rust/cubestore/cross/
       - name: Push to Docker Hub
