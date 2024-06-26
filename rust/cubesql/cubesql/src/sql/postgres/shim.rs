@@ -334,6 +334,8 @@ impl AsyncPostgresShim {
                                     "Load Request".to_string(),
                                     serde_json::json!({
                                         "query": span_id.as_ref().unwrap().query_key.clone(),
+                                        // Hide query by default until Execute
+                                        "isDataQuery": false,
                                     }),
                                 )
                                 .await?;
@@ -370,20 +372,36 @@ impl AsyncPostgresShim {
                     }
                 }
                 protocol::FrontendMessage::Execute(body) => {
+                    let span_id = if let Some(portal) = self.portals.get(&body.portal) {
+                        portal.span_id()
+                    } else {
+                        None
+                    };
                     if tracked_error.is_none() {
                         doing_extended_query_message = true;
-                        let span_id = if let Some(portal) = self.portals.get(&body.portal) {
-                            portal.span_id()
-                        } else {
-                            None
-                        };
                         let result = self
                             .execute(body)
                             .await
                             .map_err(|e| e.with_span_id(span_id.clone()));
-                        if result.is_ok() {
-                            if let Some(auth_context) = self.session.state.auth_context() {
-                                if let Some(span_id) = span_id {
+                        if let Some(auth_context) = self.session.state.auth_context() {
+                            if let Some(span_id) = span_id {
+                                // Always indicate whether this is a data query
+                                // Errors are always visible ("data queries")
+                                self.session
+                                    .session_manager
+                                    .server
+                                    .transport
+                                    .log_load_state(
+                                        Some(span_id.clone()),
+                                        auth_context.clone(),
+                                        self.session.state.get_load_request_meta(),
+                                        "Data Query Status".to_string(),
+                                        serde_json::json!({
+                                            "isDataQuery": !result.is_ok() || span_id.is_data_query().await
+                                        }),
+                                    )
+                                    .await?;
+                                if result.is_ok() {
                                     self.session
                                         .session_manager
                                         .server
@@ -406,6 +424,25 @@ impl AsyncPostgresShim {
                         }
                         result
                     } else {
+                        if let Some(auth_context) = self.session.state.auth_context() {
+                            if let Some(span_id) = span_id {
+                                // If there was an error, always show the query
+                                self.session
+                                    .session_manager
+                                    .server
+                                    .transport
+                                    .log_load_state(
+                                        Some(span_id.clone()),
+                                        auth_context,
+                                        self.session.state.get_load_request_meta(),
+                                        "Data Query Status".to_string(),
+                                        serde_json::json!({
+                                            "isDataQuery": true
+                                        }),
+                                    )
+                                    .await?;
+                            }
+                        }
                         continue;
                     }
                 }
