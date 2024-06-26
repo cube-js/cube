@@ -667,10 +667,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Disable rustup update (issue workaround for Windows)
-        run: rustup set auto-self-update disable
-        if: contains(runner.os, 'windows')
-        shell: bash
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:

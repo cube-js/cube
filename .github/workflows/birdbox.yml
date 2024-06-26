@@ -28,10 +28,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Disable rustup update (issue workaround for Windows)
-        run: rustup set auto-self-update disable
-        if: contains(runner.os, 'windows')
-        shell: bash
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
