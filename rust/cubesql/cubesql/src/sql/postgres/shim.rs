@@ -594,9 +594,7 @@ impl AsyncPostgresShim {
         Ok(())
     }
 
-    pub async fn write_admin_shutdown_fatal_message(
-        &mut self,
-    ) -> Result<(), ConnectionError> {
+    pub async fn write_admin_shutdown_fatal_message(&mut self) -> Result<(), ConnectionError> {
         buffer::write_message(
             &mut bytes::BytesMut::new(),
             &mut self.socket,

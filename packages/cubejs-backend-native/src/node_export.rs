@@ -141,24 +141,24 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let runtime = tokio_runtime_node(&mut cx)?;
 
     runtime.spawn(async move {
-                log::warn!("inside shutdown_interface spawned thread");
-                match services
-        
-            .stop_processing_loops()
-            .await {
-                            Ok(_) => {
-                                log::warn!("stop_processing_loops awaited");
-                                deferred.settle_with(&channel, move |mut cx| Ok(cx.undefined())).await.unwrap();
-                            },
-                            Err(err) => {
-                                log::warn!("stop_processing_loops erred");
-                                channel.send(move |mut cx| {
-                                    let err = JsError::error(&mut cx, err.to_string()).unwrap();
-                                    deferred.reject(&mut cx, err);
-                                    Ok(())
-                                });
-                            }
-                        };
+        log::warn!("inside shutdown_interface spawned thread");
+        match services.stop_processing_loops().await {
+            Ok(_) => {
+                log::warn!("stop_processing_loops awaited");
+                deferred
+                    .settle_with(&channel, move |mut cx| Ok(cx.undefined()))
+                    .await
+                    .unwrap();
+            }
+            Err(err) => {
+                log::warn!("stop_processing_loops erred");
+                channel.send(move |mut cx| {
+                    let err = JsError::error(&mut cx, err.to_string()).unwrap();
+                    deferred.reject(&mut cx, err);
+                    Ok(())
+                });
+            }
+        };
     });
 
     Ok(promise)
