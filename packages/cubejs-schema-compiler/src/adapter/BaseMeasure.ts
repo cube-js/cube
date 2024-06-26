@@ -146,6 +146,10 @@ export class BaseMeasure {
       return this.query.runningTotalDateJoinCondition();
     }
     const { rollingWindow } = definition;
+    if (rollingWindow.type === 'to_date') {
+      return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity);
+    }
+    // TODO deprecated
     if (rollingWindow.type === 'year_to_date' || rollingWindow.type === 'quarter_to_date' || rollingWindow.type === 'month_to_date') {
       return this.query.rollingWindowToDateJoinCondition(rollingWindow.type.replace('_to_date', ''));
     }

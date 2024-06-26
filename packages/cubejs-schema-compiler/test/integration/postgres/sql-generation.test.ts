@@ -83,7 +83,8 @@ describe('SQL Generation', () => {
           type: 'sum',
           sql: 'amount',
           rollingWindow: {
-            type: 'quarter_to_date'
+            type: 'to_date',
+            granularity: 'quarter'
           }
         },
         revenue_day_ago: {
