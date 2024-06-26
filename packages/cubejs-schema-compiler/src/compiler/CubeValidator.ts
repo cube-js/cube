@@ -116,6 +116,8 @@ const FixedRollingWindow = {
   offset: Joi.any().valid('start', 'end')
 };
 
+const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
+
 const YearToDate = {
   type: Joi.string().valid('year_to_date'),
 };
@@ -126,6 +128,11 @@ const QuarterToDate = {
 
 const MonthToDate = {
   type: Joi.string().valid('month_to_date'),
+};
+
+const ToDate = {
+  type: Joi.string().valid('to_date'),
+  granularity: GranularitySchema,
 };
 
 const BaseMeasure = {
@@ -149,6 +156,7 @@ const BaseMeasure = {
       { is: 'year_to_date', then: YearToDate },
       { is: 'quarter_to_date', then: QuarterToDate },
       { is: 'month_to_date', then: MonthToDate },
+      { is: 'to_date', then: ToDate },
       { is: 'fixed',
         then: FixedRollingWindow,
         otherwise: FixedRollingWindow
@@ -276,8 +284,6 @@ const OriginalSqlSchema = condition(
     uniqueKeyColumns: Joi.array().items(Joi.string())
   }),
 );
-
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
 
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
 const NonReferencesFields = ['timeDimension', 'timeDimensions', 'rollups', 'measures', 'dimensions', 'segments'];
