@@ -308,7 +308,7 @@ jobs:
       - name: Run Cube Store in background
         run: |
           chmod +x ./rust/cubestore/target/release/cubestored
-          RUNNER_TRACKING_ID="" && ./rust/cubestore/target/release/cubestored &
+          ./rust/cubestore/target/release/cubestored &
       - name: Run Cubestore Integration
         timeout-minutes: 10
         run: |
