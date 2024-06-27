@@ -698,7 +698,7 @@ jobs:
         run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
       - name: Upload Binary to Release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -795,7 +795,7 @@ jobs:
         run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          ${{ matrix.tar_executable }} -cvzf cubestored-${{ matrix.target }}.tar.gz *
+          ${{ matrix.tar_executable }} -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
       - name: Upload Binary to Release
         uses: svenstaro/upload-release-action@v2
         with:
