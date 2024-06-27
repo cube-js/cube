@@ -148,6 +148,7 @@ ORDER BY ...
 To execute the *regular query* part, Cube will generate the SQL for an upstream
 [data source][ref-data-sources]. Then, Cube will do *post-processing* by
 executing the rest of the query using an internal SQL execution engine.
+Learn more in the [SQL API documentation][ref-sql-api-qpp].
 
 Queries with post-processing, since they include regular queries, benefit from
 [in-memory cache and pre-aggregations][ref-caching]. They can also be modified
@@ -236,6 +237,7 @@ Thus, queries with pushdown are not reducible to [regular
 queries](#regular-query) and post-processing on top of them. To execute a query
 with pushdown, Cube will need to transform it and generate the SQL for an
 upstream [data source][ref-data-sources].
+Learn more in the [SQL API documentation][ref-sql-api-qpd].
 
 <InfoBox>
 
@@ -328,6 +330,8 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-sql-api-qpp]: /product/apis-integrations/sql-api/query-format#query-post-processing
+[ref-sql-api-qpd]: /product/apis-integrations/sql-api/query-format#query-pushdown
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-graphql-api]: /product/apis-integrations/graphql-api
 [ref-data-sources]: /product/configuration/data-sources

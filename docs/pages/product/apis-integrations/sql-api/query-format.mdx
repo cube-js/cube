@@ -144,7 +144,7 @@ format:
 
 Because of this transformation, not all functions and expressions are supported
 in query fragments performing `SELECT` from cube tables. Please refer to the
-[reference](/reference/sql-api) to see whether a specific expression or function
+[SQL API reference][ref-ref-sql-api] to see whether a specific expression or function
 is supported.
 
 For example, the following query won't work because the SQL API can't push down the
@@ -217,7 +217,7 @@ all target database capabilities for data processing.
 
 During the rewrite process, Cube validates that the target database would support transpired SQL queries.
 If direct conversion is not possible, different SQL transformation rewrite rules can be applied to achieve successful translation.
-Please refer to [SQL API reference](/reference/sql-api) for the list of supported SQL functions and clauses.
+Please refer to the [SQL API reference][ref-ref-sql-api] for the list of supported SQL functions and clauses.
 Support varies based on the target database.
 
 ## Top-down and bottom-up evaluation
@@ -431,4 +431,6 @@ As you can see, the sorting operation is done after the regular query and the pr
 [ref-data-model-concepts]: /product/data-modeling/concepts
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types
 [ref-query-default-limit]: /product/apis-integrations/queries#row-limit
+[ref-ref-sql-api]: /reference/sql-api
+
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
