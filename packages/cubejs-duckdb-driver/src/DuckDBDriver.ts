@@ -81,32 +81,6 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
     const defaultConnection = db.connect();
     const execAsync: (sql: string, ...params: any[]) => Promise<void> = promisify(defaultConnection.exec).bind(defaultConnection) as any;
 
-    try {
-      await execAsync('INSTALL httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on httpfs installation', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
-    try {
-      await execAsync('LOAD httpfs');
-    } catch (e) {
-      if (this.logger) {
-        console.error('DuckDB - error on loading httpfs', {
-          e
-        });
-      }
-
-      // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
-      throw e;
-    }
-
     const configuration = [
       {
         key: 's3_region',
