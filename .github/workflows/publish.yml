@@ -16,10 +16,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Node.js 18.x
         uses: actions/setup-node@v4
@@ -90,10 +91,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
@@ -201,10 +203,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Python
@@ -297,10 +300,11 @@ jobs:
         run: rustup set auto-self-update disable
         shell: bash
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2023-12-13
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - name: Install Python
         uses: actions/setup-python@v4
@@ -668,11 +672,12 @@ jobs:
         if: contains(runner.os, 'windows')
         shell: bash
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
@@ -747,11 +752,12 @@ jobs:
         if: contains(runner.os, 'windows')
         shell: bash
       - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: nightly-2024-01-29
           target: ${{ matrix.target }}
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
