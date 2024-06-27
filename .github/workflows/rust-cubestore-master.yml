@@ -263,8 +263,8 @@ jobs:
         run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v2
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
+      - uses: actions/upload-artifact@v4
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
@@ -336,8 +336,8 @@ jobs:
         run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar -cvzf cubestored-${{ matrix.target }}.tar.gz *
-      - uses: actions/upload-artifact@v2
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
+      - uses: actions/upload-artifact@v4
         with:
           path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
           name: cubestored-${{ matrix.target }}.tar.gz
