@@ -235,7 +235,7 @@ jobs:
           cd rust/cubestore
           cargo build --release -j 4
       - name: 'Upload cubestored-x86_64-unknown-linux-gnu-release artifact'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: cubestored-x86_64-unknown-linux-gnu-release
           path: ./rust/cubestore/target/release/cubestored
@@ -301,7 +301,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: ./rust/cubestore/target/release/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -436,7 +436,7 @@ jobs:
       - name: Lerna tsc
         run: yarn tsc
       - name: Download cubestored-x86_64-unknown-linux-gnu-release artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: rust/cubestore/downloaded/latest/bin/
           name: cubestored-x86_64-unknown-linux-gnu-release
@@ -629,7 +629,7 @@ jobs:
           yarn run cypress:install
           yarn run cypress:birdbox
       - name: Upload screenshots on failure
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: cypress-screenshots-docker-dev-${{ matrix.name }}
