@@ -525,14 +525,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
         with:
           version: v0.9.1
           driver-opts: network=host
       - name: Build image
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         timeout-minutes: 30
         with:
           context: .
