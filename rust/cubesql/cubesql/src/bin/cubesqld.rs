@@ -1,5 +1,5 @@
 use cubesql::{
-    config::{Config, CubeServices},
+    config::{processing_loop::ShutdownMode, Config, CubeServices},
     telemetry::{LocalReporter, ReportingLogger},
 };
 
@@ -58,7 +58,7 @@ async fn stop_on_ctrl_c(s: &Arc<CubeServices>) {
             counter += 1;
             if counter == 1 {
                 log::info!("Received Ctrl+C, shutting down.");
-                s.stop_processing_loops().await.ok();
+                s.stop_processing_loops(ShutdownMode::Fast).await.ok();
             } else if counter == 3 {
                 log::info!("Received Ctrl+C 3 times, exiting immediately.");
                 std::process::exit(130); // 130 is the default exit code when killed by a signal.

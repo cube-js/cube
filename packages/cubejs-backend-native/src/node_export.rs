@@ -1,4 +1,5 @@
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
@@ -135,6 +136,17 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+    let js_shutdown_mode = cx.argument::<JsString>(1)?;
+    let shutdown_mode = match js_shutdown_mode.value(&mut cx).as_str() {
+        "fast" => ShutdownMode::Fast,
+        "semifast" => ShutdownMode::SemiFast,
+        "smart" => ShutdownMode::Smart,
+        _ => {
+            return cx.throw_range_error::<&str, Handle<JsPromise>>(
+                "ShutdownMode param must be 'fast', 'semifast', or 'smart'",
+            );
+        }
+    };
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
@@ -143,7 +155,7 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let runtime = tokio_runtime_node(&mut cx)?;
 
     runtime.spawn(async move {
-        match services.stop_processing_loops().await {
+        match services.stop_processing_loops(shutdown_mode).await {
             Ok(_) => {
                 let mut handles = Vec::new();
                 {
