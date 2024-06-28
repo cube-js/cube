@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.55](https://github.com/cube-js/cube/compare/v0.35.54...v0.35.55) (2024-06-28)
+
+
+### Features
+
+* **sqlite-driver:** Upgrade sqlite3 to 5.1.7 ([#8406](https://github.com/cube-js/cube/issues/8406)) ([115ce9c](https://github.com/cube-js/cube/commit/115ce9c21042828030a9b9fa3cf505649a82838d))
+
+
+
+
+
 ## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
 
 **Note:** Version bump only for package @cubejs-backend/sqlite-driver

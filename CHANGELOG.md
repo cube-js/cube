@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.55](https://github.com/cube-js/cube/compare/v0.35.54...v0.35.55) (2024-06-28)
+
+
+### Bug Fixes
+
+* **cubejs-databricks-jdbc-driver:** Remove inquirer library (reduce image size) ([#8408](https://github.com/cube-js/cube/issues/8408)) ([682354b](https://github.com/cube-js/cube/commit/682354b5f97ad302e0a9bc5590c902074fefc798))
+
+
+### Features
+
+* **docker:** Reduce image size by 52.62 mb (remove duckdb sources) ([#8407](https://github.com/cube-js/cube/issues/8407)) ([81bf1ad](https://github.com/cube-js/cube/commit/81bf1ad63aba21e4d31ec9b283308f6b52e2f844))
+* **sqlite-driver:** Upgrade sqlite3 to 5.1.7 ([#8406](https://github.com/cube-js/cube/issues/8406)) ([115ce9c](https://github.com/cube-js/cube/commit/115ce9c21042828030a9b9fa3cf505649a82838d))
+
+
+
+
+
 ## [0.35.54](https://github.com/cube-js/cube/compare/v0.35.53...v0.35.54) (2024-06-26)
 
 

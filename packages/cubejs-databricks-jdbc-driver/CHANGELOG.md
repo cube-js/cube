@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.55](https://github.com/cube-js/cube/compare/v0.35.54...v0.35.55) (2024-06-28)
+
+
+### Bug Fixes
+
+* **cubejs-databricks-jdbc-driver:** Remove inquirer library (reduce image size) ([#8408](https://github.com/cube-js/cube/issues/8408)) ([682354b](https://github.com/cube-js/cube/commit/682354b5f97ad302e0a9bc5590c902074fefc798))
+
+
+
+
+
 ## [0.35.54](https://github.com/cube-js/cube/compare/v0.35.53...v0.35.54) (2024-06-26)
 
 **Note:** Version bump only for package @cubejs-backend/databricks-jdbc-driver

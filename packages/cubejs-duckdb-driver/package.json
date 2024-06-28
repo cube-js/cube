@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/duckdb-driver",
   "description": "Cube DuckDB database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.54",
+  "version": "0.35.55",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -35,7 +35,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/testing-shared": "^0.35.54",
+    "@cubejs-backend/testing-shared": "^0.35.55",
     "@types/jest": "^27",
     "@types/node": "^16",
     "jest": "^27",
