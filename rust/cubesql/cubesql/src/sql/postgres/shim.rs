@@ -17,7 +17,7 @@ use crate::{
         session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
-        AuthContextRef, Session, StatusFlags,
+        AuthContextRef, Session, SessionState, StatusFlags,
     },
     telemetry::ContextLogger,
     transport::SpanId,
@@ -39,6 +39,7 @@ pub struct AsyncPostgresShim {
     socket: TcpStream,
     // If empty, this means socket is on a message boundary.
     partial_write_buf: bytes::BytesMut,
+    semifast_shutdown_interruptor: CancellationToken,
     // Extended query
     cursors: HashMap<String, Cursor>,
     portals: HashMap<String, Portal>,
@@ -226,13 +227,28 @@ impl From<ErrorResponse> for ConnectionError {
 }
 
 impl AsyncPostgresShim {
+    async fn flush_and_write_admin_shutdown_fatal_message(
+        shim: &mut AsyncPostgresShim,
+    ) -> Result<(), ConnectionError> {
+        // We flush the partially written buf and add the fatal message -- it's another place's
+        // responsibility to impose a timeout and abort us.
+        shim.socket
+            .write_all_buf(&mut shim.partial_write_buf)
+            .await?;
+        shim.partial_write_buf = bytes::BytesMut::new();
+        shim.write_admin_shutdown_fatal_message().await?;
+        return Ok(());
+    }
+
     pub async fn run_on(
-        shutdown_interruptor: CancellationToken,
+        fast_shutdown_interruptor: CancellationToken,
+        semifast_shutdown_interruptor: CancellationToken,
         socket: TcpStream,
         session: Arc<Session>,
         logger: Arc<dyn ContextLogger>,
     ) -> Result<(), ConnectionError> {
         let mut shim = Self {
+            semifast_shutdown_interruptor,
             socket,
             partial_write_buf: bytes::BytesMut::new(),
             cursors: HashMap::new(),
@@ -242,12 +258,8 @@ impl AsyncPostgresShim {
         };
 
         let run_result = tokio::select! {
-            _ = shutdown_interruptor.cancelled() => {
-                // We flush the partially written buf and add the fatal message -- it's another
-                // place's responsibility to impose a timeout and abort us.
-                shim.socket.write_all_buf(&mut shim.partial_write_buf).await?;
-                shim.partial_write_buf = bytes::BytesMut::new();
-                shim.write_admin_shutdown_fatal_message().await?;
+            _ = fast_shutdown_interruptor.cancelled() => {
+                Self::flush_and_write_admin_shutdown_fatal_message(&mut shim).await?;
                 shim.socket.shutdown().await?;
                 return Ok(());
             }
@@ -280,6 +292,16 @@ impl AsyncPostgresShim {
                 return Ok(());
             }
         }
+    }
+
+    fn session_state_is_semifast_shutdownable(session_state: &SessionState) -> bool {
+        return !session_state.is_in_transaction() && !session_state.has_current_query();
+    }
+
+    fn is_semifast_shutdownable(&self) -> bool {
+        return self.cursors.is_empty()
+            && self.portals.is_empty()
+            && Self::session_state_is_semifast_shutdownable(&*self.session.state);
     }
 
     fn admin_shutdown_error() -> ConnectionError {
@@ -320,10 +342,21 @@ impl AsyncPostgresShim {
         // then reads and discards messages until a Sync is reached, then issues ReadyForQuery and returns to normal message processing.
         let mut tracked_error: Option<ConnectionError> = None;
 
+        // Clone here to avoid conflicting borrows of self in the tokio::select!.
+        let semifast_shutdown_interruptor = self.semifast_shutdown_interruptor.clone();
+
         loop {
             let mut doing_extended_query_message = false;
+            let semifast_shutdownable = self.is_semifast_shutdownable();
 
-            let result = match buffer::read_message(&mut self.socket).await? {
+            let message: protocol::FrontendMessage = tokio::select! {
+                true = async { semifast_shutdownable && { semifast_shutdown_interruptor.cancelled().await; true } } => {
+                    return Self::flush_and_write_admin_shutdown_fatal_message(self).await;
+                }
+                message_result = buffer::read_message(&mut self.socket) => message_result?
+            };
+
+            let result = match message {
                 protocol::FrontendMessage::Query(body) => {
                     let span_id = Self::new_span_id(body.query.clone());
                     let mut qtrace = Qtrace::new(&body.query);

@@ -328,10 +328,12 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   });
 };
 
-export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
+export type ShutdownMode = 'fast' | 'semifast' | 'smart';
+
+export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();
 
-  await native.shutdownInterface(instance);
+  await native.shutdownInterface(instance, shutdownMode);
 };
 
 export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {

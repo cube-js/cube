@@ -298,7 +298,7 @@ describe('SQLInterface', () => {
 
       await connection.end();
     } finally {
-      await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance, 'fast');
     }
   });
 
@@ -349,7 +349,7 @@ describe('SQLInterface', () => {
 
       expect(rows).toBe(100000);
 
-      await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance, 'fast');
     } else {
       expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
     }

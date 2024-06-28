@@ -199,6 +199,18 @@ impl SessionState {
         }
     }
 
+    pub fn has_current_query(&self) -> bool {
+        let guard = self
+            .query
+            .read()
+            .expect("failed to unlock query for has_current_query");
+
+        match &*guard {
+            QueryState::None => false,
+            QueryState::Active { .. } => true,
+        }
+    }
+
     pub fn end_query(&self) {
         let mut guard = self
             .query
