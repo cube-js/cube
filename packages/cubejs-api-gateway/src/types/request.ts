@@ -6,8 +6,10 @@
  */
 
 import type { Request as ExpressRequest } from 'express';
+import type { ApiGateway } from 'src/gateway';
 import { RequestType, ApiType, ResultType } from './strings';
 import { Query } from './query';
+import type { QueryType } from './enums';
 
 /**
  * Network request context interface.
@@ -58,6 +60,14 @@ interface Request extends ExpressRequest {
    * @deprecated
    */
   authInfo?: any,
+}
+
+interface GraphQLRequestContext {
+  req: Request & {
+    context: ExtendedRequestContext;
+  },
+  resultMeta?: object,
+  apiGateway: ApiGateway
 }
 
 /**
@@ -123,7 +133,7 @@ type BaseRequest = {
  */
 type QueryRequest = BaseRequest & {
   query: Record<string, any> | Record<string, any>[];
-  queryType?: RequestType;
+  queryType?: RequestType | QueryType;
   apiType?: ApiType;
   resType?: ResultType
   memberToAlias?: Record<string, string>;
@@ -207,6 +217,7 @@ export {
   RequestContext,
   RequestExtension,
   ExtendedRequestContext,
+  GraphQLRequestContext,
   Request,
   SqlApiRequest,
   QueryRewriteFn,
