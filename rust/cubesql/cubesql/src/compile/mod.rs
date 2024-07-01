@@ -24059,4 +24059,56 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_flatten_projection_aliasing() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT DISTINCT customer_gender
+            FROM (
+                SELECT
+                    order_date,
+                    last_mod,
+                    customer_gender,
+                    notes,
+                    taxful_total_price,
+                    has_subscription,
+                    count,
+                    maxPrice,
+                    sumPrice,
+                    minPrice,
+                    avgPrice,
+                    countDistinct
+                FROM KibanaSampleDataEcommerce
+            ) AS anon_1
+            ORDER BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        )
+    }
 }
