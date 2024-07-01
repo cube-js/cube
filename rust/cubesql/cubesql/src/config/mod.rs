@@ -105,6 +105,8 @@ pub trait ConfigObj: DIService + Debug {
     fn stream_mode(&self) -> bool;
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
+
+    fn no_implicit_order(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +125,7 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub no_implicit_order: bool,
 }
 
 impl ConfigObjImpl {
@@ -158,6 +161,7 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
         }
     }
 }
@@ -216,6 +220,10 @@ impl ConfigObj for ConfigObjImpl {
     fn non_streaming_query_max_row_limit(&self) -> i32 {
         self.non_streaming_query_max_row_limit
     }
+
+    fn no_implicit_order(&self) -> bool {
+        self.no_implicit_order
+    }
 }
 
 lazy_static! {
@@ -251,6 +259,7 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                no_implicit_order: false,
             }),
         }
     }

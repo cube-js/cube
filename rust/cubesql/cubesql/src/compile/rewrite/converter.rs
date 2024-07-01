@@ -2047,11 +2047,27 @@ impl LanguageToLogicalPlanConverter {
                         query.order = if !query_order.is_empty() {
                             Some(query_order)
                         } else {
-                            // for ungrouped queries we need to return empty array so
-                            // the processing in BaseQuery.js won't automatically add default order
-                            match query.ungrouped {
-                                Some(true) => Some(vec![]),
-                                _ => None,
+                            // Probably if no order was specified in client SQL,
+                            // there should be no order implicitly added.
+                            // But this is a breaking change. So for now,
+                            // only for ungrouped queries no implicit order is added
+                            // and there is an env flag: CUBESQL_SQL_NO_IMPLICIT_ORDER
+                            // in case when it is set to true - no implicit order is
+                            // added for all queries.
+                            // We need to return empty array so the processing in
+                            // BaseQuery.js won't automatically add default order
+
+                            let cube_no_implicit_order = self
+                                .cube_context
+                                .sessions
+                                .server
+                                .config_obj
+                                .no_implicit_order();
+
+                            if cube_no_implicit_order || query.ungrouped == Some(true) {
+                                Some(vec![])
+                            } else {
+                                None
                             }
                         };
 
