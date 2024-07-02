@@ -1985,11 +1985,7 @@ impl LanguageToLogicalPlanConverter {
                         } else {
                             None
                         };
-                        query.order = if query_order.len() > 0 {
-                            Some(query_order)
-                        } else {
-                            None
-                        };
+
                         let cube_scan_query_limit = self
                             .cube_context
                             .sessions
@@ -2047,6 +2043,33 @@ impl LanguageToLogicalPlanConverter {
                         if ungrouped {
                             query.ungrouped = Some(true);
                         }
+
+                        query.order = if !query_order.is_empty() {
+                            Some(query_order)
+                        } else {
+                            // Probably if no order was specified in client SQL,
+                            // there should be no order implicitly added.
+                            // But this is a breaking change. So for now,
+                            // only for ungrouped queries no implicit order is added
+                            // and there is an env flag: CUBESQL_SQL_NO_IMPLICIT_ORDER
+                            // in case when it is set to true - no implicit order is
+                            // added for all queries.
+                            // We need to return empty array so the processing in
+                            // BaseQuery.js won't automatically add default order
+
+                            let cube_no_implicit_order = self
+                                .cube_context
+                                .sessions
+                                .server
+                                .config_obj
+                                .no_implicit_order();
+
+                            if cube_no_implicit_order || query.ungrouped == Some(true) {
+                                Some(vec![])
+                            } else {
+                                None
+                            }
+                        };
 
                         let member_fields = fields.iter().map(|(_, m)| m.clone()).collect();
 
