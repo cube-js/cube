@@ -10,8 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int16Builder,
-            Int32Builder, Int64Builder, NullArray, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -1025,6 +1025,31 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Float32 => {
+                build_column!(
+                    DataType::Float32,
+                    Float32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as f32: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }
