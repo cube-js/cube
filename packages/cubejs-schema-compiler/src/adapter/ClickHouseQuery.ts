@@ -40,21 +40,24 @@ export class ClickHouseQuery extends BaseQuery {
 
   public convertTz(field) {
     //
-    // field yields a Date or a DateTime so add in the extra toDateTime to support the Date case
+    // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
     //
     // https://clickhouse.yandex/docs/en/data_types/datetime/
     // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
     //
     //
-    return `toTimeZone(toDateTime(${field}), '${this.timezone}')`;
+    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
     if (granularity === 'week') {
-      return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      return `toDateTime64(toMonday(${dimension}, '${this.timezone}'), 0, '${this.timezone}')`;
     } else {
       const interval = GRANULARITY_TO_INTERVAL[granularity];
-      return `toDateTime(${granularity === 'second' ? 'toDateTime' : `toStartOf${interval}`}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      const toDateTime64 = `toDateTime64(${dimension}, 0, '${this.timezone}')`;
+      const toStartOfInterval = `toStartOf${interval}(${dimension}, '${this.timezone}')`;
+      const internalConversion = granularity === 'second' ? toDateTime64 : toStartOfInterval;
+      return `toDateTime64(${internalConversion}, 0, '${this.timezone}')`;
     }
   }
 
