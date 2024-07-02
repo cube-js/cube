@@ -40,6 +40,7 @@ import {
   PreAggJobStatusItem,
   PreAggJobStatusResponse,
   SqlApiRequest, MetaResponseResultFn,
+  GraphQLRequestContext,
 } from './types/request';
 import {
   CheckAuthInternalOptions,
@@ -259,6 +260,21 @@ class ApiGateway {
         }
         return graphqlHTTP({
           schema,
+          extensions: (requestInfo) => {
+            const context = requestInfo.context as GraphQLRequestContext;
+            const { resultMeta } = context;
+
+            if (!resultMeta) {
+              return {
+                resultMeta: undefined
+              };
+            }
+
+            return {
+              resultMeta,
+            };
+          },
+        
           context: {
             req,
             apiGateway: this
@@ -1525,6 +1541,7 @@ class ApiGateway {
         return res;
       })
     );
+    // TODO: Add total for all queries
     response.total = normalizedQuery.total
       ? Number(total.data[0][QueryAlias.TOTAL_COUNT])
       : undefined;

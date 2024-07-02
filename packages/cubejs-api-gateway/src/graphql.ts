@@ -31,7 +31,9 @@ import {
 } from 'graphql-scalars';
 
 import gql from 'graphql-tag';
+import type { Cube, LoadResponseResult } from '@cubejs-client/core';
 import { QueryType, MemberType } from './types/enums';
+import { GraphQLRequestContext } from './types/request';
 
 const DateTimeScalar = asNexusMethod(DateTimeResolver, 'date');
 
@@ -270,11 +272,11 @@ function whereArgToQueryFilters(
   metaConfig: any[] = []
 ) {
   const queryFilters: any[] = [];
-  
+
   Object.keys(whereArg).forEach((key) => {
     const cubeExists = metaConfig.find((cube) => cube.config.name === key);
     const normalizedKey = cubeExists ? key : capitalize(key);
-    
+
     if (['OR', 'AND'].includes(key)) {
       queryFilters.push({
         [key.toLowerCase()]: whereArg[key].reduce(
@@ -363,7 +365,7 @@ function parseDates(result: any) {
 }
 
 export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: GraphQLResolveInfo) {
-  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped } = args;
+  const { where, limit, offset, timezone, orderBy, renewQuery, ungrouped, total } = args;
 
   const measures: string[] = [];
   const dimensions: string[] = [];
@@ -385,7 +387,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
 
   getFieldNodeChildren(infos.fieldNodes[0], infos).forEach(cubeNode => {
     const cubeExists = metaConfig.find((cube) => cube.config.name === cubeNode.name.value);
-      
+
     const cubeName = cubeExists ? (cubeNode.name.value) : capitalize(cubeNode.name.value);
     const orderByArg = getArgumentValue(cubeNode, 'orderBy', infos.variableValues);
     // todo: throw if both RootOrderByInput and [Cube]OrderByInput provided
@@ -458,6 +460,7 @@ export function getJsonQuery(metaConfig: any, args: Record<string, any>, infos: 
     ...(Object.keys(order).length && { order }),
     ...(limit && { limit }),
     ...(offset && { offset }),
+    ...(total && { total }),
     ...(timezone && { timezone }),
     ...(filters.length && { filters }),
     ...(renewQuery && { renewQuery }),
@@ -471,7 +474,7 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
   const operation: any = ast.definitions.find(
     ({ kind }) => kind === 'OperationDefinition'
   );
-  
+
   const fieldNodes = operation?.selectionSet.selections;
 
   let args = {};
@@ -487,11 +490,11 @@ export function getJsonQueryFromGraphQLQuery(query: string, metaConfig: any, var
     variableValues,
     fragments: {},
   };
-  
+
   return getJsonQuery(metaConfig, args, resolveInfo);
 }
 
-export function makeSchema(metaConfig: any): GraphQLSchema {
+export function makeSchema(metaConfig: { config: Cube }[]): GraphQLSchema {
   const types: any[] = [
     DateTimeScalar,
     FloatFilter,
@@ -505,7 +508,7 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
     if (cube.public === false) {
       return false;
     }
-    
+
     return ([...cube.config.measures, ...cube.config.dimensions].filter((member) => member.isVisible)).length > 0;
   }
 
@@ -639,23 +642,27 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           offset: intArg(),
           timezone: stringArg(),
           renewQuery: booleanArg(),
+          total: booleanArg(),
+          resultMeta: booleanArg(),
           ungrouped: booleanArg(),
           orderBy: arg({
             type: 'RootOrderByInput'
           }),
         },
-        resolve: async (_, args, { req, apiGateway }, info) => {
+        resolve: async (_, args, ctx: GraphQLRequestContext, info) => {
+          const { req, apiGateway } = ctx;
           const query = getJsonQuery(metaConfig, args, info);
 
-          const results = await new Promise<any>((resolve, reject) => {
+          const results = await new Promise<LoadResponseResult<any>>((resolve, reject) => {
             apiGateway.load({
               query,
               queryType: QueryType.REGULAR_QUERY,
               context: req.context,
               res: (message) => {
-                if (message.error) {
+                if ('error' in message && message.error) {
                   reject(new Error(message.error));
                 }
+                // @ts-ignore
                 resolve(message);
               },
               apiType: 'graphql',
@@ -663,6 +670,11 @@ export function makeSchema(metaConfig: any): GraphQLSchema {
           });
 
           parseDates(results);
+          if (args.resultMeta) {
+            const { data, query: __, transformedQuery, annotation, ...resultMeta } = results;
+            ctx.resultMeta = ctx.resultMeta || {};
+            ctx.resultMeta[info.path.key] = resultMeta;
+          }
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
