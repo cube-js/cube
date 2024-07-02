@@ -18,6 +18,8 @@
     "build": "rm -rf dist && npm run tsc",
     "tsc": "tsc",
     "watch": "tsc -w",
+    "test": "npm run unit",
+    "unit": "jest dist/test --forceExit",
     "lint": "eslint src/* --ext .ts",
     "lint:fix": "eslint --fix src/* --ext .ts",
     "postinstall": "node bin/post-install"
@@ -31,6 +33,7 @@
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@azure/storage-blob": "^12.9.0",
+    "@azure/identity": "^3.4.1",
     "@cubejs-backend/base-driver": "^0.35.48",
     "@cubejs-backend/jdbc-driver": "^0.35.48",
     "@cubejs-backend/schema-compiler": "^0.35.54",
