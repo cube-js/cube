@@ -231,7 +231,7 @@ export class CubejsServer {
 
       if (this.sqlServer) {
         locks.push(
-          this.sqlServer.shutdown()
+          this.sqlServer.shutdown(graceful && (signal === 'SIGTERM') ? 'semifast' : 'fast')
         );
       }
 

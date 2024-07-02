@@ -4,7 +4,7 @@ pub mod processing_loop;
 use crate::{
     config::{
         injection::{DIService, Injector},
-        processing_loop::ProcessingLoop,
+        processing_loop::{ProcessingLoop, ShutdownMode},
     },
     sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
     transport::{HttpTransport, TransportService},
@@ -60,12 +60,15 @@ impl CubeServices {
         Ok(futures)
     }
 
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
+    pub async fn stop_processing_loops(
+        &self,
+        shutdown_mode: ShutdownMode,
+    ) -> Result<(), CubeError> {
         if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
                 .get_service_typed::<PostgresServer>()
                 .await
-                .stop_processing()
+                .stop_processing(shutdown_mode)
                 .await?;
         }
 
