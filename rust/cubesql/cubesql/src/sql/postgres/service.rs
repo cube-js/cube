@@ -65,7 +65,7 @@ impl ProcessingLoop for PostgresServer {
                                 break;
                             }
                             None => {
-                                panic!("Unreachable None case greater than some other value");
+                                unreachable!("mode compared greater than something; it can't be None");
                             }
                         }
                     } else {
@@ -172,7 +172,7 @@ impl ProcessingLoop for PostgresServer {
                             _ => {
                                 // Because of comparisons made, the smallest and 2nd smallest
                                 // Option<ShutdownMode> values are impossible.
-                                panic!("Unreachable mode={:?} case", active_shutdown_mode);
+                                unreachable!("impossible mode value, where mode={:?}", active_shutdown_mode);
                             }
                         }
                     } else {
