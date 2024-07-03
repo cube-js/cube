@@ -1821,5 +1821,13 @@ from
   `);
       expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');
     });
+
+    executePg('SQL API: metabase count cast to float32 from push down', async (connection) => {
+      const res = await connection.query(`
+        select cast(count(*) as float) as "a0" from "Customers"
+      `);
+
+      expect(res.rows).toMatchSnapshot('metabase_count_cast_to_float32_from_push_down');
+    });
   });
 }
