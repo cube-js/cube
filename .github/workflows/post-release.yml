@@ -1,4 +1,4 @@
-name: 'Bird: Release E2E tests 📦'
+name: 'Post release'
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +12,7 @@ on:
       - completed
   push:
     paths:
-      - '.github/workflows/birdbox.yml'
+      - '.github/workflows/post-release.yml'
     branches:
       - 'master'
 
@@ -20,6 +20,7 @@ on:
 jobs:
   cli:
     runs-on: ubuntu-20.04
+    name: 'E2E tests via CLI'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -81,6 +82,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-20.04
+    name: 'E2E tests via Docker'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -140,6 +142,7 @@ jobs:
 
   cypress:
     runs-on: ${{ matrix.os }}
+    name: 'Cypress E2E tests via Docker'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -148,7 +151,7 @@ jobs:
         include:
           - browser: chrome
             os: ubuntu-20.04
-            container: cypress/browsers:node12.18.3-chrome89-ff86
+            container: cypress/browsers:node18.12.0-chrome107
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -202,3 +205,22 @@ jobs:
           color: danger
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  trigger-repo-sync:
+    runs-on: ubuntu-20.04
+    name: 'Sync runtime repo'
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Trigger runtime
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'cube-runtime',
+              workflow_id: 'sync.yml',
+              ref: 'master'
+            })
