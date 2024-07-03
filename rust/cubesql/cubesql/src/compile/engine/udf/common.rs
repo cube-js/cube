@@ -2659,6 +2659,13 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
 
         for i in 0..arr.len() {
             let values = arr.value(i);
+            let values = match values.data_type() {
+                DataType::Int64 => values,
+                DataType::Int16 => cast(&values, &DataType::Int64)?,
+                _ => {
+                    return Err(DataFusionError::Internal("information_schema._pg_expandarray only supports inputs of type List<Int16> or List<Int64>".to_string()))
+                }
+            };
             let values_arr = values.as_any().downcast_ref::<Int64Array>();
             if values_arr.is_none() {
                 return Err(DataFusionError::Execution(format!("Unsupported type")));
@@ -2688,16 +2695,25 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
     });
 
     let return_type: ReturnTypeFunction =
+        // FIXME: it is likely more correct to analyze List type and match type of `x`.
+        // For now, in order to avoid unexpected breakages, this is left as `Int64`.
         Arc::new(move |_| Ok(Arc::new(DataType::Struct(fields()))));
 
     TableUDF::new(
         "information_schema._pg_expandarray",
-        &Signature::exact(
-            vec![DataType::List(Box::new(Field::new(
-                "item",
-                DataType::Int64,
-                true,
-            )))],
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                    "item",
+                    DataType::Int64,
+                    true,
+                )))]),
+                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                    "item",
+                    DataType::Int16,
+                    true,
+                )))]),
+            ],
             Volatility::Immutable,
         ),
         &return_type,

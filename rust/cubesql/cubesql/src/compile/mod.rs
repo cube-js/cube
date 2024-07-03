@@ -24111,4 +24111,88 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "metabase_introspection_indoption",
+            execute_query(
+                r#"
+                SELECT
+                  tmp.TABLE_CAT,
+                  tmp.TABLE_SCHEM,
+                  tmp.TABLE_NAME,
+                  tmp.NON_UNIQUE,
+                  tmp.INDEX_QUALIFIER,
+                  tmp.INDEX_NAME,
+                  tmp.TYPE,
+                  tmp.ORDINAL_POSITION,
+                  trim(
+                    both '"'
+                    from
+                      pg_catalog.pg_get_indexdef(tmp.CI_OID, tmp.ORDINAL_POSITION, false)
+                  ) AS COLUMN_NAME,
+                  CASE
+                    tmp.AM_NAME
+                    WHEN 'btree' THEN CASE
+                      tmp.I_INDOPTION [tmp.ORDINAL_POSITION - 1] & 1 :: smallint
+                      WHEN 1 THEN 'D'
+                      ELSE 'A'
+                    END
+                    ELSE NULL
+                  END AS ASC_OR_DESC,
+                  tmp.CARDINALITY,
+                  tmp.PAGES,
+                  tmp.FILTER_CONDITION
+                FROM
+                  (
+                    SELECT
+                      NULL AS TABLE_CAT,
+                      n.nspname AS TABLE_SCHEM,
+                      ct.relname AS TABLE_NAME,
+                      NOT i.indisunique AS NON_UNIQUE,
+                      NULL AS INDEX_QUALIFIER,
+                      ci.relname AS INDEX_NAME,
+                      CASE
+                        i.indisclustered
+                        WHEN true THEN 1
+                        ELSE CASE
+                          am.amname
+                          WHEN 'hash' THEN 2
+                          ELSE 3
+                        END
+                      END AS TYPE,
+                      (information_schema._pg_expandarray(i.indkey)).n AS ORDINAL_POSITION,
+                      ci.reltuples AS CARDINALITY,
+                      ci.relpages AS PAGES,
+                      pg_catalog.pg_get_expr(i.indpred, i.indrelid) AS FILTER_CONDITION,
+                      ci.oid AS CI_OID,
+                      i.indoption AS I_INDOPTION,
+                      am.amname AS AM_NAME
+                    FROM
+                      pg_catalog.pg_class ct
+                      JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
+                      JOIN pg_catalog.pg_index i ON (ct.oid = i.indrelid)
+                      JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
+                      JOIN pg_catalog.pg_am am ON (ci.relam = am.oid)
+                    WHERE
+                      true
+                      AND n.nspname = 'public'
+                      AND ct.relname = 'IT_Assistance_Needed'
+                  ) AS tmp
+                ORDER BY
+                  NON_UNIQUE,
+                  TYPE,
+                  INDEX_NAME,
+                  ORDINAL_POSITION
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+        Ok(())
+    }
 }
