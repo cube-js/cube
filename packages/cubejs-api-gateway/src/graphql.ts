@@ -1,4 +1,4 @@
-import R, { pick } from 'ramda';
+import R from 'ramda';
 import moment from 'moment-timezone';
 
 import {
@@ -673,10 +673,10 @@ export function makeSchema(metaConfig: { config: Cube }[]): GraphQLSchema {
           
           if (args.meta) {
             ctx.meta = { ...(ctx.meta || {}),
-              [info.path.key]: pick([
+              [info.path.key]: R.pick([
                 ...(args.total ? ['total'] : []),
                 'dbType', 'extDbType', 'external', 'lastRefreshTime', 'slowQuery'], results) };
-          } else if (args.total) ctx.meta = { ...(ctx.meta || {}), [info.path.key]: pick(['total'], results) };
+          } else if (args.total) ctx.meta = { ...(ctx.meta || {}), [info.path.key]: R.pick(['total'], results) };
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
