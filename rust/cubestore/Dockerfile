@@ -47,7 +47,7 @@ COPY cubestore cubestore
 RUN [ "$WITH_AVX2" -eq "1" ] && export RUSTFLAGS="-C target-feature=+avx2"; \
     cargo build --release -p cubestore
 
-FROM debian:bookworm-slim
+FROM debian:12.6-slim
 
 WORKDIR /cube
 
