@@ -262,16 +262,14 @@ class ApiGateway {
           schema,
           extensions: (requestInfo) => {
             const context = requestInfo.context as GraphQLRequestContext;
-            const { resultMeta } = context;
+            const { meta } = context;
 
-            if (!resultMeta) {
-              return {
-                resultMeta: undefined
-              };
+            if (!meta) {
+              return undefined;
             }
 
             return {
-              resultMeta,
+              meta,
             };
           },
         

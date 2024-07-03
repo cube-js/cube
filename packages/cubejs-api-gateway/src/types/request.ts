@@ -66,7 +66,7 @@ interface GraphQLRequestContext {
   req: Request & {
     context: ExtendedRequestContext;
   },
-  resultMeta?: object,
+  meta?: object,
   apiGateway: ApiGateway
 }
 

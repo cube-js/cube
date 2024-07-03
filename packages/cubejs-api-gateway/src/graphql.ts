@@ -1,4 +1,4 @@
-import R from 'ramda';
+import R, { pick } from 'ramda';
 import moment from 'moment-timezone';
 
 import {
@@ -643,7 +643,7 @@ export function makeSchema(metaConfig: { config: Cube }[]): GraphQLSchema {
           timezone: stringArg(),
           renewQuery: booleanArg(),
           total: booleanArg(),
-          resultMeta: booleanArg(),
+          meta: booleanArg(),
           ungrouped: booleanArg(),
           orderBy: arg({
             type: 'RootOrderByInput'
@@ -670,11 +670,13 @@ export function makeSchema(metaConfig: { config: Cube }[]): GraphQLSchema {
           });
 
           parseDates(results);
-          if (args.resultMeta) {
-            const { data, query: __, transformedQuery, annotation, ...resultMeta } = results;
-            ctx.resultMeta = ctx.resultMeta || {};
-            ctx.resultMeta[info.path.key] = resultMeta;
-          }
+          
+          if (args.meta) {
+            ctx.meta = { ...(ctx.meta || {}),
+              [info.path.key]: pick([
+                ...(args.total ? ['total'] : []),
+                'dbType', 'extDbType', 'external', 'lastRefreshTime', 'slowQuery'], results) };
+          } else if (args.total) ctx.meta = { ...(ctx.meta || {}), [info.path.key]: pick(['total'], results) };
 
           return results.data.map(entry => R.toPairs(entry)
             .reduce((res, pair) => {
