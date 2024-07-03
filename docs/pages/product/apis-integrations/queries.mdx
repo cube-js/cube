@@ -16,6 +16,21 @@ into one of [query types](#query-types).
 
 The following defaults apply to all queries run by Cube.
 
+### Order
+
+By default, Cube will apply ordering to [any query](#query-types) that does not
+set it explicitly. The default heuristics are to sort the result set by a time
+dimension, if any; otherwise, sort it by the first measure, if any; otherwise,
+sort it by the first dimension, if any. This will provide a result set that works
+great for most data visualization purposes.
+
+[SQL API][ref-sql-api] queries do not get a default ordering if they are
+[ungrouped](#ungrouped-query). You can opt out from default ordering for all SQL API
+queries by setting `CUBESQL_SQL_NO_IMPLICIT_ORDER` to `true`.
+
+For [REST API][ref-rest-api] and [GraphQL API][ref-graphql-api] queries, you can opt
+from default ordering by passing an empty array (`[]`) object as `order`.
+
 ### Row limit
 
 By default, [any query](#query-types) will return no more than 10,000 rows

@@ -233,7 +233,7 @@ export class BaseQuery {
     this.postAggregateDimensions = (this.options.postAggregateDimensions || []).map(this.newDimension.bind(this));
     this.postAggregateTimeDimensions = (this.options.postAggregateTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
-    this.order = this.options.order || [];
+
     const filters = this.extractFiltersAsTree(this.options.filters || []);
 
     // measure_filter (the one extracted from filters parameter on measure and
@@ -260,14 +260,13 @@ export class BaseQuery {
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.preAggregationsSchemaOption =
-      this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
-
-    if (this.order.length === 0) {
-      this.order = this.defaultOrder();
-    }
-
+    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
+
+    // Set the default order only when options.order is not provided at all
+    // if options.order is set (empty array [] or with data) - use it as is
+    this.order = this.options.order ?? this.defaultOrder();
+
     this.initUngrouped();
   }
 
@@ -399,12 +398,7 @@ export class BaseQuery {
       });
     } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
-
-      let id = firstMeasure.measure;
-
-      if (firstMeasure.expressionName) {
-        id = firstMeasure.expressionName;
-      }
+      const id = firstMeasure.expressionName ?? firstMeasure.measure;
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {

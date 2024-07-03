@@ -219,9 +219,9 @@ const normalizeQuery = (query, persistent) => {
 
   return {
     ...query,
+    ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    order: normalizeQueryOrder(query.order),
     filters: normalizeQueryFilters(query.filters || []),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
@@ -266,7 +266,7 @@ const remapQueryOrder = order => {
 const remapToQueryAdapterFormat = (query) => (query ? {
   ...query,
   rowLimit: query.limit,
-  order: remapQueryOrder(query.order),
+  ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
 } : query);
 
 const queryPreAggregationsSchema = Joi.object().keys({
