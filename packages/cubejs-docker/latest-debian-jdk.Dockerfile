@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile-upstream:master-experimental
-FROM node:18.20.1-bullseye-slim as builder
+FROM node:18.20.3-bullseye-slim as builder
 
 WORKDIR /cube
 COPY . .
@@ -21,7 +21,7 @@ RUN yarn install --prod \
     && rm -rf /cube/node_modules/duckdb/src \
     && yarn cache clean
 
-FROM node:18.20.1-bullseye-slim
+FROM node:18.20.3-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
 
