@@ -38,19 +38,33 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 | Query History             | Depends on [chosen tier](#query-history-tiers) |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 |
 | [Audit Log][ref-audit-log] | 4 |
+| [Monitoring Integrations][ref-monitoring-integrations] | Depends on [chosen tier](#monitoring-integrations-tiers) |
 
 ### Query History tiers
 
 [Query History][ref-query-history] and [Performance Insights][ref-performance-insights]
 features analyze and visualize the data available under the following tiers:
 
-| Query History tier | CCUs per hour | API requests/day | Data retention |
-| ------------------ | :-----------: | ---------------- | -------------- |
-| XS                 | 0             | Up to 50,000     | 1 day          |
-| S                  | 2             | Up to 100,000    | 7 days         |
-| M                  | 5             | Up to 250,000    | 14 days        |
-| L                  | 10            | Up to 500,000    | 21 days        |
-| XL                 | 20            | Up to 1,000,000  | 30 days        |
+| Tier | CCUs per hour | API requests        | Data retention |
+| ---- | :-----------: | ------------------- | -------------- |
+| XS   | 0             | Up to 50,000/day    | 1 day          |
+| S    | 2             | Up to 100,000/day   | 7 days         |
+| M    | 5             | Up to 250,000/day   | 14 days        |
+| L    | 10            | Up to 500,000/day   | 21 days        |
+| XL   | 20            | Up to 1,000,000/day | 30 days        |
+
+You can upgrade to the chosen tier by reaching out to your dedicated customer success
+manager (CSM).
+
+### Monitoring Integrations tiers
+
+[Monitoring Integrations][ref-monitoring-integrations] feature has the following tiers:
+
+| Tier | CCUs per hour | Exported data  |
+| ---- | :-----------: | -------------- |
+| XS   | 1             | Up to 10 GB/mo |
+| S    | 2             | Up to 25 GB/mo |
+| M    | 4             | Up to 50 GB/mo |
 
 You can upgrade to the chosen tier by reaching out to your dedicated customer success
 manager (CSM).
@@ -99,8 +113,8 @@ deployments with more significant security and compliance needs.**
 It offers everything in the [Premium plan](#premium) as well as [Semantic Layer
 Sync][ref-workspace-semantic-layer] with unlimited supported BI tools, SAML 2.0
 support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
-infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering], [monitoring
-integrations][ref-cloud-monitoring], and [role-based access
+infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
+[monitoring integrations][ref-monitoring-integrations], and [role-based access
 control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this plan.
 
 You can review its [pricing and minimums][cube-pricing], [support
@@ -251,7 +265,7 @@ subscription plan level. Payments are non-refundable.
 [ref-cloud-deployment-prod-cluster]:
   /product/deployment/cloud/deployment-types#production-cluster
 [ref-cloud-limits]: /product/deployment/cloud/limits
-[ref-cloud-monitoring]: /product/monitoring/integrations
+[ref-monitoring-integrations]: /product/monitoring/integrations
 [ref-cloud-acl]: /product/workspace/access-control
 [ref-cloud-deployment-prod-multicluster]:
   /product/deployment/cloud/deployment-types#production-multi-cluster

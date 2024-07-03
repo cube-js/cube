@@ -9,6 +9,7 @@ module.exports = {
   "query-history": "Query History",
   "pre-aggregations": "Pre-Aggregations",
   performance: "Performance Insights",
+  "monitoring": "Monitoring Integrations",
   "access-control": "Access Control",
   "sso": "Single Sign-on",
   "audit-log": "Audit Log",
