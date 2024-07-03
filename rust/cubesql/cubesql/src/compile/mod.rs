@@ -24195,4 +24195,47 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_split_projection_aggregate_function_column() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            SELECT
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "CUSTOMER_GENDER", 
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:SUM_PRICE:ok" 
+            FROM
+                "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+            GROUP BY 1
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        let logical_plan_str = format!("{:?}", logical_plan);
+        assert!(!logical_plan_str.contains("SUM(#SUM"));
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
 }
