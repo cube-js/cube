@@ -11,10 +11,15 @@ redirect_from:
 This section describes the various types that can be assigned to a **measure**.
 A measure can only have one type.
 
-### string
+### `string`
 
-This measure type allows defining measures as a `string` value. In the example
-below, we create a `string` measure by converting a numerical value to a string:
+This measure type allows defining measures as a `string` value.
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the string type.
+
+In the example below, we create a `string` measure by converting a numerical
+value to a string:
 
 <CodeTabs>
 
@@ -44,10 +49,14 @@ cubes:
 
 </CodeTabs>
 
-### time
+### `time`
 
-This measure type allows defining measures as a `time` value. In the example
-below, we create a `time` measure from an existing dimension:
+This measure type allows defining measures as a `time` value.
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the timestamp type.
+
+In the example below, we create a `time` measure from an existing dimension:
 
 <CodeTabs>
 
@@ -89,10 +98,13 @@ cubes:
 
 </CodeTabs>
 
-### boolean
+### `boolean`
 
 The `boolean` measure type can be used to condense data into a single boolean
 value.
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the boolean type.
 
 The example below adds an `is_completed` measure which only returns `true` if
 **all** orders have the `completed` status:
@@ -125,12 +137,14 @@ cubes:
 
 </CodeTabs>
 
-### number
+### `number`
 
-The `sql` parameter is required and can take any valid SQL expression that
-results in a number or integer. Type `number` is usually used, when performing
+Type `number` is usually used, when performing
 arithmetic operations on measures. [Learn more about Calculated
 Measures][ref-schema-ref-calc-measures].
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the numeric type.
 
 <CodeTabs>
 
@@ -193,12 +207,13 @@ cubes:
 
 </CodeTabs>
 
-### count
+### `count`
 
 Performs a table count, similar to SQL’s `COUNT` function. However, unlike
 writing raw SQL, Cube will properly calculate counts even if your query’s
-joins will produce row multiplication. You do not need to include a `sql`
-parameter for this type.
+joins will produce row multiplication.
+
+You do not need to include a `sql` parameter for this type.
 
 `drill_members` parameter is commonly used with type `count`. It allows users to
 click on the measure in the UI and inspect individual records that make up a
@@ -237,13 +252,13 @@ cubes:
 
 </CodeTabs>
 
-### count_distinct
+### `count_distinct`
 
 Calculates the number of distinct values in a given field. It makes use of SQL’s
 `COUNT DISTINCT` function.
 
-The `sql` parameter is required and can take any valid SQL expression that
-results in a table column, or interpolated JavaScript expression.
+The `sql` parameter is required and must include any valid SQL expression
+of any type (without an aggregate function).
 
 <CodeTabs>
 
@@ -273,7 +288,7 @@ cubes:
 
 </CodeTabs>
 
-### count_distinct_approx
+### `count_distinct_approx`
 
 Calculates approximate number of distinct values in a given field. Unlike
 `count_distinct` measure type, `count_distinct_approx` is decomposable aggregate
@@ -284,7 +299,8 @@ estimate distinct counts, usually based on HyperLogLog or similar algorithms.
 Wherever possible Cube will use multi-stage HLL which significantly improves
 calculation of distinct counts at scale.
 
-The `sql` parameter is required and can take any valid SQL expression.
+The `sql` parameter is required and must include any valid SQL expression
+of any type (without an aggregate function).
 
 <CodeTabs>
 
@@ -314,16 +330,14 @@ cubes:
 
 </CodeTabs>
 
-### sum
+### `sum`
 
 Adds up the values in a given field. It is similar to SQL’s `SUM` function.
 However, unlike writing raw SQL, Cube will properly calculate sums even if your
 query’s joins will result in row duplication.
 
-The `sql` parameter is required and can take any valid SQL expression that
-results in a numeric table column, or interpolated JavaScript expression. `sql`
-parameter should contain only expression to sum without actual aggregate
-function.
+The `sql` parameter is required and must include any valid SQL expression
+of the numeric type (without an aggregate function).
 
 <CodeTabs>
 
@@ -371,14 +385,14 @@ cubes:
 
 </CodeTabs>
 
-### avg
+### `avg`
 
 Averages the values in a given field. It is similar to SQL’s AVG function.
 However, unlike writing raw SQL, Cube will properly calculate averages even if
 your query’s joins will result in row duplication.
 
-The sql parameter for type: average measures can take any valid SQL expression
-that results in a numeric table column, or interpolated JavaScript expression.
+The `sql` parameter is required and must include any valid SQL expression
+of the numeric type (without an aggregate function).
 
 <CodeTabs>
 
@@ -408,9 +422,12 @@ cubes:
 
 </CodeTabs>
 
-### min
+### `min`
 
 Type of measure `min` is calculated as a minimum of values defined in `sql`.
+
+The `sql` parameter is required and must include any valid SQL expression
+of the numeric type (without an aggregate function).
 
 <CodeTabs>
 
@@ -440,9 +457,12 @@ cubes:
 
 </CodeTabs>
 
-### max
+### `max`
 
 Type of measure `max` is calculated as a maximum of values defined in `sql`.
+
+The `sql` parameter is required and must include any valid SQL expression
+of the numeric type (without an aggregate function).
 
 <CodeTabs>
 
@@ -477,7 +497,7 @@ cubes:
 When creating a **measure** you can explicitly define the format you’d like to
 see as output.
 
-### percent
+### `percent`
 
 `percent` is used for formatting numbers with a percent symbol.
 
@@ -511,7 +531,7 @@ cubes:
 
 </CodeTabs>
 
-### currency
+### `currency`
 
 `currency` is used for monetary values.
 
@@ -550,13 +570,15 @@ cubes:
 This section describes the various types that can be assigned to a
 **dimension**. A dimension can only have one type.
 
-### time
+### `time`
 
 In order to be able to work with time series data, Cube needs to identify
-time dimension which is a timestamp column in your database. You can define
+a time dimension which is a timestamp column in your database. You can define
 several time dimensions in a single cube.
 
-Note that type of target column should be `TIMESTAMP`. Please see
+Note that the type of the target column should be `TIMESTAMP`. 
+If your time-based column is type `DATE` or another temporal type, 
+you should cast it to a timestamp in the `sql` parameter of the dimension. Please see
 [this recipe][ref-string-time-dims] if your datetime information is stored
 as a string.
 
@@ -588,11 +610,13 @@ cubes:
 
 </CodeTabs>
 
-### string
+### `string`
 
 `string` is typically used with fields that contain letters or special
-characters. The `sql` parameter is required and can take any valid SQL
-expression.
+characters.
+
+The `sql` parameter is required and must include any valid SQL expression
+with an aggregate function that returns a value of the string type.
 
 The following model creates a field `full_name` by combining 2 fields:
 `first_name` and `last_name`:
@@ -625,7 +649,7 @@ cubes:
 
 </CodeTabs>
 
-### number
+### `number`
 
 `number` is typically used with fields that contain number or integer.
 
@@ -657,7 +681,7 @@ cubes:
 
 </CodeTabs>
 
-### boolean
+### `boolean`
 
 `boolean` is used with fields that contain boolean data or data coercible to
 boolean. For example:
@@ -690,7 +714,7 @@ cubes:
 
 </CodeTabs>
 
-### geo
+### `geo`
 
 `geo` dimension is used to display data on the map. Unlike other dimension types
 it requires to set two fields: latitude and longitude.
@@ -733,7 +757,7 @@ cubes:
 
 ## Dimension Formats
 
-### imageUrl
+### `imageUrl`
 
 `imageUrl` is used for displaying images in table visualization. In this case
 `sql` parameter should contain full path to the image.
@@ -768,7 +792,7 @@ cubes:
 
 </CodeTabs>
 
-### id
+### `id`
 
 `id` is used for IDs. It allows to eliminate applying of comma for 5+ digit
 numbers which is default for type `number`. The `sql` parameter is required and
@@ -804,7 +828,7 @@ cubes:
 
 </CodeTabs>
 
-### link
+### `link`
 
 `link` is used for creating hyperlinks. `link` parameter could be either String
 or Object. Use Object, when you want to give a specific label to link. See
@@ -858,7 +882,7 @@ cubes:
 
 </CodeTabs>
 
-### currency
+### `currency`
 
 `currency` is used for monetary values.
 
@@ -892,7 +916,7 @@ cubes:
 
 </CodeTabs>
 
-### percent
+### `percent`
 
 `percent` is used for formatting numbers with a percent symbol.
 

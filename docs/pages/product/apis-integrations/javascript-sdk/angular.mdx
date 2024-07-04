@@ -40,7 +40,7 @@ as a [chart](/reference/frontend/cubejs-client-core#chart-pivot) or as a
 **Simplify work with complex query types.** You can build
 [Drill Down](/reference/frontend/cubejs-client-core#drill-down) queries and
 [decompose](/reference/frontend/cubejs-client-core#decompose) the results of
-[compareDateRange](/product/apis-integrations/rest-api/query-format#time-dimensions-format)
+[compare date range queries][ref-compare-date-range]
 or [Data Blending](/product/data-modeling/concepts/data-blending) queries.
 
 [Learn more](/reference/frontend/cubejs-client-core) in the documentation for
@@ -51,8 +51,8 @@ the `@cubejs-client/core` package.
 The package provides convenient tools to work with Cube in Angular:
 
 **Modules.** Inject
-[CubejsClientModule](/reference/frontend/cubejs-client-vue#query-builder) and
-[CubejsClient](/reference/frontend/cubejs-client-vue#query-renderer) into your
+[CubeClientModule](/reference/frontend/cubejs-client-vue#query-builder) and
+[CubeClient](/reference/frontend/cubejs-client-vue#query-renderer) into your
 components and services to get access to `@cubejs-client/core` API.
 
 **Subjects.** Use [RxJS Subject](/reference/frontend/cubejs-client-ngx#api) and
@@ -70,7 +70,7 @@ Here are the typical steps to query and visualize analytical data in Angular:
   The client is also initialized with an [API token](/product/auth), but it
   takes effect only in [production](/product/deployment/production-checklist).
 - **Query data from Cube Backend and Transform data for visualization.** Use
-  [CubejsClient](/reference/frontend/cubejs-client-ngx#api) to load data. The
+  [CubeClient](/reference/frontend/cubejs-client-ngx#api) to load data. The
   client accepts a query, which is a plain JavaScript object. See
   [Query Format](/product/apis-integrations/rest-api/query-format) for details.
 - **Visualize the data.** Use tools of your choice to draw charts and create
@@ -106,3 +106,6 @@ yarn add @cubejs-client/core @cubejs-client/ngx
 Now you can build your application from scratch or connect to one of our
 [supported data visualization tools](/product/configuration/visualization-tools).
 You can also [explore example applications](/guides/examples) built with Cube.
+
+
+[ref-compare-date-range]: /product/apis-integrations/queries#compare-date-range-query

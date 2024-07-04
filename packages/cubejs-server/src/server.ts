@@ -28,15 +28,12 @@ dotenv.config({
   multiline: 'line-breaks',
 });
 
-export type InitAppFn = (app: express.Application) => void | Promise<void>;
-
 interface HttpOptions {
   cors?: CorsOptions;
 }
 
 export interface CreateOptions extends CoreCreateOptions, WebSocketServerOptions, SQLServerOptions {
   webSockets?: boolean;
-  initApp?: InitAppFn;
   http?: HttpOptions;
   gracefulShutdown?: number;
 }
@@ -96,10 +93,6 @@ export class CubejsServer {
 
       if (this.config.gracefulShutdown) {
         app.use(gracefulMiddleware(this.status, this.config.gracefulShutdown));
-      }
-
-      if (this.config.initApp) {
-        await this.config.initApp(app);
       }
 
       await this.core.initApp(app);
@@ -236,6 +229,12 @@ export class CubejsServer {
         );
       }
 
+      if (this.sqlServer) {
+        locks.push(
+          this.sqlServer.shutdown()
+        );
+      }
+
       if (this.server) {
         locks.push(
           this.server.stop(
@@ -244,13 +243,19 @@ export class CubejsServer {
         );
       }
 
-      if (graceful) {
-        // Await before all connections/refresh scheduler will end jobs
-        await Promise.all(locks);
-      }
+      const shutdownAll = async () => {
+        try {
+          if (graceful) {
+            // Await before all connections/refresh scheduler will end jobs
+            await Promise.all(locks);
+          }
+          await this.core.shutdown();
+        } finally {
+          timeoutKiller.cancel();
+        }
+      };
 
-      await this.core.shutdown();
-      await timeoutKiller.cancel();
+      await Promise.any([shutdownAll(), timeoutKiller]);
 
       return 0;
     } catch (e: any) {

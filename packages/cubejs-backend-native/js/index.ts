@@ -2,6 +2,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Writable } from 'stream';
+import type { Request as ExpressRequest } from 'express';
 
 export interface BaseMeta {
   // postgres or mysql
@@ -97,7 +98,7 @@ export type SQLInterfaceOptions = {
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
 };
 
-function loadNative() {
+export function loadNative() {
   // Development version
   if (fs.existsSync(path.join(__dirname, '/../../index.node'))) {
     return require(path.join(__dirname, '/../../index.node'));
@@ -331,8 +332,12 @@ export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise
   const native = loadNative();
 
   await native.shutdownInterface(instance);
+};
 
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
+  const native = loadNative();
+
+  await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
 };
 
 export interface PyConfiguration {
@@ -341,6 +346,17 @@ export interface PyConfiguration {
   checkAuth?: (req: unknown, authorization: string) => Promise<void>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
+}
+
+function simplifyExpressRequest(req: ExpressRequest) {
+  // Req is a large object, let's simplify it
+  // Important: Dont pass circular references
+  return {
+    url: req.url,
+    method: req.method,
+    headers: req.headers,
+    ip: req.ip,
+  };
 }
 
 export const pythonLoadConfig = async (content: string, options: { fileName: string }): Promise<PyConfiguration> => {
@@ -353,14 +369,16 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 
   if (config.checkAuth) {
     const nativeCheckAuth = config.checkAuth;
-    config.checkAuth = async (req: any, authorization: string) => nativeCheckAuth(
-      // Req is a large object, let's simplify it
-      {
-        url: req.url,
-        method: req.method,
-        headers: req.headers,
-      },
+    config.checkAuth = async (req: ExpressRequest, authorization: string) => nativeCheckAuth(
+      simplifyExpressRequest(req),
       authorization,
+    );
+  }
+
+  if (config.extendContext) {
+    const nativeExtendContext = config.extendContext;
+    config.extendContext = async (req: ExpressRequest) => nativeExtendContext(
+      simplifyExpressRequest(req),
     );
   }
 

@@ -1,0 +1,254 @@
+# Deploying Cube Cloud BYOC on AWS
+
+With Bring Your Own Cloud (BYOC) on AWS, all the components interacting with private data are deployed on 
+the customer infrastructure on AWS and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
+This document provides step-by-step instructions for deploying Cube Cloud BYOC on AWS.
+
+## Prerequisites
+
+The bulk of provisioning work will be done remotely by Cube Cloud automation.
+However, to get started, you'll need to provide Cube with the necessary access
+along with some additional information that includes:
+
+- **AWS Account ID:** The AWS account ID of the target deployment account 
+  [the AWS Console][aws-console].
+- **AWS Region:** [The AWS region][aws-docs-regions] where Cube Cloud resources
+  should be deployed.
+
+In addition to that, you'll need to make sure you have sufficient access to create
+the `CubeCloudBYOC` IAM role that would allow Cube Cloud to:
+- Create and manage a VPC
+- Create one or more EKS clusters
+- Create necessary IAM roles and policies
+- Configure VPC networking
+- Run ec2 instances
+- Manage ec2 autoscaling
+- Manage S3 buckets
+- Mange CloudWatch Logs
+
+## Provisioning access
+
+### Create a CubeCloudBYOC policy
+
+Navigate to **IAM->Policies** and create a new policy called `CubeCloudBYOC`
+with the following JSON content. Please substitute `AWS_ACCOUNT_ID` with your
+actual account ID.
+
+```JSON
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:DescribeAutoScalingGroups",
+                "autoscaling:DescribeAutoScalingInstances",
+                "autoscaling:DescribeLaunchConfigurations",
+                "autoscaling:DescribeTags",
+                "ec2:DescribeAddresses",
+                "ec2:DescribeAddressesAttribute",
+                "ec2:DescribeAvailabilityZones",
+                "ec2:DescribeInternetGateways",
+                "ec2:DescribeLaunchTemplateVersions",
+                "ec2:DescribeLaunchTemplates",
+                "ec2:DescribeNatGateways",
+                "ec2:DescribeNetworkInterfaces",
+                "ec2:DescribePrefixLists",
+                "ec2:DescribeRouteTables",
+                "ec2:DescribeSecurityGroupRules",
+                "ec2:DescribeSecurityGroups",
+                "ec2:DescribeSubnets",
+                "ec2:DescribeVpcAttribute",
+                "ec2:DescribeVpcClassicLink",
+                "ec2:DescribeVpcClassicLinkDnsSupport",
+                "ec2:DescribeVpcEndpoints",
+                "ec2:DescribeVpcPeeringConnections",
+                "ec2:DescribeVpcs",
+                "ec2:DescribeRegions",
+                "ec2:RunInstances",
+                "eks:DescribeCluster",
+                "eks:DescribeNodegroup",
+                "eks:ListClusters",
+                "iam:GetRole",
+                "sts:DecodeAuthorizationMessage"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["s3:*"],
+            "Resource": ["arn:aws:s3:::cube-store-*"]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ec2:AllocateAddress",
+                "ec2:CreateInternetGateway",
+                "ec2:CreateLaunchTemplate",
+                "ec2:CreateNatGateway",
+                "ec2:CreateRoute",
+                "ec2:CreateRouteTable",
+                "ec2:CreateSecurityGroup",
+                "ec2:CreateSubnet",
+                "ec2:CreateTags",
+                "ec2:CreateVpc",
+                "ec2:CreateVpcEndpoint",
+                "ec2:CreateVpcPeeringConnection",
+                "eks:CreateCluster",
+                "eks:CreateNodegroup",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:PassRole",
+                "iam:TagOpenIDConnectProvider",
+                "logs:CreateLogDelivery"
+            ],
+            "Resource": "*",
+            "Condition": {
+                "StringEquals": {
+                    "aws:RequestTag/Created-By": "CubeCloud"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:AddRoleToInstanceProfile",
+                "iam:AttachRolePolicy",
+                "iam:CreateInstanceProfile",
+                "iam:CreateOpenIDConnectProvider",
+                "iam:CreatePolicy",
+                "iam:CreateRole",
+                "iam:CreateServiceLinkedRole",
+                "iam:DeleteInstanceProfile",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:DeletePolicy",
+                "iam:DeleteRole",
+                "iam:DeleteRolePolicy",
+                "iam:DeleteServiceLinkedRole",
+                "iam:DetachRolePolicy",
+                "iam:GetInstanceProfile",
+                "iam:GetOpenIDConnectProvider",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:GetRole",
+                "iam:GetRolePolicy",
+                "iam:ListAttachedRolePolicies",
+                "iam:ListInstanceProfilesForRole",
+                "iam:ListOpenIDConnectProviderTags",
+                "iam:ListPolicyVersions",
+                "iam:ListRolePolicies",
+                "iam:PassRole",
+                "iam:PutRolePolicy",
+                "iam:RemoveRoleFromInstanceProfile",
+                "iam:TagInstanceProfile",
+                "iam:TagOpenIDConnectProvider",
+                "iam:TagPolicy",
+                "iam:TagRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:instance-profile/CubeCloud*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:instance-profile/cubeapp-*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:instance-profile/cube-store-*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:oidc-provider/oidc.eks.*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:policy/CubeCloud*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:policy/cubeapp-*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:role/CubeCloud*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:role/cubeapp-*",
+                "arn:aws:iam::{AWS_ACCOUNT_ID}:role/cube-store-*"
+            ],
+            "Condition": {
+                "StringEquals": {
+                    "iam:ResourceTag/Created-By": "CubeCloud"
+                }
+            }
+        },
+        { 
+            "Effect": "Allow", 
+            "Action": "iam:CreateServiceLinkedRole", 
+            "Resource": "*", 
+            "Condition": { 
+                "StringEquals": { 
+                    "iam:AWSServiceName": [ 
+                        "eks.amazonaws.com",
+                        "eks-nodegroup.amazonaws.com",
+                        "eks-fargate.amazonaws.com"
+                    ] 
+                } 
+            } 
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "autoscaling:SetDesiredCapacity",
+                "autoscaling:TerminateInstanceInAutoScalingGroup"
+            ],
+            "Resource": ["*"],
+            "Condition": {
+                "StringEquals": {
+                    "autoscaling:ResourceTag/Created-By": "CubeCloud"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["eks:*"],
+            "Resource": ["*"],
+            "Condition": {
+                "StringEquals": {
+                    "aws:ResourceTag/Created-By": "CubeCloud"
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["ec2:*"],
+            "Resource": ["*"],
+            "Condition": {
+                "StringEquals": {
+                    "ec2:ResourceTag/Created-By": "CubeCloud"
+                }
+            }
+        }
+    ]
+}
+```
+
+### Creating a role
+
+Navigate to **IAM->Roles** and create a new Role called `CubeCloudBYOC`. Select
+**AWS Account** as the Trusted entity. Type and enter
+`arn:aws:iam::307491255751:root`, which is the Cube Cloud BYOC provisioner
+account. On the **Add permissions** page, find and select the `CubeCloudBYOC`
+policy you created earlier. On the final **Review and create** page, edit the
+**Trust Policy** to make it look like this.
+
+```JSON
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::307491255751:root"
+            },
+            "Action": "sts:AssumeRole",
+            "Condition": {
+                "StringEquals": {
+                    "sts:ExternalId": "cube-cloud-byoc"
+                }
+            }
+        }
+    ]
+}
+```
+
+Make sure to include `"sts:ExternalId": "cube-cloud-byoc"` in the Condition section.
+
+## Deployment
+
+The actual deployment will be done by Cube Cloud automation. All that's left to
+do is notify your Cube contact point that access has been granted, and pass
+along your Region/AWS Account ID information.
+
+[aws-console]: https://console.aws.amazon.com/
+[aws-docs-regions]:
+  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions

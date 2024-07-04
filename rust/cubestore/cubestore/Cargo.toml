@@ -10,39 +10,39 @@ homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-ipc-channel = { version = "0.14.1" }
+ipc-channel = { version = "0.18.0" }
 libc = { version = "0.2.97", optional = true }
 
 [dependencies]
 base64 = "0.13.0"
 bumpalo = "3.6.1"
-tokio = { version = "1.0", features = ["full", "rt"] }
+tokio = { version = "1", features = ["full", "rt"] }
 warp = { version = "0.3.6" }
 sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "4388f6712dae5073c2d71d74f64cae2edd418066" }
 serde_derive = "1.0.115"
 serde = "1.0.115"
 serde_repr = "0.1"
 serde_bytes = "0.11.5"
+cuberockstore = { path = "../cuberockstore" }
 cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
+cubedatasketches = { path = "../cubedatasketches" }
 cuberpc = { path = "../cuberpc" }
 parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube", features = ["arrow"] }
 arrow = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
-arrow-flight = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube", features = ["default_nulls_last"] }
 csv = "1.1.3"
-bytes = "0.5.4"
+bytes = "1.6.0"
 serde_json = "1.0.56"
 futures = "0.3.26"
 smallvec = "1.11.0"
-flexbuffers = "0.1.1"
+flexbuffers = { version = "0.2.2", features = ["deserialize_human_readable", "serialize_human_readable"]}
 byteorder = "1.3.4"
-log = "0.4.20"
-simple_logger = "1.7.0"
-async-trait = "0.1.36"
+log = "0.4.21"
+simple_logger = { version = "2.3.0"}
+async-trait = "0.1.80"
 actix-rt = "2.7.0"
 regex = "1.3.9"
-rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy"] }
 uuid = { version = "0.8", features = ["serde", "v4"] }
 num = "0.3.0"
 enum_primitive = "0.1.1"
@@ -55,29 +55,31 @@ mockall = "0.8.1"
 async-std = "0.99"
 itertools = "0.11.0"
 bigdecimal = { version = "0.2.0", features = ["serde"] }
-rust-s3 = "0.26.3"
-aws-creds = "0.24.1"
-aws-region = "0.22.1"
+# Right now, it's not possible to use the 0.33 release because it has bugs
+# At the same time, 0.34-rc has a problem with large files uploading because it doesn't control number of parallels put(s)
+# Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
+rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", branch = "cubestore-0.32.3-backport", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
-reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
+reqwest = { version = "0.12.3", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"
 hex = "0.4.2"
 cloud-storage = "0.7.0"
-tokio-util = { version = "0.6.2", features=["compat"] }
+tokio-util = { version = "0.7.10", features=["compat"] }
 futures-timer = "3.0.2"
-tokio-stream = { version = "0.1.2", features=["io-util"] }
+tokio-stream = { version = "0.1.15", features=["io-util"] }
 scopeguard = "1.1.0"
 async-compression = { version = "0.3.7", features = ["gzip", "tokio"] }
-tempfile = "3.2.0"
+tempfile = "3.10.1"
 tarpc = { version = "0.24", features = ["tokio1"] }
 pin-project-lite = "0.2.4"
 paste = "1.0.4"
+memchr = "2"
 flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
-tracing-futures = { version = "0.2.5", features = ["tokio", "tokio-executor"] }
+tracing-futures = { version = "0.2.5" }
 lru = "0.6.5"
 moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
@@ -88,21 +90,22 @@ pin-project = "1.0.8"
 tokio-tungstenite = { version = "0.20.1", features = ["native-tls"] }
 deflate = "1.0.0"
 indoc = "1.0"
-rdkafka = { version = "0.29.0" }
 parse-size = "1.0.0"
 humansize = "2.1.3"
 deepsize = "0.2.0"
+anyhow = "1.0"
+arc-swap = "1.7.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-rdkafka = { version = "0.29.0", features = ["ssl", "gssapi", "cmake-build"] }
+rdkafka = { version = "0.36.2", features = ["ssl", "gssapi", "cmake-build"] }
 sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 # TODO support ssl for windows
 [target.'cfg(target_os = "windows")'.dependencies]
-rdkafka = { version = "0.29.0", features = ["cmake-build"] }
+rdkafka = { version = "0.36.2", features = ["cmake-build"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-rdkafka = { version = "0.29.0", features = ["ssl", "gssapi"] }
+rdkafka = { version = "0.36.2", features = ["ssl", "gssapi"] }
 sasl2-sys = { version = "0.1.6", features = ["vendored"] }
 
 [dev-dependencies]

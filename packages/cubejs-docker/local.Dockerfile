@@ -1,7 +1,7 @@
 ARG DEV_BUILD_IMAGE=cubejs/cube:build
 
 FROM $DEV_BUILD_IMAGE as build
-FROM node:16.20.2-bullseye-slim
+FROM node:18.20.3-bullseye-slim
 
 ARG IMAGE_VERSION=dev
 

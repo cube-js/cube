@@ -39,12 +39,19 @@ type LogicalOrFilter = {
   or: (QueryFilter | LogicalAndFilter)[]
 };
 
+type GroupingSet = {
+    groupType: string,
+    id: number,
+    subId?: null | number
+};
+
 type MemberExpression = {
   expression: Function;
   cubeName: string;
   name: string;
   expressionName: string;
   definition: string;
+  groupingSet?: GroupingSet
 };
 
 /**
@@ -89,7 +96,7 @@ interface NormalizedQueryFilter extends QueryFilter {
 interface NormalizedQuery extends Query {
   filters?: NormalizedQueryFilter[];
   rowLimit?: null | number;
-  order?: [{ id: string; desc: boolean }];
+  order?: { id: string; desc: boolean }[];
 }
 
 export {

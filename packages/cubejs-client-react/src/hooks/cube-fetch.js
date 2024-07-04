@@ -19,7 +19,7 @@ export function useCubeFetch(method, options = {}) {
   const { skip = false } = options;
 
   async function load(loadOptions = {}, ignoreSkip = false) {
-    const cubeApi = options.cubeApi || options.cubejsApi || context?.cubeApi || context?.cubejsApi;
+    const cubeApi = options.cubeApi || context?.cubeApi;
     const query = loadOptions.query || options.query;
 
     const queryCondition = method === 'meta' ? true : query && isQueryPresent(query);

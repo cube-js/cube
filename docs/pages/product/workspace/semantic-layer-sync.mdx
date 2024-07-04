@@ -5,9 +5,9 @@ layer from Cube to BI tools. It's the easiest way to connect a BI tool to Cube.
 
 <SuccessBox>
 
-Semantic Layer Sync with Metabase, Preset, and Superset is available in Cube Cloud on
-[all tiers](https://cube.dev/pricing). Support for Tableau and Power BI is available
-on [Enterprise and above](https://cube.dev/pricing) tiers.
+Semantic Layer Sync is available in Cube Cloud.
+Support for Metabase, Preset, and Superset is available on [all tiers](https://cube.dev/pricing).
+Support for Tableau and Power BI is available on [Enterprise and above](https://cube.dev/pricing) tiers.
 
 </SuccessBox>
 
@@ -276,6 +276,17 @@ module.exports = {
 
 ## Running syncs
 
+Cube automatically runs configured syncs every time a [new build is deployed](#on-build).
+Additionally, you can configure syncs to run [on schedule](#on-schedule).
+Finally, you can [manually](#manually) trigger any sync to run.
+
+During the sync, Cube will either create from scratch or update a database in
+the corresponding BI tool and the data model associated with it. Syncing a
+branch in [development mode][ref-dev-mode] will create a separate database,
+leaving the one associated with the production branch intact.
+
+### On build
+
 When the data model is updated, all configured syncs will automatically run.
 
 <WarningBox>
@@ -288,16 +299,79 @@ data model is updated dynamically for your Cube Cloud account.
 
 </WarningBox>
 
+### On schedule
+
+You can use the `scheduleInterval` option to specify the interval for running
+a particular sync on schedule. This is useful for cases when you expect that
+a BI tool might be temporarily unavailable via its API; the next scheduled sync
+will likely succeed anyway.
+
+<CodeTabs>
+
+```python
+from cube import config
+
+@config('semantic_layer_sync')
+def semantic_layer_sync(ctx: dict) -> list[dict]:
+  return [
+    {
+      'type': 'superset',
+      'name': 'Superset Sync',
+      'active': False,
+      'config': {
+        'user': 'mail@example.com',
+        'password': '4dceae-606a03-93ae6dc7',
+        'url': 'superset.example.com',
+        'database': 'Cube Cloud: staging-deployment',
+        'scheduleInterval': 'every 10 minutes'
+      }
+    }
+  ]
+```
+
+```javascript
+module.exports = {
+  semanticLayerSync: ({ securityContext }) => {
+    return [
+      {
+        type: "superset",
+        name: "Superset Sync",
+        active: false,
+        config: {
+          user: "mail@example.com",
+          password: "4dceae-606a03-93ae6dc7",
+          url: "superset.example.com",
+          database: "Cube Cloud: staging-deployment",
+          scheduleInterval: "every 10 minutes"
+        }
+      }
+    ]
+  }
+}
+```
+
+</CodeTabs>
+
+The `scheduleInterval` option accepts values in the `every [number] [period]`
+format, where `[number]` can be any positive integer, and `[period]` can be
+any value from the following list: `day`, `hour`, `minute`, or `days`, `hours`,
+`minutes`.
+
+<InfoBox>
+
+Development instances and [auto-suspended][ref-auto-sus] production clusters
+can't run syncs on schedule.
+
+</InfoBox>
+
+### Manually
+
 You can also run a sync manually by navigating to the <Btn>Semantic Layer
 Sync</Btn> tab on the <Btn>BI Integrations</Btn> page and clicking <Btn>Start
-Sync</Btn> next to a relevant sync.
+Sync</Btn> next to a relevant sync. This is convenient for working in the
+[development mode][ref-dev-mode].
 
 <Screenshot src="https://ucarecdn.com/e48cef02-cc89-466d-a293-11a04aacb116/" />
-
-During the sync, Cube will either create from scratch or update a database in
-the corresponding BI tool and the data model associated with it. Syncing a
-branch in [development mode][ref-dev-mode] will create a separate database,
-leaving the one associated with the production branch intact.
 
 ## Viewing history
 
@@ -328,3 +402,4 @@ on, i.e., your development mode branch, shared branch, or main branch.
 [ref-config-schemaversion]: /reference/configuration/config#schemaversion
 [ref-workspace-sls]: /workspace/bi-integrations
 [ref-dev-mode]: /product/workspace/dev-mode
+[ref-auto-sus]: /product/deployment/cloud/auto-suspension

@@ -8,8 +8,8 @@ use crate::{
             cost::BestCubePlan,
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
-                members::MemberRules, old_split::OldSplitRules, order::OrderRules,
-                split::SplitRules, wrapper::WrapperRules,
+                flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
+                order::OrderRules, split::SplitRules, wrapper::WrapperRules,
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
@@ -219,6 +219,11 @@ impl Rewriter {
                 .map(|v| v.parse::<u64>().unwrap())
                 .unwrap_or(30),
         ))
+        .with_scheduler(IncrementalScheduler::default())
+        .with_hook(|runner| {
+            runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
+            Ok(())
+        })
         .with_egraph(egraph)
     }
 
@@ -510,11 +515,12 @@ impl Rewriter {
             )),
             Box::new(FilterRules::new(
                 meta_context.clone(),
+                config_obj.clone(),
                 eval_stable_functions,
             )),
-            Box::new(DateRules::new()),
+            Box::new(DateRules::new(config_obj.clone())),
             Box::new(OrderRules::new()),
-            Box::new(CommonRules::new()),
+            Box::new(CommonRules::new(config_obj.clone())),
         ];
         let mut rewrites = Vec::new();
         for r in rules {
@@ -524,6 +530,7 @@ impl Rewriter {
             rewrites.extend(
                 WrapperRules::new(meta_context.clone(), config_obj.clone()).rewrite_rules(),
             );
+            rewrites.extend(FlattenRules::new(config_obj.clone()).rewrite_rules());
         }
         if config_obj.push_down_pull_up_split() {
             rewrites
@@ -551,4 +558,42 @@ impl Rewriter {
 
 pub trait RewriteRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
+}
+
+struct IncrementalScheduler {
+    current_iter: usize,
+    current_eclasses: Vec<Id>,
+}
+
+impl Default for IncrementalScheduler {
+    fn default() -> Self {
+        Self {
+            current_iter: usize::MAX, // force an update on the first iteration
+            current_eclasses: Default::default(),
+        }
+    }
+}
+
+impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for IncrementalScheduler {
+    fn search_rewrite<'a>(
+        &mut self,
+        iteration: usize,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        rewrite: &'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    ) -> Vec<egg::SearchMatches<'a, LogicalPlanLanguage>> {
+        if iteration != self.current_iter {
+            self.current_iter = iteration;
+            self.current_eclasses.clear();
+            self.current_eclasses
+                .extend(egraph.classes().filter_map(|class| {
+                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
+                }));
+        };
+        assert_eq!(iteration, self.current_iter);
+        rewrite.searcher.search_eclasses_with_limit(
+            egraph,
+            &mut self.current_eclasses.iter().copied(),
+            usize::MAX,
+        )
+    }
 }

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/elasticsearch-driver",
   "description": "Cube.js elasticsearch database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.34.61",
+  "version": "0.35.48",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -23,14 +23,14 @@
     "driver"
   ],
   "dependencies": {
-    "@cubejs-backend/base-driver": "^0.34.61",
-    "@cubejs-backend/shared": "^0.34.60",
+    "@cubejs-backend/base-driver": "^0.35.48",
+    "@cubejs-backend/shared": "^0.35.43",
     "@elastic/elasticsearch": "7.12.0",
     "sqlstring": "^2.3.1"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.34.25",
+    "@cubejs-backend/linter": "^0.35.0",
     "@types/jest": "^27",
     "jest": "^27",
     "testcontainers": "^8.12"

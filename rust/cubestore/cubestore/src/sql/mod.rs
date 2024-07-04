@@ -1263,6 +1263,11 @@ fn parse_hyper_log_log<'a>(
             is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
         }
+        HllFlavour::DataSketches => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
+            Ok(bytes)
+        }
     }
 }
 
@@ -1653,12 +1658,12 @@ mod tests {
     use crate::metastore::job::JobType;
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
+    use cuberockstore::rocksdb::{Options, DB};
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use rocksdb::{Options, DB};
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
@@ -1690,7 +1695,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1738,6 +1743,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -1766,7 +1772,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1814,6 +1820,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -1872,7 +1879,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1920,6 +1927,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -4280,6 +4288,45 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
+            })
+            .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[tokio::test]
+    async fn total_count_over_single_row() {
+        Config::test("total_count_over_single_row")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE test.test (idd int, value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.test (idd, value) values \
+                            (1, 10)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 sum(value) as s
+                                 from test.test
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
             })
             .await;
 

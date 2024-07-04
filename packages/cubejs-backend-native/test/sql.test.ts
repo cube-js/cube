@@ -1,13 +1,19 @@
-import mysql from 'mysql2/promise';
+import { Client } from 'pg';
+import { isCI } from '@cubejs-backend/shared';
+import { Writable } from 'stream';
 
 import * as native from '../js';
 import metaFixture from './meta';
 import { FakeRowStream } from './response-fake';
 
 const logger = jest.fn(({ event }) => {
-  if (!event.error.includes('load - strange response, success which contains error')) {
+  if (
+    !event.error.includes(
+      'load - strange response, success which contains error'
+    )
+  ) {
     expect(event.apiType).toEqual('sql');
-    expect(event.protocol).toEqual('mysql');
+    expect(event.protocol).toEqual('postgres');
   }
   console.log(event);
 });
@@ -17,35 +23,32 @@ const logger = jest.fn(({ event }) => {
 //   'trace',
 // );
 
-describe('SQLInterface', () => {
-  jest.setTimeout(60 * 1000);
-
-  it('SHOW FULL TABLES FROM `db`', async () => {
-    const load = jest.fn(async ({ request, session, query }) => {
+function interfaceMethods() {
+  return {
+    load: jest.fn(async ({ request, session, query }) => {
       console.log('[js] load', {
         request,
         session,
-        query
+        query,
       });
 
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' }
+        securityContext: { foo: 'bar' },
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
+    }),
+    sqlApiLoad: jest.fn(async ({ request, session, query, streaming }) => {
       console.log('[js] load', {
         request,
         session,
         query,
-        streaming
+        streaming,
       });
 
       if (streaming) {
@@ -57,56 +60,39 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' }
+        securityContext: { foo: 'bar' },
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const sql = jest.fn(async ({ request, session, query }) => {
+    }),
+    sql: jest.fn(async ({ request, session, query }) => {
       console.log('[js] sql', {
         request,
         session,
-        query
+        query,
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to MySQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const stream = jest.fn(async ({ request, session, query }) => {
+    }),
+    stream: jest.fn(async ({ request, session, query }) => {
       console.log('[js] stream', {
         request,
         session,
-        query
+        query,
       });
 
       return {
         stream: new FakeRowStream(query),
       };
-    });
-
-    const meta = jest.fn(async ({ request, session }) => {
-      console.log('[js] meta', {
-        request,
-        session,
-      });
-
-      expect(session).toEqual({
-        user: expect.toBeTypeOrNull(String),
-        superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' },
-      });
-
-      return metaFixture;
-    });
-
-    const sqlGenerators = jest.fn(async ({ request, session }) => {
+    }),
+    meta: jest.fn(async () => metaFixture),
+    sqlGenerators: jest.fn(async ({ request, session }) => {
       console.log('[js] sqlGenerators', {
         request,
         session,
@@ -116,9 +102,8 @@ describe('SQLInterface', () => {
         cubeNameToDataSource: {},
         dataSourceToSqlGenerator: {},
       };
-    });
-
-    const checkAuth = jest.fn(async ({ request, user }) => {
+    }),
+    checkAuth: jest.fn(async ({ request, user }) => {
       console.log('[js] checkAuth', {
         request,
         user,
@@ -141,40 +126,58 @@ describe('SQLInterface', () => {
       }
 
       throw new Error('Please specify user');
-    });
+    }),
+    logLoadEvent: ({
+      event,
+      properties,
+    }: {
+      event: string;
+      properties: any;
+    }) => {
+      console.log(
+        `Load event: ${JSON.stringify({ type: event, ...properties })}`
+      );
+    },
+  };
+}
 
-    const logLoadEvent = ({ event, properties }: { event: string, properties: any }) => {
-      console.log(`Load event: ${JSON.stringify({ type: event, ...properties })}`);
-    };
+describe('SQLInterface', () => {
+  jest.setTimeout(60 * 1000);
+
+  it('SHOW FULL TABLES FROM `db`', async () => {
+    const methods = interfaceMethods();
+    const { checkAuth, meta } = methods;
 
     const instance = await native.registerInterface({
       // nonce: '12345678910111213141516'.substring(0, 20),
       port: 4545,
-      checkAuth,
-      load,
-      sqlApiLoad,
-      sql,
-      meta,
-      stream,
-      logLoadEvent,
-      sqlGenerators,
+      pgPort: 5555,
+      ...methods,
       canSwitchUserForSession: (_payload) => true,
     });
     console.log(instance);
 
     try {
-      const testConnectionFailed = async (/** input */ { user, password }: { user?: string, password?: string }) => {
+      const testConnectionFailed = async (
+        /** input */ { user, password }: { user?: string; password?: string }
+      ) => {
+        const client = new Client({
+          host: '127.0.0.1',
+          database: 'test',
+          port: 5555,
+          ssl: false,
+          user,
+          password,
+        });
+
         try {
-          await mysql.createConnection({
-            host: '127.0.0.1',
-            port: 4545,
-            user,
-            password,
-          });
+          await client.connect();
 
           throw new Error('must throw error');
         } catch (e: any) {
-          expect(e.message).toContain('Incorrect user name or password');
+          expect(e.message).toContain(
+            'password authentication failed for user'
+          );
         }
 
         console.log(checkAuth.mock.calls);
@@ -185,13 +188,14 @@ describe('SQLInterface', () => {
             meta: null,
           },
           user: user || null,
-          password: null,
+          password:
+            password || (isCI() && process.platform === 'win32' ? 'root' : ''),
         });
       };
 
       await testConnectionFailed({
-        user: undefined,
-        password: undefined
+        user: 'random user',
+        password: undefined,
       });
       checkAuth.mockClear();
 
@@ -203,29 +207,33 @@ describe('SQLInterface', () => {
 
       await testConnectionFailed({
         user: 'allowed_user',
-        password: 'wrong_password'
+        password: 'wrong_password',
       });
       checkAuth.mockClear();
 
-      const connection = await mysql.createConnection({
+      const connection = new Client({
         host: '127.0.0.1',
-        port: 4545,
+        database: 'test',
+        port: 5555,
         user: 'allowed_user',
-        password: 'password_for_allowed_user'
+        password: 'password_for_allowed_user',
       });
+      await connection.connect();
 
       {
-        const [result] = await connection.query('SHOW FULL TABLES FROM `db`');
+        const result = await connection.query(
+          'SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = \'public\' ORDER BY table_name DESC'
+        );
         console.log(result);
 
-        expect(result).toEqual([
+        expect(result.rows).toEqual([
           {
-            Tables_in_db: 'KibanaSampleDataEcommerce',
-            Table_type: 'BASE TABLE',
+            table_name: 'Logs',
+            table_type: 'BASE TABLE',
           },
           {
-            Tables_in_db: 'Logs',
-            Table_type: 'BASE TABLE',
+            table_name: 'KibanaSampleDataEcommerce',
+            table_type: 'BASE TABLE',
           },
         ]);
       }
@@ -237,9 +245,10 @@ describe('SQLInterface', () => {
           meta: null,
         },
         user: 'allowed_user',
-        password: null,
+        password: 'password_for_allowed_user',
       });
 
+      // @ts-ignore
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
@@ -250,39 +259,99 @@ describe('SQLInterface', () => {
           superuser: false,
           securityContext: { foo: 'bar' },
         },
-        onlyCompilerId: true
+        onlyCompilerId: true,
       });
 
       try {
         // limit is used to router query to load method instead of stream
-        await connection.query('select * from KibanaSampleDataEcommerce LIMIT 1000');
+        await connection.query(
+          'select * from KibanaSampleDataEcommerce LIMIT 1000'
+        );
 
         throw new Error('Error was not passed from transport to the client');
       } catch (e: any) {
-        expect(e.sqlState).toEqual('HY000');
-        expect(e.sqlMessage).toContain('This error should be passed back to MySQL client');
+        expect(e.code).toEqual('XX000');
+        expect(e.message).toContain(
+          'This error should be passed back to PostgreSQL client'
+        );
       }
 
       if (process.env.CUBESQL_STREAM_MODE === 'true') {
-        const [result, _columns] = (await connection.query({
-          sql: 'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001',
-          rowsAsArray: false,
-        })) as any;
-        expect(result.length).toEqual(50001);
-        expect(result[0].id).toEqual(0);
-        expect(result[50000].id).toEqual(50000);
+        const result = await connection.query(
+          'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001'
+        );
+        expect(result.rows.length).toEqual(50001);
+        expect(result.rows[0].id).toEqual(0);
+        expect(result.rows[50000].id).toEqual(50000);
       }
 
       {
-        const [result] = await connection.query('select CAST(\'2020-12-25 22:48:48.000\' AS timestamp)');
+        const result = await connection.query(
+          'SELECT CAST(\'2020-12-25 22:48:48.000\' AS timestamp) as column1'
+        );
         console.log(result);
 
-        expect(result).toEqual([{ 'CAST(Utf8("2020-12-25 22:48:48.000") AS Timestamp(Nanosecond, None))': '2020-12-25T22:48:48.000' }]);
+        expect(result.rows).toEqual([
+          { column1: new Date('2020-12-25T22:48:48.000Z') },
+        ]);
       }
 
-      connection.destroy();
+      await connection.end();
     } finally {
       await native.shutdownInterface(instance);
+    }
+  });
+
+  it('streams cube sql over http', async () => {
+    if (process.env.CUBESQL_STREAM_MODE === 'true') {
+      const instance = await native.registerInterface({
+        port: 4545,
+        pgPort: 5555,
+        ...interfaceMethods(),
+        canSwitchUserForSession: (_payload) => true,
+      });
+
+      let buf = '';
+      let rows = 0;
+      const write = jest.fn((chunk, _, callback) => {
+        const lines = (buf + chunk.toString('utf-8')).split('\n');
+        buf = lines.pop() || '';
+
+        rows = lines
+          .filter((it) => it.trim().length)
+          .map((it) => {
+            const json = JSON.parse(it);
+            expect(json.error).toBeUndefined();
+
+            return json.data?.length || 0;
+          })
+          .reduce((a, b) => a + b, rows);
+
+        callback();
+      });
+
+      if (buf.length > 0) {
+        rows += JSON.parse(buf).data.length;
+      }
+
+      const cubeSqlStream = new Writable({
+        write,
+      });
+
+      const onDrain = jest.fn();
+      cubeSqlStream.on('drain', onDrain);
+
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
+        cubeSqlStream
+      );
+
+      expect(rows).toBe(100000);
+
+      await native.shutdownInterface(instance);
+    } else {
+      expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
     }
   });
 });

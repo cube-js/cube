@@ -10,6 +10,7 @@ use crate::{
         transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
         LiteralExprValue, LogicalPlanLanguage,
     },
+    config::ConfigObj,
     var, var_iter,
 };
 use datafusion::{
@@ -18,9 +19,11 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
-pub struct DateRules {}
+pub struct DateRules {
+    config_obj: Arc<dyn ConfigObj>,
+}
 
 impl RewriteRules for DateRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -38,7 +41,7 @@ impl RewriteRules for DateRules {
                             ],
                         ),
                         "+",
-                        fun_expr(
+                        self.fun_expr(
                             "ToMonthInterval",
                             vec![
                                 udf_expr("quarter", vec![column_expr("?column")]),
@@ -49,7 +52,7 @@ impl RewriteRules for DateRules {
                     "-",
                     literal_expr("?interval"),
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("quarter"), column_expr("?column")],
                 ),
@@ -63,7 +66,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr(
                                         "dayofweek",
@@ -80,7 +83,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("week"), column_expr("?column")],
                 ),
@@ -93,7 +96,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr("dayofmonth", vec![column_expr("?column")]),
                                     "-",
@@ -104,7 +107,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("month"), column_expr("?column")],
                 ),
@@ -117,7 +120,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr("dayofyear", vec![column_expr("?column")]),
                                     "-",
@@ -128,7 +131,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("year"), column_expr("?column")],
                 ),
@@ -139,13 +142,13 @@ impl RewriteRules for DateRules {
                     "date_add",
                     vec![
                         udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
+                        self.to_day_interval_expr(
                             udf_expr("hour", vec![column_expr("?column")]),
                             literal_string("hour"),
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("hour"), column_expr("?column")],
                 ),
@@ -156,7 +159,7 @@ impl RewriteRules for DateRules {
                     "date_add",
                     vec![
                         udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
+                        self.to_day_interval_expr(
                             binary_expr(
                                 binary_expr(
                                     udf_expr("hour", vec![column_expr("?column")]),
@@ -170,7 +173,7 @@ impl RewriteRules for DateRules {
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("minute"), column_expr("?column")],
                 ),
@@ -178,7 +181,7 @@ impl RewriteRules for DateRules {
             rewrite(
                 "date-to-date-trunc",
                 udf_expr("date", vec![column_expr("?column")]),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("day"), column_expr("?column")],
                 ),
@@ -186,7 +189,7 @@ impl RewriteRules for DateRules {
             // TODO
             transforming_rewrite_with_root(
                 "cast-in-date-trunc",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         literal_expr("?granularity"),
@@ -194,7 +197,7 @@ impl RewriteRules for DateRules {
                     ],
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
@@ -204,12 +207,12 @@ impl RewriteRules for DateRules {
             ),
             transforming_rewrite_with_root(
                 "cast-in-date-trunc-double",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         literal_expr("?granularity"),
                         cast_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![
                                     literal_expr("?granularity"),
@@ -221,11 +224,11 @@ impl RewriteRules for DateRules {
                     ],
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?expr".to_string()],
                             ),
@@ -238,20 +241,26 @@ impl RewriteRules for DateRules {
             transforming_rewrite_with_root(
                 "current-timestamp-to-now",
                 udf_expr("current_timestamp", Vec::<String>::new()),
-                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                alias_expr(
+                    self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    "?alias",
+                ),
                 transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "localtimestamp-to-now",
                 udf_expr("localtimestamp", Vec::<String>::new()),
-                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                alias_expr(
+                    self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    "?alias",
+                ),
                 transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "tableau-week",
                 binary_expr(
                     alias_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec!["?granularity".to_string(), column_expr("?column")],
                         ),
@@ -259,7 +268,7 @@ impl RewriteRules for DateRules {
                     ),
                     "+",
                     binary_expr(
-                        negative_expr(fun_expr(
+                        negative_expr(self.fun_expr(
                             "DatePart",
                             vec![literal_string("DOW"), column_expr("?column")],
                         )),
@@ -269,7 +278,7 @@ impl RewriteRules for DateRules {
                     ),
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("week"), column_expr("?column")],
                     ),
@@ -280,77 +289,17 @@ impl RewriteRules for DateRules {
             rewrite(
                 "metabase-interval-date-range",
                 binary_expr(
-                    cast_expr(fun_expr("Now", Vec::<String>::new()), "?data_type"),
+                    cast_expr(self.fun_expr("Now", Vec::<String>::new()), "?data_type"),
                     "+",
                     literal_expr("?interval"),
                 ),
                 udf_expr(
                     "date_add",
                     vec![
-                        fun_expr("Now", Vec::<String>::new()),
+                        self.fun_expr("Now", Vec::<String>::new()),
                         literal_expr("?interval"),
                     ],
                 ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-add-right",
-                binary_expr("?left", "+", "?interval"),
-                alias_expr(udf_expr("date_add", vec!["?left", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-add-left",
-                binary_expr("?interval", "+", "?right"),
-                alias_expr(udf_expr("date_add", vec!["?right", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-sub",
-                binary_expr("?left", "-", "?interval"),
-                alias_expr(udf_expr("date_sub", vec!["?left", "?interval"]), "?alias"),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-mul-right",
-                binary_expr("?left", "*", "?interval"),
-                alias_expr(
-                    udf_expr("interval_mul", vec!["?interval", "?left"]),
-                    "?alias",
-                ),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-mul-left",
-                binary_expr("?interval", "*", "?right"),
-                alias_expr(
-                    udf_expr("interval_mul", vec!["?interval", "?right"]),
-                    "?alias",
-                ),
-                self.transform_interval_binary_expr_with_chain_transform(
-                    "?interval",
-                    transform_original_expr_to_alias("?alias"),
-                ),
-            ),
-            transforming_rewrite_with_root(
-                "binary-expr-interval-neg",
-                negative_expr("?interval"),
-                udf_expr(
-                    "interval_mul",
-                    vec!["?interval".to_string(), literal_int(-1)],
-                ),
-                self.transform_interval_binary_expr("?interval"),
             ),
             transforming_rewrite_with_root(
                 "redshift-dateadd-to-interval-cast-unwrap",
@@ -438,17 +387,17 @@ impl RewriteRules for DateRules {
             ),
             rewrite(
                 "datastudio-dates",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         "?granularity".to_string(),
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec![literal_string("SECOND"), column_expr("?column")],
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec!["?granularity".to_string(), column_expr("?column")],
                 ),
@@ -458,45 +407,16 @@ impl RewriteRules for DateRules {
 }
 
 impl DateRules {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self { config_obj }
     }
 
-    fn transform_interval_binary_expr(
-        &self,
-        interval_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
-        self.transform_interval_binary_expr_with_chain_transform(interval_var, |_, _, _| true)
+    fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
+        fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
     }
 
-    fn transform_interval_binary_expr_with_chain_transform<T>(
-        &self,
-        interval_var: &'static str,
-        chain_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
-    {
-        let interval_var = var!(interval_var);
-        move |egraph, root, subst| {
-            if let Some(ConstantFolding::Scalar(interval)) =
-                &egraph[subst[interval_var]].data.constant
-            {
-                match interval {
-                    ScalarValue::IntervalYearMonth(_)
-                    | ScalarValue::IntervalDayTime(_)
-                    | ScalarValue::IntervalMonthDayNano(_) => {
-                        if chain_transform_fn(egraph, root, subst) {
-                            return true;
-                        }
-                    }
-                    _ => (),
-                }
-            }
-
-            false
-        }
+    fn to_day_interval_expr<D: Display>(&self, period: D, unit: D) -> String {
+        to_day_interval_expr(period, unit, self.config_obj.push_down_pull_up_split())
     }
 
     fn transform_interval_parts_to_interval(

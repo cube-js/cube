@@ -4,13 +4,13 @@ FROM rustembedded/cross:x86_64-unknown-linux-musl
 
 RUN apt-get update \
     && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl musl-tools libc6-dev apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-14 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-18 main"  \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-14 clang-14 libclang-14-dev clang-14 make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
@@ -21,7 +21,7 @@ RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm &
 RUN mkdir /musl
 
 # https://www.openssl.org/source/old/1.1.1/
-ARG OPENSSL_VERSION=1.1.1q
+ARG OPENSSL_VERSION=1.1.1w
 RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
     cd openssl-${OPENSSL_VERSION} && \
     CC="musl-gcc -fPIE -pie" ./Configure no-shared no-async --prefix=/musl --openssldir=/musl/ssl linux-x86_64 && \

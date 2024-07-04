@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:16.20.2-bullseye-slim AS base
+FROM node:18.20.3-bullseye-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -15,13 +15,6 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
        cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip mc \
     && rm -rf /var/lib/apt/lists/*
-
-ENV RUSTUP_HOME=/usr/local/rustup
-ENV CARGO_HOME=/usr/local/cargo
-ENV PATH=/usr/local/cargo/bin:$PATH
-
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
@@ -74,14 +67,16 @@ COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/pa
 COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
 COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
 COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
-COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
-COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
-COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
-COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
-COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
-COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
-COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
-COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
+
+# We dont need client libraries
+#COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
+#COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
+#COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
+#COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
+#COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
+#COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
+#COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
+#COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
 RUN yarn policies set-version v1.22.19
 RUN yarn config set network-timeout 120000 -g
@@ -150,14 +145,16 @@ COPY packages/cubejs-ksql-driver/ packages/cubejs-ksql-driver/
 COPY packages/cubejs-dbt-schema-extension/ packages/cubejs-dbt-schema-extension/
 COPY packages/cubejs-jdbc-driver/ packages/cubejs-jdbc-driver/
 COPY packages/cubejs-databricks-jdbc-driver/ packages/cubejs-databricks-jdbc-driver/
-COPY packages/cubejs-templates/ packages/cubejs-templates/
-COPY packages/cubejs-client-core/ packages/cubejs-client-core/
-COPY packages/cubejs-client-react/ packages/cubejs-client-react/
-COPY packages/cubejs-client-vue/ packages/cubejs-client-vue/
-COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
-COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
-COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
-COPY packages/cubejs-playground/ packages/cubejs-playground/
+
+# We dont need client libraries
+#COPY packages/cubejs-templates/ packages/cubejs-templates/
+#COPY packages/cubejs-client-core/ packages/cubejs-client-core/
+#COPY packages/cubejs-client-react/ packages/cubejs-client-react/
+#COPY packages/cubejs-client-vue/ packages/cubejs-client-vue/
+#COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
+#COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
+#COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
+#COPY packages/cubejs-playground/ packages/cubejs-playground/
 
 # As we don't need any UI to test drivers, it's enough to transpile ts only.
 RUN yarn lerna run tsc
@@ -175,16 +172,6 @@ RUN apt-get update \
 
 COPY --from=build /cubejs .
 COPY --from=prod_dependencies /cubejs .
-
-# /cubejs/packages/cubejs-docker/conf/DatabricksJDBC42.jar
-# /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42.jar
-# RUN mkdir /cubejs/packages/cubejs-docker/conf
-# RUN mkdir /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
-# RUN curl -H "Accept: application/zip" \
-#     https://databricks-bi-artifacts.s3.us-east-2.amazonaws.com/simbaspark-drivers/jdbc/2.6.29/DatabricksJDBC42-2.6.29.1051.zip \
-#     -o /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip
-# RUN unzip /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download/DatabricksJDBC42-2.6.29.1051.zip \
-#     -d /cubejs/packages/cubejs-databricks-jdbc-driver/dist/download
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 

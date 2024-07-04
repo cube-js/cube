@@ -112,8 +112,9 @@ describe('API Gateway', () => {
       .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
       .expect(400);
 
-    expect(res.body && res.body.error).toStrictEqual(
-      'Unable to decode query param as JSON, error: Unexpected token N in JSON at position 0'
+    expect(res.body && res.body.error).toContain(
+      // different JSON.parse errors between Node.js versions
+      'Unable to decode query param as JSON, error: Unexpected token'
     );
   });
 
@@ -283,7 +284,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 10000,
               limit: 10000,
@@ -296,7 +296,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 10000,
             limit: 10000,
@@ -344,7 +343,6 @@ describe('API Gateway', () => {
           {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [{
               member: 'Foo.bar',
               operator: 'gte',
@@ -420,7 +418,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 2,
               limit: 2,
@@ -433,7 +430,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 2,
             limit: 2,
@@ -735,7 +731,7 @@ describe('API Gateway', () => {
       const res = await req;
       expect(res.body).toMatchObject(successResult);
     };
-       
+
     const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,

@@ -47,7 +47,6 @@ const dbTypes = Joi.alternatives().try(
 
 const schemaOptions = Joi.object().keys({
   // server CreateOptions
-  initApp: Joi.func(),
   webSockets: Joi.boolean(),
   http: Joi.object().strict(true).keys({
     cors: corsOptions,

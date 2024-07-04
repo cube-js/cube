@@ -1,12 +1,10 @@
-import Moment from 'moment-timezone';
-import { extendMoment } from 'moment-range';
+import moment from 'moment-timezone';
 import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
-import type { BaseQuery } from './BaseQuery';
-
-const moment = extendMoment(Moment as any);
+import { BaseQuery } from './BaseQuery';
+import { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
 
 export class BaseTimeDimension extends BaseFilter {
   public readonly dateRange: any;
@@ -14,6 +12,8 @@ export class BaseTimeDimension extends BaseFilter {
   public readonly granularity: string;
 
   public readonly boundaryDateRange: any;
+
+  public readonly shiftInterval: string;
 
   public constructor(
     query: BaseQuery,
@@ -27,6 +27,7 @@ export class BaseTimeDimension extends BaseFilter {
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
     this.boundaryDateRange = timeDimension.boundaryDateRange;
+    this.shiftInterval = timeDimension.shiftInterval;
   }
 
   public selectColumns() {
@@ -77,6 +78,10 @@ export class BaseTimeDimension extends BaseFilter {
   public dimensionSql() {
     const context = this.query.safeEvaluateSymbolContext();
     const granularity = context.granularityOverride || this.granularity;
+    const path = granularity ? `${this.expressionPath()}.${granularity}` : this.expressionPath();
+    if ((context.renderedReference || {})[path]) {
+      return context.renderedReference[path];
+    }
 
     if (context.rollupQuery || context.wrapQuery) {
       if (context.rollupGranularity === this.granularity) {
@@ -88,6 +93,13 @@ export class BaseTimeDimension extends BaseFilter {
       return this.convertedToTz();
     }
     return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+  }
+
+  public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
+    if (this.shiftInterval) {
+      return { ...super.dimensionDefinition(), shiftInterval: this.shiftInterval };
+    }
+    return super.dimensionDefinition();
   }
 
   public convertTzForRawTimeDimensionIfNeeded(sql) {
@@ -216,7 +228,9 @@ export class BaseTimeDimension extends BaseFilter {
       ];
     }
 
-    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()]);
+    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()], {
+      timestampPrecision: this.query.timestampPrecision(),
+    });
   }
 
   public wildcardRange() {

@@ -468,7 +468,7 @@ export class OptsHandler {
         (this.isDevMode()
           ? 'dev_pre_aggregations'
           : 'prod_pre_aggregations'),
-      schemaPath: process.env.CUBEJS_SCHEMA_PATH || 'schema',
+      schemaPath: getEnv('schemaPath'),
       scheduledRefreshTimer: getEnv('refreshWorkerMode'),
       sqlCache: true,
       livePreview: getEnv('livePreview'),

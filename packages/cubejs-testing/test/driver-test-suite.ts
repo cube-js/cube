@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 // eslint-disable-next-line import/no-extraneous-dependencies
-import cubejs, { CubejsApi } from '@cubejs-client/core';
+import cubejs, { CubeApi } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
 import WebSocketTransport from '@cubejs-client/ws-transport';
@@ -36,10 +36,12 @@ export function executeTestSuite({ type, tests, config = {} }: TestSuite) {
     CUBEJS_ROLLUP_ONLY: 'false',
     ...config,
   };
+
   describe(`${type} driver tests`, () => {
     jest.setTimeout(60 * 5 * 1000);
+
     let box: BirdBox;
-    let client: CubejsApi;
+    let client: CubeApi;
     let transport: WebSocketTransport;
 
     beforeAll(async () => {

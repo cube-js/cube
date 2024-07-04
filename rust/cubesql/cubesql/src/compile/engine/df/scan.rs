@@ -10,8 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int32Builder,
-            Int64Builder, NullArray, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -42,8 +42,11 @@ use crate::{
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
-        array::{TimestampMillisecondBuilder, TimestampNanosecondBuilder},
-        datatypes::TimeUnit,
+        array::{
+            IntervalDayTimeBuilder, IntervalMonthDayNanoBuilder, IntervalYearMonthBuilder,
+            TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+        },
+        datatypes::{IntervalUnit, TimeUnit},
     },
     execution::context::TaskContext,
     logical_plan::JoinType,
@@ -146,6 +149,7 @@ pub struct WrappedSelectNode {
     pub schema: DFSchemaRef,
     pub select_type: WrappedSelectType,
     pub projection_expr: Vec<Expr>,
+    pub subqueries: Vec<Arc<LogicalPlan>>,
     pub group_expr: Vec<Expr>,
     pub aggr_expr: Vec<Expr>,
     pub window_expr: Vec<Expr>,
@@ -157,6 +161,7 @@ pub struct WrappedSelectNode {
     pub offset: Option<usize>,
     pub order_expr: Vec<Expr>,
     pub alias: Option<String>,
+    pub distinct: bool,
     pub ungrouped: bool,
 }
 
@@ -165,6 +170,7 @@ impl WrappedSelectNode {
         schema: DFSchemaRef,
         select_type: WrappedSelectType,
         projection_expr: Vec<Expr>,
+        subqueries: Vec<Arc<LogicalPlan>>,
         group_expr: Vec<Expr>,
         aggr_expr: Vec<Expr>,
         window_expr: Vec<Expr>,
@@ -176,12 +182,14 @@ impl WrappedSelectNode {
         offset: Option<usize>,
         order_expr: Vec<Expr>,
         alias: Option<String>,
+        distinct: bool,
         ungrouped: bool,
     ) -> Self {
         Self {
             schema,
             select_type,
             projection_expr,
+            subqueries,
             group_expr,
             aggr_expr,
             window_expr,
@@ -193,6 +201,7 @@ impl WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            distinct,
             ungrouped,
         }
     }
@@ -229,7 +238,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
     fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}",
+            "WrappedSelect: select_type={:?}, projection_expr={:?}, group_expr={:?}, aggregate_expr={:?}, window_expr={:?}, from={:?}, joins={:?}, filter_expr={:?}, having_expr={:?}, limit={:?}, offset={:?}, order_expr={:?}, alias={:?}, distinct={:?}",
             self.select_type,
             self.projection_expr,
             self.group_expr,
@@ -243,6 +252,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.offset,
             self.order_expr,
             self.alias,
+            self.distinct,
         )
     }
 
@@ -316,6 +326,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             self.schema.clone(),
             self.select_type.clone(),
             projection_expr,
+            self.subqueries.clone(),
             group_expr,
             aggregate_expr,
             window_expr,
@@ -332,6 +343,7 @@ impl UserDefinedLogicalNode for WrappedSelectNode {
             offset,
             order_expr,
             alias,
+            self.distinct,
             self.ungrouped,
         ))
     }
@@ -941,6 +953,31 @@ pub fn transform_response<V: ValueObject>(
                     }
                 )
             }
+            DataType::Int16 => {
+                build_column!(
+                    DataType::Int16,
+                    Int16Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
+                        (FieldValue::String(s), builder) => match s.parse::<i16>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as i16: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Int16(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
             DataType::Int32 => {
                 build_column!(
                     DataType::Int32,
@@ -988,6 +1025,31 @@ pub fn transform_response<V: ValueObject>(
                     },
                     {
                         (ScalarValue::Int64(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Float32 => {
+                build_column!(
+                    DataType::Float32,
+                    Float32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as f32: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }
@@ -1047,10 +1109,15 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%fZ"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                                .or_else(|_| {
+                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                        date.and_hms_opt(0, 0, 0).unwrap()
+                                    })
+                                })
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",
@@ -1078,10 +1145,15 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S.%f"))
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
                                 .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S.%fZ"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                                .or_else(|_| {
+                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                        date.and_hms_opt(0, 0, 0).unwrap()
+                                    })
+                                })
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse timestamp: '{}': {}",
@@ -1186,6 +1258,48 @@ pub fn transform_response<V: ValueObject>(
                                 builder.append_null()?;
                             }
                         },
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    IntervalYearMonthBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::DayTime),
+                    IntervalDayTimeBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNanoBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }

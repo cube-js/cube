@@ -2,7 +2,7 @@ module.exports = {
   "aws-athena": "AWS Athena",
   "aws-redshift": "AWS Redshift",
   "clickhouse": "ClickHouse",
-  "databricks-jdbc": "Databricks (JDBC)",
+  "databricks-jdbc": "Databricks",
   "druid": "Druid",
   "duckdb": "DuckDB / MotherDuck",
   "elasticsearch": "Elasticsearch",
@@ -19,6 +19,8 @@ module.exports = {
   "postgres": "Postgres",
   "presto": "Presto",
   "questdb": "QuestDB",
+  "risingwave": "RisingWave",
+  "singlestore": "SingleStore",
   "snowflake": "Snowflake",
   "sqlite": "SQLite",
   "trino": "Trino"

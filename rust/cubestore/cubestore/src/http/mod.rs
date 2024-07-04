@@ -871,6 +871,7 @@ mod tests {
     use flatbuffers::{FlatBufferBuilder, ForwardsUOffset, Vector, WIPOffset};
     use futures_util::{SinkExt, StreamExt};
     use indoc::indoc;
+    use log::trace;
     use std::path::Path;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
@@ -1148,6 +1149,7 @@ mod tests {
                     .next()
                     .unwrap()
                 {
+                    trace!("Message: {}", v.as_str());
                     assert_eq!(v.as_str(), counter);
                 } else {
                     panic!("String expected");
@@ -1173,6 +1175,7 @@ mod tests {
             // Orphaned complete message
             async move {
                 // takes message 1
+                tokio::time::sleep(Duration::from_millis(300)).await;
                 let mut socket = connect_and_send(1, Some("bar".to_string())).await;
                 socket.close(None).await.unwrap();
             },

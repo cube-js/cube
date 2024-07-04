@@ -61,7 +61,7 @@ const dbSchema = {
         attributes: [],
       },
       {
-        name: 'accountId',
+        name: 'account_id',
         type: 'integer',
         attributes: [],
       },
@@ -83,7 +83,7 @@ const dbSchema = {
         attributes: [],
       },
       {
-        name: 'failureCount',
+        name: 'failure_count',
         type: 'integer',
         attributes: [],
       },
@@ -110,7 +110,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Customers: {
-      sql: \`\${CUBE}.customerId = \${Customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -148,7 +148,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Accounts: {
-      sql: \`\${CUBE}.accountId = \${Accounts}.id\`,
+      sql: \`\${CUBE}.account_id = \${Accounts}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -216,8 +216,8 @@ describe('ScaffoldingTemplate', () => {
       type: \`count\`
     },
     
-    failurecount: {
-      sql: \`failureCount\`,
+    failureCount: {
+      sql: \`failure_count\`,
       type: \`sum\`
     }
   },
@@ -251,7 +251,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     customers: {
-      sql: \`\${CUBE}.customerId = \${customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${customers}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -289,7 +289,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     accounts: {
-      sql: \`\${CUBE}.accountId = \${accounts}.id\`,
+      sql: \`\${CUBE}.account_id = \${accounts}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -357,8 +357,8 @@ describe('ScaffoldingTemplate', () => {
       type: \`count\`
     },
     
-    failurecount: {
-      sql: \`failureCount\`,
+    failure_count: {
+      sql: \`failure_count\`,
       type: \`sum\`
     }
   },
@@ -407,7 +407,7 @@ describe('ScaffoldingTemplate', () => {
           {
             fileName: 'some_orders.js',
             content: `cube(\`some_orders\`, {
-  sql_table: \`public.someOrders\`,
+  sql_table: \`public.\\\`someOrders\\\`\`,
   
   joins: {
     
@@ -421,7 +421,7 @@ describe('ScaffoldingTemplate', () => {
     },
     
     somedimension: {
-      sql: \`someDimension\`,
+      sql: \`\${CUBE}.\\\`someDimension\\\`\`,
       type: \`string\`
     }
   },
@@ -460,7 +460,6 @@ describe('ScaffoldingTemplate', () => {
               },
               {
                 name: 'some.dimension.inside',
-                nestedName: ['some', 'dimension', 'inside'],
                 type: 'string',
                 attributes: [],
               },
@@ -528,7 +527,6 @@ describe('ScaffoldingTemplate', () => {
               },
               {
                 name: 'some.dimension.inside',
-                nestedName: ['some', 'dimension', 'inside'],
                 type: 'string',
                 attributes: [],
               },
@@ -608,7 +606,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: customers
-        sql: "{CUBE}.customerId = {customers}.id"
+        sql: "{CUBE}.\\"customerId\\" = {customers}.id"
         relationship: many_to_one
 
     dimensions:
@@ -639,7 +637,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: accounts
-        sql: "{CUBE}.accountId = {accounts}.id"
+        sql: "{CUBE}.account_id = {accounts}.id"
         relationship: many_to_one
 
     dimensions:
@@ -692,8 +690,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:
@@ -746,8 +744,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:
@@ -801,8 +799,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:

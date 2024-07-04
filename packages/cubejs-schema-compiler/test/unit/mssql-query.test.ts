@@ -24,6 +24,12 @@ describe('MssqlQuery', () => {
       },
 
       dimensions: {
+        id: {
+          sql: 'id',
+          type: 'number',
+          primaryKey: true,
+        },
+        
         createdAt: {
           type: 'time',
           sql: 'created_at'
@@ -175,6 +181,23 @@ describe('MssqlQuery', () => {
 
       expect(/ORDER BY/.test(subQuery.sql)).toEqual(false);
       expect(queryAndParams[0]).toMatch(/ORDER BY/);
+    }));
+
+  it('should not include group by clauses if ungrouped is set to true in query',
+    () => compiler.compile().then(() => {
+      const query = new MssqlQuery(
+        { joinGraph, cubeEvaluator, compiler },
+        {
+          dimensions: ['visitors.createdAt', 'visitors.source'],
+          ungrouped: true,
+          allowUngroupedWithoutPrimaryKey: true,
+        }
+      );
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+
+      expect(/GROUP BY/.test(queryString)).toEqual(false);
     }));
 
   it('aggregating on top of sub-queries', async () => {

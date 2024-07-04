@@ -10,7 +10,7 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "6dae83cb807fca991ae8bed6cea4f725441cf84e", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "370f91fda4a7e9387dded4edaf2425c447e76fbd", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
@@ -28,7 +28,7 @@ futures = "0.3.23"
 rand = "0.8.3"
 smallvec = "1.7.0"
 byteorder = "1.3.4"
-log = "=0.4.11"
+log = "0.4.21"
 rust_decimal = { version = "1.25", features = ["c-repr", "db-postgres"]}
 postgres-types = "0.2.3"
 # Locked, because starting from 1.15 this crate switch from chrono to time
@@ -39,18 +39,16 @@ simple_logger = "=1.13.0"
 async-trait = "0.1.36"
 regex = "1.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
-msql-srv = { git = 'https://github.com/cube-js/msql-srv', rev = '76ea0132564959c41ea13f25511fbd84acd06464' }
 bincode = "1.3.1"
-chrono = "0.4.16"
+chrono = "0.4.31"
 chrono-tz = "0.6"
 mockall = "0.8.1"
 reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
 tokio-util = { version = "0.6.2", features=["compat"] }
-mysql_common = "0.26.0"
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
-egg = "0.7.1"
+egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git" }
 paste = "1.0.6"
 csv = "1.1.6"
 tracing = { version = "0.1.40", features = ["async-await"] }
@@ -68,7 +66,6 @@ bigdecimal = "0.4.2"
 [dev-dependencies]
 pretty_assertions = "1.0.0"
 insta = "1.12"
-mysql_async = "0.29"
 portpicker = "0.1.1"
 tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }

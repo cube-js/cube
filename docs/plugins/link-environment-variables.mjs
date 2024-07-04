@@ -3,10 +3,16 @@ import { visit } from "unist-util-visit";
 const isString = (value) => typeof value === "string";
 
 const isCubeEnvVar = (value) => {
+  const prefixes = [
+    "CUBEJS_",
+    "CUBESTORE_",
+    "CUBESQL_",
+  ]
+
   return (
     !value.includes("=") &&
     !value.endsWith("_*") &&
-    (value.startsWith("CUBEJS_") || value.startsWith("CUBESTORE_"))
+    prefixes.some(prefix => value.startsWith(prefix))
   );
 };
 

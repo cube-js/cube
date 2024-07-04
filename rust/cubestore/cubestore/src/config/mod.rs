@@ -43,13 +43,13 @@ use crate::telemetry::{
 };
 use crate::util::memory::{MemoryHandler, MemoryHandlerImpl};
 use crate::CubeError;
+use cuberockstore::rocksdb::{Options, DB};
 use datafusion::cube_ext;
 use datafusion::physical_plan::parquet::{LruParquetMetadataCache, NoopParquetMetadataCache};
 use futures::future::join_all;
 use log::Level;
 use log::{debug, error};
 use mockall::automock;
-use rocksdb::{Options, DB};
 use simple_logger::SimpleLogger;
 use std::fmt::Display;
 use std::future::Future;
@@ -430,6 +430,10 @@ pub trait ConfigObj: DIService {
 
     fn metastore_remote_address(&self) -> &Option<String>;
 
+    fn cachestore_log_upload_interval(&self) -> u64;
+
+    fn cachestore_log_enabled(&self) -> bool;
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig;
 
     fn cachestore_gc_loop_interval(&self) -> u64;
@@ -489,6 +493,8 @@ pub trait ConfigObj: DIService {
     fn malloc_trim_every_secs(&self) -> u64;
 
     fn query_cache_max_capacity_bytes(&self) -> u64;
+
+    fn query_queue_cache_max_capacity(&self) -> u64;
 
     fn query_cache_time_to_idle_secs(&self) -> Option<u64>;
 
@@ -581,6 +587,8 @@ pub struct ConfigObjImpl {
     pub metastore_bind_address: Option<String>,
     pub metastore_remote_address: Option<String>,
     pub metastore_rocks_store_config: RocksStoreConfig,
+    pub cachestore_log_upload_interval: u64,
+    pub cachestore_log_enabled: bool,
     pub cachestore_rocks_store_config: RocksStoreConfig,
     pub cachestore_gc_loop_interval: u64,
     pub cachestore_cache_eviction_loop_interval: u64,
@@ -610,6 +618,7 @@ pub struct ConfigObjImpl {
     pub enable_startup_warmup: bool,
     pub malloc_trim_every_secs: u64,
     pub query_cache_max_capacity_bytes: u64,
+    pub query_queue_cache_max_capacity: u64,
     pub query_cache_time_to_idle_secs: Option<u64>,
     pub metadata_cache_max_capacity_bytes: u64,
     pub metadata_cache_time_to_idle_secs: u64,
@@ -784,6 +793,14 @@ impl ConfigObj for ConfigObjImpl {
         &self.metastore_remote_address
     }
 
+    fn cachestore_log_upload_interval(&self) -> u64 {
+        self.cachestore_log_upload_interval
+    }
+
+    fn cachestore_log_enabled(&self) -> bool {
+        self.cachestore_log_enabled
+    }
+
     fn cachestore_rocksdb_config(&self) -> &RocksStoreConfig {
         &self.cachestore_rocks_store_config
     }
@@ -893,6 +910,9 @@ impl ConfigObj for ConfigObjImpl {
     }
     fn query_cache_max_capacity_bytes(&self) -> u64 {
         self.query_cache_max_capacity_bytes
+    }
+    fn query_queue_cache_max_capacity(&self) -> u64 {
+        self.query_queue_cache_max_capacity
     }
     fn query_cache_time_to_idle_secs(&self) -> Option<u64> {
         self.query_cache_time_to_idle_secs
@@ -1022,9 +1042,9 @@ fn env_bool(name: &str, default: bool) -> bool {
     env::var(name)
         .ok()
         .map(|x| match x.as_str() {
-            "0" => false,
-            "1" => true,
-            _ => panic!("expected '0' or '1' for '{}', found '{}'", name, &x),
+            "0" | "false" => false,
+            "1" | "true" => true,
+            _ => panic!("expected '0'/'1'/true/false for '{}', found '{}'", name, &x),
         })
         .unwrap_or(default)
 }
@@ -1083,7 +1103,12 @@ where
 pub fn env_parse_size(name: &str, default: usize, max: Option<usize>, min: Option<usize>) -> usize {
     let v = match env::var(name).ok() {
         None => {
-            return default;
+            if cfg!(debug_assertions) {
+                // It's needed to check that default values are correct
+                default.to_string()
+            } else {
+                return default;
+            }
         }
         Some(v) => v,
     };
@@ -1135,17 +1160,16 @@ where
 
 impl Config {
     fn calculate_cache_compaction_trigger_size(cache_max_size: usize) -> usize {
-        match cache_max_size >> 20 {
-            // TODO: Enable this limits after moving to separate CF for cache
-            // d if d < 32 => 32 * 9,
-            // d if d < 64 => 64 * 8,
-            // d if d < 128 => 128 * 7,
-            // d if d < 256 => 256 * 6,
-            d if d < 512 => 512 * 5,
+        let trigger_size = match cache_max_size >> 20 {
+            d if d < 32 => 640 << 20,
+            d if d < 64 => 1280 << 20,
+            d if d < 512 => cache_max_size * 5,
             d if d < 1024 => cache_max_size * 4,
             d if d < 4096 => cache_max_size * 3,
             _ => cache_max_size * 2,
-        }
+        };
+
+        std::cmp::max(trigger_size, 512 << 20)
     }
 
     pub fn default() -> Config {
@@ -1325,6 +1349,13 @@ impl Config {
                 }),
                 metastore_remote_address: env::var("CUBESTORE_META_ADDR").ok(),
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: env_parse_duration(
+                    "CACHESTORE_LOG_UPLOAD_INTERVAL",
+                    30,
+                    Some(60),
+                    Some(15),
+                ),
+                cachestore_log_enabled: env_bool("CUBESTORE_CACHESTORE_LOG_ENABLED", true),
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: env_parse_duration(
                     "CUBESTORE_CACHESTORE_GC_LOOP",
@@ -1418,6 +1449,10 @@ impl Config {
                     Some(16384 << 20),
                     Some(0),
                 ) as u64,
+                query_queue_cache_max_capacity: env_parse(
+                    "CUBESTORE_QUEUE_CACHE_MAX_CAPACITY",
+                    10000,
+                ),
                 query_cache_time_to_idle_secs: if query_cache_time_to_idle_secs == 0 {
                     None
                 } else {
@@ -1555,6 +1590,8 @@ impl Config {
                 metastore_bind_address: None,
                 metastore_remote_address: None,
                 metastore_rocks_store_config: RocksStoreConfig::metastore_default(),
+                cachestore_log_upload_interval: 30,
+                cachestore_log_enabled: true,
                 cachestore_rocks_store_config: RocksStoreConfig::cachestore_default(),
                 cachestore_gc_loop_interval: 30,
                 cachestore_cache_eviction_loop_interval: 60,
@@ -1585,6 +1622,7 @@ impl Config {
                 enable_startup_warmup: true,
                 malloc_trim_every_secs: 0,
                 query_cache_max_capacity_bytes: 512 << 20,
+                query_queue_cache_max_capacity: 10000,
                 query_cache_time_to_idle_secs: Some(600),
                 metadata_cache_max_capacity_bytes: 0,
                 metadata_cache_time_to_idle_secs: 1_000,
@@ -2116,6 +2154,7 @@ impl Config {
         let query_cache = Arc::new(SqlResultCache::new(
             self.config_obj.query_cache_max_capacity_bytes(),
             self.config_obj.query_cache_time_to_idle_secs(),
+            self.config_obj.query_queue_cache_max_capacity(),
         ));
 
         let query_cache_to_move = query_cache.clone();

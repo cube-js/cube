@@ -161,7 +161,8 @@ export class CompilerApi {
       aliasNameToMember: sqlGenerator.aliasNameToMember,
       rollupMatchResults: includeDebugInfo ?
         sqlGenerator.preAggregations.rollupMatchResultDescriptions() : undefined,
-      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery()
+      canUseTransformedQuery: sqlGenerator.preAggregations.canUseTransformedQuery(),
+      memberNames: sqlGenerator.collectAllMemberNames(),
     }));
 
     if (this.sqlCache) {

@@ -100,7 +100,7 @@ export default function ChartRenderer({
   queryHasMissingMembers,
   onRunButtonClick,
 }: ChartRendererProps) {
-  const { cubejsApi } = useContext(CubeContext);
+  const { cubeApi } = useContext(CubeContext);
   const [containerSize, setContainerSize] = useState('auto');
 
   useWindowSize(); // triggers the following useEffect() on window size change
@@ -151,7 +151,7 @@ export default function ChartRenderer({
   }, [framework]);
 
   const loading: boolean =
-    queryHasMissingMembers || isQueryLoading || isBuildInProgress || !cubejsApi;
+    queryHasMissingMembers || isQueryLoading || isBuildInProgress || !cubeApi;
 
   const invisible: boolean =
     !isChartRendererReady ||
@@ -238,7 +238,7 @@ export default function ChartRenderer({
       {renderExtras()}
 
       <ChartContainer invisible={invisible}>
-        {cubejsApi ? (
+        {cubeApi ? (
           <iframe
             id={`iframe-${queryId}`}
             data-testid="chart-renderer"
