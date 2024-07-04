@@ -244,20 +244,18 @@ This technique, together with multi-router Cube Store approach, allows you to ac
 
 In general, it's better to lean towards less partitions, as long as you are satisfied with query speed.
 
-For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in <100 milliseconds. 
+For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in less than 100 milliseconds. 
 The best way to optimize this is to start from a relatively large partition (e.g., yearly or no partition at all if data permits), 
 check what the [flame graph][ref-flame-graph] in Query History shows, then iterate as needed.
 
 For optimal pre-aggregation _build performance_, you would optimize partition size together with pre-aggregation build concurrency and build time. Smaller 
 partitions with high concurrency would incur significant overhead. For optimal build performance, having 1 Cube Store worker per partition is ideal. 
-However, Cube Store workers can handle up to 4 partitions per worker conucrrently. Since Cube Store workers max out at 16, this means you should avoid having more than 64 partitions. 
+However, Cube Store workers can handle up to 4 partitions per worker conucrrently. Since Cube Store workers often max out at 16, this means you should avoid having more than 64 partitions. 
 Any additional partitions would be queued. Keep in mind that indexes essentially multiply the number of partitions that are created, 
 so for example, if you have two indexes, you would want to avoid having more than 32 partitions to avoid queueing. 
 The best way to optimize this is to make refresh keys as infrequent as possible 
 and then use the [Build History][ref-build-history] tab to check build times, along with the [Performance Insights][ref-perf-insights] page to 
 monitor Cube Store workers load, and iterate as needed.
-
-Cube Store workers 
 
 ## Using indexes
 
