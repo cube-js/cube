@@ -160,14 +160,14 @@ cubes:
 
 #### `original_sql`
 
-As the name suggests, it persists the results of the `sql` property of the cube.
-Pre-aggregations of type `original_sql` should **only** be used when the cube's
-`sql` is a complex query (i.e. nested, window functions and/or multiple joins).
+As the name suggests, it persists the results of the `sql` property of the cube
+in the data source (rather than Cube Store). `original_sql` pre-aggregations should
+**only** be used when the cube's `sql` is a complex query (i.e., nested subqueries,
+window functions, and/or multiple joins).
 
 <WarningBox>
 
-`originalSql` pre-aggregations **must only** be used when [storing
-pre-aggregations in the source database][ref-caching-using-preaggs-internal].
+`originalSql` pre-aggregations **must only** be stored in the data source.
 While you can set `external: true` for `original_sql` pre-aggregation, this is
 not recommended or generally supported.
 
@@ -1158,10 +1158,9 @@ underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
 
-`original_sql` pre-aggregations **must only** be used when [storing
-pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-This also means that `original_sql` pre-aggregations require `readOnly: false`
-to be set on their respective database driver.
+`originalSql` pre-aggregations **must only** be stored in the data source.
+While you can set `external: true` for `original_sql` pre-aggregation, this is
+not recommended or generally supported.
 
 </WarningBox>
 
@@ -1718,8 +1717,6 @@ cubes:
   /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
 [ref-caching-preaggs-selecting-preaggs]:
   /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
-[ref-caching-using-preaggs-internal]:
-  /product/caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-downstream-superset]:
   /product/configuration/visualization-tools/superset
 [ref-config-driverfactory]: /config/#driver-factory

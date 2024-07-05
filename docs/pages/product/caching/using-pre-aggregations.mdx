@@ -678,16 +678,14 @@ This query would be optimal as well.
 
 ## Pre-aggregations storage
 
-The default pre-aggregations storage in Cube is its own purpose-built storage
-layer: Cube Store.
+Cube uses its own purpose-built pre-aggregations engine: [Cube Store][ref-cube-store].
 
-Alternatively, you can store pre-aggregations **internally** in the source
-database. To store a pre-aggregation internally, set `external: false` in
-pre-aggregation definition.
+When using Cube Store, pre-aggregation data will be ingested and stored as Parquet files
+on a [blob storage][ref-cube-store-storage]. Then, Cube Store would load that data to
+execute queries using pre-aggregations.
 
-Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `original_sql`
-pre-aggregations in Cube Store.
+However, [`original_sql`][ref-original-sql] pre-aggregations are stored in the data source
+by default. It is not recommended to store `original_sql` pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
 
@@ -1024,3 +1022,5 @@ streaming engine.
 [ref-perf-insights]: /product/workspace/performance
 [ref-build-history]: /product/workspace/pre-aggregations#build-history
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
+[ref-cube-store]: /product/caching/running-in-production#architecture
+[ref-cube-store-storage]: /product/caching/running-in-production#storage
