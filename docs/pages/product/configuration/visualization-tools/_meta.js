@@ -19,5 +19,5 @@ module.exports = {
   "streamlit": "Streamlit",
   "superset": "Superset / Preset",
   "tableau": "Tableau",
-  "thoughtspot": "Thoughtspot"
+  "thoughtspot": "ThoughtSpot"
 }
