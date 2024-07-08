@@ -71,7 +71,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Export bucket AWS account region.
      */
     awsRegion?: string,
-    
+
     /**
      * Export bucket Azure account key.
      */
@@ -119,7 +119,7 @@ export class DatabricksDriver extends JDBCDriver {
   private showSparkProtocolWarn: boolean;
 
   /**
-   * Read-only mode flag.
+   * Driver Configuration.
    */
   protected readonly config: DatabricksDriverConfiguration;
 
@@ -221,6 +221,11 @@ export class DatabricksDriver extends JDBCDriver {
       exportBucketCsvEscapeSymbol:
         getEnv('dbExportBucketCsvEscapeSymbol', { dataSource }),
     };
+    if (config.readOnly === undefined) {
+      // we can set readonly to true if there is no bucket config provided
+      config.readOnly = !config.exportBucket;
+    }
+
     super(config);
     this.config = config;
     this.showSparkProtocolWarn = showSparkProtocolWarn;
@@ -639,7 +644,7 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.queryColumnTypes(sql, params);
 
     await this.createExternalTableFromSql(tableFullName, sql, params, types);
-    
+
     return types;
   }
 
@@ -650,7 +655,7 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.tableColumnTypes(tableFullName);
 
     await this.createExternalTableFromTable(tableFullName, types);
-    
+
     return types;
   }
 
