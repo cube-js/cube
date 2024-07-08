@@ -1,0 +1,27 @@
+[package]
+name = "neonservice"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+proc-macro = true
+
+[dependencies]
+byteorder = "1.4.2"
+itertools = "0.10.0"
+Inflector = "0.11.4"
+
+[dependencies.proc-macro2]
+version = "1.0"
+
+[dependencies.quote]
+version = "1.0"
+
+[dependencies.syn]
+version = "1.0"
+features = ["full"]
+
+[dependencies.async-trait]
+version = "0.1.42"

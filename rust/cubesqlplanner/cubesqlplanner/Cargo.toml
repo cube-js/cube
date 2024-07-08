@@ -1,0 +1,21 @@
+[package]
+name = "cubesqlplanner"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "4fc9df9367b3a1be158805f763d847f6f3ae72b0", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
+itertools = "0.10.2"
+cubeclient = { path = "../../cubesql/cubeclient" }
+neonservice = { path = "../neonservice/" }
+async-trait = "0.1.36"
+serde = "1.0.115"
+serde_json = "1.0.56"
+cubenativeutils = { path = "../../cubenativeutils/" }
+[dependencies.neon]
+version = "=1"
+default-features = false
+features = ["napi-1", "napi-4", "napi-6", "futures"]

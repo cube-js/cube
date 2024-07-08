@@ -342,6 +342,12 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
 };
 
+export const buildSqlAndParams = async (cubeEvaluator: any, queryParams: any): Promise<boolean> => {
+  const native = loadNative();
+
+  return await native.buildSqlAndParams(cubeEvaluator, JSON.stringify(queryParams));
+};
+
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,

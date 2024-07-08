@@ -23,6 +23,9 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
 import { SqlParser } from '../parser/SqlParser';
+import {
+   buildSqlAndParams as nativeBuildSqlAndParams,
+} from '@cubejs-backend/native';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -573,6 +576,8 @@ export class BaseQuery {
     return false;
   }
 
+
+
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -597,6 +602,16 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
+  }
+
+  async buildSqlAndParamsTest(exportAnnotatedSql) {
+    const queryParams = {
+        measures: this.options.measures,
+        dimensions: this.options.dimensions
+    }
+    let r = await nativeBuildSqlAndParams(this.cubeEvaluator, queryParams);
+    console.log("!!! native res ", r);
+    return this.buildSqlAndParams(exportAnnotatedSql);
   }
 
   get shouldReuseParams() {

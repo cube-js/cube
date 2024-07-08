@@ -280,6 +280,7 @@ export class CubeEvaluator extends CubeSymbols {
   protected prepareMembers(members: any, cube: any, errorReporter: ErrorReporter) {
     members = members || {};
 
+    console.log("!! members !!: ", members);
     for (const memberName of Object.keys(members)) {
       let ownedByCube = true;
       let aliasMember;

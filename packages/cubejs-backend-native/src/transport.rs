@@ -1,7 +1,6 @@
 use log::{debug, error, trace};
 use neon::prelude::*;
 use std::collections::HashMap;
-use std::fmt::Display;
 
 use async_trait::async_trait;
 use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
@@ -19,12 +18,14 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::NativeAuthContext;
-use crate::channel::{call_raw_js_with_channel_as_callback, NodeSqlGenerator};
+use crate::channel::NodeSqlGenerator;
 use crate::node_obj_serializer::NodeObjSerializer;
-use crate::{
-    auth::TransportRequest, channel::call_js_with_channel_as_callback,
-    stream::call_js_with_stream_as_callback,
+use crate::{auth::TransportRequest, stream::call_js_with_stream_as_callback};
+use cubenativeutils::channel::{
+    call_js_with_channel_as_callback, call_raw_js_with_channel_as_callback,
 };
+
+use cubenativeutils::utils::MapCubeErrExt;
 
 #[derive(Debug)]
 pub struct NodeBridgeTransport {
@@ -572,14 +573,3 @@ fn key_to_values<T>(
 }
 
 di_service!(NodeBridgeTransport, [TransportService]);
-
-// Extension trait to map abstract errors to CubeError
-pub trait MapCubeErrExt<T> {
-    fn map_cube_err(self, message: &str) -> Result<T, CubeError>;
-}
-
-impl<T, E: Display> MapCubeErrExt<T> for Result<T, E> {
-    fn map_cube_err(self, message: &str) -> Result<T, CubeError> {
-        self.map_err(|e| CubeError::user(format!("{}: {}", message, e)))
-    }
-}

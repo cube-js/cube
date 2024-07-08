@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::spawn;
 
-use crate::channel::call_js_with_channel_as_callback;
+use cubenativeutils::channel::call_js_with_channel_as_callback;
 
 #[derive(Debug)]
 pub struct NodeBridgeLogger {
