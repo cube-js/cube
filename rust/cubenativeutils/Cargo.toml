@@ -1,22 +1,12 @@
 [package]
-name = "cubejs-native"
-version = "0.28.0"
-authors = ["Cube Dev, Inc."]
-edition = "2018"
-license = "Apache-2.0"
-description = "Native module for Cube.js (binding to Rust codebase)"
-documentation = "https://cube.dev/docs"
-homepage = "https://cube.dev"
-exclude = ["index.node"]
+name = "cubenativeutils"
+version = "0.1.0"
+edition = "2021"
 
-[lib]
-crate-type = ["cdylib"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cubesql = { path = "../../rust/cubesql/cubesql" }
-cubeclient = { path = "../../rust/cubesql/cubeclient" }
-cubesqlplanner = { path = "../../rust/cubesqlplanner" }
-cubenativeutils = { path = "../../rust/cubenativeutils" }
+cubesql = { path = "../cubesql/cubesql" }
 tokio = { version = "1", features = ["full", "rt"] }
 async-channel = { version = "2" }
 async-trait = "0.1.36"
@@ -41,7 +31,3 @@ pyo3-asyncio = { version = "0.20.0", features = ["tokio-runtime", "attributes"],
 version = "=1"
 default-features = false
 features = ["napi-1", "napi-4", "napi-6", "futures"]
-
-[features]
-default = []
-python = ["pyo3", "pyo3-asyncio"]

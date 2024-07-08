@@ -20,7 +20,7 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
       });
-      const queryAndParams = query.buildSqlAndParams();
+      const queryAndParams = await query.buildSqlAndParamsTest();
       expect(queryAndParams[0]).toContain('card_tbl');
     });
   });
@@ -33,7 +33,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query', async () => {
+    it('Simple query2', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {

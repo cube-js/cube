@@ -30,12 +30,12 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::channel::call_js_fn;
 use crate::cross::CLRepr;
 use crate::stream::OnDrainHandler;
 use crate::utils::batch_to_rows;
 use auth::{NativeAuthContext, NodeBridgeAuthService};
 use config::NodeConfig;
+use cubenativeutils::channel::call_js_fn;
 use cubesql::telemetry::LocalReporter;
 use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
 use log::Level;
@@ -44,6 +44,9 @@ use neon::prelude::*;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
+
+use cubenativeutils::wrappers::object::NativeObject;
+use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NeonCubeEvaluator};
 
 struct SQLInterface {
     services: Arc<CubeServices>,
@@ -491,6 +494,37 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
+//============ sql planner ===================
+
+fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
+    let cube_evaluator = cx.argument::<JsObject>(0)?.root(&mut cx);
+
+    let channel = Arc::new(cx.channel());
+
+    let cube_evaluator = NeonCubeEvaluator::new(NativeObject::new(cx.channel(), cube_evaluator));
+
+    let runtime = tokio_runtime_node(&mut cx)?;
+
+    let query_params = cx.argument::<JsString>(1)?.value(&mut cx);
+
+    let (deferred, promise) = cx.promise();
+
+    runtime.spawn(async move {
+        let r = cube_evaluator
+            .parse_path("measures".to_string(), "cards.count".to_string())
+            .await;
+        println!("!!!! ---F {:?}", r);
+
+        deferred.settle_with(channel.as_ref(), move |mut cx| Ok(cx.string("fhfhfhfh")));
+    });
+    //let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
+
+    //arg_clrep.into_js(&mut cx)
+    let res = "SELECT".to_string(); // build_sql_query_and_params();
+
+    Ok(promise.upcast::<JsValue>())
+}
+
 #[neon::main]
 fn main(mut cx: ModuleContext) -> NeonResult<()> {
     // We use log_rerouter to swap logger, because we init logger from js side in api-gateway
@@ -511,6 +545,8 @@ fn main(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
+
+    cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     template::template_register_module(&mut cx)?;
 
