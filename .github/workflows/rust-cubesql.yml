@@ -67,6 +67,10 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
+      - name: Install lld
+        run: |
+          # ubuntu 24.04 has lld-18
+          sudo apt-get update && sudo apt install -y lld
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
