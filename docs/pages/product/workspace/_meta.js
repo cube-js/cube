@@ -10,9 +10,11 @@ module.exports = {
   "pre-aggregations": "Pre-Aggregations",
   performance: "Performance Insights",
   "access-control": "Access Control",
-  sso: "Single Sign-on",
-  budgets: "Budgets",
-  preferences: "Preferences",
-  cli: "CLI",
+  "sso": "Single Sign-on",
+  "audit-log": "Audit Log",
+  "budgets": "Budgets",
+  "preferences": "Preferences",
+  "cli": "CLI",
   "ai-assistant": "AI Assistant",
-};
+  "semantic-catalog": "Semantic Catalog",
+}
