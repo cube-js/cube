@@ -1,4 +1,4 @@
-name: 'Bird: Release E2E tests 📦'
+name: 'Post release'
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +12,7 @@ on:
       - completed
   push:
     paths:
-      - '.github/workflows/birdbox.yml'
+      - '.github/workflows/post-release.yml'
     branches:
       - 'master'
 
@@ -20,25 +20,21 @@ on:
 jobs:
   cli:
     runs-on: ubuntu-20.04
+    name: 'E2E tests via CLI'
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04, macos-11, windows-2019]
         node-version: [18.x]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Disable rustup update (issue workaround for Windows)
-        run: rustup set auto-self-update disable
-        if: contains(runner.os, 'windows')
-        shell: bash
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -52,7 +48,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -86,6 +82,7 @@ jobs:
 
   docker:
     runs-on: ubuntu-20.04
+    name: 'E2E tests via Docker'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -95,11 +92,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -113,7 +110,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -145,6 +142,7 @@ jobs:
 
   cypress:
     runs-on: ${{ matrix.os }}
+    name: 'Cypress E2E tests via Docker'
     timeout-minutes: 60
     strategy:
       fail-fast: false
@@ -153,16 +151,16 @@ jobs:
         include:
           - browser: chrome
             os: ubuntu-20.04
-            container: cypress/browsers:node12.18.3-chrome89-ff86
+            container: cypress/browsers:node18.12.0-chrome107
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 18.x
       - name: Restore lerna
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           # npm cache files are stored in `~/.npm` on Linux/macOS
           path: |
@@ -176,7 +174,7 @@ jobs:
       - name: Set Yarn version
         run: yarn policies set-version v1.22.19
       - name: Yarn install
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:
@@ -207,3 +205,22 @@ jobs:
           color: danger
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+  trigger-repo-sync:
+    runs-on: ubuntu-20.04
+    name: 'Sync runtime repo'
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Trigger runtime
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'cube-runtime',
+              workflow_id: 'sync.yml',
+              ref: 'master'
+            })

@@ -25,11 +25,11 @@ jobs:
       - id: git-log
         run: git log HEAD~30..HEAD
       - id: get-tag-test
-        run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "$SHA $(git rev-list -n 1 "$(git tag --contains "$SHA")")"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag
-        run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "sha=$(git rev-list -n 1 "$(git tag --contains "$SHA")")" >> "$GITHUB_OUTPUT"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag-out
@@ -51,13 +51,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          version: v0.9.1
+        uses: docker/setup-qemu-action@v3
       - name: Push to Docker Hub
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: ./
           file: ./packages/cubejs-docker/dev.Dockerfile

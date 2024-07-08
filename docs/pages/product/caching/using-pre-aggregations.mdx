@@ -251,6 +251,23 @@ Alternatively, if you want to explicitly introduce key partitioning, you can use
 Each orchestrator ID can use a different pre-aggregation schema, so you may define those based on the partitioning key you want to introduce.
 This technique, together with multi-router Cube Store approach, allows you to achieve linear scaling on the partitioning key of your choice.
 
+### Best practices
+
+In general, it's better to lean towards less partitions, as long as you are satisfied with query speed.
+
+For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in less than 100 milliseconds. 
+The best way to optimize this is to start from a relatively large partition (e.g., yearly or no partition at all if data permits), 
+check what the [flame graph][ref-flame-graph] in Query History shows, then iterate as needed.
+
+For optimal pre-aggregation _build performance_, you would optimize partition size together with pre-aggregation build concurrency and build time. Smaller 
+partitions with high concurrency would incur significant overhead. For optimal build performance, having 1 Cube Store worker per partition is ideal. 
+However, Cube Store workers can handle up to 4 partitions per worker conucrrently. Since Cube Store workers often max out at 16, this means you should avoid having more than 64 partitions. 
+Any additional partitions would be queued. Keep in mind that indexes essentially multiply the number of partitions that are created, 
+so for example, if you have two indexes, you would want to avoid having more than 32 partitions to avoid queueing. 
+The best way to optimize this is to make refresh keys as infrequent as possible 
+and then use the [Build History][ref-build-history] tab to check build times, along with the [Performance Insights][ref-perf-insights] page to 
+monitor Cube Store workers load, and iterate as needed.
+
 ## Using indexes
 
 [Indexes][ref-ref-indexes] are sorted copies of pre-aggregation data.
@@ -661,16 +678,14 @@ This query would be optimal as well.
 
 ## Pre-aggregations storage
 
-The default pre-aggregations storage in Cube is its own purpose-built storage
-layer: Cube Store.
+Cube uses its own purpose-built pre-aggregations engine: [Cube Store][ref-cube-store].
 
-Alternatively, you can store pre-aggregations **internally** in the source
-database. To store a pre-aggregation internally, set `external: false` in
-pre-aggregation definition.
+When using Cube Store, pre-aggregation data will be ingested and stored as Parquet files
+on a [blob storage][ref-cube-store-storage]. Then, Cube Store would load that data to
+execute queries using pre-aggregations.
 
-Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `original_sql`
-pre-aggregations in Cube Store.
+However, [`original_sql`][ref-original-sql] pre-aggregations are stored in the data source
+by default. It is not recommended to store `original_sql` pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
 
@@ -1003,4 +1018,9 @@ streaming engine.
 [ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
 [ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
 [ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-flame-graph]: /product/workspace/query-history#flame-graph
+[ref-perf-insights]: /product/workspace/performance
+[ref-build-history]: /product/workspace/pre-aggregations#build-history
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
+[ref-cube-store]: /product/caching/running-in-production#architecture
+[ref-cube-store-storage]: /product/caching/running-in-production#storage

@@ -2,7 +2,7 @@
 FROM debian:bullseye-slim
 
 RUN apt-get update && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget gnupg git apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl gnupg git apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main"  \
     && apt-get update \
@@ -33,7 +33,7 @@ ENV OPENSSL_DIR=/openssl
 ENV OPENSSL_ROOT_DIR=/openssl
 ENV OPENSSL_LIBRARIES=/openssl/lib
 
-ENV PYTHON_VERSION=3.12.0
+ENV PYTHON_VERSION=3.12.4
 RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz \
     && cd Python-${PYTHON_VERSION} && \
     ./configure  \

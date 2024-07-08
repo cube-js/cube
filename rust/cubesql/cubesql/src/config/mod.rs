@@ -22,24 +22,14 @@ use std::{
 use std::sync::Arc;
 
 use crate::sql::compiler_cache::{CompilerCache, CompilerCacheImpl};
-use tokio::task::JoinHandle;
+use tokio::{sync::RwLock, task::JoinHandle};
 
-#[derive(Clone)]
 pub struct CubeServices {
     pub injector: Arc<Injector>,
+    pub processing_loop_handles: RwLock<Vec<LoopHandle>>,
 }
 
 impl CubeServices {
-    pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
-        let futures = self.spawn_processing_loops().await?;
-        tokio::spawn(async move {
-            if let Err(e) = Self::wait_loops(futures).await {
-                error!("Error in processing loop: {}", e);
-            }
-        });
-        Ok(())
-    }
-
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
         let processing_loops = self.spawn_processing_loops().await?;
         Self::wait_loops(processing_loops).await
@@ -57,9 +47,9 @@ impl CubeServices {
         let mut futures = Vec::new();
 
         if self.injector.has_service_typed::<PostgresServer>().await {
-            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
+            let postgres_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
-                if let Err(e) = mysql_server.processing_loop().await {
+                if let Err(e) = postgres_server.processing_loop().await {
                     error!("{}", e.to_string());
                 };
 
@@ -115,6 +105,8 @@ pub trait ConfigObj: DIService + Debug {
     fn stream_mode(&self) -> bool;
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
+
+    fn no_implicit_order(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +125,7 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub no_implicit_order: bool,
 }
 
 impl ConfigObjImpl {
@@ -168,6 +161,7 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
         }
     }
 }
@@ -226,6 +220,10 @@ impl ConfigObj for ConfigObjImpl {
     fn non_streaming_query_max_row_limit(&self) -> i32 {
         self.non_streaming_query_max_row_limit
     }
+
+    fn no_implicit_order(&self) -> bool {
+        self.no_implicit_order
+    }
 }
 
 lazy_static! {
@@ -261,6 +259,7 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                no_implicit_order: false,
             }),
         }
     }
@@ -347,6 +346,7 @@ impl Config {
     pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
+            processing_loop_handles: RwLock::new(Vec::new()),
         }
     }
 

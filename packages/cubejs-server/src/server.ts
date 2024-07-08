@@ -229,6 +229,12 @@ export class CubejsServer {
         );
       }
 
+      if (this.sqlServer) {
+        locks.push(
+          this.sqlServer.shutdown()
+        );
+      }
+
       if (this.server) {
         locks.push(
           this.server.stop(
@@ -237,13 +243,19 @@ export class CubejsServer {
         );
       }
 
-      if (graceful) {
-        // Await before all connections/refresh scheduler will end jobs
-        await Promise.all(locks);
-      }
+      const shutdownAll = async () => {
+        try {
+          if (graceful) {
+            // Await before all connections/refresh scheduler will end jobs
+            await Promise.all(locks);
+          }
+          await this.core.shutdown();
+        } finally {
+          timeoutKiller.cancel();
+        }
+      };
 
-      await this.core.shutdown();
-      await timeoutKiller.cancel();
+      await Promise.any([shutdownAll(), timeoutKiller]);
 
       return 0;
     } catch (e: any) {

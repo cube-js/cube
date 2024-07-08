@@ -2,6 +2,7 @@ pub mod aggregate_function;
 pub mod alias;
 pub mod binary_expr;
 pub mod case;
+pub mod cast;
 pub mod column;
 pub mod dates;
 pub mod functions;
@@ -45,6 +46,7 @@ impl RewriteRules for SplitRules {
         self.granularity_rules(&mut rules);
         self.binary_expr_rules(&mut rules);
         self.case_rules(&mut rules);
+        self.cast_rules(&mut rules);
 
         rules
     }
@@ -137,6 +139,44 @@ impl SplitRules {
     pub fn single_arg_split_point_rules(
         &self,
         name: &str,
+        match_rule: impl Fn() -> String + Clone,
+        inner_rule: impl Fn() -> String + Clone,
+        outer_rule: impl Fn(String) -> String + Clone,
+        transform_fn: impl Fn(
+                bool,
+                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+                &mut egg::Subst,
+            ) -> bool
+            + Sync
+            + Send
+            + Clone
+            + 'static,
+        projection_rules: bool,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        if projection_rules {
+            self.single_arg_split_point_rules_projection(
+                name,
+                match_rule.clone(),
+                inner_rule.clone(),
+                outer_rule.clone(),
+                transform_fn.clone(),
+                rules,
+            );
+        }
+        self.single_arg_split_point_rules_aggregate(
+            name,
+            match_rule,
+            inner_rule,
+            outer_rule,
+            transform_fn,
+            rules,
+        );
+    }
+
+    pub fn single_arg_split_point_rules_aggregate(
+        &self,
+        name: &str,
         match_rule: impl Fn() -> String,
         inner_rule: impl Fn() -> String,
         outer_rule: impl Fn(String) -> String,
@@ -149,7 +189,6 @@ impl SplitRules {
             + Send
             + Clone
             + 'static,
-        projection_rules: bool,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
         rules.push(transforming_chain_rewrite(
@@ -173,29 +212,46 @@ impl SplitRules {
                 transform_fn.clone(),
             ),
         ));
-        if projection_rules {
-            rules.push(transforming_chain_rewrite(
-                &format!("split-{}-point-projection", name),
-                projection_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
-                vec![("?match_expr", match_rule())],
-                projection_split_pullup_replacer(
-                    alias_expr(inner_rule(), "?inner_alias"),
-                    alias_expr(
-                        outer_rule("?outer_alias_column".to_string()),
-                        "?inner_alias",
-                    ),
-                    "?list_node",
-                    "?alias_to_cube",
-                ),
-                self.transform_single_arg_split_point(
-                    "?match_expr",
+    }
+
+    pub fn single_arg_split_point_rules_projection(
+        &self,
+        name: &str,
+        match_rule: impl Fn() -> String,
+        inner_rule: impl Fn() -> String,
+        outer_rule: impl Fn(String) -> String,
+        transform_fn: impl Fn(
+                bool,
+                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+                &mut egg::Subst,
+            ) -> bool
+            + Sync
+            + Send
+            + Clone
+            + 'static,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        rules.push(transforming_chain_rewrite(
+            &format!("split-{}-point-projection", name),
+            projection_split_pushdown_replacer("?match_expr", "?list_node", "?alias_to_cube"),
+            vec![("?match_expr", match_rule())],
+            projection_split_pullup_replacer(
+                alias_expr(inner_rule(), "?inner_alias"),
+                alias_expr(
+                    outer_rule("?outer_alias_column".to_string()),
                     "?inner_alias",
-                    "?outer_alias_column",
-                    true,
-                    transform_fn.clone(),
                 ),
-            ));
-        }
+                "?list_node",
+                "?alias_to_cube",
+            ),
+            self.transform_single_arg_split_point(
+                "?match_expr",
+                "?inner_alias",
+                "?outer_alias_column",
+                true,
+                transform_fn.clone(),
+            ),
+        ));
     }
 
     fn transform_single_arg_split_point(

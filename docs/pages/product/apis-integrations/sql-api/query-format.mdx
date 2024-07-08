@@ -144,8 +144,10 @@ format:
 
 Because of this transformation, not all functions and expressions are supported
 in query fragments performing `SELECT` from cube tables. Please refer to the
-[reference](/reference/sql-api) to see whether a specific expression or function
-is supported.
+[SQL API reference][ref-ref-sql-api] to see whether a specific expression or function
+is supported and whether it can be used in [selection][link-selection-projection]
+(e.g., `WHERE`) or [projection][link-selection-projection] (e.g., `SELECT`) parts
+of SQL queries.
 
 For example, the following query won't work because the SQL API can't push down the
 `CASE` expression to Cube for processing. It is not possible to translate `CASE`
@@ -166,11 +168,13 @@ GROUP BY 1;
 ```
 
 You can leverage nested queries in cases like this. You can wrap your `SELECT`
-statement from a cube table into another `SELECT` statement to perform
-calculations with expressions like `CASE`. This outer select is **not** part of
-the SQL query that being rewritten and thus allows you to use more SQL
-functions, operators and expressions. You can rewrite the above query as
-follows, making sure to wrap the original `SELECT` statement:
+statement from a cube table (**inner query**) into another `SELECT` statement
+(**outer query**) to perform calculations with expressions like `CASE`.
+This outer `SELECT` is **not** part of the SQL query that being rewritten and
+thus allows you to use more SQL functions, operators and expressions.
+
+You can rewrite the above query as follows, making sure to wrap the original
+`SELECT` statement:
 
 ```sql
 SELECT
@@ -217,7 +221,7 @@ all target database capabilities for data processing.
 
 During the rewrite process, Cube validates that the target database would support transpired SQL queries.
 If direct conversion is not possible, different SQL transformation rewrite rules can be applied to achieve successful translation.
-Please refer to [SQL API reference](/reference/sql-api) for the list of supported SQL functions and clauses.
+Please refer to the [SQL API reference][ref-ref-sql-api] for the list of supported SQL functions and clauses.
 Support varies based on the target database.
 
 ## Top-down and bottom-up evaluation
@@ -431,4 +435,7 @@ As you can see, the sorting operation is done after the regular query and the pr
 [ref-data-model-concepts]: /product/data-modeling/concepts
 [ref-measure-types]: /reference/data-model/types-and-formats#measure-types
 [ref-query-default-limit]: /product/apis-integrations/queries#row-limit
+[ref-ref-sql-api]: /reference/sql-api
+
 [link-postgres-boolean]: https://www.postgresql.org/docs/current/datatype-boolean.html
+[link-selection-projection]: https://stackoverflow.com/a/1031101

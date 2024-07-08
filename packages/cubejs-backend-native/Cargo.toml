@@ -9,8 +9,11 @@ documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 exclude = ["index.node"]
 
+[profile.dev]
+opt-level = 1
+
 [lib]
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "lib"]
 
 [dependencies]
 cubesql = { path = "../../rust/cubesql/cubesql" }
@@ -41,5 +44,6 @@ default-features = false
 features = ["napi-1", "napi-4", "napi-6", "futures"]
 
 [features]
-default = []
+default = ["neon-entrypoint"]
+neon-entrypoint = []
 python = ["pyo3", "pyo3-asyncio"]

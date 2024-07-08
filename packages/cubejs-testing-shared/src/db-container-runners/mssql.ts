@@ -2,12 +2,8 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type MssqlStartOptions = DBRunnerContainerOptions & {
-    version?: string,
-};
-
 export class MssqlDbRunner extends DbRunnerAbstract {
-  public static startContainer(options: MssqlStartOptions) {
+  public static startContainer(options: DBRunnerContainerOptions) {
     const version = process.env.TEST_MSSQL_VERSION || options.version || '2017-latest';
 
     const container = new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)

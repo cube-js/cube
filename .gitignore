@@ -22,4 +22,5 @@ tsconfig.tsbuildinfo
 testings/
 rust/cubesql/profile.json
 .cubestore
+.env
 

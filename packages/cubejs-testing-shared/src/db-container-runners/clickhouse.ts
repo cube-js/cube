@@ -2,16 +2,12 @@ import { GenericContainer } from 'testcontainers';
 
 import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract';
 
-type QuestStartOptions = DBRunnerContainerOptions & {
-  version?: string,
-};
+export class ClickhouseDBRunner extends DbRunnerAbstract {
+  public static startContainer(options: DBRunnerContainerOptions) {
+    const version = process.env.TEST_CLICKHOUSE_VERSION || options.version || '23.11';
 
-export class QuestDBRunner extends DbRunnerAbstract {
-  public static startContainer(options: QuestStartOptions) {
-    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '7.2';
-
-    const container = new GenericContainer(`questdb/questdb:${version}`)
-      .withExposedPorts(8812)
+    const container = new GenericContainer(`clickhouse/clickhouse-server:${version}`)
+      .withExposedPorts(8123)
       .withStartupTimeout(10 * 1000);
 
     if (options.volumes) {

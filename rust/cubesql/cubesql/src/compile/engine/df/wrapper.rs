@@ -1,7 +1,14 @@
 use crate::{
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
-        rewrite::{extract_exprlist_from_groupping_set, WrappedSelectType},
+        rewrite::{
+            extract_exprlist_from_groupping_set,
+            rules::{
+                filters::Decimal,
+                utils::{DecomposedDayTime, DecomposedMonthDayNano},
+            },
+            WrappedSelectType,
+        },
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -26,8 +33,8 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
 use std::{
-    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, iter, pin::Pin, result,
-    sync::Arc,
+    any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
+    pin::Pin, result, sync::Arc,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -373,13 +380,20 @@ impl CubeScanWrapperNode {
                     .cloned();
                 if let Some(node) = cube_scan_node {
                     let mut new_node = node.clone();
-                    new_node.request.limit = Some(query_limit);
+                    new_node.request.limit = Some(
+                        new_node
+                            .request
+                            .limit
+                            .map_or(query_limit, |limit| min(limit, query_limit)),
+                    );
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
                 } else if let Some(node) = wrapped_select_node {
                     let mut new_node = node.clone();
-                    new_node.limit = Some(query_limit as usize);
+                    new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
+                        min(limit, query_limit as usize)
+                    }));
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
@@ -1090,6 +1104,21 @@ impl CubeScanWrapperNode {
         Ok(serde_json::json!(res).to_string())
     }
 
+    fn format_sql_decimal_type(precision: usize, scale: usize) -> String {
+        format!("NUMERIC({}, {})", precision, scale)
+    }
+
+    fn generate_sql_cast_expr(
+        sql_generator: Arc<dyn SqlGenerator>,
+        inner_expr: String,
+        data_type: String,
+    ) -> result::Result<String, DataFusionError> {
+        sql_generator
+            .get_sql_templates()
+            .cast_expr(inner_expr, data_type)
+            .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e)))
+    }
+
     pub fn generate_sql_for_expr(
         plan: Arc<Self>,
         mut sql_query: SqlQuery,
@@ -1430,7 +1459,7 @@ impl CubeScanWrapperNode {
                         DataType::Utf8 => "TEXT".to_string(),
                         DataType::LargeUtf8 => "TEXT".to_string(),
                         DataType::Decimal(precision, scale) => {
-                            format!("NUMERIC({}, {})", precision, scale)
+                            CubeScanWrapperNode::format_sql_decimal_type(precision, scale)
                         }
                         x => {
                             return Err(DataFusionError::Execution(format!(
@@ -1439,12 +1468,11 @@ impl CubeScanWrapperNode {
                             )));
                         }
                     };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .cast_expr(expr, data_type)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e))
-                        })?;
+                    let resulting_sql = CubeScanWrapperNode::generate_sql_cast_expr(
+                        sql_generator,
+                        expr,
+                        data_type,
+                    )?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::TryCast { .. } => {}
@@ -1500,7 +1528,27 @@ impl CubeScanWrapperNode {
                             f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
                             sql_query,
                         ),
-                        // ScalarValue::Decimal128(_, _, _) => {}
+                        ScalarValue::Decimal128(x, precision, scale) => {
+                            // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
+                            let scale: usize = scale;
+
+                            (
+                                if let Some(x) = x {
+                                    let number = Decimal::format_string(x, scale);
+                                    let data_type = CubeScanWrapperNode::format_sql_decimal_type(
+                                        precision, scale,
+                                    );
+                                    CubeScanWrapperNode::generate_sql_cast_expr(
+                                        sql_generator,
+                                        format!("'{}'", number),
+                                        data_type,
+                                    )?
+                                } else {
+                                    "NULL".to_string()
+                                },
+                                sql_query,
+                            )
+                        }
                         ScalarValue::Int8(x) => (
                             x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
                             sql_query,
@@ -1617,7 +1665,7 @@ impl CubeScanWrapperNode {
                                 (
                                     sql_generator
                                         .get_sql_templates()
-                                        .interval_expr(interval, num.into(), date_part.to_string())
+                                        .interval_any_expr(interval, num.into(), date_part)
                                         .map_err(|e| {
                                             DataFusionError::Internal(format!(
                                                 "Can't generate SQL for interval: {}",
@@ -1632,37 +1680,24 @@ impl CubeScanWrapperNode {
                         }
                         ScalarValue::IntervalDayTime(x) => {
                             if let Some(x) = x {
-                                let days = x >> 32;
-                                let millis = x & 0xFFFFFFFF;
-                                if days > 0 && millis > 0 {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for interval: mixed intervals aren't supported: {} days {} millis encoded as {}",
-                                        days, millis, x
-                                    )));
-                                }
-                                let (num, date_part) = if days > 0 {
-                                    (days, "DAY")
-                                } else {
-                                    (millis, "MILLISECOND")
-                                };
-                                let interval = format!("{} {}", num, date_part);
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .interval_expr(interval, num, date_part.to_string())
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for interval: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedDayTime::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
                             } else {
                                 ("NULL".to_string(), sql_query)
                             }
                         }
-                        // ScalarValue::IntervalMonthDayNano(_) => {}
+                        ScalarValue::IntervalMonthDayNano(x) => {
+                            if let Some(x) = x {
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedMonthDayNano::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::Struct(_, _) => {}
                         ScalarValue::Null => ("NULL".to_string(), sql_query),
                         x => {

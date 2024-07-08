@@ -284,7 +284,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 10000,
               limit: 10000,
@@ -297,7 +296,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 10000,
             limit: 10000,
@@ -345,7 +343,6 @@ describe('API Gateway', () => {
           {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [{
               member: 'Foo.bar',
               operator: 'gte',
@@ -421,7 +418,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 2,
               limit: 2,
@@ -434,7 +430,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 2,
             limit: 2,
@@ -736,7 +731,7 @@ describe('API Gateway', () => {
       const res = await req;
       expect(res.body).toMatchObject(successResult);
     };
-       
+
     const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,
