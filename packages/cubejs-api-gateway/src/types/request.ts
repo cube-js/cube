@@ -61,9 +61,9 @@ interface Request extends ExpressRequest {
 }
 
 /**
- * Function that should provides basic query conversion mechanic.
+ * Function that should provide basic query conversion mechanic.
  * Used as a part of a main configuration object of the server-core
- * to provide extendabillity to a query processing logic.
+ * to provide extendability to a query processing logic.
  */
 type QueryRewriteFn =
   (query: Query, context: RequestContext) => Promise<Query>;
@@ -71,7 +71,7 @@ type QueryRewriteFn =
 /**
  * Function that should provides a logic for extracting security
  * context from the request. Used as a part of a main configuration
- * object of the server-core to provide extendabillity to a query
+ * object of the server-core to provide extendability to a query
  * security processing logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
@@ -80,9 +80,9 @@ type SecurityContextExtractorFn =
   (ctx: Readonly<RequestContext>) => any;
 
 /**
- * Function that should provides a logic for extracting request
- * extesion context from the request. Used as a part of a main
- * configuration object of the server-core to provide extendabillity
+ * Function that should provide a logic for extracting request
+ * extension context from the request. Used as a part of a main
+ * configuration object of the server-core to provide extendability
  * to a query processing logic.
  */
 type ExtendContextFn =
@@ -99,7 +99,7 @@ type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
 /**
  * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
- * server-core to provide extendabillity for this logic.
+ * server-core to provide extendability for this logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
  */
