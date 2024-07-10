@@ -45,10 +45,18 @@ Audit Log displays events in a table with the following information for each eve
 
 You can click on any event to view extended information:
 - IP address from which an event was initiated.
-- Event-specific attributes with sensitive information (e.g., passwords and tokens)
-sanitized.
+- Event-specific attributes.
 
 <Screenshot src="https://ucarecdn.com/43f0d225-0cde-40dd-867b-8705f3ee0ff2/" />
+
+#### Sanitization
+
+Audit Log uses heuristics to detect sensitive values (e.g., passwords and tokens)
+and sanitize them, i.e., replace them with `[HIDDEN]` in event-specific
+attributes. You can see that a password was sanitized on the screenshot above.
+
+If you'd like your custom environment variable to be sanitized, include one of
+the following substrings in its name: `PASS`, `SECRET`, `TOKEN`, `KEY`.
 
 ### Filters
 
