@@ -1,4 +1,4 @@
-FROM rust:1-bookworm as builder
+FROM rust:1-bookworm AS builder
 
 RUN rustup update && \
     rustup default nightly-2024-01-10 && \
