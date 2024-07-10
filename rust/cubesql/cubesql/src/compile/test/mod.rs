@@ -218,6 +218,89 @@ pub fn get_test_meta() -> Vec<V1CubeMeta> {
             segments: Vec::new(),
             joins: Some(Vec::new()),
         },
+        V1CubeMeta {
+            name: "MultiTypeCube".to_string(),
+            title: None,
+            dimensions: (0..10)
+                .flat_map(|i| {
+                    [
+                        V1CubeMetaDimension {
+                            name: format!("MultiTypeCube.dim_num{}", i),
+                            _type: "number".to_string(),
+                        },
+                        V1CubeMetaDimension {
+                            name: format!("MultiTypeCube.dim_str{}", i),
+                            _type: "string".to_string(),
+                        },
+                        V1CubeMetaDimension {
+                            name: format!("MultiTypeCube.dim_date{}", i),
+                            _type: "time".to_string(),
+                        },
+                    ]
+                })
+                .collect(),
+            measures: (0..10)
+                .flat_map(|i| {
+                    [
+                        V1CubeMetaMeasure {
+                            name: format!("WiderCube.measure_num{}", i),
+                            _type: "number".to_string(),
+                            agg_type: Some("number".to_string()),
+                            title: None,
+                        },
+                        V1CubeMetaMeasure {
+                            name: format!("WiderCube.measure_str{}", i),
+                            _type: "string".to_string(),
+                            agg_type: Some("max".to_string()),
+                            title: None,
+                        },
+                        V1CubeMetaMeasure {
+                            name: format!("WiderCube.measure_date{}", i),
+                            _type: "time".to_string(),
+                            agg_type: Some("max".to_string()),
+                            title: None,
+                        },
+                    ]
+                })
+                .chain(
+                    vec![
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("count".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("max".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("min".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("avg".to_string()),
+                        },
+                        V1CubeMetaMeasure {
+                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            title: None,
+                            _type: "number".to_string(),
+                            agg_type: Some("countDistinct".to_string()),
+                        },
+                    ]
+                    .into_iter(),
+                )
+                .collect(),
+            segments: Vec::new(),
+            joins: Some(Vec::new()),
+        },
     ]
 }
 

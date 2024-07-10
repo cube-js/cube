@@ -518,10 +518,223 @@ pub fn tableau_bugs_b8888(c: &mut Criterion) {
     bench_func!("tableau_bugs_b8888", get_tableau_bugs_b8888_query(), c);
 }
 
+fn get_quicksight_1_query() -> String {
+    r#"
+    SELECT
+    "LocalTemp.order_date_tg",
+    "LocalTemp.customer_gender",
+    "something_2",
+    "LocalTemp.taxful_total_price_sum",
+    "$otherbucket_group_count",
+    "count"
+    FROM
+    (
+        SELECT
+        "LocalTemp.order_date_tg",
+        "$VAL_1",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "LocalTemp.customer_gender"
+        END AS "LocalTemp.customer_gender",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END AS "$f7",
+        CASE
+            WHEN "$VAL_2" > 25 THEN 1
+            ELSE 0
+        END AS "something_2",
+        SUM(
+            "LocalTemp.taxful_total_price_sum"
+        ) AS "LocalTemp.taxful_total_price_sum",
+        COUNT(*) AS "$otherbucket_group_count",
+        SUM("count") AS "count"
+        FROM
+        (
+            SELECT
+            "customer_gender" AS "LocalTemp.customer_gender",
+            date_trunc('day', "order_date") AS "LocalTemp.order_date_tg",
+            COUNT(*) AS "count",
+            SUM("taxful_total_price") AS "LocalTemp.taxful_total_price_sum",
+            DENSE_RANK() OVER (
+                ORDER BY
+                date_trunc('day', "order_date") DESC NULLS LAST
+            ) AS "$VAL_1",
+            DENSE_RANK() OVER (
+                PARTITION BY date_trunc('day', "order_date")
+                ORDER BY
+                "customer_gender" NULLS FIRST
+            ) AS "$VAL_2"
+            FROM
+            "public"."KibanaSampleDataEcommerce"
+            WHERE
+            (
+                "notes" NOT IN ('alpha', 'beta', 'gamma', 'delta')
+                OR "notes" IS NULL
+                OR "notes" IS NULL
+            )
+            AND "customer_gender" = 'Lima Lima Uniform'
+            AND "order_date" >= date_trunc(
+                'day',
+                TO_TIMESTAMP('2022-04-17 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+            )
+            AND "order_date" < date_trunc(
+                'day',
+                TO_TIMESTAMP('2022-06-05 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+            ) + 1 * interval '1 DAY'
+            GROUP BY
+            "customer_gender",
+            date_trunc('day', "order_date")
+        ) AS "t"
+        WHERE
+        "$VAL_1" <= 200
+        GROUP BY
+        "LocalTemp.order_date_tg",
+        "$VAL_1",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "LocalTemp.customer_gender"
+        END,
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END,
+        CASE
+            WHEN "$VAL_2" > 25 THEN 1
+            ELSE 0
+        END
+        ORDER BY
+        "$VAL_1" NULLS FIRST,
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END NULLS FIRST
+    ) AS "t0"
+   "#
+    .into()
+}
+
+fn quicksight_1(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("quicksight_1", get_quicksight_1_query(), c);
+}
+
+fn get_quicksight_2_query() -> String {
+    r#"
+SELECT
+  "Temp-A",
+  "Foo.dim_str5",
+  "something_2",
+  "sumof_sum_num2",
+  "$count_of_groups",
+  "count"
+FROM
+  (
+    SELECT
+      "Temp-A",
+      "$VAL_1",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "Foo.dim_str5"
+      END AS "Foo.dim_str5",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END AS "$f7",
+      CASE
+        WHEN "$VAL_2" > 25 THEN 1
+        ELSE 0
+      END AS "something_2",
+      SUM("sum_num2") AS "sumof_sum_num2",
+      COUNT(*) AS "$count_of_groups",
+      SUM("count") AS "count"
+    FROM
+      (
+        SELECT
+          "dim_str5" AS "Foo.dim_str5",
+          date_trunc('day', "dim_date1") AS "Temp-A",
+          COUNT(*) AS "count",
+          SUM("dim_num2") AS "sum_num2",
+          DENSE_RANK() OVER (
+            ORDER BY
+              date_trunc('day', "dim_date1") DESC NULLS LAST
+          ) AS "$VAL_1",
+          DENSE_RANK() OVER (
+            PARTITION BY date_trunc('day', "dim_date1")
+            ORDER BY
+              "dim_str5" NULLS FIRST
+          ) AS "$VAL_2"
+        FROM
+          "public"."MultiTypeCube"
+        WHERE
+          "dim_str1" IN (
+            '$0',
+            '$0 - $500',
+            '$1000 - $5K',
+            '$100K+',
+            '$10K - $25K',
+            '$25K - $50K',
+            '$500 - $1K',
+            '$50K - $100K',
+            '$5K - $10K',
+            'Credit'
+          )
+          AND "dim_str2" IN ('Open')
+          AND CAST(
+            "dim_num1" AS INTEGER
+          ) IN (0)
+          AND "dim_str3" <> '0002146'
+          AND "dim_str3" IS NOT NULL
+          AND "dim_str4" = 'Tango Golf Heaviside'
+          AND "dim_date1" >= date_trunc(
+            'day',
+            TO_TIMESTAMP('2024-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+          )
+          AND "dim_date1" < date_trunc(
+            'day',
+            TO_TIMESTAMP('2024-07-05 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+          ) + 1 * interval '1 DAY'
+        GROUP BY
+          "dim_str5",
+          date_trunc('day', "dim_date1")
+      ) AS "t"
+    WHERE
+      "$VAL_1" <= 200
+    GROUP BY
+      "Temp-A",
+      "$VAL_1",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "Foo.dim_str5"
+      END,
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END,
+      CASE
+        WHEN "$VAL_2" > 25 THEN 1
+        ELSE 0
+      END
+    ORDER BY
+      "$VAL_1" NULLS FIRST,
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END NULLS FIRST
+  ) AS "t0"
+   "#
+    .into()
+}
+
+fn quicksight_2(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("quicksight_2", get_quicksight_2_query(), c);
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
     targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k, tableau_logical_17,
-        tableau_bugs_b8888, ts_last_day_redshift
+        tableau_bugs_b8888, ts_last_day_redshift, quicksight_1, quicksight_2
 }
 criterion_main!(benches);
