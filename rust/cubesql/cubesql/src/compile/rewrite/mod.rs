@@ -591,16 +591,16 @@ fn column_name_to_member_to_aliases(
         .collect::<Vec<_>>()
 }
 
-fn member_name_by_alias(
+fn member_name_to_expr_by_alias(
     egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     id: Id,
     alias: &str,
-) -> Option<String> {
+) -> Option<MemberNameToExpr> {
     egraph
         .index(id)
         .data
         .find_member(|_, a| a == alias)
-        .and_then(|(m, _a)| m.0.clone())
+        .map(|(m, _a)| m.clone())
 }
 
 fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
