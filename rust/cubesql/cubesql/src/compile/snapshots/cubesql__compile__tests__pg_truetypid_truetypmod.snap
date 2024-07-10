@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 10275
+assertion_line: 11431
 expression: "execute_query(\"\n                SELECT\n                    a.attrelid,\n                    a.attname,\n                    t.typname,\n                    information_schema._pg_truetypid(a.*, t.*) typid,\n                    information_schema._pg_truetypmod(a.*, t.*) typmod,\n                    information_schema._pg_numeric_precision(\n                        information_schema._pg_truetypid(a.*, t.*),\n                        information_schema._pg_truetypmod(a.*, t.*)\n                    ) as_arg\n                FROM pg_attribute a\n                JOIN pg_type t ON t.oid = a.atttypid\n                ORDER BY a.attrelid ASC, a.attnum ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------+--------------------+-----------+-------+--------+--------+
@@ -239,4 +239,71 @@ expression: "execute_query(\"\n                SELECT\n                    a.att
 | 18035    | dim99              | numeric   | 1700  | -1     | NULL   |
 | 18035    | __user             | text      | 25    | -1     | NULL   |
 | 18035    | __cubeJoinField    | text      | 25    | -1     | NULL   |
+| 18245    | measure_num0       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str0       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date0      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num1       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str1       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date1      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num2       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str2       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date2      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num3       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str3       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date3      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num4       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str4       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date4      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num5       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str5       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date5      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num6       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str6       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date6      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num7       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str7       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date7      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num8       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str8       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date8      | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_num9       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_str9       | numeric   | 1700  | -1     | NULL   |
+| 18245    | measure_date9      | numeric   | 1700  | -1     | NULL   |
+| 18245    | count              | int8      | 20    | -1     | 64     |
+| 18245    | maxPrice           | numeric   | 1700  | -1     | NULL   |
+| 18245    | minPrice           | numeric   | 1700  | -1     | NULL   |
+| 18245    | avgPrice           | numeric   | 1700  | -1     | NULL   |
+| 18245    | countDistinct      | int8      | 20    | -1     | 64     |
+| 18245    | dim_num0           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str0           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date0          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num1           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str1           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date1          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num2           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str2           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date2          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num3           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str3           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date3          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num4           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str4           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date4          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num5           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str5           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date5          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num6           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str6           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date6          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num7           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str7           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date7          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num8           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str8           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date8          | timestamp | 1114  | -1     | NULL   |
+| 18245    | dim_num9           | numeric   | 1700  | -1     | NULL   |
+| 18245    | dim_str9           | text      | 25    | -1     | NULL   |
+| 18245    | dim_date9          | timestamp | 1114  | -1     | NULL   |
+| 18245    | __user             | text      | 25    | -1     | NULL   |
+| 18245    | __cubeJoinField    | text      | 25    | -1     | NULL   |
 +----------+--------------------+-----------+-------+--------+--------+
