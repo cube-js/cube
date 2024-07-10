@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.58](https://github.com/cube-js/cube/compare/v0.35.57...v0.35.58) (2024-07-10)
+
+
+### Bug Fixes
+
+* **postgres-driver:** Don't throw errors for pseudo fields like `__user` ([9c01c1b](https://github.com/cube-js/cube/commit/9c01c1b8486afd65da1166acf9f2782ec97986c2))
+* **postgres-driver:** Mapping for generic int as int8 ([#8338](https://github.com/cube-js/cube/issues/8338)) ([3202d8d](https://github.com/cube-js/cube/commit/3202d8d4cc5bd6fca48b8c9b5e1ea9d9566ff8a2))
+
+
+
+
+
 ## [0.35.57](https://github.com/cube-js/cube/compare/v0.35.56...v0.35.57) (2024-07-05)
 
 **Note:** Version bump only for package @cubejs-backend/postgres-driver
