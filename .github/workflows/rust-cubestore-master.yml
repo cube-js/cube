@@ -223,7 +223,7 @@ jobs:
         run: vcpkg integrate install; vcpkg install openssl:x64-windows
       - name: Instal LLVM for Windows
         if: ${{ startsWith(matrix.os, 'windows') }}
-        run: choco install -y --force llvm --version 18.1.2
+        run: choco install -y --force llvm --version 18.1.6
       - name: Set Env Variables for Windows
         uses: allenevans/set-env@v3.0.0
         if: ${{ startsWith(matrix.os, 'windows') }}
