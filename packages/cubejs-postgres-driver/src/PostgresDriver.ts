@@ -33,6 +33,8 @@ const NativeTypeToPostgresType: Record<string, string> = {};
 Object.entries(types.builtins).forEach(([key, value]) => {
   NativeTypeToPostgresType[value] = key;
 });
+// pg-types lacks the default `unknown` type since it's a pseudo-type
+NativeTypeToPostgresType['705'] = 'UNKNOWN';
 
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)

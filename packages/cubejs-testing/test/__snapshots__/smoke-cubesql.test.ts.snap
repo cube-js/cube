@@ -221,6 +221,19 @@ Array [
 ]
 `;
 
+exports[`SQL API Postgres (Data) select null in subquery with streaming 1`] = `
+Array [
+  Object {
+    "usr": null,
+    "val": 789,
+  },
+  Object {
+    "usr": null,
+    "val": 987,
+  },
+]
+`;
+
 exports[`SQL API Postgres (Data) tableau bi fiscal year query: result 1`] = `
 Array [
   Object {
