@@ -322,7 +322,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       const getFileStream = () => {
         if (!currentFileStream) {
           const writer = csvWriter({ headers: columns.map(c => c.name) });
-          const tempFile = tempy.file();
+          const tempFile = tempy.temporaryFile();
           tempFiles.push(tempFile);
           const gzipStream = createGzip();
           pipelinePromises.push(new Promise((resolve, reject) => {
