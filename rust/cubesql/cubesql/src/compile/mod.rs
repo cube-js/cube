@@ -24238,4 +24238,74 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_filter_in_outer_query_over_date_trunced_column() {
+        init_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            WITH pre_aggregation AS
+            (
+                SELECT
+                    customer_gender,
+                    date_trunc('month', "order_date") AS order_date__month,
+                    measure(count) AS value
+                FROM "KibanaSampleDataEcommerce"
+                WHERE customer_gender IN ('male', 'female', 'other')
+                GROUP BY 1, 2
+            )
+            SELECT *
+            FROM pre_aggregation
+            WHERE (customer_gender = 'female') AND (order_date__month = CAST('2019-01-01 00:00:00' AS TIMESTAMP));
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
+                dimensions: Some(vec![
+                    "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                ]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: Some("month".to_string()),
+                    date_range: Some(json!(vec![
+                        "2019-01-01T00:00:00.000Z".to_string(),
+                        "2019-01-31T23:59:59.999Z".to_string()
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec![
+                            "male".to_string(),
+                            "female".to_string(),
+                            "other".to_string()
+                        ]),
+                        or: None,
+                        and: None
+                    },
+                    V1LoadRequestQueryFilterItem {
+                        member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
+                        operator: Some("equals".to_string()),
+                        values: Some(vec!["female".to_string()]),
+                        or: None,
+                        and: None
+                    },
+                ]),
+                ungrouped: None,
+            }
+        )
+    }
 }

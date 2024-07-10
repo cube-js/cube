@@ -2,14 +2,14 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, Member, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
         fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr,
         like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int, literal_string,
-        measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        measure_expr, member_name_to_expr_by_alias, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -2624,15 +2624,17 @@ impl FilterRules {
                     for aliases in
                         var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
                     {
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
+                        if let Some((member_name, granularity, cube)) =
+                            Self::filter_member_name_with_granularity(
+                                egraph,
+                                subst,
+                                &meta_context,
+                                alias_to_cube_var,
+                                column_var,
+                                members_var,
+                                &aliases,
+                            )
+                        {
                             if let Some(member_type) = cube.member_type(&member_name) {
                                 // Segments + __user are handled by separate rule
                                 if cube.lookup_measure_by_member_name(&member_name).is_some()
@@ -2759,11 +2761,23 @@ impl FilterRules {
                                                 let value = format_iso_timestamp(timestamp);
 
                                                 match expr_op {
+                                                    // TODO: all other operators need special granularity handlers like Eq
                                                     Operator::Lt => vec![value],
                                                     Operator::LtEq => vec![value],
                                                     Operator::Gt => vec![value],
                                                     Operator::GtEq => vec![value],
-                                                    Operator::Eq => vec![value.to_string(), value],
+                                                    Operator::Eq => {
+                                                        if let Some(granularity) = granularity {
+                                                            if let Some((_, end)) = Self::naive_datetime_to_range_by_granularity(timestamp, &granularity) {
+                                                                let end = format_iso_timestamp(end.checked_sub_signed(Duration::milliseconds(1)).unwrap());
+                                                                vec![value, end]
+                                                            } else {
+                                                                continue;
+                                                            }
+                                                        } else {
+                                                            vec![value.to_string(), value]
+                                                        }
+                                                    }
                                                     _ => {
                                                         continue;
                                                     }
@@ -3565,6 +3579,27 @@ impl FilterRules {
         members_var: Var,
         aliases: &Vec<(String, String)>,
     ) -> Option<(String, V1CubeMeta)> {
+        Self::filter_member_name_with_granularity(
+            egraph,
+            subst,
+            meta_context,
+            alias_to_cube_var,
+            column_var,
+            members_var,
+            aliases,
+        )
+        .map(|(name, _, meta)| (name, meta))
+    }
+
+    fn filter_member_name_with_granularity(
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: &Subst,
+        meta_context: &Arc<MetaContext>,
+        alias_to_cube_var: Var,
+        column_var: Var,
+        members_var: Var,
+        aliases: &Vec<(String, String)>,
+    ) -> Option<(String, Option<String>, V1CubeMeta)> {
         for alias_to_cube in var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
         {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
@@ -3574,24 +3609,32 @@ impl FilterRules {
                     .iter()
                     .find(|(a, _)| a == &alias_name)
                     .map(|(_, name)| name.to_string());
-                let member_name = if member_name.is_some() {
-                    member_name
+                let (member_name, granularity) = if member_name.is_some() {
+                    (member_name, None)
                 } else {
                     // TODO: aliases are not enough?
-                    member_name_by_alias(egraph, subst[members_var], &alias_name)
+                    member_name_to_expr_by_alias(egraph, subst[members_var], &alias_name)
+                        .map(|(member_name, member, _)| {
+                            if let Member::TimeDimension { granularity, .. } = member {
+                                (member_name, granularity)
+                            } else {
+                                (member_name, None)
+                            }
+                        })
+                        .unwrap_or((None, None))
                 };
 
                 if let Some(member_name) = member_name {
                     if let Some(cube) =
                         meta_context.find_cube_with_name(&member_name.split(".").next().unwrap())
                     {
-                        return Some((member_name, cube));
+                        return Some((member_name, granularity, cube));
                     }
                 } else if let Some((_, cube)) =
                     meta_context.find_cube_by_column(alias_to_cube, &column)
                 {
                     if let Some(original_name) = Self::original_member_name(&cube, &column.name) {
-                        return Some((original_name, cube));
+                        return Some((original_name, granularity, cube));
                     }
                 }
             }
