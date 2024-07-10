@@ -1084,7 +1084,8 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
         subst: &Subst,
         _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
         _rule_name: Symbol,
-    ) -> Vec<Id> {
+        appended_output: &mut Vec<Id>,
+    ) {
         let data = subst
             .data
             .as_ref()
@@ -1092,7 +1093,6 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
         let list_matches = data.downcast_ref::<ListMatches>().expect("wrong data type");
 
         let mut subst = subst.clone();
-        let mut result_ids = vec![];
         list_matches.for_each(|list_substs| {
             for list in &self.lists {
                 let new_list = list_substs
@@ -1110,12 +1110,10 @@ impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
             subst.extend(list_substs[0].iter());
             let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
             if egraph.union(eclass, new_id) {
-                result_ids.push(new_id);
+                appended_output.push(new_id);
                 eclass = new_id;
             }
         });
-
-        result_ids
     }
 
     fn vars(&self) -> Vec<Var> {
@@ -2190,13 +2188,14 @@ where
         subst: &Subst,
         searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
         rule_name: Symbol,
-    ) -> Vec<Id> {
+        appended_output: &mut Vec<Id>,
+    ) {
         let mut new_subst = subst.clone();
         if (self.vars_to_substitute)(egraph, eclass, &mut new_subst) {
             self.pattern
-                .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name)
+                .apply_one(egraph, eclass, &new_subst, searcher_ast, rule_name, appended_output);
         } else {
-            Vec::new()
+            // Return nothing onto appended_output.
         }
     }
 }
