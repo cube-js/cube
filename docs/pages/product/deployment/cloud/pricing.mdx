@@ -33,10 +33,10 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 | ------------------------- | :--------------------------------------------: |
 | Production Cluster        |                       4                        |
 | Development Instance      |                       1                        |
-| Dedicated VPC             |                       3                        |
 | Cube Store Worker         |                       1                        |
 | Cube API Instance         |                       1                        |
 | Query History             | Depends on [chosen tier](#query-history-tiers) |
+| [Dedicated infrastructure][ref-dedicated-infra] | 3 |
 | [Audit Log][ref-audit-log] | 4 |
 
 ### Query History tiers
@@ -96,10 +96,10 @@ terms][ref-premium-plan-support], and [limits][ref-cloud-limits].
 **Enterprise plan is suitable for high-scale or mission-critical production
 deployments with more significant security and compliance needs.**
 
-It offers everything in the [Premium plan](#premium) as well as [semantic layer
-sync][ref-workspace-semantic-layer] with unlimited supported BI tools, SAML 2.0
-support for single sign-on, Azure support for all regions, a dedicated VPC for
-your Cube Cloud infrastructure, [VPC peering][ref-cloud-vpc-peering], [monitoring
+It offers everything in the [Premium plan](#premium) as well as [Semantic Layer
+Sync][ref-workspace-semantic-layer] with unlimited supported BI tools, SAML 2.0
+support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
+infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering], [monitoring
 integrations][ref-cloud-monitoring], and [role-based access
 control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this plan.
 
@@ -123,7 +123,8 @@ terms][ref-enterprise-premier-plan-support], and [limits][ref-cloud-limits].
 The following examples provide insight into the total cost to use Cube Cloud:
 - [Small-scale deployment](#small-scale-deployment) (production cluster, Premium plan).
 - [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise plan).
-- [Large-scale deployment](#large-scale-deployment) (production multi-cluster with VPC, Enterprise plan).
+- [Large-scale deployment](#large-scale-deployment) (production multi-cluster
+with dedicated infrastructure, Enterprise plan).
 
 ### Small-scale deployment
 
@@ -183,7 +184,7 @@ its globally distributed workforce, customer base, and (or) partners to operate 
 
 This organization:
 * Uses the Enterprise plan of Cube Cloud.
-* Uses a dedicated VPC.
+* Uses [dedicated infrastructure][ref-dedicated-infra].
 * Runs a Production Multi-Cluster that is active 24/7, includes 3 Production Clusters, with each
 Production Cluster auto-scaling up to 10 API instances during a few peak hours every day.
 * Operates on a large volume of data that requires the usage of 16 Cube Store Workers to run
@@ -196,7 +197,7 @@ of data engineers.
 
 | Resource                                        | Usage per month                                                                             | CCU per month                    | Cost per month                             |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------ |
-| Dedicated VPC                                   | 1 VPC region ×<br/>24 hours per day ×<br/>30 days                                           | 720 hours ×<br/>3 CCUs per hour  | 2160 CCUs ×<br/>\$0.4 per CCU = **\$864**  |
+| Dedicated infrastructure                        | 1 region ×<br/>24 hours per day ×<br/>30 days                                               | 720 hours ×<br/>3 CCUs per hour  | 2160 CCUs ×<br/>\$0.4 per CCU = **\$864**  |
 | Production Multi-Cluster                        | 3 Production Clusters ×<br/>24 hours per day ×<br/>30 days                                  | 2160 hours ×<br/>4 CCUs per hour | 8640 CCUs ×<br/>\$0.4 per CCU = **\$3456** |
 | Additional Cube API Instance                    | 3 Production Clusters ×<br/>(10 – 2) API Instances ×<br/>4 hours per day ×<br/>30 days      | 2880 hours ×<br/>1 CCU per hour  | 2880 CCUs ×<br/>\$0.4 per CCU = **\$1152** |
 | Cube Store Worker                               | 1 Production Multi-Cluster ×<br/>16 Cube Store Workers ×<br/>12 hours per day ×<br/>30 days | 5760 hours ×<br/>1 CCU per hour  | 5760 CCUs ×<br/>\$0.4 per CCU = **\$2304** |
@@ -266,3 +267,5 @@ subscription plan level. Payments are non-refundable.
 [ref-query-history]: /product/workspace/query-history
 [ref-performance-insights]: /product/workspace/performance
 [ref-audit-log]: /product/workspace/audit-log
+[ref-dedicated-infra]: /product/deployment/cloud/infrastructure#dedicated-infrastructure
+[ref-sso]: /product/workspace/sso
