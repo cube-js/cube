@@ -140,6 +140,7 @@ type SqlApiRequest = BaseRequest & {
   apiType?: ApiType;
   queryKey: any;
   streaming?: boolean;
+  memberExpressions?: boolean;
 };
 
 /**

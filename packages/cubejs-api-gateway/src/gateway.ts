@@ -49,7 +49,9 @@ import {
 } from './types/auth';
 import {
   Query,
-  NormalizedQuery, MemberExpression,
+  NormalizedQuery,
+  MemberExpression,
+  ParsedMemberExpression,
 } from './types/query';
 import {
   UserBackgroundContext,
@@ -144,7 +146,7 @@ class ApiGateway {
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
-  
+
   protected readonly contextRejectionMiddleware: ContextRejectionMiddlewareFn;
 
   protected readonly wsContextAcceptor: ContextAcceptorFn;
@@ -153,6 +155,7 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
 
   public constructor(
@@ -186,7 +189,7 @@ class ApiGateway {
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    this.event = options.event || function () {};
+    this.event = options.event || function dummyEvent() {};
   }
 
   public initApp(app: ExpressApplication) {
@@ -226,7 +229,7 @@ class ApiGateway {
         schema = makeSchema(metaConfig);
         compilerApi.setGraphQLSchema(schema);
       }
-      
+
       try {
         const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
         res.json({ jsonQuery });
@@ -361,7 +364,7 @@ class ApiGateway {
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
         const server = this.initSQLServer();
-        
+
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Transfer-Encoding', 'chunked');
 
@@ -1170,11 +1173,12 @@ class ApiGateway {
    * an array of query type and array of normalized queries.
    */
   protected async getNormalizedQueries(
-    query: Record<string, any> | Record<string, any>[],
+    inputQuery: Record<string, any> | Record<string, any>[],
     context: RequestContext,
     persistent = false,
+    memberExpressions: boolean = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
-    query = this.parseQueryParam(query);
+    let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
@@ -1186,7 +1190,7 @@ class ApiGateway {
       queryType = QueryTypeEnum.BLENDING_QUERY;
     }
 
-    const queries = Array.isArray(query) ? query : [query];
+    const queries: Query[] = Array.isArray(query) ? query : [query];
 
     this.log({
       type: 'Query Rewrite',
@@ -1198,13 +1202,28 @@ class ApiGateway {
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
+          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+
+          if (hasExpressionsInQuery) {
+            if (!memberExpressions) {
+              throw new Error('Expressions are not allowed in this context');
+            }
+
+            currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+          }
+
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          const rewrite = await this.queryRewrite(
+          let rewrittenQuery = await this.queryRewrite(
             normalizedQuery,
             context,
           );
+
+          if (hasExpressionsInQuery) {
+            rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
+          }
+
           return normalizeQuery(
-            rewrite,
+            rewrittenQuery,
             persistent,
           );
         }
@@ -1254,13 +1273,8 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      query = this.parseQueryParam(query);
-
-      if (memberExpressions) {
-        query = this.parseMemberExpressionsInQueries(query);
-      }
-
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context, disableLimitEnforcing);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context, disableLimitEnforcing, memberExpressions);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
@@ -1287,12 +1301,10 @@ class ApiGateway {
     }
   }
 
-  private parseMemberExpressionsInQueries(query: Record<string, any> | Record<string, any>[]): Query | Query[] {
-    if (Array.isArray(query)) {
-      return query.map(q => this.parseMemberExpressionsInQuery(<Query>q));
-    } else {
-      return this.parseMemberExpressionsInQuery(<Query>query);
-    }
+  private hasExpressionsInQuery(query: Query): boolean {
+    const arraysToCheck = [query.measures, query.dimensions, query.segments];
+
+    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
   }
 
   private parseMemberExpressionsInQuery(query: Query): Query {
@@ -1304,7 +1316,7 @@ class ApiGateway {
     };
   }
 
-  private parseMemberExpression(memberExpression: string): string | MemberExpression {
+  private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
     try {
       if (memberExpression.startsWith('{')) {
         const obj = JSON.parse(memberExpression);
@@ -1321,7 +1333,7 @@ class ApiGateway {
           cubeName: obj.cube_name,
           name: obj.alias,
           expressionName: obj.alias,
-          expression: Function.constructor.apply(null, args),
+          expression: args,
           definition: memberExpression,
           groupingSet,
         };
@@ -1331,6 +1343,25 @@ class ApiGateway {
     } catch {
       return memberExpression;
     }
+  }
+
+  private evalMemberExpressionsInQuery(query: Query): Query {
+    return {
+      ...query,
+      measures: (query.measures || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+      dimensions: (query.dimensions || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+      segments: (query.segments || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+    };
+  }
+
+  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): string | MemberExpression {
+    const expression = Array.isArray(memberExpression.expression) ?
+      Function.constructor.apply(null, memberExpression.expression) : memberExpression.expression;
+
+    return {
+      ...memberExpression,
+      expression,
+    };
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
@@ -1682,8 +1713,7 @@ class ApiGateway {
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
-      const sqlQueries = await this
-        .getSqlQueriesInternal(context, normalizedQueries);
+      const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
 
@@ -1779,14 +1809,12 @@ class ApiGateway {
       query = this.parseQueryParam(request.query);
       let resType: ResultType = ResultType.DEFAULT;
 
-      query = this.parseMemberExpressionsInQueries(query);
-
       if (!Array.isArray(query) && query.responseFormat) {
         resType = query.responseFormat;
       }
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context, request.streaming);
+        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
 
       const compilerApi = await this.getCompilerApi(context);
       let metaConfigResult = await compilerApi.metaConfig({
@@ -2014,9 +2042,9 @@ class ApiGateway {
     e, context, query, res, requestStarted
   }: HandleErrorOptions) {
     const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
-    
+
     const plainError = e.plainMessages;
-    
+
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -2342,7 +2370,7 @@ class ApiGateway {
           token,
           error: error.stack || error.toString()
         }, <any>req);
-        
+
         res.status(e.status).json({ error: e.message });
       } else if (e instanceof Error) {
         this.log({
@@ -2366,7 +2394,7 @@ class ApiGateway {
   protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
-  
+
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: ExpressResponse, next: NextFunction) => {
     try {
       req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
