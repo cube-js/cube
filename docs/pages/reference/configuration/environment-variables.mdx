@@ -1282,7 +1282,7 @@ The logging level for Cube Store.
 
 ## `CUBESTORE_META_ADDR`
 
-The address/port pair for the **router** node in the cluster.
+The address/port pair for the Cube Store **router** node in the cluster.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1290,8 +1290,8 @@ The address/port pair for the **router** node in the cluster.
 
 ## `CUBESTORE_META_PORT`
 
-The port for the **router** node to listen for connections on. Ignored when
-`CUBESTORE_META_ADDR` is set.
+The port for the Cube Store **router** node to listen for connections on.
+Ignored when `CUBESTORE_META_ADDR` is set.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1418,8 +1418,10 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 
 ## `CUBESTORE_SERVER_NAME`
 
-The full name and port number of the Cube Store server. Must be unique for each
-instance in cluster mode.
+The full name and port number of the Cube Store node (either the router
+or a worker). Must be unique for each instance in the Cube Store cluster.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1445,7 +1447,7 @@ insertion.
 ## `CUBESTORE_WORKER_PORT`
 
 The port for Cube Store workers to listen to connections on. When set, the node
-will start as a **worker** in the cluster
+will start as a Cube Store **worker** in the cluster
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1453,7 +1455,9 @@ will start as a **worker** in the cluster
 
 ## `CUBESTORE_WORKERS`
 
-A comma-separated list of address/port pairs for Cube Store workers.
+A comma-separated list of address/port pairs of Cube Store workers.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values                              | Default in Development | Default in Production |
 | -------------------------------------------- | ---------------------- | --------------------- |
@@ -1462,6 +1466,12 @@ A comma-separated list of address/port pairs for Cube Store workers.
 ```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
+
+Used to implement stateless addressing within a Cube Store cluster.
+By analyzing `CUBESTORE_WORKERS` and `CUBESTORE_SERVER_NAME`, each node
+is able to determine its position within a Cube Store cluster.
+This allows each worker to know which pre-aggregation partitions it owns
+and how the load is distributed across all workers.
 
 ## `DEBUG_LOG`
 

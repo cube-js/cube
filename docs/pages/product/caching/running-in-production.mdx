@@ -132,11 +132,11 @@ reference][ref-config-env].
 
 | Environment Variable    | Specify on Router? | Specify on Worker? |
 | ----------------------- | ------------------ | ------------------ |
-| `CUBESTORE_SERVER_NAME` | Yes                | Yes                |
-| `CUBESTORE_META_PORT`   | Yes                | -                  |
-| `CUBESTORE_WORKERS`     | Yes                | Yes                |
-| `CUBESTORE_WORKER_PORT` | -                  | Yes                |
-| `CUBESTORE_META_ADDR`   | -                  | Yes                |
+| `CUBESTORE_SERVER_NAME` | ✅ Yes              | ✅ Yes              |
+| `CUBESTORE_META_PORT`   | ✅ Yes              | —                  |
+| `CUBESTORE_WORKERS`     | ✅ Yes              | ✅ Yes              |
+| `CUBESTORE_WORKER_PORT` | —                  | ✅ Yes              |
+| `CUBESTORE_META_ADDR`   | —                  | ✅ Yes              |
 
 `CUBESTORE_WORKERS` and `CUBESTORE_META_ADDR` variables should be set with
 stable addresses, which should not change. You can use stable DNS names and put
