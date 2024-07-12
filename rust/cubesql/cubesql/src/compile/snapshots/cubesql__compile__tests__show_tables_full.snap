@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 7985
 expression: "execute_query(\"show full tables;\".to_string(), DatabaseProtocol::MySQL).await?"
 ---
 +---------------------------+------------+
@@ -9,4 +10,5 @@ expression: "execute_query(\"show full tables;\".to_string(), DatabaseProtocol::
 | Logs                      | BASE TABLE |
 | NumberCube                | BASE TABLE |
 | WideCube                  | BASE TABLE |
+| MultiTypeCube             | BASE TABLE |
 +---------------------------+------------+

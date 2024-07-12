@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 10828
+assertion_line: 11984
 expression: "execute_query(\"\n                SELECT\n                    att.attname,\n                    att.attnum,\n                    cl.oid\n                FROM pg_attribute att\n                JOIN pg_class cl ON\n                    cl.oid = attrelid AND (\n                        cl.relkind = 's' OR\n                        cl.relkind = 'r'\n                    )\n                ORDER BY\n                    cl.oid ASC,\n                    att.attnum ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +--------------------+--------+-------+
@@ -239,4 +239,71 @@ expression: "execute_query(\"\n                SELECT\n                    att.a
 | dim99              | 205    | 18035 |
 | __user             | 206    | 18035 |
 | __cubeJoinField    | 207    | 18035 |
+| measure_num0       | 1      | 18245 |
+| measure_str0       | 2      | 18245 |
+| measure_date0      | 3      | 18245 |
+| measure_num1       | 4      | 18245 |
+| measure_str1       | 5      | 18245 |
+| measure_date1      | 6      | 18245 |
+| measure_num2       | 7      | 18245 |
+| measure_str2       | 8      | 18245 |
+| measure_date2      | 9      | 18245 |
+| measure_num3       | 10     | 18245 |
+| measure_str3       | 11     | 18245 |
+| measure_date3      | 12     | 18245 |
+| measure_num4       | 13     | 18245 |
+| measure_str4       | 14     | 18245 |
+| measure_date4      | 15     | 18245 |
+| measure_num5       | 16     | 18245 |
+| measure_str5       | 17     | 18245 |
+| measure_date5      | 18     | 18245 |
+| measure_num6       | 19     | 18245 |
+| measure_str6       | 20     | 18245 |
+| measure_date6      | 21     | 18245 |
+| measure_num7       | 22     | 18245 |
+| measure_str7       | 23     | 18245 |
+| measure_date7      | 24     | 18245 |
+| measure_num8       | 25     | 18245 |
+| measure_str8       | 26     | 18245 |
+| measure_date8      | 27     | 18245 |
+| measure_num9       | 28     | 18245 |
+| measure_str9       | 29     | 18245 |
+| measure_date9      | 30     | 18245 |
+| count              | 31     | 18245 |
+| maxPrice           | 32     | 18245 |
+| minPrice           | 33     | 18245 |
+| avgPrice           | 34     | 18245 |
+| countDistinct      | 35     | 18245 |
+| dim_num0           | 36     | 18245 |
+| dim_str0           | 37     | 18245 |
+| dim_date0          | 38     | 18245 |
+| dim_num1           | 39     | 18245 |
+| dim_str1           | 40     | 18245 |
+| dim_date1          | 41     | 18245 |
+| dim_num2           | 42     | 18245 |
+| dim_str2           | 43     | 18245 |
+| dim_date2          | 44     | 18245 |
+| dim_num3           | 45     | 18245 |
+| dim_str3           | 46     | 18245 |
+| dim_date3          | 47     | 18245 |
+| dim_num4           | 48     | 18245 |
+| dim_str4           | 49     | 18245 |
+| dim_date4          | 50     | 18245 |
+| dim_num5           | 51     | 18245 |
+| dim_str5           | 52     | 18245 |
+| dim_date5          | 53     | 18245 |
+| dim_num6           | 54     | 18245 |
+| dim_str6           | 55     | 18245 |
+| dim_date6          | 56     | 18245 |
+| dim_num7           | 57     | 18245 |
+| dim_str7           | 58     | 18245 |
+| dim_date7          | 59     | 18245 |
+| dim_num8           | 60     | 18245 |
+| dim_str8           | 61     | 18245 |
+| dim_date8          | 62     | 18245 |
+| dim_num9           | 63     | 18245 |
+| dim_str9           | 64     | 18245 |
+| dim_date9          | 65     | 18245 |
+| __user             | 66     | 18245 |
+| __cubeJoinField    | 67     | 18245 |
 +--------------------+--------+-------+
