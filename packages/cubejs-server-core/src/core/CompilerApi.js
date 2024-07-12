@@ -57,40 +57,49 @@ export class CompilerApi {
     }
 
     if (!this.compilers || this.compilerVersion !== compilerVersion) {
-      const startCompilingTime = new Date().getTime();
-      try {
-        this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
-          version: compilerVersion,
-          requestId
-        });
-
-        this.compilers = await compile(this.repository, {
-          allowNodeRequire: this.allowNodeRequire,
-          compileContext: this.compileContext,
-          allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
-          standalone: this.standalone,
-          nativeInstance: this.nativeInstance,
-        });
-        this.compilerVersion = compilerVersion;
-        this.queryFactory = await this.createQueryFactory(this.compilers);
-
-        this.logger('Compiling schema completed', {
-          version: compilerVersion,
-          requestId,
-          duration: ((new Date()).getTime() - startCompilingTime),
-        });
-      } catch (e) {
-        this.logger('Compiling schema error', {
-          version: compilerVersion,
-          requestId,
-          duration: ((new Date()).getTime() - startCompilingTime),
-          error: (e.stack || e).toString()
-        });
+      this.compilers = this.compileSchema(compilerVersion, requestId).catch(e => {
+        this.compilers = undefined;
         throw e;
-      }
+      });
+      this.compilerVersion = compilerVersion;
     }
 
     return this.compilers;
+  }
+
+  async compileSchema(compilerVersion, requestId) {
+    const startCompilingTime = new Date().getTime();
+    try {
+      this.logger(this.compilers ? 'Recompiling schema' : 'Compiling schema', {
+        version: compilerVersion,
+        requestId
+      });
+
+      const compilers = await compile(this.repository, {
+        allowNodeRequire: this.allowNodeRequire,
+        compileContext: this.compileContext,
+        allowJsDuplicatePropsInSchema: this.allowJsDuplicatePropsInSchema,
+        standalone: this.standalone,
+        nativeInstance: this.nativeInstance,
+      });
+      this.queryFactory = await this.createQueryFactory(compilers);
+
+      this.logger('Compiling schema completed', {
+        version: compilerVersion,
+        requestId,
+        duration: ((new Date()).getTime() - startCompilingTime),
+      });
+
+      return compilers;
+    } catch (e) {
+      this.logger('Compiling schema error', {
+        version: compilerVersion,
+        requestId,
+        duration: ((new Date()).getTime() - startCompilingTime),
+        error: (e.stack || e).toString()
+      });
+      throw e;
+    }
   }
 
   async createQueryFactory(compilers) {
