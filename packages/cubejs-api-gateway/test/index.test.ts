@@ -397,7 +397,7 @@ describe('API Gateway', () => {
             req.authInfo = authorization;
           }
         },
-        queryRewrite: async (query, context) => {
+        queryRewrite: async (query, _context) => {
           query.limit = 2;
           return query;
         }
@@ -732,6 +732,8 @@ describe('API Gateway', () => {
       expect(res.body).toMatchObject(successResult);
     };
 
+    /*
+     Test using this is commented out below
     const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,
@@ -757,6 +759,7 @@ describe('API Gateway', () => {
         expect(res.body.error).toBe(payload.result.error);
       }
     };
+    */
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },

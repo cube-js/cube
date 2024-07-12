@@ -10,7 +10,6 @@ import {
   TimeMember,
   FilterOperator,
   QueryTimeDimensionGranularity,
-  QueryOrderType,
 } from './strings';
 import { ResultType } from './enums';
 
