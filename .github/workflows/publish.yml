@@ -107,18 +107,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Yarn install
-        uses: nick-fields/retry@v3
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         env:
@@ -212,18 +200,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Yarn install
-        uses: nick-fields/retry@v3
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release
@@ -298,18 +274,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Yarn install
-        uses: nick-fields/retry@v3
-        env:
-          CUBESTORE_SKIP_POST_INSTALL: true
-        with:
-          max_attempts: 3
-          retry_on: error
-          retry_wait_seconds: 15
-          timeout_minutes: 20
-          command: yarn install --frozen-lockfile
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release
