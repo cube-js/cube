@@ -107,8 +107,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         env:
@@ -202,8 +200,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release
@@ -278,8 +274,6 @@ jobs:
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
-      - name: Compile TypeScript
-        run: yarn tsc
       - name: Build native (fallback)
         if: (matrix.python-version == 'fallback')
         run: cd packages/cubejs-backend-native && npm run native:build-release
