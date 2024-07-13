@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
+
+
+### Features
+
+* **cubejs-databricks-jdbc-driver:** read-only mode ([#8440](https://github.com/cube-js/cube/issues/8440)) ([6d2f97a](https://github.com/cube-js/cube/commit/6d2f97a4c4a845279dc629780041b9bcb8a47bb9))
+
+
+
+
+
 ## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
 
 
