@@ -10,7 +10,7 @@ datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "4
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 itertools = "0.10.2"
 cubeclient = { path = "../../cubesql/cubeclient" }
-neonservice = { path = "../neonservice/" }
+nativebridge = { path = "../nativebridge/" }
 async-trait = "0.1.36"
 serde = "1.0.115"
 serde_json = "1.0.56"

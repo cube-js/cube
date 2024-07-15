@@ -670,7 +670,6 @@ dependencies = [
  "cubeclient",
  "cubenativeutils",
  "cubesql",
- "cubesqlplanner",
  "findshlibs",
  "futures",
  "libc",
@@ -765,21 +764,6 @@ dependencies = [
  "tokio-util 0.6.10",
  "tracing",
  "uuid 0.8.2",
-]
-
-[[package]]
-name = "cubesqlplanner"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "cubeclient",
- "cubenativeutils",
- "datafusion",
- "itertools",
- "neon",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]

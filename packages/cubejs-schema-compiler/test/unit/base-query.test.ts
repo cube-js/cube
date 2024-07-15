@@ -20,7 +20,7 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
       });
-      const queryAndParams = await query.buildSqlAndParamsTest();
+      const queryAndParams = query.buildSqlAndParamsTest();
       expect(queryAndParams[0]).toContain('card_tbl');
     });
   });

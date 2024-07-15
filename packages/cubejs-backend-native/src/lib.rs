@@ -45,8 +45,11 @@ use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
 
-use cubenativeutils::wrappers::object::NativeObject;
-use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NeonCubeEvaluator};
+use cubenativeutils::wrappers::neon::context::ContextHolder;
+use cubenativeutils::wrappers::neon::object::NeonObject;
+use cubenativeutils::wrappers::object::{NativeObject, NativeObjectHolder};
+use std::rc::Rc;
+//use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NeonCubeEvaluator};
 
 struct SQLInterface {
     services: Arc<CubeServices>,
@@ -496,14 +499,50 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
 
 //============ sql planner ===================
 
-fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
-    let cube_evaluator = cx.argument::<JsObject>(0)?.root(&mut cx);
+fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
+    //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
+    //context should be used only inside function
+    let mut cx = extend_function_context_lifetime(cx);
+    let cube_evaluator = cx.argument::<JsValue>(0)?;
 
-    let channel = Arc::new(cx.channel());
+    let context_holder = ContextHolder::new(cx);
 
-    let cube_evaluator = NeonCubeEvaluator::new(NativeObject::new(cx.channel(), cube_evaluator));
+    let (arg1, arg2) = {
+        let mut b_context = context_holder.borrow_mut();
+        println!("!----!!! ---");
+        let cxx = b_context.get_context();
+        let arg1 = cxx.string("measures").upcast::<JsValue>();
+        let arg2 = cxx.string("cards.count").upcast::<JsValue>();
+        (arg1, arg2)
+    };
+    let neon_object = NeonObject::new(context_holder.clone(), cube_evaluator.clone());
 
-    let runtime = tokio_runtime_node(&mut cx)?;
+    let args: Vec<Rc<dyn NativeObject>> = vec![
+        NeonObject::new(context_holder.clone(), arg1),
+        NeonObject::new(context_holder.clone(), arg2),
+    ];
+
+    println!("!----2222 ---");
+    let r = neon_object.call("parsePath", args).unwrap();
+    println!("!----3333 ---");
+
+    {
+        let mut b_context = context_holder.borrow_mut();
+        let cxx = b_context.get_context();
+        let res_obj = r
+            .as_any()
+            .downcast_ref::<NeonObject<FunctionContext>>()
+            .unwrap()
+            .get_object()
+            .downcast::<JsArray, _>(cxx);
+
+        println!("!!! --- res_obj {:?}", res_obj);
+    }
+
+    /* let cube_evaluator =
+    NeonCubeEvaluator::new_from_native(NativeObject::new(cx.channel(), cube_evaluator)); */
+
+    /* let runtime = tokio_runtime_node(&mut cx)?;
 
     let query_params = cx.argument::<JsString>(1)?.value(&mut cx);
 
@@ -513,16 +552,21 @@ fn build_sql_and_params(mut cx: FunctionContext) -> JsResult<JsValue> {
         let r = cube_evaluator
             .parse_path("measures".to_string(), "cards.count".to_string())
             .await;
-        println!("!!!! ---F {:?}", r);
+        println!("!!!! ---F1 {:?}", r);
 
         deferred.settle_with(channel.as_ref(), move |mut cx| Ok(cx.string("fhfhfhfh")));
-    });
+    }); */
     //let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
 
     //arg_clrep.into_js(&mut cx)
     let res = "SELECT".to_string(); // build_sql_query_and_params();
+    let mut cx = context_holder.borrow_mut();
+    let cxx = cx.get_context();
+    Ok(cxx.string("cccc").upcast::<JsValue>())
+}
 
-    Ok(promise.upcast::<JsValue>())
+fn extend_function_context_lifetime<'a>(cx: FunctionContext<'a>) -> FunctionContext<'static> {
+    unsafe { std::mem::transmute::<FunctionContext<'a>, FunctionContext<'static>>(cx) }
 }
 
 #[neon::main]

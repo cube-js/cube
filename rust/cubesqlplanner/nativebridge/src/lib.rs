@@ -8,7 +8,7 @@ use syn::spanned::Spanned;
 use syn::{parse_macro_input, FnArg, Item, Pat, ReturnType, TraitItem};
 
 #[proc_macro_attribute]
-pub fn neon_service(_attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
+pub fn native_bridge(_attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
     let svc = parse_macro_input!(input as NeonService);
 
     proc_macro::TokenStream::from(svc.into_token_stream())
@@ -152,17 +152,16 @@ impl NeonMethod {
             args,
             output,
         } = &self;
-        let arg_names = args
+        let js_args_set = args
             .iter()
             .filter_map(|a| match a {
                 FnArg::Typed(ty) => match ty.pat.as_ref() {
-                    Pat::Ident(id) => Some(id.ident.clone()),
+                    Pat::Ident(id) => Some(Self::js_agr_set(&id.ident)),
                     x => panic!("Unexpected pattern: {:?}", x),
                 },
                 FnArg::Receiver(_) => None,
             })
             .collect::<Vec<_>>();
-        let variant = self.variant_ident();
         let js_method_name = self.camel_case_name();
 
         if *asyncness {
@@ -172,8 +171,7 @@ impl NeonMethod {
                         .call(
                             #js_method_name,
                             Box::new(|holder| {
-                                holder.add(path_type)?;
-                                holder.add(path)?;
+                                #( #js_args_set )*
 
                                 Ok(())
                             }),
@@ -190,7 +188,7 @@ impl NeonMethod {
         }
     }
 
-    fn js_argr_set(arg: &FnArg) -> proc_macro2::TokenStream {
+    fn js_agr_set(arg: &Ident) -> proc_macro2::TokenStream {
         quote! {
             holder.add(#arg)?;
         }
@@ -213,50 +211,6 @@ impl NeonMethod {
         match c.next() {
             None => String::new(),
             Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-        }
-    }
-
-    fn server_impl(
-        &self,
-        method_call_ident: Ident,
-        method_result_ident: Ident,
-    ) -> proc_macro2::TokenStream {
-        let &Self {
-            ident,
-            asyncness,
-            args,
-            ..
-        } = &self;
-        let arg_names = args
-            .iter()
-            .filter_map(|a| match a {
-                FnArg::Typed(ty) => match ty.pat.as_ref() {
-                    Pat::Ident(id) => Some(id.ident.clone()),
-                    x => panic!("Unexpected pattern: {:?}", x),
-                },
-                FnArg::Receiver(_) => None,
-            })
-            .collect::<Vec<_>>();
-        let variant = self.variant_ident();
-
-        let match_method = if arg_names.is_empty() {
-            quote! {
-                #method_call_ident::#variant
-            }
-        } else {
-            quote! {
-                #method_call_ident::#variant(#( #arg_names ),*)
-            }
-        };
-
-        if *asyncness {
-            quote! {
-                #match_method => #method_result_ident::#variant(self.service.#ident(#( #arg_names ),*).await)
-            }
-        } else {
-            quote! {
-                #match_method => unimplemented!()
-            }
         }
     }
 
