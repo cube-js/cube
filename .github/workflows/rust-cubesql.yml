@@ -76,7 +76,7 @@ jobs:
           # default key
           key: cubesql-x86_64-unknown-linux-gnu
           shared-key: cubesql-x86_64-unknown-linux-gnu
-      - name: Install tarpaulin@0.29.2
+      - name: Install cargo-llvm-cov@0.6.10
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-llvm-cov
