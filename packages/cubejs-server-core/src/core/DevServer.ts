@@ -596,7 +596,7 @@ export class DevServer {
       try {
         await schemaConverter.generate();
       } catch (error) {
-        res.status(400).json({ error: (error as Error).message || error });
+        return res.status(400).json({ error: (error as Error).message || error });
       }
 
       schemaConverter.getSourceFiles().forEach(({ cubeName: currentCubeName, fileName, source }) => {
@@ -605,7 +605,7 @@ export class DevServer {
         }
       });
 
-      res.json('ok');
+      return res.json('ok');
     }));
   }
 
