@@ -73,7 +73,7 @@ target "x86_64-unknown-linux-gnu" {
   platforms = ["linux/amd64"]
 }
 
-target "x86_64-unknown-linux-gnu" {
+target "x86_64-unknown-linux-gnu-python" {
   inherits = ["x86_64-unknown-linux-gnu"]
   contexts = {
     base = "target:x86_64-unknown-linux-gnu"
