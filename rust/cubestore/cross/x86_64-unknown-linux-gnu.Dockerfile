@@ -1,21 +1,23 @@
 # libc 2.31 python 3.9
 FROM debian:bullseye-slim
 
+ARG LLVM_VERSION=18
+
 RUN apt-get update && apt-get -y upgrade \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl gnupg git apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-18 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-$LLVM_VERSION main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 lld-18 clang-18 libclang-18-dev clang-18 make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-${LLVM_VERSION} lld-${LLVM_VERSION} clang-$LLVM_VERSION libclang-${LLVM_VERSION}-dev clang-$LLVM_VERSION make cmake \
       lzma-dev liblzma-dev libpython3-dev \
     && rm -rf /var/lib/apt/lists/*;
 
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100 \
-    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 \
-    && update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-18 100 \
-    && update-alternatives --install /usr/bin/lld clang-cpp /usr/bin/lld-18 100 \
-    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 100 \
-    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100;
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/lld clang-cpp /usr/bin/lld-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100;
 
 # https://www.openssl.org/source/old/1.1.1/
 ARG OPENSSL_VERSION=1.1.1w
