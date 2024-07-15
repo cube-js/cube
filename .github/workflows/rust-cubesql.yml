@@ -16,9 +16,11 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     name: Check fmt/clippy
+    container:
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
 
     steps:
       - name: Checkout
@@ -47,9 +49,11 @@ jobs:
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     name: Unit (Rewrite Engine)
+    container:
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
 
     steps:
       - name: Checkout
@@ -61,8 +65,8 @@ jobs:
         with:
           workspaces: ./rust/cubesql -> target
           # default key
-          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
-          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          key: cubesql-x86_64-unknown-linux-gnu
+          shared-key: cubesql-x86_64-unknown-linux-gnu
       - name: Install tarpaulin@0.28.0
         uses: baptiste0928/cargo-install@v3
         with:
@@ -105,7 +109,7 @@ jobs:
             target: "aarch64-unknown-linux-gnu"
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-25062024
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) }}
 
     steps:
       - name: Checkout
@@ -121,8 +125,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubesql -> target
-          key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
-          shared-key: cubesql-${{ runner.OS }}-${{ matrix.target }}-${{ matrix.node-version }}
+          key: cubesql-${{ matrix.target }}
+          shared-key: cubesql-${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
