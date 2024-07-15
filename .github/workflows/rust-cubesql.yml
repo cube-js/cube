@@ -14,9 +14,6 @@ on:
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
 
-permissions:
-  id-token: write
-
 jobs:
   lint:
     runs-on: ubuntu-24.04
@@ -92,7 +89,7 @@ jobs:
       - name: Upload code coverage
         uses: codecov/codecov-action@v4
         with:
-          use_oidc: true
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./rust/cubesql/lcov.info
           verbose: true
           flags: cubesql
