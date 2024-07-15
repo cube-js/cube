@@ -50,6 +50,7 @@ jobs:
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
+    #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     name: Unit (Rewrite Engine)
@@ -66,11 +67,6 @@ jobs:
           # default key
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
-      - name: Install tarpaulin@0.28.0
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-tarpaulin
-          version: "0.28.0"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -78,7 +74,7 @@ jobs:
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
-        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+        run: cd rust/cubesql && cargo test
 
   native_linux:
     needs: [lint]
