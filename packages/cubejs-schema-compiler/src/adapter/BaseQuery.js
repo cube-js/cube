@@ -604,12 +604,12 @@ export class BaseQuery {
     );
   }
 
-  async buildSqlAndParamsTest(exportAnnotatedSql) {
+  buildSqlAndParamsTest(exportAnnotatedSql) {
     const queryParams = {
         measures: this.options.measures,
         dimensions: this.options.dimensions
     }
-    let r = await nativeBuildSqlAndParams(this.cubeEvaluator, queryParams);
+    let r = nativeBuildSqlAndParams(this.cubeEvaluator, queryParams);
     console.log("!!! native res ", r);
     return this.buildSqlAndParams(exportAnnotatedSql);
   }

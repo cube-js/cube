@@ -708,7 +708,6 @@ dependencies = [
  "cubeclient",
  "cubenativeutils",
  "cubesql",
- "cubesqlplanner",
  "findshlibs",
  "futures",
  "http-body-util",

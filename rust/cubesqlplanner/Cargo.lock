@@ -773,8 +773,8 @@ dependencies = [
  "cubenativeutils",
  "datafusion",
  "itertools",
+ "nativebridge",
  "neon",
- "neonservice",
  "serde",
  "serde_json",
  "tokio",
@@ -1797,6 +1797,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "nativebridge"
+version = "0.1.0"
+dependencies = [
+ "Inflector",
+ "async-trait",
+ "byteorder",
+ "itertools",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "neon"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1820,19 +1833,6 @@ dependencies = [
  "quote",
  "syn 2.0.69",
  "syn-mid",
-]
-
-[[package]]
-name = "neonservice"
-version = "0.1.0"
-dependencies = [
- "Inflector",
- "async-trait",
- "byteorder",
- "itertools",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
