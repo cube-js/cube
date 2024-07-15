@@ -284,7 +284,7 @@ jobs:
             compress: false
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-25062024
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024
     steps:
       - uses: actions/checkout@v4
       - name: Setup Rust toolchain
