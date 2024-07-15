@@ -113,7 +113,7 @@ export class DevServer {
       });
 
       const tablesSchema = await driver.tablesSchema();
-      
+
       this.cubejsServer.event('Dev Server DB Schema Load Success');
       if (Object.keys(tablesSchema || {}).length === 0) {
         this.cubejsServer.event('Dev Server DB Schema Load Empty');
@@ -164,17 +164,17 @@ export class DevServer {
 
       await fs.emptyDir(path.join(options.schemaPath, 'cubes'));
       await fs.emptyDir(path.join(options.schemaPath, 'views'));
-      
+
       await fs.writeFile(path.join(options.schemaPath, 'views', 'example_view.yml'), `# In Cube, views are used to expose slices of your data graph and act as data marts.
-# You can control which measures and dimensions are exposed to BIs or data apps, 
+# You can control which measures and dimensions are exposed to BIs or data apps,
 # as well as the direction of joins between the exposed cubes.
 # You can learn more about views in documentation here - https://cube.dev/docs/schema/reference/view
 
 
-# The following example shows a view defined on top of orders and customers cubes. 
-# Both orders and customers cubes are exposed using the "includes" parameter to 
+# The following example shows a view defined on top of orders and customers cubes.
+# Both orders and customers cubes are exposed using the "includes" parameter to
 # control which measures and dimensions are exposed.
-# Prefixes can also be applied when exposing measures or dimensions. 
+# Prefixes can also be applied when exposing measures or dimensions.
 # In this case, the customers' city dimension is prefixed with the cube name,
 # resulting in "customers_city" when querying the view.
 
@@ -189,10 +189,10 @@ export class DevServer {
 #
 #           - total_amount
 #           - count
-#      
+#
 #       - join_path: orders.customers
 #         prefix: true
-#         includes: 
+#         includes:
 #           - city`);
       await Promise.all(files.map(file => fs.writeFile(path.join(options.schemaPath, 'cubes', file.fileName), file.content)));
 
@@ -530,15 +530,15 @@ export class DevServer {
       if (!variables.CUBEJS_API_SECRET) {
         variables.CUBEJS_API_SECRET = options.apiSecret;
       }
-      
+
       let envs: Record<string, string> = {};
       const envPath = path.join(process.cwd(), '.env');
       if (fs.existsSync(envPath)) {
         envs = dotenv.parse(fs.readFileSync(envPath));
       }
-      
+
       const schemaPath = envs.CUBEJS_SCHEMA_PATH || process.env.CUBEJS_SCHEMA_PATH || 'model';
-      
+
       variables.CUBEJS_EXTERNAL_DEFAULT = 'true';
       variables.CUBEJS_SCHEDULED_REFRESH_DEFAULT = 'true';
       variables.CUBEJS_DEV_MODE = 'true';
