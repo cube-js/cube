@@ -118,7 +118,7 @@ jobs:
             target: "aarch64-unknown-linux-gnu"
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-15082024${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) }}
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024${{ matrix.python-version != 'fallback' && format('-python-{0}', matrix.python-version) || '' }}
 
     steps:
       - name: Checkout
