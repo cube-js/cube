@@ -36,7 +36,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
-          config: .github/buildkitd.toml
+          buildkitd-config: .github/buildkitd.toml
       - name: Build and push
         uses: docker/bake-action@v5
         with:
