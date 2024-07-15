@@ -80,7 +80,32 @@ export class DevServer {
         const errorString = ((e as Error).stack || e).toString();
         console.error(errorString);
         this.cubejsServer.event('Dev Server Error', { error: errorString });
-        res.status(500).json({ error: errorString });
+
+        // We don't know what state response is left at here:
+        // It could be corked, headers could be sent, body could be sent completely or partially
+
+        // Also, because we pass `next` to handler without any wrapper we don't know if it was called or not
+        // Hence, we shouldn't call it for error handling
+
+        try {
+          while (res.writableCorked > 0) {
+            res.uncork();
+          }
+
+          if (res.writableEnded) {
+            // There's nothing we can do for response, error happened after call to end()
+          } else if (res.headersSent) {
+            // If header is already sent, we can't alter any of it, so best we can do is just terminate body
+            res.end();
+          } else {
+            res.status(500).json({ error: errorString });
+          }
+        } catch (send500Error) {
+          const send500ErrorString = ((send500Error as Error).stack || send500Error).toString();
+          console.error(send500ErrorString);
+          this.cubejsServer.event('Dev Server Error', { error: send500ErrorString });
+          res.destroy(send500Error);
+        }
       }
     };
 
