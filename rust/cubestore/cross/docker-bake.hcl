@@ -52,8 +52,7 @@ target "aarch64-unknown-linux-gnu-python" {
   platforms = ["linux/amd64"]
 }
 
-# We use -python prefix for ci
-target "x86_64-unknown-linux-musl-python" {
+target "x86_64-unknown-linux-musl" {
   context = "."
   dockerfile = "x86_64-unknown-linux-musl.Dockerfile"
   args = {
