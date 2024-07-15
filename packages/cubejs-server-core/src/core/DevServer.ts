@@ -77,9 +77,10 @@ export class DevServer {
       try {
         await handler(req, res, next);
       } catch (e) {
-        console.error(((e as Error).stack || e).toString());
-        this.cubejsServer.event('Dev Server Error', { error: ((e as Error).stack || e).toString() });
-        res.status(500).json({ error: ((e as Error).stack || e).toString() });
+        const errorString = ((e as Error).stack || e).toString();
+        console.error(errorString);
+        this.cubejsServer.event('Dev Server Error', { error: errorString });
+        res.status(500).json({ error: errorString });
       }
     };
 
