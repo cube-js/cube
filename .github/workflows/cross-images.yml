@@ -3,13 +3,13 @@ name: Cross Images
 on:
   push:
     paths:
-      - '.github/workflows/push-cross-images.yml'
+      - '.github/workflows/cross-images.yml'
       - 'rust/cubestore/cross/**'
     branches:
       - 'master'
   pull_request:
     paths:
-      - '.github/workflows/push-cross-images.yml'
+      - '.github/workflows/cross-images.yml'
       - 'rust/cubestore/cross/**'
 
 jobs:
@@ -33,17 +33,8 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Load .cross file
-        uses: xom9ikk/dotenv@v2.3.0
+      - name: Build and push
+        uses: docker/bake-action@v5
         with:
-          path: rust/cubestore/cross/
-      - name: Push to Docker Hub
-        uses: docker/build-push-action@v6
-        with:
-          context: ./
-          file: ./rust/cubestore/cross/${{ matrix.target }}.Dockerfile
-          platforms: linux/amd64
+          workdir: ./rust/cubestore/cross
           push: ${{ github.ref == 'refs/heads/master' }}
-          tags: cubejs/rust-cross:${{ matrix.target }},cubejs/rust-cross:${{ matrix.target }}-${{ env.CROSS_VERSION }}
