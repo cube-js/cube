@@ -37,4 +37,5 @@ jobs:
         uses: docker/bake-action@v5
         with:
           workdir: ./rust/cubestore/cross
+          targets: ${{ matrix.target }}
           push: ${{ github.ref == 'refs/heads/master' }}
