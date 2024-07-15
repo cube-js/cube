@@ -12,7 +12,7 @@ RUN apt-get update \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 lld-18 clang-18 libclang-18-dev clang-18 \
         make cmake libsasl2-dev \
         libc6 libc6-dev libc6-arm64-cross libc6-dev-arm64-cross \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
@@ -23,6 +23,7 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 1
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 \
     && update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-18 100 \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-18 100 \
+    && update-alternatives --install /usr/bin/lld clang-cpp /usr/bin/lld-18 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-18 100;
 
 ENV ARCH=arm \
