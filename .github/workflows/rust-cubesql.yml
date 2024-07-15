@@ -88,7 +88,7 @@ jobs:
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
-        run: cd rust/cubesql && cargo tarpaulin --workspace --no-fail-fast --avoid-cfg-tarpaulin --out Xml
+        run: cd rust/cubesql && cargo tarpaulin --workspace --engine llvm --no-fail-fast --avoid-cfg-tarpaulin --out Xml
 #      - name: Upload code coverage
 #        uses: codecov/codecov-action@v3
 #        with:
