@@ -29,7 +29,6 @@ use itertools::Itertools;
 use std::{
     borrow::Cow,
     fmt::{self, Display, Formatter},
-    ops::Index,
     str::FromStr,
     sync::Arc,
 };
@@ -545,6 +544,9 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
+// vvv This TODO comment was written before find_member_by_alias cached results, but
+// column_name_to_member_vec might still be useful if LogicalPlanData cannot be borrowed immutably.
+
 // TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
     member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
@@ -562,19 +564,66 @@ pub fn column_name_to_member_vec(
 }
 
 impl LogicalPlanData {
-    fn find_member(
-        &self,
-        f: impl Fn(&MemberNameToExpr, &str) -> bool,
-    ) -> Option<(&MemberNameToExpr, String)> {
+    fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
         let mut relation = WithColumnRelation(None);
-        for tuple @ (_, _member, expr) in self.member_name_to_expr.as_ref()?.iter() {
-            let column_name = expr_column_name(&expr, &None);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
+        if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
+            if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
+                if *cached_index == usize::MAX {
+                    return None;
+                }
+                return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
             }
-            let column_name = expr_column_name_with_relation(&expr, &mut relation);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
+            for (index, tuple @ (_, _member, expr)) in member_names_to_expr.list.iter().enumerate()
+            {
+                {
+                    let column_name = expr_column_name(&expr, &None);
+                    let equal = name == &column_name;
+                    let _ = member_names_to_expr
+                        .cached_lookups
+                        .try_insert(column_name, index);
+
+                    if equal {
+                        return Some((tuple, name.to_string()));
+                    }
+                }
+                {
+                    let column_name = expr_column_name_with_relation(&expr, &mut relation);
+                    let equal = name == &column_name;
+                    let _ = member_names_to_expr
+                        .cached_lookups
+                        .try_insert(column_name, index);
+
+                    if equal {
+                        return Some((tuple, name.to_string()));
+                    }
+                }
+            }
+            member_names_to_expr
+                .cached_lookups
+                .insert(name.to_string(), usize::MAX);
+            return None;
+        }
+        return None;
+    }
+
+    fn find_member_by_alias_immutably(&self, name: &str) -> Option<(&MemberNameToExpr, String)> {
+        let mut relation = WithColumnRelation(None);
+        if let Some(member_names_to_expr) = &self.member_name_to_expr {
+            if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
+                if *cached_index == usize::MAX {
+                    return None;
+                }
+                return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
+            }
+            for tuple @ (_, _member, expr) in member_names_to_expr.list.iter() {
+                let column_name = expr_column_name(&expr, &None);
+                if name == &column_name {
+                    return Some((tuple, column_name));
+                }
+                let column_name = expr_column_name_with_relation(&expr, &mut relation);
+                if name == &column_name {
+                    return Some((tuple, column_name));
+                }
             }
         }
         None
@@ -589,18 +638,6 @@ fn column_name_to_member_to_aliases(
         .filter(|(_, member)| member.is_some())
         .map(|(column_name, member)| (column_name, member.unwrap()))
         .collect::<Vec<_>>()
-}
-
-fn member_name_to_expr_by_alias(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    id: Id,
-    alias: &str,
-) -> Option<MemberNameToExpr> {
-    egraph
-        .index(id)
-        .data
-        .find_member(|_, a| a == alias)
-        .map(|(m, _a)| m.clone())
 }
 
 fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {

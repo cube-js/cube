@@ -92,7 +92,8 @@ impl OrderRules {
                     .index(subst[members_var])
                     .data
                     .member_name_to_expr
-                    .clone()
+                    .as_ref()
+                    .map(|x| x.list.clone())
                 {
                     let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
                     let referenced_columns = referenced_columns(referenced_expr);

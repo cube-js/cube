@@ -44,7 +44,7 @@ use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
-    ops::Index,
+    ops::{Index, IndexMut},
     sync::Arc,
 };
 
@@ -1339,7 +1339,8 @@ impl MemberRules {
                         .index(subst[members_var])
                         .data
                         .member_name_to_expr
-                        .clone()
+                        .as_ref()
+                        .map(|x| x.list.clone())
                     {
                         let column_name_to_member_name =
                             column_name_to_member_vec(member_name_to_expr);
@@ -1469,7 +1470,8 @@ impl MemberRules {
                                 .index(subst[members_var])
                                 .data
                                 .member_name_to_expr
-                                .clone()
+                                .as_ref()
+                                .map(|x| x.list.clone())
                             {
                                 let member_column_names =
                                     column_name_to_member_vec(member_name_to_expr);
@@ -1758,12 +1760,13 @@ impl MemberRules {
             var!(filtered_member_pushdown_replacer_alias_to_cube_var);
         let flat_list = self.config_obj.push_down_pull_up_split();
         move |egraph, subst| {
-            for alias_to_cube in var_iter!(
+            let alias_to_cubes: Vec<_> = var_iter!(
                 egraph[subst[member_pushdown_replacer_alias_to_cube_var]],
                 MemberPushdownReplacerAliasToCube
             )
             .cloned()
-            {
+            .collect();
+            for alias_to_cube in alias_to_cubes {
                 let column_iter = if default_count {
                     vec![Column::from_name(Self::default_count_measure_name())]
                 } else {
@@ -1775,9 +1778,9 @@ impl MemberRules {
                     let alias_name = expr_column_name(&Expr::Column(alias_column), &None);
 
                     if let Some((member, member_alias)) = &egraph
-                        .index(subst[old_members_var])
+                        .index_mut(subst[old_members_var])
                         .data
-                        .find_member(|_, member_alias| member_alias == &alias_name)
+                        .find_member_by_alias(&alias_name)
                     {
                         let cube_to_filter = if let Some(cube) = member.1.cube() {
                             Some(cube)
@@ -2645,7 +2648,8 @@ impl MemberRules {
                 .index(subst[left_aliases_var])
                 .data
                 .member_name_to_expr
-                .clone()
+                .as_ref()
+                .map(|x| x.list.clone())
             {
                 let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
                 let left_aliases = column_name_to_member_to_aliases(column_name_to_member_name);
@@ -2654,7 +2658,8 @@ impl MemberRules {
                     .index(subst[right_aliases_var])
                     .data
                     .member_name_to_expr
-                    .clone()
+                    .as_ref()
+                    .map(|x| x.list.clone())
                 {
                     let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
                     let right_aliases =
