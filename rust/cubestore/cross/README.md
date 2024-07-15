@@ -19,18 +19,13 @@ Keep in mind:
 
 ```sh
 # dmY
-export $(cat .env | xargs)
+docker buildx bake x86_64-unknown-linux-gnu-python --push
+docker buildx bake aarch64-unknown-linux-gnu-python --push
+docker buildx bake x86_64-unknown-linux-musl-python --push
 
-docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION -f x86_64-unknown-linux-gnu.Dockerfile .
-docker buildx build --platform linux/amd64 -t cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION -f x86_64-unknown-linux-musl.Dockerfile .
-docker buildx build --platform linux/amd64 -t cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION -f aarch64-unknown-linux-gnu.Dockerfile .
-
-docker push cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION
-docker push cubejs/rust-cross:x86_64-unknown-linux-musl-$CROSS_VERSION
-docker push cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION
+export CROSS_VERSION=15082024
 
 # Verify versions
 docker run --platform linux/amd64 --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-$CROSS_VERSION cc --version
-docker run --platform linux/amd64 --rm -it cubejs/rust-cross:x86_64-unknown-linux-gnu-buster-$CROSS_VERSION cc --version
 docker run --platform linux/amd64 --rm -it cubejs/rust-cross:aarch64-unknown-linux-gnu-$CROSS_VERSION cc --version
 ```
