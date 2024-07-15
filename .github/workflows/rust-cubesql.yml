@@ -71,6 +71,11 @@ jobs:
         run: |
           # ubuntu 24.04 has lld-18
           sudo apt-get update && sudo apt install -y lld
+      - name: Install cargo-llvm-cov@0.6.10
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-llvm-cov
+          version: "0.6.10"
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -78,7 +83,16 @@ jobs:
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
-        run: cd rust/cubesql && cargo test
+        run: |
+          cd rust/cubesql
+          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      - name: Upload code coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./rust/cubesql/lcov.info
+          verbose: true
+          flags: cubesql
+          fail_ci_if_error: false
 
   native_linux:
     needs: [lint]
