@@ -76,5 +76,8 @@
     "micromatch": "4.0.6"
   },
   "license": "MIT",
-  "packageManager": "yarn@1.22.19"
+  "packageManager": "yarn@1.22.19",
+  "volta": {
+    "node": "18.0.0"
+  }
 }

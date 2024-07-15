@@ -10,7 +10,8 @@ RUN yarn config set network-timeout 120000 -g
 # We are copying root yarn.lock file to the context folder during the Publish GH
 # action. So, a process will use the root lock file here.
 RUN yarn install --prod && yarn cache clean
-
+RUN yarn add tough-cookie@4.1.3
+RUN rm yarn.lock
 FROM node:18.20.3-bullseye-slim
 
 ARG IMAGE_VERSION=unknown
