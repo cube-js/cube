@@ -59,7 +59,7 @@ target "x86_64-unknown-linux-musl-python" {
   args = {
     LLVM_VERSION = LLVM_VERSION
   }
-  tags = ["cubejs/cross:x86_64-unknown-linux-musl-${CROSS_VERSION}"]
+  tags = ["cubejs/rust-cross:x86_64-unknown-linux-musl-${CROSS_VERSION}"]
   platforms = ["linux/amd64"]
 }
 
@@ -69,7 +69,7 @@ target "x86_64-unknown-linux-gnu" {
   args = {
     LLVM_VERSION = LLVM_VERSION
   }
-  tags = ["cubejs/cross:x86_64-unknown-linux-gnu-${CROSS_VERSION}"]
+  tags = ["cubejs/rust-cross:x86_64-unknown-linux-gnu-${CROSS_VERSION}"]
   platforms = ["linux/amd64"]
 }
 
