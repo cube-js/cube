@@ -4,7 +4,7 @@ ARG PYTHON_VERSION
 ARG PYTHON_RELEASE
 
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y python${PYTHON_VERSION_RELEASE} \
-    && get autoremove -y;
+    && rm -rf /var/lib/apt/lists/*;
 
 RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz \
     # python  is required for cross compiling python :D
