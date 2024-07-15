@@ -3622,4 +3622,42 @@ export class BaseQuery {
       }
     });
   }
+
+  flattenAllMembers() {
+    return R.flatten(
+      this.measures
+        .concat(this.dimensions)
+        .concat(this.segments)
+        .concat(this.filters)
+        .concat(this.measureFilters)
+        .concat(this.timeDimensions)
+        .map(m => m.getMembers()),
+    );
+  }
+
+  allBackAliasMembers() {
+    return this.backAliasMembers(this.flattenAllMembers());
+  }
+
+  backAliasMembers(members) {
+    const query = this;
+    return members.map(
+      member => {
+        const collectedMembers = query
+          .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        const memberPath = member.expressionPath();
+        let nonAliasSeen = false;
+        return collectedMembers
+          .filter(d => {
+            if (!query.cubeEvaluator.byPathAnyType(d).aliasMember) {
+              nonAliasSeen = true;
+            }
+            return !nonAliasSeen;
+          })
+          .map(d => (
+            { [query.cubeEvaluator.byPathAnyType(d).aliasMember]: memberPath }
+          )).reduce((a, b) => ({ ...a, ...b }), {});
+      }
+    ).reduce((a, b) => ({ ...a, ...b }), {});
+  }
 }
