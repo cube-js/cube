@@ -10,7 +10,7 @@ RUN apt-get update \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 lld-18 clang-18 libclang-18-dev clang-18 make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \
