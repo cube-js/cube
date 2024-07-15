@@ -50,11 +50,10 @@ jobs:
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
+    #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     name: Unit (Rewrite Engine)
-    container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
 
     steps:
       - name: Checkout
@@ -62,25 +61,12 @@ jobs:
         with:
           # pulls all commits (needed for codecov)
           fetch-depth: 2
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly-2023-12-13
-          # override: true # this is by default on
-          rustflags: ""
-          components: rustfmt, clippy
-          cache: false
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubesql -> target
           # default key
-          key: cubesql-x86_64-unknown-linux-gnu
-          shared-key: cubesql-x86_64-unknown-linux-gnu
-      - name: Install cargo-llvm-cov@0.6.10
-        uses: baptiste0928/cargo-install@v3
-        with:
-          crate: cargo-llvm-cov
-          version: "0.6.10"
+          key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
+          shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Unit tests (Rewrite Engine)
         env:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
@@ -88,16 +74,7 @@ jobs:
           CUBESQL_SQL_PUSH_DOWN: true
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
-        run: |
-          cd rust/cubesql
-          cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
-      - name: Upload code coverage
-        uses: codecov/codecov-action@v3
-        with:
-          files: ./rust/cubesql/lcov.info
-          verbose: true
-          flags: cubesql
-          fail_ci_if_error: false
+        run: cd rust/cubesql && cargo test
 
   native_linux:
     needs: [lint]
