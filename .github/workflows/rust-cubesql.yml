@@ -87,7 +87,7 @@ jobs:
           cd rust/cubesql
           cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
       - name: Upload code coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           files: ./rust/cubesql/lcov.info
           verbose: true
