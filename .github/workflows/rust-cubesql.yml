@@ -14,6 +14,9 @@ on:
       - 'packages/cubejs-backend-native/**'
       - 'rust/cubesql/**'
 
+permissions:
+  id-token: write
+
 jobs:
   lint:
     runs-on: ubuntu-24.04
