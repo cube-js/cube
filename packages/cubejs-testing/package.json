@@ -120,7 +120,7 @@
     "eslint-plugin-cypress": "^2.12.1",
     "globby": "^11.0.4",
     "jest": "^27",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "jwt-decode": "^3.1.2",
     "pg": "^8.7.3",
     "typescript": "~5.2.2",

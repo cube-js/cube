@@ -64,7 +64,7 @@
     "dotenv": "^16.0.3",
     "fs-extra": "^11.1.1",
     "jest": "^27",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "pg": "^8.7.3",
     "ramda": "^0.28.0",
     "testcontainers": "^9.3.0",
