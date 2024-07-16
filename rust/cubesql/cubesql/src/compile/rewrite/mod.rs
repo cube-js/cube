@@ -545,7 +545,7 @@ impl ExprRewriter for WithColumnRelation {
 }
 
 // vvv This TODO comment was written before find_member_by_alias cached results, but
-// column_name_to_member_vec might still be useful if LogicalPlanData cannot be borrowed immutably.
+// column_name_to_member_vec might still be useful if LogicalPlanData cannot be borrowed mutably.
 
 // TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
