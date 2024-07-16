@@ -39,8 +39,8 @@ endpoint = "https://logs-prod-012.grafana.net"
 
 [sinks.loki.auth]
 strategy = "basic"
-user = "618504"
-password = "eyJrIjoiMDVmMzE4MTk4ZDY1NGE5NWQ3Y2M2Yjk0MzE0M2JkZmJjNTMzMzU5ZCIsIm4iOiJrZXkiLCJpZCI6ODc1NzE5fQ=="
+user = "$CUBE_CLOUD_MONITORING_GRAFANA_CLOUD_USER"
+password = "$CUBE_CLOUD_MONITORING_GRAFANA_CLOUD_PASSWORD"
 
 [sinks.loki.encoding]
 codec = "json"

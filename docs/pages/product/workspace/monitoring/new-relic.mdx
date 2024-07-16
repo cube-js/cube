@@ -1,0 +1,68 @@
+# Integration with New Relic
+
+[New Relic](https://newrelic.com) is an all-in-one observability platform.
+This guide demonstrates how to set up Cube Cloud to export logs and metrics
+to New Relic.
+
+## Configuration
+
+First, enable [monitoring integrations][ref-monitoring-integrations] in Cube
+Cloud.
+
+### Exporting logs
+
+To export logs to New Relic, configure the
+[`new_relic`](https://vector.dev/docs/reference/configuration/sinks/new_relic/)
+sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+Use the `logs` API endpoint.
+
+Example configuration:
+
+```toml
+[sinks.new_relic_logs]
+type = "new_relic"
+api = "logs"
+inputs = [
+  "cubejs-server",
+  "refresh-scheduler",
+  "ext-db",
+  "warmup-job",
+  "cubestore"
+]
+region = "eu"
+compression = "gzip"
+account_id = "$CUBE_CLOUD_MONITORING_NEW_RELIC_ACCOUNT_ID"
+license_key = "$CUBE_CLOUD_MONITORING_NEW_RELIC_LICENSE_KEY"
+```
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to New Relic and watch the logs coming.
+
+### Exporting metrics
+
+To export metrics to New Relic, configure the
+[`new_relic`](https://vector.dev/docs/reference/configuration/sinks/new_relic/)
+sink in your [`vector.toml` configuration file][ref-monitoring-integrations-conf].
+Use the `metrics` API endpoint.
+
+Example configuration:
+
+```toml
+[sinks.new_relic_metrics]
+type = "new_relic"
+api = "metrics"
+inputs = [
+  "metrics"
+]
+region = "eu"
+compression = "gzip"
+account_id = "$CUBE_CLOUD_MONITORING_NEW_RELIC_ACCOUNT_ID"
+license_key = "$CUBE_CLOUD_MONITORING_NEW_RELIC_LICENSE_KEY"
+```
+
+Commit the configuration for Vector, it should take effect in a minute. Then,
+navigate to New Relic and watch the metrics coming.
+
+
+[ref-monitoring-integrations]: /product/workspace/monitoring
+[ref-monitoring-integrations-conf]: /product/workspace/monitoring#configuration
