@@ -1,9 +1,8 @@
 use crate::{
     compile::rewrite::{
         aggregate,
-        analysis::LogicalPlanAnalysis,
-        column_name_to_member_vec, cube_scan_wrapper, grouping_set_expr, original_expr_name,
-        rewrite,
+        analysis::{LogicalPlanAnalysis, LogicalPlanData},
+        cube_scan_wrapper, grouping_set_expr, original_expr_name, rewrite,
         rules::{members::MemberRules, wrapper::WrapperRules},
         subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
         wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
@@ -19,6 +18,7 @@ use crate::{
 };
 use datafusion::logical_plan::Column;
 use egg::{EGraph, Rewrite, Subst, Var};
+use std::ops::IndexMut;
 
 impl WrapperRules {
     pub fn aggregate_rules(
@@ -489,7 +489,7 @@ impl WrapperRules {
                 for fun in fun_name_var
                     .map(|fun_var| {
                         var_iter!(egraph[subst[fun_var]], AggregateFunctionExprFun)
-                            .map(|fun| Some(fun))
+                            .map(|fun| Some(fun.clone()))
                             .collect()
                     })
                     .unwrap_or(vec![None])
@@ -502,7 +502,7 @@ impl WrapperRules {
                         })
                         .unwrap_or(vec![false])
                     {
-                        let call_agg_type = MemberRules::get_agg_type(fun, distinct);
+                        let call_agg_type = MemberRules::get_agg_type(fun.as_ref(), distinct);
 
                         let column_iter = if let Some(column_var) = column_var {
                             var_iter!(egraph[subst[column_var]], ColumnExprColumn)
@@ -512,18 +512,17 @@ impl WrapperRules {
                             vec![Column::from_name(MemberRules::default_count_measure_name())]
                         };
 
-                        if let Some(member_name_to_expr) = egraph[subst[cube_members_var]]
+                        if let Some(member_names_to_expr) = &mut egraph
+                            .index_mut(subst[cube_members_var])
                             .data
                             .member_name_to_expr
-                            .as_ref()
-                            .map(|x| x.list.clone())
                         {
-                            let column_name_to_member_name =
-                                column_name_to_member_vec(member_name_to_expr);
                             for column in column_iter {
-                                if let Some((_, Some(member))) = column_name_to_member_name
-                                    .iter()
-                                    .find(|(cn, _)| cn == &column.name)
+                                if let Some((&(Some(ref member), _, _), _)) =
+                                    LogicalPlanData::do_find_member_by_alias(
+                                        member_names_to_expr,
+                                        &column.name,
+                                    )
                                 {
                                     if let Some(measure) =
                                         meta.find_measure_with_name(member.to_string())

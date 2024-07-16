@@ -6,9 +6,10 @@ pub mod rewriter;
 pub mod rules;
 
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member, OriginalExpr},
+    compile::rewrite::analysis::{LogicalPlanAnalysis, OriginalExpr},
     CubeError,
 };
+use analysis::MemberNamesToExpr;
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
@@ -544,99 +545,92 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-// vvv This TODO comment was written before find_member_by_alias cached results, but
-// column_name_to_member_vec might still be useful if LogicalPlanData cannot be borrowed mutably.
-
-// TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
-    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
+    member_names_to_expr: &mut MemberNamesToExpr,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
-    member_name_to_expr
-        .into_iter()
-        .flat_map(|(member, _, expr)| {
-            [
-                (expr_column_name(&expr, &None), member.clone()),
-                (expr_column_name_with_relation(&expr, &mut relation), member),
-            ]
+    for (index, _tuple @ (_, _member, expr)) in member_names_to_expr
+        .list
+        .iter()
+        .enumerate()
+        .skip(member_names_to_expr.uncached_lookups_offset)
+    {
+        {
+            let column_name = expr_column_name(&expr, &None);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+        {
+            let column_name = expr_column_name_with_relation(&expr, &mut relation);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+    }
+    member_names_to_expr.uncached_lookups_offset = member_names_to_expr.list.len();
+
+    member_names_to_expr
+        .cached_lookups
+        .iter()
+        .map(|(column_name, &index)| {
+            (
+                column_name.clone(),
+                member_names_to_expr.list[index].0.clone(),
+            )
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 impl LogicalPlanData {
     fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
-        let mut relation = WithColumnRelation(None);
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
-            if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
-                return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
-            }
-            for (index, tuple @ (_, _member, expr)) in member_names_to_expr
-                .list
-                .iter()
-                .enumerate()
-                .skip(member_names_to_expr.uncached_lookups_offset)
+            Self::do_find_member_by_alias(member_names_to_expr, name)
+        } else {
+            None
+        }
+    }
+
+    fn do_find_member_by_alias<'a>(
+        member_names_to_expr: &'a mut MemberNamesToExpr,
+        name: &str,
+    ) -> Option<(&'a MemberNameToExpr, String)> {
+        if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
+            return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
+        }
+        let mut relation = WithColumnRelation(None);
+        for (index, tuple @ (_, _member, expr)) in member_names_to_expr
+            .list
+            .iter()
+            .enumerate()
+            .skip(member_names_to_expr.uncached_lookups_offset)
+        {
             {
-                {
-                    let column_name = expr_column_name(&expr, &None);
-                    let equal = name == &column_name;
-                    let _ = member_names_to_expr
-                        .cached_lookups
-                        .try_insert(column_name, index);
+                let column_name = expr_column_name(&expr, &None);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
 
-                    if equal {
-                        return Some((tuple, name.to_string()));
-                    }
+                if equal {
+                    return Some((tuple, name.to_string()));
                 }
-                {
-                    let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                    let equal = name == &column_name;
-                    let _ = member_names_to_expr
-                        .cached_lookups
-                        .try_insert(column_name, index);
-
-                    if equal {
-                        return Some((tuple, name.to_string()));
-                    }
-                }
-                member_names_to_expr.uncached_lookups_offset = index + 1;
             }
-            return None;
+            {
+                let column_name = expr_column_name_with_relation(&expr, &mut relation);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
+
+                if equal {
+                    return Some((tuple, name.to_string()));
+                }
+            }
+            member_names_to_expr.uncached_lookups_offset = index + 1;
         }
         return None;
     }
-
-    fn find_member_by_alias_immutably(&self, name: &str) -> Option<(&MemberNameToExpr, String)> {
-        let mut relation = WithColumnRelation(None);
-        if let Some(member_names_to_expr) = &self.member_name_to_expr {
-            if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
-                if *cached_index == usize::MAX {
-                    return None;
-                }
-                return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
-            }
-            for tuple @ (_, _member, expr) in member_names_to_expr.list.iter() {
-                let column_name = expr_column_name(&expr, &None);
-                if name == &column_name {
-                    return Some((tuple, column_name));
-                }
-                let column_name = expr_column_name_with_relation(&expr, &mut relation);
-                if name == &column_name {
-                    return Some((tuple, column_name));
-                }
-            }
-        }
-        None
-    }
-}
-
-fn column_name_to_member_to_aliases(
-    column_name_to_member: Vec<(String, Option<String>)>,
-) -> Vec<(String, String)> {
-    column_name_to_member
-        .into_iter()
-        .filter(|(_, member)| member.is_some())
-        .map(|(column_name, member)| (column_name, member.unwrap()))
-        .collect::<Vec<_>>()
 }
 
 fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
