@@ -13,9 +13,9 @@ use datafusion::{
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
-            IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
-            TimestampNanosecondType, UInt32Type,
+            ArrowPrimitiveType, DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type,
+            IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
+            TimeUnit, TimestampNanosecondType, UInt32Type,
         },
     },
     error::{DataFusionError, Result},
@@ -45,6 +45,9 @@ use crate::{
     },
     sql::SessionState,
 };
+
+type IntervalDayTime = <IntervalDayTimeType as ArrowPrimitiveType>::Native;
+type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native;
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
@@ -1424,10 +1427,12 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     };
 }
 
-fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result<NaiveDateTime> {
-    let month = (i >> (64 + 32)) & 0xFFFFFFFF;
-    let day = (i >> 64) & 0xFFFFFFFF;
-    let nano = i & 0xFFFFFFFFFFFFFFFF;
+fn date_addsub_month_day_nano(
+    t: NaiveDateTime,
+    i: IntervalMonthDayNano,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (month, day, nano) = IntervalMonthDayNanoType::to_parts(i);
 
     let result = if month > 0 && is_add || month < 0 && !is_add {
         t.checked_add_months(Months::new(month as u32))
@@ -1442,9 +1447,7 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     };
 
     let result = result.and_then(|t| {
-        t.checked_add_signed(Duration::nanoseconds(
-            (nano as i64) * (if !is_add { -1 } else { 1 }),
-        ))
+        t.checked_add_signed(Duration::nanoseconds(nano * (if !is_add { -1 } else { 1 })))
     });
     result.ok_or_else(|| {
         DataFusionError::Execution(format!(
@@ -1454,15 +1457,30 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     })
 }
 
-fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
-    let i = match is_add {
-        true => interval,
-        false => -interval,
+fn date_addsub_day_time(
+    t: NaiveDateTime,
+    interval: IntervalDayTime,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (days, millis) = IntervalDayTimeType::to_parts(interval);
+
+    let result = if days > 0 && is_add || days < 0 && !is_add {
+        t.checked_add_days(Days::new(days as u64))
+    } else {
+        t.checked_sub_days(Days::new(days.abs() as u64))
     };
 
-    let days: i64 = i.signum() * (i.abs() >> 32);
-    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    return Ok(t + chrono::Duration::days(days) + chrono::Duration::milliseconds(millis));
+    let result = result.and_then(|t| {
+        t.checked_add_signed(Duration::milliseconds(
+            millis as i64 * (if !is_add { -1 } else { 1 }),
+        ))
+    });
+    result.ok_or_else(|| {
+        DataFusionError::Execution(format!(
+            "Failed to add interval: {} day {} ms",
+            days, millis
+        ))
+    })
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
