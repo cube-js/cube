@@ -2336,7 +2336,7 @@ export class BaseQuery {
 
   /**
    * Evaluate escaped SQL-alias for cube or cube's property
-   * (measure, dimention).
+   * (measure, dimension).
    * @param {string} cubeName
    * @returns string
    */
@@ -3494,9 +3494,13 @@ export class BaseQuery {
   static extractFilterMembers(filter) {
     if (filter.operator === 'and' || filter.operator === 'or') {
       return filter.values.map(f => BaseQuery.extractFilterMembers(f)).reduce((a, b) => ((a && b) ? { ...a, ...b } : null), {});
-    } else if (filter.measure || filter.dimension) {
+    } else if (filter.measure) {
       return {
-        [filter.measure || filter.dimension]: true
+        [filter.measure]: true
+      };
+    } else if (filter.dimension) {
+      return {
+        [filter.dimension]: true
       };
     } else {
       return null;
