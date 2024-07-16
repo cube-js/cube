@@ -215,6 +215,6 @@ Client packages has it's own `.eslintrc.js` files.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.
 All PRs are merged using the squash strategy. PR title usually would be used as a name for commit. So please make sure it has a sensible name.  
-4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(@cubejs-backend/server-core):` or `fix(cubestore):`.
+4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(server-core):` or `fix(cubestore):`.
 5. Commit messages that are getting merged should contain mostly "Why" those changes are made as opposed to "What" changes are done. "Why" can be a feature, reference to issue or reasons to fix something like a chore.
 6. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced. Please do not include files that contain only reformatting changes in the commit.
