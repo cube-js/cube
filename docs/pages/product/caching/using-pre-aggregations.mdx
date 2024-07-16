@@ -980,6 +980,25 @@ please [let us know](https://cube.dev/contact) if you are interested in early
 access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
+## Troubleshooting
+
+### Members with unknown types
+
+When building pre-aggregations, you might get an error similar to the this one:
+
+```
+Error during create table: CREATE TABLE <REDACTED>:
+Custom type 'fixed' is not supported
+```
+
+It means that a member of a pre-aggregation has a type in the upstream data
+source that Cube Store can not recognize (e.g., `fixed` in this case).
+
+To resolve, please add a cast to a known type in the [`sql` parameter][ref-member-sql]
+of this member. For numeric types, it will most likely be an integer, a float,
+or a decimal type, depending on the nature of your data.
+
+
 [ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
 [ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
 [ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
@@ -1024,3 +1043,4 @@ streaming engine.
 [ref-matching-preaggs]: /product/caching/matching-pre-aggregations
 [ref-cube-store]: /product/caching/running-in-production#architecture
 [ref-cube-store-storage]: /product/caching/running-in-production#storage
+[ref-member-sql]: /reference/data-model/dimensions#sql
