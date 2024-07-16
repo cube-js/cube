@@ -40,7 +40,7 @@ use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Date32Array, Date64Array, TimestampNanosecondArray},
-        datatypes::DataType,
+        datatypes::{DataType, IntervalDayTimeType},
     },
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
@@ -4441,7 +4441,9 @@ impl FilterRules {
                     subst.insert(
                         one_day_var,
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                            ScalarValue::IntervalDayTime(Some(1 << 32)),
+                            ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(
+                                1, 0,
+                            ))),
                         ))),
                     );
                     return true;
