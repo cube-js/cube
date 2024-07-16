@@ -2159,15 +2159,16 @@ export class BaseQuery {
     const memberPathArray = [cubeName, name];
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
-    if (!type && this.cubeEvaluator.isMeasure(memberPathArray)) {
-      type = 'measure';
+    if (!type) {
+      if (this.cubeEvaluator.isMeasure(memberPathArray)) {
+        type = 'measure';
+      } else if (this.cubeEvaluator.isDimension(memberPathArray)) {
+        type = 'dimension';
+      } else if (this.cubeEvaluator.isSegment(memberPathArray)) {
+        type = 'segment';
+      }
     }
-    if (!type && this.cubeEvaluator.isDimension(memberPathArray)) {
-      type = 'dimension';
-    }
-    if (!type && this.cubeEvaluator.isSegment(memberPathArray)) {
-      type = 'segment';
-    }
+
     const parentMember = this.safeEvaluateSymbolContext().currentMember;
     if (this.safeEvaluateSymbolContext().memberChildren && parentMember) {
       this.safeEvaluateSymbolContext().memberChildren[parentMember] = this.safeEvaluateSymbolContext().memberChildren[parentMember] || [];
