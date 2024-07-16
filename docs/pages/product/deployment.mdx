@@ -171,8 +171,6 @@ concurrency as you require.
 A sample Docker Compose stack setting Cube Store cluster up might look like:
 
 ```yaml
-version: "2.2"
-
 services:
   cubestore_router:
     image: cubejs/cubestore:latest
@@ -220,7 +218,6 @@ cluster run on a single machine.
 A simplified example using AWS S3 might look like:
 
 ```yaml
-version: "2.2"
 services:
   cubestore_router:
     image: cubejs/cubestore:latest
