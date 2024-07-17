@@ -24300,4 +24300,29 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_sum_avg_null_type() -> Result<(), CubeError> {
+        init_logger();
+
+        insta::assert_snapshot!(
+            "sum_null_type",
+            execute_query(
+                "SELECT SUM(x) FROM (SELECT NULL AS x) AS t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "avg_null_type",
+            execute_query(
+                "SELECT AVG(x) FROM (SELECT NULL AS x) AS t".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }
