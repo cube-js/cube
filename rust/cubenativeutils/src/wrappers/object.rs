@@ -7,7 +7,7 @@ use std::rc::Rc;
 pub trait NativeObjectHolder {
     fn new_from_native(native: NativeObjectHandler) -> Self;
 
-    fn get_native_object(self) -> NativeObjectHandler;
+    fn get_native_object(&self) -> &NativeObjectHandler;
 }
 
 pub trait NativeObject: NativeBoxedClone {

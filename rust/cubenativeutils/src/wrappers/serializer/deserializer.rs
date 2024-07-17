@@ -17,6 +17,13 @@ impl NativeDeserializer {
     pub fn new(input: NativeObjectHandler) -> Self {
         Self { input }
     }
+
+    pub fn deserialize<T>(self) -> Result<T, NativeObjSerializerError>
+    where
+        T: DeserializeOwned,
+    {
+        T::deserialize(self)
+    }
 }
 
 impl<'de> Deserializer<'de> for NativeDeserializer {
