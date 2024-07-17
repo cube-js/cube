@@ -14,7 +14,6 @@ use cubesql::{
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
-use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -104,11 +103,6 @@ struct MetaRequest {
     session: SessionContext,
     #[serde(rename = "onlyCompilerId")]
     only_compiler_id: bool,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SqlResponseSerialized {
-    sql: (String, Vec<String>),
 }
 
 #[async_trait]

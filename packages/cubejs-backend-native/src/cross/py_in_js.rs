@@ -25,7 +25,7 @@ impl Finalize for JsPyFunctionWrapper {}
 pub type BoxedJsPyFunctionWrapper = JsBox<RefCell<JsPyFunctionWrapper>>;
 
 pub fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromise> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("cl_repr_py_function_wrapper {}", _fun_name);
 
     let (deferred, promise) = cx.promise();

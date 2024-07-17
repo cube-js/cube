@@ -44,11 +44,11 @@ impl NodeConfig {
         self.config.configure().await;
 
         injector
-            .register_typed::<dyn TransportService, _, _, _>(async move |_| transport)
+            .register_typed::<dyn TransportService, _, _, _>(|_| async move { transport })
             .await;
 
         injector
-            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| auth)
+            .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move { auth })
             .await;
 
         self.config.cube_services().await

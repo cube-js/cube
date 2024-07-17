@@ -18,7 +18,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -91,7 +91,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -181,7 +181,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -256,7 +256,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt

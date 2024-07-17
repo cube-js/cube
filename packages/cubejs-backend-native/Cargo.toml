@@ -45,5 +45,6 @@ features = ["napi-1", "napi-4", "napi-6", "futures"]
 
 [features]
 default = ["neon-entrypoint"]
+neon-debug = []
 neon-entrypoint = []
 python = ["pyo3", "pyo3-asyncio"]
