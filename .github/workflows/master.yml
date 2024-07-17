@@ -82,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: "native-linux-x64-glibc-3.9.node"    # this name is referenced below in docker-image-dev
-          path: ./packages/cubejs-backend-native/native/index.node
+          path: ./packages/cubejs-backend-native/index.node
           overwrite: true
 
   docker-image-dev:
