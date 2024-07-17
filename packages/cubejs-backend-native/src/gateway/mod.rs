@@ -3,4 +3,4 @@ pub mod router;
 pub mod server;
 
 pub use router::ApiGatewayRouterBuilder;
-pub use server::ApiGatewayServer;
+pub use server::{ApiGatewayServer, ApiGatewayServerImpl};
