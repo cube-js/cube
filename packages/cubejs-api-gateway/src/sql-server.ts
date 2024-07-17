@@ -158,6 +158,7 @@ export class SQLServer {
               sqlQuery,
               streaming,
               context,
+              memberExpressions: true,
               res: (response) => {
                 if ('error' in response) {
                   reject({
