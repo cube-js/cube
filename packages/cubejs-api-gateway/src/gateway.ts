@@ -90,6 +90,7 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
+import fetch from 'node-fetch';
 
 type HandleErrorOptions = {
     e: any,
@@ -499,6 +500,20 @@ class ApiGateway {
         });
       }));
     }
+
+    app.all(
+      `${this.basePath}/v2/stream`,
+      userMiddlewares,
+      (req: Request, res: ExpressResponse, next) => {
+        console.log(req);
+
+        // req.
+
+        fetch('http://localhost:3838/v2/stream').then((s) => {
+          console.log(s);
+        });
+      }
+    );
 
     app.use(this.handleErrorMiddleware);
   }

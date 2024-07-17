@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
-use crate::config::NodeConfig;
+use crate::config::{NodeConfig, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
@@ -21,18 +21,18 @@ use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::batch_to_rows;
 
-use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
+use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 
 struct SQLInterface {
-    services: Arc<CubeServices>,
+    services: Arc<NodeCubeServices>,
 }
 
 impl Finalize for SQLInterface {}
 
 impl SQLInterface {
-    pub fn new(services: Arc<CubeServices>) -> Self {
+    pub fn new(services: Arc<NodeCubeServices>) -> Self {
         Self { services }
     }
 }
@@ -61,23 +61,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .get::<JsFunction, _, _>(&mut cx, "canSwitchUserForSession")?
         .root(&mut cx);
 
-    let nonce_handle = options.get_value(&mut cx, "nonce")?;
-    let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
-        let value = nonce_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
-        Some(value.value(&mut cx))
-    } else {
-        None
-    };
-
-    let port_handle = options.get_value(&mut cx, "port")?;
-    let port = if port_handle.is_a::<JsNumber, _>(&mut cx) {
-        let value = port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
-
-        Some(value.value(&mut cx) as u16)
-    } else {
-        None
-    };
-
     let pg_port_handle = options.get_value(&mut cx, "pgPort")?;
     let pg_port = if pg_port_handle.is_a::<JsNumber, _>(&mut cx) {
         let value = pg_port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
@@ -103,7 +86,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(port, pg_port, nonce);
+        let config = NodeConfig::new(pg_port);
 
         runtime.block_on(async move {
             let services = Arc::new(
@@ -123,10 +106,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
                 Ok(())
             }));
-            {
-                let mut w = services.processing_loop_handles.write().await;
-                *w = loops;
-            }
         });
     });
 
@@ -145,13 +124,8 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     runtime.spawn(async move {
         match services.stop_processing_loops().await {
             Ok(_) => {
-                let mut handles = Vec::new();
-                {
-                    let mut w = services.processing_loop_handles.write().await;
-                    std::mem::swap(&mut *w, &mut handles);
-                }
-                for h in handles {
-                    let _ = h.await;
+                if let Err(err) = services.await_processing_loops().await {
+                    log::error!("Error during awaiting on shutdown: {}", err)
                 }
 
                 deferred
@@ -175,13 +149,16 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 const CHUNK_DELIM: &str = "\n";
 
 async fn handle_sql_query(
-    services: Arc<CubeServices>,
+    services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
     sql_query: &String,
 ) -> Result<(), CubeError> {
-    let config = services.injector.get_service_typed::<dyn ConfigObj>().await;
+    let config = services
+        .injector()
+        .get_service_typed::<dyn ConfigObj>()
+        .await;
 
     if !config.stream_mode() {
         return Err(CubeError::internal(
@@ -190,11 +167,11 @@ async fn handle_sql_query(
     }
 
     let transport_service = services
-        .injector
+        .injector()
         .get_service_typed::<dyn TransportService>()
         .await;
     let session_manager = services
-        .injector
+        .injector()
         .get_service_typed::<SessionManager>()
         .await;
 

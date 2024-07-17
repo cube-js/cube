@@ -1,6 +1,7 @@
 #![feature(async_closure)]
 #![feature(thread_id_value)]
 #![allow(clippy::result_large_err)]
+#![feature(diagnostic_namespace)]
 
 extern crate findshlibs;
 
@@ -8,6 +9,7 @@ pub mod auth;
 pub mod channel;
 pub mod config;
 pub mod cross;
+pub mod gateway;
 pub mod logger;
 pub mod node_export;
 pub mod node_obj_serializer;
