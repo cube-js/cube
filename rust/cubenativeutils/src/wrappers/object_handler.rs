@@ -1,9 +1,8 @@
+use super::context::NativeContextHolder;
 use super::object::{
     NativeArray, NativeBoolean, NativeNumber, NativeObject, NativeString, NativeStruct,
 };
 use cubesql::CubeError;
-use std::any::Any;
-use std::rc::Rc;
 
 pub struct NativeObjectHandler {
     object: Box<dyn NativeObject>,
@@ -78,6 +77,10 @@ impl NativeObjectHandler {
     }
     pub fn is_undefined(&self) -> bool {
         self.object.is_undefined()
+    }
+
+    pub fn get_context(&self) -> Result<NativeContextHolder, CubeError> {
+        self.object.get_context()
     }
 }
 

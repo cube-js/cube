@@ -56,9 +56,9 @@ use cubenativeutils::wrappers::object::{
 use cubenativeutils::wrappers::object_handler::NativeObjectHandler;
 use cubenativeutils::wrappers::serializer::deserializer::NativeDeserializer;
 use cubenativeutils::wrappers::serializer::serializer::NativeSerializer;
+use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NativeCubeEvaluator};
 use serde::Deserialize;
 use std::rc::Rc;
-//use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NeonCubeEvaluator};
 
 struct SQLInterface {
     services: Arc<CubeServices>,
@@ -517,54 +517,19 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
     let neon_context_holder = ContextHolder::new(cx);
 
     let context_holder = neon_context_holder.as_native_context_holder();
-    let args = vec![
-        NativeSerializer::serialize("measures", context_holder.clone()).unwrap(),
-        NativeSerializer::serialize("cards.count", context_holder.clone()).unwrap(),
-    ];
 
-    let neon_object = NativeObjectHandler::new(NeonObject::new(
+    let native_object = NativeObjectHandler::new(NeonObject::new(
         neon_context_holder.weak(),
         cube_evaluator.clone(),
     ));
 
-    println!("!----2222 ---");
-    let neon_struct = neon_object.into_object().into_struct().unwrap();
-    let r = neon_struct.call_method("parsePath", args).unwrap();
-    println!("!----33133 ---");
+    let evaluator = NativeCubeEvaluator::new_from_native(native_object);
 
-    println!("!---- 5555 ----- ");
+    let res = evaluator
+        .parse_path("measures".to_string(), "cards.count".to_string())
+        .unwrap();
 
-    let de = NativeDeserializer::new(r.clone());
-    let res = Vec::<String>::deserialize(de).unwrap();
-
-    println!("!---- res {:?}", res);
-
-    let array = r.into_object().into_array().unwrap();
-    let v = array.get(0).unwrap();
-
-    println!(
-        "!---- 66667666 ----- {:?}",
-        v.into_object().into_string().unwrap().value()
-    );
-
-    /* let cube_evaluator =
-    NeonCubeEvaluator::new_from_native(NativeObject::new(cx.channel(), cube_evaluator)); */
-
-    /* let runtime = tokio_runtime_node(&mut cx)?;
-
-    let query_params = cx.argument::<JsString>(1)?.value(&mut cx);
-
-    let (deferred, promise) = cx.promise();
-
-    runtime.spawn(async move {
-        let r = cube_evaluator
-            .parse_path("measures".to_string(), "cards.count".to_string())
-            .await;
-        println!("!!!! ---F1 {:?}", r);
-
-        deferred.settle_with(channel.as_ref(), move |mut cx| Ok(cx.string("fhfhfhfh")));
-    }); */
-    //let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
+    println!("! rrrrr {:?}", res);
 
     //arg_clrep.into_js(&mut cx)
     let res = context_holder.string("SELECT".to_string()).into_object();

@@ -15,7 +15,7 @@ crate-type = ["cdylib"]
 [dependencies]
 cubesql = { path = "../../rust/cubesql/cubesql" }
 cubeclient = { path = "../../rust/cubesql/cubeclient" }
-#cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner/" }
+cubesqlplanner = { path = "../../rust/cubesqlplanner/cubesqlplanner/" }
 cubenativeutils = { path = "../../rust/cubenativeutils" }
 tokio = { version = "1", features = ["full", "rt"] }
 async-channel = { version = "2" }
