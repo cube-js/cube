@@ -25,7 +25,7 @@ cubesql = { path = "../../rust/cubesql/cubesql" }
 findshlibs = "0.10.2"
 futures = "0.3.30"
 http-body-util = "0.1"
-axum = { version = "=0.7.2", features = ["default", "ws"] }
+axum = { version = "0.7.5", features = ["default", "ws"] }
 libc = "0.2"
 log = "0.4.21"
 log-reroute = "0.1"

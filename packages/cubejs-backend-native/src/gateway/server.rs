@@ -57,7 +57,16 @@ impl ProcessingLoop for ApiGatewayServerImpl {
             }
         };
 
+        let mut close_socket_rx_to_move = self.close_socket_tx.subscribe();
+
+        let shutdown_signal = || async move {
+            let _ = close_socket_rx_to_move.changed().await;
+
+            log::trace!("Shutdown signal received");
+        };
+
         axum::serve(listener, router)
+            .with_graceful_shutdown(shutdown_signal())
             .await
             .map_err(|err| CubeError::internal(err.to_string()))
     }

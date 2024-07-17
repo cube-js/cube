@@ -36,12 +36,12 @@ impl NodeCubeServices {
             .has_service_typed::<dyn ApiGatewayServer>()
             .await
         {
-            println!("kek");
             let gateway_server = self
                 .services
                 .injector
                 .get_service_typed::<dyn ApiGatewayServer>()
                 .await;
+
             futures.push(tokio::spawn(async move {
                 if let Err(e) = gateway_server.processing_loop().await {
                     log::error!("{}", e.to_string());
@@ -127,7 +127,7 @@ impl NodeConfig {
             .await;
 
         injector
-            .register_typed::<dyn ApiGatewayServer, _, _, _>(async move |i| {
+            .register_typed::<dyn ApiGatewayServer, _, _, _>(|i| async move {
                 ApiGatewayServerImpl::new(
                     ApiGatewayRouterBuilder::new(),
                     "0.0.0.0:3838".to_string(),
