@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
-use crate::config::{NodeConfig, NodeCubeServices};
+use crate::config::{NodeConfiguration, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
@@ -37,7 +37,7 @@ impl SQLInterface {
     }
 }
 
-fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
+fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
     let check_auth = options
         .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
@@ -95,7 +95,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(native_gateway_port, pg_port);
+        let config = C::new(native_gateway_port, pg_port);
 
         runtime.block_on(async move {
             let services = Arc::new(
@@ -451,9 +451,9 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
-pub fn register_module_exports(mut cx: ModuleContext) -> NeonResult<()> {
+pub fn register_module_exports<C: NodeConfiguration+ 'static>(mut cx: ModuleContext) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
-    cx.export_function("registerInterface", register_interface)?;
+    cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;

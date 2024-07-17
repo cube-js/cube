@@ -95,13 +95,19 @@ trait NativeConfiguration {
 }
 
 #[derive(Clone)]
-pub struct NodeConfig {
+pub struct NodeConfigurationImpl {
     pub config: Config,
     pub api_gateway_address: Option<String>,
 }
 
-impl NodeConfig {
-    pub fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> NodeConfig {
+pub trait NodeConfiguration {
+    fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> Self;
+
+    async fn configure(&self, transport: Arc<NodeBridgeTransport>, auth: Arc<NodeBridgeAuthService>) -> NodeCubeServices;
+}
+
+impl NodeConfiguration for NodeConfigurationImpl {
+    fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> Self {
         let config = Config::default();
         let config = config.update_config(|mut c| {
             if let Some(p) = pg_port {
@@ -121,7 +127,7 @@ impl NodeConfig {
         }
     }
 
-    pub async fn configure(
+    async fn configure(
         &self,
         transport: Arc<NodeBridgeTransport>,
         auth: Arc<NodeBridgeAuthService>,

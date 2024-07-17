@@ -25,6 +25,7 @@ use neon::prelude::*;
 use once_cell::sync::OnceCell;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
+use crate::config::NodeConfigurationImpl;
 
 pub fn tokio_runtime_node<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
     match tokio_runtime() {
@@ -68,7 +69,7 @@ fn main(cx: ModuleContext) -> NeonResult<()> {
     )
     .unwrap();
 
-    node_export::register_module_exports(cx)?;
+    node_export::register_module_exports::<NodeConfigurationImpl>(cx)?;
 
     Ok(())
 }
