@@ -84,9 +84,8 @@ export interface CanSwitchUserPayload {
 }
 
 export type SQLInterfaceOptions = {
-  port?: number,
+  nativeGatewayPort?: number,
   pgPort?: number,
-  nonce?: string,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,

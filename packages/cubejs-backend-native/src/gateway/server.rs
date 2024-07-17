@@ -44,7 +44,12 @@ impl ApiGatewayServer for ApiGatewayServerImpl {}
 #[async_trait]
 impl ProcessingLoop for ApiGatewayServerImpl {
     async fn processing_loop(&self) -> Result<(), CubeError> {
-        let listener = TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        println!(
+            "🔗 Cube (native api gateway) is listening on {}",
+            self.address
+        );
+
+        let listener = TcpListener::bind(&self.address).await?;
 
         let router = {
             let mut guard = self.router.lock().await;

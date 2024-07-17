@@ -149,8 +149,6 @@ describe('SQLInterface', () => {
     const { checkAuth, meta } = methods;
 
     const instance = await native.registerInterface({
-      // nonce: '12345678910111213141516'.substring(0, 20),
-      port: 4545,
       pgPort: 5555,
       ...methods,
       canSwitchUserForSession: (_payload) => true,
@@ -305,7 +303,6 @@ describe('SQLInterface', () => {
   it('streams cube sql over http', async () => {
     if (process.env.CUBESQL_STREAM_MODE === 'true') {
       const instance = await native.registerInterface({
-        port: 4545,
         pgPort: 5555,
         ...interfaceMethods(),
         canSwitchUserForSession: (_payload) => true,

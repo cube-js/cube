@@ -90,13 +90,18 @@ impl NodeCubeServices {
     }
 }
 
+trait NativeConfiguration {
+    fn api_gateway_address(&self) -> &Option<String>;
+}
+
 #[derive(Clone)]
 pub struct NodeConfig {
     pub config: Config,
+    pub api_gateway_address: Option<String>,
 }
 
 impl NodeConfig {
-    pub fn new(pg_port: Option<u16>) -> NodeConfig {
+    pub fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> NodeConfig {
         let config = Config::default();
         let config = config.update_config(|mut c| {
             if let Some(p) = pg_port {
@@ -106,7 +111,14 @@ impl NodeConfig {
             c
         });
 
-        Self { config }
+        Self {
+            config,
+            api_gateway_address: if let Some(gateway_port) = gateway_port {
+                Some(format!("0.0.0.0:{}", gateway_port))
+            } else {
+                None
+            },
+        }
     }
 
     pub async fn configure(
@@ -126,15 +138,19 @@ impl NodeConfig {
             .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move { auth })
             .await;
 
-        injector
-            .register_typed::<dyn ApiGatewayServer, _, _, _>(|i| async move {
-                ApiGatewayServerImpl::new(
-                    ApiGatewayRouterBuilder::new(),
-                    "0.0.0.0:3838".to_string(),
-                    i.get_service_typed().await,
-                )
-            })
-            .await;
+        if let Some(api_gateway_address) = &self.api_gateway_address {
+            let api_gateway_address = api_gateway_address.clone();
+
+            injector
+                .register_typed::<dyn ApiGatewayServer, _, _, _>(|i| async move {
+                    ApiGatewayServerImpl::new(
+                        ApiGatewayRouterBuilder::new(),
+                        api_gateway_address,
+                        i.get_service_typed().await,
+                    )
+                })
+                .await;
+        }
 
         NodeCubeServices::new(self.config.cube_services().await)
     }

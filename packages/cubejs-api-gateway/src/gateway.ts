@@ -90,7 +90,6 @@ import {
   transformJoins,
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
-import fetch from 'node-fetch';
 
 type HandleErrorOptions = {
     e: any,
@@ -501,19 +500,34 @@ class ApiGateway {
       }));
     }
 
-    app.all(
-      `${this.basePath}/v2/stream`,
-      userMiddlewares,
-      (req: Request, res: ExpressResponse, next) => {
-        console.log(req);
+    if (getEnv('nativeApiGateway')) {
+      app.all(
+        `${this.basePath}/v2/stream`,
+        userMiddlewares,
+        async (req: Request, res: ExpressResponse, next) => {
+          const server = this.initSQLServer();
 
-        // req.
+          try {
+            const uri = req.url.replace(this.basePath, '');
+            const response = await fetch(`http://0.0.0.0:${server.getNativeGatewayPort()}${uri}`, {
+              method: req.method,
+            });
 
-        fetch('http://localhost:3838/v2/stream').then((s) => {
-          console.log(s);
-        });
-      }
-    );
+            res.status(response.status);
+
+            if (response.body) {
+              for await (const chunk of (response.body as any)) {
+                res.write(chunk);
+              }
+            }
+
+            res.send();
+          } catch (e) {
+            next(e);
+          }
+        }
+      );
+    }
 
     app.use(this.handleErrorMiddleware);
   }

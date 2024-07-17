@@ -70,6 +70,15 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         None
     };
 
+    let native_gateway_port = options.get_value(&mut cx, "nativeGatewayPort")?;
+    let native_gateway_port = if native_gateway_port.is_a::<JsNumber, _>(&mut cx) {
+        let value = native_gateway_port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+
+        Some(value.value(&mut cx) as u16)
+    } else {
+        None
+    };
+
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
 
@@ -86,7 +95,7 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(pg_port);
+        let config = NodeConfig::new(native_gateway_port, pg_port);
 
         runtime.block_on(async move {
             let services = Arc::new(
