@@ -214,6 +214,14 @@ queries **not** querying cube tables.
 
 </WarningBox>
 
+<ReferenceBox>
+
+Query pushdown currently has the following limitations:
+* No support for [joins between cubes](https://github.com/cube-js/cube/issues/8483).
+* No support for [custom aggregations in `number` measures](https://github.com/cube-js/cube/issues/8482).
+
+</ReferenceBox>
+
 Query pushdown provides a safe net for queries that can't be rewritten
 into combination of a [regular query][ref-regular-queries] and post-processing.
 Such queries' SQL would be transpiled to target database query leveraging
