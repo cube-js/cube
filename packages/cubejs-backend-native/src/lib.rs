@@ -54,9 +54,10 @@ use cubenativeutils::wrappers::object::{
     NativeObject, NativeObjectHolder, NativeStruct, NativeType,
 };
 use cubenativeutils::wrappers::object_handler::NativeObjectHandler;
-use cubenativeutils::wrappers::serializer::deserializer::NativeDeserializer;
-use cubenativeutils::wrappers::serializer::serializer::NativeSerializer;
-use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NativeCubeEvaluator};
+use cubenativeutils::wrappers::serializer::NativeDeserializer;
+use cubenativeutils::wrappers::serializer::NativeSerialize;
+use cubesqlplanner::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
+use cubesqlplanner::planner::base_query_options::BaseQueryOptions;
 use serde::Deserialize;
 use std::rc::Rc;
 
@@ -512,13 +513,19 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
     //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
     //context should be used only inside function
     let mut cx = extend_function_context_lifetime(cx);
-    let cube_evaluator = cx.argument::<JsValue>(0)?;
+    let options = cx.argument::<JsValue>(0)?;
 
     let neon_context_holder = ContextHolder::new(cx);
 
+    let options = NativeObjectHandler::new(NeonObject::new(neon_context_holder.weak(), options));
+
     let context_holder = neon_context_holder.as_native_context_holder();
 
-    let native_object = NativeObjectHandler::new(NeonObject::new(
+    let options = NativeDeserializer::deserialize::<BaseQueryOptions>(options).unwrap();
+
+    println!("!!! opts {:?}", options);
+
+    /* let native_object = NativeObjectHandler::new(NeonObject::new(
         neon_context_holder.weak(),
         cube_evaluator.clone(),
     ));
@@ -529,7 +536,7 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
         .parse_path("measures".to_string(), "cards.count".to_string())
         .unwrap();
 
-    println!("! rrrrr {:?}", res);
+    println!("! rrrrr {:?}", res); */
 
     //arg_clrep.into_js(&mut cx)
     let res = context_holder.string("SELECT".to_string()).into_object();

@@ -9,11 +9,11 @@ use serde::{de, ser, Deserializer};
 use std::fmt;
 use std::fmt::Display;
 
-pub struct NativeDeserializer {
+pub struct NativeSerdeDeserializer {
     input: NativeObjectHandler,
 }
 
-impl NativeDeserializer {
+impl NativeSerdeDeserializer {
     pub fn new(input: NativeObjectHandler) -> Self {
         Self { input }
     }
@@ -26,7 +26,7 @@ impl NativeDeserializer {
     }
 }
 
-impl<'de> Deserializer<'de> for NativeDeserializer {
+impl<'de> Deserializer<'de> for NativeSerdeDeserializer {
     type Error = NativeObjSerializerError;
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -67,7 +67,7 @@ impl<'de> Deserializer<'de> for NativeDeserializer {
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
-        visitor: V,
+        _visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
@@ -75,14 +75,14 @@ impl<'de> Deserializer<'de> for NativeDeserializer {
         todo!()
     }
 
-    fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
         todo!()
     }
 
-    fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -134,7 +134,7 @@ impl<'de> SeqAccess<'de> for NativeSeqDeserializer {
 
         self.idx += 1;
 
-        let de = NativeDeserializer::new(v);
+        let de = NativeSerdeDeserializer::new(v);
         seed.deserialize(de).map(Some)
     }
 }
@@ -142,7 +142,8 @@ impl<'de> SeqAccess<'de> for NativeSeqDeserializer {
 struct NativeMapDeserializer {
     input: Box<dyn NativeStruct>,
     prop_names: Vec<NativeObjectHandler>,
-    idx: u32,
+    key_idx: u32,
+    value_idx: u32,
     len: u32,
 }
 
@@ -151,11 +152,13 @@ impl NativeMapDeserializer {
         let prop_names = input.get_own_property_names().map_err(|_| {
             NativeObjSerializerError::Message(format!("Failed to get property names"))
         })?;
+        println!("!!! --- len {:?}", prop_names.len());
         let len = prop_names.len() as u32;
         Ok(Self {
             input,
             prop_names,
-            idx: 0,
+            key_idx: 0,
+            value_idx: 0,
             len,
         })
     }
@@ -167,15 +170,15 @@ impl<'de> MapAccess<'de> for NativeMapDeserializer {
     where
         K: DeserializeSeed<'de>,
     {
-        if self.idx >= self.len {
+        if self.key_idx >= self.len {
             return Ok(None);
         }
         let v = self
             .prop_names
-            .get(self.idx as usize)
+            .get(self.key_idx as usize)
             .ok_or_else(|| NativeObjSerializerError::Message("Failed to get key".to_string()))?;
-        self.idx += 1;
-        seed.deserialize(NativeDeserializer::new(v.clone()))
+        self.key_idx += 1;
+        seed.deserialize(NativeSerdeDeserializer::new(v.clone()))
             .map(Some)
     }
 
@@ -183,14 +186,17 @@ impl<'de> MapAccess<'de> for NativeMapDeserializer {
     where
         V: DeserializeSeed<'de>,
     {
-        if self.idx >= self.len {
+        if self.value_idx >= self.len {
             return Err(NativeObjSerializerError::Message(format!(
                 "Array index out of bounds"
             )));
         }
-        let prop_name = self.prop_names.get(self.idx as usize).ok_or_else(|| {
-            NativeObjSerializerError::Message(format!("Array index out of bounds"))
-        })?;
+        let prop_name = self
+            .prop_names
+            .get(self.value_idx as usize)
+            .ok_or_else(|| {
+                NativeObjSerializerError::Message(format!("Array index out of bounds"))
+            })?;
         let prop_string = prop_name
             .to_string()
             .and_then(|s| s.value())
@@ -200,8 +206,8 @@ impl<'de> MapAccess<'de> for NativeMapDeserializer {
             NativeObjSerializerError::Message(format!("Failed to get property name"))
         })?;
 
-        self.idx += 1;
-        let de = NativeDeserializer::new(value);
+        self.value_idx += 1;
+        let de = NativeSerdeDeserializer::new(value);
         let res = seed.deserialize(de)?;
         Ok(res)
     }
