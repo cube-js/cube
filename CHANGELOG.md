@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix "unable to represent JsFunction in Python" in queries when using python for cube configuration ([#8449](https://github.com/cube-js/cube/issues/8449)) ([bcef222](https://github.com/cube-js/cube/commit/bcef222ec178af1d3bbe06282c7ab63e8ec6eccf))
+* **server-core:** Headers sent multiple times from dev-server handlers crashes it ([#8463](https://github.com/cube-js/cube/issues/8463)) ([45bbb8a](https://github.com/cube-js/cube/commit/45bbb8a739b4d9f079ba78fa48365632ea2eef8c))
+
+
+### Features
+
+* **cubesql:** Upgrade rust to nightly-2024-07-15 ([#8473](https://github.com/cube-js/cube/issues/8473)) ([6a6a7fe](https://github.com/cube-js/cube/commit/6a6a7fe694c13d04bf048434df92e20ad920aed5))
+* **cubesql:** Use lld linker for linux ([#8439](https://github.com/cube-js/cube/issues/8439)) ([a2fb38b](https://github.com/cube-js/cube/commit/a2fb38b410382abdd925d42e10673e9192f0f880))
+
+
+
+
+
 ## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
 
 

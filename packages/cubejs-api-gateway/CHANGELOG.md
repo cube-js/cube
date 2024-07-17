@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+
+### Bug Fixes
+
+* **cubesql:** Fix "unable to represent JsFunction in Python" in queries when using python for cube configuration ([#8449](https://github.com/cube-js/cube/issues/8449)) ([bcef222](https://github.com/cube-js/cube/commit/bcef222ec178af1d3bbe06282c7ab63e8ec6eccf))
+
+
+
+
+
 ## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
 
 **Note:** Version bump only for package @cubejs-backend/api-gateway

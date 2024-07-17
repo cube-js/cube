@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+
+### Features
+
+* **cubesql:** Upgrade rust to nightly-2024-07-15 ([#8473](https://github.com/cube-js/cube/issues/8473)) ([6a6a7fe](https://github.com/cube-js/cube/commit/6a6a7fe694c13d04bf048434df92e20ad920aed5))
+* **cubesql:** Use lld linker for linux ([#8439](https://github.com/cube-js/cube/issues/8439)) ([a2fb38b](https://github.com/cube-js/cube/commit/a2fb38b410382abdd925d42e10673e9192f0f880))
+
+
+
+
+
 ## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
