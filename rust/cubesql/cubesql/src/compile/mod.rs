@@ -1917,8 +1917,6 @@ mod tests {
     }
 
     trait LogicalPlanTestUtils {
-        fn find_projection_schema(&self) -> DFSchemaRef;
-
         fn find_cube_scan(&self) -> CubeScanNode;
 
         fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode;
@@ -1948,13 +1946,6 @@ mod tests {
     }
 
     impl LogicalPlanTestUtils for LogicalPlan {
-        fn find_projection_schema(&self) -> DFSchemaRef {
-            match self {
-                LogicalPlan::Projection(proj) => proj.schema.clone(),
-                _ => panic!("Root plan node is not projection!"),
-            }
-        }
-
         fn find_cube_scan(&self) -> CubeScanNode {
             let cube_scans = find_cube_scans_deep_search(Arc::new(self.clone()), true);
             if cube_scans.len() != 1 {

@@ -11888,10 +11888,10 @@ cardinal@^2.1.1:
     ansicolors "~0.3.2"
     redeyed "~2.1.0"
 
-cargo-cp-artifact@^0.1:
-  version "0.1.6"
-  resolved "https://registry.yarnpkg.com/cargo-cp-artifact/-/cargo-cp-artifact-0.1.6.tgz#df1bc9dad036ae0f4230639a869182e1d5850f89"
-  integrity sha512-CQw0doK/aaF7j041666XzuilHxqMxaKkn+I5vmBsd8SAwS0cO5CqVEVp0xJwOKstyqWZ6WK4Ww3O6p26x/Goyg==
+cargo-cp-artifact@^0.1.9:
+  version "0.1.9"
+  resolved "https://registry.yarnpkg.com/cargo-cp-artifact/-/cargo-cp-artifact-0.1.9.tgz#32264a0a48109e26c48da334daff9a1da9d9b7c8"
+  integrity sha512-6F+UYzTaGB+awsTXg0uSJA1/b/B3DDJzpKVRu0UmyI7DmNeaAl2RFHuTGIN6fEgpadRxoXGb7gbC1xo4C3IdyA==
 
 case-sensitive-paths-webpack-plugin@^2.3.0:
   version "2.4.0"

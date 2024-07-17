@@ -16,7 +16,7 @@ use cubesql::CubeError;
 use neon::prelude::*;
 use tokio::sync::{oneshot, Semaphore};
 
-#[cfg(build = "debug")]
+#[cfg(feature = "neon-debug")]
 use log::trace;
 
 use neon::types::JsDate;
@@ -241,7 +241,7 @@ impl ValueObject for JsValueObject<'_> {
 }
 
 fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.push_chunk");
 
     let this = cx
@@ -267,7 +267,7 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.start");
 
     let this = cx
@@ -279,7 +279,7 @@ fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.end");
 
     let this = cx
@@ -293,7 +293,7 @@ fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.reject");
 
     let this = cx
