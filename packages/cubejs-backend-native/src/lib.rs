@@ -25,6 +25,7 @@ use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use serde_json::Map;
 use tokio::sync::Semaphore;
+use uuid::adapter::compact::deserialize;
 
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -45,9 +46,17 @@ use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
 
+use cubenativeutils::wrappers::context::NativeContextHolder;
 use cubenativeutils::wrappers::neon::context::ContextHolder;
+use cubenativeutils::wrappers::neon::object::neon_struct::NeonStruct;
 use cubenativeutils::wrappers::neon::object::NeonObject;
-use cubenativeutils::wrappers::object::{NativeObject, NativeObjectHolder};
+use cubenativeutils::wrappers::object::{
+    NativeObject, NativeObjectHolder, NativeStruct, NativeType,
+};
+use cubenativeutils::wrappers::object_handler::NativeObjectHandler;
+use cubenativeutils::wrappers::serializer::deserializer::NativeDeserializer;
+use cubenativeutils::wrappers::serializer::serializer::NativeSerializer;
+use serde::Deserialize;
 use std::rc::Rc;
 //use cubesqlplanner::cube_adaptor::evaluator::{CubeEvaluator, NeonCubeEvaluator};
 
@@ -505,39 +514,38 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
     let mut cx = extend_function_context_lifetime(cx);
     let cube_evaluator = cx.argument::<JsValue>(0)?;
 
-    let context_holder = ContextHolder::new(cx);
+    let neon_context_holder = ContextHolder::new(cx);
 
-    let (arg1, arg2) = {
-        let mut b_context = context_holder.borrow_mut();
-        println!("!----!!! ---");
-        let cxx = b_context.get_context();
-        let arg1 = cxx.string("measures").upcast::<JsValue>();
-        let arg2 = cxx.string("cards.count").upcast::<JsValue>();
-        (arg1, arg2)
-    };
-    let neon_object = NeonObject::new(context_holder.clone(), cube_evaluator.clone());
-
-    let args: Vec<Rc<dyn NativeObject>> = vec![
-        NeonObject::new(context_holder.clone(), arg1),
-        NeonObject::new(context_holder.clone(), arg2),
+    let context_holder = neon_context_holder.as_native_context_holder();
+    let args = vec![
+        NativeSerializer::serialize("measures", context_holder.clone()).unwrap(),
+        NativeSerializer::serialize("cards.count", context_holder.clone()).unwrap(),
     ];
 
+    let neon_object = NativeObjectHandler::new(NeonObject::new(
+        neon_context_holder.weak(),
+        cube_evaluator.clone(),
+    ));
+
     println!("!----2222 ---");
-    let r = neon_object.call("parsePath", args).unwrap();
-    println!("!----3333 ---");
+    let neon_struct = neon_object.into_object().into_struct().unwrap();
+    let r = neon_struct.call_method("parsePath", args).unwrap();
+    println!("!----33133 ---");
 
-    {
-        let mut b_context = context_holder.borrow_mut();
-        let cxx = b_context.get_context();
-        let res_obj = r
-            .as_any()
-            .downcast_ref::<NeonObject<FunctionContext>>()
-            .unwrap()
-            .get_object()
-            .downcast::<JsArray, _>(cxx);
+    println!("!---- 5555 ----- ");
 
-        println!("!!! --- res_obj {:?}", res_obj);
-    }
+    let de = NativeDeserializer::new(r.clone());
+    let res = Vec::<String>::deserialize(de).unwrap();
+
+    println!("!---- res {:?}", res);
+
+    let array = r.into_object().into_array().unwrap();
+    let v = array.get(0).unwrap();
+
+    println!(
+        "!---- 66667666 ----- {:?}",
+        v.into_object().into_string().unwrap().value()
+    );
 
     /* let cube_evaluator =
     NeonCubeEvaluator::new_from_native(NativeObject::new(cx.channel(), cube_evaluator)); */
@@ -559,10 +567,11 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
     //let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
 
     //arg_clrep.into_js(&mut cx)
-    let res = "SELECT".to_string(); // build_sql_query_and_params();
-    let mut cx = context_holder.borrow_mut();
-    let cxx = cx.get_context();
-    Ok(cxx.string("cccc").upcast::<JsValue>())
+    let res = context_holder.string("SELECT".to_string()).into_object();
+
+    let res = NeonObject::<FunctionContext>::map_native(&res, |o| o.get_object()).unwrap();
+
+    Ok(res)
 }
 
 fn extend_function_context_lifetime<'a>(cx: FunctionContext<'a>) -> FunctionContext<'static> {
