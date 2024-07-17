@@ -123,6 +123,25 @@ impl NativeService {
             }
         }
     }
+
+    fn serialization_impl(&self) -> proc_macro2::TokenStream {
+        let struct_ident = self.struct_ident();
+        quote! {
+            impl NativeSerialize for #struct_ident {
+
+                fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandler, CubeError> {
+                    Ok(self.native_object.clone())
+                }
+            }
+
+            impl NativeDeserialize for #struct_ident {
+
+                fn from_native(v: NativeObjectHandler) -> Result<Self, CubeError> {
+                    Ok(Self::new_from_native(v))
+                }
+            }
+        }
+    }
 }
 
 impl NativeMethod {
@@ -165,10 +184,6 @@ impl NativeMethod {
             .iter()
             .map(|a| Self::js_agr_set(a))
             .collect::<Vec<_>>();
-        let js_args_names = typed_args
-            .iter()
-            .map(|a| Self::native_arg_ident(a))
-            .collect::<Vec<_>>();
         let js_method_name = self.camel_case_name();
 
         if !*asyncness {
@@ -182,10 +197,7 @@ impl NativeMethod {
                             #js_method_name,
                             args
                         )?;
-                   let deserializer = NativeDeserializer::new(res);
-                   deserializer.deserialize().map_err(|e| {
-                       CubeError::internal(format!("Error deserializing result: {}", e))
-                   })
+                   NativeDeserializer::deserialize(res)
                 }
             }
         } else {
@@ -198,14 +210,9 @@ impl NativeMethod {
     }
 
     fn js_agr_set(arg: &Ident) -> proc_macro2::TokenStream {
-        let native_arg = Self::native_arg_ident(arg);
         quote! {
-            NativeSerializer::serialize(&#arg, context_holder.clone()).map_err(|e| CubeError::internal(format!("Error serializing argument: {}", e)))?
+            #arg.to_native(context_holder.clone())?
         }
-    }
-
-    fn native_arg_ident(arg: &Ident) -> Ident {
-        format_ident!("native_{}", arg)
     }
 
     fn camel_case_name(&self) -> String {
@@ -227,10 +234,6 @@ impl NativeMethod {
             Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
         }
     }
-
-    fn variant_ident(&self) -> Ident {
-        format_ident!("{}", self.ident.to_string().to_camel_case())
-    }
 }
 
 impl ToTokens for NativeService {
@@ -240,11 +243,7 @@ impl ToTokens for NativeService {
             self.struct_body(),
             self.native_holder_impl(),
             self.struct_impl(),
-            /* self.method_call_enum(),
-            self.method_result_enum(),
-            self.client_transport_trait(),
-            self.client_impl(),
-            self.server_impl(), */
+            self.serialization_impl(),
         ]);
     }
 }

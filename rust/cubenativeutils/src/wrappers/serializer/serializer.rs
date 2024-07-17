@@ -1,10 +1,8 @@
 use super::error::NativeObjSerializerError;
-use crate::wrappers::context::NativeContextHolder;
-use crate::wrappers::object::{NativeArray, NativeStruct};
-use crate::wrappers::object_handler::NativeObjectHandler;
+use crate::wrappers::{NativeArray, NativeContextHolder, NativeObjectHandler, NativeStruct};
 use serde::{ser, Serialize};
 
-pub struct NativeSerializer {
+pub struct NativeSerdeSerializer {
     context: NativeContextHolder,
 }
 
@@ -24,7 +22,7 @@ pub struct NativeTupleSerializer {
     tuple: Box<dyn NativeArray>,
 }
 
-impl NativeSerializer {
+impl NativeSerdeSerializer {
     pub fn new(context: NativeContextHolder) -> Self {
         Self { context }
     }
@@ -36,12 +34,12 @@ impl NativeSerializer {
     where
         T: Serialize,
     {
-        let serializer = NativeSerializer::new(context);
+        let serializer = NativeSerdeSerializer::new(context);
         value.serialize(serializer)
     }
 }
 
-impl ser::Serializer for NativeSerializer {
+impl ser::Serializer for NativeSerdeSerializer {
     type Ok = NativeObjectHandler;
     type Error = NativeObjSerializerError;
     type SerializeSeq = NativeSeqSerializer;
@@ -144,7 +142,7 @@ impl ser::Serializer for NativeSerializer {
     where
         T: ?Sized + Serialize,
     {
-        NativeSerializer::serialize(value, self.context.clone())
+        NativeSerdeSerializer::serialize(value, self.context.clone())
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
@@ -273,7 +271,7 @@ impl ser::SerializeSeq for NativeSeqSerializer {
     where
         T: Serialize,
     {
-        let value_value = NativeSerializer::serialize(value, self.context.clone())?;
+        let value_value = NativeSerdeSerializer::serialize(value, self.context.clone())?;
         self.seq.set(self.last_id, value_value).map_err(|e| {
             NativeObjSerializerError::Message(format!("Can't set value to array: {}", e))
         })?;
@@ -318,8 +316,8 @@ impl ser::SerializeMap for NativeMapSerializer {
         K: Serialize,
         V: Serialize,
     {
-        let key_value = NativeSerializer::serialize(key, self.context.clone())?;
-        let value_value = NativeSerializer::serialize(value, self.context.clone())?;
+        let key_value = NativeSerdeSerializer::serialize(key, self.context.clone())?;
+        let value_value = NativeSerdeSerializer::serialize(value, self.context.clone())?;
         let string_down_cast = key_value.into_string().map_err(|e| {
             NativeObjSerializerError::Message(format!("Can't downcast key to native string: {}", e))
         })?;
@@ -351,7 +349,7 @@ impl ser::SerializeStruct for NativeMapSerializer {
     where
         T: Serialize,
     {
-        let value_value = NativeSerializer::serialize(value, self.context.clone())?;
+        let value_value = NativeSerdeSerializer::serialize(value, self.context.clone())?;
         self.obj.set_field(key, value_value).map_err(|e| {
             NativeObjSerializerError::Message(format!("Can't set value to obj: {}", e))
         })?;

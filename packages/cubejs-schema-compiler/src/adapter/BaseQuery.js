@@ -609,7 +609,8 @@ export class BaseQuery {
         measures: this.options.measures,
         dimensions: this.options.dimensions
     }
-    let r = nativeBuildSqlAndParams(this.cubeEvaluator, queryParams);
+    console.log("!!ff ", queryParams);
+    let r = nativeBuildSqlAndParams(queryParams);
     console.log("!!! native res ", r);
     return this.buildSqlAndParams(exportAnnotatedSql);
   }
