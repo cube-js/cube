@@ -206,7 +206,7 @@ export class QuestDriver<Config extends QuestDriverConfiguration = QuestDriverCo
 
   // eslint-disable-next-line camelcase
   public async getTablesQuery(_schemaName: string): Promise<({ table_name?: string, TABLE_NAME?: string })[]> {
-    return await this.query('SHOW TABLES', []);
+    return this.query('SHOW TABLES', []);
   }
 
   public async tableColumnTypes(table: string) {
