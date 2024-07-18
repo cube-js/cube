@@ -4,7 +4,7 @@ import { DbRunnerAbstract, DBRunnerContainerOptions } from './db-runner.abstract
 
 export class QuestDBRunner extends DbRunnerAbstract {
   public static startContainer(options: DBRunnerContainerOptions) {
-    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '7.2';
+    const version = process.env.TEST_QUEST_DB_VERSION || options.version || '8.0.3';
 
     const container = new GenericContainer(`questdb/questdb:${version}`)
       .withExposedPorts(8812)
