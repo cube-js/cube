@@ -1536,6 +1536,10 @@ fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) ->
     format!("(InListExpr {} {} {})", expr, list, negated)
 }
 
+fn inlist_expr_list(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("InListExprList", exprs, true)
+}
+
 fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {
     format!("(InSubqueryExpr {} {} {})", expr, subquery, negated)
 }

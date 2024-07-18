@@ -7,9 +7,10 @@ use crate::{
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr,
-        like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int, literal_string,
-        measure_expr, member_name_to_expr_by_alias, negative_expr, not_expr, projection, rewrite,
+        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
+        is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
+        literal_string, measure_expr, member_name_to_expr_by_alias, negative_expr, not_expr,
+        projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -394,18 +395,18 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "in-filter-equal",
                 filter_replacer(
-                    inlist_expr("?expr", "?list", "?negated"),
+                    inlist_expr("?expr", inlist_expr_list(vec!["?elem"]), "?negated"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    "?binary_expr",
+                    binary_expr("?expr", "?op", "?elem"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
+                self.transform_filter_in_to_equal("?negated", "?op"),
             ),
             transforming_rewrite(
                 "filter-in-list-datetrunc",
@@ -3288,45 +3289,24 @@ impl FilterRules {
     // Transform ?expr IN (?literal) to ?expr = ?literal
     fn transform_filter_in_to_equal(
         &self,
-        expr_val: &'static str,
-        list_var: &'static str,
         negated_var: &'static str,
-        return_binary_expr_var: &'static str,
+        op_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let expr_val = var!(expr_val);
-        let list_var = var!(list_var);
         let negated_var = var!(negated_var);
-        let return_binary_expr_var = var!(return_binary_expr_var);
+        let op_var = var!(op_var);
 
         move |egraph, subst| {
-            let expr_id = subst[expr_val];
-            let scalar = match &egraph[subst[list_var]].data.constant_in_list {
-                Some(list) if list.len() == 1 => list[0].clone(),
-                _ => return false,
-            };
-
             for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                 let operator = if *negated {
                     Operator::NotEq
                 } else {
                     Operator::Eq
                 };
-                let operator =
-                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator)));
 
-                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                    LiteralExprValue(scalar),
-                ));
-                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
-
-                let return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                    expr_id,
-                    operator,
-                    literal_expr,
-                ]));
-
-                subst.insert(return_binary_expr_var, return_binary_expr);
-
+                subst.insert(
+                    op_var,
+                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator))),
+                );
                 return true;
             }
 
