@@ -9,8 +9,7 @@ use crate::{
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
         fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
         is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
-        literal_string, measure_expr, member_name_to_expr_by_alias, negative_expr, not_expr,
-        projection, rewrite,
+        literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -3593,10 +3592,14 @@ impl FilterRules {
                     (member_name, None)
                 } else {
                     // TODO: aliases are not enough?
-                    member_name_to_expr_by_alias(egraph, subst[members_var], &alias_name)
-                        .map(|(member_name, member, _)| {
+                    egraph
+                        .index(subst[members_var])
+                        .data
+                        .find_member_by_alias_immutably(&alias_name)
+                        .map(|((member_name, member, _), _)| {
+                            let member_name: Option<String> = member_name.clone();
                             if let Member::TimeDimension { granularity, .. } = member {
-                                (member_name, granularity)
+                                (member_name, granularity.clone())
                             } else {
                                 (member_name, None)
                             }
@@ -4100,8 +4103,12 @@ impl FilterRules {
                 TimeDimensionDateRangeReplacerMember
             ) {
                 let member = member.to_string();
-                if let Some(member_name_to_expr) =
-                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                if let Some(member_name_to_expr) = &egraph
+                    .index(subst[members_var])
+                    .data
+                    .member_name_to_expr
+                    .as_ref()
+                    .map(|x| &x.list)
                 {
                     if member_name_to_expr
                         .iter()
@@ -4166,8 +4173,12 @@ impl FilterRules {
                 egraph[subst[time_dimension_member_var]],
                 TimeDimensionDateRangeReplacerMember
             ) {
-                if let Some(member_name_to_expr) =
-                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                if let Some(member_name_to_expr) = &egraph
+                    .index(subst[members_var])
+                    .data
+                    .member_name_to_expr
+                    .as_ref()
+                    .map(|x| &x.list)
                 {
                     if member_name_to_expr
                         .iter()

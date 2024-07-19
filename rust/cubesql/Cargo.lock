@@ -887,6 +887,7 @@ dependencies = [
  "futures",
  "futures-core",
  "futures-util",
+ "hashbrown 0.14.3",
  "insta",
  "itertools",
  "lazy_static",
