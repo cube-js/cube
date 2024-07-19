@@ -10153,7 +10153,7 @@ ORDER BY
     async fn test_interval_mul() -> Result<(), CubeError> {
         let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
         let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
-        let multiplicands = vec![1, 5, -10];
+        let multiplicands = vec!["1", "5", "-10", "1.5"];
 
         let selects = units
             .iter()
@@ -10179,6 +10179,42 @@ ORDER BY
         let query = format!("{} ORDER BY id ASC", selects.join(" UNION ALL "));
         insta::assert_snapshot!(
             "interval_mul",
+            execute_query(query, DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_interval_div() -> Result<(), CubeError> {
+        let base_timestamp = "TO_TIMESTAMP('2020-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')";
+        let units = vec!["year", "month", "week", "day", "hour", "minute", "second"];
+        let divisors = vec!["1.5"];
+
+        let selects = units
+            .iter()
+            .enumerate()
+            .map(|(i, unit)| {
+                let columns = divisors
+                    .iter()
+                    .map(|divisor| {
+                        // Brackets around interval are necessary due to bug in sqlparser
+                        // See https://github.com/sqlparser-rs/sqlparser-rs/issues/1345
+                        // TODO remove brackets once fixed
+                        format!(
+                            "{base_timestamp} + (interval '1 {unit}') / {divisor} AS \"i/{divisor}\""
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                format!(
+                    "SELECT {i} AS id, '{unit}' AS unit, {}",
+                    columns.join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        let query = format!("{} ORDER BY id ASC", selects.join(" UNION ALL "));
+        insta::assert_snapshot!(
+            "interval_div",
             execute_query(query, DatabaseProtocol::PostgreSQL).await?
         );
 
