@@ -570,7 +570,11 @@ impl LogicalPlanData {
             if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
                 return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
             }
-            for (index, tuple @ (_, _member, expr)) in member_names_to_expr.list.iter().enumerate().skip(member_names_to_expr.uncached_lookups_offset)
+            for (index, tuple @ (_, _member, expr)) in member_names_to_expr
+                .list
+                .iter()
+                .enumerate()
+                .skip(member_names_to_expr.uncached_lookups_offset)
             {
                 {
                     let column_name = expr_column_name(&expr, &None);
