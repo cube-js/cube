@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
+
+
+### Bug Fixes
+
+* **cubejs-questdb-driver:** fix obsolete column name in SHOW TABLES ([#8493](https://github.com/cube-js/cube/issues/8493)) Thanks [@puzpuzpuz](https://github.com/puzpuzpuz)! ([f135933](https://github.com/cube-js/cube/commit/f135933daf2df9b7a867c9ff1187c5b4bf15483d))
+
+
+
+
+
 ## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
 
 **Note:** Version bump only for package @cubejs-backend/questdb-driver
