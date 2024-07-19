@@ -12,7 +12,6 @@
 // #![feature(trace_macros)]
 #![recursion_limit = "2048"]
 #![feature(error_generic_member_access)]
-#![feature(map_try_insert)]
 
 // trace_macros!(false);
 

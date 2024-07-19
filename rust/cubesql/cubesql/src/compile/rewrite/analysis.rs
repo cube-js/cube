@@ -29,7 +29,8 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{Analysis, DidMerge, EGraph, Id};
-use std::{cmp::Ordering, collections::HashMap, fmt::Debug, ops::Index, sync::Arc};
+use hashbrown;
+use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
@@ -62,7 +63,7 @@ pub struct MemberNamesToExpr {
     /// Results of lookup_member_by_column_name represented as indexes into `list`.
     // Note that using Vec<(String, usize)> had nearly identical performance the last time that was
     // benchmarked.
-    pub cached_lookups: HashMap<String, usize>,
+    pub cached_lookups: hashbrown::HashMap<String, usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -708,7 +709,7 @@ impl LogicalPlanAnalysis {
         };
         list.map(|x| MemberNamesToExpr {
             list: x,
-            cached_lookups: HashMap::new(),
+            cached_lookups: hashbrown::HashMap::new(),
         })
     }
 
