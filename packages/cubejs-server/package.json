@@ -55,7 +55,7 @@
     "codesandbox-import-utils": "^2.1.12",
     "cors": "^2.8.4",
     "express": "^4.17.1",
-    "jsonwebtoken": "^8.4.0",
+    "jsonwebtoken": "^9.0.2",
     "semver": "^7.3.2",
     "source-map-support": "^0.5.19",
     "ws": "^7.1.2"

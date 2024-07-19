@@ -355,7 +355,7 @@ export async function startBirdBoxFromContainer(
     }).listen(4000);
     proxyServer.on('error', async (err, req, res) => {
       process.stderr.write(`[Proxy Server] error: ${err}\n`);
-      if (!res.headersSent) {
+      if ('headersSent' in res && !res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
       res.end(JSON.stringify({ error: err.message }));
