@@ -568,12 +568,9 @@ impl LogicalPlanData {
         let mut relation = WithColumnRelation(None);
         if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
             if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
-                if *cached_index == usize::MAX {
-                    return None;
-                }
                 return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
             }
-            for (index, tuple @ (_, _member, expr)) in member_names_to_expr.list.iter().enumerate()
+            for (index, tuple @ (_, _member, expr)) in member_names_to_expr.list.iter().enumerate().skip(member_names_to_expr.uncached_lookups_offset)
             {
                 {
                     let column_name = expr_column_name(&expr, &None);
@@ -597,10 +594,8 @@ impl LogicalPlanData {
                         return Some((tuple, name.to_string()));
                     }
                 }
+                member_names_to_expr.uncached_lookups_offset = index + 1;
             }
-            member_names_to_expr
-                .cached_lookups
-                .insert(name.to_string(), usize::MAX);
             return None;
         }
         return None;
