@@ -1,6 +1,6 @@
 use super::NeonObject;
 use crate::wrappers::object::{NativeArray, NativeBoxedClone, NativeObject, NativeType};
-use crate::wrappers::object_handler::NativeObjectHandler;
+use crate::wrappers::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use neon::prelude::*;
 
@@ -29,7 +29,7 @@ impl<C: Context<'static> + 'static> NativeArray for NeonArray<C> {
         self.object
             .map_downcast_neon_object::<JsArray, _, _>(|cx, object| Ok(object.len(cx)))
     }
-    fn to_vec(&self) -> Result<Vec<NativeObjectHandler>, CubeError> {
+    fn to_vec(&self) -> Result<Vec<NativeObjectHandle>, CubeError> {
         let neon_vec = self
             .object
             .map_downcast_neon_object::<JsArray, _, _>(|cx, object| {
@@ -39,10 +39,10 @@ impl<C: Context<'static> + 'static> NativeArray for NeonArray<C> {
             })?;
         Ok(neon_vec
             .into_iter()
-            .map(|o| NativeObjectHandler::new(NeonObject::new(self.object.get_context(), o)))
+            .map(|o| NativeObjectHandle::new(NeonObject::new(self.object.get_context(), o)))
             .collect())
     }
-    fn set(&self, index: u32, value: NativeObjectHandler) -> Result<bool, CubeError> {
+    fn set(&self, index: u32, value: NativeObjectHandle) -> Result<bool, CubeError> {
         let value = value.downcast_object::<NeonObject<C>>()?.into_object();
         self.object
             .map_downcast_neon_object::<JsArray, _, _>(|cx, object| {
@@ -51,7 +51,7 @@ impl<C: Context<'static> + 'static> NativeArray for NeonArray<C> {
                     .map_err(|_| CubeError::internal(format!("Error setting index {}", index)))
             })
     }
-    fn get(&self, index: u32) -> Result<NativeObjectHandler, CubeError> {
+    fn get(&self, index: u32) -> Result<NativeObjectHandle, CubeError> {
         let r = self
             .object
             .map_downcast_neon_object::<JsArray, _, _>(|cx, object| {
@@ -59,7 +59,7 @@ impl<C: Context<'static> + 'static> NativeArray for NeonArray<C> {
                     .get(cx, index)
                     .map_err(|_| CubeError::internal(format!("Error setting index {}", index)))
             })?;
-        Ok(NativeObjectHandler::new(NeonObject::new(
+        Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.get_context(),
             r,
         )))

@@ -2,7 +2,7 @@ use super::NeonObject;
 use crate::wrappers::object::{
     NativeBoolean, NativeBoxedClone, NativeNumber, NativeObject, NativeString, NativeType,
 };
-use crate::wrappers::object_handler::NativeObjectHandler;
+use crate::wrappers::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use neon::prelude::*;
 

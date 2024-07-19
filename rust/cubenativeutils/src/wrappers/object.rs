@@ -1,14 +1,8 @@
 use super::context::NativeContextHolder;
-use super::object_handler::NativeObjectHandler;
+use super::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use std::any::Any;
 use std::rc::Rc;
-
-pub trait NativeObjectHolder {
-    fn new_from_native(native: NativeObjectHandler) -> Self;
-
-    fn get_native_object(&self) -> &NativeObjectHandler;
-}
 
 pub trait NativeObject: NativeBoxedClone {
     fn as_any(&self) -> &dyn Any;
@@ -32,25 +26,25 @@ pub trait NativeType {
 
 pub trait NativeArray: NativeType {
     fn len(&self) -> Result<u32, CubeError>;
-    fn to_vec(&self) -> Result<Vec<NativeObjectHandler>, CubeError>;
-    fn set(&self, index: u32, value: NativeObjectHandler) -> Result<bool, CubeError>;
-    fn get(&self, index: u32) -> Result<NativeObjectHandler, CubeError>;
+    fn to_vec(&self) -> Result<Vec<NativeObjectHandle>, CubeError>;
+    fn set(&self, index: u32, value: NativeObjectHandle) -> Result<bool, CubeError>;
+    fn get(&self, index: u32) -> Result<NativeObjectHandle, CubeError>;
 }
 
 pub trait NativeStruct: NativeType {
-    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandler, CubeError>;
-    fn set_field(&self, field_name: &str, value: NativeObjectHandler) -> Result<bool, CubeError>;
-    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandler>, CubeError>;
+    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle, CubeError>;
+    fn set_field(&self, field_name: &str, value: NativeObjectHandle) -> Result<bool, CubeError>;
+    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle>, CubeError>;
 
     fn call_method(
         &self,
         method: &str,
-        args: Vec<NativeObjectHandler>,
-    ) -> Result<NativeObjectHandler, CubeError>;
+        args: Vec<NativeObjectHandle>,
+    ) -> Result<NativeObjectHandle, CubeError>;
 }
 
 pub trait NativeFunction: NativeType {
-    fn call(&self, args: Vec<NativeObjectHandler>) -> Result<NativeObjectHandler, CubeError>;
+    fn call(&self, args: Vec<NativeObjectHandle>) -> Result<NativeObjectHandle, CubeError>;
 }
 
 pub trait NativeString: NativeType {

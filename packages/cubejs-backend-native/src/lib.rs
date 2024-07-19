@@ -46,18 +46,13 @@ use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
 use transport::NodeBridgeTransport;
 
-use cubenativeutils::wrappers::context::NativeContextHolder;
 use cubenativeutils::wrappers::neon::context::ContextHolder;
-use cubenativeutils::wrappers::neon::object::neon_struct::NeonStruct;
 use cubenativeutils::wrappers::neon::object::NeonObject;
-use cubenativeutils::wrappers::object::{
-    NativeObject, NativeObjectHolder, NativeStruct, NativeType,
-};
-use cubenativeutils::wrappers::object_handler::NativeObjectHandler;
-use cubenativeutils::wrappers::serializer::NativeDeserializer;
-use cubenativeutils::wrappers::serializer::NativeSerialize;
-use cubesqlplanner::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
-use cubesqlplanner::planner::base_query_options::BaseQueryOptions;
+use cubenativeutils::wrappers::object_handle::NativeObjectHandle;
+use cubenativeutils::wrappers::serializer::NativeDeserialize;
+use cubesqlplanner::cube_bridge::base_query_options::{BaseQueryOptions, NativeBaseQueryOptions};
+use cubesqlplanner::planner::base_query::BaseQuery;
+
 use serde::Deserialize;
 use std::rc::Rc;
 
@@ -517,31 +512,19 @@ fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
 
     let neon_context_holder = ContextHolder::new(cx);
 
-    let options = NativeObjectHandler::new(NeonObject::new(neon_context_holder.weak(), options));
+    let options = NativeObjectHandle::new(NeonObject::new(neon_context_holder.weak(), options));
 
     let context_holder = neon_context_holder.as_native_context_holder();
 
-    let options = NativeDeserializer::deserialize::<BaseQueryOptions>(options).unwrap();
+    let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
 
-    println!("!!! opts {:?}", options);
-
-    /* let native_object = NativeObjectHandler::new(NeonObject::new(
-        neon_context_holder.weak(),
-        cube_evaluator.clone(),
-    ));
-
-    let evaluator = NativeCubeEvaluator::new_from_native(native_object);
-
-    let res = evaluator
-        .parse_path("measures".to_string(), "cards.count".to_string())
-        .unwrap();
-
-    println!("! rrrrr {:?}", res); */
+    let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
 
     //arg_clrep.into_js(&mut cx)
-    let res = context_holder.string("SELECT".to_string()).into_object();
+    let res = base_query.build_sql_and_params().unwrap();
 
-    let res = NeonObject::<FunctionContext>::map_native(&res, |o| o.get_object()).unwrap();
+    let res =
+        NeonObject::<FunctionContext>::map_native(res.object_ref(), |o| o.get_object()).unwrap();
 
     Ok(res)
 }

@@ -26,6 +26,7 @@ import { SqlParser } from '../parser/SqlParser';
 import {
    buildSqlAndParams as nativeBuildSqlAndParams,
 } from '@cubejs-backend/native';
+import { eventNames } from 'process';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -595,7 +596,6 @@ export class BaseQuery {
         return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
       }
     }
-
     return this.compilers.compiler.withQuery(
       this,
       () => this.cacheValue(
@@ -613,12 +613,17 @@ export class BaseQuery {
   buildSqlAndParamsTest(exportAnnotatedSql) {
     const queryParams = {
         measures: this.options.measures,
-        dimensions: this.options.dimensions
+        dimensions: this.options.dimensions,
+        joinRoot: this.join.root,
+        cubeEvaluator: this.cubeEvaluator,
+
     }
-    console.log("!!ff ", queryParams);
     let r = nativeBuildSqlAndParams(queryParams);
-    console.log("!!! native res ", r);
-    return this.buildSqlAndParams(exportAnnotatedSql);
+    console.log("!!! rust res ", r);
+    let rr = this.buildSqlAndParams(exportAnnotatedSql);
+    console.log("!!! origin res ", rr);
+    return rr;
+
   }
 
   get shouldReuseParams() {
@@ -1544,6 +1549,7 @@ export class BaseQuery {
     ).reduce((a, b) => a.concat(b), []);
 
     const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
+
     return this.joinSql([
       { sql: cubeSql, alias: cubeAlias },
       ...(subQueryDimensionsByCube[join.root] || []).map(d => this.subQueryJoin(d)),
@@ -1816,6 +1822,7 @@ export class BaseQuery {
 
     const fromPath = this.cubeEvaluator.cubeFromPath(cube);
     if (fromPath.sqlTable) {
+
       return this.evaluateSql(cube, fromPath.sqlTable);
     }
 
@@ -2255,6 +2262,7 @@ export class BaseQuery {
         ) {
           this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
         }
+
         return result;
       } else if (type === 'dimension') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
