@@ -10,7 +10,7 @@ describe('SQL Generation', () => {
       createCubeSchemaYaml({ name: 'cards', sqlTable: 'card_tbl' })
     );
 
-    it('Simple query', async () => {
+    it('Simple query Test', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -33,7 +33,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query2', async () => {
+    it('Simple query', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {

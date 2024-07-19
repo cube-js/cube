@@ -3,12 +3,24 @@ use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
-use syn::parse::{Parse, ParseStream};
+use syn::parse::{Parse, ParseStream, Parser};
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, FnArg, Item, Pat, ReturnType, TraitItem};
+use syn::{
+    parse_macro_input, punctuated::Punctuated, AngleBracketedGenericArguments, Attribute, FnArg,
+    Generics, Item, Meta, Pat, Path, PathArguments, PathSegment, ReturnType, TraitItem,
+    TraitItemMethod, Type, TypePath,
+};
 #[proc_macro_attribute]
-pub fn native_bridge(_attr: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
-    let svc = parse_macro_input!(input as NativeService);
+pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
+    let mut svc = parse_macro_input!(input as NativeService);
+    let args = parse_macro_input!(args with Punctuated::<Meta, syn::Token![,]>::parse_terminated);
+    if args.len() > 0 {
+        let arg = args.first().unwrap();
+        match arg {
+            Meta::Path(p) => svc.static_data_type = Some(p.clone()),
+            _ => {}
+        }
+    }
 
     proc_macro::TokenStream::from(svc.into_token_stream())
 }
@@ -16,6 +28,17 @@ pub fn native_bridge(_attr: TokenStream, input: TokenStream) -> proc_macro::Toke
 struct NativeService {
     ident: Ident,
     methods: Vec<NativeMethod>,
+    pub static_data_type: Option<Path>,
+}
+
+enum NativeMethodType {
+    Call,
+    Getter,
+}
+
+struct NativeOutputParams {
+    type_path: Path,
+    dynamic_container_path: Option<Path>,
 }
 
 struct NativeMethod {
@@ -23,6 +46,8 @@ struct NativeMethod {
     asyncness: bool,
     args: Vec<FnArg>,
     output: ReturnType,
+    output_params: NativeOutputParams,
+    method_type: NativeMethodType,
 }
 
 impl Parse for NativeService {
@@ -38,7 +63,12 @@ impl Parse for NativeService {
                             ident: method_item.sig.ident.clone(),
                             args: method_item.sig.inputs.iter().cloned().collect::<Vec<_>>(),
                             output: method_item.sig.output.clone(),
+                            output_params: Self::get_output_for_deserializer(
+                                &method_item.sig.output,
+                            )
+                            .unwrap(),
                             asyncness: method_item.sig.asyncness.is_some(),
+                            method_type: Self::parse_method_type(method_item),
                         }),
                         _ => None,
                     })
@@ -46,6 +76,7 @@ impl Parse for NativeService {
                 NativeService {
                     ident: trait_item.ident.clone(),
                     methods,
+                    static_data_type: None,
                 }
             }
             x => {
@@ -60,6 +91,145 @@ impl Parse for NativeService {
 }
 
 impl NativeService {
+    fn parse_method_type(method_item: &TraitItemMethod) -> NativeMethodType {
+        if method_item.attrs.len() == 1 {
+            let attr = method_item.attrs.first().unwrap();
+            let ident = attr.path.segments.last().unwrap().ident.clone();
+            if ident.to_string() == "field" {
+                NativeMethodType::Getter
+            } else {
+                NativeMethodType::Call
+            }
+        } else {
+            NativeMethodType::Call
+        }
+    }
+    fn get_output_for_deserializer(tp: &ReturnType) -> syn::Result<NativeOutputParams> {
+        let s = match tp {
+            ReturnType::Default => Err(syn::Error::new(
+                tp.span(),
+                "Return type should be Result<_>",
+            )),
+            ReturnType::Type(_, tt) => match tt.as_ref() {
+                syn::Type::Path(tp) => {
+                    let segs = &tp.path.segments;
+                    let seg = segs.last().ok_or(syn::Error::new(
+                        tp.span(),
+                        "Return type should be Result<_>",
+                    ))?;
+                    if seg.ident.to_string() != "Result" {
+                        return Err(syn::Error::new(
+                            tp.span(),
+                            "Return type should be Result<_>",
+                        ));
+                    }
+                    let args = &seg.arguments;
+                    Self::get_type_for_deserialize_from_result_args(args)
+                }
+                _ => Err(syn::Error::new(
+                    tp.span(),
+                    "Return type should be Result<_>",
+                )),
+            },
+        };
+        s
+    }
+
+    fn get_type_for_deserialize_from_result_args(
+        args: &PathArguments,
+    ) -> syn::Result<NativeOutputParams> {
+        match args {
+            syn::PathArguments::AngleBracketed(args) => {
+                let arg = args.args.first().ok_or(syn::Error::new(
+                    args.span(),
+                    "Return type should be Result<_>",
+                ))?;
+                match arg {
+                    syn::GenericArgument::Type(tp) => match tp {
+                        Type::Path(tp) => {
+                            let segs = &tp.path.segments;
+                            let seg = segs.last().ok_or(syn::Error::new(
+                                tp.span(),
+                                "Return type should be Result<_>",
+                            ))?;
+                            let ident = &seg.ident;
+                            if ident.to_string() == "Rc"
+                                || ident.to_string() == "Arc"
+                                || ident.to_string() == "Box"
+                            {
+                                if let Some(dyn_path) =
+                                    Self::get_dyn_type_for_deserialize(&seg.arguments)
+                                {
+                                    let mut dynamic_container_path = tp.path.clone();
+                                    let last_seg =
+                                        dynamic_container_path.segments.last_mut().unwrap();
+                                    last_seg.arguments = syn::PathArguments::None;
+                                    Ok(NativeOutputParams {
+                                        type_path: dyn_path,
+                                        dynamic_container_path: Some(dynamic_container_path),
+                                    })
+                                } else {
+                                    Ok(NativeOutputParams {
+                                        type_path: tp.path.clone(),
+                                        dynamic_container_path: None,
+                                    })
+                                }
+                            } else {
+                                Ok(NativeOutputParams {
+                                    type_path: tp.path.clone(),
+                                    dynamic_container_path: None,
+                                })
+                            }
+                        }
+                        _ => Err(syn::Error::new(
+                            arg.span(),
+                            "Return type should be Result<_>",
+                        )),
+                    },
+                    _ => Err(syn::Error::new(
+                        arg.span(),
+                        "Return type should be Result<_>",
+                    )),
+                }
+            }
+            _ => Err(syn::Error::new(
+                args.span(),
+                "Return type should be Result<_>",
+            )),
+        }
+    }
+
+    fn get_dyn_type_for_deserialize(args: &PathArguments) -> Option<Path> {
+        match args {
+            syn::PathArguments::AngleBracketed(args) => {
+                if args.args.is_empty() {
+                    return None;
+                }
+                let arg = args.args.first().unwrap();
+
+                match arg {
+                    syn::GenericArgument::Type(tp) => match tp {
+                        Type::TraitObject(to) => {
+                            let type_param_bound = to.bounds.first().unwrap();
+                            match type_param_bound {
+                                syn::TypeParamBound::Trait(trait_bound) => {
+                                    let mut path = trait_bound.path.clone();
+                                    let last = path.segments.last_mut().unwrap();
+                                    last.ident = format_ident!("Native{}", last.ident);
+                                    Some(path)
+                                }
+                                _ => None,
+                            }
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn original_trait(&self) -> proc_macro2::TokenStream {
         let service_ident = &self.ident;
         let methods = self
@@ -68,35 +238,50 @@ impl NativeService {
             .map(|m| m.original_method())
             .collect::<Vec<_>>();
         // TODO Supertraits
+        let static_data_method = self.static_data_method_def();
         quote! {
-            #[async_trait]
             pub trait #service_ident {
                 #( #methods )*
+                #static_data_method
             }
+        }
+    }
+
+    fn static_data_method_def(&self) -> proc_macro2::TokenStream {
+        if let Some(static_data_type) = &self.static_data_type {
+            quote! {
+                fn static_data(&self) -> &#static_data_type;
+            }
+        } else {
+            proc_macro2::TokenStream::new()
+        }
+    }
+
+    fn static_data_method_impl(&self) -> proc_macro2::TokenStream {
+        if let Some(static_data_type) = &self.static_data_type {
+            quote! {
+                fn static_data(&self) -> &#static_data_type {
+                    &self.static_data
+                }
+            }
+        } else {
+            proc_macro2::TokenStream::new()
         }
     }
 
     fn struct_body(&self) -> proc_macro2::TokenStream {
         let struct_ident = self.struct_ident();
-        quote! {
-            pub struct #struct_ident {
-                native_object: NativeObjectHandler,
-            }
-        }
-    }
-
-    fn native_holder_impl(&self) -> proc_macro2::TokenStream {
-        let struct_ident = self.struct_ident();
-        quote! {
-            impl NativeObjectHolder for #struct_ident {
-
-                fn new_from_native(native_object: NativeObjectHandler) -> Self {
-                    Self {native_object}
-
+        if let Some(static_data_type) = &self.static_data_type {
+            quote! {
+                pub struct #struct_ident {
+                    native_object: NativeObjectHandle,
+                    static_data: #static_data_type,
                 }
-
-                fn get_native_object(&self) -> &NativeObjectHandler {
-                    &self.native_object
+            }
+        } else {
+            quote! {
+                pub struct #struct_ident {
+                    native_object: NativeObjectHandle,
                 }
             }
         }
@@ -107,6 +292,28 @@ impl NativeService {
     }
 
     fn struct_impl(&self) -> proc_macro2::TokenStream {
+        let struct_ident = self.struct_ident();
+        if let Some(static_data_type) = &self.static_data_type {
+            quote! {
+                impl #struct_ident {
+                    pub fn try_new(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                        let static_data = #static_data_type::from_native(native_object.clone())?;
+                        Ok(Self {native_object, static_data} )
+                    }
+                }
+            }
+        } else {
+            quote! {
+                impl #struct_ident {
+                    pub fn try_new(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                        Ok(Self {native_object} )
+                    }
+                }
+            }
+        }
+    }
+
+    fn struct_bridge_impl(&self) -> proc_macro2::TokenStream {
         let service_ident = &self.ident;
         let struct_ident = self.struct_ident();
         let methods = self
@@ -114,12 +321,13 @@ impl NativeService {
             .iter()
             .map(|m| m.method_impl())
             .collect::<Vec<_>>();
+        let static_data_method = self.static_data_method_impl();
         quote! {
 
 
-            #[async_trait]
             impl #service_ident for #struct_ident {
                 #( #methods )*
+                #static_data_method
             }
         }
     }
@@ -129,15 +337,15 @@ impl NativeService {
         quote! {
             impl NativeSerialize for #struct_ident {
 
-                fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandler, CubeError> {
+                fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError> {
                     Ok(self.native_object.clone())
                 }
             }
 
             impl NativeDeserialize for #struct_ident {
 
-                fn from_native(v: NativeObjectHandler) -> Result<Self, CubeError> {
-                    Ok(Self::new_from_native(v))
+                fn from_native(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                    Self::try_new(native_object)
                 }
             }
         }
@@ -151,6 +359,7 @@ impl NativeMethod {
             asyncness,
             args,
             output,
+            ..
         } = &self;
         if *asyncness {
             quote! {
@@ -169,6 +378,8 @@ impl NativeMethod {
             asyncness,
             args,
             output,
+            output_params,
+            method_type,
         } = &self;
         let typed_args = args
             .iter()
@@ -186,25 +397,50 @@ impl NativeMethod {
             .collect::<Vec<_>>();
         let js_method_name = self.camel_case_name();
 
-        if !*asyncness {
-            quote! {
-                fn #ident(#( #args ),*) #output {
-                    let context_holder = self.native_object.get_context()?;
-                    let args = vec![#( #js_args_set ),*];
+        let deseralization = Self::deserialization_impl(&output_params);
 
-                    let res = self.native_object.to_struct()?
-                        .call_method(
-                            #js_method_name,
-                            args
-                        )?;
-                   NativeDeserializer::deserialize(res)
+        match method_type {
+            NativeMethodType::Call => {
+                quote! {
+                    fn #ident(#( #args ),*) #output {
+                        let context_holder = self.native_object.get_context()?;
+                        let args = vec![#( #js_args_set ),*];
+
+
+                        let res = self.native_object.to_struct()?
+                            .call_method(
+                                #js_method_name,
+                                args
+                            )?;
+                        #deseralization
+                    }
                 }
+            }
+            NativeMethodType::Getter => {
+                quote! {
+                    fn #ident(#( #args ),*) #output {
+                        let res = self.native_object.to_struct()?
+                            .get_field(
+                                #js_method_name,
+                            )?;
+
+                        #deseralization
+                    }
+                }
+            }
+        }
+    }
+
+    fn deserialization_impl(output_params: &NativeOutputParams) -> proc_macro2::TokenStream {
+        let output_type = &output_params.type_path;
+
+        if let Some(dynamic_container_path) = &output_params.dynamic_container_path {
+            quote! {
+                Ok(#dynamic_container_path::new(NativeDeserializer::deserialize::<#output_type>(res)?))
             }
         } else {
             quote! {
-                fn #ident(#( #args ),*) #output {
-                    unimplemented!()
-                }
+                NativeDeserializer::deserialize::<#output_type>(res)
             }
         }
     }
@@ -241,8 +477,8 @@ impl ToTokens for NativeService {
         tokens.extend(vec![
             self.original_trait(),
             self.struct_body(),
-            self.native_holder_impl(),
             self.struct_impl(),
+            self.struct_bridge_impl(),
             self.serialization_impl(),
         ]);
     }

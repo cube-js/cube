@@ -1,5 +1,5 @@
 use super::error::NativeObjSerializerError;
-use crate::wrappers::{NativeArray, NativeContextHolder, NativeObjectHandler, NativeStruct};
+use crate::wrappers::{NativeArray, NativeContextHolder, NativeObjectHandle, NativeStruct};
 use serde::{ser, Serialize};
 
 pub struct NativeSerdeSerializer {
@@ -30,7 +30,7 @@ impl NativeSerdeSerializer {
     pub fn serialize<T: ?Sized>(
         value: &T,
         context: NativeContextHolder,
-    ) -> Result<NativeObjectHandler, NativeObjSerializerError>
+    ) -> Result<NativeObjectHandle, NativeObjSerializerError>
     where
         T: Serialize,
     {
@@ -40,7 +40,7 @@ impl NativeSerdeSerializer {
 }
 
 impl ser::Serializer for NativeSerdeSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
     type SerializeSeq = NativeSeqSerializer;
     type SerializeTuple = NativeTupleSerializer;
@@ -51,79 +51,79 @@ impl ser::Serializer for NativeSerdeSerializer {
     type SerializeStructVariant = NativeMapSerializer;
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.boolean(v).into_object(),
         ))
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.number(v as f64).into_object(),
         ))
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.string(String::from(v)).into_object(),
         ))
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(
+        Ok(NativeObjectHandle::new(
             self.context.string(String::from(v)).into_object(),
         ))
     }
@@ -135,7 +135,7 @@ impl ser::Serializer for NativeSerdeSerializer {
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.context.undefined()))
+        Ok(NativeObjectHandle::new(self.context.undefined()))
     }
 
     fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
@@ -146,11 +146,11 @@ impl ser::Serializer for NativeSerdeSerializer {
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.context.undefined()))
+        Ok(NativeObjectHandle::new(self.context.undefined()))
     }
 
     fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.context.undefined()))
+        Ok(NativeObjectHandle::new(self.context.undefined()))
     }
 
     fn serialize_unit_variant(
@@ -264,7 +264,7 @@ impl ser::Serializer for NativeSerdeSerializer {
 }
 
 impl ser::SerializeSeq for NativeSeqSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -281,12 +281,12 @@ impl ser::SerializeSeq for NativeSeqSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.seq.into_object()))
+        Ok(NativeObjectHandle::new(self.seq.into_object()))
     }
 }
 
 impl ser::SerializeMap for NativeMapSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_key<T: ?Sized>(&mut self, _key: &T) -> Result<(), Self::Error>
@@ -333,12 +333,12 @@ impl ser::SerializeMap for NativeMapSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.obj.into_object()))
+        Ok(NativeObjectHandle::new(self.obj.into_object()))
     }
 }
 
 impl ser::SerializeStruct for NativeMapSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_field<T: ?Sized>(
@@ -357,12 +357,12 @@ impl ser::SerializeStruct for NativeMapSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.obj.into_object()))
+        Ok(NativeObjectHandle::new(self.obj.into_object()))
     }
 }
 
 impl ser::SerializeStructVariant for NativeMapSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_field<T: ?Sized>(
@@ -379,12 +379,12 @@ impl ser::SerializeStructVariant for NativeMapSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.obj.into_object()))
+        Ok(NativeObjectHandle::new(self.obj.into_object()))
     }
 }
 
 impl ser::SerializeTuple for NativeTupleSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_element<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
@@ -397,12 +397,12 @@ impl ser::SerializeTuple for NativeTupleSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.tuple.into_object()))
+        Ok(NativeObjectHandle::new(self.tuple.into_object()))
     }
 }
 
 impl ser::SerializeTupleStruct for NativeTupleSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
@@ -415,12 +415,12 @@ impl ser::SerializeTupleStruct for NativeTupleSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.tuple.into_object()))
+        Ok(NativeObjectHandle::new(self.tuple.into_object()))
     }
 }
 
 impl ser::SerializeTupleVariant for NativeTupleSerializer {
-    type Ok = NativeObjectHandler;
+    type Ok = NativeObjectHandle;
     type Error = NativeObjSerializerError;
 
     fn serialize_field<T: ?Sized>(&mut self, _value: &T) -> Result<(), Self::Error>
@@ -433,6 +433,6 @@ impl ser::SerializeTupleVariant for NativeTupleSerializer {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        Ok(NativeObjectHandler::new(self.tuple.into_object()))
+        Ok(NativeObjectHandle::new(self.tuple.into_object()))
     }
 }

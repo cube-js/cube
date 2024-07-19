@@ -4,11 +4,11 @@ use super::object::{
 };
 use cubesql::CubeError;
 
-pub struct NativeObjectHandler {
+pub struct NativeObjectHandle {
     object: Box<dyn NativeObject>,
 }
 
-impl NativeObjectHandler {
+impl NativeObjectHandle {
     pub fn new(object: Box<dyn NativeObject>) -> Self {
         Self { object }
     }
@@ -32,43 +32,33 @@ impl NativeObjectHandler {
             .map_err(|_| CubeError::internal("Unable to downcast object".to_string()))
     }
 
-    #[allow(dead_code)]
     pub fn into_struct(self) -> Result<Box<dyn NativeStruct>, CubeError> {
         self.object.into_struct()
     }
-    #[allow(dead_code)]
     pub fn into_array(self) -> Result<Box<dyn NativeArray>, CubeError> {
         self.object.into_array()
     }
-    #[allow(dead_code)]
     pub fn into_string(self) -> Result<Box<dyn NativeString>, CubeError> {
         self.object.into_string()
     }
-    #[allow(dead_code)]
     pub fn into_number(self) -> Result<Box<dyn NativeNumber>, CubeError> {
         self.object.into_number()
     }
-    #[allow(dead_code)]
     pub fn into_boolean(self) -> Result<Box<dyn NativeBoolean>, CubeError> {
         self.object.into_boolean()
     }
-    #[allow(dead_code)]
     pub fn to_struct(&self) -> Result<Box<dyn NativeStruct>, CubeError> {
         self.object.boxed_clone().into_struct()
     }
-    #[allow(dead_code)]
     pub fn to_array(&self) -> Result<Box<dyn NativeArray>, CubeError> {
         self.object.boxed_clone().into_array()
     }
-    #[allow(dead_code)]
     pub fn to_string(&self) -> Result<Box<dyn NativeString>, CubeError> {
         self.object.boxed_clone().into_string()
     }
-    #[allow(dead_code)]
     pub fn to_number(&self) -> Result<Box<dyn NativeNumber>, CubeError> {
         self.object.boxed_clone().into_number()
     }
-    #[allow(dead_code)]
     pub fn to_boolean(&self) -> Result<Box<dyn NativeBoolean>, CubeError> {
         self.object.boxed_clone().into_boolean()
     }
@@ -84,7 +74,7 @@ impl NativeObjectHandler {
     }
 }
 
-impl Clone for NativeObjectHandler {
+impl Clone for NativeObjectHandle {
     fn clone(&self) -> Self {
         Self {
             object: self.object.boxed_clone(),

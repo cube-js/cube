@@ -1,9 +1,24 @@
+use super::expression::Expr;
 use super::filter::Filter;
 use super::from::From;
-use datafusion::logical_expr::Expr;
+use std::fmt;
 
 pub struct Select {
-    projection: Vec<Expr>,
-    filter: Option<Filter>,
-    from: From,
+    pub projection: Vec<Expr>,
+    pub from: From,
+}
+
+impl fmt::Display for Select {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "SELECT")?;
+        for expr in self.projection.iter().take(1) {
+            write!(f, "{}", expr)?;
+        }
+        for expr in self.projection.iter().skip(1) {
+            write!(f, ",{}", expr)?;
+        }
+
+        writeln!(f, "")?;
+        write!(f, "{}", self.from)
+    }
 }

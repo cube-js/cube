@@ -1,4 +1,4 @@
-use datafusion::logical_expr::Expr;
+use super::expression::Expr;
 pub struct Filter {
     expr: Expr,
 }

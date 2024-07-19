@@ -2,7 +2,7 @@ use super::NeonObject;
 use crate::wrappers::object::{
     NativeArray, NativeBoxedClone, NativeObject, NativeStruct, NativeType,
 };
-use crate::wrappers::object_handler::NativeObjectHandler;
+use crate::wrappers::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use neon::prelude::*;
 
@@ -27,7 +27,7 @@ impl<C: Context<'static> + 'static> NativeType for NeonStruct<C> {
 }
 
 impl<C: Context<'static> + 'static> NativeStruct for NeonStruct<C> {
-    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandler, CubeError> {
+    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle, CubeError> {
         let neon_reuslt = self.object.map_neon_object(|cx, neon_object| {
             let this = neon_object
                 .downcast::<JsObject, _>(cx)
@@ -35,13 +35,13 @@ impl<C: Context<'static> + 'static> NativeStruct for NeonStruct<C> {
             this.get::<JsValue, _, _>(cx, field_name)
                 .map_err(|_| CubeError::internal(format!("Field `{}` not found", field_name)))
         })??;
-        Ok(NativeObjectHandler::new(NeonObject::new(
+        Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,
         )))
     }
 
-    fn set_field(&self, field_name: &str, value: NativeObjectHandler) -> Result<bool, CubeError> {
+    fn set_field(&self, field_name: &str, value: NativeObjectHandle) -> Result<bool, CubeError> {
         let value = value.downcast_object::<NeonObject<C>>()?.into_object();
         self.object
             .map_downcast_neon_object::<JsObject, _, _>(|cx, object| {
@@ -50,7 +50,7 @@ impl<C: Context<'static> + 'static> NativeStruct for NeonStruct<C> {
                     .map_err(|_| CubeError::internal(format!("Error setting field {}", field_name)))
             })
     }
-    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandler>, CubeError> {
+    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle>, CubeError> {
         let neon_array = self.object.map_neon_object(|cx, neon_object| {
             let this = neon_object
                 .downcast::<JsObject, _>(cx)
@@ -65,14 +65,14 @@ impl<C: Context<'static> + 'static> NativeStruct for NeonStruct<C> {
         })??;
         Ok(neon_array
             .into_iter()
-            .map(|o| NativeObjectHandler::new(NeonObject::new(self.object.context.clone(), o)))
+            .map(|o| NativeObjectHandle::new(NeonObject::new(self.object.context.clone(), o)))
             .collect())
     }
     fn call_method(
         &self,
         method: &str,
-        args: Vec<NativeObjectHandler>,
-    ) -> Result<NativeObjectHandler, CubeError> {
+        args: Vec<NativeObjectHandle>,
+    ) -> Result<NativeObjectHandle, CubeError> {
         let neon_args = args
             .into_iter()
             .map(|arg| -> Result<_, CubeError> {
@@ -92,7 +92,7 @@ impl<C: Context<'static> + 'static> NativeStruct for NeonStruct<C> {
                 .call(cx, this, neon_args)
                 .map_err(|_| CubeError::internal(format!("Failed to call method `{}`", method)))
         })??;
-        Ok(NativeObjectHandler::new(NeonObject::new(
+        Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
             neon_reuslt,
         )))

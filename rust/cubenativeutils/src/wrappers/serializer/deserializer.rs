@@ -1,7 +1,7 @@
 use super::error::NativeObjSerializerError;
 use crate::wrappers::context::NativeContextHolder;
 use crate::wrappers::object::{NativeArray, NativeStruct};
-use crate::wrappers::object_handler::NativeObjectHandler;
+use crate::wrappers::object_handle::NativeObjectHandle;
 use serde;
 use serde::de::{DeserializeOwned, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::forward_to_deserialize_any;
@@ -10,11 +10,11 @@ use std::fmt;
 use std::fmt::Display;
 
 pub struct NativeSerdeDeserializer {
-    input: NativeObjectHandler,
+    input: NativeObjectHandle,
 }
 
 impl NativeSerdeDeserializer {
-    pub fn new(input: NativeObjectHandler) -> Self {
+    pub fn new(input: NativeObjectHandle) -> Self {
         Self { input }
     }
 
@@ -141,7 +141,7 @@ impl<'de> SeqAccess<'de> for NativeSeqDeserializer {
 
 struct NativeMapDeserializer {
     input: Box<dyn NativeStruct>,
-    prop_names: Vec<NativeObjectHandler>,
+    prop_names: Vec<NativeObjectHandle>,
     key_idx: u32,
     value_idx: u32,
     len: u32,
@@ -152,7 +152,6 @@ impl NativeMapDeserializer {
         let prop_names = input.get_own_property_names().map_err(|_| {
             NativeObjSerializerError::Message(format!("Failed to get property names"))
         })?;
-        println!("!!! --- len {:?}", prop_names.len());
         let len = prop_names.len() as u32;
         Ok(Self {
             input,

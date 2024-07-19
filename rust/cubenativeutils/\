@@ -14,8 +14,17 @@ impl<T: Serialize> NativeSerialize for T {
     }
 }
 
-impl NativeSerialize for NativeObjectHandle {
+/* impl NativeSerialize for NativeObjectHandle {
     fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError> {
+        Ok(self.clone())
+    }
+} */
+
+impl Serialize for NativeObjectHandle {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
         Ok(self.clone())
     }
 }
