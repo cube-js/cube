@@ -3508,16 +3508,16 @@ export class BaseQuery {
     }
   }
 
-  static findAndSubTreeForFilterGroup(filter, groupMembers, newGroupFilter) {
+  static findAndSubTreeForFilterGroup(filter, groupMembers, newGroupFilter, aliases) {
     if ((filter.operator === 'and' || filter.operator === 'or') && !filter.values?.length) {
       return null;
     }
     const filterMembers = BaseQuery.extractFilterMembers(filter);
-    if (filterMembers && Object.keys(filterMembers).every(m => groupMembers.indexOf(m) !== -1)) {
+    if (filterMembers && Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1))) {
       return filter;
     }
     if (filter.operator === 'and') {
-      const result = filter.values.map(f => BaseQuery.findAndSubTreeForFilterGroup(f, groupMembers, newGroupFilter)).filter(f => !!f);
+      const result = filter.values.map(f => BaseQuery.findAndSubTreeForFilterGroup(f, groupMembers, newGroupFilter, aliases)).filter(f => !!f);
       if (!result.length) {
         return null;
       }
@@ -3542,21 +3542,30 @@ export class BaseQuery {
     );
   }
 
-  static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter) {
+  static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases) {
     if (!filter) {
       return '1 = 1';
     }
 
     if (filter.operator === 'and' || filter.operator === 'or') {
       const values = filter.values
-        .map(f => BaseQuery.renderFilterParams(f, filterParamArgs, allocateParam, newGroupFilter))
+        .map(f => BaseQuery.renderFilterParams(f, filterParamArgs, allocateParam, newGroupFilter, aliases))
         .map(v => ({ filterToWhere: () => v }));
 
       return newGroupFilter({ operator: filter.operator, values }).filterToWhere();
     }
 
-    const filterParams = filter && filter.filterParams();
-    const filterParamArg = filterParamArgs.filter(p => p.__member() === filter.measure || p.__member() === filter.dimension)[0];
+    const filterParams = filter.filterParams();
+    const filterParamArg = filterParamArgs.filter(p => {
+      const member = p.__member();
+      return member === filter.measure ||
+             member === filter.dimension ||
+            (aliases[member] && (
+              aliases[member] === filter.measure ||
+              aliases[member] === filter.dimension
+            ));
+    })[0];
+
     if (!filterParamArg) {
       throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
     }
@@ -3589,15 +3598,24 @@ export class BaseQuery {
         return f.__member();
       });
 
-      const filter = BaseQuery.findAndSubTreeForFilterGroup(newGroupFilter({ operator: 'and', values: allFilters }), groupMembers, newGroupFilter);
+      const aliases = allFilters ?
+        allFilters.map(v => (v.query ? v.query.allBackAliasMembers() : {}))
+          .reduce((a, b) => ({ ...a, ...b }), {})
+        : {};
+      const filter = BaseQuery.findAndSubTreeForFilterGroup(
+        newGroupFilter({ operator: 'and', values: allFilters }),
+        groupMembers,
+        newGroupFilter,
+        Object.values(aliases)
+      );
 
-      return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter)})`;
+      return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases)})`;
     };
   }
 
   static filterProxyFromAllFilters(allFilters, cubeEvaluator, allocateParam, newGroupFilter) {
     return new Proxy({}, {
-      get: (target, name) => {
+      get: (_target, name) => {
         if (name === '_objectWithResolvedProperties') {
           return true;
         }
@@ -3614,12 +3632,18 @@ export class BaseQuery {
                 return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
               },
               toString() {
+                const aliases = allFilters ?
+                  allFilters.map(v => (v.query ? v.query.allBackAliasMembers() : {}))
+                    .reduce((a, b) => ({ ...a, ...b }), {})
+                  : {};
                 const filter = BaseQuery.findAndSubTreeForFilterGroup(
                   newGroupFilter({ operator: 'and', values: allFilters }),
                   [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
-                  newGroupFilter
+                  newGroupFilter,
+                  Object.values(aliases)
                 );
-                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter)})`;
+
+                return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
               }
             })
           })
