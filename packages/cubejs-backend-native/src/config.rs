@@ -100,8 +100,14 @@ pub struct NodeConfigurationImpl {
     pub api_gateway_address: Option<String>,
 }
 
+#[derive(Debug)]
+pub struct NodeConfigurationFactoryOptions {
+    pub gateway_port: Option<u16>,
+    pub pg_port: Option<u16>,
+}
+
 pub trait NodeConfiguration {
-    fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> Self;
+    fn new(options: NodeConfigurationFactoryOptions) -> Self;
 
     async fn configure(
         &self,
@@ -111,10 +117,10 @@ pub trait NodeConfiguration {
 }
 
 impl NodeConfiguration for NodeConfigurationImpl {
-    fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> Self {
+    fn new(options: NodeConfigurationFactoryOptions) -> Self {
         let config = Config::default();
         let config = config.update_config(|mut c| {
-            if let Some(p) = pg_port {
+            if let Some(p) = options.pg_port {
                 c.postgres_bind_address = Some(format!("0.0.0.0:{}", p));
             };
 
@@ -123,7 +129,7 @@ impl NodeConfiguration for NodeConfigurationImpl {
 
         Self {
             config,
-            api_gateway_address: if let Some(gateway_port) = gateway_port {
+            api_gateway_address: if let Some(gateway_port) = options.gateway_port {
                 Some(format!("0.0.0.0:{}", gateway_port))
             } else {
                 None
@@ -156,7 +162,7 @@ impl NodeConfiguration for NodeConfigurationImpl {
                     ApiGatewayServerImpl::new(
                         ApiGatewayRouterBuilder::new(),
                         api_gateway_address,
-                        i.get_service_typed().await,
+                        i.clone(),
                     )
                 })
                 .await;

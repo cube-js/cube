@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
-use crate::config::{NodeConfiguration, NodeCubeServices};
+use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
@@ -70,9 +70,9 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         None
     };
 
-    let native_gateway_port = options.get_value(&mut cx, "nativeGatewayPort")?;
-    let native_gateway_port = if native_gateway_port.is_a::<JsNumber, _>(&mut cx) {
-        let value = native_gateway_port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+    let gateway_port = options.get_value(&mut cx, "gatewayPort")?;
+    let gateway_port = if gateway_port.is_a::<JsNumber, _>(&mut cx) {
+        let value = gateway_port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
 
         Some(value.value(&mut cx) as u16)
     } else {
@@ -95,7 +95,10 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = C::new(native_gateway_port, pg_port);
+        let config = C::new(NodeConfigurationFactoryOptions {
+            gateway_port,
+            pg_port,
+        });
 
         runtime.block_on(async move {
             let services = Arc::new(

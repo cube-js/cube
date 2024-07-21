@@ -1,9 +1,10 @@
 use crate::gateway::handlers::stream_handler_v2;
+use crate::gateway::ApiGatewayState;
 use axum::routing::{get, MethodRouter};
 use axum::Router;
 
 pub struct ApiGatewayRouterBuilder {
-    router: Router<()>,
+    router: Router<ApiGatewayState>,
 }
 
 impl ApiGatewayRouterBuilder {
@@ -14,13 +15,13 @@ impl ApiGatewayRouterBuilder {
         Self { router }
     }
 
-    pub fn route(self, path: &str, method_router: MethodRouter<()>) -> Self {
+    pub fn route(self, path: &str, method_router: MethodRouter<ApiGatewayState>) -> Self {
         Self {
             router: self.router.route(path, method_router),
         }
     }
 
-    pub fn build(self) -> Router<()> {
+    pub fn build(self) -> Router<ApiGatewayState> {
         self.router
     }
 }

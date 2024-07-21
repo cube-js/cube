@@ -1,7 +1,7 @@
-use crate::gateway::ApiGatewayRouterBuilder;
+use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayState};
 use async_trait::async_trait;
+use cubesql::config::injection::Injector;
 use cubesql::config::processing_loop::ProcessingLoop;
-use cubesql::sql::SessionManager;
 use cubesql::CubeError;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -10,13 +10,11 @@ use tokio::sync::{watch, Mutex, RwLock};
 pub trait ApiGatewayServer: ProcessingLoop {}
 
 pub struct ApiGatewayServerImpl {
-    router: tokio::sync::Mutex<Option<axum::Router<()>>>,
+    router: Mutex<Option<axum::Router<()>>>,
     // options
     address: String,
     close_socket_rx: RwLock<watch::Receiver<bool>>,
     close_socket_tx: watch::Sender<bool>,
-    // reference
-    session_manager: Arc<SessionManager>,
 }
 
 cubesql::di_service!(ApiGatewayServerImpl, [ApiGatewayServer]);
@@ -25,14 +23,17 @@ impl ApiGatewayServerImpl {
     pub fn new(
         router_builder: ApiGatewayRouterBuilder,
         address: String,
-        session_manager: Arc<SessionManager>,
+        injector: Arc<Injector>,
     ) -> Arc<Self> {
         let (close_socket_tx, close_socket_rx) = watch::channel(false);
 
+        let router = router_builder
+            .build()
+            .with_state(ApiGatewayState::new(injector));
+
         Arc::new(Self {
-            router: Mutex::new(Some(router_builder.build())),
+            router: Mutex::new(Some(router)),
             address,
-            session_manager,
             close_socket_rx: RwLock::new(close_socket_rx),
             close_socket_tx,
         })

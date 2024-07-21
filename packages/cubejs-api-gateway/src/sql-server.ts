@@ -87,7 +87,7 @@ export class SQLServer {
     const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
 
     this.sqlInterfaceInstance = await registerInterface({
-      nativeGatewayPort: this.getNativeGatewayPort(),
+      gatewayPort: this.getNativeGatewayPort(),
       pgPort: options.pgSqlPort,
       checkAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
