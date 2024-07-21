@@ -1,8 +1,7 @@
-use std::sync::Arc;
-
 use crate::gateway::server::ApiGatewayServerImpl;
 use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayServer};
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
+use async_trait::async_trait;
 use cubesql::config::injection::Injector;
 use cubesql::{
     config::{Config, CubeServices},
@@ -10,6 +9,7 @@ use cubesql::{
     transport::TransportService,
     CubeError,
 };
+use std::sync::Arc;
 use tokio::task::JoinHandle;
 
 pub type LoopHandle = JoinHandle<Result<(), CubeError>>;
@@ -90,7 +90,7 @@ impl NodeCubeServices {
     }
 }
 
-trait NativeConfiguration {
+pub trait NativeConfiguration {
     fn api_gateway_address(&self) -> &Option<String>;
 }
 
@@ -106,6 +106,7 @@ pub struct NodeConfigurationFactoryOptions {
     pub pg_port: Option<u16>,
 }
 
+#[async_trait]
 pub trait NodeConfiguration {
     fn new(options: NodeConfigurationFactoryOptions) -> Self;
 
@@ -113,9 +114,10 @@ pub trait NodeConfiguration {
         &self,
         transport: Arc<NodeBridgeTransport>,
         auth: Arc<NodeBridgeAuthService>,
-    ) -> NodeCubeServices;
+    ) -> Arc<NodeCubeServices>;
 }
 
+#[async_trait]
 impl NodeConfiguration for NodeConfigurationImpl {
     fn new(options: NodeConfigurationFactoryOptions) -> Self {
         let config = Config::default();
@@ -141,7 +143,7 @@ impl NodeConfiguration for NodeConfigurationImpl {
         &self,
         transport: Arc<NodeBridgeTransport>,
         auth: Arc<NodeBridgeAuthService>,
-    ) -> NodeCubeServices {
+    ) -> Arc<NodeCubeServices> {
         let injector = self.config.injector();
 
         self.config.configure().await;
@@ -168,6 +170,6 @@ impl NodeConfiguration for NodeConfigurationImpl {
                 .await;
         }
 
-        NodeCubeServices::new(self.config.cube_services().await)
+        Arc::new(NodeCubeServices::new(self.config.cube_services().await))
     }
 }

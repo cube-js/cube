@@ -101,14 +101,11 @@ fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult
         });
 
         runtime.block_on(async move {
-            let services = Arc::new(
-                config
-                    .configure(Arc::new(transport_service), Arc::new(auth_service))
-                    .await,
-            );
+            let services = config
+                .configure(Arc::new(transport_service), Arc::new(auth_service))
+                .await;
 
-            let services_arc = services.clone();
-            let interface = SQLInterface::new(services_arc);
+            let interface = SQLInterface::new(services.clone());
 
             log::debug!("Cube SQL Start");
 
