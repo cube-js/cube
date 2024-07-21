@@ -236,12 +236,6 @@ impl From<ParseIntError> for CubeError {
     }
 }
 
-impl From<reqwest::Error> for CubeError {
-    fn from(v: reqwest::Error) -> Self {
-        CubeError::internal(v.to_string())
-    }
-}
-
 impl From<SetLoggerError> for CubeError {
     fn from(v: SetLoggerError) -> Self {
         CubeError::internal(v.to_string())

@@ -44,9 +44,8 @@ bincode = "1.3.1"
 chrono = "0.4.31"
 chrono-tz = "0.6"
 mockall = "0.8.1"
-reqwest = { version = "0.11.0", features = ["json", "rustls-tls"], default-features = false }
 nanoid = "0.3.0"
-tokio-util = { version = "0.6.2", features=["compat"] }
+tokio-util = { version = "0.7", features=["compat"] }
 comfy-table = "7.1.0"
 bitflags = "1.3.2"
 egg = { rev = "952f8c2a1033e5da097d23c523b0d8e392eb532b", git = "https://github.com/cube-js/egg.git" }
@@ -72,7 +71,8 @@ tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] 
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
 criterion = { version = "0.4.0", features = ["html_reports"] }
-console-subscriber = "0.2.0"
+# Only for local debugging
+#console-subscriber = "0.3.0"
 
 [[test]]
 name = "e2e"
