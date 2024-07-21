@@ -103,7 +103,11 @@ pub struct NodeConfigurationImpl {
 pub trait NodeConfiguration {
     fn new(gateway_port: Option<u16>, pg_port: Option<u16>) -> Self;
 
-    async fn configure(&self, transport: Arc<NodeBridgeTransport>, auth: Arc<NodeBridgeAuthService>) -> NodeCubeServices;
+    async fn configure(
+        &self,
+        transport: Arc<NodeBridgeTransport>,
+        auth: Arc<NodeBridgeAuthService>,
+    ) -> NodeCubeServices;
 }
 
 impl NodeConfiguration for NodeConfigurationImpl {

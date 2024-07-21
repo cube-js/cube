@@ -19,13 +19,13 @@ pub mod template;
 pub mod transport;
 pub mod utils;
 
+use crate::config::NodeConfigurationImpl;
 use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use cubesql::CubeError;
 use neon::prelude::*;
 use once_cell::sync::OnceCell;
 use simple_logger::SimpleLogger;
 use tokio::runtime::{Builder, Runtime};
-use crate::config::NodeConfigurationImpl;
 
 pub fn tokio_runtime_node<'a, C: Context<'a>>(cx: &mut C) -> NeonResult<&'static Runtime> {
     match tokio_runtime() {

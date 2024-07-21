@@ -451,7 +451,9 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
-pub fn register_module_exports<C: NodeConfiguration+ 'static>(mut cx: ModuleContext) -> NeonResult<()> {
+pub fn register_module_exports<C: NodeConfiguration + 'static>(
+    mut cx: ModuleContext,
+) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
     cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
