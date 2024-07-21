@@ -5,15 +5,26 @@ use cubesql::config::processing_loop::ProcessingLoop;
 use cubesql::CubeError;
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tokio::sync::{watch, Mutex, RwLock};
+use tokio::sync::{watch, Mutex};
 
 pub trait ApiGatewayServer: ProcessingLoop {}
 
-pub struct ApiGatewayServerImpl {
-    router: Mutex<Option<axum::Router<()>>>,
+struct InnerFactoryState {
+    router: axum::Router<()>,
     // options
     address: String,
-    close_socket_rx: RwLock<watch::Receiver<bool>>,
+    close_socket_rx: watch::Receiver<bool>,
+}
+
+impl InnerFactoryState {
+    fn split(self) -> (axum::Router<()>, String, watch::Receiver<bool>) {
+        (self.router, self.address, self.close_socket_rx)
+    }
+}
+
+pub struct ApiGatewayServerImpl {
+    // processing_loop uses &self. split via Option::take
+    inner_factory_state: Mutex<Option<InnerFactoryState>>,
     close_socket_tx: watch::Sender<bool>,
 }
 
@@ -32,9 +43,11 @@ impl ApiGatewayServerImpl {
             .with_state(ApiGatewayState::new(injector));
 
         Arc::new(Self {
-            router: Mutex::new(Some(router)),
-            address,
-            close_socket_rx: RwLock::new(close_socket_rx),
+            inner_factory_state: Mutex::new(Some(InnerFactoryState {
+                router,
+                address,
+                close_socket_rx,
+            })),
             close_socket_tx,
         })
     }
@@ -45,17 +58,10 @@ impl ApiGatewayServer for ApiGatewayServerImpl {}
 #[async_trait]
 impl ProcessingLoop for ApiGatewayServerImpl {
     async fn processing_loop(&self) -> Result<(), CubeError> {
-        println!(
-            "🔗 Cube (native api gateway) is listening on {}",
-            self.address
-        );
-
-        let listener = TcpListener::bind(&self.address).await?;
-
-        let router = {
-            let mut guard = self.router.lock().await;
+        let (router, address, mut close_socket_rx) = {
+            let mut guard = self.inner_factory_state.lock().await;
             if let Some(r) = guard.take() {
-                r
+                r.split()
             } else {
                 return Err(CubeError::internal(
                     "ApiGatewayServer cannot be started twice".to_string(),
@@ -63,10 +69,12 @@ impl ProcessingLoop for ApiGatewayServerImpl {
             }
         };
 
-        let mut close_socket_rx_to_move = self.close_socket_tx.subscribe();
+        println!("🔗 Cube (native api gateway) is listening on {}", address);
+
+        let listener = TcpListener::bind(&address).await?;
 
         let shutdown_signal = || async move {
-            let _ = close_socket_rx_to_move.changed().await;
+            let _ = close_socket_rx.changed().await;
 
             log::trace!("Shutdown signal received");
         };
