@@ -108,6 +108,10 @@ export class PrestodbQuery extends BaseQuery {
     return `${offsetClause}${limitClause}`;
   }
 
+  public get castInListTimeDimensionValues() {
+    return true;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';

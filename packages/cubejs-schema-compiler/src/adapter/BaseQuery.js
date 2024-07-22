@@ -603,6 +603,10 @@ export class BaseQuery {
     return false;
   }
 
+  get castInListTimeDimensionValues() {
+    return false;
+  }
+
   /**
    * Returns a dictionary mapping each preagregation to its corresponding query fragment.
    * @returns {Record<string, Array<string>>}
