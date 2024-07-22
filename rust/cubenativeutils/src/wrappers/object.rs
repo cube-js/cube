@@ -1,4 +1,5 @@
 use super::context::NativeContextHolder;
+use super::neon::object::NeonObject;
 use super::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use std::any::Any;

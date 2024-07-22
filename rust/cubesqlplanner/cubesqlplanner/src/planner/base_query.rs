@@ -52,13 +52,23 @@ impl BaseQuery {
     }
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
-        let res = plan.to_string();
+        let sql = plan.to_string();
+        let params = self.get_params()?;
+        let res = self.context.empty_array();
+        res.set(0, sql.to_native(self.context.clone())?)?;
+        res.set(1, params.to_native(self.context.clone())?)?;
+        let result = NativeObjectHandle::new(res.into_object());
 
-        res.to_native(self.context.clone())
+        Ok(result)
     }
 
     fn build_sql_and_params_impl(&self) -> Result<GenerationPlan, CubeError> {
         self.simple_query()
+    }
+
+    //TODO temporary realization
+    fn get_params(&self) -> Result<Vec<String>, CubeError> {
+        Ok(Vec::new())
     }
 
     fn simple_query(&self) -> Result<GenerationPlan, CubeError> {

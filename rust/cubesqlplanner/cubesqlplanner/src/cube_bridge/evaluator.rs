@@ -21,12 +21,14 @@ pub struct CubeEvaluatorStatic {
 pub trait CubeEvaluator {
     #[field]
     fn primary_keys(&self) -> Result<HashMap<String, String>, CubeError>;
-    fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
+    #[optional]
+    fn parse_path(&self, path_type: String, path: String)
+        -> Result<Option<Vec<String>>, CubeError>;
     fn measure_by_path(&self, measure_path: String)
         -> Result<Rc<dyn MeasureDefinition>, CubeError>;
     fn dimension_by_path(
         &self,
         measure_path: String,
     ) -> Result<Rc<dyn DimensionDefinition>, CubeError>;
-    fn cube_from_path(&self, cube_path: String) -> Result<Box<dyn CubeDefinition>, CubeError>;
+    fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
 }
