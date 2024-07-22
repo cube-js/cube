@@ -381,4 +381,4 @@ where
     })
 }
 
-type LoopHandle = JoinHandle<Result<(), CubeError>>;
+pub type LoopHandle = JoinHandle<Result<(), CubeError>>;

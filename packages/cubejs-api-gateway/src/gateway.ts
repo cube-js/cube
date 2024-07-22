@@ -18,6 +18,8 @@ import type {
   Request as ExpressRequest,
   Response as ExpressResponse,
 } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+
 import {
   QueryType,
   ApiScopes,
@@ -498,6 +500,20 @@ class ApiGateway {
           res: this.resToResultFn(res)
         });
       }));
+    }
+
+    if (getEnv('nativeApiGateway')) {
+      const server = this.initSQLServer();
+
+      const proxyMiddleware = createProxyMiddleware<Request, Response>({
+        target: `http://127.0.0.1:${server.getNativeGatewayPort()}/v2`,
+        changeOrigin: true,
+      });
+
+      app.use(
+        `${this.basePath}/v2`,
+        proxyMiddleware as any
+      );
     }
 
     app.use(this.handleErrorMiddleware);

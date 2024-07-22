@@ -310,9 +310,7 @@ export class ServerContainer {
 
     const exports: Record<string, any> = {};
 
-    const script = new vm.Script(content, {
-      displayErrors: true,
-    });
+    const script = new vm.Script(content);
     script.runInNewContext(
       {
         require,
@@ -322,6 +320,7 @@ export class ServerContainer {
       },
       {
         filename: 'cube.js',
+        displayErrors: true,
       }
     );
 

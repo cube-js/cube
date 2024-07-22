@@ -84,9 +84,7 @@ export interface CanSwitchUserPayload {
 }
 
 export type SQLInterfaceOptions = {
-  port?: number,
   pgPort?: number,
-  nonce?: string,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
@@ -96,6 +94,8 @@ export type SQLInterfaceOptions = {
   logLoadEvent: (payload: LogLoadEventPayload) => unknown | Promise<unknown>,
   sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
+  // gateway options
+  gatewayPort?: number,
 };
 
 export function loadNative() {

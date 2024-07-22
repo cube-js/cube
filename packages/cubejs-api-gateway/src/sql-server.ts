@@ -18,7 +18,7 @@ export type SQLServerOptions = {
   canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
   pgSqlPort?: number,
-  sqlNonce?: string,
+  gatewayPort?: number,
   sqlUser?: string,
   sqlSuperUser?: string,
   sqlPassword?: string,
@@ -26,6 +26,8 @@ export type SQLServerOptions = {
 
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
+
+  protected gatewayPort: number = 7575;
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
@@ -36,6 +38,14 @@ export class SQLServer {
     );
   }
 
+  public getNativeGatewayPort(): number {
+    if (this.gatewayPort) {
+      return this.gatewayPort;
+    }
+
+    throw new Error('Native ApiGateway is not enabled');
+  }
+
   public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
     await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
   }
@@ -43,6 +53,10 @@ export class SQLServer {
   public async init(options: SQLServerOptions): Promise<void> {
     if (this.sqlInterfaceInstance) {
       throw new Error('Unable to start SQL interface two times');
+    }
+
+    if (options.gatewayPort) {
+      this.gatewayPort = options.gatewayPort;
     }
 
     const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
@@ -73,9 +87,8 @@ export class SQLServer {
     const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
 
     this.sqlInterfaceInstance = await registerInterface({
-      port: options.sqlPort,
+      gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      nonce: options.sqlNonce,
       checkAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
