@@ -140,6 +140,6 @@ jobs:
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'master',
               inputs: {
-                cube-image: 'cubejs/cube:dev'
+                'cube-image': 'cubejs/cube:dev'
               }
             })
