@@ -18,7 +18,7 @@ export type SQLServerOptions = {
   canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
   pgSqlPort?: number,
-  sqlNonce?: string,
+  gatewayPort?: number,
   sqlUser?: string,
   sqlSuperUser?: string,
   sqlPassword?: string,
@@ -27,7 +27,7 @@ export type SQLServerOptions = {
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
 
-  protected gatewayPort: number | undefined;
+  protected gatewayPort: number = 7575;
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
@@ -36,10 +36,6 @@ export class SQLServer {
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
-
-    if (getEnv('nativeApiGateway')) {
-      this.gatewayPort = 8888;
-    }
   }
 
   public getNativeGatewayPort(): number {
@@ -57,6 +53,10 @@ export class SQLServer {
   public async init(options: SQLServerOptions): Promise<void> {
     if (this.sqlInterfaceInstance) {
       throw new Error('Unable to start SQL interface two times');
+    }
+
+    if (options.gatewayPort) {
+      this.gatewayPort = options.gatewayPort;
     }
 
     const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))

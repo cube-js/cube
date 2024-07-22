@@ -1724,17 +1724,6 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  sqlNonce: () => {
-    if (process.env.CUBEJS_SQL_NONCE) {
-      if (process.env.CUBEJS_SQL_NONCE.length < 14) {
-        throw new InvalidConfiguration('CUBEJS_SQL_NONCE', process.env.CUBEJS_SQL_NONCE, 'Is too short. It should be 14 chars at least.');
-      }
-
-      return process.env.CUBEJS_SQL_NONCE;
-    }
-
-    return undefined;
-  },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
