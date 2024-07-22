@@ -3599,7 +3599,8 @@ export class BaseQuery {
       });
 
       const aliases = allFilters ?
-        allFilters.map(v => (v.query ? v.query.allBackAliasMembers() : {}))
+        allFilters
+          .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
           .reduce((a, b) => ({ ...a, ...b }), {})
         : {};
       const filter = BaseQuery.findAndSubTreeForFilterGroup(
@@ -3632,15 +3633,25 @@ export class BaseQuery {
                 return cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
               },
               toString() {
+                // Segments should be excluded because they are evaluated separately in cubeReferenceProxy
+                // In other case this falls into the recursive loop/stack exceeded caused by:
+                // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+                // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
+                // evaluateSymbolSql() -> evaluateSql()... -> and got here again
                 const aliases = allFilters ?
-                  allFilters.map(v => (v.query ? v.query.allBackAliasMembers() : {}))
+                  allFilters
+                    .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
+                // Filtering aliases that somehow relate to this cube
+                const filteredAliases = Object.entries(aliases)
+                  .filter(([key, value]) => key.startsWith(cubeNameObj.cube) || value.startsWith(cubeNameObj.cube))
+                  .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
                 const filter = BaseQuery.findAndSubTreeForFilterGroup(
                   newGroupFilter({ operator: 'and', values: allFilters }),
                   [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
                   newGroupFilter,
-                  Object.values(aliases)
+                  Object.values(filteredAliases)
                 );
 
                 return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
@@ -3652,16 +3663,20 @@ export class BaseQuery {
     });
   }
 
-  flattenAllMembers() {
+  flattenAllMembers(excludeSegments = false) {
     return R.flatten(
       this.measures
         .concat(this.dimensions)
-        .concat(this.segments)
+        .concat(excludeSegments ? [] : this.segments)
         .concat(this.filters)
         .concat(this.measureFilters)
         .concat(this.timeDimensions)
         .map(m => m.getMembers()),
     );
+  }
+
+  allBackAliasMembersExceptSegments() {
+    return this.backAliasMembers(this.flattenAllMembers(true));
   }
 
   allBackAliasMembers() {
