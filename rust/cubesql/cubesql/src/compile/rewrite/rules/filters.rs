@@ -54,6 +54,12 @@ pub struct FilterRules {
     eval_stable_functions: bool,
 }
 
+impl FilterRules {
+    fn inlist_expr_list(&self, exprs: Vec<impl Display>) -> String {
+        inlist_expr_list(exprs, self.config_obj.push_down_pull_up_split())
+    }
+}
+
 impl RewriteRules for FilterRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
         let mut rules = vec![
@@ -394,7 +400,7 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "in-filter-equal",
                 filter_replacer(
-                    inlist_expr("?expr", inlist_expr_list(vec!["?elem"]), "?negated"),
+                    inlist_expr("?expr", self.inlist_expr_list(vec!["?elem"]), "?negated"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
