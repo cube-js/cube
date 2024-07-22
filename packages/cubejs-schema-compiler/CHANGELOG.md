@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+
+### Bug Fixes
+
+* **schema-compiler:** Replace all toDateTime with toDateTime64 in ClickHouseQuery adapter to handle dates before 1970 ([#8390](https://github.com/cube-js/cube/issues/8390)) Thanks @Ilex4524 ! )j ([f6cff1a](https://github.com/cube-js/cube/commit/f6cff1a8a8dc510ad365ff53c02b1b15a8ba70f2))
+
+
+
+
+
 ## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

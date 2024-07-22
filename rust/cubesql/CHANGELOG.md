@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+
+### Features
+
+* **native:** Initial support for native api-gateway ([#8472](https://github.com/cube-js/cube/issues/8472)) ([d917d6f](https://github.com/cube-js/cube/commit/d917d6fd422090cc78fc30125731d147a091de6c))
+* **rust/cubeclient:** Upgrade reqwest to 0.12.5 (hyper 1) ([#8498](https://github.com/cube-js/cube/issues/8498)) ([f77c3aa](https://github.com/cube-js/cube/commit/f77c3aad67566568117f2c1d42859e2fd53a13d2))
+
+
+### Performance Improvements
+
+* **cubesql:** Replaced LogicalPlanData::find_member with a caching version ([#8469](https://github.com/cube-js/cube/issues/8469)) ([858d965](https://github.com/cube-js/cube/commit/858d965a42b30e446ae7fd19899cfd9b078ee63f))
+
+
+
+
+
 ## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
 
 

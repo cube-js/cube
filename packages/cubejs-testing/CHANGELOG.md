@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+
+### Features
+
+* **native:** Initial support for native api-gateway ([#8472](https://github.com/cube-js/cube/issues/8472)) ([d917d6f](https://github.com/cube-js/cube/commit/d917d6fd422090cc78fc30125731d147a091de6c))
+
+
+
+
+
 ## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
 
 **Note:** Version bump only for package @cubejs-backend/testing
