@@ -3,6 +3,7 @@ use crate::gateway::ApiGatewayState;
 use axum::routing::{get, MethodRouter};
 use axum::Router;
 
+#[derive(Debug, Clone)]
 pub struct ApiGatewayRouterBuilder {
     router: Router<ApiGatewayState>,
 }
