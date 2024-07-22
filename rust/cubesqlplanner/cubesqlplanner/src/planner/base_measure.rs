@@ -26,7 +26,6 @@ impl BaseMeasure {
         self.measure.clone() */
         let path = self.path()?;
         let cube_name = &path[0];
-        let name = &path[1];
         let primary_keys = self
             .cube_evaluator
             .static_data()
