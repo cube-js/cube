@@ -198,7 +198,7 @@ function runSchemasGeneration(type: DriverType, schemas: Schemas) {
 function prepareTestData(type: DriverType, schemas?: Schemas) {
   const targetFolder = getTargetFolder(type);
   clearTestData(type);
-  
+
   if (schemas) {
     runSchemasGeneration(type, schemas);
   } else {
@@ -212,7 +212,7 @@ function prepareTestData(type: DriverType, schemas?: Schemas) {
       const originalContent = fs.readFileSync(
         path.join(SOURCE, name), 'utf8'
       );
-  
+
       const updatedContent = originalContent.replace('_type_', type);
       fs.writeFileSync(
         path.join(targetFolder, name),
@@ -277,7 +277,7 @@ export async function startBirdBoxFromContainer(
   if (process.env.BIRDBOX_CUBESTORE_VERSION === undefined) {
     process.env.BIRDBOX_CUBESTORE_VERSION = 'latest';
   }
-  
+
   const composeFileName = `${options.type}.yml`;
   const composeFilePath = path.resolve(path.dirname(__filename), '../../birdbox-fixtures/');
   let dc: DockerComposeEnvironment;
@@ -296,7 +296,7 @@ export async function startBirdBoxFromContainer(
 
     const newComposeFileName = `${options.type}.json`;
     fs.writeFileSync(path.join(composeFilePath, newComposeFileName), JSON.stringify(yamlContent));
-    
+
     dc = new DockerComposeEnvironment(
       composeFilePath,
       newComposeFileName
@@ -353,11 +353,13 @@ export async function startBirdBoxFromContainer(
     proxyServer = HttpProxy.createProxyServer({
       target: `http://localhost:${port}`
     }).listen(4000);
-    proxyServer.on('error', async (err, req, res) => {
+    proxyServer.on('error', async (err, req, res: any) => {
       process.stderr.write(`[Proxy Server] error: ${err}\n`);
+
       if (!res.headersSent) {
         res.writeHead(500, { 'content-type': 'application/json' });
       }
+
       res.end(JSON.stringify({ error: err.message }));
     });
   }

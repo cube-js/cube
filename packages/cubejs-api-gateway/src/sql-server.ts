@@ -27,7 +27,7 @@ export type SQLServerOptions = {
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
 
-  protected nativeGatewayPort: number | undefined;
+  protected gatewayPort: number | undefined;
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
@@ -38,13 +38,13 @@ export class SQLServer {
     );
 
     if (getEnv('nativeApiGateway')) {
-      this.nativeGatewayPort = 8888;
+      this.gatewayPort = 8888;
     }
   }
 
   public getNativeGatewayPort(): number {
-    if (this.nativeGatewayPort) {
-      return this.nativeGatewayPort;
+    if (this.gatewayPort) {
+      return this.gatewayPort;
     }
 
     throw new Error('Native ApiGateway is not enabled');
@@ -87,7 +87,7 @@ export class SQLServer {
     const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
 
     this.sqlInterfaceInstance = await registerInterface({
-      gatewayPort: this.getNativeGatewayPort(),
+      gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
       checkAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
