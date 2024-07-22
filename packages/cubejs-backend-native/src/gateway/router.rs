@@ -7,6 +7,12 @@ pub struct ApiGatewayRouterBuilder {
     router: Router<ApiGatewayState>,
 }
 
+impl Default for ApiGatewayRouterBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ApiGatewayRouterBuilder {
     pub fn new() -> Self {
         let router = Router::new();

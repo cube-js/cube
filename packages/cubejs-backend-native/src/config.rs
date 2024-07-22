@@ -131,11 +131,9 @@ impl NodeConfiguration for NodeConfigurationImpl {
 
         Self {
             config,
-            api_gateway_address: if let Some(gateway_port) = options.gateway_port {
-                Some(format!("0.0.0.0:{}", gateway_port))
-            } else {
-                None
-            },
+            api_gateway_address: options
+                .gateway_port
+                .map(|gateway_port| format!("0.0.0.0:{}", gateway_port)),
         }
     }
 
