@@ -35,7 +35,7 @@ inputs = [
   "warmup-job",
   "cubestore"
 ]
-default_api_key = "0746ad78335ac7c0219ee38b47ada6a6"
+default_api_key = "$CUBE_CLOUD_MONITORING_DATADOG_API_KEY"
 site = "datadoghq.eu"
 compression = "gzip"
 healthcheck = false
@@ -55,6 +55,5 @@ navigate to <Btn>Logs</Btn> in Datadog and watch the logs coming:
 [datadog-docs-sites]: https://docs.datadoghq.com/getting_started/site/
 [vector-datadog-logs]:
   https://vector.dev/docs/reference/configuration/sinks/datadog_logs/
-[ref-monitoring-integrations]: /product/monitoring/integrations
-[ref-monitoring-integrations-conf]:
-  /product/monitoring/integrations#configuration
+[ref-monitoring-integrations]: /product/workspace/monitoring
+[ref-monitoring-integrations-conf]: /product/workspace/monitoring#configuration

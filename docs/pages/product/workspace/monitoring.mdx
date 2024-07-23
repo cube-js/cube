@@ -12,18 +12,10 @@ long term.
 
 <SuccessBox>
 
-Monitoring integrations are available in Cube Cloud on
-[Enterprise](https://cube.dev/pricing) tier.
-[Contact us](https://cube.dev/contact) for details.
+Monitoring integrations are available in Cube Cloud on [Enterprise](https://cube.dev/pricing) plan.
+Users can choose a [Monitoring Integrations tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers).
 
 </SuccessBox>
-
-<InfoBox>
-
-Monitoring integrations are only available on [dedicated
-infrastructure][ref-dedicated-infra].
-
-</InfoBox>
 
 <WarningBox>
 
@@ -44,24 +36,29 @@ following guides and configuration examples to get tool-specific instructions:
 
 <Grid imageSize={[56, 56]}>
   <GridItem
-    url="integrations/cloudwatch"
+    url="monitoring/cloudwatch"
     imageUrl="https://static.cube.dev/icons/aws.svg"
     title="Amazon CloudWatch"
   />
   <GridItem
-    url="integrations/s3"
+    url="monitoring/s3"
     imageUrl="https://static.cube.dev/icons/aws.svg"
     title="Amazon S3"
   />
   <GridItem
-    url="integrations/datadog"
+    url="monitoring/datadog"
     imageUrl="https://static.cube.dev/icons/datadog.svg"
     title="Datadog"
   />
   <GridItem
-    url="integrations/grafana-cloud"
+    url="monitoring/grafana-cloud"
     imageUrl="https://static.cube.dev/icons/grafana.svg"
     title="Grafana Cloud"
+  />
+  <GridItem
+    url="monitoring/new-relic"
+    imageUrl="https://static.cube.dev/icons/new-relic.svg"
+    title="New Relic"
   />
 </Grid>
 
@@ -69,9 +66,10 @@ following guides and configuration examples to get tool-specific instructions:
 
 To enable monitoring integrations, navigate to <Btn>Settings → Monitoring
 Integrations</Btn> and click <Btn>Enable Vector</Btn> to add a Vector agent to
-your deployment.
+your deployment. You can use the dropdown to select a [Monitoring Integrations
+tier](/product/deployment/cloud/pricing#monitoring-integrations-tiers).
 
-<Screenshot src="https://ucarecdn.com/7db3949b-83b9-48ae-b4b6-bd2afeda5001/" />
+<Screenshot src="https://ucarecdn.com/bf05182f-bbb0-4c20-a95e-ca7aeb03829e/" />
 
 Under <Btn>Metrics export</Btn>, you will see credentials for the
 `prometheus_exporter` sink, in case you'd like to setup [metrics

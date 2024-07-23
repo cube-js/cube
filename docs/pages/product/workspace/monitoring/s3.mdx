@@ -45,6 +45,20 @@ enabled = false
 Commit the configuration for Vector, it should take effect in a minute. Then,
 navigate to your S3 bucket and watch the logs coming.
 
+## Troubleshooting
 
-[ref-monitoring-integrations]: /product/monitoring/integrations
-[ref-monitoring-integrations-conf]: /product/monitoring/integrations#configuration
+### Bucket region mismatch
+
+You might see the following error message in Vector logs:
+
+```
+The bucket you are attempting to access must be addressed using the specified
+endpoint. Please send all future requests to this endpoint.
+```
+
+This often happens if the bucket on Amazon S3 is in a region that is different
+from the one you’ve specified in the configuration for Vector.
+
+
+[ref-monitoring-integrations]: /product/workspace/monitoring
+[ref-monitoring-integrations-conf]: /product/workspace/monitoring#configuration
