@@ -35,10 +35,10 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 | Development Instance      |                       1                        |
 | Cube Store Worker         |                       1                        |
 | Cube API Instance         |                       1                        |
-| Query History             | Depends on [chosen tier](#query-history-tiers) |
+| Query History             | Depends on a [chosen tier](#query-history-tiers) |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 |
 | [Audit Log][ref-audit-log] | 4 |
-| [Monitoring Integrations][ref-monitoring-integrations] | Depends on [chosen tier](#monitoring-integrations-tiers) |
+| [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
 
 ### Query History tiers
 
@@ -66,8 +66,8 @@ manager (CSM).
 | S    | 2             | Up to 25 GB/mo |
 | M    | 4             | Up to 50 GB/mo |
 
-You can upgrade to the chosen tier by reaching out to your dedicated customer success
-manager (CSM).
+You can [upgrade][ref-monitoring-integrations-config] to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
 
 ## Pricing plans
 
@@ -266,6 +266,7 @@ subscription plan level. Payments are non-refundable.
   /product/deployment/cloud/deployment-types#production-cluster
 [ref-cloud-limits]: /product/deployment/cloud/limits
 [ref-monitoring-integrations]: /product/monitoring/integrations
+[ref-monitoring-integrations-config]: /product/workspace/monitoring#configuration
 [ref-cloud-acl]: /product/workspace/access-control
 [ref-cloud-deployment-prod-multicluster]:
   /product/deployment/cloud/deployment-types#production-multi-cluster
