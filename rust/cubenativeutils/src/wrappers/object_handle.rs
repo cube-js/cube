@@ -1,66 +1,54 @@
-use super::context::NativeContextHolder;
-use super::object::{
-    NativeArray, NativeBoolean, NativeNumber, NativeObject, NativeString, NativeStruct,
-};
+use super::inner_types::InnerTypes;
+use super::object::NativeObject;
 use cubesql::CubeError;
 
-pub struct NativeObjectHandle {
-    object: Box<dyn NativeObject>,
+#[derive(Clone)]
+pub struct NativeObjectHandle<IT: InnerTypes> {
+    object: IT::Object,
 }
 
-impl NativeObjectHandle {
-    pub fn new(object: Box<dyn NativeObject>) -> Self {
+impl<IT: InnerTypes> NativeObjectHandle<IT> {
+    pub fn new(object: IT::Object) -> Self {
         Self { object }
     }
 
-    pub fn object_ref(&self) -> &Box<dyn NativeObject> {
+    pub fn object_ref(&self) -> &IT::Object {
         &self.object
     }
 
-    pub fn downcast_object_ref<T: NativeObject + 'static>(&self) -> Option<&T> {
-        self.object.as_any().downcast_ref()
-    }
-
-    pub fn into_object(self) -> Box<dyn NativeObject> {
+    pub fn into_object(self) -> IT::Object {
         self.object
     }
 
-    pub fn downcast_object<T: NativeObject + 'static>(self) -> Result<Box<T>, CubeError> {
-        self.object
-            .into_any()
-            .downcast::<T>()
-            .map_err(|_| CubeError::internal("Unable to downcast object".to_string()))
-    }
-
-    pub fn into_struct(self) -> Result<Box<dyn NativeStruct>, CubeError> {
+    pub fn into_struct(self) -> Result<IT::Struct, CubeError> {
         self.object.into_struct()
     }
-    pub fn into_array(self) -> Result<Box<dyn NativeArray>, CubeError> {
+    pub fn into_array(self) -> Result<IT::Array, CubeError> {
         self.object.into_array()
     }
-    pub fn into_string(self) -> Result<Box<dyn NativeString>, CubeError> {
+    pub fn into_string(self) -> Result<IT::String, CubeError> {
         self.object.into_string()
     }
-    pub fn into_number(self) -> Result<Box<dyn NativeNumber>, CubeError> {
+    pub fn into_number(self) -> Result<IT::Number, CubeError> {
         self.object.into_number()
     }
-    pub fn into_boolean(self) -> Result<Box<dyn NativeBoolean>, CubeError> {
+    pub fn into_boolean(self) -> Result<IT::Boolean, CubeError> {
         self.object.into_boolean()
     }
-    pub fn to_struct(&self) -> Result<Box<dyn NativeStruct>, CubeError> {
-        self.object.boxed_clone().into_struct()
+    pub fn to_struct(&self) -> Result<IT::Struct, CubeError> {
+        self.object.clone().into_struct()
     }
-    pub fn to_array(&self) -> Result<Box<dyn NativeArray>, CubeError> {
-        self.object.boxed_clone().into_array()
+    pub fn to_array(&self) -> Result<IT::Array, CubeError> {
+        self.object.clone().into_array()
     }
-    pub fn to_string(&self) -> Result<Box<dyn NativeString>, CubeError> {
-        self.object.boxed_clone().into_string()
+    pub fn to_string(&self) -> Result<IT::String, CubeError> {
+        self.object.clone().into_string()
     }
-    pub fn to_number(&self) -> Result<Box<dyn NativeNumber>, CubeError> {
-        self.object.boxed_clone().into_number()
+    pub fn to_number(&self) -> Result<IT::Number, CubeError> {
+        self.object.clone().into_number()
     }
-    pub fn to_boolean(&self) -> Result<Box<dyn NativeBoolean>, CubeError> {
-        self.object.boxed_clone().into_boolean()
+    pub fn to_boolean(&self) -> Result<IT::Boolean, CubeError> {
+        self.object.clone().into_boolean()
     }
     pub fn is_null(&self) -> bool {
         self.object.is_null()
@@ -69,15 +57,7 @@ impl NativeObjectHandle {
         self.object.is_undefined()
     }
 
-    pub fn get_context(&self) -> Result<NativeContextHolder, CubeError> {
+    pub fn get_context(&self) -> IT::Context {
         self.object.get_context()
-    }
-}
-
-impl Clone for NativeObjectHandle {
-    fn clone(&self) -> Self {
-        Self {
-            object: self.object.boxed_clone(),
-        }
     }
 }

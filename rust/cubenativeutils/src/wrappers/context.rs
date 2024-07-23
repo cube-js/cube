@@ -1,62 +1,43 @@
-use super::object::{
-    NativeArray, NativeBoolean, NativeBoxedClone, NativeNumber, NativeObject, NativeString,
-    NativeStruct,
-};
-use std::rc::Rc;
-pub trait NativeContext: ContextBoxedClone {
-    fn boolean(&self, v: bool) -> Box<dyn NativeBoolean>;
-    fn string(&self, v: String) -> Box<dyn NativeString>;
-    fn number(&self, v: f64) -> Box<dyn NativeNumber>;
-    fn undefined(&self) -> Box<dyn NativeObject>;
-    fn empty_array(&self) -> Box<dyn NativeArray>;
-    fn empty_struct(&self) -> Box<dyn NativeStruct>;
+use super::inner_types::InnerTypes;
+use super::object_handle::NativeObjectHandle;
+
+pub trait NativeContext<IT: InnerTypes>: Clone {
+    fn boolean(&self, v: bool) -> IT::Boolean;
+    fn string(&self, v: String) -> IT::String;
+    fn number(&self, v: f64) -> IT::Number;
+    fn undefined(&self) -> NativeObjectHandle<IT>;
+    fn empty_array(&self) -> IT::Array;
+    fn empty_struct(&self) -> IT::Struct;
 }
 
-pub struct NativeContextHolder {
-    context: Box<dyn NativeContext>,
+#[derive(Clone)]
+pub struct NativeContextHolder<IT: InnerTypes> {
+    context: IT::Context,
 }
 
-impl NativeContextHolder {
-    pub fn new(context: Box<dyn NativeContext>) -> Self {
+impl<IT: InnerTypes> NativeContextHolder<IT> {
+    pub fn new(context: IT::Context) -> Self {
         Self { context }
     }
-    pub fn context(&self) -> &Box<dyn NativeContext> {
+    pub fn context(&self) -> &impl NativeContext<IT> {
         &self.context
     }
-    pub fn boolean(&self, v: bool) -> Box<dyn NativeBoolean> {
+    pub fn boolean(&self, v: bool) -> IT::Boolean {
         self.context.boolean(v)
     }
-    pub fn string(&self, v: String) -> Box<dyn NativeString> {
+    pub fn string(&self, v: String) -> IT::String {
         self.context.string(v)
     }
-    pub fn number(&self, v: f64) -> Box<dyn NativeNumber> {
+    pub fn number(&self, v: f64) -> IT::Number {
         self.context.number(v)
     }
-    pub fn undefined(&self) -> Box<dyn NativeObject> {
+    pub fn undefined(&self) -> NativeObjectHandle<IT> {
         self.context.undefined()
     }
-    pub fn empty_array(&self) -> Box<dyn NativeArray> {
+    pub fn empty_array(&self) -> IT::Array {
         self.context.empty_array()
     }
-    pub fn empty_struct(&self) -> Box<dyn NativeStruct> {
+    pub fn empty_struct(&self) -> IT::Struct {
         self.context.empty_struct()
-    }
-}
-
-impl Clone for NativeContextHolder {
-    fn clone(&self) -> Self {
-        NativeContextHolder {
-            context: self.context.boxed_clone(),
-        }
-    }
-}
-
-pub trait ContextBoxedClone {
-    fn boxed_clone(&self) -> Box<dyn NativeContext>;
-}
-
-impl<T: NativeContext + Clone + 'static> ContextBoxedClone for T {
-    fn boxed_clone(&self) -> Box<dyn NativeContext> {
-        Box::new(self.clone())
     }
 }

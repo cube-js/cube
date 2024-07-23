@@ -1,21 +1,31 @@
 use super::serializer::NativeSerdeSerializer;
+use crate::wrappers::inner_types::InnerTypes;
 use crate::wrappers::{NativeContextHolder, NativeObjectHandle};
 use crate::CubeError;
 use serde::Serialize;
 
-pub trait NativeSerialize {
-    fn to_native(&self, context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError>;
+pub trait NativeSerialize<IT: InnerTypes> {
+    fn to_native(
+        &self,
+        context: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
-impl<T: Serialize> NativeSerialize for T {
-    fn to_native(&self, context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError> {
+impl<IT: InnerTypes, T: Serialize> NativeSerialize<IT> for T {
+    fn to_native(
+        &self,
+        context: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
         NativeSerdeSerializer::serialize(self, context)
             .map_err(|e| CubeError::internal(format!("Serialize error: {}", e)))
     }
 }
 
-impl NativeSerialize for NativeObjectHandle {
-    fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError> {
+impl<IT: InnerTypes> NativeSerialize<IT> for NativeObjectHandle<IT> {
+    fn to_native(
+        &self,
+        _context: NativeContextHolder<IT>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError> {
         Ok(self.clone())
     }
 }

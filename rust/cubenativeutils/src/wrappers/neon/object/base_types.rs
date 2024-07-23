@@ -1,83 +1,73 @@
 use super::NeonObject;
-use crate::wrappers::object::{
-    NativeBoolean, NativeBoxedClone, NativeNumber, NativeObject, NativeString, NativeType,
-};
-use crate::wrappers::object_handle::NativeObjectHandle;
+use crate::wrappers::neon::inner_types::NeonInnerTypes;
+
+use crate::wrappers::object::{NativeBoolean, NativeNumber, NativeString, NativeType};
 use cubesql::CubeError;
 use neon::prelude::*;
 
-pub struct NeonString<C: Context<'static>> {
-    object: Box<NeonObject<C>>,
+pub struct NeonString<'cx, C: Context<'cx>> {
+    object: NeonObject<'cx, C>,
 }
 
-impl<C: Context<'static>> NeonString<C> {
-    pub fn new(object: Box<NeonObject<C>>) -> Box<Self> {
-        Box::new(Self { object })
+impl<'cx, C: Context<'cx>> NeonString<'cx, C> {
+    pub fn new(object: NeonObject<'cx, C>) -> Self {
+        Self { object }
     }
 }
 
-impl<C: Context<'static> + 'static> NativeType for NeonString<C> {
-    fn into_object(self: Box<Self>) -> Box<dyn NativeObject> {
+impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonString<'cx, C> {
+    fn into_object(self) -> NeonObject<'cx, C> {
         self.object
     }
-    fn get_object(&self) -> Box<dyn NativeObject> {
-        self.object.boxed_clone()
-    }
 }
 
-impl<C: Context<'static> + 'static> NativeString for NeonString<C> {
+impl<'cx, C: Context<'cx> + 'cx> NativeString<NeonInnerTypes<'cx, C>> for NeonString<'cx, C> {
     fn value(&self) -> Result<String, CubeError> {
         self.object
             .map_downcast_neon_object::<JsString, _, _>(|cx, object| Ok(object.value(cx)))
     }
 }
 
-pub struct NeonNumber<C: Context<'static>> {
-    object: Box<NeonObject<C>>,
+pub struct NeonNumber<'cx, C: Context<'cx>> {
+    object: NeonObject<'cx, C>,
 }
 
-impl<C: Context<'static> + 'static> NativeType for NeonNumber<C> {
-    fn into_object(self: Box<Self>) -> Box<dyn NativeObject> {
+impl<'cx, C: Context<'cx>> NeonNumber<'cx, C> {
+    pub fn new(object: NeonObject<'cx, C>) -> Self {
+        Self { object }
+    }
+}
+
+impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonNumber<'cx, C> {
+    fn into_object(self) -> NeonObject<'cx, C> {
         self.object
     }
-    fn get_object(&self) -> Box<dyn NativeObject> {
-        self.object.boxed_clone()
-    }
 }
 
-impl<C: Context<'static>> NeonNumber<C> {
-    pub fn new(object: Box<NeonObject<C>>) -> Box<Self> {
-        Box::new(Self { object })
-    }
-}
-
-impl<C: Context<'static> + 'static> NativeNumber for NeonNumber<C> {
+impl<'cx, C: Context<'cx> + 'cx> NativeNumber<NeonInnerTypes<'cx, C>> for NeonNumber<'cx, C> {
     fn value(&self) -> Result<f64, CubeError> {
         self.object
             .map_downcast_neon_object::<JsNumber, _, _>(|cx, object| Ok(object.value(cx)))
     }
 }
 
-pub struct NeonBoolean<C: Context<'static>> {
-    object: Box<NeonObject<C>>,
+pub struct NeonBoolean<'cx, C: Context<'cx>> {
+    object: NeonObject<'cx, C>,
 }
 
-impl<C: Context<'static> + 'static> NativeType for NeonBoolean<C> {
-    fn into_object(self: Box<Self>) -> Box<dyn NativeObject> {
+impl<'cx, C: Context<'cx>> NeonBoolean<'cx, C> {
+    pub fn new(object: NeonObject<'cx, C>) -> Self {
+        Self { object }
+    }
+}
+
+impl<'cx, C: Context<'cx> + 'cx> NativeType<NeonInnerTypes<'cx, C>> for NeonBoolean<'cx, C> {
+    fn into_object(self) -> NeonObject<'cx, C> {
         self.object
     }
-    fn get_object(&self) -> Box<dyn NativeObject> {
-        self.object.boxed_clone()
-    }
 }
 
-impl<C: Context<'static>> NeonBoolean<C> {
-    pub fn new(object: Box<NeonObject<C>>) -> Box<Self> {
-        Box::new(Self { object })
-    }
-}
-
-impl<C: Context<'static> + 'static> NativeBoolean for NeonBoolean<C> {
+impl<'cx, C: Context<'cx> + 'cx> NativeBoolean<NeonInnerTypes<'cx, C>> for NeonBoolean<'cx, C> {
     fn value(&self) -> Result<bool, CubeError> {
         self.object
             .map_downcast_neon_object::<JsBoolean, _, _>(|cx, object| Ok(object.value(cx)))

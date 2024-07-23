@@ -1,71 +1,55 @@
-use super::context::NativeContextHolder;
-use super::neon::object::NeonObject;
+use super::inner_types::InnerTypes;
 use super::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
-use std::any::Any;
-use std::rc::Rc;
 
-pub trait NativeObject: NativeBoxedClone {
-    fn as_any(&self) -> &dyn Any;
-    fn into_any(self: Box<Self>) -> Box<dyn Any>;
+pub trait NativeObject<IT: InnerTypes>: Clone {
+    fn get_context(&self) -> IT::Context;
 
-    fn get_context(&self) -> Result<NativeContextHolder, CubeError>;
-
-    fn into_struct(self: Box<Self>) -> Result<Box<dyn NativeStruct>, CubeError>;
-    fn into_array(self: Box<Self>) -> Result<Box<dyn NativeArray>, CubeError>;
-    fn into_string(self: Box<Self>) -> Result<Box<dyn NativeString>, CubeError>;
-    fn into_number(self: Box<Self>) -> Result<Box<dyn NativeNumber>, CubeError>;
-    fn into_boolean(self: Box<Self>) -> Result<Box<dyn NativeBoolean>, CubeError>;
+    fn into_struct(self) -> Result<IT::Struct, CubeError>;
+    fn into_array(self) -> Result<IT::Array, CubeError>;
+    fn into_string(self) -> Result<IT::String, CubeError>;
+    fn into_number(self) -> Result<IT::Number, CubeError>;
+    fn into_boolean(self) -> Result<IT::Boolean, CubeError>;
     fn is_null(&self) -> bool;
     fn is_undefined(&self) -> bool;
 }
 
-pub trait NativeType {
-    fn into_object(self: Box<Self>) -> Box<dyn NativeObject>;
-    fn get_object(&self) -> Box<dyn NativeObject>;
+pub trait NativeType<IT: InnerTypes> {
+    fn into_object(self) -> IT::Object;
 }
 
-pub trait NativeArray: NativeType {
+pub trait NativeArray<IT: InnerTypes>: NativeType<IT> {
     fn len(&self) -> Result<u32, CubeError>;
-    fn to_vec(&self) -> Result<Vec<NativeObjectHandle>, CubeError>;
-    fn set(&self, index: u32, value: NativeObjectHandle) -> Result<bool, CubeError>;
-    fn get(&self, index: u32) -> Result<NativeObjectHandle, CubeError>;
+    fn to_vec(&self) -> Result<Vec<NativeObjectHandle<IT>>, CubeError>;
+    fn set(&self, index: u32, value: NativeObjectHandle<IT>) -> Result<bool, CubeError>;
+    fn get(&self, index: u32) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
-pub trait NativeStruct: NativeType {
-    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle, CubeError>;
-    fn set_field(&self, field_name: &str, value: NativeObjectHandle) -> Result<bool, CubeError>;
-    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle>, CubeError>;
+pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
+    fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
+    fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
+        -> Result<bool, CubeError>;
+    fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle<IT>>, CubeError>;
 
     fn call_method(
         &self,
         method: &str,
-        args: Vec<NativeObjectHandle>,
-    ) -> Result<NativeObjectHandle, CubeError>;
+        args: Vec<NativeObjectHandle<IT>>,
+    ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
-pub trait NativeFunction: NativeType {
-    fn call(&self, args: Vec<NativeObjectHandle>) -> Result<NativeObjectHandle, CubeError>;
-}
+/* pub trait NativeFunction<IT: InnerTypes> {
+    fn call(&self, args: Vec<NativeObjectHandle<IT>>) -> Result<NativeObjectHandle<IT>, CubeError>;
+} */
 
-pub trait NativeString: NativeType {
+pub trait NativeString<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<String, CubeError>;
 }
 
-pub trait NativeNumber: NativeType {
+pub trait NativeNumber<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<f64, CubeError>;
 }
 
-pub trait NativeBoolean: NativeType {
+pub trait NativeBoolean<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<bool, CubeError>;
-}
-
-pub trait NativeBoxedClone {
-    fn boxed_clone(&self) -> Box<dyn NativeObject>;
-}
-
-impl<T: NativeObject + Clone + 'static> NativeBoxedClone for T {
-    fn boxed_clone(&self) -> Box<dyn NativeObject> {
-        Box::new(self.clone())
-    }
 }

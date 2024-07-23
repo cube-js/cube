@@ -1,20 +1,20 @@
 use super::error::NativeObjSerializerError;
-use crate::wrappers::context::NativeContextHolder;
-use crate::wrappers::object::{NativeArray, NativeStruct};
+use crate::wrappers::inner_types::InnerTypes;
+use crate::wrappers::object::{
+    NativeArray, NativeBoolean, NativeNumber, NativeString, NativeStruct,
+};
 use crate::wrappers::object_handle::NativeObjectHandle;
 use serde;
 use serde::de::{DeserializeOwned, DeserializeSeed, MapAccess, SeqAccess, Visitor};
 use serde::forward_to_deserialize_any;
-use serde::{de, ser, Deserializer};
-use std::fmt;
-use std::fmt::Display;
+use serde::Deserializer;
 
-pub struct NativeSerdeDeserializer {
-    input: NativeObjectHandle,
+pub struct NativeSerdeDeserializer<IT: InnerTypes> {
+    input: NativeObjectHandle<IT>,
 }
 
-impl NativeSerdeDeserializer {
-    pub fn new(input: NativeObjectHandle) -> Self {
+impl<IT: InnerTypes> NativeSerdeDeserializer<IT> {
+    pub fn new(input: NativeObjectHandle<IT>) -> Self {
         Self { input }
     }
 
@@ -26,7 +26,7 @@ impl NativeSerdeDeserializer {
     }
 }
 
-impl<'de> Deserializer<'de> for NativeSerdeDeserializer {
+impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
     type Error = NativeObjSerializerError;
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -41,10 +41,10 @@ impl<'de> Deserializer<'de> for NativeSerdeDeserializer {
         } else if let Ok(val) = self.input.to_number() {
             visitor.visit_f64(val.value().unwrap())
         } else if let Ok(val) = self.input.to_array() {
-            let deserializer = NativeSeqDeserializer::new(val);
+            let deserializer = NativeSeqDeserializer::<IT>::new(val);
             visitor.visit_seq(deserializer)
         } else if let Ok(val) = self.input.to_struct() {
-            let deserializer = NativeMapDeserializer::new(val)?;
+            let deserializer = NativeMapDeserializer::<IT>::new(val)?;
             visitor.visit_map(deserializer)
         } else {
             Err(NativeObjSerializerError::Message(
@@ -104,20 +104,20 @@ impl<'de> Deserializer<'de> for NativeSerdeDeserializer {
     }
 }
 
-pub struct NativeSeqDeserializer {
-    input: Box<dyn NativeArray>,
+pub struct NativeSeqDeserializer<IT: InnerTypes> {
+    input: IT::Array,
     idx: u32,
     len: u32,
 }
 
-impl NativeSeqDeserializer {
-    pub fn new(input: Box<dyn NativeArray>) -> Self {
+impl<IT: InnerTypes> NativeSeqDeserializer<IT> {
+    pub fn new(input: IT::Array) -> Self {
         let len = input.len().unwrap();
         Self { input, idx: 0, len }
     }
 }
 
-impl<'de> SeqAccess<'de> for NativeSeqDeserializer {
+impl<'de, IT: InnerTypes> SeqAccess<'de> for NativeSeqDeserializer<IT> {
     type Error = NativeObjSerializerError;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -139,16 +139,16 @@ impl<'de> SeqAccess<'de> for NativeSeqDeserializer {
     }
 }
 
-struct NativeMapDeserializer {
-    input: Box<dyn NativeStruct>,
-    prop_names: Vec<NativeObjectHandle>,
+struct NativeMapDeserializer<IT: InnerTypes> {
+    input: IT::Struct,
+    prop_names: Vec<NativeObjectHandle<IT>>,
     key_idx: u32,
     value_idx: u32,
     len: u32,
 }
 
-impl NativeMapDeserializer {
-    pub fn new(input: Box<dyn NativeStruct>) -> Result<Self, NativeObjSerializerError> {
+impl<IT: InnerTypes> NativeMapDeserializer<IT> {
+    pub fn new(input: IT::Struct) -> Result<Self, NativeObjSerializerError> {
         let prop_names = input.get_own_property_names().map_err(|_| {
             NativeObjSerializerError::Message(format!("Failed to get property names"))
         })?;
@@ -163,7 +163,7 @@ impl NativeMapDeserializer {
     }
 }
 
-impl<'de> MapAccess<'de> for NativeMapDeserializer {
+impl<'de, IT: InnerTypes> MapAccess<'de> for NativeMapDeserializer<IT> {
     type Error = NativeObjSerializerError;
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where

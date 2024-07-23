@@ -1,17 +1,28 @@
+//use super::object::NeonObject;
+use super::inner_types::NeonInnerTypes;
+use super::object::base_types::*;
+use super::object::neon_array::NeonArray;
+use super::object::neon_struct::NeonStruct;
 use super::object::NeonObject;
-use crate::wrappers::context::{NativeContext, NativeContextHolder};
+use crate::wrappers::context::NativeContext;
 use crate::wrappers::object::NativeObject;
+use crate::wrappers::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use neon::prelude::*;
 use std::cell::{RefCell, RefMut};
+use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
-pub struct ContextWrapper<C: Context<'static>> {
+pub struct ContextWrapper<'cx, C: Context<'cx>> {
     cx: C,
+    lifetime: PhantomData<&'cx ()>,
 }
 
-impl<C: Context<'static>> ContextWrapper<C> {
+impl<'cx, C: Context<'cx>> ContextWrapper<'cx, C> {
     pub fn new(cx: C) -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::new(Self { cx }))
+        Rc::new(RefCell::new(Self {
+            cx,
+            lifetime: Default::default(),
+        }))
     }
 
     pub fn with_context<T, F>(&mut self, f: F) -> T
@@ -26,18 +37,18 @@ impl<C: Context<'static>> ContextWrapper<C> {
     }
 }
 
-pub struct ContextHolder<C: Context<'static>> {
-    context: Rc<RefCell<ContextWrapper<C>>>,
+pub struct ContextHolder<'cx, C: Context<'cx>> {
+    context: Rc<RefCell<ContextWrapper<'cx, C>>>,
 }
 
-impl<C: Context<'static> + 'static> ContextHolder<C> {
+impl<'cx, C: Context<'cx> + 'cx> ContextHolder<'cx, C> {
     pub fn new(cx: C) -> Self {
         Self {
             context: ContextWrapper::new(cx),
         }
     }
 
-    pub fn borrow_mut(&self) -> RefMut<ContextWrapper<C>> {
+    pub fn borrow_mut(&self) -> RefMut<ContextWrapper<'cx, C>> {
         self.context.borrow_mut()
     }
 
@@ -49,55 +60,58 @@ impl<C: Context<'static> + 'static> ContextHolder<C> {
         context.with_context(f)
     }
 
-    pub fn as_native_context_holder(&self) -> NativeContextHolder {
+    /* pub fn as_native_context_holder(&self) -> NativeContextHolder {
         NativeContextHolder::new(Box::new(self.clone()))
-    }
+    } */
 
-    pub fn weak(&self) -> WeakContextHolder<C> {
+    pub fn weak(&self) -> WeakContextHolder<'cx, C> {
         WeakContextHolder {
             context: Rc::downgrade(&self.context),
         }
     }
 }
 
-impl<C: Context<'static> + 'static> NativeContext for ContextHolder<C> {
-    fn boolean(&self, v: bool) -> Box<dyn crate::wrappers::object::NativeBoolean> {
-        let obj = NeonObject::new(self.weak(), self.with_context(|cx| cx.boolean(v).upcast()));
+impl<'cx, C: Context<'cx> + 'cx> NativeContext<NeonInnerTypes<'cx, C>> for ContextHolder<'cx, C> {
+    fn boolean(&self, v: bool) -> NeonBoolean<'cx, C> {
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.boolean(v).upcast()));
         obj.into_boolean().unwrap()
     }
 
-    fn string(&self, v: String) -> Box<dyn crate::wrappers::object::NativeString> {
-        let obj = NeonObject::new(self.weak(), self.with_context(|cx| cx.string(v).upcast()));
+    fn string(&self, v: String) -> NeonString<'cx, C> {
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.string(v).upcast()));
         obj.into_string().unwrap()
     }
 
-    fn number(&self, v: f64) -> Box<dyn crate::wrappers::object::NativeNumber> {
-        let obj = NeonObject::new(self.weak(), self.with_context(|cx| cx.number(v).upcast()));
+    fn number(&self, v: f64) -> NeonNumber<'cx, C> {
+        let obj = NeonObject::new(self.clone(), self.with_context(|cx| cx.number(v).upcast()));
         obj.into_number().unwrap()
     }
 
-    fn undefined(&self) -> Box<dyn crate::wrappers::object::NativeObject> {
-        NeonObject::new(self.weak(), self.with_context(|cx| cx.undefined().upcast()))
+    fn undefined(&self) -> NativeObjectHandle<NeonInnerTypes<'cx, C>> {
+        NativeObjectHandle::new(NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| cx.undefined().upcast()),
+        ))
     }
 
-    fn empty_array(&self) -> Box<dyn crate::wrappers::object::NativeArray> {
+    fn empty_array(&self) -> NeonArray<'cx, C> {
         let obj = NeonObject::new(
-            self.weak(),
+            self.clone(),
             self.with_context(|cx| cx.empty_array().upcast()),
         );
         obj.into_array().unwrap()
     }
 
-    fn empty_struct(&self) -> Box<dyn crate::wrappers::object::NativeStruct> {
+    fn empty_struct(&self) -> NeonStruct<'cx, C> {
         let obj = NeonObject::new(
-            self.weak(),
+            self.clone(),
             self.with_context(|cx| cx.empty_object().upcast()),
         );
         obj.into_struct().unwrap()
     }
 }
 
-impl<C: Context<'static>> Clone for ContextHolder<C> {
+impl<'cx, C: Context<'cx>> Clone for ContextHolder<'cx, C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),
@@ -105,12 +119,15 @@ impl<C: Context<'static>> Clone for ContextHolder<C> {
     }
 }
 
-pub struct WeakContextHolder<C: Context<'static>> {
-    context: Weak<RefCell<ContextWrapper<C>>>,
+pub struct WeakContextHolder<'cx, C: Context<'cx>> {
+    context: Weak<RefCell<ContextWrapper<'cx, C>>>,
 }
 
-impl<C: Context<'static>> WeakContextHolder<C> {
-    pub fn try_upgrade(&self) -> Result<ContextHolder<C>, CubeError> {
+impl<'cx, C: Context<'cx>> WeakContextHolder<'cx, C> {
+    pub fn try_upgrade<'a>(&'a self) -> Result<ContextHolder<'a, C>, CubeError>
+    where
+        'a: 'cx,
+    {
         if let Some(context) = self.context.upgrade() {
             Ok(ContextHolder { context })
         } else {
@@ -131,7 +148,7 @@ impl<C: Context<'static>> WeakContextHolder<C> {
     }
 }
 
-impl<C: Context<'static>> Clone for WeakContextHolder<C> {
+impl<'cx, C: Context<'cx>> Clone for WeakContextHolder<'cx, C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),

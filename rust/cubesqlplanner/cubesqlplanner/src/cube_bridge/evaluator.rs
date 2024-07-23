@@ -22,8 +22,7 @@ pub trait CubeEvaluator {
     #[field]
     fn primary_keys(&self) -> Result<HashMap<String, String>, CubeError>;
     #[optional]
-    fn parse_path(&self, path_type: String, path: String)
-        -> Result<Option<Vec<String>>, CubeError>;
+    fn parse_path(&self, path_type: String, path: String) -> Result<Vec<String>, CubeError>;
     fn measure_by_path(&self, measure_path: String)
         -> Result<Rc<dyn MeasureDefinition>, CubeError>;
     fn dimension_by_path(

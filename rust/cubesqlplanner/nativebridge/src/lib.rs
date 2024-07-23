@@ -230,6 +230,13 @@ impl NativeService {
         }
     }
 
+    fn imports(&self) -> proc_macro2::TokenStream {
+        quote! {
+            use cubenativeutils::wrappers::inner_types::InnerTypes;
+            use cubenativeutils::wrappers::object::NativeStruct;
+        }
+    }
+
     fn original_trait(&self) -> proc_macro2::TokenStream {
         let service_ident = &self.ident;
         let methods = self
@@ -273,15 +280,15 @@ impl NativeService {
         let struct_ident = self.struct_ident();
         if let Some(static_data_type) = &self.static_data_type {
             quote! {
-                pub struct #struct_ident {
-                    native_object: NativeObjectHandle,
+                pub struct #struct_ident<IT:InnerTypes> {
+                    native_object: NativeObjectHandle<IT>,
                     static_data: #static_data_type,
                 }
             }
         } else {
             quote! {
-                pub struct #struct_ident {
-                    native_object: NativeObjectHandle,
+                pub struct #struct_ident<IT:InnerTypes> {
+                    native_object: NativeObjectHandle<IT>,
                 }
             }
         }
@@ -295,8 +302,8 @@ impl NativeService {
         let struct_ident = self.struct_ident();
         if let Some(static_data_type) = &self.static_data_type {
             quote! {
-                impl #struct_ident {
-                    pub fn try_new(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                impl<IT: InnerTypes> #struct_ident<IT> {
+                    pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
                         let static_data = #static_data_type::from_native(native_object.clone())?;
                         Ok(Self {native_object, static_data} )
                     }
@@ -304,8 +311,8 @@ impl NativeService {
             }
         } else {
             quote! {
-                impl #struct_ident {
-                    pub fn try_new(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                impl<IT: InnerTypes> #struct_ident<IT> {
+                    pub fn try_new(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
                         Ok(Self {native_object} )
                     }
                 }
@@ -325,7 +332,7 @@ impl NativeService {
         quote! {
 
 
-            impl #service_ident for #struct_ident {
+            impl<IT:InnerTypes> #service_ident for #struct_ident<IT> {
                 #( #methods )*
                 #static_data_method
             }
@@ -335,16 +342,16 @@ impl NativeService {
     fn serialization_impl(&self) -> proc_macro2::TokenStream {
         let struct_ident = self.struct_ident();
         quote! {
-            impl NativeSerialize for #struct_ident {
+            impl<IT: InnerTypes> NativeSerialize<IT> for #struct_ident<IT> {
 
-                fn to_native(&self, _context: NativeContextHolder) -> Result<NativeObjectHandle, CubeError> {
+                fn to_native(&self, _context: NativeContextHolder<IT>) -> Result<NativeObjectHandle<IT>, CubeError> {
                     Ok(self.native_object.clone())
                 }
             }
 
-            impl NativeDeserialize for #struct_ident {
+            impl<IT: InnerTypes> NativeDeserialize<IT> for #struct_ident<IT> {
 
-                fn from_native(native_object: NativeObjectHandle) -> Result<Self, CubeError> {
+                fn from_native(native_object: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
                     Self::try_new(native_object)
                 }
             }
@@ -375,11 +382,11 @@ impl NativeMethod {
     fn method_impl(&self) -> proc_macro2::TokenStream {
         let &Self {
             ident,
-            asyncness,
             args,
             output,
             output_params,
             method_type,
+            ..
         } = &self;
         let typed_args = args
             .iter()
@@ -403,7 +410,7 @@ impl NativeMethod {
             NativeMethodType::Call => {
                 quote! {
                     fn #ident(#( #args ),*) #output {
-                        let context_holder = self.native_object.get_context()?;
+                        let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
                         let args = vec![#( #js_args_set ),*];
 
 
@@ -436,11 +443,11 @@ impl NativeMethod {
 
         if let Some(dynamic_container_path) = &output_params.dynamic_container_path {
             quote! {
-                Ok(#dynamic_container_path::new(NativeDeserializer::deserialize::<#output_type>(res)?))
+                Ok(#dynamic_container_path::new(NativeDeserializer::deserialize::<IT, #output_type<IT>>(res)?))
             }
         } else {
             quote! {
-                NativeDeserializer::deserialize::<#output_type>(res)
+                NativeDeserializer::deserialize::<IT, #output_type>(res)
             }
         }
     }
@@ -475,6 +482,7 @@ impl NativeMethod {
 impl ToTokens for NativeService {
     fn to_tokens(&self, tokens: &mut proc_macro2::TokenStream) {
         tokens.extend(vec![
+            self.imports(),
             self.original_trait(),
             self.struct_body(),
             self.struct_impl(),

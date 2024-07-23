@@ -4,25 +4,27 @@ use super::base_measure::BaseMeasure;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::plan::{Expr, From, GenerationPlan, Select};
+use cubenativeutils::wrappers::inner_types::InnerTypes;
+use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
+use cubenativeutils::wrappers::NativeType;
 use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct BaseQuery {
-    context: NativeContextHolder,
+pub struct BaseQuery<IT: InnerTypes> {
+    context: NativeContextHolder<IT>,
     cube_evaluator: Rc<dyn CubeEvaluator>,
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     join_root: String, //TODO temporary
 }
 
-impl BaseQuery {
+impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn try_new(
-        context: NativeContextHolder,
+        context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
-        println!("!!! opts {:?}", options.static_data());
         let cube_evaluator = options.cube_evaluator()?;
 
         let measures = if let Some(measures) = &options.static_data().measures {
@@ -50,7 +52,7 @@ impl BaseQuery {
             join_root: options.static_data().join_root.clone().unwrap(),
         })
     }
-    pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle, CubeError> {
+    pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
         let sql = plan.to_string();
         let params = self.get_params()?;

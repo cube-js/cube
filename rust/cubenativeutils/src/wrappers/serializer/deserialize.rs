@@ -1,22 +1,23 @@
 use super::deserializer::NativeSerdeDeserializer;
+use crate::wrappers::inner_types::InnerTypes;
 use crate::wrappers::NativeObjectHandle;
 use crate::CubeError;
 use serde::de::DeserializeOwned;
 
-pub trait NativeDeserialize: Sized {
-    fn from_native(v: NativeObjectHandle) -> Result<Self, CubeError>;
+pub trait NativeDeserialize<IT: InnerTypes>: Sized {
+    fn from_native(v: NativeObjectHandle<IT>) -> Result<Self, CubeError>;
 }
 
-impl<T: DeserializeOwned + Sized> NativeDeserialize for T {
-    fn from_native(v: NativeObjectHandle) -> Result<Self, CubeError> {
+impl<IT: InnerTypes, T: DeserializeOwned + Sized> NativeDeserialize<IT> for T {
+    fn from_native(v: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         NativeSerdeDeserializer::new(v)
             .deserialize()
             .map_err(|e| CubeError::internal(format!("Failed to deserialize: {}", e)))
     }
 }
 
-impl NativeDeserialize for NativeObjectHandle {
-    fn from_native(v: NativeObjectHandle) -> Result<Self, CubeError> {
+impl<IT: InnerTypes> NativeDeserialize<IT> for NativeObjectHandle<IT> {
+    fn from_native(v: NativeObjectHandle<IT>) -> Result<Self, CubeError> {
         Ok(v)
     }
 }
@@ -24,7 +25,9 @@ impl NativeDeserialize for NativeObjectHandle {
 pub struct NativeDeserializer {}
 
 impl NativeDeserializer {
-    pub fn deserialize<T: NativeDeserialize>(v: NativeObjectHandle) -> Result<T, CubeError> {
+    pub fn deserialize<IT: InnerTypes, T: NativeDeserialize<IT>>(
+        v: NativeObjectHandle<IT>,
+    ) -> Result<T, CubeError> {
         T::from_native(v)
     }
 }
