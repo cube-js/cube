@@ -325,12 +325,7 @@ export async function startBirdBoxFromContainer(
   }
 
   if (options.env) {
-    for (const k of Object.keys(options.env)) {
-      const val = options.env[k];
-      if (val) {
-        dc = dc.withEnv(k, val);
-      }
-    }
+    dc = dc.withEnvironment(options.env as any);
   }
   if (options.log === Log.PIPE) {
     process.stdout.write(
@@ -340,16 +335,12 @@ export async function startBirdBoxFromContainer(
 
   const env = await dc
     .withStartupTimeout(30 * 1000)
-    .withEnv(
-      'BIRDBOX_CUBEJS_VERSION',
-      process.env.BIRDBOX_CUBEJS_VERSION
-    )
-    .withEnv(
-      'BIRDBOX_CUBESTORE_VERSION',
-      process.env.BIRDBOX_CUBESTORE_VERSION
-    )
-    .withEnv('CUBEJS_TELEMETRY', 'false')
-    .withEnv('CUBEJS_SCHEMA_PATH', 'schema')
+    .withEnvironment({
+      BIRDBOX_CUBEJS_VERSION: process.env.BIRDBOX_CUBEJS_VERSION,
+      BIRDBOX_CUBESTORE_VERSION: process.env.BIRDBOX_CUBESTORE_VERSION,
+      CUBEJS_TELEMETRY: 'false',
+      CUBEJS_SCHEMA_PATH: 'schema',
+    })
     .up();
 
   const host = '127.0.0.1';
