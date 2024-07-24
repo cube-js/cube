@@ -7,9 +7,11 @@ export class MysqlDBRunner extends DbRunnerAbstract {
     const version = process.env.TEST_MYSQL_VERSION || options.version || '5.7';
 
     const builder = new GenericContainer(`mysql:${version}`)
-      .withEnv('MYSQL_ROOT_PASSWORD', process.env.TEST_DB_PASSWORD || 'Test1test')
+      .withEnvironment({
+        MYSQL_ROOT_PASSWORD: process.env.TEST_DB_PASSWORD || 'Test1test',
+      })
       .withHealthCheck({
-        test: 'mysqladmin ping -h localhost',
+        test: ['CMD-SHELL', 'mysqladmin ping -h localhost'],
         interval: 5 * 1000,
         timeout: 2 * 1000,
         retries: 3,
@@ -23,14 +25,12 @@ export class MysqlDBRunner extends DbRunnerAbstract {
        * workaround for MySQL 8 and unsupported auth in mysql package
        * @link https://github.com/mysqljs/mysql/pull/2233
        */
-      builder.withCmd(['--default-authentication-plugin=mysql_native_password']);
+      builder.withCommand(['--default-authentication-plugin=mysql_native_password']);
     }
 
     if (options.volumes) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const { source, target, bindMode } of options.volumes) {
-        builder.withBindMount(source, target, bindMode);
-      }
+      const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));
+      builder.withBindMounts(binds);
     }
 
     return builder.start();
