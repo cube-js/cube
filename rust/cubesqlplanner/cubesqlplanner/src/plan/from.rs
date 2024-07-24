@@ -2,12 +2,12 @@ use crate::planner::BaseCube;
 use std::fmt;
 use std::rc::Rc;
 
-pub enum From<'cx> {
+pub enum From {
     Empty,
-    Cube(Rc<BaseCube<'cx>>),
+    Cube(Rc<BaseCube>),
 }
 
-impl<'cx> fmt::Display for From<'cx> {
+impl fmt::Display for From {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             From::Empty => write!(f, ""),

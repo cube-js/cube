@@ -247,7 +247,7 @@ impl NativeService {
         // TODO Supertraits
         let static_data_method = self.static_data_method_def();
         quote! {
-            pub trait #service_ident<'cx> {
+            pub trait #service_ident {
                 #( #methods )*
                 #static_data_method
             }
@@ -332,7 +332,7 @@ impl NativeService {
         quote! {
 
 
-            impl<'cx, IT:InnerTypes> #service_ident<'cx> for #struct_ident<IT> {
+            impl<IT:InnerTypes> #service_ident for #struct_ident<IT> {
                 #( #methods )*
                 #static_data_method
             }

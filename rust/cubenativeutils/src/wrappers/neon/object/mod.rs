@@ -11,12 +11,12 @@ use crate::wrappers::object::NativeObject;
 use cubesql::CubeError;
 use neon::prelude::*;
 
-pub struct NeonObject<'cx, C: Context<'cx>> {
+pub struct NeonObject<'cx: 'static, C: Context<'cx>> {
     context: ContextHolder<'cx, C>,
     object: Handle<'cx, JsValue>,
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NeonObject<'cx, C> {
+impl<'cx: 'static, C: Context<'cx> + 'cx> NeonObject<'cx, C> {
     pub fn new(context: ContextHolder<'cx, C>, object: Handle<'cx, JsValue>) -> Self {
         Self { context, object }
     }
@@ -57,7 +57,9 @@ impl<'cx, C: Context<'cx> + 'cx> NeonObject<'cx, C> {
     }
 }
 
-impl<'cx, C: Context<'cx> + 'cx> NativeObject<NeonInnerTypes<'cx, C>> for NeonObject<'cx, C> {
+impl<'cx: 'static, C: Context<'cx> + 'cx> NativeObject<NeonInnerTypes<'cx, C>>
+    for NeonObject<'cx, C>
+{
     fn get_context(&self) -> ContextHolder<'cx, C> {
         self.context.clone()
     }
@@ -112,7 +114,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeObject<NeonInnerTypes<'cx, C>> for NeonOb
     }
 }
 
-impl<'cx, C: Context<'cx>> Clone for NeonObject<'cx, C> {
+impl<'cx: 'static, C: Context<'cx>> Clone for NeonObject<'cx, C> {
     fn clone(&self) -> Self {
         Self {
             context: self.context.clone(),

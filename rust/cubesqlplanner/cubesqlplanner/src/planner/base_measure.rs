@@ -4,13 +4,13 @@ use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct BaseMeasure<'cx> {
+pub struct BaseMeasure {
     measure: String,
-    cube_evaluator: Rc<dyn CubeEvaluator<'cx> + 'cx>,
+    cube_evaluator: Rc<dyn CubeEvaluator>,
 }
 
-impl<'cx> BaseMeasure<'cx> {
-    pub fn new(measure: String, cube_evaluator: Rc<dyn CubeEvaluator<'cx> + 'cx>) -> Rc<Self> {
+impl BaseMeasure {
+    pub fn new(measure: String, cube_evaluator: Rc<dyn CubeEvaluator>) -> Rc<Self> {
         Rc::new(Self {
             measure,
             cube_evaluator,

@@ -2,12 +2,12 @@ use crate::planner::{BaseDimension, BaseMeasure};
 use std::fmt;
 use std::rc::Rc;
 
-pub enum Expr<'cx> {
-    Measure(Rc<BaseMeasure<'cx>>),
+pub enum Expr {
+    Measure(Rc<BaseMeasure>),
     Dimension(Rc<BaseDimension>),
 }
 
-impl<'cx> fmt::Display for Expr<'cx> {
+impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Expr::Measure(measure) => {

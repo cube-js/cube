@@ -6,7 +6,7 @@ use cubesql::CubeError;
 use neon::prelude::*;
 
 #[derive(Clone)]
-pub struct NeonArray<'cx, C: Context<'cx>> {
+pub struct NeonArray<'cx: 'static, C: Context<'cx>> {
     object: NeonObject<'cx, C>,
 }
 

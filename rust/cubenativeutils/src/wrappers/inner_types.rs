@@ -2,7 +2,7 @@ use super::context::NativeContext;
 use super::object::{
     NativeArray, NativeBoolean, NativeNumber, NativeObject, NativeString, NativeStruct,
 };
-pub trait InnerTypes: Clone {
+pub trait InnerTypes: Clone + 'static {
     type Object: NativeObject<Self>;
     type Struct: NativeStruct<Self>;
     type Array: NativeArray<Self>;

@@ -5,7 +5,7 @@ use crate::wrappers::object::{NativeBoolean, NativeNumber, NativeString, NativeT
 use cubesql::CubeError;
 use neon::prelude::*;
 
-pub struct NeonString<'cx, C: Context<'cx>> {
+pub struct NeonString<'cx: 'static, C: Context<'cx>> {
     object: NeonObject<'cx, C>,
 }
 
@@ -28,7 +28,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeString<NeonInnerTypes<'cx, C>> for NeonSt
     }
 }
 
-pub struct NeonNumber<'cx, C: Context<'cx>> {
+pub struct NeonNumber<'cx: 'static, C: Context<'cx>> {
     object: NeonObject<'cx, C>,
 }
 
@@ -51,7 +51,7 @@ impl<'cx, C: Context<'cx> + 'cx> NativeNumber<NeonInnerTypes<'cx, C>> for NeonNu
     }
 }
 
-pub struct NeonBoolean<'cx, C: Context<'cx>> {
+pub struct NeonBoolean<'cx: 'static, C: Context<'cx>> {
     object: NeonObject<'cx, C>,
 }
 

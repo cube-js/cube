@@ -7,7 +7,7 @@ use crate::wrappers::inner_types::InnerTypes;
 use neon::prelude::*;
 use std::marker::PhantomData;
 
-pub struct NeonInnerTypes<'cx, C: Context<'cx>> {
+pub struct NeonInnerTypes<'cx: 'static, C: Context<'cx>> {
     lifetime: PhantomData<&'cx ContextHolder<'cx, C>>,
 }
 
@@ -19,7 +19,7 @@ impl<'cx, C: Context<'cx>> Clone for NeonInnerTypes<'cx, C> {
     }
 }
 
-impl<'cx, C: Context<'cx>> InnerTypes for NeonInnerTypes<'cx, C> {
+impl<'cx: 'static, C: Context<'cx>> InnerTypes for NeonInnerTypes<'cx, C> {
     type Object = NeonObject<'cx, C>;
     type Context = ContextHolder<'cx, C>;
     type Array = NeonArray<'cx, C>;

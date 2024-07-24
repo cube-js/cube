@@ -11,11 +11,11 @@ pub use select::Select;
 
 use std::fmt::{self, write};
 
-pub enum GenerationPlan<'cx> {
-    Select(Select<'cx>),
+pub enum GenerationPlan {
+    Select(Select),
 }
 
-impl<'cx> fmt::Display for GenerationPlan<'cx> {
+impl fmt::Display for GenerationPlan {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             GenerationPlan::Select(select) => {

@@ -12,18 +12,18 @@ use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct BaseQuery<'cx, IT: InnerTypes> {
+pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
-    cube_evaluator: Rc<dyn CubeEvaluator<'cx> + 'cx>,
-    measures: Vec<Rc<BaseMeasure<'cx>>>,
+    cube_evaluator: Rc<dyn CubeEvaluator>,
+    measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     join_root: String, //TODO temporary
 }
 
-impl<'cx, IT: InnerTypes> BaseQuery<'cx, IT> {
+impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn try_new(
         context: NativeContextHolder<IT>,
-        options: Rc<dyn BaseQueryOptions<'cx> + 'cx>,
+        options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
         let cube_evaluator = options.cube_evaluator()?;
 
@@ -91,7 +91,7 @@ impl<'cx, IT: InnerTypes> BaseQuery<'cx, IT> {
         Ok(res)
     }
 
-    fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube<'cx>>, CubeError> {
+    fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
         let eval = self.cube_evaluator.clone();
         let def = self.cube_evaluator.cube_from_path(cube_path)?;
         Ok(BaseCube::new(eval, def))
