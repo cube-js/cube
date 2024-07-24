@@ -29,13 +29,24 @@ const ScreenshotHighlight = ({ highlight, src }: ScreenshotProps) => (
   />
 )
 
+// Apparently, HEIC images are not shown properly in non-Safari browsers
+// if served "as is". So, if an image is serverd from Uploadcare, let's
+// always convert it to WEBP
+function getOptimizedLink(url: string): string {
+  if (url.startsWith('https://ucarecdn.com/')) {
+    return `${url}-/format/webp/`
+  }
+  
+  return url
+}
+
 export const Screenshot = (props: ScreenshotProps) => {
   return (
     <div className={cn('screenshot')} style={{ textAlign: 'center'}}>
       {props.highlight ? (<ScreenshotHighlight {...props} />) : null}
       <img
         alt={props.alt}
-        src={props.src}
+        src={getOptimizedLink(props.src)}
         style={{ border: 'none', filter: props.highlight ? 'brightness(0.5)' : 'none' }}
         width="100%"
       />
@@ -48,7 +59,7 @@ export const Diagram = (props: ScreenshotProps) => (
     {props.highlight ? (<ScreenshotHighlight {...props} />) : null}
     <img
       alt={props.alt}
-      src={props.src}
+      src={getOptimizedLink(props.src)}
       style={{ border: 'none', filter: props.highlight ? 'brightness(0.5)' : 'none' }}
       width="100%"
     />
