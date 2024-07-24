@@ -12,6 +12,18 @@ export class RedshiftQuery extends PostgresQuery {
     return 'GETDATE()';
   }
 
+  public hllInit(sql) {
+    return `HLL_CREATE_SKETCH(${sql}))`;
+  }
+
+  public hllMerge(sql) {
+    return `HLL_CARDINALITY(HLL_COMBINE(HLL_CREATE_SKETCH(${sql})))`;
+  }
+
+  public countDistinctApprox(sql) {
+    return `APPROXIMATE COUNT(DISTINCT ${sql})`;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DLOG10 = 'LOG(10, {{ args_concat }})';
