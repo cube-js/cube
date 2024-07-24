@@ -3878,17 +3878,17 @@ ORDER BY \"COUNT(count)\" DESC"
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-  ( 
-    "KibanaSampleDataEcommerce"."order_date" >= DATE_TRUNC( 
-      'MONTH', 
-      CAST(CAST('2024-01-01' AS DATE) AS TIMESTAMP) 
-    ) 
-  ) AS "Calculation_2760495522668597250" 
-FROM 
-  "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce" 
-GROUP BY 
-  1 
+            SELECT
+  (
+    "KibanaSampleDataEcommerce"."order_date" >= DATE_TRUNC(
+      'MONTH',
+      CAST(CAST('2024-01-01' AS DATE) AS TIMESTAMP)
+    )
+  ) AS "Calculation_2760495522668597250"
+FROM
+  "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+GROUP BY
+  1
             "#
             .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -4395,15 +4395,15 @@ limit
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            r#"select 
-  max("rows"."order_date") as "a0", 
-  min("rows"."order_date") as "a1" 
-from 
-  ( 
-    select 
-      "order_date" 
-    from 
-      "public"."KibanaSampleDataEcommerce" "$Table" 
+            r#"select
+  max("rows"."order_date") as "a0",
+  min("rows"."order_date") as "a1"
+from
+  (
+    select
+      "order_date"
+    from
+      "public"."KibanaSampleDataEcommerce" "$Table"
   ) "rows" "#
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -4441,21 +4441,21 @@ from
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            r#"select 
-  count(distinct("rows"."sumPrice")) + max( 
-    case 
-      when "rows"."sumPrice" is null then 1 
-      else 0 
-    end 
-  ) as "a0", 
-  min("rows"."sumPrice") as "a1", 
-  max("rows"."sumPrice") as "a2" 
-from 
-  ( 
-    select 
-      "sumPrice" 
-    from 
-      "public"."KibanaSampleDataEcommerce" "$Table" 
+            r#"select
+  count(distinct("rows"."sumPrice")) + max(
+    case
+      when "rows"."sumPrice" is null then 1
+      else 0
+    end
+  ) as "a0",
+  min("rows"."sumPrice") as "a1",
+  max("rows"."sumPrice") as "a2"
+from
+  (
+    select
+      "sumPrice"
+    from
+      "public"."KibanaSampleDataEcommerce" "$Table"
   ) "rows"
   "#
             .to_string(),
@@ -4623,7 +4623,7 @@ from
 
         let query_plan = convert_select_to_query_plan(
             r#"SELECT "_"."semijoin3.c98" AS "c98", "_"."a0" AS "a0" FROM (
-            SELECT "rows"."semijoin3.c98" AS "semijoin3.c98", sum(CAST("rows"."basetable2.a0" AS NUMERIC)) AS "a0" FROM 
+            SELECT "rows"."semijoin3.c98" AS "semijoin3.c98", sum(CAST("rows"."basetable2.a0" AS NUMERIC)) AS "a0" FROM
             (
                 SELECT "$Outer"."basetable2.a0", "$Inner"."semijoin3.c98" FROM (
                     SELECT "__cubeJoinField" AS "basetable2.c95", "count" AS "basetable2.a0" FROM "public"."KibanaSampleDataEcommerce" AS "$Table"
@@ -4676,40 +4676,40 @@ from
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            r#"select 
-  "_"."customer_gender", 
-  "_"."notes", 
-  "_"."a0" 
-from 
-  ( 
-    select 
-      "rows"."customer_gender" as "customer_gender", 
-      "rows"."notes" as "notes", 
-      sum(cast("rows"."sumPrice" as decimal)) as "a0" 
-    from 
-      ( 
-        select 
-          "_"."customer_gender", 
-          "_"."notes", 
-          "_"."count", 
-          "_"."order_date", 
-          "_"."maxPrice", 
-          "_"."minPrice", 
-          "_"."sumPrice", 
-          "_"."__user", 
-          "_"."__cubeJoinField" 
-        from 
-          "public"."KibanaSampleDataEcommerce" "_" 
-        where 
-          "_"."order_date" = timestamp '2024-01-01 00:00:00' 
-      ) "rows" 
-    group by 
-      "customer_gender", 
+            r#"select
+  "_"."customer_gender",
+  "_"."notes",
+  "_"."a0"
+from
+  (
+    select
+      "rows"."customer_gender" as "customer_gender",
+      "rows"."notes" as "notes",
+      sum(cast("rows"."sumPrice" as decimal)) as "a0"
+    from
+      (
+        select
+          "_"."customer_gender",
+          "_"."notes",
+          "_"."count",
+          "_"."order_date",
+          "_"."maxPrice",
+          "_"."minPrice",
+          "_"."sumPrice",
+          "_"."__user",
+          "_"."__cubeJoinField"
+        from
+          "public"."KibanaSampleDataEcommerce" "_"
+        where
+          "_"."order_date" = timestamp '2024-01-01 00:00:00'
+      ) "rows"
+    group by
+      "customer_gender",
       "notes"
-  ) "_" 
-where 
-  not "_"."a0" is null 
-limit 
+  ) "_"
+where
+  not "_"."a0" is null
+limit
   1000001"#
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -7013,7 +7013,7 @@ limit
         let query_plan = convert_select_to_query_plan(
             r#"
 WITH "qt_0" AS (
-  SELECT 
+  SELECT
     "ta_1"."read" "ca_1",
     CASE
       WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
@@ -7079,9 +7079,9 @@ ORDER BY "ca_4" ASC
         let query_plan = convert_select_to_query_plan(
             r#"
 WITH "qt_0" AS (
-  SELECT 
-    "ta_1"."read" "ca_1", 
-    DATE_TRUNC('month', "ta_2"."order_date") "ca_2", 
+  SELECT
+    "ta_1"."read" "ca_1",
+    DATE_TRUNC('month', "ta_2"."order_date") "ca_2",
     CASE
       WHEN sum("ta_2"."sumPrice") IS NOT NULL THEN sum("ta_2"."sumPrice")
       ELSE 0
@@ -7089,22 +7089,22 @@ WITH "qt_0" AS (
   FROM "public"."KibanaSampleDataEcommerce" "ta_2"
     JOIN "tpch5k"."public"."Logs" "ta_1"
       ON "ta_2"."__cubeJoinField" = "ta_1"."__cubeJoinField"
-  GROUP BY 
-    "ca_1", 
+  GROUP BY
+    "ca_1",
     "ca_2"
-  
+
 )
-SELECT 
-  "ta_3"."ca_1" "ca_4", 
-  DATE_TRUNC('month', DATEADD(day, CAST(2 AS int), DATE '2014-01-01')) "ca_5", 
+SELECT
+  "ta_3"."ca_1" "ca_4",
+  DATE_TRUNC('month', DATEADD(day, CAST(2 AS int), DATE '2014-01-01')) "ca_5",
   CASE
     WHEN sum(3) IS NOT NULL THEN sum(3)
     ELSE 0
   END "ca_6"
 FROM "qt_0" "ta_3"
 GROUP BY "ca_4"
-ORDER BY 
-  "ca_4" ASC, 
+ORDER BY
+  "ca_4" ASC,
   "ca_6" ASC
         "#
             .to_string(),
@@ -9622,6 +9622,96 @@ ORDER BY
         );
 
         insta::assert_snapshot!(
+            "generate_series_date32_2_args",
+            execute_query(
+                "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_date32_3_args_2days_interval",
+            execute_query(
+                "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date, '2 days'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_date32_3_args_3years_interval",
+            execute_query(
+                "SELECT generate_series('2016-07-23'::date, '2024-07-28'::date, '3 years'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_2_args",
+            execute_query(
+                "SELECT generate_series('2024-07-23 00:00:00'::timestamp, '2024-07-28 00:00:00'::timestamp);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_2years_interval",
+            execute_query(
+                "SELECT generate_series('2014-07-23 00:00:00'::timestamp, '2024-10-28 00:00:00'::timestamp, '2 years'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_2months_interval",
+            execute_query(
+                "SELECT generate_series('2024-07-23 00:00:00'::timestamp, '2024-10-28 00:00:00'::timestamp, '2 months'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_2days_interval",
+            execute_query(
+                "SELECT generate_series('2024-07-23 00:00:00'::timestamp, '2024-07-28 00:00:00'::timestamp, '2 days'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_1h_30m_interval",
+            execute_query(
+                "SELECT generate_series('2024-07-25 00:00:00'::timestamp, '2024-07-25 12:00:00'::timestamp, '1 hours 30 minutes'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_20s_interval",
+            execute_query(
+                "SELECT generate_series('2024-07-25 00:00:00'::timestamp, '2024-07-25 00:01:30'::timestamp, '20 seconds'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
+            "generate_series_timestamp_3_args_6y_5m_4d_3h_2min_1s_interval",
+            execute_query(
+                "SELECT generate_series('2010-01-01 00:00:00'::timestamp, '2024-07-25 00:01:30'::timestamp, '6 years 5 months 4 days 3 hours 2 minutes 1 seconds'::interval);".to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        insta::assert_snapshot!(
             "pg_catalog_generate_series_i64",
             execute_query(
                 "SELECT pg_catalog.generate_series(1, 5);".to_string(),
@@ -10469,26 +10559,26 @@ ORDER BY
         insta::assert_snapshot!(
             "superset_indkey_varchar_query",
             execute_query(
-                r#"SELECT 
-                    i.relname as relname, 
-                    ix.indisunique, 
-                    ix.indexprs, 
-                    a.attname, 
-                    a.attnum, 
-                    c.conrelid, 
-                    ix.indkey::varchar, 
-                    ix.indoption::varchar, 
-                    i.reloptions, 
-                    am.amname, 
-                    pg_get_expr(ix.indpred, ix.indrelid), 
-                    ix.indnkeyatts as indnkeyatts 
-                FROM pg_class t 
-                    join pg_index ix on t.oid = ix.indrelid 
-                    join pg_class i on i.oid = ix.indexrelid 
-                    left outer join pg_attribute a on t.oid = a.attrelid and a.attnum = ANY(ix.indkey) 
-                    left outer join pg_constraint c on (ix.indrelid = c.conrelid and ix.indexrelid = c.conindid and c.contype in ('p', 'u', 'x')) 
-                    left outer join pg_am am on i.relam = am.oid 
-                WHERE t.relkind IN ('r', 'v', 'f', 'm', 'p') and t.oid = 18010 and ix.indisprimary = 'f' 
+                r#"SELECT
+                    i.relname as relname,
+                    ix.indisunique,
+                    ix.indexprs,
+                    a.attname,
+                    a.attnum,
+                    c.conrelid,
+                    ix.indkey::varchar,
+                    ix.indoption::varchar,
+                    i.reloptions,
+                    am.amname,
+                    pg_get_expr(ix.indpred, ix.indrelid),
+                    ix.indnkeyatts as indnkeyatts
+                FROM pg_class t
+                    join pg_index ix on t.oid = ix.indrelid
+                    join pg_class i on i.oid = ix.indexrelid
+                    left outer join pg_attribute a on t.oid = a.attrelid and a.attnum = ANY(ix.indkey)
+                    left outer join pg_constraint c on (ix.indrelid = c.conrelid and ix.indexrelid = c.conindid and c.contype in ('p', 'u', 'x'))
+                    left outer join pg_am am on i.relam = am.oid
+                WHERE t.relkind IN ('r', 'v', 'f', 'm', 'p') and t.oid = 18010 and ix.indisprimary = 'f'
                 ORDER BY t.relname, i.relname
                 ;"#
                 .to_string(),
@@ -12269,9 +12359,9 @@ ORDER BY
             "metabase_type_in_subquery_query",
             execute_query(
                 "
-                SELECT nspname, typname 
-                FROM pg_type t 
-                JOIN pg_namespace n ON n.oid = t.typnamespace 
+                SELECT nspname, typname
+                FROM pg_type t
+                JOIN pg_namespace n ON n.oid = t.typnamespace
                 WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e);
                 "
                 .to_string(),
@@ -12745,8 +12835,8 @@ ORDER BY
             "thoughtspot_dateadd_literal_date32",
             execute_query(
                 "
-                SELECT 
-                    DATE_TRUNC('month', DATEADD(day, CAST(50 AS int), DATE '2014-01-01')) \"ca_1\", 
+                SELECT
+                    DATE_TRUNC('month', DATEADD(day, CAST(50 AS int), DATE '2014-01-01')) \"ca_1\",
                     CASE
                         WHEN sum(3) IS NOT NULL THEN sum(3)
                         ELSE 0
@@ -13597,10 +13687,10 @@ ORDER BY
     async fn metabase_interval_date_range_filter() {
         let logical_plan = convert_select_to_query_plan(
             "
-            SELECT COUNT(*) 
-            FROM KibanaSampleDataEcommerce 
+            SELECT COUNT(*)
+            FROM KibanaSampleDataEcommerce
             WHERE KibanaSampleDataEcommerce.order_date >= CAST((CAST(now() AS timestamp) + (INTERVAL '-30 day')) AS date);
-            ".to_string(), 
+            ".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 
@@ -13913,7 +14003,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = convert_select_to_query_plan(
             "
             SELECT CAST(TRUNC(EXTRACT(YEAR FROM order_date)) AS INTEGER), Count(1) FROM KibanaSampleDataEcommerce GROUP BY 1
-            ".to_string(), 
+            ".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 
@@ -14015,13 +14105,13 @@ ORDER BY "source"."str0" ASC
         }
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT \"source\".\"count\" AS \"count\" 
+            "SELECT \"source\".\"count\" AS \"count\"
             FROM (
                     SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
-                    WHERE \"public\".\"KibanaSampleDataEcommerce\".\"order_date\" 
-                    BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z' 
+                    WHERE \"public\".\"KibanaSampleDataEcommerce\".\"order_date\"
+                    BETWEEN timestamp with time zone '2022-06-13T12:30:00.000Z'
                     AND timestamp with time zone '2022-06-29T12:30:00.000Z'
-            ) 
+            )
             \"source\""
             .to_string(),
         DatabaseProtocol::PostgreSQL,
@@ -14081,11 +14171,11 @@ ORDER BY "source"."str0" ASC
         for [interval, lowest, highest, from, to] in cases {
             let logical_plan = convert_select_to_query_plan(
                 format!(
-                    "SELECT \"source\".\"count\" AS \"count\" 
+                    "SELECT \"source\".\"count\" AS \"count\"
                     FROM (
                         SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" FROM \"public\".\"KibanaSampleDataEcommerce\"
                         WHERE (\"public\".\"KibanaSampleDataEcommerce\".\"order_date\" + {}) BETWEEN {} AND {}
-                    ) 
+                    )
                     \"source\"",
                     interval, lowest, highest
                 ),
@@ -14160,7 +14250,7 @@ ORDER BY "source"."str0" ASC
             FROM \"public\".\"KibanaSampleDataEcommerce\"
             GROUP BY ((floor(((\"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" - 1.1) / 0.025)) * 0.025) + 1.1)
             ORDER BY ((floor(((\"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" - 1.1) / 0.025)) * 0.025) + 1.1) ASC;
-            ".to_string(), 
+            ".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
 
@@ -14277,8 +14367,8 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
-                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
-                FROM \"public\".\"KibanaSampleDataEcommerce\" 
+                "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+                FROM \"public\".\"KibanaSampleDataEcommerce\"
                 WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" BETWEEN 1 AND 2
                 LIMIT 10"
                 .to_string(),
@@ -14318,8 +14408,8 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\" 
-            FROM \"public\".\"KibanaSampleDataEcommerce\" 
+            "SELECT \"public\".\"KibanaSampleDataEcommerce\".\"count\" AS \"count\"
+            FROM \"public\".\"KibanaSampleDataEcommerce\"
             WHERE \"public\".\"KibanaSampleDataEcommerce\".\"taxful_total_price\" NOT BETWEEN 1 AND 2
             LIMIT 10"
             .to_string(),
@@ -14374,7 +14464,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
-                "SELECT ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0)) AS \"order_date\", 
+                "SELECT ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0)) AS \"order_date\",
                                min(\"KibanaSampleDataEcommerce\".\"minPrice\") AS \"min\"
                 FROM \"KibanaSampleDataEcommerce\"
                 GROUP BY ceil((CAST(extract(doy from CAST(date_trunc('week', \"KibanaSampleDataEcommerce\".\"order_date\") AS timestamp)) AS integer) / 7.0))
@@ -14514,8 +14604,8 @@ ORDER BY "source"."str0" ASC
             let logical_plan = convert_select_to_query_plan(
                 format!(
                     "
-                SELECT 
-                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\", 
+                SELECT
+                    CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
                     {}(Date_trunc('SECOND', \"order_date\")) AS \"qt_d3yqo2towc\"
                 FROM  KibanaSampleDataEcommerce
                 GROUP BY \"qt_m3uskv6gwc\"
@@ -14550,13 +14640,13 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             "
-            SELECT 
+            SELECT
                 CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
                 COUNT(1) AS \"__record_count\"
             FROM KibanaSampleDataEcommerce
-            WHERE Date_trunc('SECOND', \"order_date\") 
-                BETWEEN 
-                    CAST('2022-07-11 18:00:00.000000' AS TIMESTAMP) 
+            WHERE Date_trunc('SECOND', \"order_date\")
+                BETWEEN
+                    CAST('2022-07-11 18:00:00.000000' AS TIMESTAMP)
                 AND CAST('2022-07-11 19:00:00.000000' AS TIMESTAMP)
             GROUP BY \"qt_m3uskv6gwc\";
             "
@@ -14595,7 +14685,7 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             "
-            SELECT 
+            SELECT
                 CAST(Date_trunc('SECOND', \"order_date\") AS DATE) AS \"qt_m3uskv6gwc\",
                 COUNT(1) AS \"__record_count\",
                 \"customer_gender\"
@@ -14721,13 +14811,13 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT \"source\".\"substring131715\" AS \"substring131715\" 
+            "SELECT \"source\".\"substring131715\" AS \"substring131715\"
                 FROM (
-                    SELECT 
-                        \"public\".\"KibanaSampleDataEcommerce\".\"__user\" AS \"__user\", 
-                        SUBSTRING(\"public\".\"KibanaSampleDataEcommerce\".\"__user\" FROM 1 FOR 1234) AS \"substring131715\" 
+                    SELECT
+                        \"public\".\"KibanaSampleDataEcommerce\".\"__user\" AS \"__user\",
+                        SUBSTRING(\"public\".\"KibanaSampleDataEcommerce\".\"__user\" FROM 1 FOR 1234) AS \"substring131715\"
                     FROM \"public\".\"KibanaSampleDataEcommerce\"
-                ) AS \"source\" 
+                ) AS \"source\"
                 LIMIT 10000".to_string(),
             DatabaseProtocol::PostgreSQL
         ).await.as_logical_plan();
@@ -15034,16 +15124,16 @@ ORDER BY "source"."str0" ASC
             "holistics_left_join_query",
             execute_query(
                 "
-                SELECT 
-                    TRIM(c.conname) AS constraint_name, 
-                    CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END AS constraint_type, 
-                    TRIM(cn.nspname) AS constraint_schema, 
-                    TRIM(tn.nspname) AS schema_name, 
-                    TRIM(tc.relname) AS table_name, 
-                    TRIM(ta.attname) AS column_name, 
-                    TRIM(fn.nspname) AS referenced_schema_name, 
-                    TRIM(fc.relname) AS referenced_table_name, 
-                    TRIM(fa.attname) AS referenced_column_name, 
+                SELECT
+                    TRIM(c.conname) AS constraint_name,
+                    CASE c.contype WHEN 'p' THEN 'PRIMARY KEY' WHEN 'u' THEN 'UNIQUE' WHEN 'f' THEN 'FOREIGN KEY' END AS constraint_type,
+                    TRIM(cn.nspname) AS constraint_schema,
+                    TRIM(tn.nspname) AS schema_name,
+                    TRIM(tc.relname) AS table_name,
+                    TRIM(ta.attname) AS column_name,
+                    TRIM(fn.nspname) AS referenced_schema_name,
+                    TRIM(fc.relname) AS referenced_table_name,
+                    TRIM(fa.attname) AS referenced_column_name,
                     o.ord AS ordinal_position
                 FROM pg_constraint c
                     LEFT JOIN generate_series(1,1600) as o(ord) ON c.conkey[o.ord] IS NOT  NULL
@@ -15054,12 +15144,12 @@ ORDER BY "source"."str0" ASC
                     LEFT JOIN pg_namespace cn ON c.connamespace=cn.oid
                     LEFT JOIN pg_namespace tn ON tc.relnamespace=tn.oid
                     LEFT JOIN pg_namespace fn ON fc.relnamespace=fn.oid
-                WHERE 
-                    CASE c.contype WHEN 'p' 
-                    THEN 'PRIMARY KEY' WHEN 'u' 
-                    THEN 'UNIQUE' WHEN 'f' 
-                    THEN 'FOREIGN KEY' 
-                    END 
+                WHERE
+                    CASE c.contype WHEN 'p'
+                    THEN 'PRIMARY KEY' WHEN 'u'
+                    THEN 'UNIQUE' WHEN 'f'
+                    THEN 'FOREIGN KEY'
+                    END
                 IN ('UNIQUE', 'PRIMARY KEY', 'FOREIGN KEY') AND tc.relkind = 'r'
                 ".to_string(),
                 DatabaseProtocol::PostgreSQL
@@ -15122,13 +15212,13 @@ ORDER BY "source"."str0" ASC
         {
             let logical_plan = convert_select_to_query_plan(
                 format!("
-                    SELECT 
+                    SELECT
                         TO_CHAR((CAST((DATE_TRUNC('{}', (CAST(\"table\".\"order_date\" AS timestamptz)) AT TIME ZONE 'Etc/UTC')) AT TIME ZONE 'Etc/UTC' AS timestamptz)) AT TIME ZONE 'Etc/UTC', 'YYYY-MM-DD HH24:MI:SS') AS \"dm_pu_ca_754b1e\",
                         MAX(\"table\".\"maxPrice\") AS \"a_pu_n_51f23b\"
                     FROM \"KibanaSampleDataEcommerce\" \"table\"
                     GROUP BY 1
                     ORDER BY 2 DESC
-                    LIMIT 100000", 
+                    LIMIT 100000",
                     granularity),
                 DatabaseProtocol::PostgreSQL
             ).await.as_logical_plan();
@@ -15287,7 +15377,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let logical_plan = convert_select_to_query_plan(
-            "SELECT \"table\".\"count\" AS \"pu_c_3dcebf__0\", 
+            "SELECT \"table\".\"count\" AS \"pu_c_3dcebf__0\",
                 \"table\".\"maxPrice\" AS \"pu_mn_287b51__1\",
                 MIN(\"table\".\"minPrice\") AS \"m_pu_mn_ad42df__2\",
                 CAST ( NULL AS text ) AS \"h__placeholder_marker_0\",
@@ -17345,8 +17435,8 @@ ORDER BY "source"."str0" ASC
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT *
-            FROM KibanaSampleDataEcommerce 
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            FROM KibanaSampleDataEcommerce
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
             "#
             .to_string(),
@@ -17398,8 +17488,8 @@ ORDER BY "source"."str0" ASC
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read, NumberCube.someNumber, extract(MONTH FROM KibanaSampleDataEcommerce.order_date)
-            FROM KibanaSampleDataEcommerce 
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            FROM KibanaSampleDataEcommerce
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             LEFT JOIN NumberCube ON (NumberCube.__cubeJoinField = Logs.__cubeJoinField)
             WHERE Logs.read
             GROUP BY 2,3,4
@@ -17447,7 +17537,7 @@ ORDER BY "source"."str0" ASC
             r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
             FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             WHERE Logs.read
             GROUP BY 2
             "#
@@ -17556,7 +17646,7 @@ ORDER BY "source"."str0" ASC
             r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
             FROM (SELECT * FROM KibanaSampleDataEcommerce where customer_gender is not null order by customer_gender) KibanaSampleDataEcommerce
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             WHERE Logs.read
             GROUP BY 2
             "#
@@ -17728,8 +17818,8 @@ ORDER BY "source"."str0" ASC
         let query = convert_sql_to_cube_query(
             &r#"
             SELECT *
-            FROM KibanaSampleDataEcommerce 
-            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read) 
+            FROM KibanaSampleDataEcommerce
+            LEFT JOIN Logs ON (KibanaSampleDataEcommerce.has_subscription = Logs.read)
             "#
             .to_string(),
             meta.clone(),
@@ -17752,7 +17842,7 @@ ORDER BY "source"."str0" ASC
             &r#"
             SELECT count(KibanaSampleDataEcommerce.count), Logs.read
             FROM (SELECT * FROM KibanaSampleDataEcommerce) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs where read order by read limit 10) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs where read order by read limit 10) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             GROUP BY 2
             "#
             .to_string(),
@@ -17780,7 +17870,7 @@ ORDER BY "source"."str0" ASC
             &r#"
             SELECT *
             FROM (SELECT count(count), __cubeJoinField FROM KibanaSampleDataEcommerce group by 2) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             "#
             .to_string(),
             meta.clone(),
@@ -17809,7 +17899,7 @@ ORDER BY "source"."str0" ASC
             r#"
             SELECT *
             FROM (SELECT count(count), __cubeJoinField, extract(MONTH from order_date) FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField) 
+            LEFT JOIN (SELECT read, __cubeJoinField FROM Logs) Logs ON (KibanaSampleDataEcommerce.__cubeJoinField = Logs.__cubeJoinField)
             "#
             .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -17869,7 +17959,7 @@ ORDER BY "source"."str0" ASC
             r#"
             SELECT *
             FROM (SELECT count(count), extract(MONTH from order_date), taxful_total_price FROM KibanaSampleDataEcommerce group by 2, 3) KibanaSampleDataEcommerce
-            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id) 
+            LEFT JOIN (SELECT id, read FROM Logs) Logs ON (KibanaSampleDataEcommerce.taxful_total_price = Logs.id)
             "#
             .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -18033,7 +18123,7 @@ ORDER BY "source"."str0" ASC
                     ) q1
                     where (
                         (
-                            ('2022-11-01T00:00:00+00:00'::timestamptz <= cast_timestamp_to_datetime_11) and 
+                            ('2022-11-01T00:00:00+00:00'::timestamptz <= cast_timestamp_to_datetime_11) and
                             ('2022-11-15T23:59:59.999+00:00'::timestamptz >= cast_timestamp_to_datetime_11)
                         ) or
                         (cast_timestamp_to_datetime_11 is null)
@@ -18860,13 +18950,13 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                "ta_1"."customer_gender" "ca_1", 
+            SELECT
+                "ta_1"."customer_gender" "ca_1",
                 avg(CAST("ta_1"."avgPrice" AS FLOAT8)) "ca_2"
             FROM KibanaSampleDataEcommerce "ta_1"
             GROUP BY "ca_1"
-            ORDER BY 
-                "ca_2" DESC, 
+            ORDER BY
+                "ca_2" DESC,
                 "ca_1" ASC
             LIMIT 2
             "#
@@ -18972,8 +19062,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                (((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) % 3) + 1) "ca_1", 
+            SELECT
+                (((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) % 3) + 1) "ca_1",
                 CASE
                     WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
                     ELSE 0
@@ -19625,12 +19715,12 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-             SELECT 
+             SELECT
                  TO_CHAR("ta_1"."order_date", 'Mon') "ca_1",
                  DATE_TRUNC('qtr', "ta_1"."order_date") "ca_2"
              FROM KibanaSampleDataEcommerce "ta_1"
-             GROUP BY 
-                 "ca_1", 
+             GROUP BY
+                 "ca_1",
                  "ca_2"
              "#
             .to_string(),
@@ -19667,7 +19757,7 @@ ORDER BY "source"."str0" ASC
             r#"
             WITH "qt_0" AS (
                 SELECT
-                    CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0))) "ca_1", 
+                    CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0))) "ca_1",
                     CASE
                         WHEN sum("ta_1"."count") IS NOT NULL THEN sum("ta_1"."count")
                         ELSE 0
@@ -19884,8 +19974,8 @@ ORDER BY "source"."str0" ASC
         let query_plan = convert_select_to_query_plan(
             r#"
             WITH "qt_0" AS (
-                SELECT 
-                    DATEDIFF(day, min("ta_1"."order_date"), TO_DATE('2020-02-20','YYYY-MM-DD')) "ca_1", 
+                SELECT
+                    DATEDIFF(day, min("ta_1"."order_date"), TO_DATE('2020-02-20','YYYY-MM-DD')) "ca_1",
                     min("ta_1"."order_date") "ca_2"
                 FROM KibanaSampleDataEcommerce "ta_1"
                 HAVING DATEDIFF(day, min("ta_1"."order_date"), TO_DATE('2020-02-20','YYYY-MM-DD')) > 4
@@ -20978,7 +21068,7 @@ ORDER BY "source"."str0" ASC
         init_logger();
 
         let query_plan = convert_select_to_query_plan(
-            r#"SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, COUNT(DISTINCT countDistinct) mp 
+            r#"SELECT CASE WHEN customer_gender = 'female' THEN 'f' ELSE 'm' END, COUNT(DISTINCT countDistinct) mp
             FROM KibanaSampleDataEcommerce a
             WHERE
               (
@@ -20986,7 +21076,7 @@ ORDER BY "source"."str0" ASC
                   ( a.order_date ) >= '2024-01-01'
                   AND ( a.order_date ) < '2024-02-01'
                 )
-              ) 
+              )
             GROUP BY 1"#
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
@@ -21663,8 +21753,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                "ta_1"."customer_gender" AS "ca_1", 
+            SELECT
+                "ta_1"."customer_gender" AS "ca_1",
                 CAST(
                     EXTRACT(YEAR FROM "ta_1"."order_date")
                     || '-'
@@ -21673,8 +21763,8 @@ ORDER BY "source"."str0" ASC
                     AS DATE
                 ) AS "ca_2"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
-            GROUP BY 
-                "ca_1", 
+            GROUP BY
+                "ca_1",
                 "ca_2"
             LIMIT 1000
             ;"#
@@ -21749,7 +21839,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT
-                "ta_1"."customer_gender" AS "ca_1", 
+                "ta_1"."customer_gender" AS "ca_1",
                 (MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1) AS "ca_2"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
             GROUP BY
@@ -21792,12 +21882,12 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                (CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1) AS "ca_1", 
+            SELECT
+                (CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1) AS "ca_1",
                 "ta_1"."customer_gender" AS "ca_2"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
-            GROUP BY 
-                "ca_1", 
+            GROUP BY
+                "ca_1",
                 "ca_2"
             LIMIT 1000
             ;"#
@@ -21860,12 +21950,12 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                (CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1) - 1) * -1) * INTERVAL '1 month') AS date) + 1) AS "ca_1", 
+            SELECT
+                (CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + (((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1) - 1) * -1) * INTERVAL '1 month') AS date) + 1) AS "ca_1",
                 "ta_1"."customer_gender" AS "ca_2"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
-            GROUP BY 
-                "ca_1", 
+            GROUP BY
+                "ca_1",
                 "ca_2"
             LIMIT 1000
             ;"#
@@ -21904,12 +21994,12 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1) AS "ca_1", 
+            SELECT
+                (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1) AS "ca_1",
                 "ta_1"."customer_gender" AS "ca_2"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
-            GROUP BY 
-                "ca_1", 
+            GROUP BY
+                "ca_1",
                 "ca_2"
             LIMIT 1000
             ;"#
@@ -22183,11 +22273,11 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            select 
+            select
                 datetrunc_12 "Week of Event Date",
                 sum_15 "Active_Events_SUM_Metric"
             from (
-                select 
+                select
                     (
                         date_trunc(
                             'week',
@@ -22206,7 +22296,7 @@ ORDER BY "source"."str0" ASC
                             (
                                 order_date :: timestamptz + cast(1 || ' day' as interval)
                             )
-                        ) + cast(-1 || ' day' as interval) 
+                        ) + cast(-1 || ' day' as interval)
                     )
             ) q1
             order by
@@ -22248,58 +22338,58 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            select 
-                "_"."order_date" as "c10" 
-            from 
-                ( 
-                    select 
-                        "order_date", 
-                        "_"."t0_0" as "t0_0", 
-                        "_"."t1_0" as "t1_0" 
-                    from 
-                        ( 
-                            select 
-                                "_"."order_date", 
-                                "_"."o0", 
-                                "_"."t0_0", 
-                                "_"."t1_0" 
-                            from 
-                                ( 
-                                    select 
-                                        "_"."order_date" as "order_date", 
-                                        "_"."o0" as "o0", 
-                                        case 
-                                            when "_"."o0" is not null then "_"."o0" 
-                                            else timestamp '1899-12-28 00:00:00' 
-                                        end as "t0_0", 
-                                        case 
-                                            when "_"."o0" is null then 0 
-                                            else 1 
-                                        end as "t1_0" 
-                                    from 
-                                        ( 
-                                            select 
-                                                "rows"."order_date" as "order_date", 
-                                                "rows"."o0" as "o0" 
-                                            from 
-                                                ( 
-                                                    select 
-                                                        "order_date" as "order_date", 
-                                                        "order_date" as "o0" 
-                                                    from 
-                                                        "public"."KibanaSampleDataEcommerce" "$Table" 
-                                                ) "rows" 
-                                            group by 
-                                                "order_date", 
-                                                "o0" 
-                                        ) "_" 
-                                ) "_" 
-                        ) "_" 
-                ) "_" 
-            order by 
-                "_"."t0_0", 
-                "_"."t1_0" 
-            limit 
+            select
+                "_"."order_date" as "c10"
+            from
+                (
+                    select
+                        "order_date",
+                        "_"."t0_0" as "t0_0",
+                        "_"."t1_0" as "t1_0"
+                    from
+                        (
+                            select
+                                "_"."order_date",
+                                "_"."o0",
+                                "_"."t0_0",
+                                "_"."t1_0"
+                            from
+                                (
+                                    select
+                                        "_"."order_date" as "order_date",
+                                        "_"."o0" as "o0",
+                                        case
+                                            when "_"."o0" is not null then "_"."o0"
+                                            else timestamp '1899-12-28 00:00:00'
+                                        end as "t0_0",
+                                        case
+                                            when "_"."o0" is null then 0
+                                            else 1
+                                        end as "t1_0"
+                                    from
+                                        (
+                                            select
+                                                "rows"."order_date" as "order_date",
+                                                "rows"."o0" as "o0"
+                                            from
+                                                (
+                                                    select
+                                                        "order_date" as "order_date",
+                                                        "order_date" as "o0"
+                                                    from
+                                                        "public"."KibanaSampleDataEcommerce" "$Table"
+                                                ) "rows"
+                                            group by
+                                                "order_date",
+                                                "o0"
+                                        ) "_"
+                                ) "_"
+                        ) "_"
+                ) "_"
+            order by
+                "_"."t0_0",
+                "_"."t1_0"
+            limit
                 101
             "#
             .to_string(),
@@ -22373,16 +22463,16 @@ ORDER BY "source"."str0" ASC
                 SELECT
                     pg_catalog.pg_type.typname AS name,
                     pg_catalog.pg_type_is_visible(pg_catalog.pg_type.oid) AS visible,
-                    pg_catalog.pg_namespace.nspname AS schema, lbl_agg.labels AS labels 
+                    pg_catalog.pg_namespace.nspname AS schema, lbl_agg.labels AS labels
                 FROM pg_catalog.pg_type
                 JOIN pg_catalog.pg_namespace ON pg_catalog.pg_namespace.oid = pg_catalog.pg_type.typnamespace
                 LEFT OUTER JOIN (
                     SELECT
                         pg_catalog.pg_enum.enumtypid AS enumtypid,
-                        array_agg(pg_catalog.pg_enum.enumlabel ORDER BY pg_catalog.pg_enum.enumsortorder) AS labels 
+                        array_agg(pg_catalog.pg_enum.enumlabel ORDER BY pg_catalog.pg_enum.enumsortorder) AS labels
                     FROM pg_catalog.pg_enum
                     GROUP BY pg_catalog.pg_enum.enumtypid
-                ) AS lbl_agg ON pg_catalog.pg_type.oid = lbl_agg.enumtypid 
+                ) AS lbl_agg ON pg_catalog.pg_type.oid = lbl_agg.enumtypid
                 WHERE pg_catalog.pg_type.typtype = 'e'
                 ORDER BY
                     pg_catalog.pg_namespace.nspname,
@@ -22416,7 +22506,7 @@ ORDER BY "source"."str0" ASC
                     END AS filter_definition,
                     pg_catalog.pg_index.indnkeyatts,
                     idx_cols.elements,
-                    idx_cols.elements_is_expr 
+                    idx_cols.elements_is_expr
                 FROM pg_catalog.pg_index
                 JOIN pg_catalog.pg_class AS cls_idx ON pg_catalog.pg_index.indexrelid = cls_idx.oid
                 JOIN pg_catalog.pg_am ON cls_idx.relam = pg_catalog.pg_am.oid
@@ -22425,7 +22515,7 @@ ORDER BY "source"."str0" ASC
                         idx_attr.indexrelid AS indexrelid,
                         min(idx_attr.indrelid) AS min_1,
                         array_agg(idx_attr.element ORDER BY idx_attr.ord) AS elements,
-                        array_agg(idx_attr.is_expr ORDER BY idx_attr.ord) AS elements_is_expr 
+                        array_agg(idx_attr.is_expr ORDER BY idx_attr.ord) AS elements_is_expr
                     FROM (
                         SELECT
                             idx.indexrelid AS indexrelid,
@@ -22436,21 +22526,21 @@ ORDER BY "source"."str0" ASC
                                     THEN pg_catalog.pg_get_indexdef(idx.indexrelid, idx.ord + 1, true)
                                 ELSE CAST(pg_catalog.pg_attribute.attname AS TEXT)
                             END AS element,
-                            idx.attnum = 0 AS is_expr 
+                            idx.attnum = 0 AS is_expr
                         FROM (
                             SELECT
                                 pg_catalog.pg_index.indexrelid AS indexrelid,
                                 pg_catalog.pg_index.indrelid AS indrelid,
                                 unnest(pg_catalog.pg_index.indkey) AS attnum,
-                                generate_subscripts(pg_catalog.pg_index.indkey, 1) AS ord 
-                            FROM pg_catalog.pg_index 
+                                generate_subscripts(pg_catalog.pg_index.indkey, 1) AS ord
+                            FROM pg_catalog.pg_index
                             WHERE
                                 NOT pg_catalog.pg_index.indisprimary
                                 AND pg_catalog.pg_index.indrelid IN (18000)
                         ) AS idx
                         LEFT OUTER JOIN pg_catalog.pg_attribute ON
                             pg_catalog.pg_attribute.attnum = idx.attnum
-                            AND pg_catalog.pg_attribute.attrelid = idx.indrelid 
+                            AND pg_catalog.pg_attribute.attrelid = idx.indrelid
                         WHERE idx.indrelid IN (18000)
                     ) AS idx_attr
                     GROUP BY idx_attr.indexrelid
@@ -22458,7 +22548,7 @@ ORDER BY "source"."str0" ASC
                 LEFT OUTER JOIN pg_catalog.pg_constraint ON
                     pg_catalog.pg_index.indrelid = pg_catalog.pg_constraint.conrelid
                     AND pg_catalog.pg_index.indexrelid = pg_catalog.pg_constraint.conindid
-                    AND pg_catalog.pg_constraint.contype = ANY (ARRAY['p', 'u', 'x']) 
+                    AND pg_catalog.pg_constraint.contype = ANY (ARRAY['p', 'u', 'x'])
                 WHERE
                     pg_catalog.pg_index.indrelid IN (18000)
                     AND NOT pg_catalog.pg_index.indisprimary
@@ -23002,10 +23092,10 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_1", 
-                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
-                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_3", 
+            SELECT
+                DATE_TRUNC('MONTH', CAST("ta_1"."order_date" AS date)) AS "ca_1",
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2",
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_3",
                 min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_4"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
             GROUP BY "ca_1"
@@ -23041,15 +23131,15 @@ ORDER BY "source"."str0" ASC
 
         let query_plan = convert_select_to_query_plan(
             r#"
-            SELECT 
-                CAST("ta_1"."order_date" AS date) AS "ca_1", 
-                COALESCE(sum("ta_1"."count"), 0) AS "ca_2", 
-                min((MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) AS "ca_3", 
-                min(EXTRACT(DAY FROM "ta_1"."order_date")) AS "ca_4", 
-                min((CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1)) AS "ca_5", 
-                min(FLOOR(((EXTRACT(DAY FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) + 6) / NULLIF(7,0)))) AS "ca_6", 
-                min(FLOOR(((CAST(("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day') AS date) - CAST((CAST(EXTRACT(YEAR FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-' || EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-01' AS DATE) + ((EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) - 1) * -1) * INTERVAL '1 month') AS date) + 1 + 6) / NULLIF(7,0)))) AS "ca_7", 
-                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_8", 
+            SELECT
+                CAST("ta_1"."order_date" AS date) AS "ca_1",
+                COALESCE(sum("ta_1"."count"), 0) AS "ca_2",
+                min((MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) AS "ca_3",
+                min(EXTRACT(DAY FROM "ta_1"."order_date")) AS "ca_4",
+                min((CAST("ta_1"."order_date" AS date) - CAST((CAST(EXTRACT(YEAR FROM "ta_1"."order_date") || '-' || EXTRACT(MONTH FROM "ta_1"."order_date") || '-01' AS DATE) + ((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) * -1) * INTERVAL '1 month') AS date) + 1)) AS "ca_5",
+                min(FLOOR(((EXTRACT(DAY FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) + 6) / NULLIF(7,0)))) AS "ca_6",
+                min(FLOOR(((CAST(("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day') AS date) - CAST((CAST(EXTRACT(YEAR FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-' || EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) || '-01' AS DATE) + ((EXTRACT(MONTH FROM ("ta_1"."order_date" + (4 - (MOD(CAST((CAST("ta_1"."order_date" AS date) - CAST(DATE '1970-01-01' AS date) + 3) AS numeric), 7) + 1)) * INTERVAL '1 day')) - 1) * -1) * INTERVAL '1 month') AS date) + 1 + 6) / NULLIF(7,0)))) AS "ca_7",
+                min((MOD(CAST((EXTRACT(MONTH FROM "ta_1"."order_date") - 1) AS numeric), 3) + 1)) AS "ca_8",
                 min(CEIL((EXTRACT(MONTH FROM "ta_1"."order_date") / NULLIF(3.0,0.0)))) AS "ca_9"
             FROM "db"."public"."KibanaSampleDataEcommerce" AS "ta_1"
             GROUP BY "ca_1"
@@ -23173,8 +23263,8 @@ ORDER BY "source"."str0" ASC
             vec![
                 (
                     "statements/select".to_string(),
-                    r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }} 
-FROM ({{ from }}) AS {{ from_alias }} 
+                    r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }}
+FROM ({{ from }}) AS {{ from_alias }}
 {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
 {% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if offset %}
 OFFSET {{ offset }}{% endif %}{% if limit %}
@@ -24234,8 +24324,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         let logical_plan = convert_select_to_query_plan(
             r#"
             SELECT
-                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "CUSTOMER_GENDER", 
-                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:SUM_PRICE:ok" 
+                CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT) AS "CUSTOMER_GENDER",
+                SUM("KibanaSampleDataEcommerce"."sumPrice") AS "sum:SUM_PRICE:ok"
             FROM
                 "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
             GROUP BY 1
