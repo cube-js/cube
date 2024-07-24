@@ -32,7 +32,7 @@ export type SQLServerConstructorOptions = {
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
 
-  protected gatewayPort: number = 7575;
+  protected readonly gatewayPort: number | undefined;
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
@@ -43,13 +43,19 @@ export class SQLServer {
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
 
-    if (options.gatewayPort) {
-      this.gatewayPort = options.gatewayPort;
+    // Actually, proxy is enabled in gateway
+    // But passing port into registerInterface will start native gateway
+    if (getEnv('nativeApiGateway')) {
+      this.gatewayPort = options.gatewayPort || 7575;
     }
   }
 
   public getNativeGatewayPort(): number {
-    return this.gatewayPort;
+    if (this.gatewayPort) {
+      return this.gatewayPort;
+    }
+
+    throw new Error('Native api gateway is not enabled');
   }
 
   public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
