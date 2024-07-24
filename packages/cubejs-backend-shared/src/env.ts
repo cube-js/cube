@@ -1696,6 +1696,18 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  nativeApiGatewayPort: () => {
+    if (process.env.CUBEJS_NATIVE_API_GATEWAY_PORT === 'false') {
+      return undefined;
+    }
+
+    const port = asFalseOrPort(process.env.CUBEJS_NATIVE_API_GATEWAY_PORT || 'false', 'CUBEJS_NATIVE_API_GATEWAY_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
   pgSqlPort: () => {
     if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
       return undefined;
@@ -1727,7 +1739,7 @@ const variables: Record<string, (...args: any) => any> = {
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
-  // Internal testing
+  // Internal testing, please don't enable it. It's not ready for public preview
   nativeApiGateway: () => get('CUBE_JS_NATIVE_API_GATEWAY_INTERNAL')
     .asBool(),
   // Experiments & Preview flags

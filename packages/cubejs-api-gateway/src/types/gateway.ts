@@ -49,6 +49,7 @@ type ScheduledRefreshContextsFn =
  */
 interface ApiGatewayOptions {
   standalone: boolean;
+  gatewayPort?: number,
   dataSourceStorage: any;
   refreshScheduler: any;
   scheduledRefreshContexts?: ScheduledRefreshContextsFn;
