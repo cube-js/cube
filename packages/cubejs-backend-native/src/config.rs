@@ -3,6 +3,7 @@ use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayServer};
 use crate::{auth::NodeBridgeAuthService, transport::NodeBridgeTransport};
 use async_trait::async_trait;
 use cubesql::config::injection::Injector;
+use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::{
     config::{Config, CubeServices},
     sql::SqlAuthService,
@@ -54,8 +55,11 @@ impl NodeCubeServices {
         Ok(futures)
     }
 
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
-        self.services.stop_processing_loops().await?;
+    pub async fn stop_processing_loops(
+        &self,
+        shutdown_mode: ShutdownMode,
+    ) -> Result<(), CubeError> {
+        self.services.stop_processing_loops(shutdown_mode).await?;
 
         if self
             .services
@@ -68,7 +72,7 @@ impl NodeCubeServices {
                 .injector
                 .get_service_typed::<dyn ApiGatewayServer>()
                 .await;
-            gateway_server.stop_processing().await?;
+            gateway_server.stop_processing(shutdown_mode).await?;
         }
 
         Ok(())

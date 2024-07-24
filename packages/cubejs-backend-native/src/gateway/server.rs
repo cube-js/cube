@@ -1,7 +1,7 @@
 use crate::gateway::{ApiGatewayRouterBuilder, ApiGatewayState};
 use async_trait::async_trait;
 use cubesql::config::injection::Injector;
-use cubesql::config::processing_loop::ProcessingLoop;
+use cubesql::config::processing_loop::{ProcessingLoop, ShutdownMode};
 use cubesql::CubeError;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -85,7 +85,8 @@ impl ProcessingLoop for ApiGatewayServerImpl {
             .map_err(|err| CubeError::internal(err.to_string()))
     }
 
-    async fn stop_processing(&self) -> Result<(), CubeError> {
+    async fn stop_processing(&self, _mode: ShutdownMode) -> Result<(), CubeError> {
+        // ShutdownMode was added for Postgres protocol and its use here has not yet been considered.
         self.close_socket_tx.send(true)?;
         Ok(())
     }
