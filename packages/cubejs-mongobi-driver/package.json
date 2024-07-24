@@ -41,7 +41,7 @@
   "devDependencies": {
     "@cubejs-backend/linter": "^0.35.0",
     "@types/generic-pool": "^3.1.9",
-    "testcontainers": "^9.8.0",
+    "testcontainers": "^10.10.4",
     "typescript": "~5.2.2"
   },
   "jest": {
