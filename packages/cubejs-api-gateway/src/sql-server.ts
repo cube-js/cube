@@ -18,10 +18,14 @@ export type SQLServerOptions = {
   canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
   pgSqlPort?: number,
-  gatewayPort?: number,
   sqlUser?: string,
   sqlSuperUser?: string,
   sqlPassword?: string,
+  gatewayPort?: number,
+};
+
+export type SQLServerConstructorOptions = {
+  gatewayPort?: number,
 };
 
 export class SQLServer {
@@ -31,19 +35,20 @@ export class SQLServer {
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
+    options: SQLServerConstructorOptions,
   ) {
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
+
+    if (options.gatewayPort) {
+      this.gatewayPort = options.gatewayPort;
+    }
   }
 
   public getNativeGatewayPort(): number {
-    if (this.gatewayPort) {
-      return this.gatewayPort;
-    }
-
-    throw new Error('Native ApiGateway is not enabled');
+    return this.gatewayPort
   }
 
   public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
@@ -53,10 +58,6 @@ export class SQLServer {
   public async init(options: SQLServerOptions): Promise<void> {
     if (this.sqlInterfaceInstance) {
       throw new Error('Unable to start SQL interface two times');
-    }
-
-    if (options.gatewayPort) {
-      this.gatewayPort = options.gatewayPort;
     }
 
     const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))

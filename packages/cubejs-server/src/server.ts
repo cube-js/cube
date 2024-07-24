@@ -73,7 +73,7 @@ export class CubejsServer {
       },
     };
 
-    this.core = this.createCoreInstance(config, systemOptions);
+    this.core = this.createCoreInstance(this.config, systemOptions);
     this.server = null;
   }
 

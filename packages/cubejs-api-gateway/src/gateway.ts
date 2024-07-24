@@ -80,7 +80,7 @@ import {
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
-import { SQLServer } from './sql-server';
+import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
@@ -160,6 +160,8 @@ class ApiGateway {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
 
+  protected readonly sqlServer: SQLServer;
+
   public constructor(
     protected readonly apiSecret: string,
     protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
@@ -192,6 +194,19 @@ class ApiGateway {
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
     // eslint-disable-next-line @typescript-eslint/no-empty-function
     this.event = options.event || function dummyEvent() {};
+    this.sqlServer = this.createSQLServerInstance({
+      gatewayPort: options.gatewayPort,
+    });
+  }
+
+  public getSQLServer(): SQLServer {
+    return this.sqlServer;
+  }
+
+  protected createSQLServerInstance(options: SQLServerConstructorOptions): SQLServer {
+    return new SQLServer(this, {
+      gatewayPort: options.gatewayPort,
+    });
   }
 
   public initApp(app: ExpressApplication) {
@@ -365,13 +380,11 @@ class ApiGateway {
       `${this.basePath}/v1/cubesql`,
       userMiddlewares,
       userAsyncHandler(async (req, res) => {
-        const server = this.initSQLServer();
-
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Transfer-Encoding', 'chunked');
 
         try {
-          await server.execSql(req.body.query, res, req.context?.securityContext);
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
         } catch (e: any) {
           this.handleError({
             e,
@@ -503,10 +516,8 @@ class ApiGateway {
     }
 
     if (getEnv('nativeApiGateway')) {
-      const server = this.initSQLServer();
-
       const proxyMiddleware = createProxyMiddleware<Request, Response>({
-        target: `http://127.0.0.1:${server.getNativeGatewayPort()}/v2`,
+        target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
         changeOrigin: true,
       });
 
@@ -517,16 +528,6 @@ class ApiGateway {
     }
 
     app.use(this.handleErrorMiddleware);
-  }
-
-  protected _sqlServer: SQLServer | undefined;
-
-  public initSQLServer() {
-    if (!this._sqlServer) {
-      this._sqlServer = new SQLServer(this);
-    }
-
-    return this._sqlServer;
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
