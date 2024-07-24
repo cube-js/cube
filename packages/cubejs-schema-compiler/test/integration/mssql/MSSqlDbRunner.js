@@ -93,11 +93,16 @@ export class MSSqlDbRunner extends BaseDbRunner {
     const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
 
     return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
-      .withEnv('ACCEPT_EULA', 'Y')
-      .withEnv('MSSQL_PID', 'Developer')
-      .withEnv('MSSQL_SA_PASSWORD', this.password())
+      .withEnvironment({
+        ACCEPT_EULA: 'Y',
+        MSSQL_PID: 'Developer',
+        MSSQL_SA_PASSWORD: this.password(),
+      })
       .withHealthCheck({
-        test: `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`,
+        test: [
+          'CMD-SHELL',
+          `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`
+        ],
         interval: 2 * 1000,
         timeout: 3 * 1000,
         retries: 5,

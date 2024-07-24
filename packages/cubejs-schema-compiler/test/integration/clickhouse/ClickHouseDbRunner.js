@@ -84,7 +84,7 @@ export class ClickHouseDbRunner {
   testQueries = async (queries, prepareDataSet) => {
     if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
       this.container = await new GenericContainer(`clickhouse/clickhouse-server:${this.clickHouseVersion}`)
-        .withExposedPorts(8123)
+        .withExposedPorts(this.port())
         .start();
     }
 
@@ -110,15 +110,15 @@ export class ClickHouseDbRunner {
     // DateTime64: toStartOfDay, toStartOfHour, toStartOfMinute, toStartOfFiveMinutes, toStartOfTenMinutes, toStartOfFifteenMinutes, timeSlot.
     //
     // https://clickhouse.com/docs/en/operations/settings/settings#enable-extended-results-for-datetime-functions
-    const extendedDateTimeResultsOptions = this.supportsExtendedDateTimeResults ? { 
-      enable_extended_results_for_datetime_functions: '1' 
+    const extendedDateTimeResultsOptions = this.supportsExtendedDateTimeResults ? {
+      enable_extended_results_for_datetime_functions: '1'
     } : {};
 
     for (const [query, params] of queries) {
       requests.push(clickHouse.querying(formatSql(query, params), {
         dataObjects: true,
-        queryOptions: { 
-          session_id: clickHouse.sessionId, 
+        queryOptions: {
+          session_id: clickHouse.sessionId,
           join_use_nulls: '1',
           ...extendedDateTimeResultsOptions
         }
@@ -132,6 +132,10 @@ export class ClickHouseDbRunner {
 
   testQuery = async (queryAndParams, prepareDataSet) => this.testQueries([queryAndParams], prepareDataSet)
     .then(res => res[0]);
+
+  port() {
+    return 8123;
+  }
 }
 
 //

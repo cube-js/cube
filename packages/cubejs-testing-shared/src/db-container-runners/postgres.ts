@@ -8,9 +8,11 @@ export class PostgresDBRunner extends DbRunnerAbstract {
     const version = process.env.TEST_PGSQL_VERSION || options.version || '9.6.8';
 
     const container = new GenericContainer(`postgres:${version}`)
-      .withEnv('POSTGRES_USER', 'test')
-      .withEnv('POSTGRES_DB', 'test')
-      .withEnv('POSTGRES_PASSWORD', 'test')
+      .withEnvironment({
+        POSTGRES_USER: 'test',
+        POSTGRES_DB: 'test',
+        POSTGRES_PASSWORD: 'test',
+      })
       .withExposedPorts(5432)
       // .withHealthCheck({
       //   test: 'pg_isready -U root -d model_test',
@@ -23,10 +25,8 @@ export class PostgresDBRunner extends DbRunnerAbstract {
       .withStartupTimeout(10 * 1000);
 
     if (options.volumes) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const { source, target, bindMode } of options.volumes) {
-        container.withBindMount(source, target, bindMode);
-      }
+      const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));
+      container.withBindMounts(binds);
     }
 
     return container.start();
