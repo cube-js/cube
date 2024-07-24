@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8601
+assertion_line: 9657
 expression: "execute_query(\"\n                SELECT\n                    attrelid,\n                    attname,\n                    pg_catalog.pg_get_expr(attname, attrelid) default\n                FROM pg_catalog.pg_attribute\n                ORDER BY\n                    attrelid ASC,\n                    attname ASC\n                ;\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------+--------------------+---------+
@@ -239,4 +239,71 @@ expression: "execute_query(\"\n                SELECT\n                    attre
 | 18035    | measure98          | NULL    |
 | 18035    | measure99          | NULL    |
 | 18035    | minPrice           | NULL    |
+| 18245    | __cubeJoinField    | NULL    |
+| 18245    | __user             | NULL    |
+| 18245    | avgPrice           | NULL    |
+| 18245    | count              | NULL    |
+| 18245    | countDistinct      | NULL    |
+| 18245    | dim_date0          | NULL    |
+| 18245    | dim_date1          | NULL    |
+| 18245    | dim_date2          | NULL    |
+| 18245    | dim_date3          | NULL    |
+| 18245    | dim_date4          | NULL    |
+| 18245    | dim_date5          | NULL    |
+| 18245    | dim_date6          | NULL    |
+| 18245    | dim_date7          | NULL    |
+| 18245    | dim_date8          | NULL    |
+| 18245    | dim_date9          | NULL    |
+| 18245    | dim_num0           | NULL    |
+| 18245    | dim_num1           | NULL    |
+| 18245    | dim_num2           | NULL    |
+| 18245    | dim_num3           | NULL    |
+| 18245    | dim_num4           | NULL    |
+| 18245    | dim_num5           | NULL    |
+| 18245    | dim_num6           | NULL    |
+| 18245    | dim_num7           | NULL    |
+| 18245    | dim_num8           | NULL    |
+| 18245    | dim_num9           | NULL    |
+| 18245    | dim_str0           | NULL    |
+| 18245    | dim_str1           | NULL    |
+| 18245    | dim_str2           | NULL    |
+| 18245    | dim_str3           | NULL    |
+| 18245    | dim_str4           | NULL    |
+| 18245    | dim_str5           | NULL    |
+| 18245    | dim_str6           | NULL    |
+| 18245    | dim_str7           | NULL    |
+| 18245    | dim_str8           | NULL    |
+| 18245    | dim_str9           | NULL    |
+| 18245    | maxPrice           | NULL    |
+| 18245    | measure_date0      | NULL    |
+| 18245    | measure_date1      | NULL    |
+| 18245    | measure_date2      | NULL    |
+| 18245    | measure_date3      | NULL    |
+| 18245    | measure_date4      | NULL    |
+| 18245    | measure_date5      | NULL    |
+| 18245    | measure_date6      | NULL    |
+| 18245    | measure_date7      | NULL    |
+| 18245    | measure_date8      | NULL    |
+| 18245    | measure_date9      | NULL    |
+| 18245    | measure_num0       | NULL    |
+| 18245    | measure_num1       | NULL    |
+| 18245    | measure_num2       | NULL    |
+| 18245    | measure_num3       | NULL    |
+| 18245    | measure_num4       | NULL    |
+| 18245    | measure_num5       | NULL    |
+| 18245    | measure_num6       | NULL    |
+| 18245    | measure_num7       | NULL    |
+| 18245    | measure_num8       | NULL    |
+| 18245    | measure_num9       | NULL    |
+| 18245    | measure_str0       | NULL    |
+| 18245    | measure_str1       | NULL    |
+| 18245    | measure_str2       | NULL    |
+| 18245    | measure_str3       | NULL    |
+| 18245    | measure_str4       | NULL    |
+| 18245    | measure_str5       | NULL    |
+| 18245    | measure_str6       | NULL    |
+| 18245    | measure_str7       | NULL    |
+| 18245    | measure_str8       | NULL    |
+| 18245    | measure_str9       | NULL    |
+| 18245    | minPrice           | NULL    |
 +----------+--------------------+---------+
