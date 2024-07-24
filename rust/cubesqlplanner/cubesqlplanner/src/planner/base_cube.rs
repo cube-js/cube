@@ -3,14 +3,14 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::utils::escape_column_name;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
-pub struct BaseCube {
-    cube_evaluator: Rc<dyn CubeEvaluator>,
-    cube_definition: Rc<dyn CubeDefinition>,
+pub struct BaseCube<'cx> {
+    cube_evaluator: Rc<dyn CubeEvaluator<'cx> + 'cx>,
+    cube_definition: Rc<dyn CubeDefinition<'cx> + 'cx>,
 }
-impl BaseCube {
+impl<'cx> BaseCube<'cx> {
     pub fn new(
-        cube_evaluator: Rc<dyn CubeEvaluator>,
-        cube_definition: Rc<dyn CubeDefinition>,
+        cube_evaluator: Rc<dyn CubeEvaluator<'cx> + 'cx>,
+        cube_definition: Rc<dyn CubeDefinition<'cx> + 'cx>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_evaluator,

@@ -1,15 +1,13 @@
-use super::aggregation::Aggregation;
-use super::select::Select;
 use crate::planner::BaseCube;
 use std::fmt;
 use std::rc::Rc;
 
-pub enum From {
+pub enum From<'cx> {
     Empty,
-    Cube(Rc<BaseCube>),
+    Cube(Rc<BaseCube<'cx>>),
 }
 
-impl fmt::Display for From {
+impl<'cx> fmt::Display for From<'cx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             From::Empty => write!(f, ""),

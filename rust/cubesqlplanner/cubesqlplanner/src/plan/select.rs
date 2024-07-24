@@ -1,14 +1,13 @@
 use super::expression::Expr;
-use super::filter::Filter;
 use super::from::From;
 use std::fmt;
 
-pub struct Select {
-    pub projection: Vec<Expr>,
-    pub from: From,
+pub struct Select<'cx> {
+    pub projection: Vec<Expr<'cx>>,
+    pub from: From<'cx>,
 }
 
-impl fmt::Display for Select {
+impl<'cx> fmt::Display for Select<'cx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "SELECT")?;
         for expr in self.projection.iter().take(1) {

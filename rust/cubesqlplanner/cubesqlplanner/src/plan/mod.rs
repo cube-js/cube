@@ -1,7 +1,7 @@
-pub mod aggregation;
+//pub mod aggregation;
 pub mod builder;
 pub mod expression;
-pub mod filter;
+//pub mod filter;
 pub mod from;
 pub mod select;
 
@@ -11,11 +11,11 @@ pub use select::Select;
 
 use std::fmt::{self, write};
 
-pub enum GenerationPlan {
-    Select(Select),
+pub enum GenerationPlan<'cx> {
+    Select(Select<'cx>),
 }
 
-impl fmt::Display for GenerationPlan {
+impl<'cx> fmt::Display for GenerationPlan<'cx> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             GenerationPlan::Select(select) => {
