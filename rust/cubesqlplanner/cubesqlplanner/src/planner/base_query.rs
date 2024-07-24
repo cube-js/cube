@@ -22,7 +22,6 @@ impl BaseQuery {
         context: NativeContextHolder,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
-        println!("!!! opts {:?}", options.static_data());
         let cube_evaluator = options.cube_evaluator()?;
 
         let measures = if let Some(measures) = &options.static_data().measures {

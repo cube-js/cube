@@ -1,14 +1,12 @@
-use inflector::Inflector;
 use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
-use syn::parse::{Parse, ParseStream, Parser};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, AngleBracketedGenericArguments, Attribute, FnArg,
-    Generics, Item, Meta, Pat, Path, PathArguments, PathSegment, ReturnType, TraitItem,
-    TraitItemMethod, Type, TypePath,
+    parse_macro_input, punctuated::Punctuated, FnArg, Item, Meta, Pat, Path, PathArguments,
+    ReturnType, TraitItem, TraitItemMethod, Type,
 };
 #[proc_macro_attribute]
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
@@ -43,7 +41,6 @@ struct NativeOutputParams {
 
 struct NativeMethod {
     ident: Ident,
-    asyncness: bool,
     args: Vec<FnArg>,
     output: ReturnType,
     output_params: NativeOutputParams,
@@ -67,7 +64,6 @@ impl Parse for NativeService {
                                 &method_item.sig.output,
                             )
                             .unwrap(),
-                            asyncness: method_item.sig.asyncness.is_some(),
                             method_type: Self::parse_method_type(method_item),
                         }),
                         _ => None,
@@ -356,30 +352,23 @@ impl NativeMethod {
     fn original_method(&self) -> proc_macro2::TokenStream {
         let &Self {
             ident,
-            asyncness,
             args,
             output,
             ..
         } = &self;
-        if *asyncness {
-            quote! {
-                async fn #ident(#( #args ),*) #output;
-            }
-        } else {
-            quote! {
-                fn #ident(#( #args ),*) #output;
-            }
+        quote! {
+            fn #ident(#( #args ),*) #output;
         }
     }
 
     fn method_impl(&self) -> proc_macro2::TokenStream {
         let &Self {
             ident,
-            asyncness,
             args,
             output,
             output_params,
             method_type,
+            ..
         } = &self;
         let typed_args = args
             .iter()

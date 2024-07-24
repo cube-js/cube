@@ -619,9 +619,7 @@ export class BaseQuery {
 
     }
     let r = nativeBuildSqlAndParams(queryParams);
-    console.log("!!! rust res ", r);
     let rr = this.buildSqlAndParams(exportAnnotatedSql);
-    console.log("!!! origin res ", rr);
     return rr;
 
   }

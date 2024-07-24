@@ -128,7 +128,7 @@ impl ser::Serializer for NativeSerdeSerializer {
         ))
     }
 
-    fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
+    fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok, Self::Error> {
         Err(NativeObjSerializerError::Message(
             "serialize_bytes is not implemented".to_string(),
         ))
@@ -149,15 +149,15 @@ impl ser::Serializer for NativeSerdeSerializer {
         Ok(NativeObjectHandle::new(self.context.undefined()))
     }
 
-    fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
         Ok(NativeObjectHandle::new(self.context.undefined()))
     }
 
     fn serialize_unit_variant(
         self,
-        name: &'static str,
-        variant_index: u32,
-        variant: &'static str,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         Err(NativeObjSerializerError::Message(
             "serialize_unit_variant is not implemented".to_string(),
@@ -166,8 +166,8 @@ impl ser::Serializer for NativeSerdeSerializer {
 
     fn serialize_newtype_struct<T>(
         self,
-        name: &'static str,
-        value: &T,
+        _name: &'static str,
+        _value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
         T: ?Sized + Serialize,

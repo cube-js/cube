@@ -1,8 +1,6 @@
 use super::object::{
-    NativeArray, NativeBoolean, NativeBoxedClone, NativeNumber, NativeObject, NativeString,
-    NativeStruct,
+    NativeArray, NativeBoolean, NativeNumber, NativeObject, NativeString, NativeStruct,
 };
-use std::rc::Rc;
 pub trait NativeContext: ContextBoxedClone {
     fn boolean(&self, v: bool) -> Box<dyn NativeBoolean>;
     fn string(&self, v: String) -> Box<dyn NativeString>;

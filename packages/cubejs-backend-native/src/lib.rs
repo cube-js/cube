@@ -25,7 +25,6 @@ use futures::StreamExt;
 use once_cell::sync::OnceCell;
 use serde_json::Map;
 use tokio::sync::Semaphore;
-use uuid::adapter::compact::deserialize;
 
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -50,10 +49,9 @@ use cubenativeutils::wrappers::neon::context::ContextHolder;
 use cubenativeutils::wrappers::neon::object::NeonObject;
 use cubenativeutils::wrappers::object_handle::NativeObjectHandle;
 use cubenativeutils::wrappers::serializer::NativeDeserialize;
-use cubesqlplanner::cube_bridge::base_query_options::{BaseQueryOptions, NativeBaseQueryOptions};
+use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
 use cubesqlplanner::planner::base_query::BaseQuery;
 
-use serde::Deserialize;
 use std::rc::Rc;
 
 struct SQLInterface {

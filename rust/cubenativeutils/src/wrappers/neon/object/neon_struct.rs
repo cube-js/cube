@@ -1,7 +1,5 @@
 use super::NeonObject;
-use crate::wrappers::object::{
-    NativeArray, NativeBoxedClone, NativeObject, NativeStruct, NativeType,
-};
+use crate::wrappers::object::{NativeBoxedClone, NativeObject, NativeStruct, NativeType};
 use crate::wrappers::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
 use neon::prelude::*;
