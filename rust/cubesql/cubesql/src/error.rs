@@ -219,15 +219,8 @@ impl From<Box<bincode::ErrorKind>> for CubeError {
     }
 }
 
-impl
-    From<tokio::sync::watch::error::SendError<Option<crate::config::processing_loop::ShutdownMode>>>
-    for CubeError
-{
-    fn from(
-        v: tokio::sync::watch::error::SendError<
-            Option<crate::config::processing_loop::ShutdownMode>,
-        >,
-    ) -> Self {
+impl<T> From<tokio::sync::watch::error::SendError<T>> for CubeError {
+    fn from(v: tokio::sync::watch::error::SendError<T>) -> Self {
         CubeError::internal(v.to_string())
     }
 }
