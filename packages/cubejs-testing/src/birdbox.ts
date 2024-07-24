@@ -222,11 +222,17 @@ function prepareTestData(type: DriverType, schemas?: Schemas) {
   }
 }
 
+// Some logic to kill Cube in stop is more precise if we know killCube is only used to send signals
+// that get the process terminated.
+type KillCubeSignal = 'SIGINT' | 'SIGTERM';
+
 /**
  * Birdbox object interface.
  */
 export interface BirdBox {
   stop: () => Promise<void>;
+  killCube: (signal: KillCubeSignal) => void;
+  onCubeExit: () => Promise<number | null>;
   stdout: internal.Readable | null;
   configuration: {
     playgroundUrl: string;
@@ -246,11 +252,21 @@ export async function startBirdBoxFromContainer(
   if (process.env.TEST_CUBE_HOST) {
     const host = process.env.TEST_CUBE_HOST || 'localhost';
     const port = process.env.TEST_CUBE_PORT || '8888';
+    const pid = process.env.TEST_CUBE_PID ? Number(process.env.TEST_CUBE_PID) : null;
 
     return {
       stop: async () => {
         process.stdout.write('[Birdbox] Closed\n');
       },
+      killCube: (signal: KillCubeSignal) => {
+        if (pid !== null) {
+          process.kill(pid, signal);
+        } else {
+          process.stdout.write(`[Birdbox] Cannot kill Cube instance running in TEST_CUBE_HOST mode without TEST_CUBE_PID defined\n`);
+          throw new Error('Attempted to use killCube while running with TEST_CUBE_HOST');
+        }
+      },
+      onCubeExit: (): Promise<number | null> => Promise.reject(new Error('onCubeExit not implemented')), // TODO: Implement
       stdout: null,
       configuration: {
         playgroundUrl: `http://${host}:${port}`,
@@ -409,6 +425,15 @@ export async function startBirdBoxFromContainer(
         process.stdout.write('[Birdbox] Closed\n');
       }
     },
+    killCube: (signal: KillCubeSignal) => {
+      process.stdout.write(`[Birdbox] killCube (with signal ${signal}) not implemented for containers\n`);
+      throw new Error('killCube not implemented for containers');
+    },
+    onCubeExit: (): Promise<number | null> => {
+      const _ = 0;
+      return Promise.reject(new Error('onCubeExit not implemented for containers'));
+      // TODO: Implement.
+    },
     configuration: {
       playgroundUrl: `http://${host}:${playgroundPort}`,
       apiUrl: `http://${host}:${port}/cubejs-api/v1`,
@@ -559,6 +584,11 @@ export async function startBirdBoxFromCli(
     ...options.env,
   };
 
+  let exitResolve: (code: number | null) => void;
+  const exitPromise = new Promise<number | null>((res, _rej) => {
+    exitResolve = res;
+  });
+
   try {
     cli = spawn(
       options.useCubejsServerBinary
@@ -589,6 +619,10 @@ export async function startBirdBoxFromCli(
         process.stdout.write(msg);
       });
     }
+    cli.on('exit', (code, signal) => {
+      process.stdout.write(`[Birdbox] Child process '${cli.pid}' exited with 'exit' event code ${code}, signal ${signal}\n`);
+      exitResolve(code);
+    });
     await pausePromise(10 * 1000);
   } catch (e) {
     process.stdout.write(`Error spawning cube: ${e}\n`);
@@ -596,6 +630,7 @@ export async function startBirdBoxFromCli(
     db.stop();
   }
 
+  let sentKillSignal = false;
   return {
     // @ts-expect-error
     stdout: cli.stdout,
@@ -611,12 +646,30 @@ export async function startBirdBoxFromCli(
         process.stdout.write('[Birdbox] Done with DB\n');
       }
       if (cli.pid) {
-        process.kill(-cli.pid, 'SIGINT');
+        process.stdout.write(`[Birdbox] Killing process group '${cli.pid}'\n`);
+        // Here, normally, we kill the process group by passing -cli.pid (a negative value), but
+        // with killCube we just kill the main process, and then can't kill any process group --
+        // maybe that test has poor cleanup actions.
+        try {
+          process.kill(-cli.pid, 'SIGINT');
+        } catch (error) {
+          if (!sentKillSignal) {
+            throw error;
+          }
+        }
       }
       if (options.log === Log.PIPE) {
         process.stdout.write('[Birdbox] Closed\n');
       }
     },
+    killCube: (signal: KillCubeSignal) => {
+      process.stdout.write(`[Birdbox] Killing Cube (pid = '${cli.pid}') with signal ${signal}\n`);
+      if (cli.pid) {
+        process.kill(cli.pid, signal);
+        sentKillSignal = true;
+      }
+    },
+    onCubeExit: (): Promise<number | null> => exitPromise,
     configuration: {
       playgroundUrl: 'http://127.0.0.1:4000',
       apiUrl: 'http://127.0.0.1:4000/cubejs-api/v1',

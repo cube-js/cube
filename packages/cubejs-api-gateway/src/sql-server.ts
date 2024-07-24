@@ -7,6 +7,7 @@ import {
   Request as NativeRequest,
   LoadRequestMeta,
 } from '@cubejs-backend/native';
+import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
@@ -347,7 +348,7 @@ export class SQLServer {
     // @todo Implement
   }
 
-  public async shutdown(): Promise<void> {
-    await shutdownInterface(this.sqlInterfaceInstance!);
+  public async shutdown(mode: ShutdownMode): Promise<void> {
+    await shutdownInterface(this.sqlInterfaceInstance!, mode);
   }
 }
