@@ -48,7 +48,7 @@ export class SQLServer {
   }
 
   public getNativeGatewayPort(): number {
-    return this.gatewayPort
+    return this.gatewayPort;
   }
 
   public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
