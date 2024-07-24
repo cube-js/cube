@@ -63,6 +63,7 @@ export class CubejsServer {
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
       pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
+      gatewayPort: config.gatewayPort || getEnv('nativeApiGatewayPort'),
       http: {
         ...config.http,
         cors: {
