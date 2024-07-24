@@ -10,7 +10,7 @@ use crate::{
     var, var_iter,
 };
 use egg::{EGraph, Rewrite, Subst};
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 pub struct OrderRules {}
 
@@ -88,26 +88,33 @@ impl OrderRules {
         let aliases_var = var!(aliases_var);
         move |egraph, subst| {
             if let Some(referenced_expr) = &egraph.index(subst[sort_exp_var]).data.referenced_expr {
-                if let Some(member_name_to_expr) = egraph
+                if egraph
                     .index(subst[members_var])
                     .data
                     .member_name_to_expr
-                    .as_ref()
-                    .map(|x| x.list.clone())
+                    .is_some()
                 {
-                    let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
                     let referenced_columns = referenced_columns(referenced_expr);
-                    if referenced_columns
-                        .iter()
-                        .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
+                    if let Some(member_name_to_expr) = &mut egraph
+                        .index_mut(subst[members_var])
+                        .data
+                        .member_name_to_expr
                     {
-                        subst.insert(
-                            aliases_var,
-                            egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
-                                OrderReplacerColumnNameToMember(column_name_to_member_name),
-                            )),
-                        );
-                        return true;
+                        let column_name_to_member_name =
+                            column_name_to_member_vec(member_name_to_expr);
+
+                        if referenced_columns
+                            .iter()
+                            .all(|c| column_name_to_member_name.iter().any(|(cn, _)| cn == c))
+                        {
+                            subst.insert(
+                                aliases_var,
+                                egraph.add(LogicalPlanLanguage::OrderReplacerColumnNameToMember(
+                                    OrderReplacerColumnNameToMember(column_name_to_member_name),
+                                )),
+                            );
+                            return true;
+                        }
                     }
                 }
             }
