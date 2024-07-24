@@ -7,8 +7,8 @@ redirect_from:
 
 Development mode allows to test and debug the data model in an isolated
 environment before releasing any changes to production. When the development
-mode is enabled, a new set of API endpoints is deployed specifically for the
-branch.
+mode is enabled, you'll have access to your personal API endpoints that will track the branch you're on and will be updated automatically when you make changes to the data model.
+Read more about environments on the [Environments][ref-environments] page.
 
 <SuccessBox>
 
@@ -17,10 +17,62 @@ Development mode is available in Cube Cloud on
 
 </SuccessBox>
 
+## Development flow
+
+### Save changes
+
+When you make changes to the data model, you can save them by clicking the "Save all" button in the actions bar at the top of the screen.
+
+<Screenshot
+  alt="Save all button"
+/>
+
+### Commit & Sync
+
+After saving changes, you can commit them to the branch you're working on by clicking the "Commit & Sync" button in the actions bar.
+
+<Screenshot
+  alt="Commit & Sync button"
+/>
+
+<Screenshot
+  alt="Commit & Sync modal"
+/>
+
+### Merge or Create a Pull Request
+
+After committing changes, you can merge them into the parent branch or create a pull request by clicking the "Merge" or "Create a Pull Request" button in the actions bar.
+<Screenshot
+  alt="Merge and Create a Pull Request buttons"
+/>
+
+<Screenshot
+  alt="Merge modal"
+/>
+
+### Updating the branch
+
+When there are changes in the parent branch, you can update your active branch by pulling changes from the parent branch.
+If your active branch got updated in the connected repository, you can update it by pulling changes from the remote.
+<Screenshot
+  alt="Pull from Parent branch button"
+/>
+<Screenshot
+  alt="Pull from Remote button"
+/>
+
+### Resolving conflicts
+In some cases, you may encounter conflicts when merging or pulling changes from the parent branch or remote.
+If this happens, you'll see a warning about conflicts in the actions bar.
+You'll then be able to either resolve them manually or discard the changes.
+<Screenshot
+  alt="Conflict Resolution UI"
+/>
+
 ## Finding endpoints
 
-After entering Development Mode, go to the Overview page to see all available
-endpoints for the branch:
+In Development Mode, you'll have dedicated endpoints that will track the branch you're on.
+They will be shown on the Overview page:
 
 <div style={{ textAlign: "center" }}>
   <img
@@ -53,3 +105,5 @@ different Git branch of the same repository.
 The version of Cube used in the Development API **is not** guaranteed to be the
 same each time. If this affects your development process, we recommend reaching
 out to our support team.
+
+[ref-environments]: /product/workspace/environments

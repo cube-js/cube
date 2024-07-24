@@ -3,6 +3,7 @@ module.exports = {
   "data-model": "Data Model",
   "rollup-designer": "Rollup Designer",
   "dev-mode": "Development mode",
+  "environments": "Environments",
   vizard: "Chart Prototyping",
   "semantic-layer-sync": "Semantic Layer Sync",
   "sql-runner": "SQL Runner",

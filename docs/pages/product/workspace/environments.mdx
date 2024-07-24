@@ -1,0 +1,22 @@
+# Environments
+
+An environment provides access to your data model. Cube Cloud provides the following environments:
+- production (default)
+- staging - providing access to the data model on a specific branch.
+  Each branch in the repository corresponds to a separate staging environment.
+- development - providing access to the data model that you are currently working on.
+  The development environment is automatically created when you enter [development mode][ref-dev-mode].
+  It tracks the branch you're on and is updated automatically when you make changes to the data model.
+
+Each environment provides its own set of API and SQL API endpoints.
+You can access them on the [Data Model][ref-data-model]'s Overview page and <Btn>BI Integrations<Btn> SQL API Connection tab.
+
+<Screenshot
+  alt="Data Model's Overview page"
+/>
+<Screenshot
+  alt="BI Integrations SQL API Connection tab"
+/>
+
+[ref-dev-mode]: /product/workspace/dev-mode
+[ref-data-model]: /product/workspace/data-model

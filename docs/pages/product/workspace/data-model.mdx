@@ -32,22 +32,22 @@ specific to this branch. This development API hot-reloads your data model
 changes, allowing you to quickly test API changes from your applications.
 
 To enter development mode, navigate to the <Btn>Data Model</Btn> screen and
-click <Btn>Enter Development Mode</Btn>.
+click <Btn>Dev Mode</Btn>.
 
-<Screenshot src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/" />
+<Screenshot
+  src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/"
+  alt="Entering dev mode"
+/>
 
-When development mode is active, a grey bar will be visible at the top of the
-screen. It provides several useful controls and indicators:
+If you are entering development mode from the main branch, you will be asked to
+choose an existing branch or create a new one. You can configure whether it's possible
+to commit directly to the main branch in the deployment settings.
 
-- The name of the current development Git branch
-- The status of the development API. After any changes to the project, the API
-  will hot-reload, and the API status will indicate when it's ready.
-- 'Copy API URL' will copy the API URL to the clipboard for the current
-  development branch.
+When development mode is active, the status of the development API will be shown
+at the top of the screen. After any changes to the project, the API
+will hot-reload, and the API status will indicate when it's ready.
 
-<Screenshot src="https://ucarecdn.com/915e829d-39a7-4d65-b5d4-678bc7545a6f/" />
-
-You can exit development mode by clicking <Btn>Exit</Btn> in the grey banner. If
+You can exit development mode by clicking <Btn>Dev Mode X</Btn> in the purple banner. If
 you've been editing a data model and navigate away, Cube Cloud will warn you if
 there are any unsaved changes:
 
