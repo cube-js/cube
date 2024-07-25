@@ -62,13 +62,17 @@ export class SQLServer {
     await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
   }
 
+  protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
+    return (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
+      || this.createDefaultCheckSqlAuthFn(options);
+  }
+
   public async init(options: SQLServerOptions): Promise<void> {
     if (this.sqlInterfaceInstance) {
       throw new Error('Unable to start SQL interface two times');
     }
 
-    const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
-      || this.createDefaultCheckSqlAuthFn(options);
+    const checkSqlAuth: CheckSQLAuthFn = this.buildCheckSqlAuth(options);
 
     const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
       || this.createDefaultCanSwitchSqlUserFn(options);
