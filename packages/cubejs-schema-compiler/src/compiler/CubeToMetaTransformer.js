@@ -52,6 +52,9 @@ export class CubeToMetaTransformer {
         description: cube.description,
         connectedComponent: this.joinGraph.connectedComponents()[cube.name],
         meta: cube.meta,
+        sqlTable: cube.sqlTable && this.cubeEvaluator.evaluateReferences(
+          cube.name, cube.sqlTable, {}
+        ),
         measures: R.compose(
           R.map((nameToMetric) => ({
             ...this.measureConfig(cube.name, cubeTitle, nameToMetric),

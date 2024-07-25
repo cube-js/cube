@@ -178,6 +178,11 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       }
     });
 
+    execute('meta snapshot', async () => {
+      const meta = await client.meta();
+      expect(meta.cubes).toMatchSnapshot();
+    });
+
     execute('must not fetch a hidden cube', async () => {
       const meta = await client.meta();
       expect(meta.cubes.find(cube => cube.name === 'HiddenECommerce')).toBe(undefined);

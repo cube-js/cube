@@ -235,11 +235,13 @@ export class CompilerApi {
         compilerId: compilers.compilerId,
       };
     }
+
     return compilers.metaTransformer.cubes;
   }
 
   async metaConfigExtended(options) {
     const { metaTransformer } = await this.getCompilers(options);
+
     return {
       metaConfig: metaTransformer?.cubes,
       cubeDefinitions: metaTransformer?.cubeEvaluator?.cubeDefinitions,
