@@ -26,7 +26,6 @@
     "@cubejs-backend/linter": "^0.35.0",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
-    "@types/request-promise": "^4.1.46",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
@@ -35,10 +34,10 @@
     "@cubejs-backend/shared": "^0.35.63",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
+    "form-data": "^4.0.0",
     "fs-extra": "^9.1.0",
     "jsonwebtoken": "^8.5.1",
-    "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "node-fetch": "^2.7.0"
   },
   "publishConfig": {
     "access": "public"
