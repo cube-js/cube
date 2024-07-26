@@ -1,3 +1,4 @@
+#![allow(dead_code, unused)]
 pub mod cube_bridge;
 pub mod cube_query;
 pub mod cube_schema;

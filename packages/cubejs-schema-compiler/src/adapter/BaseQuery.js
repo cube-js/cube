@@ -11,8 +11,12 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv } from '@cubejs-backend/shared';
 
+import {
+  buildSqlAndParams as nativeBuildSqlAndParams,
+} from '@cubejs-backend/native';
+import { eventNames } from 'process';
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseDimension } from './BaseDimension';
@@ -23,10 +27,6 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
 import { SqlParser } from '../parser/SqlParser';
-import {
-   buildSqlAndParams as nativeBuildSqlAndParams,
-} from '@cubejs-backend/native';
-import { eventNames } from 'process';
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -577,47 +577,45 @@ export class BaseQuery {
     return false;
   }
 
-
-
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+    if (getEnv('useRustSqlPlanner')) {
+      return this.buildSqlAndParamsRust(exportAnnotatedSql);
+    } else {
+      if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+        if (this.externalPreAggregationQuery()) { // TODO performance
+          return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+        }
       }
+      return this.compilers.compiler.withQuery(
+        this,
+        () => this.cacheValue(
+          ['buildSqlAndParams', exportAnnotatedSql],
+          () => this.paramAllocator.buildSqlAndParams(
+            this.buildParamAnnotatedSql(),
+            exportAnnotatedSql,
+            this.shouldReuseParams
+          ),
+          { cache: this.queryCache }
+        )
+      );
     }
-    return this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
-        { cache: this.queryCache }
-      )
-    );
   }
 
-  buildSqlAndParamsTest(exportAnnotatedSql) {
+  buildSqlAndParamsRust(exportAnnotatedSql) {
     const queryParams = {
-        measures: this.options.measures,
-        dimensions: this.options.dimensions,
-        joinRoot: this.join.root,
-        cubeEvaluator: this.cubeEvaluator,
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      joinRoot: this.join.root,
+      cubeEvaluator: this.cubeEvaluator,
 
-    }
-    let r = nativeBuildSqlAndParams(queryParams);
-    console.log("!!! rust res ", r);
-    let rr = this.buildSqlAndParams(exportAnnotatedSql);
-    console.log("!!! origin res ", rr);
-    return rr;
-
+    };
+    const res = nativeBuildSqlAndParams(queryParams);
+    return res;
   }
 
   get shouldReuseParams() {
@@ -1816,7 +1814,6 @@ export class BaseQuery {
 
     const fromPath = this.cubeEvaluator.cubeFromPath(cube);
     if (fromPath.sqlTable) {
-
       return this.evaluateSql(cube, fromPath.sqlTable);
     }
 

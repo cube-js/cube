@@ -1,14 +1,12 @@
-use inflector::Inflector;
 use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
-use syn::parse::{Parse, ParseStream, Parser};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::{
-    parse_macro_input, punctuated::Punctuated, AngleBracketedGenericArguments, Attribute, FnArg,
-    Generics, Item, Meta, Pat, Path, PathArguments, PathSegment, ReturnType, TraitItem,
-    TraitItemMethod, Type, TypePath,
+    parse_macro_input, punctuated::Punctuated, FnArg, Item, Meta, Pat, Path, PathArguments,
+    ReturnType, TraitItem, TraitItemMethod, Type,
 };
 #[proc_macro_attribute]
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {

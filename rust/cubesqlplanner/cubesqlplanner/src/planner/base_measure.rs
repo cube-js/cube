@@ -1,6 +1,5 @@
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::utils::escape_column_name;
-use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
