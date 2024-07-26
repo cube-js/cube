@@ -756,7 +756,7 @@ jobs:
               owner: 'cubedevinc',
               repo: 'sql-api-test-suite',
               workflow_id: 'test_and_run_test_suites.yml',
-              ref: 'master',
+              ref: 'main',
               inputs: {
                 'cube-image': 'cubejs/cube:latest'
               }
