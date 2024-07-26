@@ -861,7 +861,7 @@ impl LocationHelper {
             let res = client.head(location).send().await?;
             if !res.status().is_success() {
                 return Err(CubeError::user(format!(
-                    "Unable to import file from http location, status code: {}"
+                    "Unable to import from http location, status code: {}",
                     res.status()
                 )));
             }
