@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 
 use std::vec;
 
-use cubenativeutils::channel::call_js_fn;
+use crate::channel::call_js_fn;
 
 use cubesql::CubeError;
 

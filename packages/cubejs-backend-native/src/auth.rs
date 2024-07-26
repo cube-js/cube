@@ -13,7 +13,7 @@ use std::any::Any;
 use std::sync::Arc;
 use uuid::Uuid;
 
-use cubenativeutils::channel::call_js_with_channel_as_callback;
+use crate::channel::call_js_with_channel_as_callback;
 
 #[derive(Debug)]
 pub struct NodeBridgeAuthService {
