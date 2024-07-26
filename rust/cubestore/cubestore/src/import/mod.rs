@@ -863,7 +863,7 @@ impl LocationHelper {
                 return Err(CubeError::user(format!(
                     "Unable to import file from http location, status code: {}"
                     res.status()
-                )))
+                )));
             }
 
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
