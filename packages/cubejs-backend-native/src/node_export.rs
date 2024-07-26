@@ -467,7 +467,7 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 
 //============ sql planner ===================
 
-fn build_sql_and_params<'a>(cx: FunctionContext<'a>) -> JsResult<JsValue> {
+fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
     //context should be used only inside function
     let mut cx = extend_function_context_lifetime(cx);
