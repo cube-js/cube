@@ -1,13 +1,16 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubesql::compile::test::rewrite_engine::{
-    cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
+use cubesql::compile::test::{
+    get_test_tenant_ctx,
+    rewrite_engine::{cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner},
 };
 use itertools::Itertools;
 use std::sync::Arc;
 
 macro_rules! bench_func {
     ($NAME:expr, $QUERY:expr, $CRITERION:expr) => {{
-        let context = Arc::new(futures::executor::block_on(cube_context()));
+        let context = Arc::new(futures::executor::block_on(cube_context(
+            get_test_tenant_ctx(),
+        )));
         let plan = query_to_logical_plan($QUERY, &context);
         let rules = rewrite_rules(context.clone());
 

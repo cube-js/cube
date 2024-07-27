@@ -403,7 +403,9 @@ pub fn get_test_tenant_ctx_customized(custom_templates: Vec<(String, String)>) -
     ))
 }
 
-fn sql_generator(custom_templates: Vec<(String, String)>) -> Arc<dyn SqlGenerator + Send + Sync> {
+pub fn sql_generator(
+    custom_templates: Vec<(String, String)>,
+) -> Arc<dyn SqlGenerator + Send + Sync> {
     Arc::new(SqlGeneratorMock {
         sql_templates: Arc::new(
             SqlTemplates::new(

@@ -81,3 +81,7 @@ harness = false
 [[bench]]
 name = "benchmarks"
 harness = false
+
+[[bench]]
+name = "large_model"
+harness = false
