@@ -25,7 +25,7 @@ RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLV
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
-    && update-alternatives --install /usr/bin/lld clang-cpp /usr/bin/lld-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100;
 
 ENV ARCH=arm \
