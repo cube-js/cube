@@ -11,11 +11,32 @@ Generate a Cube query that can be used to answer a user's question, and (optiona
 | `messages` | ✅ Yes   | An array of messages in the format: `{ "role": "user" \| "assistant", "content": "string" }`    |
 | `views`    |          | An array of view names (used to limit the views that the AI API can use to generate its answer) |
 | `runQuery` |          | Boolean (true or false) whether to run the query and return its results                         |
+| `options`  |          | Object of format `{ "chart": bool }`                                                            |
 
 Response
 
 - `message` - A message from the AI assistant describing the query, how it was chosen, why it could not generate the requested query, etc.
 - `cube_query` - A Cube [Query](/product/apis-integrations/rest-api/query-format) that could be used to answer the given question
+- `chart` - A config to chart the data with.
+
+### Options
+
+#### Chart
+
+The AI API can provide a chart spec to help you display the results.
+It is not particular to a specific charting library; you can translate it into your preferred library.
+
+To enable it, set the `chart` option to `true` in your request.
+The output format is below:
+
+```json
+{
+    "type": "bar" | "line" | "pie" | "area" | "scatter" | "table",
+    "x": String,
+    "y": String[],
+    "pivot": String // optional
+}
+```
 
 ### Examples
 
@@ -169,5 +190,44 @@ Example response:
     "external": false,
     "slowQuery": false,
     "total": null
+}
+```
+
+#### With `chart` option
+
+```bash{outputLines: 1,3-9,11-15}
+curl \
+ -X POST  \
+ -H "Content-Type: application/json" \
+ -H "Authorization: EXAMPLE-API-TOKEN" \
+ --data '{ "messages": [{ "role": "user", "content": "What cities have the highest aov this year?" }], "options": { "chart": true }}' \
+ https://YOUR_CUBE_API/cubejs-api/v1/ai/query/completions
+```
+
+Example response:
+
+```json
+{
+  "message": "To find the cities with the highest Average Order Value (AOV) this year, we can use the Orders View. This query will aggregate data to calculate the average order value per city for the current year.",
+  "cube_query": {
+    "measures": ["orders_view.average_order_value"],
+    "dimensions": ["orders_view.users_city"],
+    "timeDimensions": [
+      {
+        "dimension": "orders_view.created_at",
+        "granularity": "year",
+        "dateRange": "this year"
+      }
+    ],
+    "order": {
+      "orders_view.average_order_value": "desc"
+    },
+    "limit": 10
+  },
+  "chart": {
+    "type": "bar",
+    "x": "line_items_view.users_city",
+    "y": ["line_items_view.total_amount"]
+  }
 }
 ```
