@@ -583,7 +583,7 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (getEnv('useRustSqlPlanner')) {
+    if (getEnv('nativeSqlPlanner')) {
       return this.buildSqlAndParamsRust(exportAnnotatedSql);
     } else {
       if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
