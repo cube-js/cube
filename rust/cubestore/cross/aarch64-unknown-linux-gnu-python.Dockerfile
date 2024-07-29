@@ -24,4 +24,8 @@ RUN wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VER
     && make -j $(nproc) \
     && make install \
     && cd .. && rm -rf Python-${PYTHON_VERSION} \
-    && rm -rf /var/lib/apt/lists/*; \
+    && rm -rf /var/lib/apt/lists/*;
+
+ENV PYO3_CROSS_PYTHON_VERSION=${PYTHON_RELEASE} \
+    PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
+    PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib

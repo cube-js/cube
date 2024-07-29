@@ -14,7 +14,7 @@ RUN apt-get update \
     && apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y libffi-dev binutils-multiarch binutils-aarch64-linux-gnu gcc-multilib g++-multilib \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-$LLVM_VERSION lld-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev clang-$LLVM_VERSION \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-$LLVM_VERSION lld-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev \
         make cmake libsasl2-dev \
         libc6 libc6-dev libc6-arm64-cross libc6-dev-arm64-cross \
         gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
@@ -47,19 +47,16 @@ RUN wget https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz -O - | tar -xz && \
 
 # https://www.openssl.org/source/old/1.1.1/
 ENV OPENSSL_VERSION=1.1.1w
-RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz &&\
-    cd openssl-${OPENSSL_VERSION} && \
-    ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 && \
-    make depend && \
-    make -j $(nproc) && \
-    make install_sw && \
-    make install_ssldirs && \
-    cd .. && rm -rf openssl-${OPENSSL_VERSION}
+RUN wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz -O - | tar -xz \
+    && cd openssl-${OPENSSL_VERSION} \
+    && ./Configure --prefix=/usr/aarch64-linux-gnu --openssldir=/usr/aarch64-linux-gnu/lib linux-aarch64 \
+    && make depend \
+    && make -j $(nproc) \
+    && make install_sw \
+    && make install_ssldirs \
+    && cd .. && rm -rf openssl-${OPENSSL_VERSION}
 
-ENV PYO3_CROSS_PYTHON_VERSION=3.11 \
-    PYO3_CROSS_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
-    PYO3_CROSS_LIB_DIR=/usr/aarch64-linux-gnu/lib \
-    OPENSSL_DIR=/usr/aarch64-linux-gnu \
+ENV OPENSSL_DIR=/usr/aarch64-linux-gnu \
     OPENSSL_STATIC=yes \
     OPENSSL_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
     OPENSSL_LIB_DIR=/usr/aarch64-linux-gnu/lib \
