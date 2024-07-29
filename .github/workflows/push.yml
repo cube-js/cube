@@ -205,6 +205,8 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    container:
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
     steps:
       - name: Maximize build space (disk space limitations)
         run: |
