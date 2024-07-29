@@ -141,6 +141,8 @@ pub struct Table {
     #[serde(default)]
     select_statement: Option<String>,
     #[serde(default)]
+    vrl: Option<String>,
+    #[serde(default)]
     source_columns: Option<Vec<Column>>,
     #[serde(default)]
     stream_offset: Option<StreamOffset>,
@@ -184,6 +186,7 @@ impl Table {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        vrl: Option<String>,
         source_columns: Option<Vec<Column>>,
         stream_offset: Option<StreamOffset>,
         unique_key_column_indices: Option<Vec<u64>>,
@@ -204,6 +207,7 @@ impl Table {
             build_range_end,
             seal_at,
             select_statement,
+            vrl,
             source_columns,
             stream_offset,
             sealed: false,
@@ -310,6 +314,10 @@ impl Table {
 
     pub fn select_statement(&self) -> &Option<String> {
         &self.select_statement
+    }
+
+    pub fn vrl(&self) -> &Option<String> {
+        &self.vrl
     }
 
     pub fn source_columns(&self) -> &Option<Vec<Column>> {
