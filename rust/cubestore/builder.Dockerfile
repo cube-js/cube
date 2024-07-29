@@ -16,14 +16,14 @@ RUN apt update \
     # add it twice to workaround:
     && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-$LLVM_VERSION main" \
     && add-apt-repository --yes "deb https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-$LLVM_VERSION main" \
-    && sleep 5 \
     && apt update \
-    && apt install -y git llvm-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev clang-$LLVM_VERSION cmake \
+    && apt install -y git llvm-$LLVM_VERSION clang-$LLVM_VERSION libclang-$LLVM_VERSION-dev clang-$LLVM_VERSION lld-$LLVM_VERSION cmake \
     && rm -rf /var/lib/apt/lists/*;
 
-RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100
-RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100
-RUN update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100
-RUN update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 100;
 
 WORKDIR /usr/src

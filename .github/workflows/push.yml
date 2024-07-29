@@ -205,25 +205,18 @@ jobs:
     runs-on: ubuntu-20.04
     timeout-minutes: 60
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    container:
+      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024
     steps:
-      - name: Maximize build space (disk space limitations)
-        run: |
-          echo "Before"
-          df -h
-          sudo apt-get remove -y 'php.*'
-          sudo apt-get remove -y '^mongodb-.*'
-          sudo apt-get remove -y '^mysql-.*'
-          sudo apt-get autoremove -y
-          sudo apt-get clean
-
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          echo "After"
-          df -h
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-01-29
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
