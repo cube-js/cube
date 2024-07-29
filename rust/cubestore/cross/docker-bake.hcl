@@ -1,5 +1,5 @@
 variable "CROSS_VERSION" {
-  default = "15082024"
+  default = "01082024"
 }
 
 variable "LLVM_VERSION" {

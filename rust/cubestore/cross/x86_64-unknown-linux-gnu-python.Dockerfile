@@ -16,7 +16,4 @@ RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${
     && ln -f -s /usr/bin/python${PYTHON_RELEASE} /usr/bin/python3 \
     && cd .. && rm -rf Python-${PYTHON_VERSION};
 
-# pyo3 uses python3 to detect version, but there is a bug and it uses python3.9 (system), this force it to use a new python
 ENV PYO3_PYTHON=python${PYTHON_RELEASE}
-
-ENV PATH="/cargo/bin:$PATH"
