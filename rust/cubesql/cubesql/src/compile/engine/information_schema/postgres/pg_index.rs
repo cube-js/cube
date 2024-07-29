@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use datafusion::{
     arrow::{
         array::{
-            Array, ArrayRef, BooleanBuilder, Int64Builder, ListBuilder, StringBuilder,
+            Array, ArrayRef, BooleanBuilder, Int16Builder, ListBuilder, StringBuilder,
             UInt16Builder, UInt32Builder,
         },
         datatypes::{DataType, Field, Schema, SchemaRef},
@@ -31,10 +31,10 @@ struct PgCatalogIndexBuilder {
     indisready: BooleanBuilder,
     indislive: BooleanBuilder,
     indisreplident: BooleanBuilder,
-    indkey: ListBuilder<Int64Builder>,
-    indcollation: StringBuilder,
-    indclass: StringBuilder,
-    indoption: StringBuilder,
+    indkey: ListBuilder<Int16Builder>,
+    indcollation: ListBuilder<UInt32Builder>,
+    indclass: ListBuilder<UInt32Builder>,
+    indoption: ListBuilder<Int16Builder>,
     indexprs: StringBuilder,
     indpred: StringBuilder,
 }
@@ -58,10 +58,10 @@ impl PgCatalogIndexBuilder {
             indisready: BooleanBuilder::new(capacity),
             indislive: BooleanBuilder::new(capacity),
             indisreplident: BooleanBuilder::new(capacity),
-            indkey: ListBuilder::new(Int64Builder::new(capacity)),
-            indcollation: StringBuilder::new(capacity),
-            indclass: StringBuilder::new(capacity),
-            indoption: StringBuilder::new(capacity),
+            indkey: ListBuilder::new(Int16Builder::new(capacity)),
+            indcollation: ListBuilder::new(UInt32Builder::new(capacity)),
+            indclass: ListBuilder::new(UInt32Builder::new(capacity)),
+            indoption: ListBuilder::new(Int16Builder::new(capacity)),
             indexprs: StringBuilder::new(capacity),
             indpred: StringBuilder::new(capacity),
         }
@@ -136,12 +136,24 @@ impl TableProvider for PgCatalogIndexProvider {
             Field::new("indisreplident", DataType::Boolean, false),
             Field::new(
                 "indkey",
-                DataType::List(Box::new(Field::new("item", DataType::Int64, true))),
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
                 false,
             ),
-            Field::new("indcollation", DataType::Utf8, false),
-            Field::new("indclass", DataType::Utf8, false),
-            Field::new("indoption", DataType::Utf8, false),
+            Field::new(
+                "indcollation",
+                DataType::List(Box::new(Field::new("item", DataType::UInt32, true))),
+                false,
+            ),
+            Field::new(
+                "indclass",
+                DataType::List(Box::new(Field::new("item", DataType::UInt32, true))),
+                false,
+            ),
+            Field::new(
+                "indoption",
+                DataType::List(Box::new(Field::new("item", DataType::Int16, true))),
+                false,
+            ),
             Field::new("indexprs", DataType::Utf8, true),
             Field::new("indpred", DataType::Utf8, true),
         ]))

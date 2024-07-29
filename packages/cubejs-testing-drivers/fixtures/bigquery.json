@@ -11,10 +11,15 @@
       "CUBEJS_DB_BQ_PROJECT_ID": "cube-open-source",
       "CUBEJS_DB_BQ_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS}",
 
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true",
+
       "CUBEJS_DB_EXPORT_BUCKET": "cube-open-source-export-bucket",
       "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcp"
     },
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -90,6 +95,23 @@
         ]
       },
       {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
         "name": "CountByProduct",
         "time_dimension": "CUBE.orderDate",
         "granularity": "month",
@@ -121,9 +143,8 @@
     "---------------------------------------",
     "Full tests                             ",
     "---------------------------------------",
-    "must built pre-aggregations",
-    "querying Customers: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + total + offset",
+    "querying Customers: dimensions + order + total + offset",
+    "querying ECommerce: dimensions + order + total + offset",
 
     "---------------------------------------",
     "SKIPED FOR ALL                         ",
@@ -132,13 +153,15 @@
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
-    "querying ECommerce: partitioned pre-agg",
-    "querying ECommerce: partitioned pre-agg higher granularity",
-    "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
-    "--------------------",
-    "week granularity is not supported for intervals",
-    "--------------------"
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params",
+    "SQL API: Complex Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

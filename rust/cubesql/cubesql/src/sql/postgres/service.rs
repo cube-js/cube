@@ -3,11 +3,12 @@ use log::{error, trace};
 use std::sync::Arc;
 use tokio::{
     net::TcpListener,
-    sync::{oneshot, watch, RwLock},
+    sync::{watch, RwLock},
 };
+use tokio_util::sync::CancellationToken;
 
 use crate::{
-    config::processing_loop::ProcessingLoop,
+    config::processing_loop::{ProcessingLoop, ShutdownMode},
     sql::{session::DatabaseProtocol, SessionManager},
     telemetry::{ContextLogger, SessionLogger},
     CubeError,
@@ -18,8 +19,8 @@ use super::shim::AsyncPostgresShim;
 pub struct PostgresServer {
     // options
     address: String,
-    close_socket_rx: RwLock<watch::Receiver<bool>>,
-    close_socket_tx: watch::Sender<bool>,
+    close_socket_rx: RwLock<watch::Receiver<Option<ShutdownMode>>>,
+    close_socket_tx: watch::Sender<Option<ShutdownMode>>,
     // reference
     session_manager: Arc<SessionManager>,
 }
@@ -33,17 +34,48 @@ impl ProcessingLoop for PostgresServer {
 
         println!("🔗 Cube SQL (pg) is listening on {}", self.address);
 
+        let fast_shutdown_interruptor = CancellationToken::new();
+        let semifast_shutdown_interruptor = CancellationToken::new();
+
+        let mut joinset = tokio::task::JoinSet::new();
+        let mut active_shutdown_mode: Option<ShutdownMode> = None;
+
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
             let (socket, _) = tokio::select! {
-                res = stop_receiver.changed() => {
-                    if res.is_err() || *stop_receiver.borrow() {
-                        trace!("[pg] Stopping processing_loop via channel");
+                _ = stop_receiver.changed() => {
+                    let mode = *stop_receiver.borrow();
+                    if mode > active_shutdown_mode {
+                        active_shutdown_mode = mode;
+                        match active_shutdown_mode {
+                            Some(ShutdownMode::Fast) => {
+                                trace!("[pg] Stopping processing_loop via channel, fast mode");
 
-                        return Ok(());
+                                fast_shutdown_interruptor.cancel();
+                                break;
+                            }
+                            Some(ShutdownMode::SemiFast) => {
+                                trace!("[pg] Stopping processing_loop via channel, semifast mode");
+
+                                semifast_shutdown_interruptor.cancel();
+                                break;
+                            }
+                            Some(ShutdownMode::Smart) => {
+                                trace!("[pg] Stopping processing_loop via interruptor, smart mode");
+                                break;
+                            }
+                            None => {
+                                unreachable!("mode compared greater than something; it can't be None");
+                            }
+                        }
                     } else {
                         continue;
                     }
+                }
+                Some(_) = joinset.join_next() => {
+                    // We do nothing here; whatever is here needs to be in the join_next() cleanup
+                    // after the loop.
+                    continue;
                 }
                 accept_res = listener.accept() => {
                     match accept_res {
@@ -73,20 +105,19 @@ impl ProcessingLoop for PostgresServer {
 
             trace!("[pg] New connection {}", session.state.connection_id);
 
-            let (mut tx, rx) = oneshot::channel::<()>();
-
             let connection_id = session.state.connection_id;
             let session_manager = self.session_manager.clone();
-            tokio::spawn(async move {
-                tx.closed().await;
 
-                trace!("[pg] Removing connection {}", connection_id);
-
-                session_manager.drop_session(connection_id).await;
-            });
-
-            tokio::spawn(async move {
-                let handler = AsyncPostgresShim::run_on(socket, session.clone(), logger.clone());
+            let fast_shutdown_interruptor = fast_shutdown_interruptor.clone();
+            let semifast_shutdown_interruptor = semifast_shutdown_interruptor.clone();
+            let join_handle: tokio::task::JoinHandle<()> = tokio::spawn(async move {
+                let handler = AsyncPostgresShim::run_on(
+                    fast_shutdown_interruptor,
+                    semifast_shutdown_interruptor,
+                    socket,
+                    session.clone(),
+                    logger.clone(),
+                );
                 if let Err(e) = handler.await {
                     logger.error(
                         format!("Error during processing PostgreSQL connection: {}", e).as_str(),
@@ -99,22 +130,78 @@ impl ProcessingLoop for PostgresServer {
                         trace!("Backtrace: not found");
                     }
                 };
+            });
 
-                // Handler can finish with panic, it's why we are using additional channel to drop session by moving it here
-                std::mem::drop(rx);
+            // We use a separate task because `handler` above, the result of
+            // `AsyncPostgresShim::run_on,` can panic, which we want to catch.  (And which the
+            // JoinHandle catches.)
+            joinset.spawn(async move {
+                let _ = join_handle.await;
+
+                trace!("[pg] Removing connection {}", connection_id);
+
+                session_manager.drop_session(connection_id).await;
             });
         }
+
+        // Close the listening socket (so we _visibly_ stop accepting incoming connections) before
+        // we wait for the outstanding connection tasks finish.
+        std::mem::drop(listener);
+
+        // Now that we've had the stop signal, wait for outstanding connection tasks to finish
+        // cleanly.
+
+        loop {
+            let mut stop_receiver = self.close_socket_rx.write().await;
+            tokio::select! {
+                _ = stop_receiver.changed() => {
+                    let mode = *stop_receiver.borrow();
+                    if mode > active_shutdown_mode {
+                        active_shutdown_mode = mode;
+                        match active_shutdown_mode {
+                            Some(ShutdownMode::Fast) => {
+                                trace!("[pg] Stopping processing_loop via channel: upgrading to fast mode");
+
+                                fast_shutdown_interruptor.cancel();
+                            }
+                            Some(ShutdownMode::SemiFast) => {
+                                trace!("[pg] Stopping processing_loop via channel: upgrading to semifast mode");
+
+                                semifast_shutdown_interruptor.cancel();
+                            }
+                            _ => {
+                                // Because of comparisons made, the smallest and 2nd smallest
+                                // Option<ShutdownMode> values are impossible.
+                                unreachable!("impossible mode value, where mode={:?}", active_shutdown_mode);
+                            }
+                        }
+                    } else {
+                        continue;
+                    }
+                }
+                res = joinset.join_next() => {
+                    if let None = res {
+                        break;
+                    } else {
+                        // We do nothing here, same as the other join_next() cleanup in the prior loop.
+                        continue;
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 
-    async fn stop_processing(&self) -> Result<(), CubeError> {
-        self.close_socket_tx.send(true)?;
+    async fn stop_processing(&self, mode: ShutdownMode) -> Result<(), CubeError> {
+        self.close_socket_tx.send(Some(mode))?;
         Ok(())
     }
 }
 
 impl PostgresServer {
     pub fn new(address: String, session_manager: Arc<SessionManager>) -> Arc<Self> {
-        let (close_socket_tx, close_socket_rx) = watch::channel(false);
+        let (close_socket_tx, close_socket_rx) = watch::channel(None::<ShutdownMode>);
         Arc::new(Self {
             address,
             session_manager,

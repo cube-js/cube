@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 8951
+assertion_line: 10108
 expression: "execute_query(\"SELECT\n                    oid,\n                    relname,\n                    pg_total_relation_size(oid) relsize\n                FROM pg_class\n                ORDER BY oid ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+---------------------------+---------+
@@ -10,4 +10,5 @@ expression: "execute_query(\"SELECT\n                    oid,\n                 
 | 18019 | Logs                      | 8192    |
 | 18029 | NumberCube                | 8192    |
 | 18035 | WideCube                  | 8192    |
+| 18245 | MultiTypeCube             | 8192    |
 +-------+---------------------------+---------+

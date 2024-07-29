@@ -14,7 +14,6 @@ use cubesql::{
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
-use serde_derive::Deserialize;
 use serde_derive::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -106,11 +105,6 @@ struct MetaRequest {
     only_compiler_id: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SqlResponseSerialized {
-    sql: (String, Vec<String>),
-}
-
 #[async_trait]
 impl TransportService for NodeBridgeTransport {
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
@@ -134,6 +128,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: false,
         })?;
+
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
@@ -296,19 +291,6 @@ impl TransportService for NodeBridgeTransport {
             Some(extra),
         )
         .await?;
-
-        if let Some(error) = response.get("error").and_then(|e| e.as_str()) {
-            if let Some(stack) = response.get("stack").and_then(|e| e.as_str()) {
-                return Err(CubeError::user(format!(
-                    "Error during SQL generation: {}\n{}",
-                    error, stack
-                )));
-            }
-            return Err(CubeError::user(format!(
-                "Error during SQL generation: {}",
-                error
-            )));
-        }
 
         let sql = response
             .get("sql")

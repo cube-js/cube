@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 13674
+assertion_line: 15048
 expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS \\\"table_name\\\",\\n          a.attname AS \\\"column_name\\\",\\n          format_type(a.atttypid, a.atttypmod) AS \\\"data_type\\\"\\n        FROM pg_namespace n,\\n             pg_class c,\\n             pg_attribute a\\n        WHERE n.oid = c.relnamespace\\n          AND c.oid = a.attrelid\\n          AND a.attnum > 0\\n          AND NOT a.attisdropped\\n          AND c.relname IN (SELECT table_name\\nFROM information_schema.tables\\nWHERE (table_type = 'BASE TABLE' OR table_type = 'VIEW')\\n  AND table_schema NOT IN ('pg_catalog', 'information_schema')\\n  AND has_schema_privilege(table_schema, 'USAGE'::text)\\n)\\n\n                /* Added to avoid random output order and validate snapshot */\n                order by table_name, column_name;\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +----------------------------------+--------------------+-----------------------------+
@@ -29,6 +29,73 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.Logs                      | content            | text                        |
 | public.Logs                      | id                 | numeric                     |
 | public.Logs                      | read               | boolean                     |
+| public.MultiTypeCube             | __cubeJoinField    | text                        |
+| public.MultiTypeCube             | __user             | text                        |
+| public.MultiTypeCube             | avgPrice           | numeric                     |
+| public.MultiTypeCube             | count              | bigint                      |
+| public.MultiTypeCube             | countDistinct      | bigint                      |
+| public.MultiTypeCube             | dim_date0          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date1          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date2          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date3          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date4          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date5          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date6          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date7          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date8          | timestamp without time zone |
+| public.MultiTypeCube             | dim_date9          | timestamp without time zone |
+| public.MultiTypeCube             | dim_num0           | numeric                     |
+| public.MultiTypeCube             | dim_num1           | numeric                     |
+| public.MultiTypeCube             | dim_num2           | numeric                     |
+| public.MultiTypeCube             | dim_num3           | numeric                     |
+| public.MultiTypeCube             | dim_num4           | numeric                     |
+| public.MultiTypeCube             | dim_num5           | numeric                     |
+| public.MultiTypeCube             | dim_num6           | numeric                     |
+| public.MultiTypeCube             | dim_num7           | numeric                     |
+| public.MultiTypeCube             | dim_num8           | numeric                     |
+| public.MultiTypeCube             | dim_num9           | numeric                     |
+| public.MultiTypeCube             | dim_str0           | text                        |
+| public.MultiTypeCube             | dim_str1           | text                        |
+| public.MultiTypeCube             | dim_str2           | text                        |
+| public.MultiTypeCube             | dim_str3           | text                        |
+| public.MultiTypeCube             | dim_str4           | text                        |
+| public.MultiTypeCube             | dim_str5           | text                        |
+| public.MultiTypeCube             | dim_str6           | text                        |
+| public.MultiTypeCube             | dim_str7           | text                        |
+| public.MultiTypeCube             | dim_str8           | text                        |
+| public.MultiTypeCube             | dim_str9           | text                        |
+| public.MultiTypeCube             | maxPrice           | numeric                     |
+| public.MultiTypeCube             | measure_date0      | numeric                     |
+| public.MultiTypeCube             | measure_date1      | numeric                     |
+| public.MultiTypeCube             | measure_date2      | numeric                     |
+| public.MultiTypeCube             | measure_date3      | numeric                     |
+| public.MultiTypeCube             | measure_date4      | numeric                     |
+| public.MultiTypeCube             | measure_date5      | numeric                     |
+| public.MultiTypeCube             | measure_date6      | numeric                     |
+| public.MultiTypeCube             | measure_date7      | numeric                     |
+| public.MultiTypeCube             | measure_date8      | numeric                     |
+| public.MultiTypeCube             | measure_date9      | numeric                     |
+| public.MultiTypeCube             | measure_num0       | numeric                     |
+| public.MultiTypeCube             | measure_num1       | numeric                     |
+| public.MultiTypeCube             | measure_num2       | numeric                     |
+| public.MultiTypeCube             | measure_num3       | numeric                     |
+| public.MultiTypeCube             | measure_num4       | numeric                     |
+| public.MultiTypeCube             | measure_num5       | numeric                     |
+| public.MultiTypeCube             | measure_num6       | numeric                     |
+| public.MultiTypeCube             | measure_num7       | numeric                     |
+| public.MultiTypeCube             | measure_num8       | numeric                     |
+| public.MultiTypeCube             | measure_num9       | numeric                     |
+| public.MultiTypeCube             | measure_str0       | numeric                     |
+| public.MultiTypeCube             | measure_str1       | numeric                     |
+| public.MultiTypeCube             | measure_str2       | numeric                     |
+| public.MultiTypeCube             | measure_str3       | numeric                     |
+| public.MultiTypeCube             | measure_str4       | numeric                     |
+| public.MultiTypeCube             | measure_str5       | numeric                     |
+| public.MultiTypeCube             | measure_str6       | numeric                     |
+| public.MultiTypeCube             | measure_str7       | numeric                     |
+| public.MultiTypeCube             | measure_str8       | numeric                     |
+| public.MultiTypeCube             | measure_str9       | numeric                     |
+| public.MultiTypeCube             | minPrice           | numeric                     |
 | public.NumberCube                | __cubeJoinField    | text                        |
 | public.NumberCube                | __user             | text                        |
 | public.NumberCube                | someNumber         | numeric                     |

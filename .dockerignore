@@ -11,6 +11,7 @@
 !rust/cubestore/bin
 !rust/cubesql/package.json
 
+packages/cubejs-backend-native/target
 packages/*/node_modules/
 packages/*/dist/
 packages/*/coverage/

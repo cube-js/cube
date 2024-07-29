@@ -50,6 +50,6 @@ export class DruidQuery extends BaseQuery {
   }
 
   public nowTimestampSql(): string {
-    return `CURRENT_TIMESTAMP`;
+    return 'CURRENT_TIMESTAMP';
   }
 }

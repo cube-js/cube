@@ -8,6 +8,7 @@ module.exports = {
   "hashboard": "Hashboard",
   "hex": "Hex",
   "jupyter": "Jupyter",
+  "klipfolio": "Klipfolio",
   "langchain": "LangChain",
   "metabase": "Metabase",
   "observable": "Observable",
@@ -18,5 +19,5 @@ module.exports = {
   "streamlit": "Streamlit",
   "superset": "Superset / Preset",
   "tableau": "Tableau",
-  "thoughtspot": "Thoughtspot"
+  "thoughtspot": "ThoughtSpot"
 }

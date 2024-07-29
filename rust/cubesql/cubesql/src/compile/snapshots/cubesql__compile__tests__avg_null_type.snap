@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(\"SELECT AVG(x) FROM (SELECT NULL AS x) AS t\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----------+
+| AVG(t.x) |
++----------+
+| NULL     |
++----------+

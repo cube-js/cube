@@ -1,7 +1,14 @@
 use crate::{
     compile::{
         engine::df::scan::{CubeScanNode, DataType, MemberField, WrappedSelectNode},
-        rewrite::WrappedSelectType,
+        rewrite::{
+            extract_exprlist_from_groupping_set,
+            rules::{
+                filters::Decimal,
+                utils::{DecomposedDayTime, DecomposedMonthDayNano},
+            },
+            WrappedSelectType,
+        },
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -16,8 +23,8 @@ use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
-        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, LogicalPlan,
-        UserDefinedLogicalNode,
+        plan::Extension, replace_col, Column, DFSchema, DFSchemaRef, Expr, GroupingSet,
+        LogicalPlan, UserDefinedLogicalNode,
     },
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
@@ -26,8 +33,8 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde_derive::*;
 use std::{
-    any::Any, collections::HashMap, convert::TryInto, fmt, future::Future, pin::Pin, result,
-    sync::Arc,
+    any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
+    pin::Pin, result, sync::Arc,
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -42,6 +49,64 @@ struct UngrouppedMemberDef {
     alias: String,
     cube_params: Vec<String>,
     expr: String,
+    grouping_set: Option<GroupingSetDesc>,
+}
+
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub enum GroupingSetType {
+    Rollup,
+    Cube,
+}
+
+#[derive(Clone, Serialize, Debug, PartialEq, Eq)]
+pub struct GroupingSetDesc {
+    pub group_type: GroupingSetType,
+    pub id: u64,
+    pub sub_id: Option<u64>,
+}
+
+impl GroupingSetDesc {
+    pub fn new(group_type: GroupingSetType, id: u64) -> Self {
+        Self {
+            group_type,
+            id,
+            sub_id: None,
+        }
+    }
+}
+
+fn extract_group_type_from_groupping_set(
+    exprs: &Vec<Expr>,
+) -> Result<Vec<Option<GroupingSetDesc>>> {
+    let mut result = Vec::new();
+    let mut id = 0;
+    for expr in exprs {
+        match expr {
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(exprs) => {
+                    result.extend(
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Rollup, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
+                }
+                GroupingSet::Cube(exprs) => {
+                    result.extend(
+                        iter::repeat(Some(GroupingSetDesc::new(GroupingSetType::Cube, id)))
+                            .take(exprs.len()),
+                    );
+                    id += 1;
+                }
+                GroupingSet::GroupingSets(_) => {
+                    return Err(DataFusionError::Internal(format!(
+                        "SQL generation for GroupingSet is not supported"
+                    )))
+                }
+            },
+            _ => result.push(None),
+        }
+    }
+    Ok(result)
 }
 
 impl SqlQuery {
@@ -315,13 +380,20 @@ impl CubeScanWrapperNode {
                     .cloned();
                 if let Some(node) = cube_scan_node {
                     let mut new_node = node.clone();
-                    new_node.request.limit = Some(query_limit);
+                    new_node.request.limit = Some(
+                        new_node
+                            .request
+                            .limit
+                            .map_or(query_limit, |limit| min(limit, query_limit)),
+                    );
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
                 } else if let Some(node) = wrapped_select_node {
                     let mut new_node = node.clone();
-                    new_node.limit = Some(query_limit as usize);
+                    new_node.limit = Some(new_node.limit.map_or(query_limit as usize, |limit| {
+                        min(limit, query_limit as usize)
+                    }));
                     Arc::new(LogicalPlan::Extension(Extension {
                         node: Arc::new(new_node),
                     }))
@@ -569,10 +641,11 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
+                            let flat_group_expr = extract_exprlist_from_groupping_set(&group_expr);
                             let (group_by, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
-                                group_expr.clone(),
+                                flat_group_expr.clone(),
                                 sql,
                                 generator.clone(),
                                 &column_remapping,
@@ -583,6 +656,7 @@ impl CubeScanWrapperNode {
                                 subqueries_sql.clone(),
                             )
                             .await?;
+                            let group_descs = extract_group_type_from_groupping_set(&group_expr)?;
                             let (aggregate, sql) = Self::generate_column_expr(
                                 plan.clone(),
                                 schema.clone(),
@@ -673,10 +747,12 @@ impl CubeScanWrapperNode {
                                 load_request.dimensions = Some(
                                     group_by
                                         .iter()
-                                        .map(|m| {
-                                            Self::ungrouped_member_def(
+                                        .zip(group_descs.iter())
+                                        .map(|(m, t)| {
+                                            Self::dimension_member_def(
                                                 m,
                                                 &ungrouped_scan_node.used_cubes,
+                                                t,
                                             )
                                         })
                                         .collect::<Result<_>>()?,
@@ -718,7 +794,7 @@ impl CubeScanWrapperNode {
                                                                     projection[i].clone()
                                                                 })
                                                         }).or_else(|| {
-                                                            group_expr
+                                                            flat_group_expr
                                                                 .iter()
                                                                 .find_position(|e| {
                                                                     expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
@@ -730,7 +806,7 @@ impl CubeScanWrapperNode {
                                                                 col_name,
                                                                 projection_expr,
                                                                 aggr_expr,
-                                                                group_expr
+                                                                flat_group_expr
                                                             ))
                                                         })?;
                                                     Ok(vec![
@@ -792,6 +868,7 @@ impl CubeScanWrapperNode {
                                         sql.sql.to_string(),
                                         projection,
                                         group_by,
+                                        group_descs,
                                         aggregate,
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
@@ -989,7 +1066,10 @@ impl CubeScanWrapperNode {
         Ok((aliased_columns, sql))
     }
 
-    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
+    fn make_member_def(
+        column: &AliasedColumn,
+        used_cubes: &Vec<String>,
+    ) -> Result<UngrouppedMemberDef> {
         let res = UngrouppedMemberDef {
             cube_name: used_cubes
                 .iter()
@@ -1004,8 +1084,39 @@ impl CubeScanWrapperNode {
             alias: column.alias.clone(),
             cube_params: used_cubes.clone(),
             expr: column.expr.clone(),
+            grouping_set: None,
         };
+        Ok(res)
+    }
+
+    fn ungrouped_member_def(column: &AliasedColumn, used_cubes: &Vec<String>) -> Result<String> {
+        let res = Self::make_member_def(column, used_cubes)?;
         Ok(serde_json::json!(res).to_string())
+    }
+
+    fn dimension_member_def(
+        column: &AliasedColumn,
+        used_cubes: &Vec<String>,
+        grouping_type: &Option<GroupingSetDesc>,
+    ) -> Result<String> {
+        let mut res = Self::make_member_def(column, used_cubes)?;
+        res.grouping_set = grouping_type.clone();
+        Ok(serde_json::json!(res).to_string())
+    }
+
+    fn format_sql_decimal_type(precision: usize, scale: usize) -> String {
+        format!("NUMERIC({}, {})", precision, scale)
+    }
+
+    fn generate_sql_cast_expr(
+        sql_generator: Arc<dyn SqlGenerator>,
+        inner_expr: String,
+        data_type: String,
+    ) -> result::Result<String, DataFusionError> {
+        sql_generator
+            .get_sql_templates()
+            .cast_expr(inner_expr, data_type)
+            .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e)))
     }
 
     pub fn generate_sql_for_expr(
@@ -1348,7 +1459,7 @@ impl CubeScanWrapperNode {
                         DataType::Utf8 => "TEXT".to_string(),
                         DataType::LargeUtf8 => "TEXT".to_string(),
                         DataType::Decimal(precision, scale) => {
-                            format!("NUMERIC({}, {})", precision, scale)
+                            CubeScanWrapperNode::format_sql_decimal_type(precision, scale)
                         }
                         x => {
                             return Err(DataFusionError::Execution(format!(
@@ -1357,12 +1468,11 @@ impl CubeScanWrapperNode {
                             )));
                         }
                     };
-                    let resulting_sql = sql_generator
-                        .get_sql_templates()
-                        .cast_expr(expr, data_type)
-                        .map_err(|e| {
-                            DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e))
-                        })?;
+                    let resulting_sql = CubeScanWrapperNode::generate_sql_cast_expr(
+                        sql_generator,
+                        expr,
+                        data_type,
+                    )?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::TryCast { .. } => {}
@@ -1418,7 +1528,27 @@ impl CubeScanWrapperNode {
                             f.map(|f| format!("{}", f)).unwrap_or("NULL".to_string()),
                             sql_query,
                         ),
-                        // ScalarValue::Decimal128(_, _, _) => {}
+                        ScalarValue::Decimal128(x, precision, scale) => {
+                            // In Postgres, NUMERIC or DECIMAL scale can be negative.  But it's unsigned, here.
+                            let scale: usize = scale;
+
+                            (
+                                if let Some(x) = x {
+                                    let number = Decimal::format_string(x, scale);
+                                    let data_type = CubeScanWrapperNode::format_sql_decimal_type(
+                                        precision, scale,
+                                    );
+                                    CubeScanWrapperNode::generate_sql_cast_expr(
+                                        sql_generator,
+                                        format!("'{}'", number),
+                                        data_type,
+                                    )?
+                                } else {
+                                    "NULL".to_string()
+                                },
+                                sql_query,
+                            )
+                        }
                         ScalarValue::Int8(x) => (
                             x.map(|x| format!("{}", x)).unwrap_or("NULL".to_string()),
                             sql_query,
@@ -1535,7 +1665,7 @@ impl CubeScanWrapperNode {
                                 (
                                     sql_generator
                                         .get_sql_templates()
-                                        .interval_expr(interval, num.into(), date_part.to_string())
+                                        .interval_any_expr(interval, num.into(), date_part)
                                         .map_err(|e| {
                                             DataFusionError::Internal(format!(
                                                 "Can't generate SQL for interval: {}",
@@ -1550,37 +1680,24 @@ impl CubeScanWrapperNode {
                         }
                         ScalarValue::IntervalDayTime(x) => {
                             if let Some(x) = x {
-                                let days = x >> 32;
-                                let millis = x & 0xFFFFFFFF;
-                                if days > 0 && millis > 0 {
-                                    return Err(DataFusionError::Internal(format!(
-                                        "Can't generate SQL for interval: mixed intervals aren't supported: {} days {} millis encoded as {}",
-                                        days, millis, x
-                                    )));
-                                }
-                                let (num, date_part) = if days > 0 {
-                                    (days, "DAY")
-                                } else {
-                                    (millis, "MILLISECOND")
-                                };
-                                let interval = format!("{} {}", num, date_part);
-                                (
-                                    sql_generator
-                                        .get_sql_templates()
-                                        .interval_expr(interval, num, date_part.to_string())
-                                        .map_err(|e| {
-                                            DataFusionError::Internal(format!(
-                                                "Can't generate SQL for interval: {}",
-                                                e
-                                            ))
-                                        })?,
-                                    sql_query,
-                                )
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedDayTime::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
                             } else {
                                 ("NULL".to_string(), sql_query)
                             }
                         }
-                        // ScalarValue::IntervalMonthDayNano(_) => {}
+                        ScalarValue::IntervalMonthDayNano(x) => {
+                            if let Some(x) = x {
+                                let templates = sql_generator.get_sql_templates();
+                                let decomposed = DecomposedMonthDayNano::from_raw_interval_value(x);
+                                let generated_sql = decomposed.generate_interval_sql(&templates)?;
+                                (generated_sql, sql_query)
+                            } else {
+                                ("NULL".to_string(), sql_query)
+                            }
+                        }
                         // ScalarValue::Struct(_, _) => {}
                         ScalarValue::Null => ("NULL".to_string(), sql_query),
                         x => {
@@ -1770,6 +1887,70 @@ impl CubeScanWrapperNode {
                         sql_query,
                     ))
                 }
+                Expr::GroupingSet(grouping_set) => match grouping_set {
+                    datafusion::logical_plan::GroupingSet::Rollup(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .rollup_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::Cube(exprs) => {
+                        let mut sql_exprs = Vec::new();
+                        for expr in exprs {
+                            let (sql, query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                expr,
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            sql_query = query;
+                            sql_exprs.push(sql);
+                        }
+                        Ok((
+                            sql_generator
+                                .get_sql_templates()
+                                .cube_expr(sql_exprs)
+                                .map_err(|e| {
+                                    DataFusionError::Internal(format!(
+                                        "Can't generate SQL for rollup expression: {}",
+                                        e
+                                    ))
+                                })?,
+                            sql_query,
+                        ))
+                    }
+                    datafusion::logical_plan::GroupingSet::GroupingSets(_) => {
+                        Err(DataFusionError::Internal(format!(
+                            "SQL generation for GroupingSet is not supported"
+                        )))
+                    }
+                },
+
                 Expr::WindowFunction {
                     fun,
                     args,

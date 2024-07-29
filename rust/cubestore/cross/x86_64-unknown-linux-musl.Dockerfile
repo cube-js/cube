@@ -2,15 +2,17 @@
 # https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.x86_64-unknown-linux-musl
 FROM rustembedded/cross:x86_64-unknown-linux-musl
 
+ARG LLVM_VERSION=18
+
 RUN apt-get update \
     && apt-get -y upgrade \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget musl-tools libc6-dev apt-transport-https ca-certificates \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common pkg-config wget curl musl-tools libc6-dev apt-transport-https ca-certificates \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
-    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-18 main"  \
+    && add-apt-repository "deb https://apt.llvm.org/focal/ llvm-toolchain-focal-${LLVM_VERSION} main"  \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update \
     # llvm14-dev will install python 3.8 as bin/python3
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-18 clang-18 libclang-18-dev clang-18 make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-${LLVM_VERSION} lld-${LLVM_VERSION} clang-${LLVM_VERSION} libclang-${LLVM_VERSION}-dev clang-${LLVM_VERSION} make cmake \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN ln -s /usr/include/x86_64-linux-gnu/asm /usr/include/x86_64-linux-musl/asm && \

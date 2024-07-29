@@ -19,6 +19,7 @@ module.exports = {
   "postgres": "Postgres",
   "presto": "Presto",
   "questdb": "QuestDB",
+  "risingwave": "RisingWave",
   "singlestore": "SingleStore",
   "snowflake": "Snowflake",
   "sqlite": "SQLite",

@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 10027
 expression: "execute_query(\"SELECT\n                    relname,\n                    has_table_privilege('ovr', relname, 'SELECT') \\\"select\\\",\n                    has_table_privilege('ovr', relname, 'INSERT') \\\"insert\\\"\n                FROM pg_class\n                ORDER BY relname ASC\n                \".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------------------+--------+--------+
@@ -7,6 +8,7 @@ expression: "execute_query(\"SELECT\n                    relname,\n             
 +---------------------------+--------+--------+
 | KibanaSampleDataEcommerce | true   | false  |
 | Logs                      | true   | false  |
+| MultiTypeCube             | true   | false  |
 | NumberCube                | true   | false  |
 | WideCube                  | true   | false  |
 +---------------------------+--------+--------+

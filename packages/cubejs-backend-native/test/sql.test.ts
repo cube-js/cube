@@ -1,12 +1,17 @@
 import { Client } from 'pg';
 import { isCI } from '@cubejs-backend/shared';
+import { Writable } from 'stream';
 
 import * as native from '../js';
 import metaFixture from './meta';
 import { FakeRowStream } from './response-fake';
 
 const logger = jest.fn(({ event }) => {
-  if (!event.error.includes('load - strange response, success which contains error')) {
+  if (
+    !event.error.includes(
+      'load - strange response, success which contains error'
+    )
+  ) {
     expect(event.apiType).toEqual('sql');
     expect(event.protocol).toEqual('postgres');
   }
@@ -18,35 +23,32 @@ const logger = jest.fn(({ event }) => {
 //   'trace',
 // );
 
-describe('SQLInterface', () => {
-  jest.setTimeout(60 * 1000);
-
-  it('SHOW FULL TABLES FROM `db`', async () => {
-    const load = jest.fn(async ({ request, session, query }) => {
+function interfaceMethods() {
+  return {
+    load: jest.fn(async ({ request, session, query }) => {
       console.log('[js] load', {
         request,
         session,
-        query
+        query,
       });
 
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' }
+        securityContext: { foo: 'bar' },
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to PostgreSQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const sqlApiLoad = jest.fn(async ({ request, session, query, streaming }) => {
+    }),
+    sqlApiLoad: jest.fn(async ({ request, session, query, streaming }) => {
       console.log('[js] load', {
         request,
         session,
         query,
-        streaming
+        streaming,
       });
 
       if (streaming) {
@@ -58,56 +60,39 @@ describe('SQLInterface', () => {
       expect(session).toEqual({
         user: expect.toBeTypeOrNull(String),
         superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' }
+        securityContext: { foo: 'bar' },
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to PostgreSQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const sql = jest.fn(async ({ request, session, query }) => {
+    }),
+    sql: jest.fn(async ({ request, session, query }) => {
       console.log('[js] sql', {
         request,
         session,
-        query
+        query,
       });
 
       // It's just an emulation that ApiGateway returns error
       return {
-        error: 'This error should be passed back to PostgreSQL client'
+        error: 'This error should be passed back to PostgreSQL client',
       };
-    });
-
-    const stream = jest.fn(async ({ request, session, query }) => {
+    }),
+    stream: jest.fn(async ({ request, session, query }) => {
       console.log('[js] stream', {
         request,
         session,
-        query
+        query,
       });
 
       return {
         stream: new FakeRowStream(query),
       };
-    });
-
-    const meta = jest.fn(async ({ request, session }) => {
-      console.log('[js] meta', {
-        request,
-        session,
-      });
-
-      expect(session).toEqual({
-        user: expect.toBeTypeOrNull(String),
-        superuser: expect.any(Boolean),
-        securityContext: { foo: 'bar' },
-      });
-
-      return metaFixture;
-    });
-
-    const sqlGenerators = jest.fn(async ({ request, session }) => {
+    }),
+    meta: jest.fn(async () => metaFixture),
+    sqlGenerators: jest.fn(async ({ request, session }) => {
       console.log('[js] sqlGenerators', {
         request,
         session,
@@ -117,9 +102,8 @@ describe('SQLInterface', () => {
         cubeNameToDataSource: {},
         dataSourceToSqlGenerator: {},
       };
-    });
-
-    const checkAuth = jest.fn(async ({ request, user }) => {
+    }),
+    checkAuth: jest.fn(async ({ request, user }) => {
       console.log('[js] checkAuth', {
         request,
         user,
@@ -142,30 +126,39 @@ describe('SQLInterface', () => {
       }
 
       throw new Error('Please specify user');
-    });
+    }),
+    logLoadEvent: ({
+      event,
+      properties,
+    }: {
+      event: string;
+      properties: any;
+    }) => {
+      console.log(
+        `Load event: ${JSON.stringify({ type: event, ...properties })}`
+      );
+    },
+  };
+}
 
-    const logLoadEvent = ({ event, properties }: { event: string, properties: any }) => {
-      console.log(`Load event: ${JSON.stringify({ type: event, ...properties })}`);
-    };
+describe('SQLInterface', () => {
+  jest.setTimeout(60 * 1000);
+
+  it('SHOW FULL TABLES FROM `db`', async () => {
+    const methods = interfaceMethods();
+    const { checkAuth, meta } = methods;
 
     const instance = await native.registerInterface({
-      // nonce: '12345678910111213141516'.substring(0, 20),
-      port: 4545,
       pgPort: 5555,
-      checkAuth,
-      load,
-      sqlApiLoad,
-      sql,
-      meta,
-      stream,
-      logLoadEvent,
-      sqlGenerators,
+      ...methods,
       canSwitchUserForSession: (_payload) => true,
     });
     console.log(instance);
 
     try {
-      const testConnectionFailed = async (/** input */ { user, password }: { user?: string, password?: string }) => {
+      const testConnectionFailed = async (
+        /** input */ { user, password }: { user?: string; password?: string }
+      ) => {
         const client = new Client({
           host: '127.0.0.1',
           database: 'test',
@@ -180,7 +173,9 @@ describe('SQLInterface', () => {
 
           throw new Error('must throw error');
         } catch (e: any) {
-          expect(e.message).toContain('password authentication failed for user');
+          expect(e.message).toContain(
+            'password authentication failed for user'
+          );
         }
 
         console.log(checkAuth.mock.calls);
@@ -191,13 +186,14 @@ describe('SQLInterface', () => {
             meta: null,
           },
           user: user || null,
-          password: password || (isCI() && process.platform === 'win32' ? 'root' : ''),
+          password:
+            password || (isCI() && process.platform === 'win32' ? 'root' : ''),
         });
       };
 
       await testConnectionFailed({
         user: 'random user',
-        password: undefined
+        password: undefined,
       });
       checkAuth.mockClear();
 
@@ -209,7 +205,7 @@ describe('SQLInterface', () => {
 
       await testConnectionFailed({
         user: 'allowed_user',
-        password: 'wrong_password'
+        password: 'wrong_password',
       });
       checkAuth.mockClear();
 
@@ -250,6 +246,7 @@ describe('SQLInterface', () => {
         password: 'password_for_allowed_user',
       });
 
+      // @ts-ignore
       expect(meta.mock.calls[0][0]).toEqual({
         request: {
           id: expect.any(String),
@@ -260,36 +257,98 @@ describe('SQLInterface', () => {
           superuser: false,
           securityContext: { foo: 'bar' },
         },
-        onlyCompilerId: true
+        onlyCompilerId: true,
       });
 
       try {
         // limit is used to router query to load method instead of stream
-        await connection.query('select * from KibanaSampleDataEcommerce LIMIT 1000');
+        await connection.query(
+          'select * from KibanaSampleDataEcommerce LIMIT 1000'
+        );
 
         throw new Error('Error was not passed from transport to the client');
       } catch (e: any) {
         expect(e.code).toEqual('XX000');
-        expect(e.message).toContain('This error should be passed back to PostgreSQL client');
+        expect(e.message).toContain(
+          'This error should be passed back to PostgreSQL client'
+        );
       }
 
       if (process.env.CUBESQL_STREAM_MODE === 'true') {
-        const result = await connection.query('select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001');
+        const result = await connection.query(
+          'select id, order_date from KibanaSampleDataEcommerce order by order_date desc limit 50001'
+        );
         expect(result.rows.length).toEqual(50001);
         expect(result.rows[0].id).toEqual(0);
         expect(result.rows[50000].id).toEqual(50000);
       }
 
       {
-        const result = await connection.query('SELECT CAST(\'2020-12-25 22:48:48.000\' AS timestamp) as column1');
+        const result = await connection.query(
+          'SELECT CAST(\'2020-12-25 22:48:48.000\' AS timestamp) as column1'
+        );
         console.log(result);
 
-        expect(result.rows).toEqual([{ column1: new Date('2020-12-25T22:48:48.000Z') }]);
+        expect(result.rows).toEqual([
+          { column1: new Date('2020-12-25T22:48:48.000Z') },
+        ]);
       }
 
       await connection.end();
     } finally {
-      await native.shutdownInterface(instance);
+      await native.shutdownInterface(instance, 'fast');
+    }
+  });
+
+  it('streams cube sql over http', async () => {
+    if (process.env.CUBESQL_STREAM_MODE === 'true') {
+      const instance = await native.registerInterface({
+        pgPort: 5555,
+        ...interfaceMethods(),
+        canSwitchUserForSession: (_payload) => true,
+      });
+
+      let buf = '';
+      let rows = 0;
+      const write = jest.fn((chunk, _, callback) => {
+        const lines = (buf + chunk.toString('utf-8')).split('\n');
+        buf = lines.pop() || '';
+
+        rows = lines
+          .filter((it) => it.trim().length)
+          .map((it) => {
+            const json = JSON.parse(it);
+            expect(json.error).toBeUndefined();
+
+            return json.data?.length || 0;
+          })
+          .reduce((a, b) => a + b, rows);
+
+        callback();
+      });
+
+      if (buf.length > 0) {
+        rows += JSON.parse(buf).data.length;
+      }
+
+      const cubeSqlStream = new Writable({
+        write,
+      });
+
+      const onDrain = jest.fn();
+      cubeSqlStream.on('drain', onDrain);
+
+      await native.execSql(
+        instance,
+        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
+        cubeSqlStream
+      );
+
+      expect(rows).toBe(100000);
+
+      await native.shutdownInterface(instance, 'fast');
+    } else {
+      expect(process.env.CUBESQL_STREAM_MODE).toBeFalsy();
     }
   });
 });

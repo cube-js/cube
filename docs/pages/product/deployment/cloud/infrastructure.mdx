@@ -20,10 +20,17 @@ in your cloud account.
 
 This is the most common deployment option that is the easiest to get started with.
 In this scenario, everything is deployed on the Cube Cloud infrastructure in
-one of our **Shared** VPCs. Cube Cloud Control Plane takes care of creating,
+one of our **shared** VPCs. Cube Cloud Control Plane takes care of creating,
 scaling, and monitoring your Cube Deployments, as well as managing Cube Store
 and persisting pre-aggregated data. This option requires the least effort to
-set up and is available on all pricing plans.
+set up.
+
+<SuccessBox>
+
+Shared infrastructure is available in Cube Cloud on
+[all plans](https://cube.dev/pricing).
+
+</SuccessBox>
 
 Please note that some Enterprise features, such as VPC peering or PrivateLink are
 not available on the shared infrastructure. There's also a possibility of resource
@@ -32,7 +39,7 @@ contention ("noisy neighbor") problem.
 <div style={{ textAlign: "center" }}>
   <img
     alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (shared)"
-    src="https://ucarecdn.com/e4ea270f-08f6-4ff9-97eb-e92c6b6a2e7e/"
+    src="https://ucarecdn.com/35329e6b-3829-44dd-85c1-25250a8c9461/"
     style={{ border: "none" }}
     width="100%"
   />
@@ -44,13 +51,19 @@ It is similar to the previous option, but each customer gets a
 [Dedicated][ref-dedicated-vpc] VPC within one of Cube Cloud's own cloud
 accounts that hosts only that customer's deployments. This option is great for
 most of the typical Enterprise use-cases as it provides a higher level of
-performance, as well as additional security and isolation. It is is available on
+performance, as well as additional security and isolation.
+
+<SuccessBox>
+
+Dedicated infrastructure is available in Cube Cloud on
 the [Enterprise](https://cube.dev/pricing) plan and above.
+
+</SuccessBox>
 
 <div style={{ textAlign: "center" }}>
   <img
     alt="High-level diagram of the fully managed Cube Cloud Infrastructure option (dedicated)"
-    src="https://ucarecdn.com/c30caaf9-91ae-4671-9d20-98d76c7bf3e9/"
+    src="https://ucarecdn.com/2cc55ee4-5598-41ce-a15a-69ca683e8412/"
     style={{ border: "none" }}
     width="100%"
   />
@@ -58,18 +71,25 @@ the [Enterprise](https://cube.dev/pricing) plan and above.
 
 ## Dedicated infrastructure with CSPS
 
-On the [Enterprise Premier](https://cube.dev/pricing) plan, Cube Cloud offers
-a **Customer-supplied pre-aggregation storage (CSPS)** that allows moving all data at rest to the customer
+Cube Cloud offers a **customer-supplied pre-aggregation storage (CSPS)** that
+allows moving all data at rest to the customer
 infrastructure. In this scenario, all Cube components reside on the Cube Cloud
 side. However, Cube Store uses a customer-provided object store for reading and
 persisting pre-aggregated data. This provides additional peace of mind when
 processing highly critical business or personal information.
 
+<SuccessBox>
+
+Dedicated infrastructure with CSPS is available in Cube Cloud on
+the [Enterprise Premier](https://cube.dev/pricing) plan.
+
+</SuccessBox>
+
 
 <div style={{ textAlign: "center" }}>
   <img
     alt="High-level diagram explaining the CSPS option"
-    src="https://ucarecdn.com/229d4a50-34af-43f2-b29d-5c64ccbed674/"
+    src="https://ucarecdn.com/f5c4c0d4-2ab4-4356-831f-543c1f2de90d/"
     style={{ border: "none" }}
     width="100%"
   />
@@ -77,15 +97,20 @@ processing highly critical business or personal information.
 
 ## BYOC
 
-
 With [Bring Your Own Cloud](/product/deployment/cloud/byoc) (BYOC) all the components interacting with private data are deployed on the customer infrastructure 
-on a platform of choice (AWS/Azure/GCP) and managed by the Cube Cloud Control Plane via the Cube Cloud Operator. It is is available on the [Enterprise Premier](https://cube.dev/pricing) plan.
+on a platform of choice (AWS/Azure/GCP) and managed by the Cube Cloud Control Plane via the Cube Cloud Operator.
 
+<SuccessBox>
+
+BYOC is available in Cube Cloud on
+the [Enterprise Premier](https://cube.dev/pricing) plan.
+
+</SuccessBox>
 
 <div style={{ textAlign: "center" }}>
   <img
     alt="High-level architecture diagram of the Cube Cloud BYOC deployment option"
-    src="https://ucarecdn.com/3196c035-c496-4c09-bd00-d83c0bbf4d23/"
+    src="https://ucarecdn.com/ba07643a-00eb-4509-828f-c54e6ba14888/"
     style={{ border: "none" }}
     width="100%"
   />

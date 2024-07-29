@@ -9,6 +9,8 @@ process.env.TZ = 'GMT';
 export class ClickHouseDbRunner {
   adapter = 'clickhouse';
   container = null;
+  clickHouseVersion = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
+  supportsExtendedDateTimeResults = this.clickHouseVersion >= '22.9';
 
   tearDown = async () => {
     if (this.container) {
@@ -31,6 +33,10 @@ export class ClickHouseDbRunner {
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
       await clickHouse.querying(`
     CREATE TEMPORARY TABLE cards (id UInt64, visitor_id UInt64, visitor_checkin_id UInt64)
+    ENGINE = ${engine}
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+      await clickHouse.querying(`
+    CREATE TEMPORARY TABLE events (id UInt64, type String, name String, started_at DateTime64, ended_at Nullable(DateTime64))
     ENGINE = ${engine}
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
 
@@ -63,15 +69,22 @@ export class ClickHouseDbRunner {
     (1, 1, 1),
     (2, 1, 2),
     (3, 3, 6)
+  `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } }),
+      await clickHouse.querying(`
+    INSERT INTO
+    events
+    (id, type, name, started_at, ended_at) VALUES
+    (1, 'moon_missions', 'Apollo 10', '1969-05-18 16:49:00', '1969-05-26 16:52:23'),
+    (2, 'moon_missions', 'Apollo 11', '1969-07-16 13:32:00', '1969-07-24 16:50:35'),
+    (3, 'moon_missions', 'Artemis I', '2021-11-16 06:32:00', '2021-12-11 18:50:00'),
+    (4, 'private_missions', 'Axiom Mission 1', '2022-04-08 15:17:12', '2022-04-25 17:06:00')
   `, { queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' } });
   };
 
   testQueries = async (queries, prepareDataSet) => {
     if (!this.container && !process.env.TEST_CLICKHOUSE_HOST) {
-      const version = process.env.TEST_CLICKHOUSE_VERSION || '23.11';
-
-      this.container = await new GenericContainer(`clickhouse/clickhouse-server:${version}`)
-        .withExposedPorts(8123)
+      this.container = await new GenericContainer(`clickhouse/clickhouse-server:${this.clickHouseVersion}`)
+        .withExposedPorts(this.port())
         .start();
     }
 
@@ -87,10 +100,28 @@ export class ClickHouseDbRunner {
 
     const requests = [];
 
+    // Controls whether functions return results with extended date and time ranges.
+    //
+    // 0 — Functions return Date or DateTime for all arguments (default).
+    // 1 — Functions return Date32 or DateTime64 for those argument types, and Date or DateTime otherwise.
+    //
+    // Extended ranges apply to:
+    // Date32: toStartOfYear, toStartOfISOYear, toStartOfQuarter, toStartOfMonth, toLastDayOfMonth, toStartOfWeek, toLastDayOfWeek, toMonday.
+    // DateTime64: toStartOfDay, toStartOfHour, toStartOfMinute, toStartOfFiveMinutes, toStartOfTenMinutes, toStartOfFifteenMinutes, timeSlot.
+    //
+    // https://clickhouse.com/docs/en/operations/settings/settings#enable-extended-results-for-datetime-functions
+    const extendedDateTimeResultsOptions = this.supportsExtendedDateTimeResults ? {
+      enable_extended_results_for_datetime_functions: '1'
+    } : {};
+
     for (const [query, params] of queries) {
       requests.push(clickHouse.querying(formatSql(query, params), {
         dataObjects: true,
-        queryOptions: { session_id: clickHouse.sessionId, join_use_nulls: '1' }
+        queryOptions: {
+          session_id: clickHouse.sessionId,
+          join_use_nulls: '1',
+          ...extendedDateTimeResultsOptions
+        }
       }));
     }
 
@@ -101,6 +132,10 @@ export class ClickHouseDbRunner {
 
   testQuery = async (queryAndParams, prepareDataSet) => this.testQueries([queryAndParams], prepareDataSet)
     .then(res => res[0]);
+
+  port() {
+    return 8123;
+  }
 }
 
 //

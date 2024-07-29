@@ -1,7 +1,7 @@
 use crate::{
     compile::rewrite::{
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        column_expr, fun_expr, literal_expr,
+        cast_expr, literal_expr,
         rules::{members::min_granularity, split::SplitRules, utils::parse_granularity_string},
         LiteralExprValue, LogicalPlanLanguage,
     },
@@ -16,19 +16,19 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-part",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
-                    vec!["?granularity".to_string(), column_expr("?column")],
+                    vec!["?granularity".to_string(), "?expr".to_string()],
                 )
             },
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?output_granularity"), column_expr("?column")],
+                    vec![literal_expr("?output_granularity"), "?expr".to_string()],
                 )
             },
             |alias_column| {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![literal_expr("?output_granularity"), alias_column],
                 )
@@ -40,33 +40,65 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-trunc-within-date-part",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
                     vec![
                         "?outer_granularity".to_string(),
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
-                            vec!["?inner_granularity".to_string(), column_expr("?column")],
+                            vec!["?inner_granularity".to_string(), "?expr".to_string()],
                         ),
                     ],
                 )
             },
-            || {
-                fun_expr(
-                    "DateTrunc",
-                    vec![literal_expr("?output_granularity"), column_expr("?column")],
-                )
-            },
+            || self.fun_expr("DateTrunc", vec!["?new_inner_granularity", "?expr"]),
             |alias_column| {
-                fun_expr(
+                self.fun_expr(
                     "DatePart",
-                    vec![literal_expr("?output_granularity"), alias_column],
+                    vec!["?new_outer_granularity".to_string(), alias_column],
                 )
             },
             self.transform_date_part_within_date_trunc(
                 "?outer_granularity",
                 "?inner_granularity",
-                "?output_granularity",
+                "?new_outer_granularity",
+                "?new_inner_granularity",
+            ),
+            false,
+            rules,
+        );
+        self.single_arg_split_point_rules(
+            "date-trunc-within-date-part-with-cast",
+            || {
+                self.fun_expr(
+                    "DatePart",
+                    vec![
+                        "?outer_granularity".to_string(),
+                        cast_expr(
+                            self.fun_expr(
+                                "DateTrunc",
+                                vec!["?inner_granularity".to_string(), "?expr".to_string()],
+                            ),
+                            "?cast_type",
+                        ),
+                    ],
+                )
+            },
+            || self.fun_expr("DateTrunc", vec!["?new_inner_granularity", "?expr"]),
+            |alias_column| {
+                self.fun_expr(
+                    "DatePart",
+                    vec![
+                        "?new_outer_granularity".to_string(),
+                        cast_expr(alias_column, "?cast_type"),
+                    ],
+                )
+            },
+            self.transform_date_part_within_date_trunc(
+                "?outer_granularity",
+                "?inner_granularity",
+                "?new_outer_granularity",
+                "?new_inner_granularity",
             ),
             false,
             rules,
@@ -74,31 +106,19 @@ impl SplitRules {
         self.single_arg_split_point_rules(
             "date-trunc",
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    vec![literal_expr("?granularity"), "?expr".to_string()],
                 )
             },
             || {
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
-                    vec![literal_expr("?granularity"), column_expr("?column")],
+                    vec![literal_expr("?granularity"), "?expr".to_string()],
                 )
             },
             |alias_column| alias_column,
             |_, _, _| true,
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "date-trunc-pass-through",
-            |expr| fun_expr("DateTrunc", vec![literal_expr("?granularity"), expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "date-part-pass-through",
-            |expr| fun_expr("DatePart", vec![literal_expr("?granularity"), expr]),
             false,
             rules,
         );
@@ -138,7 +158,8 @@ impl SplitRules {
         &self,
         outer_var: &str,
         inner_var: &str,
-        granularity_var: &str,
+        new_outer_var: &str,
+        new_inner_var: &str,
     ) -> impl Fn(
         bool,
         &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -149,7 +170,8 @@ impl SplitRules {
            + Clone {
         let outer_var = var!(outer_var);
         let inner_var = var!(inner_var);
-        let granularity_var = var!(granularity_var);
+        let new_outer_var = var!(new_outer_var);
+        let new_inner_var = var!(new_inner_var);
         move |_, egraph, subst| {
             if let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(outer_granularity)))) =
                 &egraph[subst[outer_var]].data.constant
@@ -157,23 +179,29 @@ impl SplitRules {
                 if let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(inner_granularity)))) =
                     &egraph[subst[inner_var]].data.constant
                 {
+                    let Some(min_granularity) =
+                        min_granularity(&outer_granularity, &inner_granularity)
+                    else {
+                        subst.insert(new_outer_var, subst[outer_var]);
+                        subst.insert(new_inner_var, subst[inner_var]);
+                        return true;
+                    };
+
                     let date_trunc_granularity =
-                        match min_granularity(&outer_granularity, &inner_granularity) {
-                            Some(granularity) => {
-                                if granularity.to_lowercase() == inner_granularity.to_lowercase() {
-                                    outer_granularity
-                                } else {
-                                    inner_granularity
-                                }
-                            }
-                            None => return false,
+                        if min_granularity.to_lowercase() == inner_granularity.to_lowercase() {
+                            outer_granularity
+                        } else {
+                            inner_granularity
                         };
 
-                    let granularity =
+                    let granularity_value =
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
                             ScalarValue::Utf8(Some(date_trunc_granularity.to_string())),
                         )));
-                    subst.insert(granularity_var, granularity);
+                    let granularity =
+                        egraph.add(LogicalPlanLanguage::LiteralExpr([granularity_value]));
+                    subst.insert(new_outer_var, granularity);
+                    subst.insert(new_inner_var, granularity);
                     return true;
                 }
             }

@@ -10,8 +10,8 @@ use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotatio
 pub use datafusion::{
     arrow::{
         array::{
-            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float64Builder, Int16Builder,
-            Int32Builder, Int64Builder, NullArray, StringBuilder,
+            ArrayRef, BooleanBuilder, Date32Builder, DecimalBuilder, Float32Builder,
+            Float64Builder, Int16Builder, Int32Builder, Int64Builder, NullArray, StringBuilder,
         },
         datatypes::{DataType, SchemaRef},
         error::{ArrowError, Result as ArrowResult},
@@ -42,8 +42,11 @@ use crate::{
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 use datafusion::{
     arrow::{
-        array::{TimestampMillisecondBuilder, TimestampNanosecondBuilder},
-        datatypes::TimeUnit,
+        array::{
+            IntervalDayTimeBuilder, IntervalMonthDayNanoBuilder, IntervalYearMonthBuilder,
+            TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+        },
+        datatypes::{IntervalUnit, TimeUnit},
     },
     execution::context::TaskContext,
     logical_plan::JoinType,
@@ -1025,6 +1028,31 @@ pub fn transform_response<V: ValueObject>(
                     }
                 )
             }
+            DataType::Float32 => {
+                build_column!(
+                    DataType::Float32,
+                    Float32Builder,
+                    response,
+                    field_name,
+                    {
+                        (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
+                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
+                            Ok(v) => builder.append_value(v)?,
+                            Err(error) => {
+                                warn!(
+                                    "Unable to parse value as f32: {}",
+                                    error.to_string()
+                                );
+
+                                builder.append_null()?
+                            }
+                        },
+                    },
+                    {
+                        (ScalarValue::Float32(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
             DataType::Float64 => {
                 build_column!(
                     DataType::Float64,
@@ -1230,6 +1258,48 @@ pub fn transform_response<V: ValueObject>(
                                 builder.append_null()?;
                             }
                         },
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::YearMonth) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::YearMonth),
+                    IntervalYearMonthBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalYearMonth(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::DayTime) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::DayTime),
+                    IntervalDayTimeBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalDayTime(v), builder) => builder.append_option(v.clone())?,
+                    }
+                )
+            }
+            DataType::Interval(IntervalUnit::MonthDayNano) => {
+                build_column!(
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                    IntervalMonthDayNanoBuilder,
+                    response,
+                    field_name,
+                    {
+                        // TODO
+                    },
+                    {
+                        (ScalarValue::IntervalMonthDayNano(v), builder) => builder.append_option(v.clone())?,
                     }
                 )
             }

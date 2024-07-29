@@ -1,10 +1,13 @@
 import {
   setupLogger,
   registerInterface,
+  shutdownInterface,
+  execSql,
   SqlInterfaceInstance,
   Request as NativeRequest,
   LoadRequestMeta,
 } from '@cubejs-backend/native';
+import type { ShutdownMode } from '@cubejs-backend/native';
 import { displayCLIWarning, getEnv } from '@cubejs-backend/shared';
 
 import * as crypto from 'crypto';
@@ -16,22 +19,52 @@ export type SQLServerOptions = {
   canSwitchSqlUser?: CanSwitchSQLUserFn,
   sqlPort?: number,
   pgSqlPort?: number,
-  sqlNonce?: string,
   sqlUser?: string,
   sqlSuperUser?: string,
   sqlPassword?: string,
+  gatewayPort?: number,
+};
+
+export type SQLServerConstructorOptions = {
+  gatewayPort?: number,
 };
 
 export class SQLServer {
   protected sqlInterfaceInstance: SqlInterfaceInstance | null = null;
 
+  protected readonly gatewayPort: number | undefined;
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
+    options: SQLServerConstructorOptions,
   ) {
     setupLogger(
       ({ event }) => apiGateway.log(event),
       process.env.CUBEJS_LOG_LEVEL === 'trace' ? 'trace' : 'warn'
     );
+
+    // Actually, proxy is enabled in gateway
+    // But passing port into registerInterface will start native gateway
+    if (getEnv('nativeApiGateway')) {
+      this.gatewayPort = options.gatewayPort || 7575;
+    }
+  }
+
+  public getNativeGatewayPort(): number {
+    if (this.gatewayPort) {
+      return this.gatewayPort;
+    }
+
+    throw new Error('Native api gateway is not enabled');
+  }
+
+  public async execSql(sqlQuery: string, stream: any, securityContext?: any) {
+    await execSql(this.sqlInterfaceInstance!, sqlQuery, stream, securityContext);
+  }
+
+  protected buildCheckSqlAuth(options: SQLServerOptions): CheckSQLAuthFn {
+    return (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
+      || this.createDefaultCheckSqlAuthFn(options);
   }
 
   public async init(options: SQLServerOptions): Promise<void> {
@@ -39,8 +72,7 @@ export class SQLServer {
       throw new Error('Unable to start SQL interface two times');
     }
 
-    const checkSqlAuth: CheckSQLAuthFn = (options.checkSqlAuth && this.wrapCheckSqlAuthFn(options.checkSqlAuth))
-      || this.createDefaultCheckSqlAuthFn(options);
+    const checkSqlAuth: CheckSQLAuthFn = this.buildCheckSqlAuth(options);
 
     const canSwitchSqlUser: CanSwitchSQLUserFn = options.canSwitchSqlUser
       || this.createDefaultCanSwitchSqlUserFn(options);
@@ -67,9 +99,8 @@ export class SQLServer {
     const canSwitchUserForSession = async (session, user) => session.superuser || canSwitchSqlUser(session.user, user);
 
     this.sqlInterfaceInstance = await registerInterface({
-      port: options.sqlPort,
+      gatewayPort: this.gatewayPort,
       pgPort: options.pgSqlPort,
-      nonce: options.sqlNonce,
       checkAuth: async ({ request, user, password }) => {
         const { password: returnedPassword, superuser, securityContext, skipPasswordCheck } = await checkSqlAuth(request, user, password);
 
@@ -89,11 +120,19 @@ export class SQLServer {
           try {
             await this.apiGateway.meta({
               context,
-              res: (message) => {
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
                 if (onlyCompilerId) {
-                  resolve({ compilerId: message.compilerId });
+                  resolve({ compilerId: response.compilerId });
                 } else {
-                  resolve(message);
+                  resolve(response);
                 }
               },
               includeCompilerId: true,
@@ -114,8 +153,16 @@ export class SQLServer {
               query,
               queryType: 'multi',
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -136,8 +183,17 @@ export class SQLServer {
               sqlQuery,
               streaming,
               context,
-              res: (message) => {
-                resolve(message);
+              memberExpressions: true,
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -162,8 +218,16 @@ export class SQLServer {
               queryType: 'multi',
               disableLimitEnforcing: true,
               context,
-              res: (message) => {
-                resolve(message);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
               apiType: 'sql',
             });
@@ -202,8 +266,16 @@ export class SQLServer {
           try {
             await this.apiGateway.sqlGenerators({
               context,
-              res: (queries) => {
-                resolve(queries);
+              res: (response) => {
+                if ('error' in response) {
+                  reject({
+                    message: response.error
+                  });
+
+                  return;
+                }
+
+                resolve(response);
               },
             });
           } catch (e) {
@@ -284,5 +356,9 @@ export class SQLServer {
 
   public async close(): Promise<void> {
     // @todo Implement
+  }
+
+  public async shutdown(mode: ShutdownMode): Promise<void> {
+    await shutdownInterface(this.sqlInterfaceInstance!, mode);
   }
 }

@@ -7,11 +7,15 @@
       "CUBEJS_DB_TYPE": "mssql",
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_USER": "sa",
-      "CUBEJS_DB_PASS": "123-Strong-Password-321"
+      "CUBEJS_DB_PASS": "123-Strong-Password-321",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
     "image": "mcr.microsoft.com/mssql/server:2022-latest",
@@ -86,22 +90,39 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
       }
     ]
   },
   "skip": [
     "SKIPPED FOR MS SQL (total not supported)",
     "---------------------------------------",
-    "querying Customers: dimentions + total",
-    "querying Customers: dimentions + order + limit + total",
-    "querying Customers: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + limit + total + offset",
-    "querying Products: dimentions + order + total",
-    "querying Products: dimentions + order + limit + total",
-    "querying ECommerce: dimentions + total",
-    "querying ECommerce: dimentions + order + limit + total",
-    "querying ECommerce: dimentions + order + total + offset",
-    "querying ECommerce: dimentions + order + limit + total + offset",
+    "querying Customers: dimensions + total",
+    "querying Customers: dimensions + order + limit + total",
+    "querying Customers: dimensions + order + total + offset",
+    "querying Customers: dimensions + order + limit + total + offset",
+    "querying Products: dimensions + order + total",
+    "querying Products: dimensions + order + limit + total",
+    "querying ECommerce: dimensions + total",
+    "querying ECommerce: dimensions + order + limit + total",
+    "querying ECommerce: dimensions + order + total + offset",
+    "querying ECommerce: dimensions + order + limit + total + offset",
 
     "SKIPPED FOR ALL",
     "---------------------------------------",
@@ -110,6 +131,21 @@
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params",
+    "SQL API: post-aggregate percentage of total",
+    "SQL API: powerbi min max ungrouped flag",
+    "SQL API: powerbi min max push down",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

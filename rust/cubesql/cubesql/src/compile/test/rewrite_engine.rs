@@ -19,6 +19,7 @@ use crate::{
         },
         rewrite_statement, QueryPlanner,
     },
+    config::{ConfigObj, ConfigObjImpl},
     sql::session::DatabaseProtocol,
 };
 
@@ -48,7 +49,9 @@ pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPla
 }
 
 pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunner {
-    let mut converter = LogicalPlanToLanguageConverter::new(context);
+    let config_obj = ConfigObjImpl::default();
+    let flat_list = config_obj.push_down_pull_up_split();
+    let mut converter = LogicalPlanToLanguageConverter::new(context, flat_list);
     converter.add_logical_plan(&plan).unwrap();
 
     converter.take_runner()

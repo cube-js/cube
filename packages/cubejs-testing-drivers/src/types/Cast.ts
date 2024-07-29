@@ -7,4 +7,8 @@ export type Cast = {
   CREATE_TBL_SUFFIX: string,
   CREATE_SUB_PREFIX: string,
   CREATE_SUB_SUFFIX: string,
+  USE_SCHEMA: string,
+  GENERATE_BIG_SERIES?: string,
+  TRUE_LITERAL?: string,
+  FALSE_LITERAL?: string,
 };

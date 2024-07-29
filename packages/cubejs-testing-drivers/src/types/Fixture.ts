@@ -1,5 +1,5 @@
 /* eslint-disable camelcase */
-import { Cast } from 'src/dataset';
+import { Cast } from './Cast';
 
 export type Fixture = {
   extendedEnvs: {

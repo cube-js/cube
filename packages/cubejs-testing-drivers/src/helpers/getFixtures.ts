@@ -20,9 +20,16 @@ function deepMerge(a: any, b: any): any {
 export function getFixtures(type: string, extendedEnv?: string): Fixture {
   const _path = path.resolve(process.cwd(), `./fixtures/${type}.json`);
   const _content = fs.readFileSync(_path, 'utf-8');
+
   let fixtures = JSON.parse(_content);
+
   if (extendedEnv) {
+    if (!(extendedEnv in fixtures.extendedEnvs)) {
+      throw new Error(`Fixtures for ${type} doesn't contain extended env for ${extendedEnv}`);
+    }
+
     fixtures = deepMerge(fixtures, fixtures.extendedEnvs[extendedEnv]);
   }
+
   return fixtures;
 }

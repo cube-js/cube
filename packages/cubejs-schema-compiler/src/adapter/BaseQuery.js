@@ -233,7 +233,7 @@ export class BaseQuery {
     this.postAggregateDimensions = (this.options.postAggregateDimensions || []).map(this.newDimension.bind(this));
     this.postAggregateTimeDimensions = (this.options.postAggregateTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
-    this.order = this.options.order || [];
+
     const filters = this.extractFiltersAsTree(this.options.filters || []);
 
     // measure_filter (the one extracted from filters parameter on measure and
@@ -260,14 +260,13 @@ export class BaseQuery {
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.preAggregationsSchemaOption =
-      this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
-
-    if (this.order.length === 0) {
-      this.order = this.defaultOrder();
-    }
-
+    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
+
+    // Set the default order only when options.order is not provided at all
+    // if options.order is set (empty array [] or with data) - use it as is
+    this.order = this.options.order ?? this.defaultOrder();
+
     this.initUngrouped();
   }
 
@@ -399,12 +398,7 @@ export class BaseQuery {
       });
     } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
-
-      let id = firstMeasure.measure;
-
-      if (firstMeasure.expressionName) {
-        id = firstMeasure.expressionName;
-      }
+      const id = firstMeasure.expressionName ?? firstMeasure.measure;
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
@@ -452,6 +446,10 @@ export class BaseQuery {
     return new BaseGroupFilter(filter);
   }
 
+  /**
+   * @param timeDimension
+   * @return {BaseTimeDimension}
+   */
   newTimeDimension(timeDimension) {
     return new BaseTimeDimension(this, timeDimension);
   }
@@ -1395,10 +1393,18 @@ export class BaseQuery {
     return this.timeDimensions.map(d => d.dateSeriesSelectColumn());
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   dateSeriesSql(timeDimension) {
     return `(${this.seriesSql(timeDimension)}) ${this.asSyntaxTable} ${timeDimension.dateSeriesAliasName()}`;
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
@@ -1899,7 +1905,11 @@ export class BaseQuery {
       return '';
     }
     const dimensionColumns = this.dimensionColumns();
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
+    if (!dimensionColumns.length) {
+      return '';
+    }
+    const dimensionNames = dimensionColumns.map((c, i) => `${i + 1}`);
+    return this.rollupGroupByClause(dimensionNames);
   }
 
   getFieldIndex(id) {
@@ -1991,6 +2001,53 @@ export class BaseQuery {
     }
     const offset = this.offset ? parseInt(this.offset, 10) : null;
     return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @param {Array<string>} dimensionNames
+   * @returns {string}
+   */
+  rollupGroupByClause(dimensionNames) {
+    if (this.ungrouped) {
+      return '';
+    }
+    const dimensionColumns = this.dimensionColumns();
+    if (!dimensionColumns.length) {
+      return '';
+    }
+
+    const groupingSets = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupingSet);
+
+    let result = ' GROUP BY ';
+
+    dimensionColumns.forEach((c, i) => {
+      const groupingSet = groupingSets[i];
+      const comma = i > 0 ? ', ' : '';
+      const prevId = i > 0 ? (groupingSets[i - 1] || { id: null }).id : null;
+      const currId = (groupingSet || { id: null }).id;
+
+      if (prevId !== null && currId !== prevId) {
+        result += ')';
+      }
+
+      if ((prevId === null || currId !== prevId) && groupingSet != null) {
+        if (groupingSet.groupType === 'Rollup') {
+          result += `${comma}ROLLUP(`;
+        } else if (groupingSet.groupType === 'Cube') {
+          result += `${comma}CUBE(`;
+        }
+      } else {
+        result += `${comma}`;
+      }
+
+      result += dimensionNames[i];
+    });
+    if (groupingSets[groupingSets.length - 1] != null) {
+      result += ')';
+    }
+
+    return result;
   }
 
   /**
@@ -2324,6 +2381,10 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
+  collectAllMemberNames() {
+    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+  }
+
   collectMultipliedMeasures(context) {
     return (fn) => {
       const foundCompositeCubeMeasures = {};
@@ -2614,6 +2675,13 @@ export class BaseQuery {
   }
 
   /**
+   * @return {number}
+   */
+  timestampPrecision() {
+    return 3;
+  }
+
+  /**
    * @param {string} field
    * @return {string}
    */
@@ -2884,7 +2952,16 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
-        LEAST: 'LEAST({{ args_concat }})',
+
+        // There is a difference in behaviour of these function processing in different DBs and DWHs.
+        // The SQL standard requires greatest and least to return null in case one argument is null.
+        // However, many DBMS ignore NULL values (mostly because greatest and least were often supported
+        // decades before they were added to the SQL standard in 2023).
+        // Cube follows the Postgres implementation (as we mimic the Postgres protocol) and ignores NULL values.
+        // So these functions are enabled on a driver-specific basis for databases that ignores NULLs.
+        // LEAST: 'LEAST({{ args_concat }})',
+        // GREATEST: 'GREATEST({{ args_concat }})',
+
         LOWER: 'LOWER({{ args_concat }})',
         UPPER: 'UPPER({{ args_concat }})',
         LEFT: 'LEFT({{ args_concat }})',
@@ -2906,7 +2983,6 @@ export class BaseQuery {
         REPEAT: 'REPEAT({{ args_concat }})',
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
-        GREATEST: 'GREATEST({{ args_concat }})',
 
         STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
@@ -2937,10 +3013,11 @@ export class BaseQuery {
           '{{ from | indent(2, true) }}\n' +
           ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
-          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
+        group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
@@ -2954,6 +3031,8 @@ export class BaseQuery {
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
         subquery: '({{ expr }})',
         in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
+        rollup: 'ROLLUP({{ exprs_concat }})',
+        cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
         true: 'TRUE',

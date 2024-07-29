@@ -29,15 +29,18 @@ Each limit can be of one of the following types:
 The following resources are subject to limits, depending on [deployment
 types][ref-deployment-types] and [pricing tiers][ref-pricing]:
 
-| Resource                                                        | Free Tier |  Starter  |  Premium  | Enterprise |      Enterprise Premier       |
-| --------------------------------------------------------------- | :-------: | :-------: | :-------: | :--------: | :---------------------------: |
-| Number of deployments                                           |     2     | Unlimited | Unlimited | Unlimited  |           Unlimited           |
-| Number of API instances                                         |     1     |    20     |    20     |     20     | [Contact us][cube-contact-us] |
-| Number of Cube Store workers                                    |     2     |    16     |    16     |     16     | [Contact us][cube-contact-us] |
-| Queries per day ([development instance][ref-dev-instance])      |   1,000   |  10,000   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
-| Queries per day ([production cluster][ref-prod-cluster])        |     —     |  50,000   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
-| Queries processed by [Query History][ref-query-history] per day |   1,000   |  50,000   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
-| Data retained by [Query History][ref-query-history]             |   1 day   |   1 day   | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] | Depends on [Query History tier][ref-query-history-tiers] |
+| Resource                                                                            | Free Tier |  Starter  |  Premium  | Enterprise |      Enterprise Premier       |
+| ----------------------------------------------------------------------------------- | :-------: | :-------: | :-------: | :--------: | :---------------------------: |
+| Number of deployments                                                               |     2     | Unlimited | Unlimited | Unlimited  |           Unlimited           |
+| Number of API instances per deployment                                              |     1     |    10     |    10     |     10     | [Contact us][cube-contact-us] |
+| Number of Cube Store workers per deployment                                         |     2     |    16     |    16     |     16     | [Contact us][cube-contact-us] |
+| Queries per day for each [development instance][ref-dev-instance]                   |   1,000   |  10,000   | Unlimited | Unlimited  | Unlimited                     |
+| Queries per day for each [production cluster][ref-prod-cluster]                     |     —     |  50,000   | Unlimited | Unlimited  | Unlimited                     |
+| [Query History][ref-query-history] — retention period                               |   1 day   | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] |
+| [Query History][ref-query-history] — queries processed per day for each deployment  |   1,000   | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] | Depends on the [tier][ref-query-history-tiers] |
+| [Audit Log][ref-audit-log] — retention period                                       |     —     |     —     |     —     |     —      | 30 days                       |
+| [Audit Log][ref-audit-log] — events collected                                       |     —     |     —     |     —     |     —      | 10,000                        |
+| [Monitoring Integrations][ref-monitoring-integrations] — exported data              |     —     | Depends on the [tier][ref-monitoring-integrations-tiers] | Depends on the [tier][ref-monitoring-integrations-tiers] | Depends on the [tier][ref-monitoring-integrations-tiers] | Depends on the [tier][ref-monitoring-integrations-tiers] |
 
 ### Number of deployments
 
@@ -73,6 +76,17 @@ support][cube-contact-us] for further assistance.
 This is a soft limit. Usage is calculated per Cube Cloud account, i.e., in total
 for all deployments within an account.
 
+### Data collected and retained by Audit Log
+
+This is a hard limit. Usage is calculated per Cube Cloud account, i.e., in total
+for all deployments within an account. Please [contact
+support][cube-contact-us] for further assistance.
+
+### Data exported via Monitoring Integrations
+
+This is a hard limit. Consider upgrading to the next [Monitoring Integrations tier][ref-monitoring-integrations-tiers].
+Usage is calculated per Cube Cloud deployment.
+
 ## Quotas
 
 The [REST][ref-rest-api] and [GraphQL][ref-gql-api] APIs both have a standard
@@ -88,9 +102,12 @@ response.
 [ref-deployment-types]: /product/deployment/cloud/deployment-types
 [ref-pricing]: /product/deployment/cloud/pricing
 [ref-query-history]: /product/workspace/query-history
+[ref-monitoring-integrations]: /product/workspace/monitoring
 [ref-dev-instance]:
   /product/deployment/cloud/deployment-types#development-instance
 [ref-prod-cluster]:
   /product/deployment/cloud/deployment-types#production-cluster
 [cube-contact-us]: https://cube.dev/contact
 [ref-query-history-tiers]: /product/deployment/cloud/pricing#query-history-tiers
+[ref-audit-log]: /product/workspace/audit-log
+[ref-monitoring-integrations-tiers]: /product/deployment/cloud/pricing#monitoring-integrations-tiers

@@ -6,15 +6,16 @@ pub mod rewriter;
 pub mod rules;
 
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member, OriginalExpr},
+    compile::rewrite::analysis::{LogicalPlanAnalysis, OriginalExpr},
     CubeError,
 };
+use analysis::MemberNamesToExpr;
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
     logical_plan::{
         plan::SubqueryType, window_frames::WindowFrame, Column, DFSchema, Expr, ExprRewritable,
-        ExprRewriter, JoinConstraint, JoinType, Operator, RewriteRecursion,
+        ExprRewriter, GroupingSet, JoinConstraint, JoinType, Operator, RewriteRecursion,
     },
     physical_plan::{
         aggregates::AggregateFunction, functions::BuiltinScalarFunction, windows::WindowFunction,
@@ -22,14 +23,15 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{
-    rewrite, Applier, EGraph, Id, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
-    Symbol, Var,
+    rewrite, Applier, EGraph, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher,
+    Subst, Symbol, Var,
 };
+use itertools::Itertools;
 use std::{
+    borrow::Cow,
     fmt::{self, Display, Formatter},
-    ops::Index,
-    slice::Iter,
     str::FromStr,
+    sync::Arc,
 };
 
 use self::analysis::{LogicalPlanData, MemberNameToExpr};
@@ -58,6 +60,12 @@ impl Display for LikeType {
 pub enum WrappedSelectType {
     Projection,
     Aggregate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+pub enum GroupingSetType {
+    Rollup,
+    Cube,
 }
 
 crate::plan_to_language! {
@@ -474,6 +482,10 @@ crate::plan_to_language! {
             members: Vec<LogicalPlan>,
             meta: Option<Vec<(String, String)>>,
         },
+        GroupingSetExpr {
+            members: Vec<Expr>,
+            type: GroupingSetType,
+        },
         QueryParam {
             index: usize,
         },
@@ -533,62 +545,92 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-// TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
-    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
+    member_names_to_expr: &mut MemberNamesToExpr,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
-    member_name_to_expr
-        .into_iter()
-        .flat_map(|(member, _, expr)| {
-            [
-                (expr_column_name(&expr, &None), member.clone()),
-                (expr_column_name_with_relation(&expr, &mut relation), member),
-            ]
+    for (index, _tuple @ (_, _member, expr)) in member_names_to_expr
+        .list
+        .iter()
+        .enumerate()
+        .skip(member_names_to_expr.uncached_lookups_offset)
+    {
+        {
+            let column_name = expr_column_name(&expr, &None);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+        {
+            let column_name = expr_column_name_with_relation(&expr, &mut relation);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+    }
+    member_names_to_expr.uncached_lookups_offset = member_names_to_expr.list.len();
+
+    member_names_to_expr
+        .cached_lookups
+        .iter()
+        .map(|(column_name, &index)| {
+            (
+                column_name.clone(),
+                member_names_to_expr.list[index].0.clone(),
+            )
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 impl LogicalPlanData {
-    fn find_member(
-        &self,
-        f: impl Fn(&MemberNameToExpr, &str) -> bool,
-    ) -> Option<(&MemberNameToExpr, String)> {
-        let mut relation = WithColumnRelation(None);
-        for tuple @ (_, _member, expr) in self.member_name_to_expr.as_ref()?.iter() {
-            let column_name = expr_column_name(&expr, &None);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
-            }
-            let column_name = expr_column_name_with_relation(&expr, &mut relation);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
-            }
+    fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
+        if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
+            Self::do_find_member_by_alias(member_names_to_expr, name)
+        } else {
+            None
         }
-        None
     }
-}
 
-fn column_name_to_member_to_aliases(
-    column_name_to_member: Vec<(String, Option<String>)>,
-) -> Vec<(String, String)> {
-    column_name_to_member
-        .into_iter()
-        .filter(|(_, member)| member.is_some())
-        .map(|(column_name, member)| (column_name, member.unwrap()))
-        .collect::<Vec<_>>()
-}
+    fn do_find_member_by_alias<'a>(
+        member_names_to_expr: &'a mut MemberNamesToExpr,
+        name: &str,
+    ) -> Option<(&'a MemberNameToExpr, String)> {
+        if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
+            return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
+        }
+        let mut relation = WithColumnRelation(None);
+        for (index, tuple @ (_, _member, expr)) in member_names_to_expr
+            .list
+            .iter()
+            .enumerate()
+            .skip(member_names_to_expr.uncached_lookups_offset)
+        {
+            {
+                let column_name = expr_column_name(&expr, &None);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
 
-fn member_name_by_alias(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    id: Id,
-    alias: &str,
-) -> Option<String> {
-    egraph
-        .index(id)
-        .data
-        .find_member(|_, a| a == alias)
-        .and_then(|(m, _a)| m.0.clone())
+                if equal {
+                    return Some((tuple, name.to_string()));
+                }
+            }
+            {
+                let column_name = expr_column_name_with_relation(&expr, &mut relation);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
+
+                if equal {
+                    return Some((tuple, name.to_string()));
+                }
+            }
+            member_names_to_expr.uncached_lookups_offset = index + 1;
+        }
+        return None;
+    }
 }
 
 fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
@@ -725,6 +767,483 @@ where
     .unwrap()
 }
 
+struct ListMatches {
+    len: usize,
+    substs: Vec<Subst>,
+    prevs: Vec<usize>,
+    start: usize,
+}
+impl ListMatches {
+    fn range(&self) -> std::ops::Range<usize> {
+        self.start..self.substs.len()
+    }
+    fn for_each(&self, mut f: impl FnMut(&[&Subst])) {
+        let mut substs = Vec::with_capacity(self.len);
+        for i in self.range() {
+            substs.clear();
+            let mut i = i;
+            while i != usize::MAX {
+                substs.push(&self.substs[i]);
+                i = self.prevs[i];
+            }
+            substs.reverse();
+            assert_eq!(substs.len(), self.len);
+            f(&substs);
+        }
+    }
+}
+
+#[derive(Clone, PartialEq)]
+pub enum ListType {
+    ProjectionExpr,
+    WindowWindowExpr,
+    AggregateGroupExpr,
+    AggregateAggrExpr,
+    ScalarFunctionExprArgs,
+    GroupingSetExprMembers,
+    WrappedSelectProjectionExpr,
+    WrappedSelectGroupExpr,
+    WrappedSelectAggrExpr,
+    WrappedSelectWindowExpr,
+    CubeScanMembers,
+}
+
+impl ListType {
+    fn empty_list(&self) -> String {
+        match self {
+            Self::ProjectionExpr => projection_expr_empty_tail(),
+            Self::WindowWindowExpr => window_window_expr_empty_tail(),
+            Self::AggregateGroupExpr => aggr_group_expr_empty_tail(),
+            Self::AggregateAggrExpr => aggr_aggr_expr_empty_tail(),
+            Self::GroupingSetExprMembers => grouping_set_expr_members_empty_tail(),
+            Self::ScalarFunctionExprArgs => scalar_fun_expr_args_empty_tail(),
+            Self::WrappedSelectProjectionExpr => wrapped_select_projection_expr_empty_tail(),
+            Self::WrappedSelectGroupExpr => wrapped_select_group_expr_empty_tail(),
+            Self::WrappedSelectAggrExpr => wrapped_select_aggr_expr_empty_tail(),
+            Self::WrappedSelectWindowExpr => wrapped_select_window_expr_empty_tail(),
+            Self::CubeScanMembers => cube_scan_members_empty_tail(),
+        }
+    }
+}
+
+impl Display for ListType {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        write!(f, "{}", self.empty_list())
+    }
+}
+
+struct ListNodeSearcher {
+    list_type: ListType,
+    list_var: Var,
+    list_pattern: Pattern<LogicalPlanLanguage>,
+    elem_pattern: Pattern<LogicalPlanLanguage>,
+    top_level_elem_vars: Vec<Var>,
+}
+
+impl ListNodeSearcher {
+    fn new(list_type: ListType, list_var: &str, list_pattern: &str, elem_pattern: &str) -> Self {
+        Self {
+            list_type,
+            list_var: list_var.parse().unwrap(),
+            list_pattern: list_pattern.parse().unwrap(),
+            elem_pattern: elem_pattern.parse().unwrap(),
+            top_level_elem_vars: vec![],
+        }
+    }
+
+    fn with_top_level_elem_vars(mut self, vars: &[&str]) -> Self {
+        self.top_level_elem_vars = vars.iter().map(|s| s.parse().unwrap()).collect();
+        self
+    }
+
+    pub fn match_node(&self, node: &LogicalPlanLanguage) -> bool {
+        self.match_node_by_list_type(node, &self.list_type)
+    }
+
+    pub fn match_node_by_list_type(
+        &self,
+        node: &LogicalPlanLanguage,
+        list_type: &ListType,
+    ) -> bool {
+        match list_type {
+            ListType::ProjectionExpr => {
+                matches!(node, LogicalPlanLanguage::ProjectionExpr(_))
+            }
+            ListType::WindowWindowExpr => {
+                matches!(node, LogicalPlanLanguage::WindowWindowExpr(_))
+            }
+            ListType::AggregateGroupExpr => {
+                matches!(node, LogicalPlanLanguage::AggregateGroupExpr(_))
+            }
+            ListType::AggregateAggrExpr => {
+                matches!(node, LogicalPlanLanguage::AggregateAggrExpr(_))
+            }
+            ListType::ScalarFunctionExprArgs => {
+                matches!(node, LogicalPlanLanguage::ScalarFunctionExprArgs(_))
+            }
+            ListType::WrappedSelectProjectionExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectProjectionExpr(_))
+            }
+            ListType::GroupingSetExprMembers => {
+                matches!(node, LogicalPlanLanguage::GroupingSetExprMembers(_))
+            }
+            ListType::WrappedSelectGroupExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectGroupExpr(_))
+            }
+            ListType::WrappedSelectAggrExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectAggrExpr(_))
+            }
+            ListType::WrappedSelectWindowExpr => {
+                matches!(node, LogicalPlanLanguage::WrappedSelectWindowExpr(_))
+            }
+            ListType::CubeScanMembers => {
+                matches!(node, LogicalPlanLanguage::CubeScanMembers(_))
+            }
+        }
+    }
+
+    fn search_from_list_matches<'a>(
+        &'a self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        limit: usize,
+        list_subst: &Subst,
+        output: &mut Vec<Subst>,
+    ) {
+        let list_id = list_subst[self.list_var];
+        for node in egraph[list_id].iter() {
+            let list_children = node.children();
+            if !self.match_node(node) || list_children.is_empty() {
+                continue;
+            }
+
+            let mut list_matches = ListMatches {
+                len: list_children.len(),
+                substs: vec![],
+                prevs: vec![],
+                start: 0,
+            };
+
+            list_matches.substs = self
+                .elem_pattern
+                .search_eclass_with_limit(egraph, list_children[0], limit)
+                .map_or(vec![], |ms| ms.substs);
+
+            list_matches.prevs = vec![usize::MAX; list_matches.substs.len()];
+
+            let agree = |subst1: &Subst, subst2: &Subst| {
+                self.top_level_elem_vars
+                    .iter()
+                    .all(|&v| subst1.get(v) == subst2.get(v))
+            };
+
+            for &list_child in &list_children[1..] {
+                debug_assert_eq!(list_matches.substs.len(), list_matches.prevs.len());
+                let range = list_matches.range();
+                if range.is_empty() {
+                    break;
+                }
+                list_matches.start = list_matches.substs.len();
+                self.elem_pattern
+                    .search_eclass_with_fn(egraph, list_child, |subst| {
+                        for i in range.clone() {
+                            if agree(&list_matches.substs[i], subst) {
+                                list_matches.substs.push(subst.clone());
+                                list_matches.prevs.push(i);
+                            }
+                        }
+                        Ok(())
+                    })
+                    .unwrap_or_default();
+            }
+
+            if !list_matches.range().is_empty() {
+                let mut subst = list_subst.clone();
+                subst.data = Some(Arc::new(list_matches));
+                output.push(subst);
+            }
+        }
+    }
+}
+
+impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
+    fn search_eclass_with_limit(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclass: Id,
+        limit: usize,
+    ) -> Option<SearchMatches<LogicalPlanLanguage>> {
+        let mut matches = SearchMatches {
+            substs: vec![],
+            eclass,
+            ast: Some(Cow::Borrowed(&self.list_pattern.ast)),
+        };
+        self.list_pattern
+            .search_eclass_with_fn(egraph, eclass, |subst| {
+                self.search_from_list_matches(egraph, limit, subst, &mut matches.substs);
+                Ok(())
+            })
+            .unwrap_or_default();
+
+        (!matches.substs.is_empty()).then(|| matches)
+    }
+
+    fn search_eclasses_with_limit(
+        &self,
+        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclasses: &mut dyn Iterator<Item = Id>,
+        limit: usize,
+    ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
+        let mut result: Vec<SearchMatches<_>> = vec![];
+
+        self.list_pattern
+            .search_eclasses_with_fn(egraph, eclasses, |id, list_subst| {
+                let last = match result.last_mut() {
+                    Some(top) if top.eclass == id => top,
+                    _ => {
+                        result.push(SearchMatches {
+                            substs: vec![],
+                            eclass: id,
+                            ast: Some(Cow::Borrowed(&self.list_pattern.ast)),
+                        });
+                        result.last_mut().unwrap()
+                    }
+                };
+                debug_assert_eq!(last.eclass, id);
+                self.search_from_list_matches(egraph, limit, list_subst, &mut last.substs);
+                Ok(())
+            })
+            .unwrap_or_default();
+
+        result.retain(|matches| !matches.substs.is_empty());
+        result
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.list_pattern.vars();
+        vars.extend(self.elem_pattern.vars());
+        vars.push(self.list_var);
+        vars
+    }
+}
+
+struct ListNodeApplierList {
+    list_type: ListType,
+    new_list_var: Var,
+    elem_pattern: PatternAst<LogicalPlanLanguage>,
+}
+
+impl ListNodeApplierList {
+    pub fn make_node(&self, list: Vec<Id>) -> LogicalPlanLanguage {
+        self.make_node_by_list_type(list, &self.list_type)
+    }
+
+    pub fn make_node_by_list_type(
+        &self,
+        list: Vec<Id>,
+        list_type: &ListType,
+    ) -> LogicalPlanLanguage {
+        match list_type {
+            ListType::ProjectionExpr => LogicalPlanLanguage::ProjectionExpr(list),
+            ListType::WindowWindowExpr => LogicalPlanLanguage::WindowWindowExpr(list),
+            ListType::AggregateGroupExpr => LogicalPlanLanguage::AggregateGroupExpr(list),
+            ListType::AggregateAggrExpr => LogicalPlanLanguage::AggregateAggrExpr(list),
+            ListType::ScalarFunctionExprArgs => LogicalPlanLanguage::ScalarFunctionExprArgs(list),
+            ListType::WrappedSelectProjectionExpr => {
+                LogicalPlanLanguage::WrappedSelectProjectionExpr(list)
+            }
+            ListType::GroupingSetExprMembers => LogicalPlanLanguage::GroupingSetExprMembers(list),
+            ListType::WrappedSelectGroupExpr => LogicalPlanLanguage::WrappedSelectGroupExpr(list),
+            ListType::WrappedSelectAggrExpr => LogicalPlanLanguage::WrappedSelectAggrExpr(list),
+            ListType::WrappedSelectWindowExpr => LogicalPlanLanguage::WrappedSelectWindowExpr(list),
+            ListType::CubeScanMembers => LogicalPlanLanguage::CubeScanMembers(list),
+        }
+    }
+}
+
+pub struct ListApplierListPattern {
+    list_type: ListType,
+    new_list_var: String,
+    elem_pattern: String,
+}
+
+struct ListNodeApplier {
+    list_pattern: PatternAst<LogicalPlanLanguage>,
+    lists: Vec<ListNodeApplierList>,
+}
+
+impl ListNodeApplier {
+    pub fn new(
+        list_type: ListType,
+        new_list_var: &str,
+        list_pattern: &str,
+        elem_pattern: &str,
+    ) -> Self {
+        Self::from_lists(
+            list_pattern,
+            [ListApplierListPattern {
+                list_type,
+                new_list_var: new_list_var.to_string(),
+                elem_pattern: elem_pattern.to_string(),
+            }],
+        )
+    }
+
+    pub fn from_lists(
+        list_pattern: &str,
+        lists: impl IntoIterator<Item = ListApplierListPattern>,
+    ) -> Self {
+        Self {
+            list_pattern: list_pattern.parse().unwrap(),
+            lists: lists
+                .into_iter()
+                .map(|list| ListNodeApplierList {
+                    list_type: list.list_type,
+                    new_list_var: list.new_list_var.parse().unwrap(),
+                    elem_pattern: list.elem_pattern.parse().unwrap(),
+                })
+                .collect(),
+        }
+    }
+}
+
+impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
+    fn apply_one(
+        &self,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        mut eclass: Id,
+        subst: &Subst,
+        _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
+        _rule_name: Symbol,
+    ) -> Vec<Id> {
+        let data = subst
+            .data
+            .as_ref()
+            .expect("no data, did you use ListNodeSearcher?");
+        let list_matches = data.downcast_ref::<ListMatches>().expect("wrong data type");
+
+        let mut subst = subst.clone();
+        let mut result_ids = vec![];
+        list_matches.for_each(|list_substs| {
+            for list in &self.lists {
+                let new_list = list_substs
+                    .iter()
+                    .map(|list_subst| {
+                        let mut subst = subst.clone();
+                        subst.extend(list_subst.iter());
+                        egraph.add_instantiation(&list.elem_pattern, &subst)
+                    })
+                    .collect();
+
+                subst.insert(list.new_list_var, egraph.add(list.make_node(new_list)));
+            }
+            let mut subst = subst.clone();
+            subst.extend(list_substs[0].iter());
+            let new_id = egraph.add_instantiation(&self.list_pattern, &subst);
+            if egraph.union(eclass, new_id) {
+                result_ids.push(new_id);
+                eclass = new_id;
+            }
+        });
+
+        result_ids
+    }
+
+    fn vars(&self) -> Vec<Var> {
+        let mut vars = self.list_pattern.vars();
+        for list in &self.lists {
+            vars.extend(list.elem_pattern.vars());
+            vars.retain(|v| *v != list.new_list_var); // this is bound by the applier itself
+        }
+        vars
+    }
+}
+
+pub struct ListPattern {
+    pattern: String,
+    list_var: String,
+    elem: String,
+}
+
+pub fn list_rewrite(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier: ListPattern,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    );
+    let applier = ListNodeApplier::new(
+        list_type,
+        &applier.list_var,
+        &applier.pattern,
+        &applier.elem,
+    );
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
+pub fn list_rewrite_with_lists(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier_pattern: &str,
+    lists: impl IntoIterator<Item = ListApplierListPattern>,
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    );
+    let applier = ListNodeApplier::from_lists(applier_pattern, lists);
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
+pub fn list_rewrite_with_vars(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier: ListPattern,
+    top_level_elem_vars: &[&str],
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    )
+    .with_top_level_elem_vars(top_level_elem_vars);
+    let applier = ListNodeApplier::new(
+        list_type,
+        &applier.list_var,
+        &applier.pattern,
+        &applier.elem,
+    );
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
+pub fn list_rewrite_with_lists_and_vars(
+    name: &str,
+    list_type: ListType,
+    searcher: ListPattern,
+    applier_pattern: &str,
+    lists: impl IntoIterator<Item = ListApplierListPattern>,
+    top_level_elem_vars: &[&str],
+) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    let searcher = ListNodeSearcher::new(
+        list_type.clone(),
+        &searcher.list_var,
+        &searcher.pattern,
+        &searcher.elem,
+    )
+    .with_top_level_elem_vars(top_level_elem_vars);
+    let applier = ListNodeApplier::from_lists(applier_pattern, lists);
+    Rewrite::new(name.to_string(), searcher, applier).unwrap()
+}
+
 fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     let mut current = list_type.to_string();
     for i in list.into_iter().rev() {
@@ -733,11 +1252,16 @@ fn list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
     current
 }
 
-#[allow(unused)]
-fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>) -> String {
-    use itertools::Itertools;
-    let list = list.iter().join(" ");
-    format!("({list_type} {list})")
+fn flat_list_expr(list_type: impl Display, list: Vec<impl Display>, is_flat: bool) -> String {
+    if list.len() < 1 {
+        return list_type.to_string();
+    }
+    if !is_flat {
+        return list_expr(list_type, list);
+    }
+    let args_iter = list.iter().map(|arg| arg.to_string());
+    let args_list: String = Itertools::intersperse(args_iter, " ".to_string()).collect();
+    format!("({} {})", list_type, args_list)
 }
 
 fn udf_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
@@ -761,8 +1285,9 @@ fn udf_fun_expr_args_empty_tail() -> String {
     "ScalarUDFExprArgs".to_string()
 }
 
-fn fun_expr(fun_name: impl Display, args: Vec<impl Display>) -> String {
-    fun_expr_var_arg(fun_name, list_expr("ScalarFunctionExprArgs", args))
+fn fun_expr(fun_name: impl Display, args: Vec<impl Display>, is_flat: bool) -> String {
+    let arg_list = fun_expr_args(args, is_flat);
+    fun_expr_var_arg(fun_name, arg_list)
 }
 
 fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
@@ -774,12 +1299,24 @@ fn fun_expr_var_arg(fun_name: impl Display, arg_list: impl Display) -> String {
     format!("(ScalarFunctionExpr {}{} {})", prefix, fun_name, arg_list)
 }
 
-fn scalar_fun_expr_args(left: impl Display, right: impl Display) -> String {
+fn fun_expr_args(args: Vec<impl Display>, is_flat: bool) -> String {
+    flat_list_expr("ScalarFunctionExprArgs", args, is_flat)
+}
+
+fn fun_expr_args_legacy(left: impl Display, right: impl Display) -> String {
+    format!("(ScalarFunctionExprArgs {} {})", left, right)
+}
+
+fn fun_expr_args_empty_tail() -> String {
+    fun_expr_args(Vec::<String>::new(), true)
+}
+
+fn scalar_fun_expr_args_legacy(left: impl Display, right: impl Display) -> String {
     format!("(ScalarFunctionExprArgs {} {})", left, right)
 }
 
 fn scalar_fun_expr_args_empty_tail() -> String {
-    "ScalarFunctionExprArgs".to_string()
+    fun_expr_args_empty_tail()
 }
 
 fn agg_fun_expr(fun_name: impl Display, args: Vec<impl Display>, distinct: impl Display) -> String {
@@ -824,6 +1361,14 @@ fn limit(skip: impl Display, fetch: impl Display, input: impl Display) -> String
 
 fn window(input: impl Display, window_expr: impl Display) -> String {
     format!("(Window {} {})", input, window_expr)
+}
+
+fn window_window_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("WindowWindowExpr", exprs, true)
+}
+
+fn window_window_expr_empty_tail() -> String {
+    window_window_expr(Vec::<String>::new())
 }
 
 fn empty_relation(
@@ -878,44 +1423,40 @@ fn wrapped_select(
     )
 }
 
-#[allow(dead_code)]
-fn wrapped_select_projection_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectProjectionExpr {} {})", left, right)
+fn wrapped_select_projection_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectProjectionExpr", exprs, true)
 }
 
 fn wrapped_select_projection_expr_empty_tail() -> String {
-    "WrappedSelectProjectionExpr".to_string()
+    wrapped_select_projection_expr(Vec::<String>::new())
 }
 
 fn wrapped_select_subqueries_empty_tail() -> String {
     "WrappedSelectSubqueries".to_string()
 }
 
-#[allow(dead_code)]
-fn wrapped_select_group_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectGroupExpr {} {})", left, right)
+fn wrapped_select_group_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectGroupExpr", exprs, true)
 }
 
 fn wrapped_select_group_expr_empty_tail() -> String {
-    "WrappedSelectGroupExpr".to_string()
+    wrapped_select_group_expr(Vec::<String>::new())
 }
 
-#[allow(dead_code)]
-fn wrapped_select_aggr_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectAggrExpr {} {})", left, right)
+fn wrapped_select_aggr_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectAggrExpr", exprs, true)
 }
 
 fn wrapped_select_aggr_expr_empty_tail() -> String {
-    "WrappedSelectAggrExpr".to_string()
+    wrapped_select_aggr_expr(Vec::<String>::new())
 }
 
-#[allow(dead_code)]
-fn wrapped_select_window_expr(left: impl Display, right: impl Display) -> String {
-    format!("(WrappedSelectWindowExpr {} {})", left, right)
+fn wrapped_select_window_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("WrappedSelectWindowExpr", exprs, true)
 }
 
 fn wrapped_select_window_expr_empty_tail() -> String {
-    "WrappedSelectWindowExpr".to_string()
+    wrapped_select_window_expr(Vec::<String>::new())
 }
 
 #[allow(dead_code)]
@@ -964,20 +1505,36 @@ fn aggregate(
     format!("(Aggregate {} {} {} {})", input, group, aggr, split)
 }
 
-fn aggr_aggr_expr(left: impl Display, right: impl Display) -> String {
-    format!("(AggregateAggrExpr {} {})", left, right)
+fn aggr_group_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("AggregateGroupExpr", exprs, true)
 }
 
-fn aggr_aggr_expr_empty_tail() -> String {
-    format!("AggregateAggrExpr")
+fn aggr_group_expr_empty_tail() -> String {
+    aggr_group_expr(Vec::<String>::new())
 }
 
-fn aggr_group_expr(left: impl Display, right: impl Display) -> String {
+fn aggr_group_expr_legacy(left: impl Display, right: impl Display) -> String {
     format!("(AggregateGroupExpr {} {})", left, right)
 }
 
-fn projection_expr(left: impl Display, right: impl Display) -> String {
-    format!("(ProjectionExpr {} {})", left, right)
+fn aggr_aggr_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("AggregateAggrExpr", exprs, true)
+}
+
+fn aggr_aggr_expr_empty_tail() -> String {
+    aggr_aggr_expr(Vec::<String>::new())
+}
+
+fn grouping_set_expr(members: impl Display, expr_type: impl Display) -> String {
+    format!("(GroupingSetExpr {} {})", members, expr_type)
+}
+
+fn grouping_set_expr_members_empty_tail() -> String {
+    format!("GroupingSetExprMembers")
+}
+
+fn aggr_aggr_expr_legacy(left: impl Display, right: impl Display) -> String {
+    format!("(AggregateAggrExpr {} {})", left, right)
 }
 
 fn sort_exp(left: impl Display, right: impl Display) -> String {
@@ -992,16 +1549,8 @@ fn sort_expr(expr: impl Display, asc: impl Display, nulls_first: impl Display) -
     format!("(SortExpr {} {} {})", expr, asc, nulls_first)
 }
 
-fn aggr_group_expr_empty_tail() -> String {
-    format!("AggregateGroupExpr")
-}
-
-fn projection_expr_empty_tail() -> String {
-    format!("ProjectionExpr")
-}
-
-fn to_day_interval_expr<D: Display>(period: D, unit: D) -> String {
-    fun_expr("ToDayInterval", vec![period, unit])
+fn to_day_interval_expr<D: Display>(period: D, unit: D, is_flat: bool) -> String {
+    fun_expr("ToDayInterval", vec![period, unit], is_flat)
 }
 
 fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> String {
@@ -1015,6 +1564,10 @@ fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> Str
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
     format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn inlist_expr_list(exprs: Vec<impl Display>, is_flat: bool) -> String {
+    flat_list_expr("InListExprList", exprs, is_flat)
 }
 
 fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {
@@ -1157,6 +1710,18 @@ fn projection(
     split: impl Display,
 ) -> String {
     format!("(Projection {} {} {} {})", expr, input, alias, split)
+}
+
+fn projection_expr(exprs: Vec<impl Display>) -> String {
+    flat_list_expr("ProjectionExpr", exprs, true)
+}
+
+fn projection_expr_empty_tail() -> String {
+    projection_expr(Vec::<String>::new())
+}
+
+fn projection_expr_legacy(left: impl Display, right: impl Display) -> String {
+    format!("(ProjectionExpr {} {})", left, right)
 }
 
 fn sort(expr: impl Display, input: impl Display) -> String {
@@ -1550,78 +2115,24 @@ pub fn original_expr_name(
         })
 }
 
-fn search_match_chained<'a>(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    cur_match: SearchMatches<'a, LogicalPlanLanguage>,
-    chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
-) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-    let mut chain = chain.clone();
-    let mut matches_to_merge = Vec::new();
-    if let Some((var, pattern)) = chain.next() {
-        for subst in cur_match.substs.iter() {
-            if let Some(id) = subst.get(var.clone()) {
-                if let Some(next_match) = pattern.search_eclass(egraph, id.clone()) {
-                    let chain_matches = search_match_chained(
-                        egraph,
-                        SearchMatches {
-                            eclass: cur_match.eclass.clone(),
-                            substs: next_match
-                                .substs
-                                .iter()
-                                .map(|next_subst| {
-                                    let mut new_subst = subst.clone();
-                                    for pattern_var in pattern.vars().into_iter() {
-                                        if let Some(pattern_var_value) = next_subst.get(pattern_var)
-                                        {
-                                            new_subst
-                                                .insert(pattern_var, pattern_var_value.clone());
-                                        }
-                                    }
-                                    new_subst
-                                })
-                                .collect::<Vec<_>>(),
-                            // TODO merge
-                            ast: cur_match.ast.clone(),
-                        },
-                        chain.clone(),
-                    );
-                    matches_to_merge.extend(chain_matches);
-                }
-            }
-        }
-        if !matches_to_merge.is_empty() {
-            let mut substs = Vec::new();
-            for m in matches_to_merge {
-                substs.extend(m.substs.clone());
-            }
-            Some(SearchMatches {
-                eclass: cur_match.eclass.clone(),
-                substs,
-                // TODO merge
-                ast: cur_match.ast.clone(),
-            })
-        } else {
-            None
-        }
-    } else {
-        Some(cur_match)
-    }
-}
-
 pub struct ChainSearcher {
     main: Pattern<LogicalPlanLanguage>,
     chain: Vec<(Var, Pattern<LogicalPlanLanguage>)>,
 }
 
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
-    fn search(
+    fn search_eclasses_with_limit(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        eclasses: &mut dyn Iterator<Item = Id>,
+        limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
-        let matches = self.main.search(egraph);
+        let matches = self
+            .main
+            .search_eclasses_with_limit(egraph, eclasses, limit);
         let mut result = Vec::new();
         for m in matches {
-            if let Some(m) = self.search_match_chained(egraph, m, self.chain.iter()) {
+            if let Some(m) = self.search_match_chained(egraph, m) {
                 result.push(m);
             }
         }
@@ -1635,7 +2146,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
         if let Some(m) = self.main.search_eclass_with_limit(egraph, eclass, limit) {
-            self.search_match_chained(egraph, m, self.chain.iter())
+            self.search_match_chained(egraph, m)
         } else {
             None
         }
@@ -1654,10 +2165,31 @@ impl ChainSearcher {
     fn search_match_chained<'a>(
         &self,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cur_match: SearchMatches<'a, LogicalPlanLanguage>,
-        chain: Iter<(Var, Pattern<LogicalPlanLanguage>)>,
+        mut cur_match: SearchMatches<'a, LogicalPlanLanguage>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
-        search_match_chained(egraph, cur_match, chain)
+        let mut new_substs = vec![];
+        for (var, pattern) in &self.chain {
+            assert!(new_substs.is_empty());
+            for subst in &cur_match.substs {
+                let eclass = subst[*var];
+                pattern
+                    .search_eclass_with_fn(egraph, eclass, |chain_subst| {
+                        let mut subst = subst.clone();
+                        subst.extend(chain_subst.iter());
+                        new_substs.push(subst);
+                        Ok(())
+                    })
+                    .unwrap_or_default();
+            }
+            std::mem::swap(&mut new_substs, &mut cur_match.substs);
+            new_substs.clear();
+        }
+
+        if cur_match.substs.is_empty() {
+            None
+        } else {
+            Some(cur_match)
+        }
     }
 }
 
@@ -1725,4 +2257,21 @@ pub fn add_root_original_expr_alias(
     } else {
         false
     }
+}
+
+pub fn extract_exprlist_from_groupping_set(exprs: &Vec<Expr>) -> Vec<Expr> {
+    let mut result = Vec::new();
+    for expr in exprs {
+        match expr {
+            Expr::GroupingSet(groupping_set) => match groupping_set {
+                GroupingSet::Rollup(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::Cube(exprs) => result.extend(exprs.iter().cloned()),
+                GroupingSet::GroupingSets(sets) => {
+                    result.extend(sets.iter().flat_map(|s| s.iter().cloned()))
+                }
+            },
+            _ => result.push(expr.clone()),
+        }
+    }
+    result
 }

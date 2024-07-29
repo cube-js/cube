@@ -18,6 +18,8 @@ import type {
   Request as ExpressRequest,
   Response as ExpressResponse,
 } from 'express';
+import { createProxyMiddleware } from 'http-proxy-middleware';
+
 import {
   QueryType,
   ApiScopes,
@@ -49,7 +51,9 @@ import {
 } from './types/auth';
 import {
   Query,
-  NormalizedQuery, MemberExpression,
+  NormalizedQuery,
+  MemberExpression,
+  ParsedMemberExpression,
 } from './types/query';
 import {
   UserBackgroundContext,
@@ -76,7 +80,7 @@ import {
 } from './query';
 import { cachedHandler } from './cached-handler';
 import { createJWKsFetcher } from './jwk';
-import { SQLServer } from './sql-server';
+import { SQLServer, SQLServerConstructorOptions } from './sql-server';
 import { getJsonQueryFromGraphQLQuery, makeSchema } from './graphql';
 import { ConfigItem, prepareAnnotation } from './helpers/prepareAnnotation';
 import transformData from './helpers/transformData';
@@ -89,7 +93,13 @@ import {
   transformPreAggregations,
 } from './helpers/transformMetaExtended';
 
-const memberExpressionRegex = /^([a-zA-Z0-9_]+).([a-zA-Z0-9_]+):\(([a-zA-Z0-9_,]+)\):(.*)$/;
+type HandleErrorOptions = {
+    e: any,
+    res: ResponseResultFn,
+    context?: any,
+    query?: any,
+    requestStarted?: Date
+};
 
 function userAsyncHandler(handler: (req: Request & { context: ExtendedRequestContext }, res: ExpressResponse) => Promise<void>) {
   return (req: ExpressRequest, res: ExpressResponse, next: NextFunction) => {
@@ -138,7 +148,7 @@ class ApiGateway {
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
-  
+
   protected readonly contextRejectionMiddleware: ContextRejectionMiddlewareFn;
 
   protected readonly wsContextAcceptor: ContextAcceptorFn;
@@ -147,7 +157,10 @@ class ApiGateway {
 
   protected readonly playgroundAuthSecret?: string;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   protected readonly event: (name: string, props?: object) => void;
+
+  protected readonly sqlServer: SQLServer;
 
   public constructor(
     protected readonly apiSecret: string,
@@ -180,7 +193,20 @@ class ApiGateway {
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
     this.wsContextAcceptor = options.wsContextAcceptor || (() => ({ accepted: true }));
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    this.event = options.event || function () {};
+    this.event = options.event || function dummyEvent() {};
+    this.sqlServer = this.createSQLServerInstance({
+      gatewayPort: options.gatewayPort,
+    });
+  }
+
+  public getSQLServer(): SQLServer {
+    return this.sqlServer;
+  }
+
+  protected createSQLServerInstance(options: SQLServerConstructorOptions): SQLServer {
+    return new SQLServer(this, {
+      gatewayPort: options.gatewayPort,
+    });
   }
 
   public initApp(app: ExpressApplication) {
@@ -220,7 +246,7 @@ class ApiGateway {
         schema = makeSchema(metaConfig);
         compilerApi.setGraphQLSchema(schema);
       }
-      
+
       try {
         const jsonQuery = getJsonQueryFromGraphQLQuery(query, metaConfig, variables);
         res.json({ jsonQuery });
@@ -350,6 +376,25 @@ class ApiGateway {
       })
     );
 
+    app.post(
+      `${this.basePath}/v1/cubesql`,
+      userMiddlewares,
+      userAsyncHandler(async (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Transfer-Encoding', 'chunked');
+
+        try {
+          await this.sqlServer.execSql(req.body.query, res, req.context?.securityContext);
+        } catch (e: any) {
+          this.handleError({
+            e,
+            context: req.context,
+            res: this.resToResultFn(res)
+          });
+        }
+      })
+    );
+
     // Used by Rollup Designer
     app.post(
       `${this.basePath}/v1/pre-aggregations/can-use`,
@@ -470,11 +515,19 @@ class ApiGateway {
       }));
     }
 
-    app.use(this.handleErrorMiddleware);
-  }
+    if (getEnv('nativeApiGateway')) {
+      const proxyMiddleware = createProxyMiddleware<Request, Response>({
+        target: `http://127.0.0.1:${this.sqlServer.getNativeGatewayPort()}/v2`,
+        changeOrigin: true,
+      });
 
-  public initSQLServer() {
-    return new SQLServer(this);
+      app.use(
+        `${this.basePath}/v2`,
+        proxyMiddleware as any
+      );
+    }
+
+    app.use(this.handleErrorMiddleware);
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
@@ -498,7 +551,7 @@ class ApiGateway {
         ...this.parseQueryParam(queryingOptions || {}),
         throwErrors: true
       }));
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -552,10 +605,11 @@ class ApiGateway {
         response.compilerId = metaConfig.compilerId;
       }
       res(response);
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e,
         context,
+        // @ts-ignore
         res,
         requestStarted,
       });
@@ -590,7 +644,7 @@ class ApiGateway {
           preAggregations: transformPreAggregations(cubeDefinitions[cube.name]?.preAggregations),
         }));
       res({ cubes });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e,
         context,
@@ -621,7 +675,7 @@ class ApiGateway {
         );
 
       res({ preAggregations: preAggregationPartitions.map(({ preAggregation }) => preAggregation) });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -683,7 +737,7 @@ class ApiGateway {
       res({
         preAggregationPartitions: preAggregationPartitions.map(mergePartitionsAndVersionEntries())
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -717,7 +771,7 @@ class ApiGateway {
           preAggregationPartition
         )
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -737,7 +791,7 @@ class ApiGateway {
         );
 
       res({ result });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -787,7 +841,7 @@ class ApiGateway {
    */
   private async preAggregationsJobs(req: Request, res: ExpressResponse) {
     const response = this.resToResultFn(res);
-    const started = new Date();
+    const requestStarted = new Date();
     const context = <RequestContext>req.context;
     const query = <PreAggsJobsRequest>req.body;
     let result;
@@ -853,8 +907,8 @@ class ApiGateway {
         source: req.header('source') || 'unknown',
       });
       response(result, { status: 200 });
-    } catch (e) {
-      this.handleError({ e, context, query, res: response, started });
+    } catch (e: any) {
+      this.handleError({ e, context, query, res: response, requestStarted });
     }
   }
 
@@ -1107,7 +1161,7 @@ class ApiGateway {
       res({
         result: await orchestratorApi.getPreAggregationQueueStates()
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1124,7 +1178,7 @@ class ApiGateway {
       res({
         result: await orchestratorApi.cancelPreAggregationQueriesFromQueue(queryKeys, dataSource)
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1136,11 +1190,12 @@ class ApiGateway {
    * an array of query type and array of normalized queries.
    */
   protected async getNormalizedQueries(
-    query: Record<string, any> | Record<string, any>[],
+    inputQuery: Record<string, any> | Record<string, any>[],
     context: RequestContext,
     persistent = false,
+    memberExpressions: boolean = false,
   ): Promise<[QueryType, NormalizedQuery[]]> {
-    query = this.parseQueryParam(query);
+    let query = this.parseQueryParam(inputQuery);
 
     let queryType: QueryType = QueryTypeEnum.REGULAR_QUERY;
     if (!Array.isArray(query)) {
@@ -1152,7 +1207,7 @@ class ApiGateway {
       queryType = QueryTypeEnum.BLENDING_QUERY;
     }
 
-    const queries = Array.isArray(query) ? query : [query];
+    const queries: Query[] = Array.isArray(query) ? query : [query];
 
     this.log({
       type: 'Query Rewrite',
@@ -1164,13 +1219,28 @@ class ApiGateway {
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
         async (currentQuery) => {
+          const hasExpressionsInQuery = this.hasExpressionsInQuery(currentQuery);
+
+          if (hasExpressionsInQuery) {
+            if (!memberExpressions) {
+              throw new Error('Expressions are not allowed in this context');
+            }
+
+            currentQuery = this.parseMemberExpressionsInQuery(currentQuery);
+          }
+
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          const rewrite = await this.queryRewrite(
+          let rewrittenQuery = await this.queryRewrite(
             normalizedQuery,
             context,
           );
+
+          if (hasExpressionsInQuery) {
+            rewrittenQuery = this.evalMemberExpressionsInQuery(rewrittenQuery);
+          }
+
           return normalizeQuery(
-            rewrite,
+            rewrittenQuery,
             persistent,
           );
         }
@@ -1220,13 +1290,8 @@ class ApiGateway {
     try {
       await this.assertApiScope('data', context.securityContext);
 
-      query = this.parseQueryParam(query);
-
-      if (memberExpressions) {
-        query = this.parseMemberExpressionsInQueries(query);
-      }
-
-      const [queryType, normalizedQueries] = await this.getNormalizedQueries(query, context, disableLimitEnforcing);
+      const [queryType, normalizedQueries] =
+        await this.getNormalizedQueries(query, context, disableLimitEnforcing, memberExpressions);
 
       const sqlQueries = await Promise.all<any>(
         normalizedQueries.map(async (normalizedQuery) => (await this.getCompilerApi(context)).getSql(
@@ -1246,19 +1311,17 @@ class ApiGateway {
       res(queryType === QueryTypeEnum.REGULAR_QUERY ?
         { sql: toQuery(sqlQueries[0]) } :
         sqlQueries.map((sqlQuery) => ({ sql: toQuery(sqlQuery) })));
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
     }
   }
 
-  private parseMemberExpressionsInQueries(query: Record<string, any> | Record<string, any>[]): Query | Query[] {
-    if (Array.isArray(query)) {
-      return query.map(q => this.parseMemberExpressionsInQuery(<Query>q));
-    } else {
-      return this.parseMemberExpressionsInQuery(<Query>query);
-    }
+  private hasExpressionsInQuery(query: Query): boolean {
+    const arraysToCheck = [query.measures, query.dimensions, query.segments];
+
+    return arraysToCheck.some(array => array?.some(item => typeof item === 'string' && item.startsWith('{')));
   }
 
   private parseMemberExpressionsInQuery(query: Query): Query {
@@ -1270,18 +1333,26 @@ class ApiGateway {
     };
   }
 
-  private parseMemberExpression(memberExpression: string): string | MemberExpression {
+  private parseMemberExpression(memberExpression: string): string | ParsedMemberExpression {
     try {
       if (memberExpression.startsWith('{')) {
         const obj = JSON.parse(memberExpression);
         const args = obj.cube_params;
         args.push(`return \`${obj.expr}\``);
+
+        const groupingSet = obj.grouping_set ? {
+          groupType: obj.grouping_set.group_type,
+          id: obj.grouping_set.id,
+          subId: obj.grouping_set.sub_id ? obj.grouping_set.sub_id : undefined
+        } : undefined;
+
         return {
           cubeName: obj.cube_name,
           name: obj.alias,
           expressionName: obj.alias,
-          expression: Function.constructor.apply(null, args),
+          expression: args,
           definition: memberExpression,
+          groupingSet,
         };
       } else {
         return memberExpression;
@@ -1289,6 +1360,25 @@ class ApiGateway {
     } catch {
       return memberExpression;
     }
+  }
+
+  private evalMemberExpressionsInQuery(query: Query): Query {
+    return {
+      ...query,
+      measures: (query.measures || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+      dimensions: (query.dimensions || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+      segments: (query.segments || []).map(m => (typeof m !== 'string' ? this.evalMemberExpression(m as ParsedMemberExpression) : m)),
+    };
+  }
+
+  private evalMemberExpression(memberExpression: MemberExpression | ParsedMemberExpression): string | MemberExpression {
+    const expression = Array.isArray(memberExpression.expression) ?
+      Function.constructor.apply(null, memberExpression.expression) : memberExpression.expression;
+
+    return {
+      ...memberExpression,
+      expression,
+    };
   }
 
   public async sqlGenerators({ context, res }: { context: RequestContext, res: ResponseResultFn }) {
@@ -1308,7 +1398,7 @@ class ApiGateway {
       )).reduce((a, b) => ({ ...a, ...b }), {});
 
       res({ cubeNameToDataSource, dataSourceToSqlGenerator });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, res, requestStarted
       });
@@ -1398,7 +1488,7 @@ class ApiGateway {
         transformedQueries: sqlQueries.map((sqlQuery) => sqlQuery.canUseTransformedQuery),
         pivotQuery: getPivotQuery(queryType, normalizedQueries)
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1640,8 +1730,7 @@ class ApiGateway {
 
       metaConfigResult = this.filterVisibleItemsInMeta(context, metaConfigResult);
 
-      const sqlQueries = await this
-        .getSqlQueriesInternal(context, normalizedQueries);
+      const sqlQueries = await this.getSqlQueriesInternal(context, normalizedQueries);
 
       let slowQuery = false;
 
@@ -1716,7 +1805,7 @@ class ApiGateway {
       } else {
         res(results[0]);
       }
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1728,7 +1817,6 @@ class ApiGateway {
     const {
       context,
       res,
-      apiType = 'sql',
     } = request;
     const requestStarted = new Date();
 
@@ -1738,14 +1826,12 @@ class ApiGateway {
       query = this.parseQueryParam(request.query);
       let resType: ResultType = ResultType.DEFAULT;
 
-      query = this.parseMemberExpressionsInQueries(query);
-
       if (!Array.isArray(query) && query.responseFormat) {
         resType = query.responseFormat;
       }
 
       const [queryType, normalizedQueries] =
-        await this.getNormalizedQueries(query, context, request.streaming);
+        await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
 
       const compilerApi = await this.getCompilerApi(context);
       let metaConfigResult = await compilerApi.metaConfig({
@@ -1849,7 +1935,7 @@ class ApiGateway {
       res(request.streaming ? results[0] : {
         results,
       });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1910,7 +1996,7 @@ class ApiGateway {
         res(error.message, error.opts);
       }
       await subscribe({ error, result });
-    } catch (e) {
+    } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted
       });
@@ -1958,12 +2044,12 @@ class ApiGateway {
     };
   }
 
-  protected handleErrorMiddleware: ErrorRequestHandler = async (e, req, res, next) => {
+  protected handleErrorMiddleware: ErrorRequestHandler = async (e, req: Request, res, next) => {
     this.handleError({
       e,
       context: (<any>req).context,
       res: this.resToResultFn(res),
-      requestStarted: new Date(),
+      requestStarted: req.requestStarted || new Date(),
     });
 
     next(e);
@@ -1971,11 +2057,11 @@ class ApiGateway {
 
   public handleError({
     e, context, query, res, requestStarted
-  }: any) {
+  }: HandleErrorOptions) {
     const requestId = getEnv('devMode') || context?.signedWithPlaygroundAuthSecret ? context?.requestId : undefined;
-    
+
     const plainError = e.plainMessages;
-    
+
     if (e instanceof CubejsHandlerError) {
       this.log({
         type: e.type,
@@ -2301,7 +2387,7 @@ class ApiGateway {
           token,
           error: error.stack || error.toString()
         }, <any>req);
-        
+
         res.status(e.status).json({ error: e.message });
       } else if (e instanceof Error) {
         this.log({
@@ -2325,14 +2411,15 @@ class ApiGateway {
   protected checkAuthSystemMiddleware: RequestHandler = async (req, res, next) => {
     await this.checkAuthWrapper(this.checkAuthSystemFn, req, res, next);
   };
-  
+
   protected requestContextMiddleware: RequestHandler = async (req: Request, res: ExpressResponse, next: NextFunction) => {
     try {
       req.context = await this.contextByReq(req, req.securityContext, getRequestIdFromRequest(req));
+      req.requestStarted = new Date();
       if (next) {
         next();
       }
-    } catch (e) {
+    } catch (e: any) {
       if (next) {
         next(e);
       } else {

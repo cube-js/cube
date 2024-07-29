@@ -1,5 +1,35 @@
 [
   {
+    "source": "/product/monitoring/integrations/cloudwatch",
+    "destination": "/product/workspace/monitoring/cloudwatch",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/s3",
+    "destination": "/product/workspace/monitoring/s3",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/datadog",
+    "destination": "/product/workspace/monitoring/datadog",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations/grafana-cloud",
+    "destination": "/product/workspace/monitoring/grafana-cloud",
+    "permanent": true
+  },
+  {
+    "source": "/product/monitoring/integrations",
+    "destination": "/product/workspace/monitoring",
+    "permanent": true
+  },
+  {
+    "source": "/product/data-modeling/concepts/subquery-dimensions",
+    "destination": "/product/data-modeling/concepts/calculated-members#subquery-dimensions",
+    "permanent": true
+  },
+  {
     "source": "/product/data-modeling/fundamentals/additional-concepts",
     "destination": "/product/data-modeling/concepts/subquery-dimensions",
     "permanent": true

@@ -91,7 +91,15 @@ cubes involved in the query.
 - If multiple cubes are referenced in the query, the pre-aggregation should
 include only members of these cubes.
 
-## Common pitfalls
+## Troubleshooting
+
+If you're not sure why a query does not match a pre-aggregation, try to identify
+the part of the query that prevents it from matching. You can do that by
+removing measures, dimensions, filters, etc. from your query until it matches.
+Then, refer to the [matching algorithm](#matching-algorithm) and [common
+pitfalls](#common-pitfalls) to understand why that part was an issue.
+
+### Common pitfalls
 
 - Most commonly, a query would not match a pre-aggregation because they contain
 [non-additive measures][ref-measure-additivity]. See [this
@@ -114,5 +122,5 @@ configuration option.
 [ref-non-strict-date-range-match]: /reference/data-model/pre-aggregations#allow_non_strict_date_range_match
 [ref-non-additive-recipe]: /guides/recipes/query-acceleration/non-additivity
 [ref-conf-scheduled-refresh-time-zones]: /reference/configuration/config#scheduled_refresh_time_zones
-[ref-ungrouped-queries]: /product/data-modeling/queries#ungrouped-query
+[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-primary-key]: /reference/data-model/dimensions#primary_key

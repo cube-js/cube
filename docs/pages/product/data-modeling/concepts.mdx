@@ -89,8 +89,16 @@ designed to accelerate queries to cubes.
 
 Note that cubes support [extension][ref-extending-cubes],
 [polymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
-Also, cubes may not only be defined statically; you can actually build
+Also, cubes should not necessarily be defined statically; you can actually build
 [dynamic data models][ref-dynamic-data-models].
+
+<InfoBox>
+
+Cube supports data models that consist of thousands of cubes and views.
+For massive [multi-tenancy][ref-multitenancy] configurations, e.g., with more than
+1,000 tenants, consider using a [multi-cluster deployment][ref-pmc].
+
+</InfoBox>
 
 ## Views
 
@@ -270,9 +278,13 @@ cubes:
 
 </CodeTabs>
 
-Dimensions can have [different types][ref-schema-dimension-types]. Also,
-[subquery dimensions][ref-subquery-dimensions] can be used to join cubes
+Also, [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
 implicitly.
+
+### Dimension types
+
+Dimensions can be of different types. See the [dimension type
+reference][ref-schema-dimension-types] for details.
 
 Time-based properties should be modeled as dimensions of the `time` type.
 Time dimensions allow grouping the result set by a unit of time (e.g. hours,
@@ -697,7 +709,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
-[ref-subquery-dimensions]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery-dimensions]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
 [self-dimensions]: #dimensions
 [self-measures]: #measures
@@ -707,3 +719,5 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-syntax-references]: /product/data-modeling/syntax#references
 [ref-syntax-references-column]: /product/data-modeling/syntax#column
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster

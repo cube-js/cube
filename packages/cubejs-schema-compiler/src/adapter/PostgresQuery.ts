@@ -51,6 +51,8 @@ export class PostgresQuery extends BaseQuery {
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.NOW = 'NOW({{ args_concat }})';
     // DATEADD is being rewritten to DATE_ADD
     // templates.functions.DATEADD = '({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)';

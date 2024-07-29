@@ -857,7 +857,15 @@ impl LocationHelper {
     ) -> Result<Option<u64>, CubeError> {
         let res = if location.starts_with("http") {
             let client = reqwest::Client::new();
+
             let res = client.head(location).send().await?;
+            if !res.status().is_success() {
+                return Err(CubeError::user(format!(
+                    "Unable to import from http location, status code: {}",
+                    res.status()
+                )));
+            }
+
             let length = res.headers().get(reqwest::header::CONTENT_LENGTH);
 
             if let Some(length) = length {

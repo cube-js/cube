@@ -125,10 +125,12 @@ export class PostgresDBRunner extends BaseDbRunner {
   async containerLazyInit() {
     const version = process.env.TEST_PGSQL_VERSION || '9.6.8';
 
-    return new GenericContainer('postgres', version)
-      .withEnv('POSTGRES_USER', 'root')
-      .withEnv('POSTGRES_DB', 'model_test')
-      .withEnv('POSTGRES_PASSWORD', this.password())
+    return new GenericContainer(`postgres:${version}`)
+      .withEnvironment({
+        POSTGRES_USER: 'root',
+        POSTGRES_DB: 'model_test',
+        POSTGRES_PASSWORD: this.password(),
+      })
       .withExposedPorts(this.port())
       // .withHealthCheck({
       //   test: 'pg_isready -U root -d model_test',
