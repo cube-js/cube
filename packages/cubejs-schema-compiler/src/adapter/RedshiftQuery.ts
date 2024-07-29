@@ -13,7 +13,7 @@ export class RedshiftQuery extends PostgresQuery {
   }
 
   public hllInit(sql) {
-    return `HLL_CREATE_SKETCH(${sql})`;
+    return `HLL(${sql})`;
   }
 
   public hllMerge(sql) {
