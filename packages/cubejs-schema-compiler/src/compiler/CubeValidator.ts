@@ -102,6 +102,15 @@ const BaseDimensionWithoutSubQuery = {
     })
   ]),
   meta: Joi.any(),
+  granularities: Joi.when('type', {
+    is: 'time',
+    then: Joi.object().pattern(identifierRegex,
+      Joi.object().keys({
+        sql: Joi.func().required(),
+        baseGranularity: Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').optional(),
+      })).optional(),
+    otherwise: Joi.forbidden()
+  })
 };
 
 const BaseDimension = Object.assign({
@@ -116,7 +125,8 @@ const FixedRollingWindow = {
   offset: Joi.any().valid('start', 'end')
 };
 
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
+// const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
+const GranularitySchema = Joi.string().required(); // To support custom granularities
 
 const YearToDate = {
   type: Joi.string().valid('year_to_date'),
@@ -201,7 +211,7 @@ const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
   Joi.object().keys({
     sql: Joi.func().required(),
-    // We dont support timezone for this, because it's useless
+    // We don't support timezone for this, because it's useless
     // We cannot support cron interval
     every: everyInterval,
   }),
