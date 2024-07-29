@@ -231,7 +231,7 @@ jobs:
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -307,7 +307,7 @@ jobs:
           key: target-${{ matrix.target }}
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
