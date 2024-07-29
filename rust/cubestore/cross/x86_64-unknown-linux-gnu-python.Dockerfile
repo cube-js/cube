@@ -4,8 +4,8 @@ ARG PYTHON_VERSION
 ARG PYTHON_RELEASE
 
 RUN cd tmp && wget https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz -O - | tar -xz \
-    && cd Python-${PYTHON_VERSION} && \
-    ./configure  \
+    && cd Python-${PYTHON_VERSION} \
+    && ./configure  \
       --enable-shared \
       --with-openssl=/openssl \
       --enable-optimizations \
