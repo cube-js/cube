@@ -383,7 +383,7 @@ export class BaseQuery {
   }
 
   defaultOrder() {
-    if (this.options.preAggregationQuery) {
+    if (this.options.preAggregationQuery || this.options.totalQuery) {
       return [];
     }
 
