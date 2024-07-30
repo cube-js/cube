@@ -317,7 +317,7 @@ crate::di_service!(KafkaClientServiceImpl, [KafkaClientService]);
 
 pub fn parse_vrl_payload_and_key(
     columns: &Vec<Column>,
-    unique_key_columns: &Vec<Column>,
+    _unique_key_columns: &Vec<Column>,
     payload: Value,
 ) -> Result<Option<Vec<TableValue>>, CubeError> {
     match payload {
@@ -325,7 +325,7 @@ pub fn parse_vrl_payload_and_key(
             let r = columns
                 .iter()
                 .map(|col| {
-                    let mut field_value = obj.get(&KeyString::from(col.get_name().clone()));
+                    let field_value = obj.get(&KeyString::from(col.get_name().clone()));
                     /* if field_value.is_none() {
                         if unique_key_columns.iter().any(|c| c.get_name() == col.get_name()) {
                             field_value = match key {
@@ -400,7 +400,7 @@ pub fn parse_vrl_value(column: &Column, value: &Value) -> Result<TableValue, Cub
                 x
             ))),
         },
-        ColumnType::Decimal { scale, .. } => match value {
+        ColumnType::Decimal {  .. } => match value {
             _ => Err(CubeError::internal(format!(
                 "ksql source decimal import isn't supported"
             ))),

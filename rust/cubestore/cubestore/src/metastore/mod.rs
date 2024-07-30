@@ -5145,6 +5145,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 false,
             )
             .await
@@ -5159,6 +5160,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
                 None,
@@ -5292,6 +5294,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -5308,6 +5311,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -5408,6 +5412,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -5494,6 +5499,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
@@ -5566,6 +5572,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col2".to_string(), "col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -5592,6 +5599,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col1".to_string()]),
                     None,
                     None,
@@ -5610,6 +5618,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -6106,6 +6115,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        None,
                         false,
                     )
                     .await
@@ -6328,6 +6338,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -6460,6 +6471,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
