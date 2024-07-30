@@ -46,6 +46,8 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
   return TIME_SERIES[granularity](range, options.timestampPrecision);
 };
 
+export const isPredefinedGranularity = (granularity: string): boolean => !!TIME_SERIES[granularity];
+
 export const FROM_PARTITION_RANGE = '__FROM_PARTITION_RANGE';
 
 export const TO_PARTITION_RANGE = '__TO_PARTITION_RANGE';
