@@ -849,6 +849,7 @@ pub trait MetaStore: DIService + Send + Sync {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        vrl: Option<String>,
         source_coulumns: Option<Vec<Column>>,
         stream_offset: Option<StreamOffset>,
         unique_key_column_names: Option<Vec<String>>,
@@ -2080,6 +2081,7 @@ impl MetaStore for RocksMetaStore {
         build_range_end: Option<DateTime<Utc>>,
         seal_at: Option<DateTime<Utc>>,
         select_statement: Option<String>,
+        vrl: Option<String>,
         source_coulumns: Option<Vec<Column>>,
         stream_offset: Option<StreamOffset>,
         unique_key_column_names: Option<Vec<String>>,
@@ -2183,6 +2185,7 @@ impl MetaStore for RocksMetaStore {
                 build_range_end,
                 seal_at,
                 select_statement,
+                vrl,
                 source_coulumns,
                 stream_offset,
                 unique_key_column_indices,
@@ -5142,6 +5145,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
                 false,
             )
             .await
@@ -5156,6 +5160,7 @@ mod tests {
                 None,
                 vec![],
                 true,
+                None,
                 None,
                 None,
                 None,
@@ -5289,6 +5294,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -5305,6 +5311,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -5405,6 +5412,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -5491,6 +5499,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
                         ("max".to_string(), "aggr_col1".to_string()),
@@ -5563,6 +5572,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col2".to_string(), "col1".to_string()]),
                     Some(vec![
                         ("sum".to_string(), "aggr_col2".to_string()),
@@ -5589,6 +5599,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     Some(vec!["col1".to_string()]),
                     None,
                     None,
@@ -5607,6 +5618,7 @@ mod tests {
                     None,
                     vec![aggr_index_def.clone()],
                     true,
+                    None,
                     None,
                     None,
                     None,
@@ -6103,6 +6115,7 @@ mod tests {
                         None,
                         None,
                         None,
+                        None,
                         false,
                     )
                     .await
@@ -6325,6 +6338,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     false,
                 )
                 .await
@@ -6457,6 +6471,7 @@ mod tests {
                     None,
                     vec![],
                     true,
+                    None,
                     None,
                     None,
                     None,

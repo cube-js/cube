@@ -291,6 +291,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     None,
                     None,
                     None,
+                    None,
                     Vec::new(),
                     None,
                     None,

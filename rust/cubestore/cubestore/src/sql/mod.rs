@@ -786,6 +786,18 @@ impl SqlService for SqlServiceImpl {
                             option.value
                         ))),
                     })?;
+                let vrl = with_options
+                    .iter()
+                    .find(|&opt| opt.name.value == "vrl")
+                    .map_or(Result::Ok(None), |option| match &option.value {
+                        Value::SingleQuotedString(select_statement) => {
+                            Result::Ok(Some(select_statement.clone()))
+                        }
+                        _ => Result::Err(CubeError::user(format!(
+                            "Bad select_statement {}",
+                            option.value
+                        ))),
+                    })?;
                 let source_table = with_options
                     .iter()
                     .find(|&opt| opt.name.value == "source_table")
@@ -825,6 +837,7 @@ impl SqlService for SqlServiceImpl {
                         build_range_end,
                         seal_at,
                         select_statement,
+                        vrl,
                         source_table,
                         stream_offset,
                         indexes,
@@ -1857,6 +1870,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -1961,6 +1975,7 @@ mod tests {
                 TableValue::String("2022-10-05 01:00:00 UTC".to_string()),
                 TableValue::String("false".to_string()),
                 TableValue::String("SELECT * FROM test WHERE created_at > '2022-05-01 00:00:00'".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -4261,7 +4276,7 @@ mod tests {
                         sum(value) value
                         from (
                             select * from test.test
-                            union all 
+                            union all
                             select * from test.test1
                             )
                         group by 1, 2

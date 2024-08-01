@@ -98,6 +98,7 @@ impl MetaStore for MetaStoreMock {
         _build_range_end: Option<DateTime<Utc>>,
         _seal_at: Option<DateTime<Utc>>,
         _select_statement: Option<String>,
+        _vrl: Option<String>,
         _source_columns: Option<Vec<Column>>,
         _stream_offset: Option<StreamOffset>,
         _unique_key_column_names: Option<Vec<String>>,
