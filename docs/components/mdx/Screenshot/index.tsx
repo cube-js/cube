@@ -34,6 +34,7 @@ const ScreenshotHighlight = ({ highlight, src }: ScreenshotProps) => (
 // always convert it to WEBP
 function getOptimizedLink(url: string): string {
   if (url.startsWith('https://ucarecdn.com/')) {
+    url = url.substring(0, url.lastIndexOf('/') + 1)
     return `${url}-/format/webp/`
   }
   
