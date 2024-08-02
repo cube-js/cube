@@ -134,6 +134,40 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_coalesce_two_dimensions() {
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            SELECT COALESCE(dim_str0, dim_str1, '(none)')
+            FROM MultiTypeCube
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "MultiTypeCube.dim_str0".to_string(),
+                    "MultiTypeCube.dim_str1".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_number() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(someNumber) as s1, SUM(someNumber) as s2, MIN(someNumber) as s3, MAX(someNumber) as s4, COUNT(someNumber) as s5 FROM NumberCube".to_string(),
@@ -15072,7 +15106,7 @@ ORDER BY "source"."str0" ASC
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN taxful_total_price IS NULL THEN NULL WHEN taxful_total_price < taxful_total_price * 2 THEN COALESCE(taxful_total_price, 0, 0) END FROM KibanaSampleDataEcommerce GROUP BY 1"
+            "SELECT CASE WHEN taxful_total_price IS NULL THEN NULL WHEN taxful_total_price < taxful_total_price * 2 THEN COALESCE(taxful_total_price, 0, 0) END, AVG(avgPrice) FROM KibanaSampleDataEcommerce GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -15122,7 +15156,7 @@ ORDER BY "source"."str0" ASC
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan_customized(
-            "SELECT CASE WHEN customer_gender = '\\`' THEN COALESCE(customer_gender, 'N/A', 'NN') ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
+            "SELECT CASE WHEN customer_gender = '\\`' THEN COALESCE(customer_gender, 'N/A', 'NN') ELSE 'N/A' END as \"\\`\", AVG(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
             vec![
                 ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
