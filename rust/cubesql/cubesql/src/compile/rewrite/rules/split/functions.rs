@@ -22,12 +22,22 @@ impl SplitRules {
             rules,
         );
 
-        self.scalar_fn_args_pass_through_rules("Trunc", false, rules);
-        self.scalar_fn_args_pass_through_rules("Lower", false, rules);
-        self.scalar_fn_args_pass_through_rules("Upper", false, rules);
-        self.scalar_fn_args_pass_through_rules("Ceil", false, rules);
-        self.scalar_fn_args_pass_through_rules("Floor", false, rules);
-        self.scalar_fn_args_pass_through_rules("CharacterLength", false, rules);
+        let fns = [
+            ("Trunc", false),
+            ("Lower", false),
+            ("Upper", false),
+            ("Ceil", false),
+            ("Floor", false),
+            ("CharacterLength", false),
+            ("Substr", false),
+            ("Lpad", false),
+            ("Rpad", false),
+        ];
+
+        for (fn_name, with_projection) in fns {
+            self.scalar_fn_args_pass_through_rules(fn_name, with_projection, rules);
+        }
+
         // TODO udf function have different list type for args, accomodate it
         self.single_arg_pass_through_rules(
             "to-char",
@@ -35,9 +45,6 @@ impl SplitRules {
             false,
             rules,
         );
-        self.scalar_fn_args_pass_through_rules("Substr", false, rules);
-        self.scalar_fn_args_pass_through_rules("Lpad", false, rules);
-        self.scalar_fn_args_pass_through_rules("Rpad", false, rules);
         self.single_arg_pass_through_rules("is-null", |expr| is_null_expr(expr), false, rules);
         self.single_arg_pass_through_rules(
             "is-not-null",
