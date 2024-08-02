@@ -53,30 +53,29 @@ impl SplitRules {
             rules,
         );
         // coalesce, nullif, left and right are a bit harder, variadic rule breaks some tests
-        // And projection split seems wrong here
         // TODO Support them properly
         self.single_arg_pass_through_rules(
             "coalesce-constant",
             |expr| self.fun_expr("Coalesce", vec![expr, literal_expr("?literal")]),
-            true,
+            false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "nullif-constant",
             |expr| self.fun_expr("NullIf", vec![expr, literal_expr("?literal")]),
-            true,
+            false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "left-constant",
             |expr| self.fun_expr("Left", vec![expr, literal_expr("?literal")]),
-            true,
+            false,
             rules,
         );
         self.single_arg_pass_through_rules(
             "right-constant",
             |expr| self.fun_expr("Right", vec![expr, literal_expr("?literal")]),
-            true,
+            false,
             rules,
         );
         self.single_arg_pass_through_rules("negative", |expr| negative_expr(expr), true, rules);

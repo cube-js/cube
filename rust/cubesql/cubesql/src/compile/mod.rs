@@ -15413,6 +15413,78 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_noninjective_call_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // Expected scan is same for every query
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan.clone(),
+                simple_load_response(vec![
+                    json!({"MultiTypeCube.dim_str0": "foo"}),
+                    json!({"MultiTypeCube.dim_str0": null}),
+                    json!({"MultiTypeCube.dim_str0": "(none)"}),
+                    json!({"MultiTypeCube.dim_str0": "abcd"}),
+                    json!({"MultiTypeCube.dim_str0": "ab__cd"}),
+                ]),
+            )
+            .await;
+
+        let exprs = [
+            ("coalesce", "COALESCE(dim_str0, '(none)')"),
+            ("nullif", "NULLIF(dim_str0, '(none)')"),
+            ("left", "LEFT(dim_str0, 2)"),
+            ("right", "RIGHT(dim_str0, 2)"),
+        ];
+
+        for (name, expr) in exprs {
+            // language=PostgreSQL
+            let query = format!(
+                r#"
+                SELECT {expr} AS result
+                FROM MultiTypeCube
+                GROUP BY 1
+                ORDER BY result
+            "#
+            );
+
+            assert_eq!(
+                context
+                    .convert_sql_to_cube_query(&query)
+                    .await
+                    .unwrap()
+                    .as_logical_plan()
+                    .find_cube_scan()
+                    .request,
+                expected_cube_scan
+            );
+
+            // Expect no dublicates in result set
+            insta::assert_snapshot!(
+                format!("noninjective_{name}_from_dimension"),
+                context.execute_query(query).await.unwrap()
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_wrapper_tableau_sunday_week() {
         if !Rewriter::sql_push_down_enabled() {
             return;
