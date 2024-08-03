@@ -5,43 +5,35 @@ redirect_from:
 
 # Deepnote
 
-You can connect to Cube from Deepnote, a new kind of data notebook that's built
-for collaboration and is Jupyter compatible, using the [Cube SQL
-API][ref-sql-api].
+Deepnote is a data notebook that is built for collaboration and is Jupyter compatible.
 
 Here's a short video guide on how to connect Deepnote to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/d00eed9dd37b476e8928126d010b3dfc" />
 
-## Enable Cube SQL API
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Deepnote</Btn> to get
+detailed instructions.
 
-Click **Deploy SQL API** and then the **How to connect your BI tool** link on
-the Overview page of your Cube deployment. Navigate to the **BIs and
-Visualization Tools** tab. You should see the screen like the one below with
-your connection credentials:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/78a4b90c-da5a-4d1f-9775-59ce6e7baad0/" />
+You can connect a Cube deployment to Deepnote using the [SQL API][ref-sql-api].
 
-### Self-hosted Cube
-
-You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from Deepnote later.
-
-```dotenv
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Deepnote.
 
 ## Connecting from Deepnote
 
 Deepnote connects to Cube as to a Postgres database.
 
+### Creating a connection
+
 <Screenshot src="https://ucarecdn.com/7e11daae-f956-47ed-8183-7805a6e7757c/" />
 
-## Querying data
+### Querying data
 
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.
