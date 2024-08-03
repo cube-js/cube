@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/workspace/semantic-layer-sync",
+    "destination": "/product/apis-integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
     "source": "/product/monitoring/integrations/cloudwatch",
     "destination": "/product/workspace/monitoring/cloudwatch",
     "permanent": true
