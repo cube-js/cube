@@ -13,7 +13,9 @@ export class BaseTimeDimension extends BaseFilter {
 
   public readonly isPredefined: boolean;
 
-  public readonly baseGranularity: string;
+  public readonly baseGranularity: string | undefined;
+
+  public readonly granularitySql: Function | undefined;
 
   public readonly boundaryDateRange: any;
 
@@ -31,9 +33,14 @@ export class BaseTimeDimension extends BaseFilter {
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
     this.isPredefined = isPredefinedGranularity(this.granularity);
-    this.baseGranularity = this.query.cubeEvaluator
-      .byPath('dimensions', timeDimension.dimension)
-      .granularities?.[this.granularity]?.baseGranularity;
+    if (!this.isPredefined) {
+      const customGranularity = this.query.cubeEvaluator
+        .byPath('dimensions', timeDimension.dimension)
+        .granularities?.[this.granularity];
+
+      this.baseGranularity = customGranularity?.baseGranularity;
+      this.granularitySql = customGranularity?.sql;
+    }
     this.boundaryDateRange = timeDimension.boundaryDateRange;
     this.shiftInterval = timeDimension.shiftInterval;
   }
@@ -95,12 +102,22 @@ export class BaseTimeDimension extends BaseFilter {
       if (context.rollupGranularity === this.granularity) {
         return super.dimensionSql();
       }
-      return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
+      if (this.isPredefined || !this.granularity) {
+        return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
+      } else {
+        return this.query.dimensionGranularitySql(this);
+      }
     }
+
     if (context.ungrouped) {
       return this.convertedToTz();
     }
-    return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+
+    if (this.isPredefined) {
+      return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+    } else {
+      return this.granularityConvertedToTz();
+    }
   }
 
   public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
@@ -115,7 +132,11 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public convertedToTz() {
-    return this.query.convertTz(this.query.dimensionSql(this));
+    return this.query.convertTz(`${this.query.dimensionSql(this)}`);
+  }
+
+  public granularityConvertedToTz() {
+    return this.query.convertTz(`(${this.query.dimensionGranularitySql(this)})`);
   }
 
   public filterToWhere() {
