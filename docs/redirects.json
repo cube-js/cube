@@ -705,11 +705,6 @@
     "permanent": true
   },
   {
-    "source": "/config/downstream/delphi",
-    "destination": "/product/configuration/visualization-tools/delphi",
-    "permanent": true
-  },
-  {
     "source": "/config/downstream/deepnote",
     "destination": "/product/configuration/visualization-tools/deepnote",
     "permanent": true

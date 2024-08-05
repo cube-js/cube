@@ -3,7 +3,6 @@ module.exports = {
   "bubble": "Bubble",
   "budibase": "Budibase",
   "deepnote": "Deepnote",
-  "delphi": "Delphi",
   "explo": "Explo",
   "hashboard": "Hashboard",
   "hex": "Hex",
