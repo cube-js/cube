@@ -2,6 +2,9 @@
 import { GenericContainer, Wait } from 'testcontainers';
 import sql from 'mssql';
 
+import { AbstractWaitStrategy } from 'testcontainers/build/wait-strategies/wait-strategy';
+import { getContainerRuntimeClient } from 'testcontainers/build/container-runtime';
+import { IntervalRetry } from 'testcontainers/build/common';
 import { BaseDbRunner } from '../postgres/BaseDbRunner';
 
 export class MSSqlDbRunner extends BaseDbRunner {
@@ -103,6 +106,37 @@ export class MSSqlDbRunner extends BaseDbRunner {
   async containerLazyInit() {
     const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
 
+    class DebuggingWaitStrategy extends AbstractWaitStrategy {
+      async waitUntilReady(container) {
+        console.log('Waiting for health check...', { containerId: container.id });
+        const client = await getContainerRuntimeClient();
+
+        const status = await new IntervalRetry(100).retryUntil(
+          async () => {
+            const health = (await client.container.inspect(container)).State.Health;
+            console.log('container health', container.id, health);
+            return health?.Status;
+          },
+          (healthCheckStatus) => healthCheckStatus === 'healthy' || healthCheckStatus === 'unhealthy',
+          () => {
+            const timeout = this.startupTimeout;
+            const message = `Health check not healthy after ${timeout}ms`;
+            console.log(message, { containerId: container.id });
+            throw new Error(message);
+          },
+          this.startupTimeout
+        );
+
+        if (status !== 'healthy') {
+          const message = `Health check failed: ${status}`;
+          console.log(message, { containerId: container.id });
+          throw new Error(message);
+        }
+
+        console.log('Health check wait strategy complete', { containerId: container.id });
+      }
+    }
+
     return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
       .withEnvironment({
         ACCEPT_EULA: 'Y',
@@ -120,7 +154,9 @@ export class MSSqlDbRunner extends BaseDbRunner {
         retries: 20,
         startPeriod: 2 * 1000,
       })
-      .withWaitStrategy(Wait.forHealthCheck())
+      // .withWaitStrategy(Wait.forHealthCheck())
+      .withWaitStrategy(new DebuggingWaitStrategy())
+      // .withWaitStrategy(Wait.forLogMessage('SQL Server is now ready for client connections'))
       .withStartupTimeout(10 * 1000)
       .start();
   }
