@@ -1,7 +1,7 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
 const pgPromise = require('pg-promise');
 // eslint-disable-next-line import/no-extraneous-dependencies
-const { GenericContainer } = require('testcontainers');
+const { GenericContainer, Wait } = require('testcontainers');
 const { BaseDbRunner } = require('./BaseDbRunner');
 
 process.env.TZ = 'GMT';
@@ -132,15 +132,18 @@ export class PostgresDBRunner extends BaseDbRunner {
         POSTGRES_PASSWORD: this.password(),
       })
       .withExposedPorts(this.port())
-      // .withHealthCheck({
-      //   test: 'pg_isready -U root -d model_test',
-      //   interval: 2 * 1000,
-      //   timeout: 500,
-      //   retries: 3
-      // })
-      // .withWaitStrategy(Wait.forHealthCheck())
-      // Postgresql do fast shutdown on start for db applying
-      .withStartupTimeout(10 * 1000)
+      .withHealthCheck({
+        test: [
+          'CMD-SHELL',
+          `pg_isready -h localhost -p ${this.port()} -U root -d model_test || exit 1`
+        ],
+        interval: 1000,
+        timeout: 500,
+        retries: 20,
+        startPeriod: 5 * 1000,
+      })
+      .withWaitStrategy(Wait.forHealthCheck())
+      .withStartupTimeout(15 * 1000)
       .start();
   }
 
