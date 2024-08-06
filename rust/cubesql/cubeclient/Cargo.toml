@@ -17,7 +17,7 @@ reqwest-middleware = { version = "0.3.2", features = ["json"] }
 anyhow = "1.0"
 async-trait = "0.1.51"
 tokio = { version = "1.6", features = ["time"] }
-uuid = { version = "0.8", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 log = "0.4"
 
 [dependencies.reqwest]
