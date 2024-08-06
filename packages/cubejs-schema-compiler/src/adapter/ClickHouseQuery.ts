@@ -259,6 +259,12 @@ export class ClickHouseQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    templates.types.boolean = 'BOOL';
+    templates.types.timestamp = 'DATETIME';
+    delete templates.types.time;
+    // ClickHouse intervals have a distinct type for each granularity
+    delete templates.types.interval;
+    delete templates.types.binary;
     return templates;
   }
 }
