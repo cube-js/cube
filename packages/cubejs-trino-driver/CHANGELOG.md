@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+**Note:** Version bump only for package @cubejs-backend/trino-driver
+
+
+
+
+
 ## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
 
 **Note:** Version bump only for package @cubejs-backend/trino-driver

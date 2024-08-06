@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Skip HEAD requests for AWS S3, fix [#8536](https://github.com/cube-js/cube/issues/8536) ([#8542](https://github.com/cube-js/cube/issues/8542)) ([41e3070](https://github.com/cube-js/cube/commit/41e30704fa0d9c72bb2aea9f64d5bddcdf71b796))
+
+
+
+
+
 ## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
 
 
