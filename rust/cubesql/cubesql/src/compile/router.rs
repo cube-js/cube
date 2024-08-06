@@ -14,8 +14,9 @@ use crate::{
     sql::{
         dataframe,
         statement::{
-            ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
-            SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
+            ApproximateCountDistinctVisitor, CastReplacer, DateTokenNormalizeReplacer,
+            RedshiftDatePartReplacer, SensitiveDataSanitizer, ToTimestampReplacer,
+            UdfWildcardArgReplacer,
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
@@ -715,6 +716,7 @@ pub fn rewrite_statement(stmt: &ast::Statement) -> ast::Statement {
     let stmt = CastReplacer::new().replace(stmt);
     let stmt = ToTimestampReplacer::new().replace(&stmt);
     let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
+    let stmt = DateTokenNormalizeReplacer::new().replace(&stmt);
     let stmt = RedshiftDatePartReplacer::new().replace(&stmt);
     let stmt = ApproximateCountDistinctVisitor::new().replace(&stmt);
 
