@@ -66,7 +66,6 @@ use crate::{
 };
 
 pub mod builder;
-pub mod context;
 pub mod engine;
 pub mod error;
 pub mod parser;
