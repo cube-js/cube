@@ -2,7 +2,8 @@
 set -eo pipefail
 
 # Debug log for test containers
-export DEBUG=testcontainers
+#export DEBUG=testcontainers
+export DEBUG="testcontainers*"
 
 export TEST_MSSQL_VERSION=2017-latest
 
