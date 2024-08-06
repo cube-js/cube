@@ -725,7 +725,7 @@ dependencies = [
  "serde_json",
  "simple_logger",
  "tokio",
- "uuid 0.8.2",
+ "uuid 1.6.1",
 ]
 
 [[package]]
