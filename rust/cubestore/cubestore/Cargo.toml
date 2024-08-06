@@ -60,7 +60,7 @@ bigdecimal = { version = "0.2.0", features = ["serde"] }
 # Tracking PR with backports: https://github.com/cube-js/rust-s3/pull/1
 rust-s3 = { git = "https://github.com/cube-js/rust-s3.git", branch = "cubestore-0.32.3-backport", default-features = false, features = ["tokio", "tokio-native-tls"] }
 deadqueue = "0.2.4"
-reqwest = { version = "0.12.3", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
+reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 nanoid = "0.3.0"
 rand = "0.8.0"
 parquet-format = "=2.6.1"
