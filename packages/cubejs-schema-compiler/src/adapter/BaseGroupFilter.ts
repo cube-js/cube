@@ -1,5 +1,3 @@
-import R from 'ramda';
-
 export class BaseGroupFilter {
   protected readonly values: any;
 
@@ -31,7 +29,7 @@ export class BaseGroupFilter {
         return null;
       }
       return `(${sql})`;
-    }).filter(R.identity).join(` ${this.operator.toUpperCase()} `);
+    }).filter(x => x).join(` ${this.operator.toUpperCase()} `);
 
     if (!r.length) {
       return null;
