@@ -29,7 +29,7 @@ WORKDIR /cube
 
 RUN set -ex; \
     apt-get update; \
-    apt-get install -y libssl3 curl
+    apt-get install -y libssl3
 
 COPY --from=builder /build/cubestore/target/release/cubestored .
 
