@@ -196,6 +196,7 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  nativeSqlPlanner: () => get('CUBEJS_NATIVE_SQL_PLANNER').asBool(),
 
   /** ****************************************************************
    * Common db options                                               *
