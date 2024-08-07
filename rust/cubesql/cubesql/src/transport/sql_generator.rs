@@ -5,11 +5,7 @@ use datafusion::{
 };
 use minijinja::{context, value::Value, Environment};
 use serde_derive::*;
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    sync::Arc,
-};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
     compile::{

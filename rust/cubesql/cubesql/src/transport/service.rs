@@ -4,9 +4,7 @@ use cubeclient::{
     models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
 };
 
-use datafusion::{
-    arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
-};
+use datafusion::arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
 use serde_derive::*;
 use std::{
     collections::HashMap,
@@ -22,10 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     compile::{
-        engine::df::{
-            scan::MemberField,
-            wrapper::SqlQuery,
-        },
+        engine::df::{scan::MemberField, wrapper::SqlQuery},
         MetaContext,
     },
     sql::{AuthContextRef, HttpAuthContext},
