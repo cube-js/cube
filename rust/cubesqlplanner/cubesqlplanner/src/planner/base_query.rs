@@ -1,6 +1,7 @@
 use super::base_cube::BaseCube;
 use super::base_dimension::BaseDimension;
 use super::base_measure::BaseMeasure;
+use super::query_tools::QueryTools;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::plan::{Expr, From, GenerationPlan, Select};
@@ -14,7 +15,7 @@ use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
-    cube_evaluator: Rc<dyn CubeEvaluator>,
+    query_tools: Rc<QueryTools>,
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     join_root: String, //TODO temporary
@@ -26,11 +27,12 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
         let cube_evaluator = options.cube_evaluator()?;
+        let query_tools = QueryTools::new(cube_evaluator.clone());
 
         let measures = if let Some(measures) = &options.static_data().measures {
             measures
                 .iter()
-                .map(|m| BaseMeasure::new(m.clone(), cube_evaluator.clone()))
+                .map(|m| BaseMeasure::new(m.clone(), query_tools.clone()))
                 .collect::<Vec<_>>()
         } else {
             Vec::new()
@@ -38,7 +40,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
             dimensions
                 .iter()
-                .map(|m| BaseDimension::new(m.clone()))
+                .map(|m| BaseDimension::new(m.clone(), query_tools.clone()))
                 .collect::<Vec<_>>()
         } else {
             Vec::new()
@@ -46,7 +48,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
         Ok(Self {
             context,
-            cube_evaluator,
+            query_tools,
             measures,
             dimensions,
             join_root: options.static_data().join_root.clone().unwrap(),
@@ -78,22 +80,28 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let select = Select {
             projection: self.simple_projection()?,
             from: From::Cube(self.cube_from_path(self.join_root.clone())?),
+            group_by: self.dimensions.clone(),
         };
         Ok(GenerationPlan::Select(select))
     }
 
     fn simple_projection(&self) -> Result<Vec<Expr>, CubeError> {
+        let measures = self.measures.iter().map(|m| Expr::Measure(m.clone()));
         let res = self
-            .measures
+            .dimensions
             .iter()
-            .map(|m| Expr::Measure(m.clone()))
+            .map(|d| Expr::Dimension(d.clone()))
+            .chain(measures)
             .collect();
         Ok(res)
     }
 
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
-        let eval = self.cube_evaluator.clone();
-        let def = self.cube_evaluator.cube_from_path(cube_path)?;
+        let eval = self.query_tools.cube_evaluator().clone();
+        let def = self
+            .query_tools
+            .cube_evaluator()
+            .cube_from_path(cube_path)?;
         Ok(BaseCube::new(eval, def))
     }
 }

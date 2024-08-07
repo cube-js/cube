@@ -15,6 +15,7 @@ async-trait = "0.1.36"
 serde = "1.0.115"
 serde_json = "1.0.56"
 cubenativeutils = { path = "../../cubenativeutils/" }
+convert_case = "0.6"
 [dependencies.neon]
 version = "=1"
 default-features = false
