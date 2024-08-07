@@ -744,6 +744,7 @@ name = "cubesqlplanner"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "convert_case",
  "cubeclient",
  "cubenativeutils",
  "datafusion",

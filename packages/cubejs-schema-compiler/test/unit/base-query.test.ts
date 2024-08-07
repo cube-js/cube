@@ -10,6 +10,9 @@ import {
   createSchemaYamlForGroupFilterParamsTests
 } from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
+import {
+  setupLogger
+} from '@cubejs-backend/native';
 
 describe('SQL Generation', () => {
   describe('Common - Yaml - syntax sugar', () => {
@@ -51,6 +54,28 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
+      expect(queryAndParams[0]).toContain('card_tbl');
+    });
+
+    it('Simple query - dimension', async () => {
+      await compilers.compiler.compile();
+
+      setupLogger(
+        ({ event }) => console.log(event),
+        'warn'
+      );
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParamsTest();
       expect(queryAndParams[0]).toContain('card_tbl');
     });
   });

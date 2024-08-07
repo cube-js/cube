@@ -402,6 +402,7 @@ export class BaseQuery {
     } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
       const id = firstMeasure.expressionName ?? firstMeasure.measure;
+      console.log("!!! id: ", id);
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
@@ -576,6 +577,30 @@ export class BaseQuery {
     return false;
   }
 
+  buildSqlAndParamsTest(exportAnnotatedSql) {
+    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
+
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
+    }
+    const rr = this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildSqlAndParams', exportAnnotatedSql],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql,
+          this.shouldReuseParams
+        ),
+        { cache: this.queryCache }
+      )
+    );
+    console.log("!! rust result: ", r[0]);
+    console.log("!! js result: ", rr[0]);
+    return rr;
+  }
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -1491,6 +1516,7 @@ export class BaseQuery {
   }
 
   commonQuery() {
+    console.log("!!! base sel, ", this.baseSelect());
     return `SELECT${this.topLimit()}
       ${this.baseSelect()}
     FROM
@@ -1987,6 +2013,7 @@ export class BaseQuery {
     if (!hash || !hash.id) {
       return null;
     }
+    console.log("!!!! hash ", hash);
 
     const fieldIndex = this.getFieldIndex(hash.id);
 
@@ -2002,6 +2029,8 @@ export class BaseQuery {
     if (R.isEmpty(this.order)) {
       return '';
     }
+
+    console.log("!!!! order ", this.order);
 
     const orderByString = R.pipe(
       R.map(this.orderHashToString),
@@ -2374,6 +2403,7 @@ export class BaseQuery {
     const self = this;
     const { cubeEvaluator } = this;
     return cubeEvaluator.resolveSymbolsCall(sql, (name) => {
+      console.log("!!!! CCCCC ", cubeName, " ",  sql);
       const nextCubeName = cubeEvaluator.symbols[name] && name || cubeName;
       const resolvedSymbol =
         cubeEvaluator.resolveSymbol(
@@ -2382,8 +2412,10 @@ export class BaseQuery {
         );
       // eslint-disable-next-line no-underscore-dangle
       if (resolvedSymbol._objectWithResolvedProperties) {
+        console.log("!!!! BBBBB ", cubeName, sql);
         return resolvedSymbol;
       }
+      console.log("!!!! AAAAA ", cubeName, sql);
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
     }, {
       sqlResolveFn: options.sqlResolveFn || ((symbol, cube, propName, subPropName) => self.evaluateSymbolSql(cube, propName, symbol, false, subPropName)),

@@ -14,7 +14,10 @@ impl fmt::Display for Expr {
                 let sql = measure.to_sql().map_err(|_| fmt::Error).unwrap();
                 write!(f, "{}", sql)
             }
-            Expr::Dimension(_) => write!(f, "dim"),
+            Expr::Dimension(dimension) => {
+                let sql = dimension.to_sql().map_err(|_| fmt::Error).unwrap();
+                write!(f, "{}", sql)
+            }
         }
     }
 }
