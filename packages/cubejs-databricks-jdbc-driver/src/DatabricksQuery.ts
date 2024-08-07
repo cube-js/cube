@@ -129,6 +129,12 @@ export class DatabricksQuery extends BaseQuery {
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
+    // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
+    // but that requires Runtime 13.3+. Should this be enabled?
+    // templates.types.timestamp = 'TIMESTAMP_NTZ';
+    delete templates.types.time;
+    // Databricks intervals have a YearMonth or DayTime type variants, but no universal type
+    delete templates.types.interval;
     return templates;
   }
 }

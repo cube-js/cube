@@ -13604,34 +13604,34 @@ ORDER BY
             );
         }
 
-        check_fn("CAST(2.0 AS NUMERIC)", "CAST('2' AS NUMERIC(38, 10))").await;
-        check_fn("CAST(2.73 AS NUMERIC)", "CAST('2.73' AS NUMERIC(38, 10))").await;
+        check_fn("CAST(2.0 AS NUMERIC)", "CAST('2' AS DECIMAL(38,10))").await;
+        check_fn("CAST(2.73 AS NUMERIC)", "CAST('2.73' AS DECIMAL(38,10))").await;
         check_fn(
             "CAST(2.73 AS NUMERIC(5, 2))",
-            "CAST('2.73' AS NUMERIC(5, 2))",
+            "CAST('2.73' AS DECIMAL(5,2))",
         )
         .await;
         check_fn(
             "CAST(-2.73 AS NUMERIC(5, 2))",
-            "CAST('-2.73' AS NUMERIC(5, 2))",
+            "CAST('-2.73' AS DECIMAL(5,2))",
         )
         .await;
-        check_fn("CAST(0 AS NUMERIC(5, 2))", "CAST('0' AS NUMERIC(5, 2))").await;
-        check_fn("CAST(0 AS NUMERIC(2, 2))", "CAST('0' AS NUMERIC(2, 2))").await;
+        check_fn("CAST(0 AS NUMERIC(5, 2))", "CAST('0' AS DECIMAL(5,2))").await;
+        check_fn("CAST(0 AS NUMERIC(2, 2))", "CAST('0' AS DECIMAL(2,2))").await;
         check_fn(
             "CAST(0.340 AS NUMERIC(2, 2))",
-            "CAST('0.34' AS NUMERIC(2, 2))",
+            "CAST('0.34' AS DECIMAL(2,2))",
         )
         .await;
         check_fn(
             "CAST(0.342 AS NUMERIC(2, 2))",
-            "CAST('0.34' AS NUMERIC(2, 2))",
+            "CAST('0.34' AS DECIMAL(2,2))",
         )
         .await;
         // TODO: Make these tests pass -- they aren't problems with literal generation, they're
         // before that.
-        // check_fn("CAST(0.345 AS NUMERIC(2, 2))", "CAST('0.35' AS NUMERIC(2, 2))").await;
-        // check_fn("CAST(-0.345 AS NUMERIC(5, 2))", "CAST('-0.35' AS NUMERIC(5, 2))").await;
+        // check_fn("CAST(0.345 AS NUMERIC(2, 2))", "CAST('0.35' AS DECIMAL(2,2))").await;
+        // check_fn("CAST(-0.345 AS NUMERIC(5, 2))", "CAST('-0.35' AS DECIMAL(5,2))").await;
     }
 
     #[tokio::test]
@@ -24491,5 +24491,118 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ungrouped: None,
             }
         )
+    }
+
+    #[tokio::test]
+    async fn test_cast_as_type_pushdown() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_logger();
+
+        let query = "
+        SELECT
+            CAST(CASE customer_gender
+                WHEN '1' THEN 2
+                WHEN '3' THEN 4
+                ELSE 5
+            END AS TEXT) AS text,
+            CAST(taxful_total_price AS REAL) AS real,
+            CAST(taxful_total_price AS DOUBLE PRECISION) AS double,
+            CAST(taxful_total_price AS DECIMAL) AS decimal
+        FROM KibanaSampleDataEcommerce AS k
+        GROUP BY 1, 2, 3, 4
+        ORDER BY
+            CAST(CASE customer_gender
+                WHEN '1' THEN 2
+                WHEN '3' THEN 4
+                ELSE 5
+            END AS TEXT) DESC,
+            CAST(taxful_total_price AS REAL),
+            CAST(taxful_total_price AS DOUBLE PRECISION),
+            CAST(taxful_total_price AS DECIMAL)
+        LIMIT 5
+        ";
+
+        // Generic
+        let query_plan =
+            convert_select_to_query_plan(query.to_string(), DatabaseProtocol::PostgreSQL).await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains(" AS STRING)"));
+        assert!(sql.contains(" AS FLOAT)"));
+        assert!(sql.contains(" AS DOUBLE)"));
+        assert!(sql.contains(" AS DECIMAL(38,10))"));
+
+        // BigQuery
+        let query_plan = convert_select_to_query_plan_customized(
+            query.to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("types/float".to_string(), "FLOAT64".to_string()),
+                ("types/double".to_string(), "FLOAT64".to_string()),
+                (
+                    "types/decimal".to_string(),
+                    "BIGDECIMAL({{ precision }},{{ scale }})".to_string(),
+                ),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains(" AS STRING)"));
+        assert!(sql.contains(" AS FLOAT64)"));
+        assert!(sql.contains(" AS BIGDECIMAL(38,10))"));
+
+        // PostgreSQL
+        let query_plan = convert_select_to_query_plan_customized(
+            query.to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("types/string".to_string(), "TEXT".to_string()),
+                ("types/float".to_string(), "REAL".to_string()),
+                ("types/double".to_string(), "DOUBLE PRECISION".to_string()),
+            ],
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains(" AS TEXT)"));
+        assert!(sql.contains(" AS REAL)"));
+        assert!(sql.contains(" AS DOUBLE PRECISION)"));
+        assert!(sql.contains(" AS DECIMAL(38,10))"));
     }
 }

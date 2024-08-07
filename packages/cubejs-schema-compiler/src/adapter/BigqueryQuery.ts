@@ -170,6 +170,11 @@ export class BigqueryQuery extends BaseQuery {
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
+    templates.types.boolean = 'BOOL';
+    templates.types.float = 'FLOAT64';
+    templates.types.double = 'FLOAT64';
+    templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
+    templates.types.binary = 'BYTES';
     return templates;
   }
 }
