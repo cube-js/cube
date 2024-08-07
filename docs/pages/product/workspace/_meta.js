@@ -5,7 +5,7 @@ module.exports = {
   "dev-mode": "Development mode",
   "environments": "Environments",
   vizard: "Chart Prototyping",
-  "semantic-layer-sync": "Semantic Layer Sync",
+  "integrations": "Integrations",
   "sql-runner": "SQL Runner",
   "query-history": "Query History",
   "pre-aggregations": "Pre-Aggregations",

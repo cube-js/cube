@@ -1,5 +1,10 @@
 [
   {
+    "source": "/product/workspace/semantic-layer-sync",
+    "destination": "/product/apis-integrations/semantic-layer-sync",
+    "permanent": true
+  },
+  {
     "source": "/product/monitoring/integrations/cloudwatch",
     "destination": "/product/workspace/monitoring/cloudwatch",
     "permanent": true
@@ -697,11 +702,6 @@
   {
     "source": "/config/downstream/hex",
     "destination": "/product/configuration/visualization-tools/hex",
-    "permanent": true
-  },
-  {
-    "source": "/config/downstream/delphi",
-    "destination": "/product/configuration/visualization-tools/delphi",
     "permanent": true
   },
   {
