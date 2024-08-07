@@ -5,18 +5,18 @@ use cubeclient::models::{
     V1CubeMeta, V1CubeMetaDimension, V1CubeMetaJoin, V1CubeMetaMeasure, V1CubeMetaSegment,
     V1LoadRequestQuery, V1LoadResponse,
 };
-use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
+use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
 use log::Level;
 use uuid::Uuid;
 
+use super::{convert_sql_to_cube_query, MetaContext, QueryPlan};
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, session::DatabaseProtocol, AuthContextRef,
-        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
-        SqlAuthService,
+        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe,
+        session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
+        ServerManager, Session, SessionManager, SqlAuthService, StatusFlags,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
@@ -24,9 +24,6 @@ use crate::{
     },
     CubeError,
 };
-use crate::sql::dataframe::batch_to_dataframe;
-use crate::sql::StatusFlags;
-use super::{convert_sql_to_cube_query, MetaContext, QueryPlan};
 
 pub mod rewrite_engine;
 #[cfg(test)]
@@ -722,7 +719,6 @@ pub async fn execute_queries_with_flags(
 pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
     Ok(execute_query_with_flags(query, db).await?.0)
 }
-
 
 lazy_static! {
     pub static ref TEST_LOGGING_INITIALIZED: std::sync::RwLock<bool> =

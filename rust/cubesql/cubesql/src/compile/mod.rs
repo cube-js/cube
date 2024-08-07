@@ -1810,7 +1810,7 @@ mod tests {
     use cubeclient::models::{
         V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
     };
-    use datafusion::{dataframe::DataFrame as DFDataFrame, logical_plan::plan::Filter};
+    use datafusion::logical_plan::plan::Filter;
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use std::env;
@@ -1829,13 +1829,15 @@ mod tests {
             },
         },
         config::{ConfigObj, ConfigObjImpl},
-        sql::{dataframe::batch_to_dataframe, types::StatusFlags},
+        sql::types::StatusFlags,
     };
     use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
-    use log::Level;
+
     use serde_json::json;
-    use simple_logger::SimpleLogger;
-    use crate::compile::test::{execute_queries_with_flags, execute_query, execute_query_with_flags, init_testing_logger};
+
+    use crate::compile::test::{
+        execute_queries_with_flags, execute_query, execute_query_with_flags, init_testing_logger,
+    };
 
     async fn convert_select_to_query_plan_customized(
         query: String,

@@ -1,6 +1,8 @@
-use crate::compile::test::{execute_query, init_testing_logger};
-use crate::CubeError;
-use crate::sql::DatabaseProtocol;
+use crate::{
+    compile::test::{execute_query, init_testing_logger},
+    sql::DatabaseProtocol,
+    CubeError,
+};
 
 #[tokio::test]
 async fn test_instr() -> Result<(), CubeError> {
@@ -11,10 +13,10 @@ async fn test_instr() -> Result<(), CubeError> {
                     instr('rust is killing me', 'e') as r2,
                     instr('Rust is killing me', 'unknown') as r3;
                 "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::MySQL
         )
-            .await?,
+        .await?,
         "+----+----+----+\n\
             | r1 | r2 | r3 |\n\
             +----+----+----+\n\
@@ -24,7 +26,6 @@ async fn test_instr() -> Result<(), CubeError> {
 
     Ok(())
 }
-
 
 #[tokio::test]
 async fn test_timediff() -> Result<(), CubeError> {
@@ -48,17 +49,17 @@ async fn test_timediff() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_ends_with() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "ends_with",
-            execute_query(
-                "select \
+        "ends_with",
+        execute_query(
+            "select \
                     ends_with('rust is killing me', 'me') as r1,
                     ends_with('rust is killing me', 'no') as r2
                 "
-                .to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::MySQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -72,10 +73,10 @@ async fn test_locate() -> Result<(), CubeError> {
                     locate('e', 'rust is killing me') as r2,
                     locate('unknown', 'Rust is killing me') as r3
                 "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::MySQL
         )
-            .await?,
+        .await?,
         "+----+----+----+\n\
             | r1 | r2 | r3 |\n\
             +----+----+----+\n\
@@ -98,10 +99,10 @@ async fn test_if() -> Result<(), CubeError> {
                 if(false, CAST(1 as int), CAST(2 as bigint)) as c2,
                 if(true, CAST(1 as bigint), CAST(2 as int)) as c3
             "#
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::MySQL
         )
-            .await?,
+        .await?,
         "+-------+-------+------+----+----+----+\n\
             | r1    | r2    | r3   | c1 | c2 | c3 |\n\
             +-------+-------+------+----+----+----+\n\
@@ -129,10 +130,10 @@ async fn test_least_single_row() -> Result<(), CubeError> {
                 least(-1.23, 3.44, 4, 10, null, -5) as r9, \
                 least(null, null, null) as r10
             "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL
         )
-            .await?,
+        .await?,
         "+-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
             | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10  |\n\
             +-----+----+----+-----+-----+----+----+-----+-------+----+------+\n\
@@ -160,10 +161,10 @@ async fn test_least_table() -> Result<(), CubeError> {
                     SELECT null as a, null as b, null as c \
                 ) as t
             "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL
         )
-            .await?,
+        .await?,
         "+-------+\n\
             | r1    |\n\
             +-------+\n\
@@ -196,10 +197,10 @@ async fn test_greatest_single_row() -> Result<(), CubeError> {
                 greatest(null, 1.5, null, 2.7, null, 3.1, null, -5, null, 10) as r10, \
                 greatest(null, null, null) as r11
             "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL
         )
-            .await?,
+        .await?,
         "+-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
             | r0  | r1 | r2 | r3  | r4  | r5 | r6 | r7  | r8    | r9 | r10 | r11  |\n\
             +-----+----+----+-----+-----+----+----+-----+-------+----+-----+------+\n\
@@ -227,10 +228,10 @@ async fn test_greatest_table() -> Result<(), CubeError> {
                     SELECT null as a, null as b, null as c \
                 ) as t
             "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::PostgreSQL
         )
-            .await?,
+        .await?,
         "+-------+\n\
             | r1    |\n\
             +-------+\n\
@@ -252,10 +253,10 @@ async fn test_ucase() -> Result<(), CubeError> {
             "select \
                 ucase('super stroka') as r1
             "
-                .to_string(),
+            .to_string(),
             DatabaseProtocol::MySQL
         )
-            .await?,
+        .await?,
         "+--------------+\n\
             | r1           |\n\
             +--------------+\n\
@@ -286,13 +287,13 @@ async fn test_convert_tz() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_backend_pid() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_backend_pid",
-            execute_query(
-                "select pg_backend_pid();".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_backend_pid",
+        execute_query(
+            "select pg_backend_pid();".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -309,9 +310,9 @@ async fn test_to_char_udf() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "to_char_2",
-            execute_query(
-                "
+        "to_char_2",
+        execute_query(
+            "
                 SELECT to_char(x, 'YYYY-MM-DD HH24:MI:SS.MS TZ')
                 FROM  (
                         SELECT Str_to_date('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') x
@@ -319,16 +320,16 @@ async fn test_to_char_udf() -> Result<(), CubeError> {
                         SELECT str_to_date('2021-08-31 11:05', '%Y-%m-%d %H:%i') x
                 ) e
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "to_char_3",
-            execute_query(
-                "
+        "to_char_3",
+        execute_query(
+            "
                 SELECT TO_CHAR(CAST(NULL AS TIMESTAMP), 'FMDay')
                 UNION ALL
                 SELECT TO_CHAR(CAST('2024-01-01 00:00:00' AS TIMESTAMP), 'FMDay')
@@ -355,11 +356,11 @@ async fn test_to_char_udf() -> Result<(), CubeError> {
                 UNION ALL
                 SELECT TO_CHAR(CAST('2024-12-01 00:00:00' AS TIMESTAMP), 'Month')
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -367,9 +368,9 @@ async fn test_to_char_udf() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_regexp_substr_udf() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "regexp_substr",
-            execute_query(
-                "SELECT
+        "regexp_substr",
+        execute_query(
+            "SELECT
                     regexp_substr('test@test.com', '@[^.]*') as match_dot,
                     regexp_substr('12345', '[0-9]+') as match_number,
                     regexp_substr('12345', '[0-9]+', 2) as match_number_pos_2,
@@ -382,26 +383,26 @@ async fn test_regexp_substr_udf() -> Result<(), CubeError> {
                     regexp_substr('test@test.com', '@[^.]*', -1) as position_negative,
                     regexp_substr('test@test.com', '@[^.]*', 100) as position_more_then_input
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "regexp_substr_column",
-            execute_query(
-                "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
+        "regexp_substr_column",
+        execute_query(
+            "SELECT r.a as input, regexp_substr(r.a, '@[^.]*') as result FROM (
                     SELECT 'test@test.com' as a
                     UNION ALL
                     SELECT 'test'
                 ) as r
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -412,7 +413,7 @@ async fn test_metabase_to_char_query() -> Result<(), CubeError> {
         "select to_char(current_timestamp, 'YYYY-MM-DD HH24:MI:SS.MS TZ')".to_string(),
         DatabaseProtocol::PostgreSQL,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }
@@ -420,13 +421,13 @@ async fn test_metabase_to_char_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_quote_ident() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "quote_ident",
-            execute_query(
-                "SELECT quote_ident('pg_catalog') i1, quote_ident('Foo bar') i2".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "quote_ident",
+        execute_query(
+            "SELECT quote_ident('pg_catalog') i1, quote_ident('Foo bar') i2".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -434,14 +435,13 @@ async fn test_quote_ident() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_current_setting() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "current_setting",
-            execute_query(
-                "SELECT current_setting('max_index_keys'), current_setting('search_path')"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "current_setting",
+        execute_query(
+            "SELECT current_setting('max_index_keys'), current_setting('search_path')".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -480,13 +480,13 @@ async fn test_bool_and_or() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pi() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pi",
-            execute_query(
-                "SELECT PI() AS PI".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pi",
+        execute_query(
+            "SELECT PI() AS PI".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -494,22 +494,22 @@ async fn test_pi() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_current_schemas_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "current_schemas_postgres",
-            execute_query(
-                "SELECT current_schemas(false)".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "current_schemas_postgres",
+        execute_query(
+            "SELECT current_schemas(false)".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "current_schemas_including_implicit_postgres",
-            execute_query(
-                "SELECT current_schemas(true)".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "current_schemas_including_implicit_postgres",
+        execute_query(
+            "SELECT current_schemas(true)".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -517,9 +517,9 @@ async fn test_current_schemas_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_format_type_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "format_type",
-            execute_query(
-                "
+        "format_type",
+        execute_query(
+            "
                 SELECT
                     t.oid,
                     t.typname,
@@ -534,11 +534,11 @@ async fn test_format_type_postgres() -> Result<(), CubeError> {
                 ORDER BY t.oid ASC
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -546,27 +546,27 @@ async fn test_format_type_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_datetime_precision_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_datetime_precision_simple",
-            execute_query(
-                "SELECT information_schema._pg_datetime_precision(1184, 3) p".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_datetime_precision_simple",
+        execute_query(
+            "SELECT information_schema._pg_datetime_precision(1184, 3) p".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "pg_datetime_precision_types",
-            execute_query(
-                "
+        "pg_datetime_precision_types",
+        execute_query(
+            "
                 SELECT t.oid, information_schema._pg_datetime_precision(t.oid, 3) p
                 FROM pg_catalog.pg_type t
                 ORDER BY t.oid ASC;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -574,27 +574,27 @@ async fn test_pg_datetime_precision_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_numeric_precision_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_numeric_precision_simple",
-            execute_query(
-                "SELECT information_schema._pg_numeric_precision(1700, 3);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_numeric_precision_simple",
+        execute_query(
+            "SELECT information_schema._pg_numeric_precision(1700, 3);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "pg_numeric_precision_types",
-            execute_query(
-                "
+        "pg_numeric_precision_types",
+        execute_query(
+            "
                 SELECT t.oid, information_schema._pg_numeric_precision(t.oid, 3) p
                 FROM pg_catalog.pg_type t
                 ORDER BY t.oid ASC;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -602,27 +602,27 @@ async fn test_pg_numeric_precision_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_numeric_scale_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_numeric_scale_simple",
-            execute_query(
-                "SELECT information_schema._pg_numeric_scale(1700, 50);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_numeric_scale_simple",
+        execute_query(
+            "SELECT information_schema._pg_numeric_scale(1700, 50);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "pg_numeric_scale_types",
-            execute_query(
-                "
+        "pg_numeric_scale_types",
+        execute_query(
+            "
                 SELECT t.oid, information_schema._pg_numeric_scale(t.oid, 10) s
                 FROM pg_catalog.pg_type t
                 ORDER BY t.oid ASC;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -631,18 +631,18 @@ async fn test_pg_numeric_scale_postgres() -> Result<(), CubeError> {
 #[cfg(debug_assertions)]
 async fn test_pg_get_userbyid_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_get_userbyid",
-            execute_query(
-                "
+        "pg_get_userbyid",
+        execute_query(
+            "
                 SELECT pg_get_userbyid(t.id)
                 FROM information_schema.testing_dataset t
                 WHERE t.id < 15;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -668,13 +668,13 @@ async fn test_unnest_postgres() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "unnest_i64_scalar",
-            execute_query(
-                "SELECT unnest(ARRAY[1,2,3,4,5]);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "unnest_i64_scalar",
+        execute_query(
+            "SELECT unnest(ARRAY[1,2,3,4,5]);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -682,76 +682,78 @@ async fn test_unnest_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_generate_series_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "generate_series_i64_1",
-            execute_query(
-                "SELECT generate_series(-5, 5);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_i64_1",
+        execute_query(
+            "SELECT generate_series(-5, 5);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_f64_2",
-            execute_query(
-                "SELECT generate_series(-5, 5, 3);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_f64_2",
+        execute_query(
+            "SELECT generate_series(-5, 5, 3);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_f64_1",
-            execute_query(
-                "SELECT generate_series(-5, 5, 0.5);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_f64_1",
+        execute_query(
+            "SELECT generate_series(-5, 5, 0.5);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_empty_1",
-            execute_query(
-                "SELECT generate_series(-5, -10, 3);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_empty_1",
+        execute_query(
+            "SELECT generate_series(-5, -10, 3);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_empty_2",
-            execute_query(
-                "SELECT generate_series(1, 5, 0);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_empty_2",
+        execute_query(
+            "SELECT generate_series(1, 5, 0);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_date32_2_args",
-            execute_query(
-                "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_date32_2_args",
+        execute_query(
+            "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_date32_3_args_2days_interval",
-            execute_query(
-                "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date, '2 days'::interval);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_date32_3_args_2days_interval",
+        execute_query(
+            "SELECT generate_series('2024-07-23'::date, '2024-07-28'::date, '2 days'::interval);"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_date32_3_args_3years_interval",
-            execute_query(
-                "SELECT generate_series('2016-07-23'::date, '2024-07-28'::date, '3 years'::interval);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_date32_3_args_3years_interval",
+        execute_query(
+            "SELECT generate_series('2016-07-23'::date, '2024-07-28'::date, '3 years'::interval);"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "generate_series_timestamp_2_args",
@@ -817,23 +819,23 @@ async fn test_generate_series_postgres() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "pg_catalog_generate_series_i64",
-            execute_query(
-                "SELECT pg_catalog.generate_series(1, 5);".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_catalog_generate_series_i64",
+        execute_query(
+            "SELECT pg_catalog.generate_series(1, 5);".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "generate_series_from_table",
-            execute_query(
-                "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "generate_series_from_table",
+        execute_query(
+            "select generate_series(1, oid) from pg_catalog.pg_type where oid in (16,17);"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -911,19 +913,19 @@ async fn test_pg_expandarray_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_type_is_visible_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_type_is_visible",
-            execute_query(
-                "
+        "pg_type_is_visible",
+        execute_query(
+            "
                 SELECT t.oid, t.typname, n.nspname, pg_catalog.pg_type_is_visible(t.oid) is_visible
                 FROM pg_catalog.pg_type t, pg_catalog.pg_namespace n
                 WHERE t.typnamespace = n.oid
                 ORDER BY t.oid ASC;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -931,23 +933,24 @@ async fn test_pg_type_is_visible_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_get_constraintdef_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_get_constraintdef_1",
-            execute_query(
-                "select pg_catalog.pg_get_constraintdef(r.oid, true) from pg_catalog.pg_constraint r;".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_get_constraintdef_1",
+        execute_query(
+            "select pg_catalog.pg_get_constraintdef(r.oid, true) from pg_catalog.pg_constraint r;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "pg_get_constraintdef_2",
-            execute_query(
-                "select pg_catalog.pg_get_constraintdef(r.oid) from pg_catalog.pg_constraint r;"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "pg_get_constraintdef_2",
+        execute_query(
+            "select pg_catalog.pg_get_constraintdef(r.oid) from pg_catalog.pg_constraint r;"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -955,19 +958,19 @@ async fn test_pg_get_constraintdef_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_to_regtype_pid() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_to_regtype",
-            execute_query(
-                "select
+        "pg_to_regtype",
+        execute_query(
+            "select
                     to_regtype('bool') b,
                     to_regtype('name') n,
                     to_regtype('_int4') ai,
                     to_regtype('unknown') u
                 ;"
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -975,9 +978,9 @@ async fn test_pg_to_regtype_pid() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_date_part_quarter() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "date_part_quarter",
-            execute_query(
-                "
+        "date_part_quarter",
+        execute_query(
+            "
                 SELECT
                     t.d,
                     date_part('quarter', t.d) q
@@ -989,11 +992,11 @@ async fn test_date_part_quarter() -> Result<(), CubeError> {
                 ) t
                 ORDER BY t.d ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1001,24 +1004,24 @@ async fn test_date_part_quarter() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_array_lower() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "array_lower_scalar",
-            execute_query(
-                "
+        "array_lower_scalar",
+        execute_query(
+            "
                 SELECT
                     array_lower(ARRAY[1,2,3,4,5]) v1,
                     array_lower(ARRAY[5,4,3,2,1]) v2,
                     array_lower(ARRAY[5,4,3,2,1], 1) v3
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "array_lower_column",
-            execute_query(
-                "
+        "array_lower_column",
+        execute_query(
+            "
                 SELECT
                     array_lower(t.v) q
                 FROM (
@@ -1026,20 +1029,20 @@ async fn test_array_lower() -> Result<(), CubeError> {
                     SELECT ARRAY[5,4,3,2,1] as v
                 ) t
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "array_lower_string",
-            execute_query(
-                "SELECT array_lower(ARRAY['a', 'b']) v1".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "array_lower_string",
+        execute_query(
+            "SELECT array_lower(ARRAY['a', 'b']) v1".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1047,24 +1050,24 @@ async fn test_array_lower() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_array_upper() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "array_upper_scalar",
-            execute_query(
-                "
+        "array_upper_scalar",
+        execute_query(
+            "
                 SELECT
                     array_upper(ARRAY[1,2,3,4,5]) v1,
                     array_upper(ARRAY[5,4,3]) v2,
                     array_upper(ARRAY[5,4], 1) v3
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "array_upper_column",
-            execute_query(
-                "
+        "array_upper_column",
+        execute_query(
+            "
                 SELECT
                     array_upper(t.v) q
                 FROM (
@@ -1075,20 +1078,20 @@ async fn test_array_upper() -> Result<(), CubeError> {
                     SELECT ARRAY[5,4,3] as v
                 ) t
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "array_upper_string",
-            execute_query(
-                "SELECT array_upper(ARRAY['a', 'b']) v1".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "array_upper_string",
+        execute_query(
+            "SELECT array_upper(ARRAY['a', 'b']) v1".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1096,9 +1099,9 @@ async fn test_array_upper() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_has_schema_privilege_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "has_schema_privilege",
-            execute_query(
-                "SELECT
+        "has_schema_privilege",
+        execute_query(
+            "SELECT
                     nspname,
                     has_schema_privilege('ovr', nspname, 'CREATE') create_top,
                     has_schema_privilege('ovr', nspname, 'create') create_lower,
@@ -1107,16 +1110,16 @@ async fn test_has_schema_privilege_postgres() -> Result<(), CubeError> {
                 FROM pg_namespace
                 ORDER BY nspname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "has_schema_privilege_default_user",
-            execute_query(
-                "SELECT
+        "has_schema_privilege_default_user",
+        execute_query(
+            "SELECT
                     nspname,
                     has_schema_privilege(nspname, 'CREATE') create_top,
                     has_schema_privilege(nspname, 'create') create_lower,
@@ -1125,27 +1128,27 @@ async fn test_has_schema_privilege_postgres() -> Result<(), CubeError> {
                 FROM pg_namespace
                 ORDER BY nspname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "has_schema_privilege_multiple",
-            execute_query(
-                "SELECT
+        "has_schema_privilege_multiple",
+        execute_query(
+            "SELECT
                     nspname,
                     has_schema_privilege(nspname, 'create,usage') create_usage,
                     has_schema_privilege(nspname, 'usage,create') usage_create
                 FROM pg_namespace
                 ORDER BY nspname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1153,26 +1156,26 @@ async fn test_has_schema_privilege_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_has_table_privilege_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "has_table_privilege",
-            execute_query(
-                "SELECT
+        "has_table_privilege",
+        execute_query(
+            "SELECT
                     relname,
                     has_table_privilege('ovr', relname, 'SELECT') \"select\",
                     has_table_privilege('ovr', relname, 'INSERT') \"insert\"
                 FROM pg_class
                 ORDER BY relname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "has_table_privilege_default_user",
-            // + testing priveleges in lowercase
-            execute_query(
-                "SELECT
+        "has_table_privilege_default_user",
+        // + testing priveleges in lowercase
+        execute_query(
+            "SELECT
                     relname,
                     has_table_privilege(relname, 'select') \"select\",
                     has_table_privilege(relname, 'insert') \"insert\",
@@ -1180,11 +1183,11 @@ async fn test_has_table_privilege_postgres() -> Result<(), CubeError> {
                 FROM pg_class
                 ORDER BY relname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1192,9 +1195,9 @@ async fn test_has_table_privilege_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "has_any_column_privilege",
-            execute_query(
-                "SELECT
+        "has_any_column_privilege",
+        execute_query(
+            "SELECT
                     relname,
                     has_any_column_privilege('ovr', relname, 'SELECT') \"select\",
                     has_any_column_privilege('ovr', relname, 'INSERT') \"insert\",
@@ -1203,17 +1206,17 @@ async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
                 FROM pg_class
                 ORDER BY relname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "has_any_column_privilege_default_user",
-            // + testing priveleges in lowercase
-            execute_query(
-                "SELECT
+        "has_any_column_privilege_default_user",
+        // + testing priveleges in lowercase
+        execute_query(
+            "SELECT
                     relname,
                     has_any_column_privilege(relname, 'select') \"select\",
                     has_any_column_privilege(relname, 'insert') \"insert\",
@@ -1222,11 +1225,11 @@ async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
                 FROM pg_class
                 ORDER BY relname ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1234,20 +1237,20 @@ async fn test_has_any_column_privilege_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_total_relation_size() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_total_relation_size",
-            execute_query(
-                "SELECT
+        "pg_total_relation_size",
+        execute_query(
+            "SELECT
                     oid,
                     relname,
                     pg_total_relation_size(oid) relsize
                 FROM pg_class
                 ORDER BY oid ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1257,18 +1260,18 @@ async fn test_redshift_charindex() -> Result<(), CubeError> {
     init_testing_logger();
 
     insta::assert_snapshot!(
-            "redshift_charindex",
-            execute_query(
-                r#"
+        "redshift_charindex",
+        execute_query(
+            r#"
                 SELECT
                     charindex('d', 'abcdefg') d,
                     charindex('h', 'abcdefg') none
                 ;"#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
