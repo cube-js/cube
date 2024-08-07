@@ -1,20 +1,22 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, env, sync::Arc};
 
 use async_trait::async_trait;
 use cubeclient::models::{
     V1CubeMeta, V1CubeMetaDimension, V1CubeMetaJoin, V1CubeMetaMeasure, V1CubeMetaSegment,
     V1LoadRequestQuery, V1LoadResponse,
 };
-use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
+use log::Level;
 use uuid::Uuid;
 
+use super::{convert_sql_to_cube_query, MetaContext, QueryPlan};
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, session::DatabaseProtocol, AuthContextRef,
-        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
-        SqlAuthService,
+        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe,
+        session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
+        ServerManager, Session, SessionManager, SqlAuthService, StatusFlags,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
@@ -23,9 +25,9 @@ use crate::{
     CubeError,
 };
 
-use super::MetaContext;
-
 pub mod rewrite_engine;
+#[cfg(test)]
+pub mod test_udfs;
 
 pub fn get_test_meta() -> Vec<V1CubeMeta> {
     vec![
@@ -667,4 +669,75 @@ pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportSe
     }
 
     Arc::new(TestConnectionTransport { meta_context })
+}
+
+pub async fn execute_query_with_flags(
+    query: String,
+    db: DatabaseProtocol,
+) -> Result<(String, StatusFlags), CubeError> {
+    execute_queries_with_flags(vec![query], db).await
+}
+
+pub async fn execute_queries_with_flags(
+    queries: Vec<String>,
+    db: DatabaseProtocol,
+) -> Result<(String, StatusFlags), CubeError> {
+    env::set_var("TZ", "UTC");
+
+    let meta = get_test_tenant_ctx();
+    let session = get_test_session(db, meta.clone()).await;
+
+    let mut output: Vec<String> = Vec::new();
+    let mut output_flags = StatusFlags::empty();
+
+    for query in queries {
+        let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone())
+            .await
+            .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+        match query {
+            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                let df = DFDataFrame::new(ctx.state, &plan);
+                let batches = df.collect().await?;
+                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+                output.push(frame.print());
+                output_flags = flags;
+            }
+            QueryPlan::MetaTabular(flags, frame) => {
+                output.push(frame.print());
+                output_flags = flags;
+            }
+            QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
+                output_flags = flags;
+            }
+        }
+    }
+
+    Ok((output.join("\n").to_string(), output_flags))
+}
+
+pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
+    Ok(execute_query_with_flags(query, db).await?.0)
+}
+
+lazy_static! {
+    pub static ref TEST_LOGGING_INITIALIZED: std::sync::RwLock<bool> =
+        std::sync::RwLock::new(false);
+}
+
+pub fn init_testing_logger() {
+    let mut initialized = TEST_LOGGING_INITIALIZED.write().unwrap();
+    if !*initialized {
+        let log_level = Level::Trace;
+        let logger = simple_logger::SimpleLogger::new()
+            .with_level(Level::Error.to_level_filter())
+            .with_module_level("cubeclient", log_level.to_level_filter())
+            .with_module_level("cubesql", log_level.to_level_filter())
+            .with_module_level("datafusion", Level::Warn.to_level_filter())
+            .with_module_level("pg-srv", Level::Warn.to_level_filter());
+
+        log::set_boxed_logger(Box::new(logger)).unwrap();
+        log::set_max_level(log_level.to_level_filter());
+        *initialized = true;
+    }
 }
