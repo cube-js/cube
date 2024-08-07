@@ -23160,7 +23160,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         if !Rewriter::sql_push_down_enabled() {
             return;
         }
-        init_logger();
+        init_testing_logger();
 
         let query = "
         SELECT
