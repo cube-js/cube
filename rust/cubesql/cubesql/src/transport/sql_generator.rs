@@ -8,15 +8,8 @@ use serde_derive::*;
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use crate::{
-    compile::{
-        engine::df::{
-            scan::MemberField,
-            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
-        },
-        MetaContext,
-    },
-    sql::{AuthContextRef, HttpAuthContext},
-    CubeError, RWLockAsync,
+    compile::engine::df::wrapper::{GroupingSetDesc, GroupingSetType},
+    CubeError,
 };
 
 #[async_trait]
