@@ -161,7 +161,7 @@ dependencies = [
  "lexical-core",
  "multiversion",
  "num",
- "rand 0.8.5",
+ "rand",
  "regex",
  "regex-syntax 0.6.29",
  "serde",
@@ -899,7 +899,7 @@ dependencies = [
  "parquet 11.1.0 (git+https://github.com/cube-js/arrow-rs.git?rev=d9c12d71b655d356c5a287226a763638417972e9)",
  "paste",
  "pin-project-lite",
- "rand 0.8.5",
+ "rand",
  "smallvec",
  "sqlparser",
  "tempfile",
@@ -1029,7 +1029,7 @@ dependencies = [
  "md-5",
  "ordered-float 2.10.1",
  "paste",
- "rand 0.8.5",
+ "rand",
  "regex",
  "sha2",
  "unicode-segmentation",
@@ -2001,15 +2001,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "nanoid"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6226bc4e142124cb44e309a37a04cd9bb10e740d8642855441d3b14808f635e"
-dependencies = [
- "rand 0.6.5",
-]
-
-[[package]]
 name = "nativebridge"
 version = "0.1.0"
 dependencies = [
@@ -2217,7 +2208,7 @@ dependencies = [
  "num",
  "num-bigint",
  "parquet-format",
- "rand 0.8.5",
+ "rand",
  "snap",
  "thrift",
  "zstd",
