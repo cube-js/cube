@@ -150,6 +150,7 @@ describe('GraphQL Schema', () => {
     const app = express();
 
     app.use('/graphql', jsonParser, (req, res) => {
+      // @ts-ignore
       const schema = makeSchema(metaConfig);
   
       return graphqlHTTP({
@@ -174,6 +175,7 @@ describe('GraphQL Schema', () => {
     const GRAPHQL_QUERIES_PATH = `${process.cwd()}/test/graphql-queries/base.gql`;
     
     app.use('/graphql', jsonParser, (req, res) => {
+      // @ts-ignore
       const schema = makeSchema(metaConfig);
     
       return graphqlHTTP({
@@ -196,6 +198,7 @@ describe('GraphQL Schema', () => {
     });
     
     test('should make valid schema', () => {
+      // @ts-ignore
       const schema = makeSchema(metaConfig);
       expectValidSchema(schema);
     });
@@ -226,6 +229,7 @@ describe('GraphQL Schema', () => {
     const app = express();
 
     app.use('/graphql', jsonParser, (req, res) => {
+      // @ts-ignore
       const schema = makeSchema(metaConfigSnakeCase);
       
       return graphqlHTTP({
