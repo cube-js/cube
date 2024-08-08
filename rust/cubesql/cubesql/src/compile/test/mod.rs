@@ -28,6 +28,8 @@ use crate::{
 pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_udfs;
+#[cfg(test)]
+pub mod test_introspection;
 
 pub fn get_test_meta() -> Vec<V1CubeMeta> {
     vec![
