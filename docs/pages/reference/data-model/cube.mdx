@@ -84,7 +84,7 @@ cubes:
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a cube. It must be unique among
 _all cubes and views_ within a deployment and follow the [naming
@@ -106,7 +106,7 @@ cubes:
 
 </CodeTabs>
 
-### data_source
+### `data_source`
 
 Each cube can have its own `data_source` name to support scenarios where data
 should be fetched from multiple databases. The value of the `data_source`
@@ -132,7 +132,7 @@ cubes:
 
 </CodeTabs>
 
-### description
+### `description`
 
 Use a description in your cubes to allow your team to better understand what
 this cube is about. It is a very simple and yet useful tool that gives a hint to
@@ -186,7 +186,7 @@ cubes:
 
 </CodeTabs>
 
-### extends
+### `extends`
 
 You can extend cubes in order to reuse all declared members of a cube. In the
 example below, `extended_order_facts` will reuse the `sql` and `count` measures
@@ -269,7 +269,7 @@ cube(`extended_order_facts`, {
 });
 ```
 
-### public
+### `public`
 
 <InfoBox>
 
@@ -303,7 +303,7 @@ To learn more about using `public` to control visibility based on security
 context, read the [Controlling access to cubes and views
 recipe][ref-recipe-control-access-cubes-views].
 
-### refresh_key
+### `refresh_key`
 
 Cube's caching layer uses `refresh_key` queries to get the current version of
 content for a specific cube. If a query result changes, Cube will invalidate all
@@ -461,7 +461,7 @@ SELECT FLOOR(EXTRACT(EPOCH FROM NOW()) / 5)
 └───────────────────────── second (0 - 59, optional)
 ```
 
-### sql
+### `sql`
 
 The `sql` parameter specifies the SQL that will be used to generate a table that
 will be queried by a cube. It can be any valid SQL query, but usually it takes
@@ -501,7 +501,7 @@ It is recommended to prefer the [`sql_table`](#parameters-sql-table) property
 over the `sql` property for all cubes that are supposed to use queries like
 this: `SELECT * FROM table`.
 
-### sql_table
+### `sql_table`
 
 The `sql_table` property is used as a concise way for defining a cube that uses
 a query like this: `SELECT * FROM table`. Instead of using the
@@ -524,7 +524,7 @@ cubes:
 
 </CodeTabs>
 
-### sql_alias
+### `sql_alias`
 
 Use `sql_alias` when auto-generated cube alias prefix is too long and truncated
 by DB such as Postgres:
@@ -550,7 +550,7 @@ cubes:
 It'll generate aliases for members such as `ofacts__count`. `sql_alias` affects
 all member names including pre-aggregation table names.
 
-### title
+### `title`
 
 Use `title` to change the display name of the cube. By default, Cube will
 humanize the cube's name, so for instance, `users_orders` would become
