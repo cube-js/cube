@@ -575,12 +575,18 @@ class ApiGateway {
       })).filter(cube => cube.config.measures?.length || cube.config.dimensions?.length || cube.config.segments?.length);
   }
 
-  public async meta({ context, res, includeCompilerId, onlyCompilerId }: {
+  public async meta({ context, res, includeCompilerId, onlyCompilerId, spanTrace }: {
     context: RequestContext,
     res: MetaResponseResultFn,
     includeCompilerId?: boolean,
-    onlyCompilerId?: boolean
+    onlyCompilerId?: boolean,
+    spanTrace?: boolean
   }) {
+    if (spanTrace) {
+      this.log({
+        type: 'SQL API Meta Request'
+      }, context);
+    }
     const requestStarted = new Date();
 
     try {
@@ -603,6 +609,12 @@ class ApiGateway {
       const response: { cubes: any[], compilerId?: string } = { cubes };
       if (includeCompilerId) {
         response.compilerId = metaConfig.compilerId;
+      }
+      if (spanTrace) {
+        this.log({
+          type: 'SQL API Meta Request Success',
+          duration: new Date().getTime() - requestStarted.getTime()
+        }, context);
       }
       res(response);
     } catch (e: any) {
@@ -1830,6 +1842,11 @@ class ApiGateway {
         resType = query.responseFormat;
       }
 
+      this.log({
+        type: 'SQL API Load Request',
+        query
+      }, context);
+
       const [queryType, normalizedQueries] =
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
 
@@ -1932,9 +1949,34 @@ class ApiGateway {
         );
       }
 
+      console.log('RESULTS');
+      console.log(results);
       res(request.streaming ? results[0] : {
         results,
       });
+
+      this.log(
+        {
+          type: 'SQL API Load Request Success',
+          query,
+          duration: this.duration(requestStarted),
+          isPlayground: Boolean(
+            context.signedWithPlaygroundAuthSecret
+          ),
+          queries: results.length,
+          queriesWithPreAggregations:
+            results.filter(
+              (r: any) => Object.keys(
+                r.usedPreAggregations || {}
+              ).length
+            ).length,
+          queriesWithData:
+            results.filter((r: any) => r.data?.length).length,
+          dbType: results.map((r: any) => r.dbType),
+          streaming: request.streaming,
+        },
+        context,
+      );
     } catch (e: any) {
       this.handleError({
         e, context, query, res, requestStarted

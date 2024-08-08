@@ -103,6 +103,8 @@ struct MetaRequest {
     session: SessionContext,
     #[serde(rename = "onlyCompilerId")]
     only_compiler_id: bool,
+    #[serde(rename = "spanTrace")]
+    span_trace: bool,
 }
 
 #[async_trait]
@@ -127,6 +129,7 @@ impl TransportService for NodeBridgeTransport {
                 security_context: native_auth.security_context.clone(),
             },
             only_compiler_id: false,
+            span_trace: true,
         })?;
 
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
@@ -228,6 +231,7 @@ impl TransportService for NodeBridgeTransport {
                 security_context: native_auth.security_context.clone(),
             },
             only_compiler_id: true,
+            span_trace: false,
         })?;
         let response = call_js_with_channel_as_callback::<V1MetaResponse>(
             self.channel.clone(),
