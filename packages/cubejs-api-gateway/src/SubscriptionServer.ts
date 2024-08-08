@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-
+import { EventEmitter } from 'events';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
@@ -22,12 +22,15 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
     protected readonly contextAcceptor: ContextAcceptorFn,
+    protected readonly eventEmitter: EventEmitter
   ) {
+    this.eventEmitter.on('cubeRenewed', (val) => this.renewCubes(val));
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
@@ -156,5 +159,16 @@ export class SubscriptionServer {
 
   public clear() {
     this.subscriptionStore.clear();
+  }
+
+  public async renewCubes(val) {
+    if (!val.renewedCube) {
+      return;
+    }
+
+    const subs = await this.subscriptionStore.getSubscriptionsByCubeName(val.renewedCube);
+    await Promise.all(subs.map(async subscription => {
+      await this.processMessage(subscription.connectionId, subscription.message, true);
+    }));
   }
 }

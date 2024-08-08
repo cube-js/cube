@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
+import { EventEmitter } from 'events';
 import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -39,22 +40,27 @@ export type QueryWithParams = QueryTuple;
 
 export type Query = {
   requestId?: string;
+  requestContext?: any;
+  cube?: string;
   dataSource: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
+  securityContext?: any;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
 export type QueryBody = {
   dataSource?: string;
+  cube?: string;
   persistent?: boolean;
   query?: string;
   values?: string[];
   continueWait?: boolean;
   renewQuery?: boolean;
   requestId?: string;
+  requestContext?: any;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;
@@ -147,6 +153,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
+    protected readonly eventEmitter: EventEmitter,
     public readonly options: QueryCacheOptions = {}
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
@@ -790,6 +797,8 @@ export class QueryCache {
         {
           requestId: query.requestId,
           dataSource: query.dataSource,
+          renewedCube: query.cube,
+          requestContext: query.requestContext,
         }
       )
     );
@@ -801,7 +810,9 @@ export class QueryCache {
     options: {
       requestId?: string;
       skipRefreshKeyWaitForRenew?: boolean;
-      dataSource: string
+      dataSource: string;
+      renewedCube?: string;
+      requestContext?: any;
     }
   ) {
     return cacheKeyQueries.map((q) => {
@@ -819,6 +830,8 @@ export class QueryCache {
           dataSource: options.dataSource,
           useInMemory: true,
           external: queryOptions?.external,
+          renewedCube: options.renewedCube,
+          requestContext: options.requestContext,
         },
       );
     });
@@ -850,6 +863,8 @@ export class QueryCache {
       persistent?: boolean,
       primaryQuery?: boolean,
       renewCycle?: boolean,
+      renewedCube?: string,
+      requestContext?: any,
     }
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
@@ -878,6 +893,16 @@ export class QueryCache {
           .cacheDriver
           .set(redisKey, result, expiration)
           .then(({ bytes }) => {
+            this.eventEmitter.emit('cubeRenewed', {
+              cacheKey,
+              requestId: options.requestId,
+              spanId,
+              primaryQuery,
+              renewCycle,
+              bytes,
+              renewedCube: options.renewedCube,
+              requestContext: options.requestContext,
+            });
             this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             this.logger('Outgoing network usage', {
               service: 'cache',
@@ -916,7 +941,6 @@ export class QueryCache {
       const inMemoryValue = this.memoryCache.get(redisKey);
       if (inMemoryValue) {
         const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
-
         if (
           renewalKey && (
             !renewalThreshold ||

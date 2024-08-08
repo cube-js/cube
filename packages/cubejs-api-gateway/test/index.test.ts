@@ -5,6 +5,7 @@ import express from 'express';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import { EventEmitter } from 'events';
 
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
 import { generateAuthToken } from './utils';
@@ -50,7 +51,8 @@ async function createApiGateway(
 ) {
   process.env.NODE_ENV = 'production';
 
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, {
+  const eventEmitter = new EventEmitter();
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, async () => adapterApi, logger, eventEmitter, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',

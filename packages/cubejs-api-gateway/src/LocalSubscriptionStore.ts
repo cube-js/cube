@@ -20,6 +20,7 @@ export class LocalSubscriptionStore {
     const connection = this.getConnection(connectionId);
     connection.subscriptions[subscriptionId] = {
       ...subscription,
+      cube: 'TODO',
       timestamp: new Date()
     };
   }
@@ -43,6 +44,10 @@ export class LocalSubscriptionStore {
           ...this.connections[connectionId].subscriptions[subscriptionId]
         }));
     }).reduce((a, b) => a.concat(b), []);
+  }
+
+  public async getSubscriptionsByCubeName(cube: string) {
+    return (await this.getAllSubscriptions()).filter(subscription => subscription.cube === cube);
   }
 
   public async cleanupSubscriptions(connectionId: string) {

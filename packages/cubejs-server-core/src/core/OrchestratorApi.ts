@@ -1,6 +1,7 @@
 /* eslint-disable no-throw-literal */
 import * as stream from 'stream';
 import pt from 'promise-timeout';
+import { EventEmitter } from 'events';
 import {
   QueryOrchestrator,
   ContinueWaitError,
@@ -28,6 +29,7 @@ export class OrchestratorApi {
   public constructor(
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger,
+    protected readonly eventEmitter: EventEmitter,
     protected readonly options: OrchestratorApiOptions
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
@@ -36,6 +38,7 @@ export class OrchestratorApi {
       options.redisPrefix || 'STANDALONE',
       driverFactory,
       logger,
+      eventEmitter,
       options
     );
   }

@@ -1,5 +1,6 @@
 import express from 'express';
 import request from 'supertest';
+import { EventEmitter } from 'events';
 import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
 import {
   compilerApi,
@@ -18,7 +19,9 @@ function createApiGateway(
   const app = express();
   const adapterApi: any = new AdapterApiMock();
   const dataSourceStorage: any = new DataSourceStorageMock();
-  const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, {
+  const eventEmitter = new EventEmitter();
+  
+  const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, eventEmitter, {
     standalone: true,
     dataSourceStorage,
     basePath: '/cubejs-api',
