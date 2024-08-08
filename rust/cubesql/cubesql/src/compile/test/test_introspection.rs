@@ -7,21 +7,21 @@ use crate::{
 #[tokio::test]
 async fn test_tableau() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "tableau_table_name_column_name_query",
-            execute_query(
-                "SELECT `table_name`, `column_name`
+        "tableau_table_name_column_name_query",
+        execute_query(
+            "SELECT `table_name`, `column_name`
                 FROM `information_schema`.`columns`
                 WHERE `data_type`='enum' AND `table_schema`='db'"
-                    .to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::MySQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "tableau_null_text_query",
-            execute_query(
-                "
+        "tableau_null_text_query",
+        execute_query(
+            "
                 SELECT
                     NULL::text AS PKTABLE_CAT,
                     pkn.nspname AS PKTABLE_SCHEM,
@@ -88,16 +88,16 @@ async fn test_tableau() -> Result<(), CubeError> {
                     pos.n
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "tableau_table_cat_query",
-            execute_query(
-                "
+        "tableau_table_cat_query",
+        execute_query(
+            "
                 SELECT
                     result.TABLE_CAT,
                     result.TABLE_SCHEM,
@@ -133,11 +133,11 @@ async fn test_tableau() -> Result<(), CubeError> {
                     result.pk_name,
                     result.key_seq;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -145,9 +145,9 @@ async fn test_tableau() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_excel() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "excel_select_db_query",
-            execute_query(
-                "
+        "excel_select_db_query",
+        execute_query(
+            "
                 SELECT
                     'db' as Database,
                     ns.nspname as Schema,
@@ -192,16 +192,16 @@ async fn test_excel() -> Result<(), CubeError> {
                 ORDER BY relname
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "excel_typname_big_query",
-            execute_query(
-                "
+        "excel_typname_big_query",
+        execute_query(
+            "
                 SELECT
                     typname as name,
                     n.nspname as Schema,
@@ -243,16 +243,16 @@ async fn test_excel() -> Result<(), CubeError> {
                 ORDER BY name
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "excel_typname_aclitem_query",
-            execute_query(
-                "
+        "excel_typname_aclitem_query",
+        execute_query(
+            "
                 SELECT
                     typname as name,
                     t.oid as oid,
@@ -265,16 +265,16 @@ async fn test_excel() -> Result<(), CubeError> {
                     typelem != 0
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "excel_pg_constraint_query",
-            execute_query(
-                "
+        "excel_pg_constraint_query",
+        execute_query(
+            "
                 SELECT
                     a.conname as Name,
                     ns.nspname as Schema,
@@ -314,16 +314,16 @@ async fn test_excel() -> Result<(), CubeError> {
                 ORDER BY 1
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "excel_pg_attribute_query",
-            execute_query(
-                "
+        "excel_pg_attribute_query",
+        execute_query(
+            "
                 SELECT DISTINCT
                     attname AS Name,
                     attnum
@@ -338,16 +338,16 @@ async fn test_excel() -> Result<(), CubeError> {
                     attnum in (2)
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "excel_fkey_query",
-            execute_query(
-                "
+        "excel_fkey_query",
+        execute_query(
+            "
                 SELECT
                     nspname as Schema,
                     cl.relname as Table,
@@ -367,11 +367,11 @@ async fn test_excel() -> Result<(), CubeError> {
                 order by 1
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "excel_large_select_query",
@@ -470,9 +470,9 @@ async fn test_excel() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "excel_exists_query",
-            execute_query(
-                "
+        "excel_exists_query",
+        execute_query(
+            "
                 SELECT
                     a.attname as fieldname,
                     a.attnum  as fieldordinal,
@@ -566,11 +566,11 @@ async fn test_excel() -> Result<(), CubeError> {
                     fieldordinal
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -578,9 +578,9 @@ async fn test_excel() -> Result<(), CubeError> {
 #[tokio::test]
 async fn tableau_desktop_constraints() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "tableau_desktop_constraints",
-            execute_query(
-                "select	'test'::name as PKTABLE_CAT,
+        "tableau_desktop_constraints",
+        execute_query(
+            "select	'test'::name as PKTABLE_CAT,
                 n2.nspname as PKTABLE_SCHEM,
                 c2.relname as PKTABLE_NAME,
                 a2.attname as PKCOLUMN_NAME,
@@ -645,11 +645,11 @@ async fn tableau_desktop_constraints() -> Result<(), CubeError> {
               on cn.conrelid = ref.confrelid
               and cn.contype = 'p')
               order by ref.oid, ref.i;"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -707,9 +707,9 @@ async fn tableau_desktop_columns() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "tableau_desktop_indexes",
-            execute_query(
-                "SELECT
+        "tableau_desktop_indexes",
+        execute_query(
+            "SELECT
                     ta.attname,
                     ia.attnum,
                     ic.relname,
@@ -736,16 +736,16 @@ async fn tableau_desktop_columns() -> Result<(), CubeError> {
                     AND ic.oid = i.indexrelid
                 ORDER BY
                     ia.attnum;"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "tableau_desktop_pkeys",
-            execute_query(
-                "SELECT
+        "tableau_desktop_pkeys",
+        execute_query(
+            "SELECT
                     ta.attname,
                     ia.attnum,
                     ic.relname,
@@ -772,16 +772,16 @@ async fn tableau_desktop_columns() -> Result<(), CubeError> {
                     AND ic.oid = i.indexrelid
                 ORDER BY
                     ia.attnum;"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "tableau_desktop_tables",
-            execute_query(
-                "select
+        "tableau_desktop_tables",
+        execute_query(
+            "select
                     relname,
                     nspname,
                     relkind
@@ -800,11 +800,11 @@ async fn tableau_desktop_columns() -> Result<(), CubeError> {
                 order by
                     nspname,
                     relname"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -838,13 +838,13 @@ async fn tableau_get_expr_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn datagrip_introspection() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "datagrip_introspection",
-            execute_query(
-                "select current_database(), current_schema(), current_user;".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "datagrip_introspection",
+        execute_query(
+            "select current_database(), current_schema(), current_user;".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -852,23 +852,23 @@ async fn datagrip_introspection() -> Result<(), CubeError> {
 #[tokio::test]
 async fn dbeaver_introspection() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "dbeaver_introspection_init",
-            execute_query(
-                "SELECT current_schema(), session_user;".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "dbeaver_introspection_init",
+        execute_query(
+            "SELECT current_schema(), session_user;".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "dbeaver_introspection_databases",
-            execute_query(
-                "SELECT db.oid,db.* FROM pg_catalog.pg_database db WHERE datname = 'cubedb'"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "dbeaver_introspection_databases",
+        execute_query(
+            "SELECT db.oid,db.* FROM pg_catalog.pg_database db WHERE datname = 'cubedb'"
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "dbeaver_introspection_namespaces",
@@ -903,20 +903,20 @@ async fn dbeaver_introspection() -> Result<(), CubeError> {
 #[tokio::test]
 async fn postico1_introspection() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "postico1_schemas",
-            execute_query(
-                "SELECT
+        "postico1_schemas",
+        execute_query(
+            "SELECT
                     oid,
                     nspname,
                     nspname = ANY (current_schemas(true)) AS is_on_search_path,
                     oid = pg_my_temp_schema() AS is_my_temp_schema,
                     pg_is_other_temp_schema(oid) AS is_other_temp_schema
                 FROM pg_namespace"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -924,9 +924,9 @@ async fn postico1_introspection() -> Result<(), CubeError> {
 #[tokio::test]
 async fn tableau_regclass_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "tableau_regclass_query",
-            execute_query(
-                "SELECT NULL          AS TABLE_CAT,
+        "tableau_regclass_query",
+        execute_query(
+            "SELECT NULL          AS TABLE_CAT,
                 n.nspname     AS TABLE_SCHEM,
                 c.relname     AS TABLE_NAME,
                 CASE n.nspname ~ '^pg_'
@@ -999,11 +999,11 @@ async fn tableau_regclass_query() -> Result<(), CubeError> {
                             AND n.nspname <> 'information_schema' ) )
             ORDER BY TABLE_SCHEM ASC, TABLE_NAME ASC
             ;"
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1052,9 +1052,9 @@ async fn powerbi_introspection() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "powerbi_composite_types",
-            execute_query(
-                "/*** Load field definitions for (free-standing) composite types ***/
+        "powerbi_composite_types",
+        execute_query(
+            "/*** Load field definitions for (free-standing) composite types ***/
                 SELECT typ.oid, att.attname, att.atttypid
                 FROM pg_type AS typ
                 JOIN pg_namespace AS ns ON (ns.oid = typ.typnamespace)
@@ -1065,25 +1065,25 @@ async fn powerbi_introspection() -> Result<(), CubeError> {
                 attnum > 0 AND     /* Don't load system attributes */
                 NOT attisdropped
                 ORDER BY typ.oid, att.attnum"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "powerbi_enums",
-            execute_query(
-                "/*** Load enum fields ***/
+        "powerbi_enums",
+        execute_query(
+            "/*** Load enum fields ***/
                 SELECT pg_type.oid, enumlabel
                 FROM pg_enum
                 JOIN pg_type ON pg_type.oid=enumtypid
                 ORDER BY oid, enumsortorder"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "powerbi_table_columns",
@@ -1099,17 +1099,17 @@ async fn powerbi_introspection() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "powerbi_schemas",
-            execute_query(
-                "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+        "powerbi_schemas",
+        execute_query(
+            "select TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
                 from INFORMATION_SCHEMA.tables
                 where TABLE_SCHEMA not in ('information_schema', 'pg_catalog')
                 order by TABLE_SCHEMA, TABLE_NAME"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "powerbi_from_subquery",
@@ -1145,9 +1145,9 @@ async fn powerbi_introspection() -> Result<(), CubeError> {
         );
 
     insta::assert_snapshot!(
-            "powerbi_uppercase_alias",
-            execute_query(
-                "
+        "powerbi_uppercase_alias",
+        execute_query(
+            "
                 select
                     i.CONSTRAINT_SCHEMA || '_' || i.CONSTRAINT_NAME as INDEX_NAME,
                     ii.COLUMN_NAME,
@@ -1173,11 +1173,11 @@ async fn powerbi_introspection() -> Result<(), CubeError> {
                     ii.ORDINAL_POSITION
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1187,9 +1187,9 @@ async fn superset_meta_queries() -> Result<(), CubeError> {
     init_testing_logger();
 
     insta::assert_snapshot!(
-            "superset_attname_query",
-            execute_query(
-                r#"SELECT a.attname
+        "superset_attname_query",
+        execute_query(
+            r#"SELECT a.attname
                 FROM pg_attribute a JOIN (
                 SELECT unnest(ix.indkey) attnum,
                 generate_subscripts(ix.indkey, 1) ord
@@ -1199,17 +1199,17 @@ async fn superset_meta_queries() -> Result<(), CubeError> {
                 WHERE a.attrelid = 13449
                 ORDER BY k.ord
                 "#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     // TODO should be pg_get_expr instead of format_type
     insta::assert_snapshot!(
-            "superset_subquery",
-            execute_query(
-                "
+        "superset_subquery",
+        execute_query(
+            "
                 SELECT
                     a.attname,
                     pg_catalog.format_type(a.atttypid, a.atttypmod),
@@ -1238,16 +1238,16 @@ async fn superset_meta_queries() -> Result<(), CubeError> {
                 ORDER BY a.attnum
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "superset_visible_query",
-            execute_query(
-                r#"
+        "superset_visible_query",
+        execute_query(
+            r#"
                 SELECT
                     t.typname as "name",
                     pg_catalog.pg_type_is_visible(t.oid) as "visible",
@@ -1263,16 +1263,16 @@ async fn superset_meta_queries() -> Result<(), CubeError> {
                     e.oid
                 ;
                 "#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
-            "superset_attype_query",
-            execute_query(
-                r#"SELECT
+        "superset_attype_query",
+        execute_query(
+            r#"SELECT
                     t.typname as "name",
                     pg_catalog.format_type(t.typbasetype, t.typtypmod) as "attype",
                     not t.typnotnull as "nullable",
@@ -1283,11 +1283,11 @@ async fn superset_meta_queries() -> Result<(), CubeError> {
                 LEFT JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
                 WHERE t.typtype = 'd'
                 ;"#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     insta::assert_snapshot!(
             "superset_indkey_varchar_query",
@@ -1328,9 +1328,9 @@ async fn superset_conname_query() -> Result<(), CubeError> {
     init_testing_logger();
 
     insta::assert_snapshot!(
-            "superset_conname_query",
-            execute_query(
-                r#"SELECT r.conname,
+        "superset_conname_query",
+        execute_query(
+            r#"SELECT r.conname,
                 pg_catalog.pg_get_constraintdef(r.oid, true) as condef,
                 n.nspname as conschema
                 FROM  pg_catalog.pg_constraint r,
@@ -1342,11 +1342,11 @@ async fn superset_conname_query() -> Result<(), CubeError> {
                 n.oid = c.relnamespace
                 ORDER BY 1
                 "#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1354,9 +1354,9 @@ async fn superset_conname_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_insubquery_where_tables_spacing() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "grafana_insubquery_where_tables_spacing",
-            execute_query(
-                "select quote_ident(table_name) as \"table\" from information_schema.tables\
+        "grafana_insubquery_where_tables_spacing",
+        execute_query(
+            "select quote_ident(table_name) as \"table\" from information_schema.tables\
             \n    where quote_ident(table_schema) not in ('information_schema',\
             \n                             'pg_catalog',\
             \n                             '_timescaledb_cache',\
@@ -1376,11 +1376,11 @@ async fn test_insubquery_where_tables_spacing() -> Result<(), CubeError> {
             \n            ) as i,\
             \n            string_to_array(current_setting('search_path'),',') s\
             \n          )"
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1388,13 +1388,13 @@ async fn test_insubquery_where_tables_spacing() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_grafana_pg_version_introspection() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "grafana_pg_version_introspection",
-            execute_query(
-                "SELECT current_setting('server_version_num')::int/100 as version".to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+        "grafana_pg_version_introspection",
+        execute_query(
+            "SELECT current_setting('server_version_num')::int/100 as version".to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1448,9 +1448,9 @@ async fn test_rust_client() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_get_expr_1",
-            execute_query(
-                "
+        "pg_get_expr_1",
+        execute_query(
+            "
                 SELECT
                     attrelid,
                     attname,
@@ -1461,15 +1461,15 @@ async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
                     attname ASC
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
     insta::assert_snapshot!(
-            "pg_get_expr_2",
-            execute_query(
-                "
+        "pg_get_expr_2",
+        execute_query(
+            "
                 SELECT
                     attrelid,
                     attname,
@@ -1480,11 +1480,11 @@ async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
                     attname ASC
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1492,9 +1492,9 @@ async fn test_pg_get_expr_postgres() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_pg_truetyp() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "pg_truetypid_truetypmod",
-            execute_query(
-                "
+        "pg_truetypid_truetypmod",
+        execute_query(
+            "
                 SELECT
                     a.attrelid,
                     a.attname,
@@ -1509,11 +1509,11 @@ async fn test_pg_truetyp() -> Result<(), CubeError> {
                 JOIN pg_type t ON t.oid = a.atttypid
                 ORDER BY a.attrelid ASC, a.attnum ASC
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1524,9 +1524,9 @@ async fn sqlalchemy_new_conname_query() -> Result<(), CubeError> {
     init_testing_logger();
 
     insta::assert_snapshot!(
-            "sqlalchemy_new_conname_query",
-            execute_query(
-                r#"SELECT
+        "sqlalchemy_new_conname_query",
+        execute_query(
+            r#"SELECT
                 a.attname,
                 pg_catalog.format_type(a.atttypid, a.atttypmod),
                 (
@@ -1586,11 +1586,11 @@ async fn sqlalchemy_new_conname_query() -> Result<(), CubeError> {
                 AND NOT a.attisdropped
             ORDER BY
                 a.attnum"#
-                    .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+                .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1598,9 +1598,9 @@ async fn sqlalchemy_new_conname_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_sqlalchemy_regtype() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "sqlalchemy_regtype",
-            execute_query(
-                "SELECT
+        "sqlalchemy_regtype",
+        execute_query(
+            "SELECT
                     typname AS name,
                     oid,
                     typarray AS array_oid,
@@ -1613,11 +1613,11 @@ async fn test_sqlalchemy_regtype() -> Result<(), CubeError> {
                 ORDER BY
                     t.oid
                 ;"
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1720,9 +1720,9 @@ async fn test_metabase() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_metabase_table_cat_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "metabase_table_cat_query",
-            execute_query(
-                "
+        "metabase_table_cat_query",
+        execute_query(
+            "
                 SELECT  result.table_cat,
                         result.table_schem,
                         result.table_name,
@@ -1747,11 +1747,11 @@ async fn test_metabase_table_cat_query() -> Result<(), CubeError> {
                 WHERE result.a_attnum = (result.keys).x
                 ORDER BY result.table_name, result.pk_name, result.key_seq;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1759,9 +1759,9 @@ async fn test_metabase_table_cat_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_metabase_pktable_cat_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "metabase_pktable_cat_query",
-            execute_query(
-                "
+        "metabase_pktable_cat_query",
+        execute_query(
+            "
                 SELECT  NULL::text  AS pktable_cat,
                         pkn.nspname AS pktable_schem,
                         pkc.relname AS pktable_name,
@@ -1820,11 +1820,11 @@ async fn test_metabase_pktable_cat_query() -> Result<(), CubeError> {
                 AND     fkc.relname = 'actor'
                 ORDER BY pkn.nspname, pkc.relname, con.conname, pos.n;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1832,19 +1832,19 @@ async fn test_metabase_pktable_cat_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_metabase_type_in_subquery_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "metabase_type_in_subquery_query",
-            execute_query(
-                "
+        "metabase_type_in_subquery_query",
+        execute_query(
+            "
                 SELECT nspname, typname
                 FROM pg_type t
                 JOIN pg_namespace n ON n.oid = t.typnamespace
                 WHERE t.oid IN (SELECT DISTINCT enumtypid FROM pg_enum e);
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1852,9 +1852,9 @@ async fn test_metabase_type_in_subquery_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "sigma_computing_ilike_query",
-            execute_query(
-                "
+        "sigma_computing_ilike_query",
+        execute_query(
+            "
                 select distinct table_schema
                 from information_schema.tables
                 where
@@ -1863,11 +1863,11 @@ async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
                     table_schema ilike '%'
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1875,9 +1875,9 @@ async fn test_sigma_computing_ilike_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_sigma_computing_pg_matviews_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "sigma_computing_pg_matviews_query",
-            execute_query(
-                "
+        "sigma_computing_pg_matviews_query",
+        execute_query(
+            "
                 SELECT table_name FROM (
                     select table_name
                     from information_schema.tables
@@ -1892,11 +1892,11 @@ async fn test_sigma_computing_pg_matviews_query() -> Result<(), CubeError> {
                 ORDER BY table_name ASC
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -1965,9 +1965,9 @@ async fn test_sigma_computing_array_subquery_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_sigma_computing_with_subquery_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "sigma_computing_with_subquery_query",
-            execute_query(
-                "
+        "sigma_computing_with_subquery_query",
+        execute_query(
+            "
                 with
                     nsp as (
                         select oid
@@ -1996,11 +1996,11 @@ async fn test_sigma_computing_with_subquery_query() -> Result<(), CubeError> {
                 order by attnum
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2008,9 +2008,9 @@ async fn test_sigma_computing_with_subquery_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_sigma_computing_attnames() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "sigma_computing_attnames",
-            execute_query(
-                "
+        "sigma_computing_attnames",
+        execute_query(
+            "
                 with
                     nsp as (
                         select oid as relnamespace
@@ -2040,11 +2040,11 @@ async fn test_sigma_computing_attnames() -> Result<(), CubeError> {
                     and attnum = any(con.conkey)
                 order by attnum
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2052,9 +2052,9 @@ async fn test_sigma_computing_attnames() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "google_sheets_pg_database_query",
-            execute_query(
-                "
+        "google_sheets_pg_database_query",
+        execute_query(
+            "
                 SELECT
                     cl.relname as Table,
                     att.attname AS Name,
@@ -2141,11 +2141,11 @@ async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
                 ORDER BY attnum
                 ;
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2153,9 +2153,9 @@ async fn test_google_sheets_pg_database_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_quicksight_has_schema_privilege_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "quicksight_has_schema_privilege_query",
-            execute_query(
-                "
+        "quicksight_has_schema_privilege_query",
+        execute_query(
+            "
                 SELECT nspname AS schema_name
                 FROM pg_namespace
                 WHERE
@@ -2167,11 +2167,11 @@ async fn test_quicksight_has_schema_privilege_query() -> Result<(), CubeError> {
                     nspname NOT LIKE 'pg_toast%' AND
                     nspname NOT LIKE 'pg_temp_%'
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2179,9 +2179,9 @@ async fn test_quicksight_has_schema_privilege_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_quicksight_pktable_cat_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "quicksight_pktable_cat_query",
-            execute_query(
-                "
+        "quicksight_pktable_cat_query",
+        execute_query(
+            "
                 SELECT
                     NULL::text AS PKTABLE_CAT,
                     pkn.nspname AS PKTABLE_SCHEM,
@@ -2249,11 +2249,11 @@ async fn test_quicksight_pktable_cat_query() -> Result<(), CubeError> {
                     con.conname,
                     pos.n
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2261,9 +2261,9 @@ async fn test_quicksight_pktable_cat_query() -> Result<(), CubeError> {
 #[tokio::test]
 async fn test_quicksight_table_cat_query() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "quicksight_table_cat_query",
-            execute_query(
-                "
+        "quicksight_table_cat_query",
+        execute_query(
+            "
                 SELECT
                     NULL AS TABLE_CAT,
                     n.nspname AS TABLE_SCHEM,
@@ -2296,11 +2296,11 @@ async fn test_quicksight_table_cat_query() -> Result<(), CubeError> {
                     pk_name,
                     key_seq
                 "
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -2967,19 +2967,19 @@ async fn test_langchain_pg_get_indexdef_and_in_realiasing() -> Result<(), CubeEr
 #[tokio::test]
 async fn test_zoho_inet_server_addr() -> Result<(), CubeError> {
     insta::assert_snapshot!(
-            "zoho_inet_server_addr",
-            execute_query(
-                "
+        "zoho_inet_server_addr",
+        execute_query(
+            "
                 select
                     pg_backend_pid(),
                     coalesce(cast(inet_server_addr() as text ),'addr'),
                     current_database()
                 ;"
-                .to_string(),
-                DatabaseProtocol::PostgreSQL,
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await?
+    );
 
     Ok(())
 }
@@ -3060,9 +3060,9 @@ async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
     init_testing_logger();
 
     insta::assert_snapshot!(
-            "metabase_introspection_indoption",
-            execute_query(
-                r#"
+        "metabase_introspection_indoption",
+        execute_query(
+            r#"
                 SELECT
                   tmp.TABLE_CAT,
                   tmp.TABLE_SCHEM,
@@ -3131,10 +3131,10 @@ async fn test_metabase_introspection_indoption() -> Result<(), CubeError> {
                   INDEX_NAME,
                   ORDINAL_POSITION
                 "#
-                .to_string(),
-                DatabaseProtocol::PostgreSQL
-            )
-            .await?
-        );
+            .to_string(),
+            DatabaseProtocol::PostgreSQL
+        )
+        .await?
+    );
     Ok(())
 }
