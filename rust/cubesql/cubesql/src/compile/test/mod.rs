@@ -9,7 +9,7 @@ use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFram
 use log::Level;
 use uuid::Uuid;
 
-use super::{convert_sql_to_cube_query, MetaContext, QueryPlan};
+use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     config::{ConfigObj, ConfigObjImpl},
@@ -725,23 +725,28 @@ pub struct TestContext {
 
 impl TestContext {
     pub async fn new(db: DatabaseProtocol) -> Self {
+        Self::with_config(db, Arc::new(ConfigObjImpl::default())).await
+    }
+
+    pub async fn with_config(db: DatabaseProtocol, config_obj: Arc<dyn ConfigObj>) -> Self {
         // TODO setenv is not thread-safe, remove this
         env::set_var("TZ", "UTC");
 
         let meta = get_test_tenant_ctx();
         let transport = get_test_transport_priv(meta.clone());
-        let session = get_test_session_with_config_and_transport(
-            db,
-            Arc::new(ConfigObjImpl::default()),
-            transport.clone(),
-        )
-        .await;
+        let session =
+            get_test_session_with_config_and_transport(db, config_obj, transport.clone()).await;
 
         TestContext {
             meta,
             transport,
             session,
         }
+    }
+
+    pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
+        // TODO push to_string() deeper
+        convert_sql_to_cube_query(&query.to_string(), self.meta.clone(), self.session.clone()).await
     }
 
     pub async fn execute_query_with_flags(
@@ -759,14 +764,10 @@ impl TestContext {
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            // TODO push to_string() deeper
-            let query = convert_sql_to_cube_query(
-                &query.to_string(),
-                self.meta.clone(),
-                self.session.clone(),
-            )
-            .await
-            .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            let query = self
+                .convert_sql_to_cube_query(&query)
+                .await
+                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
             match query {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
@@ -846,17 +847,11 @@ pub async fn convert_select_to_query_plan_with_config(
     db: DatabaseProtocol,
     config_obj: Arc<dyn ConfigObj>,
 ) -> QueryPlan {
-    env::set_var("TZ", "UTC");
-
-    let meta_context = get_test_tenant_ctx();
-    let query = convert_sql_to_cube_query(
-        &query,
-        meta_context.clone(),
-        get_test_session_with_config(db, config_obj, meta_context).await,
-    )
-    .await;
-
-    query.unwrap()
+    TestContext::with_config(db, config_obj)
+        .await
+        .convert_sql_to_cube_query(&query)
+        .await
+        .unwrap()
 }
 
 pub async fn convert_select_to_query_plan_with_meta(
