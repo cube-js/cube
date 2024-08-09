@@ -1334,6 +1334,7 @@ mod tests {
     use chrono::Datelike;
     use cubeclient::models::{
         V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
     };
     use pretty_assertions::assert_eq;
     use regex::Regex;
@@ -1357,7 +1358,7 @@ mod tests {
     use crate::compile::test::{
         convert_select_to_query_plan, convert_select_to_query_plan_customized,
         convert_select_to_query_plan_with_config, convert_select_to_query_plan_with_meta,
-        execute_queries_with_flags, execute_query, init_testing_logger,
+        execute_queries_with_flags, execute_query, init_testing_logger, TestContext,
     };
 
     #[tokio::test]
@@ -16449,6 +16450,61 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("EXTRACT"));
+    }
+
+    // TODO using this is not correct, but works for now
+    fn empty_annotation() -> V1LoadResultAnnotation {
+        V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
+    }
+
+    fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
+        V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
+    }
+
+    #[tokio::test]
+    async fn test_cube_scan_exec() {
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT dim_str0
+            FROM MultiTypeCube
+            GROUP BY 1
+        "#;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan,
+        );
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan,
+                simple_load_response(vec![json!({"MultiTypeCube.dim_str0": "foo"})]),
+            )
+            .await;
+
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
     }
 
     #[tokio::test]
