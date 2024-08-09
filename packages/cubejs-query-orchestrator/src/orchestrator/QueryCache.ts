@@ -832,6 +832,7 @@ export class QueryCache {
           external: queryOptions?.external,
           renewedCube: options.renewedCube,
           requestContext: options.requestContext,
+          isScheduledRefresh: true,
         },
       );
     });
@@ -865,6 +866,7 @@ export class QueryCache {
       renewCycle?: boolean,
       renewedCube?: string,
       requestContext?: any,
+      isScheduledRefresh?: boolean,
     }
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
@@ -893,16 +895,6 @@ export class QueryCache {
           .cacheDriver
           .set(redisKey, result, expiration)
           .then(({ bytes }) => {
-            this.eventEmitter.emit('cubeRenewed', {
-              cacheKey,
-              requestId: options.requestId,
-              spanId,
-              primaryQuery,
-              renewCycle,
-              bytes,
-              renewedCube: options.renewedCube,
-              requestContext: options.requestContext,
-            });
             this.logger('Renewed', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             this.logger('Outgoing network usage', {
               service: 'cache',
@@ -999,13 +991,19 @@ export class QueryCache {
       ) {
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
+          const res = await fetchNew();
+          this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+          return res;
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
-            if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-            }
+          fetchNew()
+            .then(res => {
+              this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+            })
+            .catch(e => {
+              if (!(e instanceof ContinueWaitError)) {
+                this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+              }
           });
         }
       }
@@ -1016,7 +1014,9 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      const res = fetchNew();
+      this.emitEventWhenUpdatedUpdated(null, res, options);
+      return res;
     }
   }
 
@@ -1047,5 +1047,28 @@ export class QueryCache {
 
   public async testConnection() {
     return this.cacheDriver.testConnection();
+  }
+
+  private emitEventWhenUpdatedUpdated(
+    prevRes: unknown,
+    res: unknown,
+    options: {
+      renewedCube?: string,
+      requestContext?: any,
+      isScheduledRefresh?: boolean,
+  }) {
+    if (!options.isScheduledRefresh) {
+      return;
+    }
+
+    const prevResHash = getCacheHash(JSON.stringify(prevRes));
+    const resHash = getCacheHash(JSON.stringify(res));
+
+    if (prevResHash !== resHash) {
+      this.eventEmitter.emit('cubeRenewed', {
+        renewedCube: options.renewedCube,
+        requestContext: options.requestContext,
+      });
+    }
   }
 }
