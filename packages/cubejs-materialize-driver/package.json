@@ -5,7 +5,7 @@
   "version": "0.35.69",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xip-online-applications/cube-core.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-materialize-driver"
   },
   "engines": {

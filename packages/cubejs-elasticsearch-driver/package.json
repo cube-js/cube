@@ -5,7 +5,7 @@
   "version": "0.35.68",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xip-online-applications/cube-core.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-elasticsearch-driver"
   },
   "engines": {

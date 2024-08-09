@@ -6,7 +6,7 @@
   "types": "index.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xip-online-applications/cube-core.git",
+    "url": "https://github.com/cube-js/cube.git",
     "directory": "packages/cubejs-server"
   },
   "engines": {
