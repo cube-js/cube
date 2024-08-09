@@ -681,49 +681,85 @@ pub async fn execute_query_with_flags(
     query: String,
     db: DatabaseProtocol,
 ) -> Result<(String, StatusFlags), CubeError> {
-    execute_queries_with_flags(vec![query], db).await
+    TestContext::new(db)
+        .await
+        .execute_query_with_flags(query)
+        .await
 }
 
 pub async fn execute_queries_with_flags(
     queries: Vec<String>,
     db: DatabaseProtocol,
 ) -> Result<(String, StatusFlags), CubeError> {
-    env::set_var("TZ", "UTC");
-
-    let meta = get_test_tenant_ctx();
-    let session = get_test_session(db, meta.clone()).await;
-
-    let mut output: Vec<String> = Vec::new();
-    let mut output_flags = StatusFlags::empty();
-
-    for query in queries {
-        let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone())
-            .await
-            .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
-        match query {
-            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
-                let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
-
-                output.push(frame.print());
-                output_flags = flags;
-            }
-            QueryPlan::MetaTabular(flags, frame) => {
-                output.push(frame.print());
-                output_flags = flags;
-            }
-            QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
-                output_flags = flags;
-            }
-        }
-    }
-
-    Ok((output.join("\n").to_string(), output_flags))
+    TestContext::new(db)
+        .await
+        .execute_queries_with_flags(queries)
+        .await
 }
 
 pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
-    Ok(execute_query_with_flags(query, db).await?.0)
+    TestContext::new(db).await.execute_query(query).await
+}
+
+pub struct TestContext {
+    meta: Arc<MetaContext>,
+    session: Arc<Session>,
+}
+
+impl TestContext {
+    pub async fn new(db: DatabaseProtocol) -> Self {
+        // TODO setenv is not thread-safe, remove this
+        env::set_var("TZ", "UTC");
+
+        let meta = get_test_tenant_ctx();
+        let session = get_test_session(db, meta.clone()).await;
+
+        TestContext { meta, session }
+    }
+
+    pub async fn execute_query_with_flags(
+        &self,
+        query: String,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        self.execute_queries_with_flags(vec![query]).await
+    }
+
+    pub async fn execute_queries_with_flags(
+        &self,
+        queries: Vec<String>,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        let mut output: Vec<String> = Vec::new();
+        let mut output_flags = StatusFlags::empty();
+
+        for query in queries {
+            let query = convert_sql_to_cube_query(&query, self.meta.clone(), self.session.clone())
+                .await
+                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            match query {
+                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                    let df = DFDataFrame::new(ctx.state, &plan);
+                    let batches = df.collect().await?;
+                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaTabular(flags, frame) => {
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
+                    output_flags = flags;
+                }
+            }
+        }
+
+        Ok((output.join("\n").to_string(), output_flags))
+    }
+
+    pub async fn execute_query(&self, query: String) -> Result<String, CubeError> {
+        Ok(self.execute_query_with_flags(query).await?.0)
+    }
 }
 
 lazy_static! {
