@@ -1,11 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter } from 'events';
+import { Subject } from 'rxjs';
+import { map, filter, bufferTime } from 'rxjs/operators';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { ExtendedRequestContext, ContextAcceptorFn } from './interfaces';
-import { Subject } from 'rxjs';
-import { map, filter, bufferTime } from 'rxjs/operators';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -24,8 +24,8 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
-
   readonly #cubeRenewSubject = new Subject<any>();
+  
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
     // Map only the renewedCube property
     map((val) => val.renewedCube),

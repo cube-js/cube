@@ -9,7 +9,6 @@ import { EventEmitter } from 'events';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
-import { ResponseResultFn } from '../src/types/request';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,

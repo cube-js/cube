@@ -12,9 +12,9 @@ const getCubeNames = (query) => {
     ...(query.measures || []).map(m => m.split('.')[0]),
     ...(query.dimensions || []).map(d => d.split('.')[0]),
   ];
-  
+
   return Array.from(new Set(allColumns));
-}
+};
 
 export class LocalSubscriptionStore {
   protected connections = {};

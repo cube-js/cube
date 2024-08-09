@@ -991,20 +991,20 @@ export class QueryCache {
       ) {
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          const res = await fetchNew();
-          this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+          const newRes = await fetchNew();
+          this.emitEventWhenUpdatedUpdated(parsedResult.result, newRes, options);
           return res;
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           fetchNew()
-            .then(res => {
-              this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+            .then(newRes => {
+              this.emitEventWhenUpdatedUpdated(parsedResult.result, newRes, options);
             })
             .catch(e => {
               if (!(e instanceof ContinueWaitError)) {
                 this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
               }
-          });
+            });
         }
       }
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
@@ -1014,9 +1014,9 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      const res = fetchNew();
-      this.emitEventWhenUpdatedUpdated(null, res, options);
-      return res;
+      const newRes = fetchNew();
+      this.emitEventWhenUpdatedUpdated(null, newRes, options);
+      return newRes;
     }
   }
 
@@ -1056,7 +1056,8 @@ export class QueryCache {
       renewedCube?: string,
       requestContext?: any,
       isScheduledRefresh?: boolean,
-  }) {
+    }
+  ) {
     if (!options.isScheduledRefresh) {
       return;
     }

@@ -368,7 +368,7 @@ export class RefreshScheduler {
           requestId: context.requestId,
           requestContext: context,
           scheduledRefresh: true,
-          cube: cube,
+          cube,
           loadRefreshKeysOnly: true,
         });
       }));
