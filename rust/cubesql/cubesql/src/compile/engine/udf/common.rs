@@ -5,17 +5,17 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, Float64Builder, GenericStringArray, Int32Builder, Int64Array,
-            Int64Builder, IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray,
-            PrimitiveBuilder, StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder, UInt64Builder,
+            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Builder,
+            Int64Array, Int64Builder, IntervalDayTimeBuilder, IntervalMonthDayNanoArray, ListArray,
+            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder, UInt64Builder,
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
-            IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
-            TimestampNanosecondType, UInt32Type,
+            ArrowPrimitiveType, DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type,
+            IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
+            TimeUnit, TimestampNanosecondType, UInt32Type,
         },
     },
     error::{DataFusionError, Result},
@@ -45,6 +45,9 @@ use crate::{
     },
     sql::SessionState,
 };
+
+type IntervalDayTime = <IntervalDayTimeType as ArrowPrimitiveType>::Native;
+type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native;
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
@@ -1424,10 +1427,12 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     };
 }
 
-fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result<NaiveDateTime> {
-    let month = (i >> (64 + 32)) & 0xFFFFFFFF;
-    let day = (i >> 64) & 0xFFFFFFFF;
-    let nano = i & 0xFFFFFFFFFFFFFFFF;
+fn date_addsub_month_day_nano(
+    t: NaiveDateTime,
+    i: IntervalMonthDayNano,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (month, day, nano) = IntervalMonthDayNanoType::to_parts(i);
 
     let result = if month > 0 && is_add || month < 0 && !is_add {
         t.checked_add_months(Months::new(month as u32))
@@ -1442,9 +1447,7 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     };
 
     let result = result.and_then(|t| {
-        t.checked_add_signed(Duration::nanoseconds(
-            (nano as i64) * (if !is_add { -1 } else { 1 }),
-        ))
+        t.checked_add_signed(Duration::nanoseconds(nano * (if !is_add { -1 } else { 1 })))
     });
     result.ok_or_else(|| {
         DataFusionError::Execution(format!(
@@ -1454,15 +1457,30 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     })
 }
 
-fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
-    let i = match is_add {
-        true => interval,
-        false => -interval,
+fn date_addsub_day_time(
+    t: NaiveDateTime,
+    interval: IntervalDayTime,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (days, millis) = IntervalDayTimeType::to_parts(interval);
+
+    let result = if days > 0 && is_add || days < 0 && !is_add {
+        t.checked_add_days(Days::new(days as u64))
+    } else {
+        t.checked_sub_days(Days::new(days.abs() as u64))
     };
 
-    let days: i64 = i.signum() * (i.abs() >> 32);
-    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    return Ok(t + chrono::Duration::days(days) + chrono::Duration::milliseconds(millis));
+    let result = result.and_then(|t| {
+        t.checked_add_signed(Duration::milliseconds(
+            millis as i64 * (if !is_add { -1 } else { 1 }),
+        ))
+    });
+    result.ok_or_else(|| {
+        DataFusionError::Execution(format!(
+            "Failed to add interval: {} day {} ms",
+            days, millis
+        ))
+    })
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
@@ -2295,6 +2313,86 @@ macro_rules! generate_series_udtf {
     }};
 }
 
+macro_rules! generate_series_helper_date32 {
+    ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
+        let current_dt = NaiveDateTime::from_timestamp_opt(($CURRENT as i64) * 86400, 0)
+            .ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Cannot convert date to NaiveDateTime: {}",
+                    $CURRENT
+                ))
+            })?;
+        let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
+        $CURRENT = (res.timestamp() / 86400) as $PRIMITIVE_TYPE;
+    };
+}
+
+macro_rules! generate_series_helper_timestamp {
+    ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
+        let current_dt = NaiveDateTime::from_timestamp_opt(
+            ($CURRENT as i64) / 1_000_000_000,
+            ($CURRENT % 1_000_000_000) as u32,
+        )
+        .ok_or_else(|| {
+            DataFusionError::Execution(format!(
+                "Cannot convert timestamp to NaiveDateTime: {}",
+                $CURRENT
+            ))
+        })?;
+        let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
+        $CURRENT = res.timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
+    };
+}
+
+macro_rules! generate_series_non_primitive_udtf {
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $HANDLE_MACRO:ident) => {{
+        let mut section_sizes: Vec<usize> = Vec::new();
+        let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
+
+        if l_arr.is_some() {
+            let l_arr = l_arr.unwrap();
+            let r_arr = downcast_primitive_arg!($ARGS[1], "right", $TYPE);
+            let step_arr = IntervalMonthDayNanoArray::from_value(
+                IntervalMonthDayNanoType::make_value(0, 1, 0), // 1 day as default
+                1,
+            );
+            let step_arr = if $ARGS.len() > 2 {
+                downcast_primitive_arg!($ARGS[2], "step", IntervalMonthDayNanoType)
+            } else {
+                &step_arr
+            };
+
+            let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
+            for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
+                let step = if step_arr.len() > i {
+                    step_arr.value(i)
+                } else {
+                    step_arr.value(0)
+                };
+
+                if let (Some(start), Some(end)) = (start, end) {
+                    let mut section_size: i64 = 0;
+                    if start <= end && step > 0 {
+                        let mut current = start;
+                        loop {
+                            if current > end {
+                                break;
+                            }
+                            builder.append_value(current).unwrap();
+
+                            section_size += 1;
+                            $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                        }
+                    }
+                    section_sizes.push(section_size as usize);
+                }
+            }
+
+            return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
+        }
+    }};
+}
+
 pub fn create_generate_series_udtf() -> TableUDF {
     let fun = make_table_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2 || args.len() == 3);
@@ -2303,6 +2401,24 @@ pub fn create_generate_series_udtf() -> TableUDF {
             generate_series_udtf!(args, Int64Type, i64)
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
             generate_series_udtf!(args, Float64Type, f64)
+        } else if args[0].as_any().downcast_ref::<Date32Array>().is_some() {
+            generate_series_non_primitive_udtf!(
+                args,
+                Date32Type,
+                i32,
+                generate_series_helper_date32
+            )
+        } else if args[0]
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .is_some()
+        {
+            generate_series_non_primitive_udtf!(
+                args,
+                TimestampNanosecondType,
+                i64,
+                generate_series_helper_timestamp
+            )
         }
 
         Err(DataFusionError::Execution(format!("Unsupported type")))
@@ -2327,6 +2443,41 @@ pub fn create_generate_series_udtf() -> TableUDF {
                     DataType::Float64,
                     DataType::Float64,
                     DataType::Float64,
+                ]),
+                TypeSignature::Exact(vec![DataType::Date32, DataType::Date32]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
                 ]),
             ],
             Volatility::Immutable,

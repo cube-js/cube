@@ -8,6 +8,7 @@ pub mod auth;
 pub mod channel;
 pub mod config;
 pub mod cross;
+pub mod gateway;
 pub mod logger;
 pub mod node_export;
 pub mod node_obj_serializer;
@@ -18,6 +19,7 @@ pub mod template;
 pub mod transport;
 pub mod utils;
 
+use crate::config::NodeConfigurationImpl;
 use cubesql::telemetry::{LocalReporter, ReportingLogger};
 use cubesql::CubeError;
 use neon::prelude::*;
@@ -67,7 +69,7 @@ fn main(cx: ModuleContext) -> NeonResult<()> {
     )
     .unwrap();
 
-    node_export::register_module_exports(cx)?;
+    node_export::register_module_exports::<NodeConfigurationImpl>(cx)?;
 
     Ok(())
 }

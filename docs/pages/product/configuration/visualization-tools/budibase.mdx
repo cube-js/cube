@@ -7,24 +7,21 @@ redirect_from:
 
 Budibase is a low-code app-building platform that helps developers create
 responsive web applications with access methods to databases, APIs, and much
-more. You can connect a Cube deployment to Budibase using Cube's
-[REST API](/reference/rest-api).
+more.
 
 Here's a short video guide on how to connect Budibase to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/c83e665fa1c947d89f3e304e5b5b81b4" />
 
-## Use REST API in Cube
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Budibase</Btn> to get
+detailed instructions.
 
-Click the "How to connect" link on the Overview page, navigate to the REST API
-tab. You will see your connection credentials, the REST API URL and the
-authorization token:
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
-
-### Self-hosted Cube
+You can connect a Cube deployment to Budibase using the [REST API](/reference/rest-api).
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -37,7 +34,9 @@ Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
-## Create a new data source in Budibase
+## Connecting from Budibase
+
+### Create a new data source
 
 Create a new "REST API" data source in Budibase.
 
@@ -48,7 +47,7 @@ Authorization token.
 
 <Screenshot src="https://ucarecdn.com/30f74134-1fd4-4d0c-af63-81f6e6aaebb5/" />
 
-## Add a query in Budibase
+### Add a query
 
 Click "+ Add Query".
 
@@ -79,7 +78,7 @@ You can also give the query a name. In this sample it's called `OrdersByMonth`.
 Lastly, click the "save" button and hit "send" to test the API and get a
 response back.
 
-## Create a data provider in Budibase
+### Create a data provider
 
 Move to the **Design** section and open the **Components**.
 
@@ -88,7 +87,7 @@ called `OrdersByMonth`.
 
 <Screenshot src="https://ucarecdn.com/a882ca72-0b75-4a2a-87a0-8a8c0036dc96/" />
 
-## Display the data in Budibase
+### Display the data
 
 Add a chart into the data provider. Next, configure the data provider for the
 chart. Make sure it's set to the data provider you just created.

@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT PI() AS PI\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-------------------+
+| PI                |
++-------------------+
+| 3.141592653589793 |
++-------------------+

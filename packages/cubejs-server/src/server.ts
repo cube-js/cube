@@ -63,7 +63,7 @@ export class CubejsServer {
       webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
       pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
-      sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
+      gatewayPort: config.gatewayPort || getEnv('nativeApiGatewayPort'),
       http: {
         ...config.http,
         cors: {
@@ -73,7 +73,7 @@ export class CubejsServer {
       },
     };
 
-    this.core = this.createCoreInstance(config, systemOptions);
+    this.core = this.createCoreInstance(this.config, systemOptions);
     this.server = null;
   }
 
@@ -231,7 +231,7 @@ export class CubejsServer {
 
       if (this.sqlServer) {
         locks.push(
-          this.sqlServer.shutdown()
+          this.sqlServer.shutdown(graceful && (signal === 'SIGTERM') ? 'semifast' : 'fast')
         );
       }
 

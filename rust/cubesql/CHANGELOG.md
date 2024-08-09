@@ -3,6 +3,118 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
+
+
+### Features
+
+* **cubesql:** Support push down cast type templates ([556ca7c](https://github.com/cube-js/cube/commit/556ca7c67b280b18221cb6748cfe20f841b1a7b9))
+
+
+
+
+
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+**Note:** Version bump only for package @cubejs-backend/cubesql
+
+
+
+
+
+## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
+
+
+### Features
+
+* **native:** Add datetime types support to generate_series() UDTF ([#8511](https://github.com/cube-js/cube/issues/8511)) ([99b3c65](https://github.com/cube-js/cube/commit/99b3c654382de0b750b6204286dc3ddf5dc7a63e))
+
+
+
+
+
+## [0.35.64](https://github.com/cube-js/cube/compare/v0.35.63...v0.35.64) (2024-07-24)
+
+
+### Bug Fixes
+
+* **native:** Fix build failures caused by new ShutdownMode param ([#8514](https://github.com/cube-js/cube/issues/8514)) ([80d10fd](https://github.com/cube-js/cube/commit/80d10fda26bc693a9c4e2510283cbc6ca06eb4a5))
+
+
+### Features
+
+* Smart and Semi-Fast shutdown ([#8411](https://github.com/cube-js/cube/issues/8411)) ([0bc8e6f](https://github.com/cube-js/cube/commit/0bc8e6f8f98e3ca68e42d0d1817bf46ef6732b22))
+
+
+### Performance Improvements
+
+* **cubesql:** More complete usage of member_name_to_expr caching ([#8497](https://github.com/cube-js/cube/issues/8497)) ([3f369e3](https://github.com/cube-js/cube/commit/3f369e3720e01772e5c64a37d533cb197f0a26e3))
+
+
+
+
+
+## [0.35.63](https://github.com/cube-js/cube/compare/v0.35.62...v0.35.63) (2024-07-24)
+
+
+### Bug Fixes
+
+* **cubesql:** Apply `IN` as `=` transformation with push down disabled ([152fca0](https://github.com/cube-js/cube/commit/152fca0edad8f384a0a4c4f8f833bcd1a3e950ed))
+
+
+### Features
+
+* **cubesql:** Support float*interval and interval/float ([#8496](https://github.com/cube-js/cube/issues/8496)) ([300f8fc](https://github.com/cube-js/cube/commit/300f8fc3224ebc0500f33e13e337bcb44cecce7c))
+
+
+
+
+
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+
+### Features
+
+* **native:** Initial support for native api-gateway ([#8472](https://github.com/cube-js/cube/issues/8472)) ([d917d6f](https://github.com/cube-js/cube/commit/d917d6fd422090cc78fc30125731d147a091de6c))
+* **rust/cubeclient:** Upgrade reqwest to 0.12.5 (hyper 1) ([#8498](https://github.com/cube-js/cube/issues/8498)) ([f77c3aa](https://github.com/cube-js/cube/commit/f77c3aad67566568117f2c1d42859e2fd53a13d2))
+
+
+### Performance Improvements
+
+* **cubesql:** Replaced LogicalPlanData::find_member with a caching version ([#8469](https://github.com/cube-js/cube/issues/8469)) ([858d965](https://github.com/cube-js/cube/commit/858d965a42b30e446ae7fd19899cfd9b078ee63f))
+
+
+
+
+
+## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
+
+
+### Bug Fixes
+
+* **cubesql:** Transform `IN` filter with one value to `=` with all expressions ([671e067](https://github.com/cube-js/cube/commit/671e067d25521deadf1502d0dec21da2df5c8e3b))
+
+
+### Features
+
+* **cubesql:** Support `Null` input type in `SUM` and `AVG` functions ([5ce589a](https://github.com/cube-js/cube/commit/5ce589a1e7b3f8e3f850fdc9abadb26e212f2da4))
+
+
+
+
+
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+
+### Features
+
+* **cubesql:** Upgrade rust to nightly-2024-07-15 ([#8473](https://github.com/cube-js/cube/issues/8473)) ([6a6a7fe](https://github.com/cube-js/cube/commit/6a6a7fe694c13d04bf048434df92e20ad920aed5))
+* **cubesql:** Use lld linker for linux ([#8439](https://github.com/cube-js/cube/issues/8439)) ([a2fb38b](https://github.com/cube-js/cube/commit/a2fb38b410382abdd925d42e10673e9192f0f880))
+
+
+
+
+
 ## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql

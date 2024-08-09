@@ -1,5 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
+assertion_line: 8876
 expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+
@@ -12,4 +13,5 @@ expression: "execute_query(\"SELECT * FROM information_schema.tables\".to_string
 | cubedb        | public             | Logs                      | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
 | cubedb        | public             | NumberCube                | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
 | cubedb        | public             | WideCube                  | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
+| cubedb        | public             | MultiTypeCube             | BASE TABLE |                              |                      |                           |                          |                        | NO                 | NO       |               |
 +---------------+--------------------+---------------------------+------------+------------------------------+----------------------+---------------------------+--------------------------+------------------------+--------------------+----------+---------------+

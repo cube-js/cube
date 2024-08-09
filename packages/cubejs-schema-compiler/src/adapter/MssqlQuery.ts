@@ -185,6 +185,14 @@ export class MssqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.types.string = 'VARCHAR';
+    templates.types.boolean = 'BIT';
+    templates.types.integer = 'INT';
+    templates.types.float = 'FLOAT(24)';
+    templates.types.double = 'FLOAT(53)';
+    templates.types.timestamp = 'DATETIME2';
+    delete templates.types.interval;
+    templates.types.binary = 'VARBINARY';
     return templates;
   }
 }

@@ -196,6 +196,7 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
+  nativeSqlPlanner: () => get('CUBEJS_NATIVE_SQL_PLANNER').asBool(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -1437,7 +1438,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_MOTHERDUCK_TOKEN', dataSource)
     ]
   ),
-  
+
   duckdbDatabasePath: ({
     dataSource
   }: {
@@ -1457,7 +1458,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_REGION', dataSource)
     ]
   ),
-  
+
   duckdbS3AccessKeyId: ({
     dataSource
   }: {
@@ -1467,7 +1468,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID', dataSource)
     ]
   ),
-  
+
   duckdbS3SecretAccessKeyId: ({
     dataSource
   }: {
@@ -1477,7 +1478,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY', dataSource)
     ]
   ),
-  
+
   duckdbS3Endpoint: ({
     dataSource
   }: {
@@ -1537,7 +1538,7 @@ const variables: Record<string, (...args: any) => any> = {
       keyByDataSource('CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN', dataSource)
     ]
   ),
-  
+
   /**
    * Presto catalog.
    */
@@ -1696,11 +1697,23 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
+  nativeApiGatewayPort: () => {
+    if (process.env.CUBEJS_NATIVE_API_GATEWAY_PORT === 'false') {
+      return undefined;
+    }
+
+    const port = asFalseOrPort(process.env.CUBEJS_NATIVE_API_GATEWAY_PORT || 'false', 'CUBEJS_NATIVE_API_GATEWAY_PORT');
+    if (port) {
+      return port;
+    }
+
+    return undefined;
+  },
   pgSqlPort: () => {
     if (process.env.CUBEJS_PG_SQL_PORT === 'false') {
       return undefined;
     }
-    
+
     const port = asFalseOrPort(process.env.CUBEJS_PG_SQL_PORT || 'false', 'CUBEJS_PG_SQL_PORT');
     if (port) {
       return port;
@@ -1724,20 +1737,12 @@ const variables: Record<string, (...args: any) => any> = {
 
     return undefined;
   },
-  sqlNonce: () => {
-    if (process.env.CUBEJS_SQL_NONCE) {
-      if (process.env.CUBEJS_SQL_NONCE.length < 14) {
-        throw new InvalidConfiguration('CUBEJS_SQL_NONCE', process.env.CUBEJS_SQL_NONCE, 'Is too short. It should be 14 chars at least.');
-      }
-
-      return process.env.CUBEJS_SQL_NONCE;
-    }
-
-    return undefined;
-  },
   sqlUser: () => get('CUBEJS_SQL_USER').asString(),
   sqlPassword: () => get('CUBEJS_SQL_PASSWORD').asString(),
   sqlSuperUser: () => get('CUBEJS_SQL_SUPER_USER').asString(),
+  // Internal testing, please don't enable it. It's not ready for public preview
+  nativeApiGateway: () => get('CUBE_JS_NATIVE_API_GATEWAY_INTERNAL')
+    .asBool(),
   // Experiments & Preview flags
   livePreview: () => get('CUBEJS_LIVE_PREVIEW')
     .default('true')

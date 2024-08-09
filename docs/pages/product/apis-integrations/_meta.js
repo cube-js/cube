@@ -1,5 +1,6 @@
 module.exports = {
   "queries": "Queries",
+  "semantic-layer-sync": "Semantic Layer Sync",
   "sql-api": "SQL API",
   "rest-api": "REST API",
   "graphql-api": "GraphQL API",

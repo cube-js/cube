@@ -5,7 +5,10 @@ use cubeclient::{
 };
 
 use datafusion::{
-    arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
+    arrow::{
+        datatypes::{DataType, SchemaRef},
+        record_batch::RecordBatch,
+    },
     logical_plan::window_frames::{WindowFrame, WindowFrameBound, WindowFrameUnits},
     physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
@@ -832,5 +835,40 @@ impl SqlTemplates {
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
+        let data_type = match data_type {
+            DataType::Decimal(precision, scale) => {
+                return self.render_template(
+                    "types/decimal",
+                    context! {
+                        precision => precision,
+                        scale => scale,
+                    },
+                )
+            }
+            // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "string",
+            DataType::Boolean => "boolean",
+            DataType::Int8 | DataType::UInt8 => "tinyint",
+            DataType::Int16 | DataType::UInt16 => "smallint",
+            DataType::Int32 | DataType::UInt32 => "integer",
+            DataType::Int64 | DataType::UInt64 => "bigint",
+            DataType::Float16 | DataType::Float32 => "float",
+            DataType::Float64 => "double",
+            DataType::Timestamp(_, _) => "timestamp",
+            DataType::Date32 | DataType::Date64 => "date",
+            DataType::Time32(_) | DataType::Time64(_) => "time",
+            DataType::Duration(_) | DataType::Interval(_) => "interval",
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
+            dt => {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for type {:?}: not supported",
+                    dt
+                )))
+            }
+        };
+        self.render_template(&format!("types/{}", data_type), context! {})
     }
 }

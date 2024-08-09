@@ -41,8 +41,8 @@ const getPivotQuery = (queryType, queries) => {
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
-const memberExpression = Joi.object().keys({
-  expression: Joi.func().required(),
+const parsedMemberExpression = Joi.object().keys({
+  expression: Joi.array().items(Joi.string()).min(1).required(),
   cubeName: Joi.string().required(),
   name: Joi.string().required(),
   expressionName: Joi.string(),
@@ -52,6 +52,9 @@ const memberExpression = Joi.object().keys({
     id: Joi.number().required(),
     subId: Joi.number()
   })
+});
+const memberExpression = parsedMemberExpression.keys({
+  expression: Joi.func().required(),
 });
 
 const operators = [
@@ -95,8 +98,8 @@ const oneCondition = Joi.object().keys({
 
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
-  measures: Joi.array().items(Joi.alternatives(id, memberExpression)),
-  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression)),
+  measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
+  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression, parsedMemberExpression)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
@@ -111,7 +114,7 @@ const querySchema = Joi.object().keys({
     Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
+  segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(0),
   offset: Joi.number().integer().min(0),

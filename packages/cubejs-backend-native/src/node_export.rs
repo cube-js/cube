@@ -1,4 +1,5 @@
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
+use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
 use cubesql::sql::{DatabaseProtocol, SessionManager};
 use cubesql::transport::TransportService;
@@ -8,36 +9,45 @@ use serde_json::Map;
 use tokio::sync::Semaphore;
 
 use std::net::SocketAddr;
+use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::auth::{NativeAuthContext, NodeBridgeAuthService};
 use crate::channel::call_js_fn;
-use crate::config::NodeConfig;
+use crate::config::{NodeConfiguration, NodeConfigurationFactoryOptions, NodeCubeServices};
 use crate::cross::CLRepr;
 use crate::logger::NodeBridgeLogger;
 use crate::stream::OnDrainHandler;
 use crate::tokio_runtime_node;
 use crate::transport::NodeBridgeTransport;
 use crate::utils::batch_to_rows;
+use cubenativeutils::wrappers::neon::context::ContextHolder;
+use cubenativeutils::wrappers::neon::inner_types::NeonInnerTypes;
+use cubenativeutils::wrappers::neon::object::NeonObject;
+use cubenativeutils::wrappers::object_handle::NativeObjectHandle;
+use cubenativeutils::wrappers::serializer::NativeDeserialize;
+use cubenativeutils::wrappers::NativeContextHolder;
+use cubesqlplanner::cube_bridge::base_query_options::NativeBaseQueryOptions;
+use cubesqlplanner::planner::base_query::BaseQuery;
 
-use cubesql::{config::CubeServices, telemetry::ReportingLogger, CubeError};
+use cubesql::{telemetry::ReportingLogger, CubeError};
 
 use neon::prelude::*;
 
 struct SQLInterface {
-    services: Arc<CubeServices>,
+    services: Arc<NodeCubeServices>,
 }
 
 impl Finalize for SQLInterface {}
 
 impl SQLInterface {
-    pub fn new(services: Arc<CubeServices>) -> Self {
+    pub fn new(services: Arc<NodeCubeServices>) -> Self {
         Self { services }
     }
 }
 
-fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
+fn register_interface<C: NodeConfiguration>(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let options = cx.argument::<JsObject>(0)?;
     let check_auth = options
         .get::<JsFunction, _, _>(&mut cx, "checkAuth")?
@@ -61,26 +71,18 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
         .get::<JsFunction, _, _>(&mut cx, "canSwitchUserForSession")?
         .root(&mut cx);
 
-    let nonce_handle = options.get_value(&mut cx, "nonce")?;
-    let nonce = if nonce_handle.is_a::<JsString, _>(&mut cx) {
-        let value = nonce_handle.downcast_or_throw::<JsString, _>(&mut cx)?;
-        Some(value.value(&mut cx))
-    } else {
-        None
-    };
-
-    let port_handle = options.get_value(&mut cx, "port")?;
-    let port = if port_handle.is_a::<JsNumber, _>(&mut cx) {
-        let value = port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+    let pg_port_handle = options.get_value(&mut cx, "pgPort")?;
+    let pg_port = if pg_port_handle.is_a::<JsNumber, _>(&mut cx) {
+        let value = pg_port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
 
         Some(value.value(&mut cx) as u16)
     } else {
         None
     };
 
-    let pg_port_handle = options.get_value(&mut cx, "pgPort")?;
-    let pg_port = if pg_port_handle.is_a::<JsNumber, _>(&mut cx) {
-        let value = pg_port_handle.downcast_or_throw::<JsNumber, _>(&mut cx)?;
+    let gateway_port = options.get_value(&mut cx, "gatewayPort")?;
+    let gateway_port = if gateway_port.is_a::<JsNumber, _>(&mut cx) {
+        let value = gateway_port.downcast_or_throw::<JsNumber, _>(&mut cx)?;
 
         Some(value.value(&mut cx) as u16)
     } else {
@@ -103,17 +105,17 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let auth_service = NodeBridgeAuthService::new(cx.channel(), check_auth);
 
     std::thread::spawn(move || {
-        let config = NodeConfig::new(port, pg_port, nonce);
+        let config = C::new(NodeConfigurationFactoryOptions {
+            gateway_port,
+            pg_port,
+        });
 
         runtime.block_on(async move {
-            let services = Arc::new(
-                config
-                    .configure(Arc::new(transport_service), Arc::new(auth_service))
-                    .await,
-            );
+            let services = config
+                .configure(Arc::new(transport_service), Arc::new(auth_service))
+                .await;
 
-            let services_arc = services.clone();
-            let interface = SQLInterface::new(services_arc);
+            let interface = SQLInterface::new(services.clone());
 
             log::debug!("Cube SQL Start");
 
@@ -123,10 +125,6 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
                 Ok(())
             }));
-            {
-                let mut w = services.processing_loop_handles.write().await;
-                *w = loops;
-            }
         });
     });
 
@@ -135,6 +133,17 @@ fn register_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 
 fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let interface = cx.argument::<JsBox<SQLInterface>>(0)?;
+    let js_shutdown_mode = cx.argument::<JsString>(1)?;
+    let shutdown_mode = match js_shutdown_mode.value(&mut cx).as_str() {
+        "fast" => ShutdownMode::Fast,
+        "semifast" => ShutdownMode::SemiFast,
+        "smart" => ShutdownMode::Smart,
+        _ => {
+            return cx.throw_range_error::<&str, Handle<JsPromise>>(
+                "ShutdownMode param must be 'fast', 'semifast', or 'smart'",
+            );
+        }
+    };
 
     let (deferred, promise) = cx.promise();
     let channel = cx.channel();
@@ -143,15 +152,10 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
     let runtime = tokio_runtime_node(&mut cx)?;
 
     runtime.spawn(async move {
-        match services.stop_processing_loops().await {
+        match services.stop_processing_loops(shutdown_mode).await {
             Ok(_) => {
-                let mut handles = Vec::new();
-                {
-                    let mut w = services.processing_loop_handles.write().await;
-                    std::mem::swap(&mut *w, &mut handles);
-                }
-                for h in handles {
-                    let _ = h.await;
+                if let Err(err) = services.await_processing_loops().await {
+                    log::error!("Error during awaiting on shutdown: {}", err)
                 }
 
                 deferred
@@ -175,13 +179,16 @@ fn shutdown_interface(mut cx: FunctionContext) -> JsResult<JsPromise> {
 const CHUNK_DELIM: &str = "\n";
 
 async fn handle_sql_query(
-    services: Arc<CubeServices>,
+    services: Arc<NodeCubeServices>,
     native_auth_ctx: Arc<NativeAuthContext>,
     channel: Arc<Channel>,
     stream_methods: WritableStreamMethods,
     sql_query: &String,
 ) -> Result<(), CubeError> {
-    let config = services.injector.get_service_typed::<dyn ConfigObj>().await;
+    let config = services
+        .injector()
+        .get_service_typed::<dyn ConfigObj>()
+        .await;
 
     if !config.stream_mode() {
         return Err(CubeError::internal(
@@ -190,11 +197,11 @@ async fn handle_sql_query(
     }
 
     let transport_service = services
-        .injector
+        .injector()
         .get_service_typed::<dyn TransportService>()
         .await;
     let session_manager = services
-        .injector
+        .injector()
         .get_service_typed::<SessionManager>()
         .await;
 
@@ -458,6 +465,42 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
     Ok(cx.undefined())
 }
 
+//============ sql planner ===================
+
+fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
+    //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
+    //context should be used only inside function
+    let mut cx = extend_function_context_lifetime(cx);
+    let options = cx.argument::<JsValue>(0)?;
+
+    let neon_context_holder = ContextHolder::new(cx);
+
+    let options = NativeObjectHandle::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
+        NeonObject::new(neon_context_holder.clone(), options),
+    );
+
+    let context_holder =
+        NativeContextHolder::<NeonInnerTypes<'static, FunctionContext<'static>>>::new(
+            neon_context_holder,
+        );
+
+    let base_query_options = Rc::new(NativeBaseQueryOptions::from_native(options).unwrap());
+
+    let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
+
+    //arg_clrep.into_js(&mut cx)
+    let res = base_query.build_sql_and_params().unwrap();
+
+    let result: NeonObject<'static, FunctionContext<'static>> = res.into_object();
+    let result = result.into_object();
+
+    Ok(result)
+}
+
+fn extend_function_context_lifetime<'a>(cx: FunctionContext<'a>) -> FunctionContext<'static> {
+    unsafe { std::mem::transmute::<FunctionContext<'a>, FunctionContext<'static>>(cx) }
+}
+
 fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     let arg = cx.argument::<JsValue>(0)?;
     let arg_clrep = CLRepr::from_js_ref(arg, &mut cx)?;
@@ -465,13 +508,17 @@ fn debug_js_to_clrepr_to_js(mut cx: FunctionContext) -> JsResult<JsValue> {
     arg_clrep.into_js(&mut cx)
 }
 
-pub fn register_module_exports(mut cx: ModuleContext) -> NeonResult<()> {
+pub fn register_module_exports<C: NodeConfiguration + 'static>(
+    mut cx: ModuleContext,
+) -> NeonResult<()> {
     cx.export_function("setupLogger", setup_logger)?;
-    cx.export_function("registerInterface", register_interface)?;
+    cx.export_function("registerInterface", register_interface::<C>)?;
     cx.export_function("shutdownInterface", shutdown_interface)?;
     cx.export_function("execSql", exec_sql)?;
     cx.export_function("isFallbackBuild", is_fallback_build)?;
     cx.export_function("__js_to_clrepr_to_js", debug_js_to_clrepr_to_js)?;
+
+    cx.export_function("buildSqlAndParams", build_sql_and_params)?;
 
     crate::template::template_register_module(&mut cx)?;
 

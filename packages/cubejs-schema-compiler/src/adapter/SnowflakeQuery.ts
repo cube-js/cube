@@ -85,6 +85,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
+    delete templates.types.interval;
     return templates;
   }
 }

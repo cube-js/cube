@@ -7,6 +7,11 @@ on:
     branches:
       - master
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
@@ -226,7 +231,7 @@ jobs:
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -302,7 +307,7 @@ jobs:
           key: target-${{ matrix.target }}
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}

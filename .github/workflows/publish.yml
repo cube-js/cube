@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*.*.*'
       - 'v*.*.*-*'
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
 
 jobs:
   npm:
@@ -18,7 +22,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -91,7 +95,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -181,7 +185,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -256,7 +260,7 @@ jobs:
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
+          toolchain: nightly-2024-07-15
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
@@ -616,7 +620,7 @@ jobs:
           key: target-${{ matrix.target }}
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -710,7 +714,7 @@ jobs:
           LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
       - name: Build with Cargo
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -738,3 +742,26 @@ jobs:
           asset_name: cubestored-${{ matrix.target }}.tar.gz
           tag: ${{ github.ref }}
           overwrite: true
+
+  trigger-test-suites:
+    name: Trigger test suites run
+    runs-on: ubuntu-20.04
+    needs: [docker-default]
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Dispatch event
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'sql-api-test-suite',
+              workflow_id: 'test_and_run_test_suites.yml',
+              ref: 'main',
+              inputs: {
+                'cube-image': 'cubejs/cube:latest'
+              }
+            })

@@ -84,9 +84,7 @@ export interface CanSwitchUserPayload {
 }
 
 export type SQLInterfaceOptions = {
-  port?: number,
   pgPort?: number,
-  nonce?: string,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
@@ -96,6 +94,8 @@ export type SQLInterfaceOptions = {
   logLoadEvent: (payload: LogLoadEventPayload) => unknown | Promise<unknown>,
   sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
+  // gateway options
+  gatewayPort?: number,
 };
 
 export function loadNative() {
@@ -328,16 +328,24 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   });
 };
 
-export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
+export type ShutdownMode = 'fast' | 'semifast' | 'smart';
+
+export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();
 
-  await native.shutdownInterface(instance);
+  await native.shutdownInterface(instance, shutdownMode);
 };
 
 export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
   const native = loadNative();
 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
+};
+
+export const buildSqlAndParams = (cubeEvaluator: any): String => {
+  const native = loadNative();
+
+  return native.buildSqlAndParams(cubeEvaluator);
 };
 
 export interface PyConfiguration {

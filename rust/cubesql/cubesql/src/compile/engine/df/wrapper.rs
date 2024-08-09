@@ -1104,10 +1104,6 @@ impl CubeScanWrapperNode {
         Ok(serde_json::json!(res).to_string())
     }
 
-    fn format_sql_decimal_type(precision: usize, scale: usize) -> String {
-        format!("NUMERIC({}, {})", precision, scale)
-    }
-
     fn generate_sql_cast_expr(
         sql_generator: Arc<dyn SqlGenerator>,
         inner_expr: String,
@@ -1117,6 +1113,16 @@ impl CubeScanWrapperNode {
             .get_sql_templates()
             .cast_expr(inner_expr, data_type)
             .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for cast: {}", e)))
+    }
+
+    fn generate_sql_type(
+        sql_generator: Arc<dyn SqlGenerator>,
+        data_type: DataType,
+    ) -> result::Result<String, DataFusionError> {
+        sql_generator
+            .get_sql_templates()
+            .sql_type(data_type)
+            .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for type: {}", e)))
     }
 
     pub fn generate_sql_for_expr(
@@ -1433,46 +1439,9 @@ impl CubeScanWrapperNode {
                         subqueries.clone(),
                     )
                     .await?;
-                    let data_type = match data_type {
-                        DataType::Null => "NULL".to_string(),
-                        DataType::Boolean => "BOOLEAN".to_string(),
-                        DataType::Int8 => "INTEGER".to_string(),
-                        DataType::Int16 => "INTEGER".to_string(),
-                        DataType::Int32 => "INTEGER".to_string(),
-                        DataType::Int64 => "INTEGER".to_string(),
-                        DataType::UInt8 => "INTEGER".to_string(),
-                        DataType::UInt16 => "INTEGER".to_string(),
-                        DataType::UInt32 => "INTEGER".to_string(),
-                        DataType::UInt64 => "INTEGER".to_string(),
-                        DataType::Float16 => "FLOAT".to_string(),
-                        DataType::Float32 => "FLOAT".to_string(),
-                        DataType::Float64 => "DOUBLE PRECISION".to_string(),
-                        DataType::Timestamp(_, _) => "TIMESTAMP".to_string(),
-                        DataType::Date32 => "DATE".to_string(),
-                        DataType::Date64 => "DATE".to_string(),
-                        DataType::Time32(_) => "TIME".to_string(),
-                        DataType::Time64(_) => "TIME".to_string(),
-                        DataType::Duration(_) => "INTERVAL".to_string(),
-                        DataType::Interval(_) => "INTERVAL".to_string(),
-                        DataType::Binary => "BYTEA".to_string(),
-                        DataType::FixedSizeBinary(_) => "BYTEA".to_string(),
-                        DataType::Utf8 => "TEXT".to_string(),
-                        DataType::LargeUtf8 => "TEXT".to_string(),
-                        DataType::Decimal(precision, scale) => {
-                            CubeScanWrapperNode::format_sql_decimal_type(precision, scale)
-                        }
-                        x => {
-                            return Err(DataFusionError::Execution(format!(
-                                "Can't generate SQL for cast: type isn't supported: {:?}",
-                                x
-                            )));
-                        }
-                    };
-                    let resulting_sql = CubeScanWrapperNode::generate_sql_cast_expr(
-                        sql_generator,
-                        expr,
-                        data_type,
-                    )?;
+                    let data_type = Self::generate_sql_type(sql_generator.clone(), data_type)?;
+                    let resulting_sql =
+                        Self::generate_sql_cast_expr(sql_generator, expr, data_type)?;
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::TryCast { .. } => {}
@@ -1535,9 +1504,10 @@ impl CubeScanWrapperNode {
                             (
                                 if let Some(x) = x {
                                     let number = Decimal::format_string(x, scale);
-                                    let data_type = CubeScanWrapperNode::format_sql_decimal_type(
-                                        precision, scale,
-                                    );
+                                    let data_type = Self::generate_sql_type(
+                                        sql_generator.clone(),
+                                        DataType::Decimal(precision, scale),
+                                    )?;
                                     CubeScanWrapperNode::generate_sql_cast_expr(
                                         sql_generator,
                                         format!("'{}'", number),

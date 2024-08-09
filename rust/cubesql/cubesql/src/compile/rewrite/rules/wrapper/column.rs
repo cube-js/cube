@@ -84,7 +84,10 @@ impl WrapperRules {
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns.iter() {
                 for alias_to_cube in var_iter!(
                     egraph[subst[alias_to_cube_var]],
                     WrapperPullupReplacerAliasToCube
@@ -110,7 +113,7 @@ impl WrapperRules {
                 }
                 if let Some((member, _)) = &egraph[subst[members_var]]
                     .data
-                    .find_member(|_, cn| cn == &column.name)
+                    .find_member_by_alias(&column.name)
                 {
                     if matches!(
                         member.1,
@@ -145,10 +148,13 @@ impl WrapperRules {
         let members_var = var!(members_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns {
                 if let Some(((Some(member), _, _), _)) = egraph[subst[members_var]]
                     .data
-                    .find_member(|_, cn| cn == &column.name)
+                    .find_member_by_alias(&column.name)
                 {
                     if let Some(measure) = meta.find_measure_with_name(member.to_string()) {
                         if measure.agg_type != Some("number".to_string()) {

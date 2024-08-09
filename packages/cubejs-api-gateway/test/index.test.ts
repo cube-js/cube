@@ -7,7 +7,9 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { EventEmitter } from 'events';
 
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import * as console from 'console';
+import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
+import { ResponseResultFn } from '../src/types/request';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
@@ -399,7 +401,7 @@ describe('API Gateway', () => {
             req.authInfo = authorization;
           }
         },
-        queryRewrite: async (query, context) => {
+        queryRewrite: async (query, _context) => {
           query.limit = 2;
           return query;
         }
@@ -669,6 +671,91 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('sql api member expressions evaluations', () => {
+    test('throw error if expressions are not allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          const errorMessage = message as { error: string };
+          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+        },
+        query: {
+          measures: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
+          ],
+          dimensions: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
+          ],
+          segments: [],
+          order: []
+        },
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: false,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+
+    test('no error if expressions are allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          expect(message.hasOwnProperty('sql')).toBe(true);
+        },
+        query: {
+          measures: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
+          ],
+          dimensions: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
+          ],
+          segments: [],
+          order: []
+        },
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: true,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+  });
+
   describe('/cubejs-system/v1', () => {
     const scheduledRefreshContextsFactory = () => ([
       { securityContext: { foo: 'bar' } },
@@ -734,6 +821,8 @@ describe('API Gateway', () => {
       expect(res.body).toMatchObject(successResult);
     };
 
+    /*
+     Test using this is commented out below
     const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,
@@ -759,6 +848,7 @@ describe('API Gateway', () => {
         expect(res.body.error).toBe(payload.result.error);
       }
     };
+    */
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },

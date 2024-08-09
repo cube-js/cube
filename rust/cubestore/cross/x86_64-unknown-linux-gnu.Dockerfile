@@ -8,14 +8,14 @@ RUN apt-get update && apt-get -y upgrade \
     && wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add - \
     && add-apt-repository "deb https://apt.llvm.org/bullseye/ llvm-toolchain-bullseye-$LLVM_VERSION main"  \
     && apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-${LLVM_VERSION} lld-${LLVM_VERSION} clang-$LLVM_VERSION libclang-${LLVM_VERSION}-dev clang-$LLVM_VERSION make cmake \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y llvm-${LLVM_VERSION} lld-${LLVM_VERSION} clang-$LLVM_VERSION libclang-${LLVM_VERSION}-dev make cmake \
       lzma-dev liblzma-dev libpython3-dev \
     && rm -rf /var/lib/apt/lists/*;
 
 RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/clang-cpp clang-cpp /usr/bin/clang-cpp-$LLVM_VERSION 100 \
-    && update-alternatives --install /usr/bin/lld clang-cpp /usr/bin/lld-$LLVM_VERSION 100 \
+    && update-alternatives --install /usr/bin/lld lld /usr/bin/lld-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang-$LLVM_VERSION 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang++-$LLVM_VERSION 100;
 
@@ -28,7 +28,7 @@ RUN cd tmp && wget https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar
     && make -j $(nproc) \
     && make install_sw \
     && make install_ssldirs \
-    && cd .. && rm -rf ${OPENSSL_VERSION}
+    && cd .. && rm -rf openssl-${OPENSSL_VERSION}
 
 ENV PKG_CONFIG_ALLOW_CROSS=1
 ENV OPENSSL_STATIC=true

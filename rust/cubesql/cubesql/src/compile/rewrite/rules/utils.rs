@@ -5,6 +5,7 @@ use std::{
 
 use chrono::{Datelike, NaiveDateTime, Timelike};
 use datafusion::{
+    arrow::datatypes::{ArrowPrimitiveType, IntervalDayTimeType, IntervalMonthDayNanoType},
     error::DataFusionError,
     logical_plan::{Expr, Operator},
     physical_plan::aggregates::AggregateFunction,
@@ -19,6 +20,9 @@ use crate::{
     transport::SqlTemplates,
     CubeError,
 };
+
+type IntervalDayTime = <IntervalDayTimeType as ArrowPrimitiveType>::Native;
+type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native;
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
     if to_normalize {
@@ -208,17 +212,13 @@ pub struct DecomposedDayTime {
 }
 
 impl DecomposedDayTime {
-    const _DAY_BITS: i32 = 32;
-    const MILLIS_BITS: i32 = 32;
-
     const DAY_LABEL: &'static str = "DAY";
     const MILLIS_LABEL: &'static str = "MILLISECOND";
 
-    pub fn from_raw_interval_value(interval: i64) -> Self {
-        Self {
-            days: (interval >> Self::MILLIS_BITS) as i32,
-            millis: interval as i32,
-        }
+    pub fn from_raw_interval_value(interval: IntervalDayTime) -> Self {
+        let (days, millis) = IntervalDayTimeType::to_parts(interval);
+
+        Self { days, millis }
     }
 
     pub fn is_single_part(&self) -> bool {
@@ -226,12 +226,12 @@ impl DecomposedDayTime {
     }
 
     pub fn millis_scalar(&self) -> ScalarValue {
-        let value = Some(self.millis as i64);
+        let value = Some(IntervalDayTimeType::make_value(0, self.millis));
         ScalarValue::IntervalDayTime(value)
     }
 
     pub fn days_scalar(&self) -> ScalarValue {
-        let value = Some((self.days as i64) << Self::MILLIS_BITS);
+        let value = Some(IntervalDayTimeType::make_value(self.days, 0));
         ScalarValue::IntervalDayTime(value)
     }
 
@@ -317,26 +317,14 @@ pub struct DecomposedMonthDayNano {
 }
 
 impl DecomposedMonthDayNano {
-    const _MONTHS_MASK: u128 = 0xFFFF_FFFF_0000_0000_0000_0000_0000_0000;
-    const DAYS_MASK: u128 = 0x0000_0000_FFFF_FFFF_0000_0000_0000_0000;
-    const NANOS_MASK: u128 = 0x0000_0000_0000_0000_FFFF_FFFF_FFFF_FFFF;
-    const _MONTHS_BITS: i32 = 32;
-    const DAYS_BITS: i32 = 32;
-    const NANOS_BITS: i32 = 64;
-    const DAYS_OFFSET: i32 = Self::NANOS_BITS;
-    const MONTHS_OFFSET: i32 = Self::DAYS_OFFSET + Self::DAYS_BITS;
-
     const MONTH: &'static str = "MONTH";
     const DAY: &'static str = "DAY";
     const MILLIS: &'static str = "MILLISECOND";
 
     const NANOS_IN_MILLI: i64 = 1_000_000;
 
-    pub fn from_raw_interval_value(interval: i128) -> Self {
-        let interval = interval as u128;
-        let months = (interval >> Self::MONTHS_OFFSET) as i32;
-        let days = (interval >> Self::DAYS_OFFSET) as i32;
-        let nanos = interval as i64;
+    pub fn from_raw_interval_value(interval: IntervalMonthDayNano) -> Self {
+        let (months, days, nanos) = IntervalMonthDayNanoType::to_parts(interval);
         // TODO: precision loss
         let millis = nanos / Self::NANOS_IN_MILLI;
         DecomposedMonthDayNano {
@@ -355,17 +343,21 @@ impl DecomposedMonthDayNano {
     }
 
     pub fn millis_scalar(&self) -> ScalarValue {
-        let value = Some(((self.millis * Self::NANOS_IN_MILLI) as u128 & Self::NANOS_MASK) as i128);
+        let value = Some(IntervalMonthDayNanoType::make_value(
+            0,
+            0,
+            self.millis * Self::NANOS_IN_MILLI,
+        ));
         ScalarValue::IntervalMonthDayNano(value)
     }
 
     pub fn days_scalar(&self) -> ScalarValue {
-        let value = Some((((self.days as u128) << Self::DAYS_OFFSET) & Self::DAYS_MASK) as i128);
+        let value = Some(IntervalMonthDayNanoType::make_value(0, self.days, 0));
         ScalarValue::IntervalMonthDayNano(value)
     }
 
     pub fn months_scalar(&self) -> ScalarValue {
-        let value = Some(((self.months as u128) << Self::MONTHS_OFFSET) as i128);
+        let value = Some(IntervalMonthDayNanoType::make_value(self.months, 0, 0));
         ScalarValue::IntervalMonthDayNano(value)
     }
 

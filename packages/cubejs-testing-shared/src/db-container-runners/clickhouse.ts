@@ -11,10 +11,8 @@ export class ClickhouseDBRunner extends DbRunnerAbstract {
       .withStartupTimeout(10 * 1000);
 
     if (options.volumes) {
-      // eslint-disable-next-line no-restricted-syntax
-      for (const { source, target, bindMode } of options.volumes) {
-        container.withBindMount(source, target, bindMode);
-      }
+      const binds = options.volumes.map(v => ({ source: v.source, target: v.target, mode: v.bindMode }));
+      container.withBindMounts(binds);
     }
 
     return container.start();

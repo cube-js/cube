@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 13436
+assertion_line: 14810
 expression: "execute_query(\"select pg_class.oid as oid from pg_class order by pg_class.oid asc\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +-------+
@@ -10,4 +10,5 @@ expression: "execute_query(\"select pg_class.oid as oid from pg_class order by p
 | 18019 |
 | 18029 |
 | 18035 |
+| 18245 |
 +-------+

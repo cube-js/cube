@@ -187,6 +187,7 @@ export interface CreateOptions {
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
+  gatewayPort?: number;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;

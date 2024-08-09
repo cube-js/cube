@@ -4,7 +4,7 @@ pub mod processing_loop;
 use crate::{
     config::{
         injection::{DIService, Injector},
-        processing_loop::ProcessingLoop,
+        processing_loop::{ProcessingLoop, ShutdownMode},
     },
     sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
     transport::{HttpTransport, TransportService},
@@ -60,12 +60,15 @@ impl CubeServices {
         Ok(futures)
     }
 
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
+    pub async fn stop_processing_loops(
+        &self,
+        shutdown_mode: ShutdownMode,
+    ) -> Result<(), CubeError> {
         if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
                 .get_service_typed::<PostgresServer>()
                 .await
-                .stop_processing()
+                .stop_processing(shutdown_mode)
                 .await?;
         }
 
@@ -286,17 +289,17 @@ impl Config {
     pub async fn configure_injector(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
-            .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
+            .register_typed::<dyn ConfigObj, _, _, _>(|_| async move { config_obj_to_register })
             .await;
 
         self.injector
-            .register_typed::<dyn TransportService, _, _, _>(async move |_| {
+            .register_typed::<dyn TransportService, _, _, _>(|_| async move {
                 Arc::new(HttpTransport::new())
             })
             .await;
 
         self.injector
-            .register_typed::<dyn CompilerCache, _, _, _>(async move |i| {
+            .register_typed::<dyn CompilerCache, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(CompilerCacheImpl::new(
                     config.clone(),
@@ -306,7 +309,7 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<ServerManager, _, _, _>(async move |i| {
+            .register_typed::<ServerManager, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
                     i.get_service_typed().await,
@@ -319,20 +322,20 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<SessionManager, _, _, _>(async move |i| {
+            .register_typed::<SessionManager, _, _, _>(|i| async move {
                 Arc::new(SessionManager::new(i.get_service_typed().await))
             })
             .await;
 
         self.injector
-            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+            .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move {
                 Arc::new(SqlAuthDefaultImpl)
             })
             .await;
 
         if self.config_obj.postgres_bind_address().is_some() {
             self.injector
-                .register_typed::<PostgresServer, _, _, _>(async move |i| {
+                .register_typed::<PostgresServer, _, _, _>(|i| async move {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     PostgresServer::new(
                         config.postgres_bind_address().as_ref().unwrap().to_string(),
@@ -381,4 +384,4 @@ where
     })
 }
 
-type LoopHandle = JoinHandle<Result<(), CubeError>>;
+pub type LoopHandle = JoinHandle<Result<(), CubeError>>;
