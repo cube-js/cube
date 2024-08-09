@@ -1,0 +1,6 @@
+services:
+  cube:
+    build: 
+      context: .
+      dockerfile: dockerfile.local-dev
+    command: ["bash" , "-c", "tail -f /dev/null"]
