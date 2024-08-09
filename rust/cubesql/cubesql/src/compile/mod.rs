@@ -1986,6 +1986,50 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_select_dimensions_substring() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+                SELECT (SUBSTR(
+                    dim_str0,
+                    CAST(dim_num1 AS INTEGER),
+                    CAST(dim_num2 AS INTEGER)
+                )) AS result
+                FROM MultiTypeCube
+                GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "MultiTypeCube.dim_str0".to_string(),
+                    "MultiTypeCube.dim_num1".to_string(),
+                    "MultiTypeCube.dim_num2".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_number() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(someNumber) as s1, SUM(someNumber) as s2, MIN(someNumber) as s3, MAX(someNumber) as s4, COUNT(someNumber) as s5 FROM NumberCube".to_string(),

@@ -13,7 +13,7 @@ use crate::{
     compile::rewrite::{
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
         analysis::LogicalPlanAnalysis,
-        fun_expr, list_rewrite_with_lists_and_vars, original_expr_name,
+        fun_expr, fun_expr_var_arg, list_rewrite_with_lists_and_vars, original_expr_name,
         projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
         rewriter::RewriteRules,
         rules::{members::MemberRules, replacer_flat_push_down_node, replacer_push_down_node},
@@ -128,6 +128,81 @@ impl SplitRules {
                     projection_split_pullup_replacer(
                         "?inner_expr",
                         node("?outer_expr".to_string()),
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                ),
+            ]);
+        }
+    }
+
+    pub fn scalar_fn_args_pass_through_rules(
+        &self,
+        fun_name: &(impl Display + ?Sized),
+        projection_rules: bool,
+        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+    ) {
+        rules.extend(vec![
+            rewrite(
+                &format!("split-{fun_name}-args-push-down-aggregate"),
+                aggregate_split_pushdown_replacer(
+                    fun_expr_var_arg(fun_name, "?args"),
+                    "?list_node",
+                    "?alias_to_cube",
+                ),
+                fun_expr_var_arg(
+                    fun_name,
+                    aggregate_split_pushdown_replacer("?args", "?list_node", "?alias_to_cube"),
+                ),
+            ),
+            rewrite(
+                &format!("split-{fun_name}-args-pull-up-aggregate"),
+                fun_expr_var_arg(
+                    fun_name,
+                    aggregate_split_pullup_replacer(
+                        "?inner_expr",
+                        "?outer_expr",
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                ),
+                aggregate_split_pullup_replacer(
+                    "?inner_expr",
+                    fun_expr_var_arg(fun_name, "?outer_expr"),
+                    "?list_node",
+                    "?alias_to_cube",
+                ),
+            ),
+        ]);
+
+        if projection_rules {
+            rules.extend(vec![
+                rewrite(
+                    &format!("split-{fun_name}-args-push-down-projection"),
+                    projection_split_pushdown_replacer(
+                        fun_expr_var_arg(fun_name, "?args"),
+                        "?list_node",
+                        "?alias_to_cube",
+                    ),
+                    fun_expr_var_arg(
+                        fun_name,
+                        projection_split_pushdown_replacer("?args", "?list_node", "?alias_to_cube"),
+                    ),
+                ),
+                rewrite(
+                    &format!("split-{fun_name}-args-pull-up-projection"),
+                    fun_expr_var_arg(
+                        fun_name,
+                        projection_split_pullup_replacer(
+                            "?inner_expr",
+                            "?outer_expr",
+                            "?list_node",
+                            "?alias_to_cube",
+                        ),
+                    ),
+                    projection_split_pullup_replacer(
+                        "?inner_expr",
+                        fun_expr_var_arg(fun_name, "?outer_expr"),
                         "?list_node",
                         "?alias_to_cube",
                     ),
