@@ -6,7 +6,7 @@
   "engines": {},
   "repository": {
     "type": "git",
-    "url": "https://github.com/cube-js/cube.git",
+    "url": "https://github.com/xip-online-applications/cube-core.git",
     "directory": "packages/cubejs-client-react"
   },
   "description": "React components for cube.js",
