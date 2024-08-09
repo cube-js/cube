@@ -2,7 +2,7 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        cast_expr, column_expr, literal_expr, literal_int,
+        case_expr, cast_expr, column_expr, is_null_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
@@ -178,6 +178,28 @@ impl SplitRules {
             |alias_column| agg_fun_expr("?fun_name", vec![alias_column], "?distinct"),
             self.transform_invariant_constant("?fun_name", "?distinct", "?constant"),
             false,
+            rules,
+        );
+        // TODO: workaround for PowerBI, it uses COUNT(DISTINCT(col)) + MAX(CASE ...) to count in NULLs
+        // as a distinct value. We don't support that yet, so don't count them
+        self.single_arg_split_point_rules_aggregate_function(
+            "aggregate-function-powerbi-count-distinct-max-case",
+            || {
+                agg_fun_expr(
+                    "Max",
+                    vec![case_expr(
+                        None,
+                        vec![(is_null_expr(column_expr("?column")), literal_int(1))],
+                        Some(literal_int(0)),
+                    )],
+                    "?distinct",
+                )
+            },
+            || literal_int(0),
+            |alias_column| agg_fun_expr("Max", vec![alias_column], "?distinct"),
+            |alias_column| alias_column,
+            |_, _, _| true,
+            |_, _, _| true,
             rules,
         );
     }
