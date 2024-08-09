@@ -1,9 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
-
+import { EventEmitter } from 'events';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
 import { ExtendedRequestContext, ContextAcceptorFn } from './interfaces';
+import { Subject } from 'rxjs';
+import { map, filter, bufferTime } from 'rxjs/operators';
 
 const methodParams: Record<string, string[]> = {
   load: ['query', 'queryType'],
@@ -22,12 +24,30 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
+
+  readonly #cubeRenewSubject = new Subject<any>();
+  readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
+    // Map only the renewedCube property
+    map((val) => val.renewedCube),
+    // Filter out any empty values
+    filter((val) => !!val),
+    // Buffer the values for 300ms
+    bufferTime(300),
+    // Filter out any empty arrays
+    filter((renewedCubes) => renewedCubes.length > 0),
+    // Convert the array of arrays to an array of unique arrays
+    map((renewedCubes) => Array.from(new Set(renewedCubes))),
+  );
+
   public constructor(
     protected readonly apiGateway: ApiGateway,
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
     protected readonly contextAcceptor: ContextAcceptorFn,
+    protected readonly eventEmitter: EventEmitter
   ) {
+    this.eventEmitter.on('cubeRenewed', (val) => this.#cubeRenewSubject.next(val));
+    this.#cubeRenewedPipe.subscribe(this.renewCubes);
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
@@ -156,5 +176,16 @@ export class SubscriptionServer {
 
   public clear() {
     this.subscriptionStore.clear();
+  }
+
+  public async renewCubes(cubes) {
+    if (cubes.length === 0) {
+      return;
+    }
+
+    const subs = await this.subscriptionStore.getSubscriptionsByCubeName(cubes);
+    await Promise.all(subs.map(async subscription => {
+      await this.processMessage(subscription.connectionId, subscription.message, true);
+    }));
   }
 }

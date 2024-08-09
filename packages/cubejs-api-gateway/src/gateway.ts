@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
+import { EventEmitter } from 'events';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -167,6 +168,7 @@ class ApiGateway {
     protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
     protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
     protected readonly logger: any,
+    protected readonly eventEmitter: EventEmitter,
     protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;
@@ -531,7 +533,7 @@ class ApiGateway {
   }
 
   public initSubscriptionServer(sendMessage: WebSocketSendMessageFn) {
-    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor);
+    return new SubscriptionServer(this, sendMessage, this.subscriptionStore, this.wsContextAcceptor, this.eventEmitter);
   }
 
   protected duration(requestStarted) {

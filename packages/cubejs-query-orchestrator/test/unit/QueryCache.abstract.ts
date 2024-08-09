@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { EventEmitter } from 'events';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
 import { QueryCache, QueryCacheOptions } from '../../src';
@@ -10,12 +11,14 @@ export type QueryCacheTestOptions = QueryCacheOptions & {
 
 export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
+    const eventEmitter = new EventEmitter();
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),
       jest.fn(() => {
         throw new Error('It`s not implemented mock...');
       }),
       jest.fn(),
+      eventEmitter,
       options,
     );
 

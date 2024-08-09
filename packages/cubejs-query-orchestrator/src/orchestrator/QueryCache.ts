@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
+import { EventEmitter } from 'events';
 import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -39,22 +40,27 @@ export type QueryWithParams = QueryTuple;
 
 export type Query = {
   requestId?: string;
+  requestContext?: any;
+  cube?: string;
   dataSource: string;
   preAggregations?: PreAggregationDescription[];
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
+  securityContext?: any;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
 
 export type QueryBody = {
   dataSource?: string;
+  cube?: string;
   persistent?: boolean;
   query?: string;
   values?: string[];
   continueWait?: boolean;
   renewQuery?: boolean;
   requestId?: string;
+  requestContext?: any;
   external?: boolean;
   isJob?: boolean;
   forceNoCache?: boolean;
@@ -147,6 +153,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
+    protected readonly eventEmitter: EventEmitter,
     public readonly options: QueryCacheOptions = {}
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
@@ -790,6 +797,8 @@ export class QueryCache {
         {
           requestId: query.requestId,
           dataSource: query.dataSource,
+          renewedCube: query.cube,
+          requestContext: query.requestContext,
         }
       )
     );
@@ -801,7 +810,9 @@ export class QueryCache {
     options: {
       requestId?: string;
       skipRefreshKeyWaitForRenew?: boolean;
-      dataSource: string
+      dataSource: string;
+      renewedCube?: string;
+      requestContext?: any;
     }
   ) {
     return cacheKeyQueries.map((q) => {
@@ -819,6 +830,9 @@ export class QueryCache {
           dataSource: options.dataSource,
           useInMemory: true,
           external: queryOptions?.external,
+          renewedCube: options.renewedCube,
+          requestContext: options.requestContext,
+          isScheduledRefresh: true,
         },
       );
     });
@@ -850,6 +864,9 @@ export class QueryCache {
       persistent?: boolean,
       primaryQuery?: boolean,
       renewCycle?: boolean,
+      renewedCube?: string,
+      requestContext?: any,
+      isScheduledRefresh?: boolean,
     }
   ) {
     const spanId = crypto.randomBytes(16).toString('hex');
@@ -916,7 +933,6 @@ export class QueryCache {
       const inMemoryValue = this.memoryCache.get(redisKey);
       if (inMemoryValue) {
         const renewedAgo = (new Date()).getTime() - inMemoryValue.time;
-
         if (
           renewalKey && (
             !renewalThreshold ||
@@ -975,13 +991,19 @@ export class QueryCache {
       ) {
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
+          const res = await fetchNew();
+          this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+          return res;
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
-            if (!(e instanceof ContinueWaitError)) {
-              this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-            }
+          fetchNew()
+            .then(res => {
+              this.emitEventWhenUpdatedUpdated(parsedResult.result, res, options);
+            })
+            .catch(e => {
+              if (!(e instanceof ContinueWaitError)) {
+                this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+              }
           });
         }
       }
@@ -992,7 +1014,9 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      const res = fetchNew();
+      this.emitEventWhenUpdatedUpdated(null, res, options);
+      return res;
     }
   }
 
@@ -1023,5 +1047,28 @@ export class QueryCache {
 
   public async testConnection() {
     return this.cacheDriver.testConnection();
+  }
+
+  private emitEventWhenUpdatedUpdated(
+    prevRes: unknown,
+    res: unknown,
+    options: {
+      renewedCube?: string,
+      requestContext?: any,
+      isScheduledRefresh?: boolean,
+  }) {
+    if (!options.isScheduledRefresh) {
+      return;
+    }
+
+    const prevResHash = getCacheHash(JSON.stringify(prevRes));
+    const resHash = getCacheHash(JSON.stringify(res));
+
+    if (prevResHash !== resHash) {
+      this.eventEmitter.emit('cubeRenewed', {
+        renewedCube: options.renewedCube,
+        requestContext: options.requestContext,
+      });
+    }
   }
 }

@@ -4,6 +4,7 @@ import fs from 'fs-extra';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
+import { EventEmitter } from 'events';
 
 import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
@@ -100,6 +101,8 @@ export class CubejsServerCore {
    * Calculate and returns driver's max pool number.
    */
   public static getDriverMaxPool = getDriverMaxPool;
+
+  private readonly eventEmitter = new EventEmitter();
 
   public repository: FileRepository;
 
@@ -470,7 +473,7 @@ export class CubejsServerCore {
     logger: LoggerFn,
     options: ApiGatewayOptions
   ): ApiGateway {
-    return new ApiGateway(apiSecret, getCompilerApi, getOrchestratorApi, logger, options);
+    return new ApiGateway(apiSecret, getCompilerApi, getOrchestratorApi, logger, this.eventEmitter, options);
   }
 
   protected async contextRejectionMiddleware(req, res, next) {
@@ -694,6 +697,7 @@ export class CubejsServerCore {
     return new OrchestratorApi(
       getDriver,
       this.logger,
+      this.eventEmitter,
       options
     );
   }
