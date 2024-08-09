@@ -1,18 +1,33 @@
+use super::query_tools::QueryTools;
+use super::BaseField;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::utils::escape_column_name;
+use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct BaseMeasure {
     measure: String,
-    cube_evaluator: Rc<dyn CubeEvaluator>,
+    query_tools: Rc<QueryTools>,
+    index: usize,
+}
+
+impl BaseField for BaseMeasure {
+    fn to_sql(&self) -> Result<String, CubeError> {
+        self.sql()
+    }
+
+    fn index(&self) -> usize {
+        self.index
+    }
 }
 
 impl BaseMeasure {
-    pub fn new(measure: String, cube_evaluator: Rc<dyn CubeEvaluator>) -> Rc<Self> {
+    pub fn new(measure: String, query_tools: Rc<QueryTools>, index: usize) -> Rc<Self> {
         Rc::new(Self {
             measure,
-            cube_evaluator,
+            query_tools,
+            index,
         })
     }
 
@@ -20,13 +35,20 @@ impl BaseMeasure {
         self.sql()
     }
 
+    pub fn measure(&self) -> &String {
+        &self.measure
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
     fn sql(&self) -> Result<String, CubeError> {
-        /* let primary_keys = self.cube_evaluator.static_data().primary_keys.get()
-        self.measure.clone() */
         let path = self.path()?;
         let cube_name = &path[0];
         let primary_keys = self
-            .cube_evaluator
+            .query_tools
+            .cube_evaluator()
             .static_data()
             .primary_keys
             .get(cube_name)
@@ -34,7 +56,10 @@ impl BaseMeasure {
         let primary_key = primary_keys.first().unwrap();
         let pk_sql = self.primary_key_sql(primary_key, cube_name)?;
 
-        let measure_definition = self.cube_evaluator.measure_by_path(self.measure.clone())?;
+        let measure_definition = self
+            .query_tools
+            .cube_evaluator()
+            .measure_by_path(self.measure.clone())?;
 
         let measure_type = &measure_definition.static_data().measure_type;
         let alias_name = escape_column_name(&self.alias_name()?);
@@ -43,7 +68,8 @@ impl BaseMeasure {
     }
 
     fn path(&self) -> Result<Vec<String>, CubeError> {
-        self.cube_evaluator
+        self.query_tools
+            .cube_evaluator()
             .parse_path("measures".to_string(), self.measure.clone())
     }
 
@@ -53,6 +79,6 @@ impl BaseMeasure {
     }
 
     fn alias_name(&self) -> Result<String, CubeError> {
-        Ok(self.measure.replace(".", "__"))
+        Ok(self.measure.to_case(Case::Snake).replace(".", "__"))
     }
 }

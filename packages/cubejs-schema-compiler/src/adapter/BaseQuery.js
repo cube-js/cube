@@ -610,8 +610,12 @@ export class BaseQuery {
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
       joinRoot: this.join.root,
       cubeEvaluator: this.cubeEvaluator,
+      baseTools: this,
+
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
@@ -1978,6 +1982,7 @@ export class BaseQuery {
     if (R.isEmpty(this.order)) {
       return '';
     }
+
 
     const orderByString = R.pipe(
       R.map(this.orderHashToString),

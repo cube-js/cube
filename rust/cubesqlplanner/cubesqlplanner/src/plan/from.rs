@@ -12,9 +12,9 @@ impl fmt::Display for From {
         match self {
             From::Empty => write!(f, ""),
             From::Cube(cube) => {
-                writeln!(f, "FROM")?;
+                writeln!(f, "    FROM")?;
                 let cubesql = cube.to_sql().map_err(|_| fmt::Error)?;
-                write!(f, "{}", cubesql)
+                write!(f, "      {} ", cubesql)
             }
         }
     }

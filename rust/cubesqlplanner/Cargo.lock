@@ -782,6 +782,7 @@ name = "cubesqlplanner"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "convert_case",
  "cubeclient",
  "cubenativeutils",
  "datafusion 7.0.0 (git+https://github.com/cube-js/arrow-datafusion.git?rev=4fc9df9367b3a1be158805f763d847f6f3ae72b0)",
