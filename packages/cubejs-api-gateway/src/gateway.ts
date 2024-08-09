@@ -1266,7 +1266,7 @@ class ApiGateway {
       if (queryGranularity.length > 1) {
         throw new UserError('Data blending query granularities must match');
       }
-      if (queryGranularity.filter(Boolean).length === 0) {
+      if (queryGranularity.length === 0) {
         throw new UserError('Data blending query without granularity is not supported');
       }
     }
