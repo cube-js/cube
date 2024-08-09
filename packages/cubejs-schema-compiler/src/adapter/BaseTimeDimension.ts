@@ -49,7 +49,8 @@ export class BaseTimeDimension extends BaseFilter {
       return null;
     }
 
-    return super.selectColumns();
+    const res =  super.selectColumns();
+    return res;
   }
 
   public hasNoRemapping() {

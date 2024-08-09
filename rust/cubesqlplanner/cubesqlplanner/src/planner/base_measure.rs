@@ -1,4 +1,5 @@
 use super::query_tools::QueryTools;
+use super::BaseField;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::planner::utils::escape_column_name;
 use convert_case::{Case, Casing};
@@ -8,18 +9,38 @@ use std::rc::Rc;
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
+    index: usize,
+}
+
+impl BaseField for BaseMeasure {
+    fn to_sql(&self) -> Result<String, CubeError> {
+        self.sql()
+    }
+
+    fn index(&self) -> usize {
+        self.index
+    }
 }
 
 impl BaseMeasure {
-    pub fn new(measure: String, query_tools: Rc<QueryTools>) -> Rc<Self> {
+    pub fn new(measure: String, query_tools: Rc<QueryTools>, index: usize) -> Rc<Self> {
         Rc::new(Self {
             measure,
             query_tools,
+            index,
         })
     }
 
     pub fn to_sql(&self) -> Result<String, CubeError> {
         self.sql()
+    }
+
+    pub fn measure(&self) -> &String {
+        &self.measure
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
     }
 
     fn sql(&self) -> Result<String, CubeError> {
