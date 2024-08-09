@@ -1824,8 +1824,7 @@ mod tests {
             engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
             test::{
-                get_sixteen_char_member_cube, get_string_cube_meta, get_test_tenant_ctx_customized,
-                get_test_tenant_ctx_with_meta,
+                get_sixteen_char_member_cube, get_string_cube_meta, get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -1844,21 +1843,19 @@ mod tests {
         db: DatabaseProtocol,
         custom_templates: Vec<(String, String)>,
     ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx_customized(custom_templates);
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session(db, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
+        TestContext::with_custom_templates(db, custom_templates)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        convert_select_to_query_plan_customized(query, db, vec![]).await
+        TestContext::new(db)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan_with_config(
