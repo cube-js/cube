@@ -338,7 +338,7 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeTruthy();
   });
 
-  it('preAggregations alternatives', async () => {
+  it('preAggregations custom granularities', async () => {
     const cubeValidator = new CubeValidator(new CubeSymbols());
     const cube = {
       name: 'name',
@@ -350,7 +350,7 @@ describe('Cube Validation', () => {
           measureReferences: () => '',
           dimensionReferences: () => '',
           partitionGranularity: 'month',
-          granularity: 'days',
+          granularity: 'custom_granularity_name',
           timeDimensionReference: () => '',
           external: true,
           refreshKey: {
@@ -364,13 +364,12 @@ describe('Cube Validation', () => {
 
     const validationResult = cubeValidator.validate(cube, {
       error: (message, e) => {
-        console.log(message);
-        expect(message).toContain('must be one of');
-        expect(message).not.toContain('rollup) must be');
+        // this callback should not be invoked
+        expect(true).toBeFalsy();
       }
     } as any);
 
-    expect(validationResult.error).toBeTruthy();
+    expect(validationResult.error).toBeFalsy();
   });
 
   it('preAggregations type unknown', async () => {

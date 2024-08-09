@@ -294,19 +294,25 @@ export class YamlCompiler {
       return {};
     }
 
-    const remapped = yamlArray.map(({ name, indexes, ...rest }) => {
-      if (memberType === 'preAggregation' && indexes) {
-        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
-      }
-
+    const remapped = yamlArray.map(({ name, indexes, granularities, ...rest }) => {
       if (!name) {
         errorsReport.error(`name isn't defined for ${memberType}: ${JSON.stringify(rest)}`);
         return {};
-      } else if (indexes) {
-        return { [name]: { indexes, ...rest } };
-      } else {
-        return { [name]: rest };
       }
+
+      const res = { [name]: {} };
+      if (memberType === 'preAggregation' && indexes) {
+        indexes = this.yamlArrayToObj(indexes || [], `${memberType}.index`, errorsReport);
+        res[name] = { indexes, ...res[name] };
+      }
+
+      if (memberType === 'dimension' && granularities) {
+        granularities = this.yamlArrayToObj(granularities || [], `${memberType}.granularity`, errorsReport);
+        res[name] = { granularities, ...res[name] };
+      }
+
+      res[name] = { ...res[name], ...rest };
+      return res;
     });
 
     return remapped.reduce((a, b) => ({ ...a, ...b }), {});

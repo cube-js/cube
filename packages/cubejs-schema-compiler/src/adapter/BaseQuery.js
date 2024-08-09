@@ -31,7 +31,7 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  year: ['year', 'quarter', 'month', 'day', 'hour', 'minute', 'second'],
   quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
   month: ['month', 'day', 'hour', 'minute', 'second'],
   week: ['week', 'day', 'hour', 'minute', 'second'],
@@ -2115,6 +2115,10 @@ export class BaseQuery {
     return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition());
   }
 
+  dimensionGranularitySql(dimension) {
+    return this.evaluateSymbolSql(dimension.path()[0], dimension.path()[1], dimension.dimensionDefinition(), null, ['granularities', dimension.granularity]);
+  }
+
   segmentSql(segment) {
     return this.evaluateSymbolSql(segment.path()[0], segment.path()[1], segment.segmentDefinition());
   }
@@ -2171,12 +2175,12 @@ export class BaseQuery {
     return this.evaluateSymbolContext || {};
   }
 
-  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, childPropPathArray) {
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
-    const memberPathArray = [cubeName, name];
+    const memberPathArray = [cubeName, name].concat(childPropPathArray ?? []);
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
     if (!type && this.cubeEvaluator.isMeasure(memberPathArray)) {
@@ -2281,7 +2285,17 @@ export class BaseQuery {
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
         } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          let res;
+
+          // TODO Temporarily placed it here, but maybe this should be moved level up and processed in
+          // more generalized way to support nested properties not only on dimension level
+          if (childPropPathArray && childPropPathArray.length > 0) {
+            const childProperty = this.cubeEvaluator.byPath('dimensions', memberPathArray);
+            res = this.autoPrefixAndEvaluateSql(cubeName, childProperty.sql, isMemberExpr);
+          } else {
+            res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          }
+
           if (symbol.shiftInterval) {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }

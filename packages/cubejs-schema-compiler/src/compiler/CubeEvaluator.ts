@@ -86,7 +86,7 @@ export class CubeEvaluator extends CubeSymbols {
     for (const cube of validCubes) {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
-    
+
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -128,21 +128,21 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.isView && (cube.includedMembers || []).length) {
       const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
-      
+
       if (!cube.hierarchies) {
         for (const cubeName of includedCubeNames) {
           const { hierarchies } = this.evaluatedCubes[cubeName] || {};
-  
+
           if (Array.isArray(hierarchies) && hierarchies.length) {
             const filteredHierarchies = hierarchies.map(it => {
               const levels = it.levels.filter(level => includedMemberPaths.includes(level));
-  
+
               return {
                 ...it,
                 levels
               };
             }).filter(it => it.levels.length);
-  
+
             cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
           }
         }
@@ -499,7 +499,28 @@ export class CubeEvaluator extends CubeSymbols {
       throw new UserError(`'${cubeAndName[1]}' not found for path '${path}'`);
     }
 
-    return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    if (cubeAndName.length === 2) {
+      return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    }
+
+    // length > 2 means that some nested property is requested.
+    if (cubeAndName.length === 3) {
+      if (!this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]][cubeAndName[2]]) {
+        throw new UserError(`'${cubeAndName[1]}.${cubeAndName[2]}' not found for path '${path}'`);
+      }
+
+      return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]][cubeAndName[2]];
+    }
+
+    if (cubeAndName.length === 4) {
+      if (!this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]][cubeAndName[2]][cubeAndName[3]]) {
+        throw new UserError(`'${cubeAndName[1]}.${cubeAndName[2]}.${cubeAndName[3]}' not found for path '${path}'`);
+      }
+
+      return this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]][cubeAndName[2]][cubeAndName[3]];
+    }
+
+    throw new UserError(`Unknown requested path: '${path}'`);
   }
 
   public parsePath(type, path) {

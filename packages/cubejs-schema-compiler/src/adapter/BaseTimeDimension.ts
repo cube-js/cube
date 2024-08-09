@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { timeSeries, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
+import { timeSeries, isPredefinedGranularity, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -10,6 +10,12 @@ export class BaseTimeDimension extends BaseFilter {
   public readonly dateRange: any;
 
   public readonly granularity: string;
+
+  public readonly isPredefined: boolean;
+
+  public readonly baseGranularity: string | undefined;
+
+  public readonly granularitySql: Function | undefined;
 
   public readonly boundaryDateRange: any;
 
@@ -26,6 +32,15 @@ export class BaseTimeDimension extends BaseFilter {
     });
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
+    this.isPredefined = isPredefinedGranularity(this.granularity);
+    if (!this.isPredefined) {
+      const customGranularity = this.query.cubeEvaluator
+        .byPath('dimensions', timeDimension.dimension)
+        .granularities?.[this.granularity];
+
+      this.baseGranularity = customGranularity?.baseGranularity;
+      this.granularitySql = customGranularity?.sql;
+    }
     this.boundaryDateRange = timeDimension.boundaryDateRange;
     this.shiftInterval = timeDimension.shiftInterval;
   }
@@ -87,12 +102,22 @@ export class BaseTimeDimension extends BaseFilter {
       if (context.rollupGranularity === this.granularity) {
         return super.dimensionSql();
       }
-      return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
+      if (this.isPredefined || !this.granularity) {
+        return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
+      } else {
+        return this.query.dimensionGranularitySql(this);
+      }
     }
+
     if (context.ungrouped) {
       return this.convertedToTz();
     }
-    return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+
+    if (this.isPredefined) {
+      return this.query.timeGroupedColumn(granularity, this.convertedToTz());
+    } else {
+      return this.granularityConvertedToTz();
+    }
   }
 
   public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
@@ -107,7 +132,11 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public convertedToTz() {
-    return this.query.convertTz(this.query.dimensionSql(this));
+    return this.query.convertTz(`${this.query.dimensionSql(this)}`);
+  }
+
+  public granularityConvertedToTz() {
+    return this.query.convertTz(`(${this.query.dimensionGranularitySql(this)})`);
   }
 
   public filterToWhere() {
@@ -210,7 +239,18 @@ export class BaseTimeDimension extends BaseFilter {
       this.rollupGranularityValue =
         this.query.cacheValue(
           ['rollupGranularity', this.granularity].concat(this.dateRange),
-          () => this.query.minGranularity(this.granularity, this.dateRangeGranularity())
+          () => {
+            if (this.isPredefined) {
+              return this.query.minGranularity(this.granularity, this.dateRangeGranularity());
+            }
+
+            if (this.baseGranularity) {
+              return this.query.minGranularity(this.baseGranularity, this.dateRangeGranularity());
+            }
+
+            // Trying to get granularity from the date range if it was provided
+            return this.dateRangeGranularity();
+          }
         );
     }
 
