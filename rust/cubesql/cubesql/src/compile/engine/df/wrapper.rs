@@ -253,6 +253,14 @@ fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
     }
 }
 
+fn expr_to_column_with_relation(e: &Expr, schema: &Arc<DFSchema>) -> Result<Column> {
+    match e {
+        Expr::Column(col) => Ok(col.clone()),
+        Expr::Sort { expr, .. } => expr_to_column_with_relation(expr, schema),
+        _ => Ok(Column::from_name(e.name(schema)?)),
+    }
+}
+
 pub struct SqlGenerationResult {
     pub data_source: Option<String>,
     pub from_alias: Option<String>,
@@ -989,8 +997,8 @@ impl CubeScanWrapperNode {
                 Self::escape_interpolation_quotes(expr_sql, ungrouped_scan_node.is_some());
             sql = new_sql_query;
 
-            let original_alias = expr_name(&original_expr, &schema)?;
-            let original_alias_key = Column::from_name(&original_alias);
+            let original_alias_key = expr_to_column_with_relation(&original_expr, &schema)?;
+            let original_alias = original_alias_key.name.clone();
             if let Some(alias_column) = next_remapping.get(&original_alias_key) {
                 let alias = alias_column.name.clone();
                 aliased_columns.push(AliasedColumn {
@@ -1009,10 +1017,7 @@ impl CubeScanWrapperNode {
                 truncated_alias.truncate(16);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
-                    if !next_remapping
-                        .iter()
-                        .any(|(_, v)| v == &Column::from_name(&alias))
-                    {
+                    if !next_remapping.iter().any(|(_, v)| v.name == alias) {
                         break;
                     }
                     alias = format!("{}_{}", truncated_alias, i);
