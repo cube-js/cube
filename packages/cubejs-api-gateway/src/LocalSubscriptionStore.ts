@@ -2,6 +2,20 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
+// TODO: Check whether this is the correct way to get cube names
+const getCubeNames = (query) => {
+  if (!query) {
+    return [];
+  }
+
+  const allColumns = [
+    ...(query.measures || []).map(m => m.split('.')[0]),
+    ...(query.dimensions || []).map(d => d.split('.')[0]),
+  ];
+  
+  return Array.from(new Set(allColumns));
+}
+
 export class LocalSubscriptionStore {
   protected connections = {};
 
@@ -20,7 +34,7 @@ export class LocalSubscriptionStore {
     const connection = this.getConnection(connectionId);
     connection.subscriptions[subscriptionId] = {
       ...subscription,
-      cube: 'TODO',
+      cubes: getCubeNames(subscription.message?.params?.query),
       timestamp: new Date()
     };
   }
@@ -46,8 +60,9 @@ export class LocalSubscriptionStore {
     }).reduce((a, b) => a.concat(b), []);
   }
 
-  public async getSubscriptionsByCubeName(cube: string) {
-    return (await this.getAllSubscriptions()).filter(subscription => subscription.cube === cube);
+  public async getSubscriptionsByCubeName(cubes: Array<string>) {
+    // TODO: Implement cube filtering by auth context
+    return (await this.getAllSubscriptions()).filter(subscription => cubes.includes(subscription.cubes[0]));
   }
 
   public async cleanupSubscriptions(connectionId: string) {
