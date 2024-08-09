@@ -60,7 +60,7 @@ export class CubejsServer {
   public constructor(config: CreateOptions = {}, systemOptions?: SystemOptions) {
     this.config = {
       ...config,
-      webSockets: true,
+      webSockets: config.webSockets || getEnv('webSockets'),
       sqlPort: config.sqlPort || getEnv('sqlPort'),
       pgSqlPort: config.pgSqlPort || getEnv('pgSqlPort'),
       sqlNonce: config.sqlNonce || getEnv('sqlNonce'),
