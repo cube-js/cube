@@ -25,7 +25,19 @@ export type WebSocketSendMessageFn = (connectionId: string, message: any) => voi
 
 export class SubscriptionServer {
 
-  private readonly cubeRenewSubject = new Subject<any>();
+  readonly #cubeRenewSubject = new Subject<any>();
+  readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
+    // Map only the renewedCube property
+    map((val) => val.renewedCube),
+    // Filter out any empty values
+    filter((val) => !!val),
+    // Buffer the values for 300ms
+    bufferTime(300),
+    // Filter out any empty arrays
+    filter((renewedCubes) => renewedCubes.length > 0),
+    // Convert the array of arrays to an array of unique arrays
+    map((renewedCubes) => Array.from(new Set(renewedCubes))),
+  );
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
@@ -34,21 +46,8 @@ export class SubscriptionServer {
     protected readonly contextAcceptor: ContextAcceptorFn,
     protected readonly eventEmitter: EventEmitter
   ) {
-    this.eventEmitter.on('cubeRenewed', (val) => this.cubeRenewSubject.next(val));
-    this.cubeRenewSubject
-      .pipe(
-        // Map only the renewedCube property
-        map((val) => val.renewedCube),
-        // Filter out any empty values
-        filter((val) => !!val),
-        // Buffer the values for 300ms
-        bufferTime(300),
-        // Filter out any empty arrays
-        filter((renewedCubes) => renewedCubes.length > 0),
-        // Convert the array of arrays to an array of unique arrays
-        map((renewedCubes) => Array.from(new Set(renewedCubes)))
-      )
-    .subscribe(this.renewCubes.bind(this));
+    this.eventEmitter.on('cubeRenewed', (val) => this.#cubeRenewSubject.next(val));
+    this.#cubeRenewedPipe.subscribe(this.renewCubes);
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {
