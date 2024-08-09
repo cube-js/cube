@@ -534,7 +534,19 @@ pub async fn get_test_session_with_config(
     config_obj: Arc<dyn ConfigObj>,
     meta_context: Arc<MetaContext>,
 ) -> Arc<Session> {
-    let test_transport = get_test_transport(meta_context);
+    get_test_session_with_config_and_transport(
+        protocol,
+        config_obj,
+        get_test_transport(meta_context),
+    )
+    .await
+}
+
+async fn get_test_session_with_config_and_transport(
+    protocol: DatabaseProtocol,
+    config_obj: Arc<dyn ConfigObj>,
+    test_transport: Arc<dyn TransportService>,
+) -> Arc<Session> {
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
         test_transport.clone(),
@@ -591,90 +603,94 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
-pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportService> {
-    #[derive(Debug)]
-    struct TestConnectionTransport {
-        meta_context: Arc<MetaContext>,
+#[derive(Debug)]
+struct TestConnectionTransport {
+    meta_context: Arc<MetaContext>,
+}
+
+#[async_trait]
+impl TransportService for TestConnectionTransport {
+    // Load meta information about cubes
+    async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
+        Ok(self.meta_context.clone())
     }
 
-    #[async_trait]
-    impl TransportService for TestConnectionTransport {
-        // Load meta information about cubes
-        async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-            Ok(self.meta_context.clone())
-        }
+    async fn sql(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        query: V1LoadRequestQuery,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _member_to_alias: Option<HashMap<String, String>>,
+        expression_params: Option<Vec<Option<String>>>,
+    ) -> Result<SqlResponse, CubeError> {
+        Ok(SqlResponse {
+            sql: SqlQuery::new(
+                format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                expression_params.unwrap_or(Vec::new()),
+            ),
+        })
+    }
 
-        async fn sql(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            query: V1LoadRequestQuery,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-            _member_to_alias: Option<HashMap<String, String>>,
-            expression_params: Option<Vec<Option<String>>>,
-        ) -> Result<SqlResponse, CubeError> {
-            Ok(SqlResponse {
-                sql: SqlQuery::new(
-                    format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
-                    expression_params.unwrap_or(Vec::new()),
-                ),
-            })
-        }
+    // Execute load query
+    async fn load(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        _query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<V1LoadResponse, CubeError> {
+        panic!("It's a fake transport");
+    }
 
-        // Execute load query
-        async fn load(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            _query: V1LoadRequestQuery,
-            _sql_query: Option<SqlQuery>,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-        ) -> Result<V1LoadResponse, CubeError> {
-            panic!("It's a fake transport");
-        }
+    async fn load_stream(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        _query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _schema: SchemaRef,
+        _member_fields: Vec<MemberField>,
+    ) -> Result<CubeStreamReceiver, CubeError> {
+        panic!("It's a fake transport");
+    }
 
-        async fn load_stream(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            _query: V1LoadRequestQuery,
-            _sql_query: Option<SqlQuery>,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-            _schema: SchemaRef,
-            _member_fields: Vec<MemberField>,
-        ) -> Result<CubeStreamReceiver, CubeError> {
-            panic!("It's a fake transport");
-        }
-
-        async fn can_switch_user_for_session(
-            &self,
-            _ctx: AuthContextRef,
-            to_user: String,
-        ) -> Result<bool, CubeError> {
-            if to_user == "good_user" {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        }
-
-        async fn log_load_state(
-            &self,
-            span_id: Option<Arc<SpanId>>,
-            ctx: AuthContextRef,
-            meta_fields: LoadRequestMeta,
-            event: String,
-            properties: serde_json::Value,
-        ) -> Result<(), CubeError> {
-            println!(
-                "Load state: {:?} {:?} {:?} {} {:?}",
-                span_id, ctx, meta_fields, event, properties
-            );
-            Ok(())
+    async fn can_switch_user_for_session(
+        &self,
+        _ctx: AuthContextRef,
+        to_user: String,
+    ) -> Result<bool, CubeError> {
+        if to_user == "good_user" {
+            Ok(true)
+        } else {
+            Ok(false)
         }
     }
 
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError> {
+        println!(
+            "Load state: {:?} {:?} {:?} {} {:?}",
+            span_id, ctx, meta_fields, event, properties
+        );
+        Ok(())
+    }
+}
+
+fn get_test_transport_priv(meta_context: Arc<MetaContext>) -> Arc<TestConnectionTransport> {
     Arc::new(TestConnectionTransport { meta_context })
+}
+
+pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportService> {
+    get_test_transport_priv(meta_context)
 }
 
 pub async fn execute_query_with_flags(
@@ -703,6 +719,7 @@ pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String
 
 pub struct TestContext {
     meta: Arc<MetaContext>,
+    transport: Arc<TestConnectionTransport>,
     session: Arc<Session>,
 }
 
@@ -712,9 +729,19 @@ impl TestContext {
         env::set_var("TZ", "UTC");
 
         let meta = get_test_tenant_ctx();
-        let session = get_test_session(db, meta.clone()).await;
+        let transport = get_test_transport_priv(meta.clone());
+        let session = get_test_session_with_config_and_transport(
+            db,
+            Arc::new(ConfigObjImpl::default()),
+            transport.clone(),
+        )
+        .await;
 
-        TestContext { meta, session }
+        TestContext {
+            meta,
+            transport,
+            session,
+        }
     }
 
     pub async fn execute_query_with_flags(
