@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, sync::Arc};
+use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
 use cubeclient::models::{
@@ -719,22 +719,27 @@ impl TestContext {
 
     pub async fn execute_query_with_flags(
         &self,
-        query: String,
+        query: impl Deref<Target = str>,
     ) -> Result<(String, StatusFlags), CubeError> {
-        self.execute_queries_with_flags(vec![query]).await
+        self.execute_queries_with_flags([query]).await
     }
 
     pub async fn execute_queries_with_flags(
         &self,
-        queries: Vec<String>,
+        queries: impl IntoIterator<Item: Deref<Target = str>>,
     ) -> Result<(String, StatusFlags), CubeError> {
         let mut output: Vec<String> = Vec::new();
         let mut output_flags = StatusFlags::empty();
 
         for query in queries {
-            let query = convert_sql_to_cube_query(&query, self.meta.clone(), self.session.clone())
-                .await
-                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            // TODO push to_string() deeper
+            let query = convert_sql_to_cube_query(
+                &query.to_string(),
+                self.meta.clone(),
+                self.session.clone(),
+            )
+            .await
+            .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
             match query {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
@@ -757,7 +762,10 @@ impl TestContext {
         Ok((output.join("\n").to_string(), output_flags))
     }
 
-    pub async fn execute_query(&self, query: String) -> Result<String, CubeError> {
+    pub async fn execute_query(
+        &self,
+        query: impl Deref<Target = str>,
+    ) -> Result<String, CubeError> {
         Ok(self.execute_query_with_flags(query).await?.0)
     }
 }
