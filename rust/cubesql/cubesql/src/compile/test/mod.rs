@@ -606,6 +606,20 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
+    load_mocks: tokio::sync::Mutex<Vec<(V1LoadRequestQuery, V1LoadResponse)>>,
+}
+
+impl TestConnectionTransport {
+    pub fn new(meta_context: Arc<MetaContext>) -> Self {
+        Self {
+            meta_context,
+            load_mocks: tokio::sync::Mutex::new(vec![]),
+        }
+    }
+
+    pub async fn add_cube_load_mock(&self, req: V1LoadRequestQuery, res: V1LoadResponse) {
+        self.load_mocks.lock().await.push((req, res));
+    }
 }
 
 #[async_trait]
@@ -636,12 +650,20 @@ impl TransportService for TestConnectionTransport {
     async fn load(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        _query: V1LoadRequestQuery,
-        _sql_query: Option<SqlQuery>,
+        query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
     ) -> Result<V1LoadResponse, CubeError> {
-        panic!("It's a fake transport");
+        if sql_query.is_some() {
+            unimplemented!("load with sql_query");
+        }
+
+        let mocks = self.load_mocks.lock().await;
+        let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
+            panic!("Unexpected query: {:?}", query);
+        };
+        Ok(res.clone())
     }
 
     async fn load_stream(
@@ -686,7 +708,7 @@ impl TransportService for TestConnectionTransport {
 }
 
 fn get_test_transport_priv(meta_context: Arc<MetaContext>) -> Arc<TestConnectionTransport> {
-    Arc::new(TestConnectionTransport { meta_context })
+    Arc::new(TestConnectionTransport::new(meta_context))
 }
 
 pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportService> {
@@ -720,6 +742,7 @@ pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String
 pub struct TestContext {
     meta: Arc<MetaContext>,
     transport: Arc<TestConnectionTransport>,
+    config_obj: Arc<dyn ConfigObj>,
     session: Arc<Session>,
 }
 
@@ -735,13 +758,25 @@ impl TestContext {
         let meta = get_test_tenant_ctx();
         let transport = get_test_transport_priv(meta.clone());
         let session =
-            get_test_session_with_config_and_transport(db, config_obj, transport.clone()).await;
+            get_test_session_with_config_and_transport(db, config_obj.clone(), transport.clone())
+                .await;
 
         TestContext {
             meta,
             transport,
+            config_obj,
             session,
         }
+    }
+
+    pub async fn add_cube_load_mock(&self, mut req: V1LoadRequestQuery, res: V1LoadResponse) {
+        // Fill in default limit to simplify passing queries as they were in logical plan
+        let config_limit = self.config_obj.non_streaming_query_max_row_limit();
+        req.limit = req
+            .limit
+            .map(|req_limit| req_limit.min(config_limit))
+            .or(Some(config_limit));
+        self.transport.add_cube_load_mock(req, res).await
     }
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
