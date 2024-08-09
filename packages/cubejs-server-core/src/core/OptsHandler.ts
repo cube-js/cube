@@ -457,7 +457,7 @@ export class OptsHandler {
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES &&
         process.env.CUBEJS_SCHEDULED_REFRESH_TIMEZONES.split(',').map(t => t.trim()),
       scheduledRefreshContexts: async () => [null],
-      basePath: '/cubejs-api',
+      basePath: process.env.CUBEJS_API_BASE_PATH || '/cubejs-api',
       dashboardAppPath: 'dashboard-app',
       dashboardAppPort: 3000,
       scheduledRefreshConcurrency:
