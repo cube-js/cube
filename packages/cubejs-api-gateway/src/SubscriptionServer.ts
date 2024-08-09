@@ -25,7 +25,7 @@ export type WebSocketSendMessageFn = (connectionId: string, message: any) => voi
 
 export class SubscriptionServer {
 
-  private cubeRenewSubject = new Subject<any>();
+  private readonly cubeRenewSubject = new Subject<any>();
 
   public constructor(
     protected readonly apiGateway: ApiGateway,
