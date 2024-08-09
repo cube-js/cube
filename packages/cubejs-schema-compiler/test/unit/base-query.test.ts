@@ -60,7 +60,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with 6 digits timestamp presicion - bigquery', async () => {
+    it('Test time series with 6 digits timestamp precision - bigquery', async () => {
       await compilers.compiler.compile();
 
       const query = new BigqueryQuery(compilers, {
@@ -185,6 +185,34 @@ describe('SQL Generation', () => {
           ])
         );
       }
+    });
+
+    it('Test same dimension with different granularities - postgres', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'quarter',
+          },
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'month',
+          }
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_quarter')).toBeTruthy();
+      expect(queryString.includes('date_trunc(\'month\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_month')).toBeTruthy();
     });
 
     it('Test for everyRefreshKeySql', async () => {
@@ -879,6 +907,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
   });
+
   it('Test BaseQuery with aliased cube', async () => {
     const set = /** @type Compilers */ prepareCompiler(`
       cube('CamelCaseCube', {
@@ -927,6 +956,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
   });
+
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();
