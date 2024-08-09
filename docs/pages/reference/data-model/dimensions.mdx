@@ -341,6 +341,44 @@ cubes:
 
 </CodeTabs>
 
+### propagate_time_dimension_to_sub_query
+
+When this statement is set to `true`, the only the time dimension filters applied to the query will be
+passed to the [subquery][self-subquery].
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  // ...
+
+  dimensions: {
+    users_count: {
+      sql: `${users.count}`,
+      type: `number`,
+      sub_query: true,
+      propagate_time_dimension_to_sub_query: true,
+    },
+  },
+});
+```
+
+```yaml
+cubes:
+  - name: products
+    # ...
+
+    dimensions:
+      - name: users_count
+        sql: "{users.count}"
+        type: number
+        sub_query: true
+        propagate_time_dimension_to_sub_query: true
+```
+
+</CodeTabs>
+
+
 ### public
 
 <InfoBox>
