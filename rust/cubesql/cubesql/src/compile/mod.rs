@@ -1816,7 +1816,7 @@ mod tests {
     use std::env;
 
     use super::{
-        test::{get_test_session, get_test_tenant_ctx},
+        test::{get_test_session, get_test_tenant_ctx, TestContext},
         *,
     };
     use crate::{
@@ -1824,8 +1824,8 @@ mod tests {
             engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
             test::{
-                get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
-                get_test_tenant_ctx_customized, get_test_tenant_ctx_with_meta,
+                get_sixteen_char_member_cube, get_string_cube_meta, get_test_tenant_ctx_customized,
+                get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -1866,17 +1866,11 @@ mod tests {
         db: DatabaseProtocol,
         config_obj: Arc<dyn ConfigObj>,
     ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session_with_config(db, config_obj, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
+        TestContext::with_config(db, config_obj)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan_with_meta(
