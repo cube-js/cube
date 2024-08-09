@@ -36,7 +36,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query', async () => {
+    it('Simple query - measures', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -47,16 +47,16 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
       expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
     });
 
     it('Simple query - dimension', async () => {
       await compilers.compiler.compile();
-
-      setupLogger(
-        ({ event }) => console.log(event),
-        'warn'
-      );
 
       const query = new PostgresQuery(compilers, {
         measures: [
@@ -68,8 +68,38 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
       });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC'
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - time dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [
+          {
+          dimension: 'cards.createdAt',
+          granularity: 'day',
+          dateRange: ['2021-01-01', '2021-01-02']
+          }
+        ],
+        timezone: 'America/Los_Angeles',
+        filters: [],
+      });
+
       const queryAndParams = query.buildSqlAndParamsTest();
-      expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
+      expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
+      expect(queryAndParams[0]).toContain('ORDER BY 2');
     });
   });
 

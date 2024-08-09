@@ -470,8 +470,6 @@ pub fn setup_logger(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     //IMPORTANT It seems to be safe here, because context lifetime is bound to function, but this
     //context should be used only inside function
-    println!("!!! --- !!!! ");
-    log::error!("!!! eeee");
     let mut cx = extend_function_context_lifetime(cx);
     let options = cx.argument::<JsValue>(0)?;
 
@@ -491,11 +489,7 @@ fn build_sql_and_params(cx: FunctionContext) -> JsResult<JsValue> {
     let base_query = BaseQuery::try_new(context_holder.clone(), base_query_options).unwrap();
 
     //arg_clrep.into_js(&mut cx)
-    let res = base_query.build_sql_and_params();
-    if let Err(r) = &res {
-        println!("!!!! {:?}", r);
-    }
-    let res = res.unwrap();
+    let res = base_query.build_sql_and_params().unwrap();
 
     let result: NeonObject<'static, FunctionContext<'static>> = res.into_object();
     let result = result.into_object();
