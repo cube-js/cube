@@ -1808,7 +1808,8 @@ pub fn find_cube_scans_deep_search(
 mod tests {
     use chrono::Datelike;
     use cubeclient::models::{
-        V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+        V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension, V1LoadResponse,
+        V1LoadResult, V1LoadResultAnnotation,
     };
     use datafusion::logical_plan::plan::Filter;
     use pretty_assertions::assert_eq;
@@ -1816,7 +1817,7 @@ mod tests {
     use std::env;
 
     use super::{
-        test::{get_test_session, get_test_tenant_ctx},
+        test::{get_test_session, get_test_tenant_ctx, TestContext},
         *,
     };
     use crate::{
@@ -1824,8 +1825,7 @@ mod tests {
             engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
             test::{
-                get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
-                get_test_tenant_ctx_customized, get_test_tenant_ctx_with_meta,
+                get_sixteen_char_member_cube, get_string_cube_meta, get_test_tenant_ctx_with_meta,
             },
         },
         config::{ConfigObj, ConfigObjImpl},
@@ -1844,21 +1844,19 @@ mod tests {
         db: DatabaseProtocol,
         custom_templates: Vec<(String, String)>,
     ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx_customized(custom_templates);
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session(db, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
+        TestContext::with_custom_templates(db, custom_templates)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        convert_select_to_query_plan_customized(query, db, vec![]).await
+        TestContext::new(db)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan_with_config(
@@ -1866,17 +1864,11 @@ mod tests {
         db: DatabaseProtocol,
         config_obj: Arc<dyn ConfigObj>,
     ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session_with_config(db, config_obj, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
+        TestContext::with_config(db, config_obj)
+            .await
+            .convert_sql_to_cube_query(&query)
+            .await
+            .unwrap()
     }
 
     async fn convert_select_to_query_plan_with_meta(
@@ -17320,6 +17312,61 @@ ORDER BY "source"."str0" ASC
             .unwrap()
             .sql
             .contains("EXTRACT"));
+    }
+
+    // TODO using this is not correct, but works for now
+    fn empty_annotation() -> V1LoadResultAnnotation {
+        V1LoadResultAnnotation::new(json!([]), json!([]), json!([]), json!([]))
+    }
+
+    fn simple_load_response(data: Vec<serde_json::Value>) -> V1LoadResponse {
+        V1LoadResponse::new(vec![V1LoadResult::new(empty_annotation(), data)])
+    }
+
+    #[tokio::test]
+    async fn test_cube_scan_exec() {
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT dim_str0
+            FROM MultiTypeCube
+            GROUP BY 1
+        "#;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan,
+        );
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan,
+                simple_load_response(vec![json!({"MultiTypeCube.dim_str0": "foo"})]),
+            )
+            .await;
+
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
     }
 
     #[tokio::test]
