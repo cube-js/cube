@@ -80,6 +80,7 @@ use crate::{
     transport::{LoadRequestMeta, SpanId, TransportService},
 };
 pub use error::{CompilationError, CompilationResult};
+pub use test::{find_cube_scans_deep_search, find_filter_deep_search, LogicalPlanTestUtils};
 
 #[derive(Clone)]
 struct QueryPlanner {
@@ -1328,47 +1329,12 @@ pub async fn get_df_batches(
     }
 }
 
-pub fn find_cube_scans_deep_search(
-    parent: Arc<LogicalPlan>,
-    panic_if_empty: bool,
-) -> Vec<CubeScanNode> {
-    pub struct FindCubeScanNodeVisitor(Vec<CubeScanNode>);
-
-    impl PlanVisitor for FindCubeScanNodeVisitor {
-        type Error = CubeError;
-
-        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-            if let LogicalPlan::Extension(ext) = plan {
-                if let Some(scan_node) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
-                    self.0.push(scan_node.clone());
-                } else if let Some(wrapper_node) =
-                    ext.node.as_any().downcast_ref::<CubeScanWrapperNode>()
-                {
-                    wrapper_node.wrapped_plan.accept(self)?;
-                }
-            }
-            Ok(true)
-        }
-    }
-
-    let mut visitor = FindCubeScanNodeVisitor(Vec::new());
-    parent.accept(&mut visitor).unwrap();
-
-    if panic_if_empty && visitor.0.len() == 0 {
-        panic!("No CubeScanNode was found in plan");
-    }
-
-    visitor.0
-}
-
 #[cfg(test)]
 mod tests {
     use chrono::Datelike;
     use cubeclient::models::{
-        V1CubeMeta, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
-        V1LoadRequestQueryTimeDimension,
+        V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
     };
-    use datafusion::logical_plan::plan::Filter;
     use pretty_assertions::assert_eq;
     use regex::Regex;
     use std::env;
@@ -1381,138 +1347,18 @@ mod tests {
         compile::{
             engine::df::scan::MemberField,
             rewrite::rewriter::Rewriter,
-            test::{
-                get_sixteen_char_member_cube, get_string_cube_meta, get_test_session_with_config,
-                get_test_tenant_ctx_customized, get_test_tenant_ctx_with_meta,
-            },
+            test::{get_sixteen_char_member_cube, get_string_cube_meta},
         },
-        config::{ConfigObj, ConfigObjImpl},
+        config::ConfigObjImpl,
     };
-    use datafusion::{
-        arrow::datatypes::DataType, logical_plan::PlanVisitor, physical_plan::displayable,
-    };
+    use datafusion::{arrow::datatypes::DataType, physical_plan::displayable};
     use serde_json::json;
 
-    use crate::compile::test::{execute_queries_with_flags, execute_query, init_testing_logger};
-
-    async fn convert_select_to_query_plan_customized(
-        query: String,
-        db: DatabaseProtocol,
-        custom_templates: Vec<(String, String)>,
-    ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx_customized(custom_templates);
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session(db, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
-    }
-
-    async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
-        convert_select_to_query_plan_customized(query, db, vec![]).await
-    }
-
-    async fn convert_select_to_query_plan_with_config(
-        query: String,
-        db: DatabaseProtocol,
-        config_obj: Arc<dyn ConfigObj>,
-    ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx();
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session_with_config(db, config_obj, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
-    }
-
-    async fn convert_select_to_query_plan_with_meta(
-        query: String,
-        meta: Vec<V1CubeMeta>,
-    ) -> QueryPlan {
-        env::set_var("TZ", "UTC");
-
-        let meta_context = get_test_tenant_ctx_with_meta(meta);
-        let query = convert_sql_to_cube_query(
-            &query,
-            meta_context.clone(),
-            get_test_session(DatabaseProtocol::PostgreSQL, meta_context).await,
-        )
-        .await;
-
-        query.unwrap()
-    }
-
-    trait LogicalPlanTestUtils {
-        fn find_cube_scan(&self) -> CubeScanNode;
-
-        fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode;
-
-        fn find_cube_scans(&self) -> Vec<CubeScanNode>;
-
-        fn find_filter(&self) -> Option<Filter>;
-    }
-
-    fn find_filter_deep_search(parent: Arc<LogicalPlan>) -> Option<Filter> {
-        pub struct FindFilterNodeVisitor(Option<Filter>);
-
-        impl PlanVisitor for FindFilterNodeVisitor {
-            type Error = CubeError;
-
-            fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-                if let LogicalPlan::Filter(filter) = plan {
-                    self.0 = Some(filter.clone());
-                }
-                Ok(true)
-            }
-        }
-
-        let mut visitor = FindFilterNodeVisitor(None);
-        parent.accept(&mut visitor).unwrap();
-        visitor.0
-    }
-
-    impl LogicalPlanTestUtils for LogicalPlan {
-        fn find_cube_scan(&self) -> CubeScanNode {
-            let cube_scans = find_cube_scans_deep_search(Arc::new(self.clone()), true);
-            if cube_scans.len() != 1 {
-                panic!("The plan includes not 1 cube_scan!");
-            }
-
-            cube_scans[0].clone()
-        }
-
-        fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode {
-            match self {
-                LogicalPlan::Extension(Extension { node }) => {
-                    if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>()
-                    {
-                        wrapper_node.clone()
-                    } else {
-                        panic!("Root plan node is not cube_scan_wrapper!");
-                    }
-                }
-                _ => panic!("Root plan node is not extension!"),
-            }
-        }
-
-        fn find_cube_scans(&self) -> Vec<CubeScanNode> {
-            find_cube_scans_deep_search(Arc::new(self.clone()), true)
-        }
-
-        fn find_filter(&self) -> Option<Filter> {
-            find_filter_deep_search(Arc::new(self.clone()))
-        }
-    }
+    use crate::compile::test::{
+        convert_select_to_query_plan, convert_select_to_query_plan_customized,
+        convert_select_to_query_plan_with_config, convert_select_to_query_plan_with_meta,
+        execute_queries_with_flags, execute_query, init_testing_logger,
+    };
 
     #[tokio::test]
     async fn test_select_measure_via_function() {
@@ -19458,51 +19304,5 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         assert!(sql.contains(" AS REAL)"));
         assert!(sql.contains(" AS DOUBLE PRECISION)"));
         assert!(sql.contains(" AS DECIMAL(38,10))"));
-    }
-
-    #[tokio::test]
-    async fn test_powerbi_count_distinct_with_max_case() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let logical_plan = convert_select_to_query_plan(
-            r#"
-            select
-                "rows"."customer_gender" as "customer_gender",
-                count(distinct("rows"."countDistinct")) + max(
-                    case
-                        when "rows"."countDistinct" is null then 1
-                        else 0
-                    end
-                ) as "a0"
-            from
-                "public"."KibanaSampleDataEcommerce" "rows"
-            group by
-                "customer_gender"
-            limit
-                1000001
-            ;"#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await
-        .as_logical_plan();
-
-        assert_eq!(
-            logical_plan.find_cube_scan().request,
-            V1LoadRequestQuery {
-                measures: Some(vec!["KibanaSampleDataEcommerce.countDistinct".to_string()]),
-                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                segments: Some(vec![]),
-                time_dimensions: None,
-                order: None,
-                limit: Some(1000001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
-            }
-        )
     }
 }
