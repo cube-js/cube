@@ -1,0 +1,17 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: logical_plan
+---
+Projection: #datepart(Utf8("QUARTER"),MultiTypeCube.dim_date0)
+  Aggregate: groupBy=[[datepart(Utf8("quarter"), #MultiTypeCube.datepart(Utf8("QUARTER"),MultiTypeCube.dim_date0)) AS datepart(Utf8("QUARTER"),MultiTypeCube.dim_date0)]], aggr=[[]]
+    CubeScan: request={
+  "measures": [],
+  "dimensions": [],
+  "segments": [],
+  "timeDimensions": [
+    {
+      "dimension": "MultiTypeCube.dim_date0",
+      "granularity": "quarter"
+    }
+  ]
+}

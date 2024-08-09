@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: logical_plan
+---
+Projection: #datepart(Utf8("epoch"),MultiTypeCube.dim_date0)
+  Projection: datepart(Utf8("epoch"), #datepart(Utf8("epoch"),MultiTypeCube.dim_date0)) AS datepart(Utf8("epoch"),MultiTypeCube.dim_date0)
+    CubeScan: request={
+  "measures": [],
+  "dimensions": [
+    "MultiTypeCube.dim_date0"
+  ],
+  "segments": []
+}

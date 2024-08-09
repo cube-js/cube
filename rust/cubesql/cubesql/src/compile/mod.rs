@@ -17294,6 +17294,66 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_extract_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        // TODO qtr is not supported in EXTRACT for now, probably in sqlparser
+        let tokens = ["epoch", "day", "dow", "quarter" /*, "qtr"*/];
+
+        for token in tokens {
+            let logical_plan = convert_select_to_query_plan(
+                // language=PostgreSQL
+                format!(
+                    r#"
+                    SELECT EXTRACT({token} FROM dim_date0)
+                    FROM MultiTypeCube
+                    GROUP BY 1
+                "#
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            insta::assert_debug_snapshot!(format!("extract_{token}_from_dimension"), logical_plan);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_date_part_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let tokens = ["epoch", "day", "dow", "quarter", "qtr"];
+
+        for token in tokens {
+            let logical_plan = convert_select_to_query_plan(
+                // language=PostgreSQL
+                format!(
+                    r#"
+                    SELECT date_part('{token}', dim_date0)
+                    FROM MultiTypeCube
+                    GROUP BY 1
+                "#
+                ),
+                DatabaseProtocol::PostgreSQL,
+            )
+            .await
+            .as_logical_plan();
+
+            insta::assert_debug_snapshot!(
+                format!("date_part_{token}_from_dimension"),
+                logical_plan
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_wrapper_tableau_sunday_week() {
         if !Rewriter::sql_push_down_enabled() {
             return;
