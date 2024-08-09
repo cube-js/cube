@@ -393,7 +393,6 @@ export default {
         this.skipHeuristics = false;
       }
 
-      this.prevValidatedQuery = validatedQuery;
       return validatedQuery;
     },
   },
