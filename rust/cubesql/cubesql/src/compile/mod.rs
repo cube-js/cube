@@ -68,6 +68,10 @@ pub mod service;
 
 pub mod test;
 
+// re-export base deps to minimise version maintenance for crate users such as cloud
+pub use datafusion;
+pub use datafusion::arrow as arrow;
+
 pub use crate::transport::ctx::*;
 use crate::{
     compile::{
