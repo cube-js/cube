@@ -28,5 +28,5 @@ jobs:
         with:
           repository: '${{ github.repository }}/cube'
           tag: 'latest'
-          context: '.'
+          context: ./packages/cubejs-docker
           dockerfile: './packages/cubejs-docker/latest.Dockerfile'
