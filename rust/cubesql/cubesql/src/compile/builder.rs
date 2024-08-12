@@ -127,7 +127,7 @@ impl QueryBuilder {
         self.filters.push(filter);
     }
 
-    pub fn build(self) -> super::CompiledQuery {
+    pub fn build(self) -> CompiledQuery {
         CompiledQuery {
             request: V1LoadRequestQuery {
                 measures: Some(self.measures.into_iter().unique().collect()),
