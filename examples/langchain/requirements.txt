@@ -1,4 +1,4 @@
-streamlit==1.34.0
+streamlit==1.37.0
 pandas==2.2.2
 python-dotenv==1.0.1
 langchain==0.1.20
