@@ -3,6 +3,8 @@ FROM node:18.20.3-bullseye-slim as builder
 WORKDIR /cube
 COPY . .
 
+RUN yarn install
+
 RUN yarn policies set-version v1.22.19
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
