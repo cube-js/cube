@@ -1,4 +1,4 @@
-use std::{collections::HashMap, env, sync::Arc};
+use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
 use cubeclient::models::{
@@ -9,7 +9,7 @@ use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFram
 use log::Level;
 use uuid::Uuid;
 
-use super::{convert_sql_to_cube_query, MetaContext, QueryPlan};
+use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 use crate::{
     compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
     config::{ConfigObj, ConfigObjImpl},
@@ -534,7 +534,19 @@ pub async fn get_test_session_with_config(
     config_obj: Arc<dyn ConfigObj>,
     meta_context: Arc<MetaContext>,
 ) -> Arc<Session> {
-    let test_transport = get_test_transport(meta_context);
+    get_test_session_with_config_and_transport(
+        protocol,
+        config_obj,
+        get_test_transport(meta_context),
+    )
+    .await
+}
+
+async fn get_test_session_with_config_and_transport(
+    protocol: DatabaseProtocol,
+    config_obj: Arc<dyn ConfigObj>,
+    test_transport: Arc<dyn TransportService>,
+) -> Arc<Session> {
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
         test_transport.clone(),
@@ -591,139 +603,254 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
+#[derive(Debug)]
+struct TestConnectionTransport {
+    meta_context: Arc<MetaContext>,
+    load_mocks: tokio::sync::Mutex<Vec<(V1LoadRequestQuery, V1LoadResponse)>>,
+}
+
+impl TestConnectionTransport {
+    pub fn new(meta_context: Arc<MetaContext>) -> Self {
+        Self {
+            meta_context,
+            load_mocks: tokio::sync::Mutex::new(vec![]),
+        }
+    }
+
+    pub async fn add_cube_load_mock(&self, req: V1LoadRequestQuery, res: V1LoadResponse) {
+        self.load_mocks.lock().await.push((req, res));
+    }
+}
+
+#[async_trait]
+impl TransportService for TestConnectionTransport {
+    // Load meta information about cubes
+    async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
+        Ok(self.meta_context.clone())
+    }
+
+    async fn sql(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        query: V1LoadRequestQuery,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _member_to_alias: Option<HashMap<String, String>>,
+        expression_params: Option<Vec<Option<String>>>,
+    ) -> Result<SqlResponse, CubeError> {
+        Ok(SqlResponse {
+            sql: SqlQuery::new(
+                format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                expression_params.unwrap_or(Vec::new()),
+            ),
+        })
+    }
+
+    // Execute load query
+    async fn load(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        query: V1LoadRequestQuery,
+        sql_query: Option<SqlQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+    ) -> Result<V1LoadResponse, CubeError> {
+        if sql_query.is_some() {
+            unimplemented!("load with sql_query");
+        }
+
+        let mocks = self.load_mocks.lock().await;
+        let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
+            panic!("Unexpected query: {:?}", query);
+        };
+        Ok(res.clone())
+    }
+
+    async fn load_stream(
+        &self,
+        _span_id: Option<Arc<SpanId>>,
+        _query: V1LoadRequestQuery,
+        _sql_query: Option<SqlQuery>,
+        _ctx: AuthContextRef,
+        _meta_fields: LoadRequestMeta,
+        _schema: SchemaRef,
+        _member_fields: Vec<MemberField>,
+    ) -> Result<CubeStreamReceiver, CubeError> {
+        panic!("It's a fake transport");
+    }
+
+    async fn can_switch_user_for_session(
+        &self,
+        _ctx: AuthContextRef,
+        to_user: String,
+    ) -> Result<bool, CubeError> {
+        if to_user == "good_user" {
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn log_load_state(
+        &self,
+        span_id: Option<Arc<SpanId>>,
+        ctx: AuthContextRef,
+        meta_fields: LoadRequestMeta,
+        event: String,
+        properties: serde_json::Value,
+    ) -> Result<(), CubeError> {
+        println!(
+            "Load state: {:?} {:?} {:?} {} {:?}",
+            span_id, ctx, meta_fields, event, properties
+        );
+        Ok(())
+    }
+}
+
+fn get_test_transport_priv(meta_context: Arc<MetaContext>) -> Arc<TestConnectionTransport> {
+    Arc::new(TestConnectionTransport::new(meta_context))
+}
+
 pub fn get_test_transport(meta_context: Arc<MetaContext>) -> Arc<dyn TransportService> {
-    #[derive(Debug)]
-    struct TestConnectionTransport {
-        meta_context: Arc<MetaContext>,
-    }
-
-    #[async_trait]
-    impl TransportService for TestConnectionTransport {
-        // Load meta information about cubes
-        async fn meta(&self, _ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
-            Ok(self.meta_context.clone())
-        }
-
-        async fn sql(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            query: V1LoadRequestQuery,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-            _member_to_alias: Option<HashMap<String, String>>,
-            expression_params: Option<Vec<Option<String>>>,
-        ) -> Result<SqlResponse, CubeError> {
-            Ok(SqlResponse {
-                sql: SqlQuery::new(
-                    format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
-                    expression_params.unwrap_or(Vec::new()),
-                ),
-            })
-        }
-
-        // Execute load query
-        async fn load(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            _query: V1LoadRequestQuery,
-            _sql_query: Option<SqlQuery>,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-        ) -> Result<V1LoadResponse, CubeError> {
-            panic!("It's a fake transport");
-        }
-
-        async fn load_stream(
-            &self,
-            _span_id: Option<Arc<SpanId>>,
-            _query: V1LoadRequestQuery,
-            _sql_query: Option<SqlQuery>,
-            _ctx: AuthContextRef,
-            _meta_fields: LoadRequestMeta,
-            _schema: SchemaRef,
-            _member_fields: Vec<MemberField>,
-        ) -> Result<CubeStreamReceiver, CubeError> {
-            panic!("It's a fake transport");
-        }
-
-        async fn can_switch_user_for_session(
-            &self,
-            _ctx: AuthContextRef,
-            to_user: String,
-        ) -> Result<bool, CubeError> {
-            if to_user == "good_user" {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        }
-
-        async fn log_load_state(
-            &self,
-            span_id: Option<Arc<SpanId>>,
-            ctx: AuthContextRef,
-            meta_fields: LoadRequestMeta,
-            event: String,
-            properties: serde_json::Value,
-        ) -> Result<(), CubeError> {
-            println!(
-                "Load state: {:?} {:?} {:?} {} {:?}",
-                span_id, ctx, meta_fields, event, properties
-            );
-            Ok(())
-        }
-    }
-
-    Arc::new(TestConnectionTransport { meta_context })
+    get_test_transport_priv(meta_context)
 }
 
 pub async fn execute_query_with_flags(
     query: String,
     db: DatabaseProtocol,
 ) -> Result<(String, StatusFlags), CubeError> {
-    execute_queries_with_flags(vec![query], db).await
+    TestContext::new(db)
+        .await
+        .execute_query_with_flags(query)
+        .await
 }
 
 pub async fn execute_queries_with_flags(
     queries: Vec<String>,
     db: DatabaseProtocol,
 ) -> Result<(String, StatusFlags), CubeError> {
-    env::set_var("TZ", "UTC");
-
-    let meta = get_test_tenant_ctx();
-    let session = get_test_session(db, meta.clone()).await;
-
-    let mut output: Vec<String> = Vec::new();
-    let mut output_flags = StatusFlags::empty();
-
-    for query in queries {
-        let query = convert_sql_to_cube_query(&query, meta.clone(), session.clone())
-            .await
-            .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
-        match query {
-            QueryPlan::DataFusionSelect(flags, plan, ctx) => {
-                let df = DFDataFrame::new(ctx.state, &plan);
-                let batches = df.collect().await?;
-                let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
-
-                output.push(frame.print());
-                output_flags = flags;
-            }
-            QueryPlan::MetaTabular(flags, frame) => {
-                output.push(frame.print());
-                output_flags = flags;
-            }
-            QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
-                output_flags = flags;
-            }
-        }
-    }
-
-    Ok((output.join("\n").to_string(), output_flags))
+    TestContext::new(db)
+        .await
+        .execute_queries_with_flags(queries)
+        .await
 }
 
 pub async fn execute_query(query: String, db: DatabaseProtocol) -> Result<String, CubeError> {
-    Ok(execute_query_with_flags(query, db).await?.0)
+    TestContext::new(db).await.execute_query(query).await
+}
+
+pub struct TestContext {
+    meta: Arc<MetaContext>,
+    transport: Arc<TestConnectionTransport>,
+    config_obj: Arc<dyn ConfigObj>,
+    session: Arc<Session>,
+}
+
+impl TestContext {
+    pub async fn new(db: DatabaseProtocol) -> Self {
+        Self::with_config(db, Arc::new(ConfigObjImpl::default())).await
+    }
+
+    pub async fn with_custom_templates(
+        db: DatabaseProtocol,
+        custom_templates: Vec<(String, String)>,
+    ) -> Self {
+        Self::with_config_and_custom_templates(
+            db,
+            Arc::new(ConfigObjImpl::default()),
+            custom_templates,
+        )
+        .await
+    }
+
+    pub async fn with_config(db: DatabaseProtocol, config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self::with_config_and_custom_templates(db, config_obj, vec![]).await
+    }
+
+    pub async fn with_config_and_custom_templates(
+        db: DatabaseProtocol,
+        config_obj: Arc<dyn ConfigObj>,
+        custom_templates: Vec<(String, String)>,
+    ) -> Self {
+        // TODO setenv is not thread-safe, remove this
+        env::set_var("TZ", "UTC");
+
+        let meta = get_test_tenant_ctx_customized(custom_templates);
+        let transport = get_test_transport_priv(meta.clone());
+        let session =
+            get_test_session_with_config_and_transport(db, config_obj.clone(), transport.clone())
+                .await;
+
+        TestContext {
+            meta,
+            transport,
+            config_obj,
+            session,
+        }
+    }
+
+    pub async fn add_cube_load_mock(&self, mut req: V1LoadRequestQuery, res: V1LoadResponse) {
+        // Fill in default limit to simplify passing queries as they were in logical plan
+        let config_limit = self.config_obj.non_streaming_query_max_row_limit();
+        req.limit = req
+            .limit
+            .map(|req_limit| req_limit.min(config_limit))
+            .or(Some(config_limit));
+        self.transport.add_cube_load_mock(req, res).await
+    }
+
+    pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
+        // TODO push to_string() deeper
+        convert_sql_to_cube_query(&query.to_string(), self.meta.clone(), self.session.clone()).await
+    }
+
+    pub async fn execute_query_with_flags(
+        &self,
+        query: impl Deref<Target = str>,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        self.execute_queries_with_flags([query]).await
+    }
+
+    pub async fn execute_queries_with_flags(
+        &self,
+        queries: impl IntoIterator<Item: Deref<Target = str>>,
+    ) -> Result<(String, StatusFlags), CubeError> {
+        let mut output: Vec<String> = Vec::new();
+        let mut output_flags = StatusFlags::empty();
+
+        for query in queries {
+            let query = self
+                .convert_sql_to_cube_query(&query)
+                .await
+                .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
+            match query {
+                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                    let df = DFDataFrame::new(ctx.state, &plan);
+                    let batches = df.collect().await?;
+                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaTabular(flags, frame) => {
+                    output.push(frame.print());
+                    output_flags = flags;
+                }
+                QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
+                    output_flags = flags;
+                }
+            }
+        }
+
+        Ok((output.join("\n").to_string(), output_flags))
+    }
+
+    pub async fn execute_query(
+        &self,
+        query: impl Deref<Target = str>,
+    ) -> Result<String, CubeError> {
+        Ok(self.execute_query_with_flags(query).await?.0)
+    }
 }
 
 lazy_static! {
@@ -753,17 +880,11 @@ pub async fn convert_select_to_query_plan_customized(
     db: DatabaseProtocol,
     custom_templates: Vec<(String, String)>,
 ) -> QueryPlan {
-    env::set_var("TZ", "UTC");
-
-    let meta_context = get_test_tenant_ctx_customized(custom_templates);
-    let query = convert_sql_to_cube_query(
-        &query,
-        meta_context.clone(),
-        get_test_session(db, meta_context).await,
-    )
-    .await;
-
-    query.unwrap()
+    TestContext::with_custom_templates(db, custom_templates)
+        .await
+        .convert_sql_to_cube_query(&query)
+        .await
+        .unwrap()
 }
 
 pub async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
@@ -775,17 +896,11 @@ pub async fn convert_select_to_query_plan_with_config(
     db: DatabaseProtocol,
     config_obj: Arc<dyn ConfigObj>,
 ) -> QueryPlan {
-    env::set_var("TZ", "UTC");
-
-    let meta_context = get_test_tenant_ctx();
-    let query = convert_sql_to_cube_query(
-        &query,
-        meta_context.clone(),
-        get_test_session_with_config(db, config_obj, meta_context).await,
-    )
-    .await;
-
-    query.unwrap()
+    TestContext::with_config(db, config_obj)
+        .await
+        .convert_sql_to_cube_query(&query)
+        .await
+        .unwrap()
 }
 
 pub async fn convert_select_to_query_plan_with_meta(
