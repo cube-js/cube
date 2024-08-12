@@ -2,7 +2,7 @@ use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
-        cast_expr, column_expr, literal_expr, literal_int,
+        case_expr, cast_expr, column_expr, is_null_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
@@ -178,6 +178,28 @@ impl SplitRules {
             |alias_column| agg_fun_expr("?fun_name", vec![alias_column], "?distinct"),
             self.transform_invariant_constant("?fun_name", "?distinct", "?constant"),
             false,
+            rules,
+        );
+        // TODO: workaround for PowerBI, it uses COUNT(DISTINCT(col)) + MAX(CASE ...) to count in NULLs
+        // as a distinct value. We don't support that yet, so don't count them
+        self.single_arg_split_point_rules_aggregate_function(
+            "aggregate-function-powerbi-count-distinct-max-case",
+            || {
+                agg_fun_expr(
+                    "Max",
+                    vec![case_expr(
+                        None,
+                        vec![(is_null_expr(column_expr("?column")), literal_int(1))],
+                        Some(literal_int(0)),
+                    )],
+                    "?distinct",
+                )
+            },
+            || literal_int(0),
+            |alias_column| agg_fun_expr("Max", vec![alias_column], "?distinct"),
+            |alias_column| alias_column,
+            self.transform_powerbi_max_case("?column", "?alias_to_cube"),
+            self.transform_powerbi_max_case("?column", "?alias_to_cube"),
             rules,
         );
     }
@@ -373,6 +395,51 @@ impl SplitRules {
                             _ => continue,
                         }
 
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+    }
+
+    pub fn transform_powerbi_max_case(
+        &self,
+        column_var: &str,
+        alias_to_cube_var: &str,
+    ) -> impl Fn(
+        bool,
+        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        &mut egg::Subst,
+    ) -> bool
+           + Sync
+           + Send
+           + Clone
+           + 'static {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let meta_context = self.meta_context.clone();
+        move |_, egraph, subst| {
+            for alias_to_cube in var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                AggregateSplitPushDownReplacerAliasToCube
+            )
+            .chain(var_iter!(
+                egraph[subst[alias_to_cube_var]],
+                ProjectionSplitPushDownReplacerAliasToCube
+            )) {
+                for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn) {
+                    // TODO Use aliases to find the cube and measure
+                    let Some((_, cube)) = meta_context.find_cube_by_column(&alias_to_cube, &column)
+                    else {
+                        continue;
+                    };
+
+                    let Some(measure) = cube.lookup_measure(&column.name) else {
+                        continue;
+                    };
+
+                    if measure.is_same_agg_type("countDistinct", false) {
                         return true;
                     }
                 }

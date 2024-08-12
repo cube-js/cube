@@ -27,9 +27,13 @@ use crate::{
 
 pub mod rewrite_engine;
 #[cfg(test)]
+pub mod test_bi_workarounds;
+#[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
+pub mod utils;
+pub use utils::*;
 
 pub fn get_test_meta() -> Vec<V1CubeMeta> {
     vec![
@@ -742,4 +746,61 @@ pub fn init_testing_logger() {
         log::set_max_level(log_level.to_level_filter());
         *initialized = true;
     }
+}
+
+pub async fn convert_select_to_query_plan_customized(
+    query: String,
+    db: DatabaseProtocol,
+    custom_templates: Vec<(String, String)>,
+) -> QueryPlan {
+    env::set_var("TZ", "UTC");
+
+    let meta_context = get_test_tenant_ctx_customized(custom_templates);
+    let query = convert_sql_to_cube_query(
+        &query,
+        meta_context.clone(),
+        get_test_session(db, meta_context).await,
+    )
+    .await;
+
+    query.unwrap()
+}
+
+pub async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
+    convert_select_to_query_plan_customized(query, db, vec![]).await
+}
+
+pub async fn convert_select_to_query_plan_with_config(
+    query: String,
+    db: DatabaseProtocol,
+    config_obj: Arc<dyn ConfigObj>,
+) -> QueryPlan {
+    env::set_var("TZ", "UTC");
+
+    let meta_context = get_test_tenant_ctx();
+    let query = convert_sql_to_cube_query(
+        &query,
+        meta_context.clone(),
+        get_test_session_with_config(db, config_obj, meta_context).await,
+    )
+    .await;
+
+    query.unwrap()
+}
+
+pub async fn convert_select_to_query_plan_with_meta(
+    query: String,
+    meta: Vec<V1CubeMeta>,
+) -> QueryPlan {
+    env::set_var("TZ", "UTC");
+
+    let meta_context = get_test_tenant_ctx_with_meta(meta);
+    let query = convert_sql_to_cube_query(
+        &query,
+        meta_context.clone(),
+        get_test_session(DatabaseProtocol::PostgreSQL, meta_context).await,
+    )
+    .await;
+
+    query.unwrap()
 }
