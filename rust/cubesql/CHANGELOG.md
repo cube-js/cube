@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.69](https://github.com/cube-js/cube/compare/v0.35.68...v0.35.69) (2024-08-12)
+
+
+### Bug Fixes
+
+* **cubesql:** Split PowerBI count distinct expression ([6a518d3](https://github.com/cube-js/cube/commit/6a518d32c70f8e7da5433d77c4476072829a3ed9))
+
+
+
+
+
 ## [0.35.68](https://github.com/cube-js/cube/compare/v0.35.67...v0.35.68) (2024-08-12)
 
 
