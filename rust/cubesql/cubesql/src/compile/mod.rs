@@ -21,7 +21,6 @@ use datafusion::{
 };
 use futures::FutureExt;
 use itertools::Itertools;
-use log::warn;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
     backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
@@ -36,7 +35,6 @@ use self::{
             planner::CubeQueryPlanner,
             scan::CubeScanNode,
         },
-        information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
         udf::*,
     },
@@ -57,7 +55,6 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::V1CubeMetaExt,
     CubeError, CubeErrorCauseType,
 };
 
@@ -181,84 +178,12 @@ impl QueryPlanner {
                 StatusFlags::empty(),
                 Box::new(dataframe::DataFrame::new(vec![], vec![])),
             )),
-            (ast::Statement::SetNames { charset_name, .. }, DatabaseProtocol::MySQL) => {
-                if !(charset_name.eq_ignore_ascii_case("utf8")
-                    || charset_name.eq_ignore_ascii_case("utf8mb4"))
-                {
-                    warn!(
-                        "SET NAME does not support non utf8 charsets, input: {}",
-                        charset_name
-                    );
-                };
-
-                Ok(QueryPlan::MetaTabular(
-                    StatusFlags::empty(),
-                    Box::new(dataframe::DataFrame::new(vec![], vec![])),
-                ))
-            }
-            (ast::Statement::Kill { .. }, DatabaseProtocol::MySQL) => Ok(QueryPlan::MetaOk(
-                StatusFlags::empty(),
-                CommandCompletion::Select(0),
-            )),
             (ast::Statement::SetRole { role_name, .. }, _) => self.set_role_to_plan(role_name),
             (ast::Statement::SetVariable { key_values }, _) => {
                 self.set_variable_to_plan(&key_values).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
                 self.show_variable_to_plan(variable, span_id.clone(), flat_list)
-                    .await
-            }
-            (ast::Statement::ShowVariables { filter }, DatabaseProtocol::MySQL) => {
-                self.show_variables_to_plan(&filter, span_id.clone(), flat_list)
-                    .await
-            }
-            (ast::Statement::ShowCreate { obj_name, obj_type }, DatabaseProtocol::MySQL) => {
-                self.show_create_to_plan(&obj_name, &obj_type)
-            }
-            (
-                ast::Statement::ShowColumns {
-                    extended,
-                    full,
-                    filter,
-                    table_name,
-                },
-                DatabaseProtocol::MySQL,
-            ) => {
-                self.show_columns_to_plan(
-                    *extended,
-                    *full,
-                    &filter,
-                    &table_name,
-                    span_id.clone(),
-                    flat_list,
-                )
-                .await
-            }
-            (
-                ast::Statement::ShowTables {
-                    extended,
-                    full,
-                    filter,
-                    db_name,
-                },
-                DatabaseProtocol::MySQL,
-            ) => {
-                self.show_tables_to_plan(
-                    *extended,
-                    *full,
-                    &filter,
-                    &db_name,
-                    span_id.clone(),
-                    flat_list,
-                )
-                .await
-            }
-            (ast::Statement::ShowCollation { filter }, DatabaseProtocol::MySQL) => {
-                self.show_collation_to_plan(&filter, span_id.clone(), flat_list)
-                    .await
-            }
-            (ast::Statement::ExplainTable { table_name, .. }, DatabaseProtocol::MySQL) => {
-                self.explain_table_to_plan(&table_name, span_id.clone(), flat_list)
                     .await
             }
             (
@@ -272,9 +197,6 @@ impl QueryPlanner {
             ) => {
                 self.explain_to_plan(&statement, *verbose, *analyze, flat_list)
                     .await
-            }
-            (ast::Statement::Use { db_name }, DatabaseProtocol::MySQL) => {
-                self.use_to_plan(&db_name)
             }
             (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
@@ -460,283 +382,6 @@ impl QueryPlanner {
         }
     }
 
-    async fn show_variables_to_plan(
-        &self,
-        filter: &Option<ast::ShowStatementFilter>,
-        span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        let filter = match filter {
-            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
-                format!("WHERE VARIABLE_NAME {}", stmt.to_string())
-            }
-            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
-                return Err(CompilationError::unsupported(format!(
-                    "Show variable doesnt support WHERE statement: {}",
-                    stmt
-                )))
-            }
-            Some(stmt @ ast::ShowStatementFilter::ILike(_)) => {
-                return Err(CompilationError::user(format!(
-                    "Show variable doesnt define ILIKE statement: {}",
-                    stmt
-                )))
-            }
-            None => "".to_string(),
-        };
-
-        let stmt = parse_sql_to_statement(
-            &format!("SELECT VARIABLE_NAME as Variable_name, VARIABLE_VALUE as Value FROM performance_schema.session_variables {} ORDER BY Variable_name DESC", filter),
-            self.state.protocol.clone(),
-            &mut None,
-        )?;
-
-        self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
-            .await
-    }
-
-    fn show_create_to_plan(
-        &self,
-        obj_name: &ast::ObjectName,
-        obj_type: &ast::ShowCreateObject,
-    ) -> Result<QueryPlan, CompilationError> {
-        match obj_type {
-            ast::ShowCreateObject::Table => {}
-            _ => {
-                return Err(CompilationError::user(format!(
-                    "SHOW CREATE doesn't support type: {}",
-                    obj_type
-                )))
-            }
-        };
-
-        let table_name_filter = if obj_name.0.len() == 2 {
-            &obj_name.0[1].value
-        } else {
-            &obj_name.0[0].value
-        };
-
-        self.meta.cubes.iter().find(|c| c.name.eq(table_name_filter)).map(|cube| {
-            let mut fields: Vec<String> = vec![];
-
-            for column in &cube.get_columns() {
-                fields.push(format!(
-                    "`{}` {}{}",
-                    column.get_name(),
-                    column.get_mysql_column_type(),
-                    if column.sql_can_be_null() { " NOT NULL" } else { "" }
-                ));
-            }
-
-            QueryPlan::MetaTabular(StatusFlags::empty(), Box::new(dataframe::DataFrame::new(
-                vec![
-                    dataframe::Column::new(
-                        "Table".to_string(),
-                        ColumnType::String,
-                        ColumnFlags::empty(),
-                    ),
-                    dataframe::Column::new(
-                        "Create Table".to_string(),
-                        ColumnType::String,
-                        ColumnFlags::empty(),
-                    )
-                ],
-                vec![dataframe::Row::new(vec![
-                    dataframe::TableValue::String(cube.name.clone()),
-                    dataframe::TableValue::String(
-                        format!("CREATE TABLE `{}` (\r\n  {}\r\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", cube.name, fields.join(",\r\n  "))
-                    ),
-                ])]
-            )))
-        }).ok_or(
-            CompilationError::user(format!(
-                "Unknown table: {}",
-                table_name_filter
-            ))
-        )
-    }
-
-    async fn show_columns_to_plan(
-        &self,
-        extended: bool,
-        full: bool,
-        filter: &Option<ast::ShowStatementFilter>,
-        table_name: &ast::ObjectName,
-        span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        let extended = match extended {
-            false => "".to_string(),
-            // The planner is unable to correctly process queries with UNION ALL in subqueries as of writing this.
-            // Uncomment this to enable EXTENDED support once such queries can be processed.
-            /*true => {
-                let extended_columns = "'' AS `Type`, NULL AS `Collation`, 'NO' AS `Null`, '' AS `Key`, NULL AS `Default`, '' AS `Extra`, 'select' AS `Privileges`, '' AS `Comment`";
-                format!("UNION ALL SELECT 'DB_TRX_ID' AS `Field`, 2 AS `Order`, {} UNION ALL SELECT 'DB_ROLL_PTR' AS `Field`, 3 AS `Order`, {}", extended_columns, extended_columns)
-            }*/
-            true => {
-                return Err(CompilationError::unsupported(
-                    "SHOW COLUMNS: EXTENDED is not implemented".to_string(),
-                ))
-            }
-        };
-
-        let columns = match full {
-            false => "`Field`, `Type`, `Null`, `Key`, `Default`, `Extra`",
-            true => "`Field`, `Type`, `Collation`, `Null`, `Key`, `Default`, `Extra`, `Privileges`, `Comment`",
-        };
-
-        let mut object_name = table_name.0.clone();
-        let table_name = match object_name.pop() {
-            Some(table_name) => escape_single_quote_string(&table_name.value).to_string(),
-            None => {
-                return Err(CompilationError::internal(format!(
-                    "Unexpected lack of table name"
-                )))
-            }
-        };
-        let db_name = match object_name.pop() {
-            Some(db_name) => escape_single_quote_string(&db_name.value).to_string(),
-            None => self.state.database().unwrap_or("db".to_string()).clone(),
-        };
-
-        let filter = match filter {
-            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
-                format!("WHERE `Field` {}", stmt.to_string())
-            }
-            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
-                format!("{}", stmt.to_string())
-            }
-            Some(stmt) => {
-                return Err(CompilationError::user(format!(
-                    "SHOW COLUMNS doesn't support requested filter: {}",
-                    stmt
-                )))
-            }
-            None => "".to_string(),
-        };
-
-        let information_schema_sql = format!("SELECT `COLUMN_NAME` AS `Field`, 1 AS `Order`, `COLUMN_TYPE` AS `Type`, IF(`DATA_TYPE` = 'varchar', 'utf8mb4_0900_ai_ci', NULL) AS `Collation`, `IS_NULLABLE` AS `Null`, `COLUMN_KEY` AS `Key`, NULL AS `Default`, `EXTRA` AS `Extra`, 'select' AS `Privileges`, `COLUMN_COMMENT` AS `Comment` FROM `information_schema`.`COLUMNS` WHERE `TABLE_NAME` = '{}' AND `TABLE_SCHEMA` = '{}' {}", table_name, db_name, extended);
-        let stmt = parse_sql_to_statement(
-            &format!(
-                "SELECT {} FROM ({}) AS `COLUMNS` {}",
-                columns, information_schema_sql, filter
-            ),
-            self.state.protocol.clone(),
-            &mut None,
-        )?;
-
-        self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
-            .await
-    }
-
-    async fn show_tables_to_plan(
-        &self,
-        // EXTENDED is accepted but does not alter the result
-        _extended: bool,
-        full: bool,
-        filter: &Option<ast::ShowStatementFilter>,
-        db_name: &Option<ast::Ident>,
-        span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        let db_name = match db_name {
-            Some(db_name) => db_name.clone(),
-            None => ast::Ident::new(self.state.database().unwrap_or("db".to_string())),
-        };
-
-        let column_name = format!("Tables_in_{}", db_name.value);
-        let column_name = match db_name.quote_style {
-            Some(quote_style) => ast::Ident::with_quote(quote_style, column_name),
-            None => ast::Ident::new(column_name),
-        };
-
-        let columns = match full {
-            false => format!("{}", column_name),
-            true => format!("{}, `Table_type`", column_name),
-        };
-
-        let filter = match filter {
-            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
-                format!("WHERE {} {}", column_name, stmt)
-            }
-            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
-                format!("{}", stmt)
-            }
-            Some(stmt) => {
-                return Err(CompilationError::user(format!(
-                    "SHOW TABLES doesn't support requested filter: {}",
-                    stmt
-                )))
-            }
-            None => "".to_string(),
-        };
-
-        let information_schema_sql = format!(
-            "SELECT `TABLE_NAME` AS {}, `TABLE_TYPE` AS `Table_type` FROM `information_schema`.`TABLES`
-WHERE `TABLE_SCHEMA` = '{}'",
-            column_name,
-            escape_single_quote_string(&db_name.value),
-        );
-        let stmt = parse_sql_to_statement(
-            &format!(
-                "SELECT {} FROM ({}) AS `TABLES` {}",
-                columns, information_schema_sql, filter
-            ),
-            self.state.protocol.clone(),
-            &mut None,
-        )?;
-
-        self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
-            .await
-    }
-
-    async fn show_collation_to_plan(
-        &self,
-        filter: &Option<ast::ShowStatementFilter>,
-        span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        let filter = match filter {
-            Some(stmt @ ast::ShowStatementFilter::Like(_)) => {
-                format!("WHERE `Collation` {}", stmt)
-            }
-            Some(stmt @ ast::ShowStatementFilter::Where(_)) => {
-                format!("{}", stmt)
-            }
-            Some(stmt) => {
-                return Err(CompilationError::user(format!(
-                    "SHOW COLLATION doesn't support requested filter: {}",
-                    stmt
-                )))
-            }
-            None => "".to_string(),
-        };
-
-        let information_schema_sql = "SELECT `COLLATION_NAME` AS `Collation`, `CHARACTER_SET_NAME` AS `Charset`, `ID` AS `Id`, `IS_DEFAULT` AS `Default`, `IS_COMPILED` AS `Compiled`, `SORTLEN` AS `Sortlen`, `PAD_ATTRIBUTE` AS `Pad_attribute` FROM `information_schema`.`COLLATIONS` ORDER BY `Collation`";
-        let stmt = parse_sql_to_statement(
-            &format!(
-                "SELECT * FROM ({}) AS `COLLATIONS` {}",
-                information_schema_sql, filter
-            ),
-            self.state.protocol.clone(),
-            &mut None,
-        )?;
-
-        self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
-            .await
-    }
-
-    async fn explain_table_to_plan(
-        &self,
-        table_name: &ast::ObjectName,
-        span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
-    ) -> Result<QueryPlan, CompilationError> {
-        // EXPLAIN <table> matches the SHOW COLUMNS output exactly, reuse the plan
-        self.show_columns_to_plan(false, false, &None, table_name, span_id, flat_list)
-            .await
-    }
-
     fn explain_to_plan(
         &self,
         statement: &Box<ast::Statement>,
@@ -804,15 +449,6 @@ WHERE `TABLE_SCHEMA` = '{}'",
         })
     }
 
-    fn use_to_plan(&self, db_name: &ast::Ident) -> Result<QueryPlan, CompilationError> {
-        self.state.set_database(Some(db_name.value.clone()));
-
-        Ok(QueryPlan::MetaOk(
-            StatusFlags::empty(),
-            CommandCompletion::Use,
-        ))
-    }
-
     fn set_role_to_plan(
         &self,
         role_name: &Option<ast::Ident>,
@@ -825,14 +461,8 @@ WHERE `TABLE_SCHEMA` = '{}'",
         let variable =
             DatabaseVariable::system("role".to_string(), ScalarValue::Utf8(Some(role_name)), None);
         self.state.set_variables(vec![variable]);
-        match self.state.protocol {
-            DatabaseProtocol::PostgreSQL => Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set)),
-            // TODO: Verify that it's possible to use MetaOk too...
-            DatabaseProtocol::MySQL => Ok(QueryPlan::MetaTabular(
-                flags,
-                Box::new(dataframe::DataFrame::new(vec![], vec![])),
-            )),
-        }
+
+        Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
     async fn set_variable_to_plan(
@@ -1010,14 +640,7 @@ WHERE `TABLE_SCHEMA` = '{}'",
                 .set_variables(global_columns_to_update, self.state.protocol.clone());
         }
 
-        match self.state.protocol {
-            DatabaseProtocol::PostgreSQL => Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set)),
-            // TODO: Verify that it's possible to use MetaOk too...
-            DatabaseProtocol::MySQL => Ok(QueryPlan::MetaTabular(
-                flags,
-                Box::new(dataframe::DataFrame::new(vec![], vec![])),
-            )),
-        }
+        Ok(QueryPlan::MetaOk(flags, CommandCompletion::Set))
     }
 
     async fn create_table_to_plan(
@@ -1761,16 +1384,13 @@ mod tests {
             },
         },
         config::{ConfigObj, ConfigObjImpl},
-        sql::types::StatusFlags,
     };
     use datafusion::{
         arrow::datatypes::DataType, logical_plan::PlanVisitor, physical_plan::displayable,
     };
     use serde_json::json;
 
-    use crate::compile::test::{
-        execute_queries_with_flags, execute_query, execute_query_with_flags, init_testing_logger,
-    };
+    use crate::compile::test::{execute_queries_with_flags, execute_query, init_testing_logger};
 
     async fn convert_select_to_query_plan_customized(
         query: String,
@@ -1895,7 +1515,7 @@ mod tests {
     async fn test_select_measure_via_function() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(maxPrice), MEASURE(minPrice), MEASURE(avgPrice) FROM KibanaSampleDataEcommerce".to_string(),
-        DatabaseProtocol::MySQL).await;
+        DatabaseProtocol::PostgreSQL).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
@@ -6392,29 +6012,6 @@ limit
     }
 
     #[tokio::test]
-    async fn test_show_create_table() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_create_table",
-            execute_query(
-                "show create table KibanaSampleDataEcommerce;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        insta::assert_snapshot!(
-            "show_create_table",
-            execute_query(
-                "show create table `db`.`KibanaSampleDataEcommerce`;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_information_schema_tables_mysql() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_tables_mysql",
@@ -7468,42 +7065,6 @@ ORDER BY
 
     #[tokio::test]
     async fn test_show_variable() -> Result<(), CubeError> {
-        // LIKE
-        insta::assert_snapshot!(
-            "show_variables_like_sql_mode",
-            execute_query(
-                "show variables like 'sql_mode';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // LIKE pattern
-        insta::assert_snapshot!(
-            "show_variables_like",
-            execute_query(
-                "show variables like '%_mode';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // Negative test, we dont define this variable
-        insta::assert_snapshot!(
-            "show_variables_like_aurora",
-            execute_query(
-                "show variables like 'aurora_version';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // All variables
-        insta::assert_snapshot!(
-            "show_variables",
-            execute_query("show variables;".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
         // Postgres escaped with quotes
         insta::assert_snapshot!(
             "show_variable_quoted",
@@ -7528,179 +7089,7 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_show_columns() -> Result<(), CubeError> {
-        // Simplest syntax
-        insta::assert_snapshot!(
-            "show_columns",
-            execute_query(
-                "show columns from KibanaSampleDataEcommerce;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // FULL
-        insta::assert_snapshot!(
-            "show_columns_full",
-            execute_query(
-                "show full columns from KibanaSampleDataEcommerce;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // LIKE
-        insta::assert_snapshot!(
-            "show_columns_like",
-            execute_query(
-                "show columns from KibanaSampleDataEcommerce like '%ice%';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // WHERE
-        insta::assert_snapshot!(
-            "show_columns_where",
-            execute_query(
-                "show columns from KibanaSampleDataEcommerce where Type = 'int';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // FROM db FROM tbl
-        insta::assert_snapshot!(
-            "show_columns_from_db",
-            execute_query(
-                "show columns from KibanaSampleDataEcommerce from db like 'count';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // Everything
-        insta::assert_snapshot!(
-            "show_columns_everything",
-            execute_query(
-                "show full columns from KibanaSampleDataEcommerce from db like '%';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_tables() -> Result<(), CubeError> {
-        // Simplest syntax
-        insta::assert_snapshot!(
-            "show_tables_simple",
-            execute_query("show tables;".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        // FULL
-        insta::assert_snapshot!(
-            "show_tables_full",
-            execute_query("show full tables;".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        // LIKE
-        insta::assert_snapshot!(
-            "show_tables_like",
-            execute_query(
-                "show tables like '%ban%';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // WHERE
-        insta::assert_snapshot!(
-            "show_tables_where",
-            execute_query(
-                "show tables where Tables_in_db = 'Logs';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // FROM db
-        insta::assert_snapshot!(
-            "show_tables_from_db",
-            execute_query("show tables from db;".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        // Everything
-        insta::assert_snapshot!(
-            "show_tables_everything",
-            execute_query(
-                "show full tables from db like '%';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_explain_table() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            execute_query(
-                "explain KibanaSampleDataEcommerce;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_use_db() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query("use db;".to_string(), DatabaseProtocol::MySQL).await?,
-            "".to_string()
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_set_variable() -> Result<(), CubeError> {
-        assert_eq!(
-            execute_query_with_flags("set autocommit=1;".to_string(), DatabaseProtocol::MySQL)
-                .await?,
-            (
-                "++\n++\n++".to_string(),
-                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
-            )
-        );
-
-        assert_eq!(
-            execute_query_with_flags(
-                "set character_set_results = utf8;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?,
-            ("++\n++\n++".to_string(), StatusFlags::SERVER_STATE_CHANGED)
-        );
-
-        assert_eq!(
-            execute_query_with_flags(
-                "set autocommit=1, sql_mode = concat(@@sql_mode,',strict_trans_tables');"
-                    .to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?,
-            (
-                "++\n++\n++".to_string(),
-                StatusFlags::SERVER_STATE_CHANGED | StatusFlags::AUTOCOMMIT
-            )
-        );
-
         insta::assert_snapshot!(
             "pg_set_app_show",
             execute_queries_with_flags(
@@ -7752,48 +7141,6 @@ ORDER BY
             .err()
             .unwrap()
             .to_string()
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_collation() -> Result<(), CubeError> {
-        // Simplest syntax
-        insta::assert_snapshot!(
-            "show_collation",
-            execute_query("show collation;".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        // LIKE
-        insta::assert_snapshot!(
-            "show_collation_like",
-            execute_query(
-                "show collation like '%unicode%';".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // WHERE
-        insta::assert_snapshot!(
-            "show_collation_where",
-            execute_query(
-                "show collation where Id between 255 and 260;".to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
-        );
-
-        // Superset query
-        insta::assert_snapshot!(
-            "show_collation_superset",
-            execute_query(
-                "show collation where charset = 'utf8mb4' and collation = 'utf8mb4_bin';"
-                    .to_string(),
-                DatabaseProtocol::MySQL
-            )
-            .await?
         );
 
         Ok(())
