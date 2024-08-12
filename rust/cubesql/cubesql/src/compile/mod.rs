@@ -21,7 +21,6 @@ use datafusion::{
 };
 use futures::FutureExt;
 use itertools::Itertools;
-use log::warn;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
     backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
@@ -36,7 +35,6 @@ use self::{
             planner::CubeQueryPlanner,
             scan::CubeScanNode,
         },
-        information_schema::mysql::ext::CubeColumnMySqlExt,
         provider::CubeContext,
         udf::*,
     },
@@ -57,7 +55,6 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::V1CubeMetaExt,
     CubeError, CubeErrorCauseType,
 };
 
@@ -1387,16 +1384,13 @@ mod tests {
             },
         },
         config::{ConfigObj, ConfigObjImpl},
-        sql::types::StatusFlags,
     };
     use datafusion::{
         arrow::datatypes::DataType, logical_plan::PlanVisitor, physical_plan::displayable,
     };
     use serde_json::json;
 
-    use crate::compile::test::{
-        execute_queries_with_flags, execute_query, execute_query_with_flags, init_testing_logger,
-    };
+    use crate::compile::test::{execute_queries_with_flags, execute_query, init_testing_logger};
 
     async fn convert_select_to_query_plan_customized(
         query: String,
