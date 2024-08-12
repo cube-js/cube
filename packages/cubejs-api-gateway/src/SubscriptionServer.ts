@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { EventEmitter } from 'events';
 import { Subject } from 'rxjs';
-import { map, filter, bufferTime } from 'rxjs/operators';
+import { map, filter, bufferTime, tap } from 'rxjs/operators';
 import { UserError } from './UserError';
 import type { ApiGateway } from './gateway';
 import type { LocalSubscriptionStore } from './LocalSubscriptionStore';
@@ -27,6 +27,7 @@ export class SubscriptionServer {
   readonly #cubeRenewSubject = new Subject<any>();
   
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
+    tap((val) => console.log('Cube renewed:', val)),
     // Map only the renewedCube property
     map((val) => val.renewedCube),
     // Filter out any empty values

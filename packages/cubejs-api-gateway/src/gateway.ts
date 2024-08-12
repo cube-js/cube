@@ -548,6 +548,7 @@ class ApiGateway {
     const requestStarted = new Date();
     try {
       await this.assertApiScope('jobs', context.securityContext);
+      this.logger('Scheduled Refresh Requested');
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
