@@ -1,14 +1,12 @@
 use core::fmt;
-use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
-    arrow::datatypes::DataType,
     execution::context::{
         default_session_builder, SessionConfig as DFSessionConfig,
         SessionContext as DFSessionContext,
     },
     logical_plan::{
         plan::{Analyze, Explain, Extension, ToStringifiedPlan},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
+        LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     optimizer::{
         optimizer::{OptimizerConfig, OptimizerRule},
@@ -24,7 +22,6 @@ use datafusion::{
 use futures::FutureExt;
 use itertools::Itertools;
 use log::warn;
-use serde::Serialize;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
     backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
@@ -32,7 +29,6 @@ use std::{
 };
 
 use self::{
-    builder::*,
     engine::{
         context::VariablesProvider,
         df::{
@@ -61,7 +57,7 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::{df_data_type_by_column_type, V1CubeMetaExt},
+    transport::V1CubeMetaExt,
     CubeError, CubeErrorCauseType,
 };
 
