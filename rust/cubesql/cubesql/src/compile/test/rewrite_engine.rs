@@ -9,7 +9,6 @@ use egg::Rewrite;
 use super::get_test_session;
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         parser::parse_sql_to_statement,
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -17,7 +16,7 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, DatabaseProtocol, MetaContext, QueryPlanner,
+        rewrite_statement, CubeContext, DatabaseProtocol, MetaContext, QueryPlanner,
     },
     config::{ConfigObj, ConfigObjImpl},
 };

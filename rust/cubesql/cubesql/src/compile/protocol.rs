@@ -1,4 +1,4 @@
-use crate::{compile::engine::provider::CubeContext, CubeError};
+use crate::{compile::CubeContext, CubeError};
 use datafusion::datasource;
 use std::{
     fmt::Debug,
@@ -64,8 +64,9 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
 
     fn support_transactions(&self) -> bool {
         match &self {
+            DatabaseProtocol::MySQL => false,
+            DatabaseProtocol::PostgreSQL => true,
             DatabaseProtocol::Extension(ext) => ext.support_transactions(),
-            _ => true,
         }
     }
 

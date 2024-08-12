@@ -29,14 +29,13 @@ use std::{
 
 use self::{
     engine::{
-        context::VariablesProvider,
         df::{
             optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
             scan::CubeScanNode,
         },
-        provider::CubeContext,
         udf::*,
+        CubeContext, VariablesProvider,
     },
     parser::parse_sql_to_statement,
     qtrace::Qtrace,

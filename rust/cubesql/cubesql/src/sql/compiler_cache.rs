@@ -1,6 +1,6 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
+        engine::CubeContext,
         qtrace::Qtrace,
         rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
         DatabaseProtocol,

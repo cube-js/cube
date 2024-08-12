@@ -1,6 +1,5 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -13,6 +12,7 @@ use crate::{
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
+        CubeContext,
     },
     config::ConfigObj,
     sql::AuthContextRef,
