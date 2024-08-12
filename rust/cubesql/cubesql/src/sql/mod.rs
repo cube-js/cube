@@ -4,7 +4,6 @@ pub(crate) mod database_variables;
 pub mod dataframe;
 pub(crate) mod postgres;
 pub(crate) mod server_manager;
-pub(crate) mod service;
 pub(crate) mod session;
 pub(crate) mod session_manager;
 pub(crate) mod statement;
@@ -17,7 +16,6 @@ pub use auth_service::{
 };
 pub use postgres::*;
 pub use server_manager::ServerManager;
-pub use service::*;
 pub use session::{DatabaseProtocol, Session, SessionProcessList, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
 pub use types::{ColumnFlags, ColumnType, StatusFlags};
