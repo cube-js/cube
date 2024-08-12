@@ -1,14 +1,12 @@
 use core::fmt;
-use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
-    arrow::datatypes::DataType,
     execution::context::{
         default_session_builder, SessionConfig as DFSessionConfig,
         SessionContext as DFSessionContext,
     },
     logical_plan::{
         plan::{Analyze, Explain, Extension, ToStringifiedPlan},
-        DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
+        LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
     },
     optimizer::{
         optimizer::{OptimizerConfig, OptimizerRule},
@@ -24,7 +22,6 @@ use datafusion::{
 use futures::FutureExt;
 use itertools::Itertools;
 use log::warn;
-use serde::Serialize;
 use sqlparser::ast::{self, escape_single_quote_string, ObjectName};
 use std::{
     backtrace::Backtrace, collections::HashMap, fmt::Formatter, future::Future, pin::Pin,
@@ -32,7 +29,6 @@ use std::{
 };
 
 use self::{
-    builder::*,
     engine::{
         context::VariablesProvider,
         df::{
@@ -61,7 +57,7 @@ use crate::{
         types::{CommandCompletion, StatusFlags},
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::{df_data_type_by_column_type, V1CubeMetaExt},
+    transport::V1CubeMetaExt,
     CubeError, CubeErrorCauseType,
 };
 
@@ -1576,71 +1572,6 @@ pub async fn convert_statement_to_cube_query(
     planner.plan(&stmt, qtrace, span_id, flat_list).await
 }
 
-#[derive(Debug, PartialEq, Serialize)]
-pub struct CompiledQuery {
-    pub request: V1LoadRequestQuery,
-    pub meta: Vec<CompiledQueryFieldMeta>,
-}
-
-impl CompiledQuery {
-    pub fn meta_as_df_projection_expr(&self) -> Vec<Expr> {
-        let mut projection = Vec::new();
-
-        for meta_field in self.meta.iter() {
-            projection.push(Expr::Alias(
-                Box::new(Expr::Column(Column {
-                    relation: None,
-                    name: meta_field.column_from.clone(),
-                })),
-                meta_field.column_to.clone(),
-            ));
-        }
-
-        projection
-    }
-
-    pub fn meta_as_df_projection_schema(&self) -> Arc<DFSchema> {
-        let mut fields: Vec<DFField> = Vec::new();
-
-        for meta_field in self.meta.iter() {
-            fields.push(DFField::new(
-                None,
-                meta_field.column_to.as_str(),
-                df_data_type_by_column_type(meta_field.column_type.clone()),
-                false,
-            ));
-        }
-
-        DFSchemaRef::new(DFSchema::new_with_metadata(fields, HashMap::new()).unwrap())
-    }
-
-    pub fn meta_as_df_schema(&self) -> Arc<DFSchema> {
-        let mut fields: Vec<DFField> = Vec::new();
-
-        for meta_field in self.meta.iter() {
-            let exists = fields
-                .iter()
-                .any(|field| field.name() == &meta_field.column_from);
-            if !exists {
-                fields.push(DFField::new(
-                    None,
-                    meta_field.column_from.as_str(),
-                    match meta_field.column_type {
-                        ColumnType::Int32 | ColumnType::Int64 => DataType::Int64,
-                        ColumnType::String => DataType::Utf8,
-                        ColumnType::Double => DataType::Float64,
-                        ColumnType::Int8 => DataType::Boolean,
-                        _ => panic!("Unimplemented support for {:?}", meta_field.column_type),
-                    },
-                    false,
-                ));
-            }
-        }
-
-        DFSchemaRef::new(DFSchema::new_with_metadata(fields, HashMap::new()).unwrap())
-    }
-}
-
 pub enum QueryPlan {
     // Meta will not be executed in DF,
     // we already knows how respond to it
@@ -1808,7 +1739,8 @@ pub fn find_cube_scans_deep_search(
 mod tests {
     use chrono::Datelike;
     use cubeclient::models::{
-        V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+        V1CubeMeta, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
+        V1LoadRequestQueryTimeDimension,
     };
     use datafusion::logical_plan::plan::Filter;
     use pretty_assertions::assert_eq;
@@ -1831,8 +1763,9 @@ mod tests {
         config::{ConfigObj, ConfigObjImpl},
         sql::types::StatusFlags,
     };
-    use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
-
+    use datafusion::{
+        arrow::datatypes::DataType, logical_plan::PlanVisitor, physical_plan::displayable,
+    };
     use serde_json::json;
 
     use crate::compile::test::{
