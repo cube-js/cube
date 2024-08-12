@@ -751,11 +751,31 @@ impl TestContext {
         Self::with_config(db, Arc::new(ConfigObjImpl::default())).await
     }
 
+    pub async fn with_custom_templates(
+        db: DatabaseProtocol,
+        custom_templates: Vec<(String, String)>,
+    ) -> Self {
+        Self::with_config_and_custom_templates(
+            db,
+            Arc::new(ConfigObjImpl::default()),
+            custom_templates,
+        )
+        .await
+    }
+
     pub async fn with_config(db: DatabaseProtocol, config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self::with_config_and_custom_templates(db, config_obj, vec![]).await
+    }
+
+    pub async fn with_config_and_custom_templates(
+        db: DatabaseProtocol,
+        config_obj: Arc<dyn ConfigObj>,
+        custom_templates: Vec<(String, String)>,
+    ) -> Self {
         // TODO setenv is not thread-safe, remove this
         env::set_var("TZ", "UTC");
 
-        let meta = get_test_tenant_ctx();
+        let meta = get_test_tenant_ctx_customized(custom_templates);
         let transport = get_test_transport_priv(meta.clone());
         let session =
             get_test_session_with_config_and_transport(db, config_obj.clone(), transport.clone())
@@ -860,17 +880,11 @@ pub async fn convert_select_to_query_plan_customized(
     db: DatabaseProtocol,
     custom_templates: Vec<(String, String)>,
 ) -> QueryPlan {
-    env::set_var("TZ", "UTC");
-
-    let meta_context = get_test_tenant_ctx_customized(custom_templates);
-    let query = convert_sql_to_cube_query(
-        &query,
-        meta_context.clone(),
-        get_test_session(db, meta_context).await,
-    )
-    .await;
-
-    query.unwrap()
+    TestContext::with_custom_templates(db, custom_templates)
+        .await
+        .convert_sql_to_cube_query(&query)
+        .await
+        .unwrap()
 }
 
 pub async fn convert_select_to_query_plan(query: String, db: DatabaseProtocol) -> QueryPlan {
