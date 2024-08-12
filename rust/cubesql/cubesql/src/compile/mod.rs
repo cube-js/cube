@@ -1515,7 +1515,7 @@ mod tests {
     async fn test_select_measure_via_function() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(maxPrice), MEASURE(minPrice), MEASURE(avgPrice) FROM KibanaSampleDataEcommerce".to_string(),
-        DatabaseProtocol::MySQL).await;
+        DatabaseProtocol::PostgreSQL).await;
 
         let logical_plan = query_plan.as_logical_plan();
         assert_eq!(
