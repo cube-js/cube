@@ -24,6 +24,7 @@ jobs:
       - name: Build & push
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:
+          repository: '${{ github.repository }}/cube
           tag: 'latest'
           context: '.'
           dockerfile: './packages/cubejs-docker/latest.Dockerfile'
