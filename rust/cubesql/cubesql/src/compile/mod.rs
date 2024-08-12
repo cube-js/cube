@@ -1739,7 +1739,8 @@ pub fn find_cube_scans_deep_search(
 mod tests {
     use chrono::Datelike;
     use cubeclient::models::{
-        V1CubeMeta, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+        V1CubeMeta, V1LoadRequestQuery, V1LoadRequestQueryFilterItem,
+        V1LoadRequestQueryTimeDimension,
     };
     use datafusion::logical_plan::plan::Filter;
     use pretty_assertions::assert_eq;
@@ -1762,8 +1763,9 @@ mod tests {
         config::{ConfigObj, ConfigObjImpl},
         sql::types::StatusFlags,
     };
-    use datafusion::{logical_plan::PlanVisitor, physical_plan::displayable};
-
+    use datafusion::{
+        arrow::datatypes::DataType, logical_plan::PlanVisitor, physical_plan::displayable,
+    };
     use serde_json::json;
 
     use crate::compile::test::{
