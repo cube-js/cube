@@ -17,10 +17,9 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, MetaContext, QueryPlanner,
+        rewrite_statement, DatabaseProtocol, MetaContext, QueryPlanner,
     },
     config::{ConfigObj, ConfigObjImpl},
-    sql::session::DatabaseProtocol,
 };
 
 pub async fn cube_context(meta: Arc<MetaContext>) -> CubeContext {

@@ -10,8 +10,9 @@ use std::{
 
 use super::{
     server_manager::ServerManager,
-    session::{DatabaseProtocol, Session, SessionProcessList, SessionStatActivity, SessionState},
+    session::{Session, SessionProcessList, SessionStatActivity, SessionState},
 };
+use crate::compile::DatabaseProtocol;
 
 #[derive(Debug)]
 pub struct SessionManager {

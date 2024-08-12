@@ -12,16 +12,6 @@ use datafusion::{
     sql::planner::ContextProvider,
 };
 
-use crate::{
-    compile::MetaContext,
-    sql::{
-        session::DatabaseProtocol, temp_tables::TempTableProvider, ColumnType, SessionManager,
-        SessionState,
-    },
-    transport::V1CubeMetaExt,
-    CubeError,
-};
-
 use super::information_schema::mysql::{
     collations::InfoSchemaCollationsProvider as MySqlSchemaCollationsProvider,
     columns::InfoSchemaColumnsProvider as MySqlSchemaColumnsProvider,
@@ -32,6 +22,12 @@ use super::information_schema::mysql::{
     statistics::InfoSchemaStatisticsProvider as MySqlSchemaStatisticsProvider,
     tables::InfoSchemaTableProvider as MySqlSchemaTableProvider,
     variables::PerfSchemaVariablesProvider as MySqlPerfSchemaVariablesProvider,
+};
+use crate::{
+    compile::{DatabaseProtocol, DatabaseProtocolDetails, MetaContext},
+    sql::{temp_tables::TempTableProvider, ColumnType, SessionManager, SessionState},
+    transport::V1CubeMetaExt,
+    CubeError,
 };
 
 use super::information_schema::postgres::{
@@ -135,27 +131,6 @@ impl ContextProvider for CubeContext {
 }
 
 impl DatabaseProtocol {
-    fn get_provider(
-        &self,
-        context: &CubeContext,
-        tr: datafusion::catalog::TableReference,
-    ) -> Option<std::sync::Arc<dyn datasource::TableProvider>> {
-        match self {
-            DatabaseProtocol::MySQL => self.get_mysql_provider(context, tr),
-            DatabaseProtocol::PostgreSQL => self.get_postgres_provider(context, tr),
-        }
-    }
-
-    pub fn table_name_by_table_provider(
-        &self,
-        table_provider: Arc<dyn datasource::TableProvider>,
-    ) -> Result<String, CubeError> {
-        match self {
-            DatabaseProtocol::MySQL => self.get_mysql_table_name(table_provider),
-            DatabaseProtocol::PostgreSQL => self.get_postgres_table_name(table_provider),
-        }
-    }
-
     pub fn get_mysql_table_name(
         &self,
         table_provider: Arc<dyn datasource::TableProvider>,
@@ -189,7 +164,7 @@ impl DatabaseProtocol {
         })
     }
 
-    fn get_mysql_provider(
+    pub(crate) fn get_mysql_provider(
         &self,
         context: &CubeContext,
         tr: datafusion::catalog::TableReference,
@@ -386,7 +361,7 @@ impl DatabaseProtocol {
         })
     }
 
-    fn get_postgres_provider(
+    pub(crate) fn get_postgres_provider(
         &self,
         context: &CubeContext,
         tr: datafusion::catalog::TableReference,

@@ -1,4 +1,5 @@
 use crate::{
+    compile::DatabaseProtocol,
     config::ConfigObj,
     sql::{
         compiler_cache::CompilerCache,
@@ -13,7 +14,7 @@ use crate::{
 };
 use std::sync::{Arc, RwLock as RwLockSync, RwLockReadGuard, RwLockWriteGuard};
 
-use super::{database_variables::DatabaseVariables, session::DatabaseProtocol};
+use super::database_variables::DatabaseVariables;
 
 #[derive(Debug)]
 pub struct ServerConfiguration {
@@ -85,6 +86,10 @@ impl ServerManager {
                 .postgres_variables
                 .read()
                 .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::Extension(ext) => unimplemented!(
+                "read_variables is not implemented for custom protocol: {:?}",
+                ext
+            ),
         }
     }
 
@@ -101,6 +106,10 @@ impl ServerManager {
                 .postgres_variables
                 .write()
                 .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::Extension(ext) => unimplemented!(
+                "write_variables is not implemented for custom protocol: {:?}",
+                ext
+            ),
         }
     }
 

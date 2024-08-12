@@ -8,7 +8,12 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
+use super::{
+    database_variables::DatabaseVariables, server_manager::ServerManager,
+    session_manager::SessionManager, AuthContextRef,
+};
 use crate::{
+    compile::{DatabaseProtocol, DatabaseProtocolDetails},
     sql::{
         database_variables::{
             mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
@@ -21,27 +26,7 @@ use crate::{
     RWLockAsync,
 };
 
-use super::{
-    database_variables::DatabaseVariables, server_manager::ServerManager,
-    session_manager::SessionManager, AuthContextRef,
-};
-
 extern crate lazy_static;
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum DatabaseProtocol {
-    MySQL,
-    PostgreSQL,
-}
-
-impl DatabaseProtocol {
-    pub fn to_string(&self) -> String {
-        match &self {
-            DatabaseProtocol::PostgreSQL => "postgres".to_string(),
-            DatabaseProtocol::MySQL => "mysql".to_string(),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct SessionProperties {
@@ -340,9 +325,13 @@ impl SessionState {
 
         match guard {
             Some(vars) => vars,
-            _ => match self.protocol {
+            _ => match &self.protocol {
                 DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
+                DatabaseProtocol::Extension(ext) => unimplemented!(
+                    "Session.all_variables is not implemented for custom protocol: {:?}",
+                    ext
+                ),
             },
         }
     }
@@ -355,11 +344,15 @@ impl SessionState {
 
         match &*guard {
             Some(vars) => vars.get(name).map(|v| v.clone()),
-            _ => match self.protocol {
+            _ => match &self.protocol {
                 DatabaseProtocol::MySQL => MYSQL_DEFAULT_VARIABLES.get(name).map(|v| v.clone()),
                 DatabaseProtocol::PostgreSQL => {
                     POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
                 }
+                DatabaseProtocol::Extension(ext) => unimplemented!(
+                    "Session.get_variable is not implemented for custom protocol: {:?}",
+                    ext
+                ),
             },
         }
     }
@@ -399,7 +392,7 @@ impl SessionState {
         };
 
         LoadRequestMeta::new(
-            self.protocol.to_string(),
+            self.protocol.get_name().to_string(),
             "sql".to_string(),
             application_name,
         )

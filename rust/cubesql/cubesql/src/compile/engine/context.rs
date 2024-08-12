@@ -8,7 +8,10 @@ use datafusion::{
 };
 use log::warn;
 
-use crate::sql::{session::DatabaseProtocol, ServerManager, SessionState};
+use crate::{
+    compile::DatabaseProtocol,
+    sql::{ServerManager, SessionState},
+};
 
 pub struct VariablesProvider {
     session: Arc<SessionState>,

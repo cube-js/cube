@@ -10,12 +10,13 @@ pub(crate) mod statement;
 pub(crate) mod temp_tables;
 pub(crate) mod types;
 
+// Public API
 pub use auth_service::{
     AuthContext, AuthContextRef, AuthenticateResponse, HttpAuthContext, SqlAuthDefaultImpl,
     SqlAuthService,
 };
 pub use postgres::*;
 pub use server_manager::ServerManager;
-pub use session::{DatabaseProtocol, Session, SessionProcessList, SessionProperties, SessionState};
+pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
 pub use types::{ColumnFlags, ColumnType, StatusFlags};
