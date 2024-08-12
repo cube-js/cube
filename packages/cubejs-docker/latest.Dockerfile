@@ -51,4 +51,4 @@ WORKDIR /cube/conf
 
 EXPOSE 4000
 
-CMD ["cubejs", "server"]
+CMD ["cube", "server"]
