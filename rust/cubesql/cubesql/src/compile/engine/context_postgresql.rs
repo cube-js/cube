@@ -1,61 +1,37 @@
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
-use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
-use datafusion::{
-    arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
-    datasource::{self, TableProvider},
-    error::DataFusionError,
-    execution::context::SessionState as DFSessionState,
-    logical_plan::Expr,
-    physical_plan::{udaf::AggregateUDF, udf::ScalarUDF, udtf::TableUDF, ExecutionPlan},
-    sql::planner::ContextProvider,
-};
+use datafusion::datasource::TableProvider;
 
-use super::information_schema::{
-    mysql::{
-        collations::InfoSchemaCollationsProvider as MySqlSchemaCollationsProvider,
-        columns::InfoSchemaColumnsProvider as MySqlSchemaColumnsProvider,
-        key_column_usage::InfoSchemaKeyColumnUsageProvider as MySqlSchemaKeyColumnUsageProvider,
-        processlist::InfoSchemaProcesslistProvider as MySqlSchemaProcesslistProvider,
-        referential_constraints::InfoSchemaReferentialConstraintsProvider as MySqlSchemaReferentialConstraintsProvider,
-        schemata::InfoSchemaSchemataProvider as MySqlSchemaSchemataProvider,
-        statistics::InfoSchemaStatisticsProvider as MySqlSchemaStatisticsProvider,
-        tables::InfoSchemaTableProvider as MySqlSchemaTableProvider,
-        variables::PerfSchemaVariablesProvider as MySqlPerfSchemaVariablesProvider,
-    },
-    postgres::{
-        character_sets::InfoSchemaCharacterSetsProvider as PostgresSchemaCharacterSetsProvider,
-        columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
-        constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
-        key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
-        referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
-        schemata::InfoSchemaSchemataProvider as PostgresSchemaSchemataProvider,
-        table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
-        tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
-        views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
-        InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
-        InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
-        InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
-        PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
-        PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
-        PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
-        PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
-        PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
-        PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
-        PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
-        PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
-        PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
-        PgPreparedStatementsProvider,
-    },
+use super::information_schema::postgres::{
+    character_sets::InfoSchemaCharacterSetsProvider as PostgresSchemaCharacterSetsProvider,
+    columns::InfoSchemaColumnsProvider as PostgresSchemaColumnsProvider,
+    constraint_column_usage::InfoSchemaConstraintColumnUsageProvider as PostgresSchemaConstraintColumnUsageProvider,
+    key_column_usage::InfoSchemaKeyColumnUsageProvider as PostgresSchemaKeyColumnUsageProvider,
+    referential_constraints::InfoSchemaReferentialConstraintsProvider as PostgresSchemaReferentialConstraintsProvider,
+    schemata::InfoSchemaSchemataProvider as PostgresSchemaSchemataProvider,
+    table_constraints::InfoSchemaTableConstraintsProvider as PostgresSchemaTableConstraintsProvider,
+    tables::InfoSchemaTableProvider as PostgresSchemaTableProvider,
+    views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
+    InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
+    InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
+    InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
+    PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
+    PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
+    PgCatalogDescriptionProvider, PgCatalogEnumProvider, PgCatalogExtensionProvider,
+    PgCatalogIndexProvider, PgCatalogInheritsProvider, PgCatalogMatviewsProvider,
+    PgCatalogNamespaceProvider, PgCatalogPartitionedTableProvider, PgCatalogProcProvider,
+    PgCatalogRangeProvider, PgCatalogRolesProvider, PgCatalogSequenceProvider,
+    PgCatalogSettingsProvider, PgCatalogStatActivityProvider, PgCatalogStatUserTablesProvider,
+    PgCatalogStatioUserTablesProvider, PgCatalogStatsProvider, PgCatalogTableProvider,
+    PgCatalogTypeProvider, PgCatalogUserProvider, PgCatalogViewsProvider,
+    PgPreparedStatementsProvider,
 };
 use crate::{
     compile::{
         engine::{CubeContext, CubeTableProvider, TableName},
-        DatabaseProtocol, DatabaseProtocolDetails, MetaContext,
+        DatabaseProtocol,
     },
-    sql::{temp_tables::TempTableProvider, ColumnType, SessionManager, SessionState},
-    transport::V1CubeMetaExt,
+    sql::temp_tables::TempTableProvider,
     CubeError,
 };
 

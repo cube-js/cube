@@ -9,5 +9,4 @@ mod variable_provider;
 
 // Public API
 pub use context::*;
-pub use context_mysql::*;
 pub use variable_provider::*;
