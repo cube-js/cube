@@ -19367,4 +19367,61 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         assert!(sql.contains(" AS DOUBLE PRECISION)"));
         assert!(sql.contains(" AS DECIMAL(38,10))"));
     }
+
+    #[tokio::test]
+    async fn test_push_down_to_grouped_query_with_filters() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            r#"
+            select
+                sum(t1.sum)
+            from (
+            select
+                customer_gender,
+                measure(sumPrice) as sum
+            from KibanaSampleDataEcommerce
+            where order_date >= '2024-01-01'
+                and order_date <= '2024-02-29'
+            group by 1
+            having measure(sumPrice) >= 5
+            ) t1
+            ;"#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await
+        .as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    granularity: None,
+                    date_range: Some(json!(vec![
+                        "2024-01-01".to_string(),
+                        "2024-02-29".to_string()
+                    ]))
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
+                    operator: Some("gte".to_string()),
+                    values: Some(vec!["5".to_string()]),
+                    or: None,
+                    and: None
+                }]),
+                ungrouped: None,
+            }
+        )
+    }
 }
