@@ -19,11 +19,6 @@ ENV PATH=/usr/local/cargo/bin:$PATH
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
 
-
-RUN yarn policies set-version v1.22.19
-# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-RUN yarn config set network-timeout 120000 -g
-
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
 ENV NODE_ENV development
@@ -36,6 +31,16 @@ COPY yarn.lock .
 COPY tsconfig.base.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
+
+RUN yarn policies set-version v1.22.19
+# Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
+RUN yarn config set network-timeout 120000 -g
+
+# There is a problem with release process.
+# We are doing version bump without updating lock files for the docker package.
+#RUN yarn install --frozen-lockfile
+
+FROM base as build
 
 # Backend
 COPY rust/cubestore/ rust/cubestore/
@@ -91,10 +96,20 @@ COPY packages/cubejs-client-vue3/ packages/cubejs-client-vue3/
 COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
-COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
-RUN yarn link:dev &&  yarn install && yarn build
+RUN yarn link:dev && yarn install && yarn build
 RUN yarn lerna run build
+
+FROM base AS final
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update \
+    && apt-get install -y ca-certificates python3 libpython3-dev \
+    && apt-get clean
+
+COPY --from=build /cubejs .
+
+COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
 ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
