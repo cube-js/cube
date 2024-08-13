@@ -11,7 +11,7 @@ jobs:
   build-and-push-image:
     name: Build Latest - TransAI Cube
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
       packages: write
@@ -28,5 +28,5 @@ jobs:
         with:
           repository: '${{ github.repository }}/cube'
           tag: 'latest'
-          context: ./packages/cubejs-docker
-          dockerfile: './packages/cubejs-docker/latest.Dockerfile'
+          context: ./
+          dockerfile: ./packages/cubejs-docker/dev.Dockerfile
