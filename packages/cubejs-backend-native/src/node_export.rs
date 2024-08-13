@@ -1,7 +1,8 @@
+use cubesql::compile::DatabaseProtocol;
 use cubesql::compile::{convert_sql_to_cube_query, get_df_batches};
 use cubesql::config::processing_loop::ShutdownMode;
 use cubesql::config::ConfigObj;
-use cubesql::sql::{DatabaseProtocol, SessionManager};
+use cubesql::sql::SessionManager;
 use cubesql::transport::TransportService;
 use futures::StreamExt;
 
