@@ -45,6 +45,8 @@ jobs:
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
+      - name: Clippy Native (with Python)
+        run: cd packages/cubejs-backend-native && cargo clippy --features python -- -D warnings
       # CubeSQL is not ready for Clippy
       #- name: Clippy CubeSQL
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
