@@ -34,7 +34,7 @@ pub fn cl_repr_py_function_wrapper(mut cx: FunctionContext) -> JsResult<JsPromis
         .this::<JsValue>()?
         .downcast_or_throw::<BoxedJsPyFunctionWrapper, _>(&mut cx)?;
 
-    let mut arguments = Vec::with_capacity(cx.len() as usize);
+    let mut arguments = Vec::with_capacity(cx.len());
 
     for arg_idx in 0..cx.len() {
         arguments.push(CLRepr::from_js_ref(
