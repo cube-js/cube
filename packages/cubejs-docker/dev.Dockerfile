@@ -112,7 +112,7 @@ RUN yarn install
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
-COPY packages/cubejs-backend-event-emitter/ packages/cubejs-backend-event-emitter/
+COPY packages/cubejs-event-emitternd-event-emitter/ packages/cubejs-event-emitter/
 COPY packages/cubejs-base-driver/ packages/cubejs-base-driver/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing-shared/ packages/cubejs-testing-shared/
