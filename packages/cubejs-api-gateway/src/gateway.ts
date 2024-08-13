@@ -113,6 +113,9 @@ function systemAsyncHandler(handler: (req: Request & { context: ExtendedRequestC
   };
 }
 
+// Prepared CheckAuthFn, default or from config: always async, returns nothing
+type PreparedCheckAuthFn = (ctx: any, authorization?: string) => Promise<void>;
+
 class ApiGateway {
   protected readonly refreshScheduler: any;
 
@@ -134,9 +137,9 @@ class ApiGateway {
 
   protected readonly dataSourceStorage: any;
 
-  public readonly checkAuthFn: CheckAuthFn;
+  public readonly checkAuthFn: PreparedCheckAuthFn;
 
-  public readonly checkAuthSystemFn: CheckAuthFn;
+  public readonly checkAuthSystemFn: PreparedCheckAuthFn;
 
   protected readonly contextToApiScopesFn: ContextToApiScopesFn;
 
@@ -2148,14 +2151,19 @@ class ApiGateway {
     };
   }
 
-  protected wrapCheckAuth(fn: CheckAuthFn): CheckAuthFn {
+  protected wrapCheckAuth(fn: CheckAuthFn): PreparedCheckAuthFn {
     // We dont need to span all logs with deprecation message
     let warningShowed = false;
     // securityContext should be object
     let showWarningAboutNotObject = false;
 
     return async (req, auth) => {
-      await fn(req, auth);
+      const result = await fn(req, auth);
+
+      // checkAuth from config can return new security context, e.g from Python config
+      if (result?.securityContext) {
+        req.securityContext = result?.securityContext;
+      }
 
       // We renamed authInfo to securityContext, but users can continue to use both ways
       if (req.securityContext && !req.authInfo) {
@@ -2187,7 +2195,7 @@ class ApiGateway {
     };
   }
 
-  protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): CheckAuthFn {
+  protected createDefaultCheckAuth(options?: JWTOptions, internalOptions?: CheckAuthInternalOptions): PreparedCheckAuthFn {
     type VerifyTokenFn = (auth: string, secret: string) => Promise<object | string> | object | string;
 
     const verifyToken = (auth, secret) => jwt.verify(auth, secret, {
@@ -2270,7 +2278,7 @@ class ApiGateway {
     };
   }
 
-  protected createCheckAuthFn(options: ApiGatewayOptions): CheckAuthFn {
+  protected createCheckAuthFn(options: ApiGatewayOptions): PreparedCheckAuthFn {
     const mainCheckAuthFn = options.checkAuth
       ? this.wrapCheckAuth(options.checkAuth)
       : this.createDefaultCheckAuth(options.jwt);
@@ -2289,7 +2297,7 @@ class ApiGateway {
     return (ctx, authorization) => mainCheckAuthFn(ctx, authorization);
   }
 
-  protected createCheckAuthSystemFn(): CheckAuthFn {
+  protected createCheckAuthSystemFn(): PreparedCheckAuthFn {
     const systemCheckAuthFn = this.createDefaultCheckAuth(
       {
         key: this.playgroundAuthSecret,
@@ -2370,7 +2378,7 @@ class ApiGateway {
     return undefined;
   }
 
-  protected async checkAuthWrapper(checkAuthFn: CheckAuthFn, req: Request, res: ExpressResponse, next) {
+  protected async checkAuthWrapper(checkAuthFn: PreparedCheckAuthFn, req: Request, res: ExpressResponse, next) {
     const token = this.extractAuthorizationHeaderWithSchema(req);
 
     try {

@@ -351,7 +351,7 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
-  checkAuth?: (req: unknown, authorization: string) => Promise<void>
+  checkAuth?: (req: unknown, authorization: string) => Promise<{ securityContext?: unknown }>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
 }
@@ -377,10 +377,16 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 
   if (config.checkAuth) {
     const nativeCheckAuth = config.checkAuth;
-    config.checkAuth = async (req: ExpressRequest, authorization: string) => nativeCheckAuth(
-      simplifyExpressRequest(req),
-      authorization,
-    );
+    config.checkAuth = async (req: ExpressRequest, authorization: string) => {
+      const nativeResult = await nativeCheckAuth(
+        simplifyExpressRequest(req),
+        authorization,
+      );
+      const securityContext = nativeResult?.securityContext;
+      return {
+        ...(securityContext ? { securityContext } : {})
+      };
+    };
   }
 
   if (config.extendContext) {

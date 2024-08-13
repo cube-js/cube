@@ -1087,15 +1087,10 @@ Default implementation parses [JSON Web Token (JWT)][link-jwt] in `Authorization
 header and sets payload to `securityContext` if it's verified. More
 information on how to generate these tokens is [here][ref-sec-ctx].
 
-You can set `securityContext = userContextObj` inside the middleware if you
-want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
+You can return object with `securityContext: userContextObj` field inside the middleware
+if you want to customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
-<ReferenceBox>
-
-Currently, assigning to security context doesn't work in Python.
-Please [track this issue](https://github.com/cube-js/cube/issues/8133).
-
-</ReferenceBox>
+Also, in JS config you can set it directly in request object.
 
 You can use empty `check_auth` function to disable built-in security or
 raise an exception to fail the authentication check.
@@ -1110,7 +1105,11 @@ def check_auth(ctx: dict, token: str) -> None:
   context = ctx['securityContext']
 
   if token == 'my_secret_token':
-    return
+    return {
+      "securityContext": {
+        "user_id": 42
+      }
+    }
 
   raise Exception('Access denied')
 ```

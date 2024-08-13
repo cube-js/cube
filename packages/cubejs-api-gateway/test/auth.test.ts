@@ -128,7 +128,7 @@ describe('test authorization', () => {
       .get('/test-auth-fake')
       .set('Authorization', `Authorization: ${badToken}`)
       .expect(403);
-      
+
     expect(loggerMock.mock.calls.length).toEqual(1);
     expect(handlerMock.mock.calls.length).toEqual(2);
 
@@ -245,6 +245,58 @@ describe('test authorization', () => {
     expect(res.body).toMatchObject({
       error: 'unknown message'
     });
+  });
+
+  test('custom checkAuth with async flow and return', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.securityContext);
+      expectSecurityContext(req.context.authInfo);
+
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: async (req: Request, auth?: string) => {
+        if (auth) {
+          await pausePromise(500);
+
+          const securityContext = jwt.verify(auth, 'secret');
+
+          req.securityContext = {
+            uid: 'should not be visible',
+          };
+
+          return {
+            securityContext,
+          };
+        }
+
+        return {};
+      }
+    });
+
+    const token = generateAuthToken({ uid: 5, });
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
+    // authInfo was deprecated, but should exist as computability
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
   test('custom checkAuth with deprecated authInfo', async () => {
