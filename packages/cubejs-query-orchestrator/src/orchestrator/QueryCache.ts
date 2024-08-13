@@ -1067,7 +1067,16 @@ export class QueryCache {
     // const resHash = getCacheHash(JSON.stringify(res));
     //
     // // if (prevResHash !== resHash) {
-    // console.log('Emitting cubeUpdated');
+    this.logger('Emitting cubeUpdated', {
+      renewedCube: options.renewedCube,
+      requestContext: options.requestContext,
+    });
+
+    console.log('Emitting cubeUpdated', {
+      renewedCube: options.renewedCube,
+      requestContext: options.requestContext,
+    });
+
     // console.log(prevRes, res);
     this.eventEmitter.emit('cubeRenewed', {
       renewedCube: options.renewedCube,
