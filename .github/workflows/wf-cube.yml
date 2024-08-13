@@ -21,8 +21,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Copy yarn.lock file
-        run: cp yarn.lock packages/cubejs-docker
+      - name: Download backend-native artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: "native-linux-x64-glibc-3.9.node"    # this name is referenced in above in native_linux
+          path: ./packages/cubejs-backend-native/
       - name: Build & push
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:
