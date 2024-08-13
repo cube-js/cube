@@ -1,6 +1,6 @@
 import * as stream from 'stream';
 import R from 'ramda';
-import { EventEmitter } from 'events';
+import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
@@ -71,7 +71,7 @@ export class QueryOrchestrator {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly eventEmitter: EventEmitter,
+    protected readonly eventEmitter: EventEmitterInterface,
     options: QueryOrchestratorOptions = {}
   ) {
     this.rollupOnlyMode = options.rollupOnlyMode;

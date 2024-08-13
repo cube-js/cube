@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-syntax */
 import * as stream from 'stream';
-import { EventEmitter } from 'events';
+import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import jwt, { Algorithm as JWTAlgorithm } from 'jsonwebtoken';
 import R from 'ramda';
 import bodyParser from 'body-parser';
@@ -168,7 +168,7 @@ class ApiGateway {
     protected readonly compilerApi: (ctx: RequestContext) => Promise<any>,
     protected readonly adapterApi: (ctx: RequestContext) => Promise<any>,
     protected readonly logger: any,
-    protected readonly eventEmitter: EventEmitter,
+    protected readonly eventEmitter: EventEmitterInterface,
     protected readonly options: ApiGatewayOptions,
   ) {
     this.dataSourceStorage = options.dataSourceStorage;

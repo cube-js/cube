@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { EventEmitter } from 'events';
+import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { Subject } from 'rxjs';
 import { map, filter, bufferTime, tap } from 'rxjs/operators';
 import { UserError } from './UserError';
@@ -24,11 +24,12 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
 export class SubscriptionServer {
-  readonly #cubeRenewSubject = new Subject<any>();
-  
+  readonly #cubeRenewSubject = new Subject<unknown>();
+
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
     tap((val) => console.log('Cube renewed:', val)),
     // Map only the renewedCube property
+    map((val) => val as { renewedCube: string }),
     map((val) => val.renewedCube),
     // Filter out any empty values
     filter((val) => !!val),
@@ -45,10 +46,10 @@ export class SubscriptionServer {
     protected readonly sendMessage: WebSocketSendMessageFn,
     protected readonly subscriptionStore: LocalSubscriptionStore,
     protected readonly contextAcceptor: ContextAcceptorFn,
-    protected readonly eventEmitter: EventEmitter
+    protected readonly eventEmitter: EventEmitterInterface
   ) {
-    this.eventEmitter.on('cubeRenewed', (val) => this.#cubeRenewSubject.next(val));
-    this.#cubeRenewedPipe.subscribe(this.renewCubes);
+    this.eventEmitter.on('cubeRenewed', (val: unknown) => this.#cubeRenewSubject.next(val));
+    this.#cubeRenewedPipe.subscribe(this.renewCubes.bind(this));
   }
 
   public resultFn(connectionId: string, messageId: string, requestId: string | undefined) {

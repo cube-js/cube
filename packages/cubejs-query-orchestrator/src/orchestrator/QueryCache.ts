@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import csvWriter from 'csv-write-stream';
 import LRUCache from 'lru-cache';
 import { pipeline } from 'stream';
-import { EventEmitter } from 'events';
+import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { getEnv, MaybeCancelablePromise, streamToArray } from '@cubejs-backend/shared';
 import { CubeStoreCacheDriver, CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 import {
@@ -21,6 +21,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import * as console from "node:console";
 
 type QueryOptions = {
   external?: boolean;
@@ -153,7 +154,7 @@ export class QueryCache {
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger: any,
-    protected readonly eventEmitter: EventEmitter,
+    protected readonly eventEmitter: EventEmitterInterface,
     public readonly options: QueryCacheOptions = {}
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
@@ -650,11 +651,11 @@ export class QueryCache {
                 source.rowStream.once('end', () => cleanup(undefined));
                 source.rowStream.once('error', cleanup);
                 source.rowStream.once('close', () => cleanup(undefined));
-      
+
                 target.once('end', () => cleanup(undefined));
                 target.once('error', cleanup);
                 target.once('close', () => cleanup(undefined));
-      
+
                 source.rowStream.pipe(target);
               })
               .catch((reason) => {
@@ -1062,14 +1063,16 @@ export class QueryCache {
       return;
     }
 
-    const prevResHash = getCacheHash(JSON.stringify(prevRes));
-    const resHash = getCacheHash(JSON.stringify(res));
-
-    if (prevResHash !== resHash) {
-      this.eventEmitter.emit('cubeRenewed', {
-        renewedCube: options.renewedCube,
-        requestContext: options.requestContext,
-      });
-    }
+    // const prevResHash = getCacheHash(JSON.stringify(prevRes));
+    // const resHash = getCacheHash(JSON.stringify(res));
+    //
+    // // if (prevResHash !== resHash) {
+    // console.log('Emitting cubeUpdated');
+    // console.log(prevRes, res);
+    this.eventEmitter.emit('cubeRenewed', {
+      renewedCube: options.renewedCube,
+      requestContext: options.requestContext,
+    });
+    // }
   }
 }

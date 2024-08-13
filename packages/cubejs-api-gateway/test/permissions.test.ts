@@ -1,12 +1,12 @@
 import express from 'express';
 import request from 'supertest';
-import { EventEmitter } from 'events';
 import { ApiGateway, ApiGatewayOptions } from '../src';
 import {
   compilerApi,
   DataSourceStorageMock,
   AdapterApiMock
 } from './mocks';
+import { DefaultEventEmitter } from '@cubejs-backend/event-emitter';
 
 const API_SECRET = 'secret';
 const AUTH_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M';
@@ -19,7 +19,7 @@ function createApiGateway(
   const app = express();
   const adapterApi: any = new AdapterApiMock();
   const dataSourceStorage: any = new DataSourceStorageMock();
-  const eventEmitter = new EventEmitter();
+  const eventEmitter = new DefaultEventEmitter();
   
   const apiGateway = new ApiGateway(API_SECRET, compilerApi, () => adapterApi, logger, eventEmitter, {
     standalone: true,

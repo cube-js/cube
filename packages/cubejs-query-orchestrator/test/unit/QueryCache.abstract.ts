@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { EventEmitter } from 'events';
+import { DefaultEventEmitter } from '@cubejs-backend/event-emitter';
 import { createCancelablePromise, pausePromise } from '@cubejs-backend/shared';
 
 import { QueryCache, QueryCacheOptions } from '../../src';
@@ -11,7 +11,7 @@ export type QueryCacheTestOptions = QueryCacheOptions & {
 
 export const QueryCacheTest = (name: string, options?: QueryCacheTestOptions) => {
   describe(`QueryQueue${name}`, () => {
-    const eventEmitter = new EventEmitter();
+    const eventEmitter = new DefaultEventEmitter();
     const cache = new QueryCache(
       crypto.randomBytes(16).toString('hex'),
       jest.fn(() => {

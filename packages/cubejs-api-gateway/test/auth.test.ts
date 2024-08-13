@@ -3,7 +3,7 @@ import express, { Application as ExpressApplication, RequestHandler } from 'expr
 // eslint-disable-next-line import/no-extraneous-dependencies
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-import { EventEmitter } from 'events';
+import { DefaultEventEmitter } from '@cubejs-backend/event-emitter';
 import { pausePromise } from '@cubejs-backend/shared';
 
 import { ApiGateway, ApiGatewayOptions, CubejsHandlerError, Request } from '../src';
@@ -32,7 +32,7 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
     }
   }
 
-  const eventEmitter = new EventEmitter();
+  const eventEmitter = new DefaultEventEmitter();
   
   const apiGateway = new ApiGatewayFake('secret', <any>null, () => adapterApi, logger, eventEmitter, {
     standalone: true,

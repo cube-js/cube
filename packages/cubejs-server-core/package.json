@@ -36,6 +36,7 @@
     "@cubejs-backend/query-orchestrator": "^0.35.67",
     "@cubejs-backend/schema-compiler": "^0.35.67",
     "@cubejs-backend/shared": "^0.35.67",
+    "@cubejs-backend/event-emitter": "^0.35.67",
     "@cubejs-backend/templates": "^0.35.67",
     "codesandbox-import-utils": "^2.1.12",
     "cross-spawn": "^7.0.1",

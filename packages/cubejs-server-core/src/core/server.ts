@@ -4,7 +4,6 @@ import fs from 'fs-extra';
 import LRUCache from 'lru-cache';
 import isDocker from 'is-docker';
 import pLimit from 'p-limit';
-import { EventEmitter } from 'events';
 
 import { ApiGateway, ApiGatewayOptions, UserBackgroundContext } from '@cubejs-backend/api-gateway';
 import {
@@ -16,6 +15,7 @@ import {
 import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
+import { DefaultEventEmitter } from '@cubejs-backend/event-emitter';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
@@ -102,7 +102,7 @@ export class CubejsServerCore {
    */
   public static getDriverMaxPool = getDriverMaxPool;
 
-  private readonly eventEmitter = new EventEmitter();
+  private readonly eventEmitter = new DefaultEventEmitter();
 
   public repository: FileRepository;
 
