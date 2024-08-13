@@ -1,11 +1,8 @@
 use cubeclient::models::V1LoadRequestQuery;
 
-use crate::{
-    compile::{
-        test::{convert_select_to_query_plan, init_testing_logger},
-        Rewriter,
-    },
-    sql::session::DatabaseProtocol,
+use crate::compile::{
+    test::{convert_select_to_query_plan, init_testing_logger},
+    DatabaseProtocol, Rewriter,
 };
 
 use super::LogicalPlanTestUtils;
