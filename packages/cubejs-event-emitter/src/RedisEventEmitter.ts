@@ -1,24 +1,19 @@
 import { RedisClient } from 'redis';
-import { RedisPool } from '@cubejs-backend/query-orchestrator';
 import { EventEmitterInterface } from './EventEmitter.interface';
 
-export interface RedisEventEmitterOptions {
-  pool: RedisPool,
-}
-
 export class RedisEventEmitter implements EventEmitterInterface {
-    readonly #redisPool: RedisPool;
+    // readonly #redisPool: RedisPool;
 
     #client: RedisClient | null = null;
 
-    public constructor({ pool }: RedisEventEmitterOptions) {
-      this.#redisPool = pool;
-      this.getClient();
-    }
+    // public constructor({ pool }: RedisEventEmitterOptions) {
+    //   this.#redisPool = pool;
+    //   this.getClient();
+    // }
 
-    protected async getClient() {
-      this.#client = await this.#redisPool.getClient();
-    }
+    // protected async getClient() {
+    //   this.#client = await this.#redisPool.getClient();
+    // }
 
     public on(event: string, listener: (...args: any[]) => void): this {
       if (!this.#client) {

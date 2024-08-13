@@ -8,54 +8,6 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build_native_linux:
-    runs-on: ubuntu-20.04
-    timeout-minutes: 60
-    name: Build Linux Native backend for Dev image
-    container:
-      image: cubejs/rust-cross:x86_64-unknown-linux-gnu-15082024-python-3.9
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: nightly-2024-07-15
-          # override: true # this is by default on
-          rustflags: ""
-          components: rustfmt
-          target: x86_64-unknown-linux-gnu
-          cache: false
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: ./rust/cubesql -> target
-          key: cubesql-x86_64-unknown-linux-gnu
-          shared-key: cubesql-x86_64-unknown-linux-gnu
-      - name: Install Node.js 18
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-      - name: Install Yarn
-        run: npm install -g yarn
-      - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
-        # We don't need to install all yarn deps to build native
-      - name: Install cargo-cp-artifact
-        run: npm install -g cargo-cp-artifact@0.1
-      - name: Build native (with Python)
-        env:
-          PYO3_PYTHON: python3.9
-          CARGO_BUILD_TARGET: x86_64-unknown-linux-gnu
-        working-directory: ./packages/cubejs-backend-native
-        run: yarn run native:build-debug-python
-      - name: Store build artifact for dev image
-        uses: actions/upload-artifact@v4
-        with:
-          name: "native-linux-x64-glibc-3.9.node"    # this name is referenced below in docker-image-dev
-          path: ./packages/cubejs-backend-native/index.node
-          overwrite: true
-
   build-and-push-image:
     name: Build Latest - TransAI Cube
     runs-on: ubuntu-latest
@@ -70,11 +22,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Download backend-native artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: "native-linux-x64-glibc-3.9.node"    # this name is referenced in above in native_linux
-          path: ./packages/cubejs-backend-native/
       - name: Build & push
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:

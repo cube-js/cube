@@ -29,7 +29,7 @@
   "dependencies": {
     "@cubejs-backend/native": "^0.35.67",
     "@cubejs-backend/shared": "^0.35.67",
-    "@cubejs-backend/event-emitter": "file:../cubejs-event-emitter",
+    "@cubejs-backend/event-emitter": "^0.35.67",
     "@ungap/structured-clone": "^0.3.4",
     "body-parser": "^1.19.0",
     "chrono-node": "^2.6.2",

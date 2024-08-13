@@ -32,7 +32,7 @@
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.67",
     "@cubejs-backend/cubestore-driver": "^0.35.67",
-    "@cubejs-backend/event-emitter": "file:../cubejs-event-emitter",
+    "@cubejs-backend/event-emitter": "^0.35.67",
     "@cubejs-backend/shared": "^0.35.67",
     "csv-write-stream": "^2.0.0",
     "es5-ext": "0.10.53",
