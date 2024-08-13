@@ -9,7 +9,6 @@ use egg::Rewrite;
 use super::get_test_session;
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         parser::parse_sql_to_statement,
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -17,10 +16,9 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, MetaContext, QueryPlanner,
+        rewrite_statement, CubeContext, DatabaseProtocol, MetaContext, QueryPlanner,
     },
     config::{ConfigObj, ConfigObjImpl},
-    sql::session::DatabaseProtocol,
 };
 
 pub async fn cube_context(meta: Arc<MetaContext>) -> CubeContext {

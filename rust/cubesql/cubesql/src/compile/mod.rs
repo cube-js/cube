@@ -29,14 +29,13 @@ use std::{
 
 use self::{
     engine::{
-        context::VariablesProvider,
         df::{
             optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
             planner::CubeQueryPlanner,
             scan::CubeScanNode,
         },
-        provider::CubeContext,
         udf::*,
+        CubeContext, VariablesProvider,
     },
     parser::parse_sql_to_statement,
     qtrace::Qtrace,
@@ -46,7 +45,6 @@ use crate::{
     sql::{
         database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe::{self},
-        session::DatabaseProtocol,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
             SensitiveDataSanitizer, ToTimestampReplacer, UdfWildcardArgReplacer,
@@ -62,13 +60,18 @@ pub mod builder;
 pub mod engine;
 pub mod error;
 pub mod parser;
+mod protocol;
 pub mod qtrace;
 pub mod rewrite;
 pub mod service;
 
+// Internal API
 pub mod test;
 
-// re-export base deps to minimise version maintenance for crate users such as cloud
+// Re-export for Public API
+pub use protocol::*;
+
+// Re-export base deps to minimise version maintenance for crate users such as cloud
 pub use datafusion::{self, arrow};
 
 pub use crate::transport::ctx::*;
@@ -577,6 +580,9 @@ impl QueryPlanner {
                         ));
                     }
                 }
+            }
+            DatabaseProtocol::Extension(_) => {
+                log::warn!("set_variable_to_plan is not supported for custom protocol");
             }
         }
 

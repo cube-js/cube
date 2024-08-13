@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{

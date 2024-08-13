@@ -11,12 +11,15 @@ use uuid::Uuid;
 
 use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
 use crate::{
-    compile::engine::df::{scan::MemberField, wrapper::SqlQuery},
+    compile::{
+        engine::df::{scan::MemberField, wrapper::SqlQuery},
+        DatabaseProtocol,
+    },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe,
-        session::DatabaseProtocol, AuthContextRef, AuthenticateResponse, HttpAuthContext,
-        ServerManager, Session, SessionManager, SqlAuthService, StatusFlags,
+        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe, AuthContextRef,
+        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
+        SqlAuthService, StatusFlags,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
@@ -559,7 +562,7 @@ async fn get_test_session_with_config_and_transport(
 
     let db_name = match &protocol {
         DatabaseProtocol::MySQL => "db",
-        DatabaseProtocol::PostgreSQL => "cubedb",
+        _ => "cubedb",
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager

@@ -1326,8 +1326,10 @@ pub fn transform_response<V: ValueObject>(
 mod tests {
     use super::*;
     use crate::{
-        compile::{engine::df::wrapper::SqlQuery, MetaContext},
-        sql::{session::DatabaseProtocol, HttpAuthContext},
+        compile::{
+            engine::df::wrapper::SqlQuery, DatabaseProtocol, DatabaseProtocolDetails, MetaContext,
+        },
+        sql::HttpAuthContext,
         transport::SqlResponse,
         CubeError,
     };
@@ -1348,7 +1350,7 @@ mod tests {
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
-            protocol.to_string(),
+            protocol.get_name().to_string(),
             "sql".to_string(),
             Some("SQL API Unit Testing".to_string()),
         )

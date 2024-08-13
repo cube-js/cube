@@ -9,12 +9,11 @@ use crate::{
         convert_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
         qtrace::Qtrace,
-        CompilationError, MetaContext, QueryPlan,
+        CompilationError, DatabaseProtocol, MetaContext, QueryPlan,
     },
     sql::{
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom},
-        session::DatabaseProtocol,
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
         types::CommandCompletion,
         AuthContextRef, Session, SessionState, StatusFlags,
