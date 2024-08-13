@@ -27,6 +27,8 @@
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
     "@types/request-promise": "^4.1.46",
+    "@types/redis": "^2.8.28",
+    "@types/ioredis": "^4.19.3",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
@@ -37,7 +39,7 @@
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
     "jsonwebtoken": "^8.5.1",
-    "redis": "^4.7.0",
+    "ioredis": "^4.27.8",
     "request": "^2.88.2",
     "request-promise": "^4.2.5"
   },

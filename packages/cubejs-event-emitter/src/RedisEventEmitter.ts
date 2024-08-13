@@ -1,38 +1,40 @@
-import RedisClient, { createClient } from 'redis';
+import { RedisClient } from 'redis';
+import { RedisPool } from '@cubejs-backend/query-orchestrator';
 import { EventEmitterInterface } from './EventEmitter.interface';
 
 export interface RedisEventEmitterOptions {
-    url: string;
-    prefix: string;
+  pool: RedisPool,
 }
 
 export class RedisEventEmitter implements EventEmitterInterface {
-    readonly #client: RedisClient.RedisClientType;
+    readonly #redisPool: RedisPool;
 
-    readonly #options: RedisEventEmitterOptions;
+    #client: RedisClient | null = null;
 
-    readonly #subscriber: RedisClient.RedisClientType;
-
-    public constructor(options: RedisEventEmitterOptions) {
-      this.#client = createClient({
-        url: options.url
-      });
-      this.#options = options;
-      this.#subscriber = this.#client.duplicate();
+    public constructor({ pool }: RedisEventEmitterOptions) {
+      this.#redisPool = pool;
+      this.getClient();
     }
 
-    public on(event: string, listener: (args: any) => void): this {
-      this.#subscriber.subscribe(`${this.#options.prefix}.${event}`, (val) => {
-        console.log('Message received from to', val);
-        listener(JSON.parse(val));
-      });
+    protected async getClient() {
+      this.#client = await this.#redisPool.getClient();
+    }
+
+    public on(event: string, listener: (...args: any[]) => void): this {
+      if (!this.#client) {
+        throw new Error('Redis client is not initialized');
+      }
+      this.#client.on(event, (val) => listener(JSON.parse(val)));
+
       return this;
     }
 
-    public emit(event: string, ...args: any): boolean {
-      const channel = `${this.#options.prefix}.${event}`;
-      this.#client.publish(channel, JSON.stringify(args));
-      // Assume that there are always listeners
+    public emit(event: string, ...args: any[]): boolean {
+      if (!this.#client) {
+        throw new Error('Redis client is not initialized');
+      }
+      this.#client.publish(event, JSON.stringify(args));
+
       return true;
     }
 }
