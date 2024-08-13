@@ -178,6 +178,8 @@ impl RewriteRules for MemberRules {
                     "?can_pushdown_join",
                     "?member_pushdown_replacer_alias_to_cube",
                     "?new_pushdown_join",
+                    "?ungrouped",
+                    "?filters",
                 ),
             ),
             transforming_rewrite(
@@ -1451,6 +1453,8 @@ impl MemberRules {
         can_pushdown_join_var: &'static str,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
         new_pushdown_join_var: &'static str,
+        ungrouped_var: &'static str,
+        filters_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
@@ -1460,74 +1464,89 @@ impl MemberRules {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
         let new_pushdown_join_var = var!(new_pushdown_join_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let filters_var = var!(filters_var);
+        let enable_ungrouped = self.enable_ungrouped;
         move |egraph, subst| {
+            let Some(referenced_group_expr) =
+                &egraph.index(subst[group_expr_var]).data.referenced_expr
+            else {
+                return false;
+            };
+
+            let Some(referenced_aggr_expr) =
+                &egraph.index(subst[aggregate_expr_var]).data.referenced_expr
+            else {
+                return false;
+            };
+
+            if enable_ungrouped {
+                // Pushing down members might eliminate dimensions, so if the query is grouped
+                // and contains filters over measures, the results will be incorrect.
+                for ungrouped in var_iter!(egraph[subst[ungrouped_var]], CubeScanUngrouped) {
+                    if *ungrouped {
+                        continue;
+                    }
+                    let Some(empty_filters) = &egraph.index(subst[filters_var]).data.is_empty_list
+                    else {
+                        return false;
+                    };
+                    if !empty_filters {
+                        return false;
+                    }
+                }
+            }
+
+            let mut columns = HashSet::new();
+            columns.extend(referenced_columns(referenced_group_expr).into_iter());
+            columns.extend(referenced_columns(referenced_aggr_expr).into_iter());
+
+            let new_pushdown_join = referenced_aggr_expr.is_empty();
+
             let aliases_to_cube: Vec<_> =
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube)
                     .cloned()
                     .collect();
 
             for alias_to_cube in aliases_to_cube {
-                if let Some(referenced_group_expr) =
-                    &egraph.index(subst[group_expr_var]).data.referenced_expr
-                {
-                    if let Some(referenced_aggr_expr) =
-                        &egraph.index(subst[aggregate_expr_var]).data.referenced_expr
+                let can_pushdown_joins: Vec<_> = var_iter!(
+                    egraph[subst[can_pushdown_join_var]],
+                    CubeScanCanPushdownJoin
+                )
+                .cloned()
+                .collect();
+
+                for can_pushdown_join in can_pushdown_joins {
+                    if let Some(member_names_to_expr) = &mut egraph
+                        .index_mut(subst[members_var])
+                        .data
+                        .member_name_to_expr
                     {
-                        let mut columns = HashSet::new();
-                        columns.extend(referenced_columns(referenced_group_expr).into_iter());
-                        columns.extend(referenced_columns(referenced_aggr_expr).into_iter());
+                        // TODO default count member is not in the columns set but it should be there
 
-                        let new_pushdown_join = referenced_aggr_expr.is_empty();
+                        if columns.iter().all(|c| {
+                            LogicalPlanData::do_find_member_by_alias(member_names_to_expr, c)
+                                .is_some()
+                        }) {
+                            let member_pushdown_replacer_alias_to_cube =
+                                egraph.add(LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
+                                    MemberPushdownReplacerAliasToCube(
+                                        Self::member_replacer_alias_to_cube(&alias_to_cube, &None),
+                                    ),
+                                ));
 
-                        let can_pushdown_joins: Vec<_> = var_iter!(
-                            egraph[subst[can_pushdown_join_var]],
-                            CubeScanCanPushdownJoin
-                        )
-                        .cloned()
-                        .collect();
+                            subst.insert(
+                                member_pushdown_replacer_alias_to_cube_var,
+                                member_pushdown_replacer_alias_to_cube,
+                            );
 
-                        for can_pushdown_join in can_pushdown_joins {
-                            if let Some(member_names_to_expr) = &mut egraph
-                                .index_mut(subst[members_var])
-                                .data
-                                .member_name_to_expr
-                            {
-                                // TODO default count member is not in the columns set but it should be there
+                            let new_pushdown_join =
+                                egraph.add(LogicalPlanLanguage::CubeScanCanPushdownJoin(
+                                    CubeScanCanPushdownJoin(new_pushdown_join && can_pushdown_join),
+                                ));
+                            subst.insert(new_pushdown_join_var, new_pushdown_join);
 
-                                if columns.iter().all(|c| {
-                                    LogicalPlanData::do_find_member_by_alias(
-                                        member_names_to_expr,
-                                        c,
-                                    )
-                                    .is_some()
-                                }) {
-                                    let member_pushdown_replacer_alias_to_cube = egraph.add(
-                                        LogicalPlanLanguage::MemberPushdownReplacerAliasToCube(
-                                            MemberPushdownReplacerAliasToCube(
-                                                Self::member_replacer_alias_to_cube(
-                                                    &alias_to_cube,
-                                                    &None,
-                                                ),
-                                            ),
-                                        ),
-                                    );
-
-                                    subst.insert(
-                                        member_pushdown_replacer_alias_to_cube_var,
-                                        member_pushdown_replacer_alias_to_cube,
-                                    );
-
-                                    let new_pushdown_join =
-                                        egraph.add(LogicalPlanLanguage::CubeScanCanPushdownJoin(
-                                            CubeScanCanPushdownJoin(
-                                                new_pushdown_join && can_pushdown_join,
-                                            ),
-                                        ));
-                                    subst.insert(new_pushdown_join_var, new_pushdown_join);
-
-                                    return true;
-                                }
-                            }
+                            return true;
                         }
                     }
                 }
