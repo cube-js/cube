@@ -54,6 +54,7 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
             ),
             Field::new("sealed", DataType::Boolean, false),
             Field::new("select_statement", DataType::Utf8, false),
+            Field::new("extension", DataType::Utf8, true),
         ]
     }
 
@@ -245,6 +246,20 @@ impl InfoSchemaTableDef for SystemTablesTableDef {
                                 .map(|t| t.as_str())
                         })
                         .collect::<Vec<_>>(),
+                ))
+            }),
+            Box::new(|tables| {
+                Arc::new(StringArray::from(
+                    tables
+                    .iter()
+                    .map(|row| {
+                        row.table
+                            .get_row()
+                            .extension()
+                            .as_ref()
+                            .map(|t| t.as_str())
+                    })
+                    .collect::<Vec<_>>(),
                 ))
             }),
         ]

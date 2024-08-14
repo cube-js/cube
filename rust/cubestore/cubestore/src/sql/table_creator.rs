@@ -2,6 +2,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::cluster::{Cluster, JobEvent, JobResultListener};
+use crate::config::injection::DIService;
 use crate::config::ConfigObj;
 use crate::import::ImportService;
 use crate::metastore::job::JobType;
@@ -14,10 +15,32 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::parser::{CubeStoreParser, PartitionedIndexRef};
 use crate::telemetry::incoming_traffic_agent_event;
 use crate::CubeError;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use sqlparser::ast::*;
 use std::mem::take;
+
+#[async_trait]
+
+pub trait TableExtensionService: DIService + Send + Sync {
+    async fn get_extension(&self) -> Option<serde_json::Value>;
+}
+
+pub struct TableExtensionServiceImpl;
+
+impl TableExtensionServiceImpl {
+    pub fn new() -> Arc<Self> { Arc::new(Self{}) }
+}
+
+#[async_trait]
+impl TableExtensionService for TableExtensionServiceImpl {
+    async fn get_extension(&self) -> Option<serde_json::Value> {
+        None
+    }
+}
+
+crate::di_service!(TableExtensionServiceImpl, [TableExtensionService]);
 
 enum FinalizeExternalTableResult {
     Ok,
@@ -27,6 +50,7 @@ pub struct TableCreator {
     db: Arc<dyn MetaStore>,
     cluster: Arc<dyn Cluster>,
     import_service: Arc<dyn ImportService>,
+    table_extension_service: Arc<dyn TableExtensionService>,
     config_obj: Arc<dyn ConfigObj>,
     create_table_timeout: Duration,
     cache: Arc<SqlResultCache>,
@@ -37,6 +61,7 @@ impl TableCreator {
         db: Arc<dyn MetaStore>,
         cluster: Arc<dyn Cluster>,
         import_service: Arc<dyn ImportService>,
+        table_extension_service: Arc<dyn TableExtensionService>,
         config_obj: Arc<dyn ConfigObj>,
         create_table_timeout: Duration,
         cache: Arc<SqlResultCache>,
@@ -45,6 +70,7 @@ impl TableCreator {
             db,
             cluster,
             import_service,
+            table_extension_service,
             config_obj,
             create_table_timeout,
             cache,
@@ -70,6 +96,7 @@ impl TableCreator {
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
+        let extension: Option<serde_json::Value> = self.table_extension_service.get_extension().await;
         if !if_not_exists {
             return self
                 .create_table_loop(
@@ -90,6 +117,7 @@ impl TableCreator {
                     aggregates,
                     partitioned_index,
                     &trace_obj,
+                    &extension,
                 )
                 .await;
         }
@@ -126,6 +154,7 @@ impl TableCreator {
                     aggregates,
                     partitioned_index,
                     &trace_obj,
+                    &extension,
                 )
                 .await
             })
@@ -151,6 +180,7 @@ impl TableCreator {
         aggregates: Option<Vec<(Ident, Ident)>>,
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
+        extension: &Option<serde_json::Value>,
     ) -> Result<IdRow<Table>, CubeError> {
         let mut retries = 0;
         let max_retries = self.config_obj.create_table_max_retries();
@@ -179,6 +209,7 @@ impl TableCreator {
                     aggregates.clone(),
                     partitioned_index.clone(),
                     trace_obj,
+                    extension,
                 )
                 .await?;
 
@@ -251,6 +282,7 @@ impl TableCreator {
         aggregates: Option<Vec<(Ident, Ident)>>,
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
+        extension: &Option<serde_json::Value>,
     ) -> Result<IdRow<Table>, CubeError> {
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
@@ -369,6 +401,7 @@ impl TableCreator {
                     None,
                     None,
                     false,
+                    extension.as_ref().map(|json_value| json_value.to_string()),
                 )
                 .await;
         }
@@ -449,6 +482,7 @@ impl TableCreator {
                 partition_split_threshold,
                 trace_obj_to_save,
                 if_not_exists,
+                extension.as_ref().map(|json_value| json_value.to_string()),
             )
             .await?;
 

@@ -10,6 +10,7 @@ use datafusion::physical_plan::hash_aggregate::{
     AggregateMode, AggregateStrategy, HashAggregateExec,
 };
 use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
@@ -182,6 +183,7 @@ pub struct ChunkStore {
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
     config: Arc<dyn ConfigObj>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
 }
@@ -342,6 +344,7 @@ impl ChunkStore {
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
         config: Arc<dyn ConfigObj>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
@@ -349,6 +352,7 @@ impl ChunkStore {
             remote_fs,
             cluster,
             config,
+            metadata_cache_factory,
             memory_chunks: RwLock::new(HashMap::new()),
             chunk_size,
         };
@@ -588,8 +592,9 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
+            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> = self.metadata_cache_factory.clone();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
-                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, metadata_cache_factory);
                 Ok(parquet.read_columns(&local_file)?)
             })
             .await??)
@@ -804,6 +809,7 @@ mod tests {
     use crate::{metastore::ColumnType, table::TableValue};
     use cuberockstore::rocksdb::{Options, DB};
     use datafusion::arrow::array::{Int64Array, StringArray};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -888,6 +894,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -942,6 +949,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 10,
             );
 
@@ -984,6 +992,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -1044,6 +1053,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 10,
             );
 
@@ -1094,6 +1104,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -1372,8 +1383,9 @@ impl ChunkStore {
             let local_file = self.remote_fs.temp_upload_path(remote_path.clone()).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
+            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> = self.metadata_cache_factory.clone();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, metadata_cache_factory);
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

@@ -6,7 +6,7 @@ use datafusion::arrow::datatypes::Schema;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
 use datafusion::parquet::file::properties::{WriterProperties, WriterVersion};
-use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
+use datafusion::physical_plan::parquet::{MetadataCacheFactory, ParquetMetadataCache};
 use std::fs::File;
 use std::sync::Arc;
 
@@ -36,15 +36,41 @@ impl CubestoreParquetMetadataCache for CubestoreParquetMetadataCacheImpl {
     }
 }
 
+pub trait CubestoreMetadataCacheFactory: DIService + Send + Sync {
+    fn cache_factory(&self) -> Arc<dyn MetadataCacheFactory>;
+}
+
+pub struct CubestoreMetadataCacheFactoryImpl {
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+}
+
+crate::di_service!(
+    CubestoreMetadataCacheFactoryImpl,
+    [CubestoreMetadataCacheFactory]
+);
+
+impl CubestoreMetadataCacheFactoryImpl {
+    pub fn new(metadata_cache_factory: Arc<dyn MetadataCacheFactory>) -> Arc<CubestoreMetadataCacheFactoryImpl> {
+        Arc::new(CubestoreMetadataCacheFactoryImpl { metadata_cache_factory })
+    }
+}
+
+impl CubestoreMetadataCacheFactory for CubestoreMetadataCacheFactoryImpl {
+    fn cache_factory(&self) -> Arc<dyn MetadataCacheFactory> {
+        self.metadata_cache_factory.clone()
+    }
+}
+
 pub struct ParquetTableStore {
     table: Index,
     row_group_size: usize,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 impl ParquetTableStore {
     pub fn read_columns(&self, path: &str) -> Result<Vec<RecordBatch>, CubeError> {
         let mut r = ParquetFileArrowReader::new(Arc::new(
-            NoopParquetMetadataCache::new().file_reader(path)?,
+            self.metadata_cache_factory.make_noop_cache().file_reader(path)?,
         ));
         let mut batches = Vec::new();
         for b in r.get_record_reader(self.row_group_size)? {
@@ -55,10 +81,11 @@ impl ParquetTableStore {
 }
 
 impl ParquetTableStore {
-    pub fn new(table: Index, row_group_size: usize) -> ParquetTableStore {
+    pub fn new(table: Index, row_group_size: usize, metadata_cache_factory: Arc<dyn MetadataCacheFactory>) -> ParquetTableStore {
         ParquetTableStore {
             table,
             row_group_size,
+            metadata_cache_factory,
         }
     }
 
@@ -77,16 +104,16 @@ impl ParquetTableStore {
     }
 
     pub fn writer_props(&self) -> WriterProperties {
-        WriterProperties::builder()
+        self.metadata_cache_factory.build_writer_props(WriterProperties::builder()
             .set_max_row_group_size(self.row_group_size)
-            .set_writer_version(WriterVersion::PARQUET_2_0)
-            .build()
+            .set_writer_version(WriterVersion::PARQUET_2_0))
     }
 
     pub fn write_data(&self, dest_file: &str, columns: Vec<ArrayRef>) -> Result<(), CubeError> {
         let schema = Arc::new(arrow_schema(&self.table));
         let batch = RecordBatch::try_new(schema.clone(), columns.to_vec())?;
 
+        // TODO: Just look for every place SerializedFileWriter is constructed and see if we missed one.
         let mut w =
             ArrowWriter::try_new(File::create(dest_file)?, schema, Some(self.writer_props()))?;
         w.write(&batch)?;
@@ -120,6 +147,7 @@ mod tests {
     use datafusion::parquet::file::reader::FileReader;
     use datafusion::parquet::file::reader::SerializedFileReader;
     use datafusion::parquet::file::statistics::{Statistics, TypedStatistics};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
@@ -153,7 +181,7 @@ mod tests {
         .unwrap();
 
         let dest_file = NamedTempFile::new().unwrap();
-        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE);
+        let store = ParquetTableStore::new(index, ROW_GROUP_SIZE, Arc::new(BasicMetadataCacheFactory::new()));
 
         let data: Vec<ArrayRef> = vec![
             Arc::new(StringArray::from(vec![
@@ -243,6 +271,7 @@ mod tests {
             )
             .unwrap(),
             row_group_size: 10,
+            metadata_cache_factory: Arc::new(BasicMetadataCacheFactory::new()),
         };
         let file = NamedTempFile::new().unwrap();
         let file_name = file.path().to_str().unwrap();
@@ -302,7 +331,7 @@ mod tests {
         let count_min = compaction::write_to_files(
             to_stream(to_split_batch).await,
             to_split.len(),
-            ParquetTableStore::new(store.table.clone(), store.row_group_size),
+            ParquetTableStore::new(store.table.clone(), store.row_group_size, Arc::new(BasicMetadataCacheFactory::new())),
             vec![split_1.to_string(), split_2.to_string()],
         )
         .await
@@ -364,7 +393,7 @@ mod tests {
             )
             .unwrap();
             let tmp_file = NamedTempFile::new().unwrap();
-            let store = ParquetTableStore::new(index.clone(), NUM_ROWS);
+            let store = ParquetTableStore::new(index.clone(), NUM_ROWS, Arc::new(BasicMetadataCacheFactory::new()));
             store
                 .write_data(
                     tmp_file.path().to_str().unwrap(),
@@ -421,7 +450,7 @@ mod tests {
 
         let data = rows_to_columns(&index.columns(), &rows);
 
-        let w = ParquetTableStore::new(index.clone(), NUM_ROWS);
+        let w = ParquetTableStore::new(index.clone(), NUM_ROWS, Arc::new(BasicMetadataCacheFactory::new()));
         w.write_data(file, data.clone()).unwrap();
         let r = concat_record_batches(&w.read_columns(file).unwrap());
         assert_eq_columns!(r.columns(), &data);

@@ -80,6 +80,8 @@ use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
+pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
+
 
 #[automock]
 #[async_trait]
@@ -158,6 +160,9 @@ impl SqlQueryContext {
     }
 }
 
+
+
+
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,
     cachestore: CacheStoreSqlService,
@@ -187,6 +192,7 @@ impl SqlServiceImpl {
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
         import_service: Arc<dyn ImportService>,
+        table_extension_service: Arc<dyn TableExtensionService>,
         config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
@@ -205,6 +211,7 @@ impl SqlServiceImpl {
                 db.clone(),
                 cluster.clone(),
                 import_service,
+                table_extension_service,
                 config_obj.clone(),
                 create_table_timeout,
                 cache.clone(),
@@ -1659,11 +1666,13 @@ mod tests {
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
     use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
+    use table_creator::TableExtensionServiceImpl;
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
@@ -1723,6 +1732,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1735,6 +1745,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1800,6 +1811,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1812,6 +1824,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1861,6 +1874,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
 
@@ -1907,6 +1921,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1919,6 +1934,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1965,6 +1981,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
