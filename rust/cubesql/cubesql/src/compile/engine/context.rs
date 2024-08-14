@@ -1,7 +1,6 @@
 use std::{any::Any, collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     datasource::{self, TableProvider},
@@ -15,7 +14,7 @@ use datafusion::{
 use crate::{
     compile::{DatabaseProtocolDetails, MetaContext},
     sql::{ColumnType, SessionManager, SessionState},
-    transport::V1CubeMetaExt,
+    transport::{CubeMeta, V1CubeMetaExt},
     CubeError,
 };
 
@@ -92,11 +91,11 @@ pub trait TableName {
 }
 
 pub struct CubeTableProvider {
-    cube: V1CubeMeta,
+    cube: CubeMeta,
 }
 
 impl CubeTableProvider {
-    pub fn new(cube: V1CubeMeta) -> Self {
+    pub fn new(cube: CubeMeta) -> Self {
         Self { cube }
     }
 }

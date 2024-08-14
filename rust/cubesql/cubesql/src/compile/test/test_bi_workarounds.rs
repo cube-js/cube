@@ -1,11 +1,11 @@
-use cubeclient::models::V1LoadRequestQuery;
-
-use crate::compile::{
-    test::{convert_select_to_query_plan, init_testing_logger},
-    DatabaseProtocol, Rewriter,
-};
-
 use super::LogicalPlanTestUtils;
+use crate::{
+    compile::{
+        test::{convert_select_to_query_plan, init_testing_logger},
+        DatabaseProtocol, Rewriter,
+    },
+    transport::TransportLoadRequestQuery,
+};
 
 #[tokio::test]
 async fn test_powerbi_count_distinct_with_max_case() {
@@ -39,7 +39,7 @@ async fn test_powerbi_count_distinct_with_max_case() {
 
     assert_eq!(
         logical_plan.find_cube_scan().request,
-        V1LoadRequestQuery {
+        TransportLoadRequestQuery {
             measures: Some(vec!["KibanaSampleDataEcommerce.countDistinct".to_string()]),
             dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
             segments: Some(vec![]),
