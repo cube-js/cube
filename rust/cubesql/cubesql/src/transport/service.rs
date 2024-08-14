@@ -1,7 +1,6 @@
 use async_trait::async_trait;
-use cubeclient::{
-    apis::{configuration::Configuration as ClientConfiguration, default_api as cube_api},
-    models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
+use cubeclient::apis::{
+    configuration::Configuration as ClientConfiguration, default_api as cube_api,
 };
 
 use datafusion::{
@@ -35,6 +34,7 @@ use crate::{
         MetaContext,
     },
     sql::{AuthContextRef, HttpAuthContext},
+    transport::{TransportLoadRequest, TransportLoadRequestQuery, TransportLoadResponse},
     CubeError, RWLockAsync,
 };
 
@@ -125,7 +125,7 @@ pub trait TransportService: Send + Sync + Debug {
     async fn sql(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
@@ -136,16 +136,16 @@ pub trait TransportService: Send + Sync + Debug {
     async fn load(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError>;
+    ) -> Result<TransportLoadResponse, CubeError>;
 
     async fn load_stream(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
@@ -262,7 +262,7 @@ impl TransportService for HttpTransport {
     async fn sql(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        _query: V1LoadRequestQuery,
+        _query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
         _member_to_alias: Option<HashMap<String, String>>,
@@ -274,11 +274,11 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError> {
+    ) -> Result<TransportLoadResponse, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
                 "Changing security context (__user) is not supported in the standalone mode"
@@ -287,7 +287,7 @@ impl TransportService for HttpTransport {
         }
 
         // TODO: support meta_fields for HTTP
-        let request = V1LoadRequest {
+        let request = TransportLoadRequest {
             query: Some(query),
             query_type: Some("multi".to_string()),
         };
@@ -300,7 +300,7 @@ impl TransportService for HttpTransport {
     async fn load_stream(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        _query: V1LoadRequestQuery,
+        _query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
