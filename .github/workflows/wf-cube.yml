@@ -21,10 +21,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Copy yarn.lock file
+        run: cp yarn.lock packages/cubejs-docker
       - name: Build & push
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:
           repository: '${{ github.repository }}/cube'
           tag: 'latest'
           context: ./
-          dockerfile: ./packages/cubejs-docker/dev.Dockerfile
+          dockerfile: ./packages/cubejs-docker/transai.Dockerfile

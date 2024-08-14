@@ -4069,6 +4069,32 @@
     tiny-invariant "^1.3.1"
     valid-url "^1.0.9"
 
+"@cubejs-backend/api-gateway@file:packages/cubejs-api-gateway":
+  version "0.35.67"
+  dependencies:
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-api-gateway-0.35.67-1c743dc6-f042-4978-be63-ceb2e51f9eb2-1723623427665/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/native" "^0.35.67"
+    "@cubejs-backend/shared" "^0.35.67"
+    "@ungap/structured-clone" "^0.3.4"
+    body-parser "^1.19.0"
+    chrono-node "^2.6.2"
+    express-graphql "^0.12.0"
+    graphql "^15.8.0"
+    graphql-scalars "^1.10.0"
+    graphql-tag "^2.12.6"
+    http-proxy-middleware "^3.0.0"
+    inflection "^1.12.0"
+    joi "^17.8.3"
+    jsonwebtoken "^8.3.0"
+    jwk-to-pem "^2.0.4"
+    moment "^2.24.0"
+    moment-timezone "^0.5.27"
+    nexus "^1.1.0"
+    node-fetch "^2.6.1"
+    ramda "^0.27.0"
+    rxjs "^7.8.1"
+    uuid "^8.3.2"
+
 "@cubejs-backend/apla-clickhouse@^1.7", "@cubejs-backend/apla-clickhouse@^1.7.0":
   version "1.7.0"
   resolved "https://registry.npmjs.org/@cubejs-backend/apla-clickhouse/-/apla-clickhouse-1.7.0.tgz"
@@ -4078,6 +4104,19 @@
   version "9.0.2"
   resolved "https://registry.npmjs.org/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz"
   integrity sha512-yC1juhXEjM7K97KfXubDm7WGipd4Lpxe+AT8XeTRE9meRULrKlw0wtE2E8AQkGOfTBn+P1SCkePQ/BzIbOh1VA==
+
+"@cubejs-backend/event-emitter@file:packages/cubejs-event-emitter":
+  version "0.35.67"
+  dependencies:
+    "@cubejs-backend/dotenv" "^9.0.2"
+    "@cubejs-backend/shared" "^0.35.67"
+    chokidar "^3.5.1"
+    env-var "^6.3.0"
+    fs-extra "^9.1.0"
+    ioredis "^4.27.8"
+    jsonwebtoken "^8.5.1"
+    request "^2.88.2"
+    request-promise "^4.2.5"
 
 "@cubejs-backend/jdbc@^0.8.0":
   version "0.8.0"

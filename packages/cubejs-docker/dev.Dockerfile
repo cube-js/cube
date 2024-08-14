@@ -32,6 +32,60 @@ COPY tsconfig.base.json .
 COPY rollup.config.js .
 COPY packages/cubejs-linter packages/cubejs-linter
 
+# Backend
+COPY rust/cubesql/package.json rust/cubesql/package.json
+COPY rust/cubestore/package.json rust/cubestore/package.json
+COPY rust/cubestore/bin rust/cubestore/bin
+COPY packages/cubejs-backend-shared/package.json packages/cubejs-backend-shared/package.json
+COPY packages/cubejs-base-driver/package.json packages/cubejs-base-driver/package.json
+COPY packages/cubejs-backend-native/package.json packages/cubejs-backend-native/package.json
+COPY packages/cubejs-testing-shared/package.json packages/cubejs-testing-shared/package.json
+COPY packages/cubejs-backend-cloud/package.json packages/cubejs-backend-cloud/package.json
+COPY packages/cubejs-api-gateway/package.json packages/cubejs-api-gateway/package.json
+COPY packages/cubejs-athena-driver/package.json packages/cubejs-athena-driver/package.json
+COPY packages/cubejs-bigquery-driver/package.json packages/cubejs-bigquery-driver/package.json
+COPY packages/cubejs-cli/package.json packages/cubejs-cli/package.json
+COPY packages/cubejs-clickhouse-driver/package.json packages/cubejs-clickhouse-driver/package.json
+COPY packages/cubejs-crate-driver/package.json packages/cubejs-crate-driver/package.json
+COPY packages/cubejs-dremio-driver/package.json packages/cubejs-dremio-driver/package.json
+COPY packages/cubejs-druid-driver/package.json packages/cubejs-druid-driver/package.json
+COPY packages/cubejs-duckdb-driver/package.json packages/cubejs-duckdb-driver/package.json
+COPY packages/cubejs-elasticsearch-driver/package.json packages/cubejs-elasticsearch-driver/package.json
+COPY packages/cubejs-firebolt-driver/package.json packages/cubejs-firebolt-driver/package.json
+COPY packages/cubejs-hive-driver/package.json packages/cubejs-hive-driver/package.json
+COPY packages/cubejs-mongobi-driver/package.json packages/cubejs-mongobi-driver/package.json
+COPY packages/cubejs-mssql-driver/package.json packages/cubejs-mssql-driver/package.json
+COPY packages/cubejs-mysql-driver/package.json packages/cubejs-mysql-driver/package.json
+COPY packages/cubejs-cubestore-driver/package.json packages/cubejs-cubestore-driver/package.json
+COPY packages/cubejs-oracle-driver/package.json packages/cubejs-oracle-driver/package.json
+COPY packages/cubejs-redshift-driver/package.json packages/cubejs-redshift-driver/package.json
+COPY packages/cubejs-postgres-driver/package.json packages/cubejs-postgres-driver/package.json
+COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/package.json
+COPY packages/cubejs-materialize-driver/package.json packages/cubejs-materialize-driver/package.json
+COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
+COPY packages/cubejs-trino-driver/package.json packages/cubejs-trino-driver/package.json
+COPY packages/cubejs-query-orchestrator/package.json packages/cubejs-query-orchestrator/package.json
+COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compiler/package.json
+COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
+COPY packages/cubejs-server-core/package.json packages/cubejs-server-core/package.json
+COPY packages/cubejs-snowflake-driver/package.json packages/cubejs-snowflake-driver/package.json
+COPY packages/cubejs-sqlite-driver/package.json packages/cubejs-sqlite-driver/package.json
+COPY packages/cubejs-ksql-driver/package.json packages/cubejs-ksql-driver/package.json
+COPY packages/cubejs-dbt-schema-extension/package.json packages/cubejs-dbt-schema-extension/package.json
+COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/package.json
+# Skip
+# COPY packages/cubejs-testing/package.json packages/cubejs-testing/package.json
+# COPY packages/cubejs-docker/package.json packages/cubejs-docker/package.json
+# Frontend
+COPY packages/cubejs-templates/package.json packages/cubejs-templates/package.json
+COPY packages/cubejs-client-core/package.json packages/cubejs-client-core/package.json
+COPY packages/cubejs-client-react/package.json packages/cubejs-client-react/package.json
+COPY packages/cubejs-client-vue/package.json packages/cubejs-client-vue/package.json
+COPY packages/cubejs-client-vue3/package.json packages/cubejs-client-vue3/package.json
+COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.json
+COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
+COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
+
 RUN yarn policies set-version v1.22.19
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
@@ -40,13 +94,24 @@ RUN yarn config set network-timeout 120000 -g
 # We are doing version bump without updating lock files for the docker package.
 #RUN yarn install --frozen-lockfile
 
+FROM base as prod_base_dependencies
+COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
+RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
+RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
+RUN yarn install --prod
+
+FROM prod_base_dependencies as prod_dependencies
+COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
+RUN yarn install --prod --ignore-scripts
+
 FROM base as build
+
+RUN yarn install
 
 # Backend
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/
 COPY packages/cubejs-backend-shared/ packages/cubejs-backend-shared/
-COPY packages/cubejs-event-emitter/ packages/cubejs-event-emitter/
 COPY packages/cubejs-base-driver/ packages/cubejs-base-driver/
 COPY packages/cubejs-backend-native/ packages/cubejs-backend-native/
 COPY packages/cubejs-testing-shared/ packages/cubejs-testing-shared/
@@ -97,8 +162,10 @@ COPY packages/cubejs-client-ngx/ packages/cubejs-client-ngx/
 COPY packages/cubejs-client-ws-transport/ packages/cubejs-client-ws-transport/
 COPY packages/cubejs-playground/ packages/cubejs-playground/
 
-RUN yarn link:dev && yarn install && yarn build
+RUN yarn build
 RUN yarn lerna run build
+
+RUN find . -name 'node_modules' -type d -prune -exec rm -rf '{}' +
 
 FROM base AS final
 
@@ -108,6 +175,7 @@ RUN apt-get update \
     && apt-get clean
 
 COPY --from=build /cubejs .
+COPY --from=prod_dependencies /cubejs .
 
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
