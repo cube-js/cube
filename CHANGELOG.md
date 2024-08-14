@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.70](https://github.com/cube-js/cube/compare/v0.35.69...v0.35.70) (2024-08-14)
+
+
+### Bug Fixes
+
+* **cubesql:** Don't push down aggregate to grouped query with filters ([df3334c](https://github.com/cube-js/cube/commit/df3334ce6e97e82c4773de5129a615ab5a3d05d8))
+
+
+
+
+
 ## [0.35.69](https://github.com/cube-js/cube/compare/v0.35.68...v0.35.69) (2024-08-12)
 
 
