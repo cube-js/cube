@@ -14,12 +14,11 @@ use crate::{
     sql::AuthContextRef,
     transport::{
         AliasedColumn, LoadRequestMeta, MetaContext, SpanId, SqlGenerator, SqlTemplates,
-        TransportService,
+        TransportLoadRequestQuery, TransportService,
     },
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
-use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
@@ -200,7 +199,7 @@ pub struct CubeScanWrapperNode {
     pub meta: Arc<MetaContext>,
     pub auth_context: AuthContextRef,
     pub wrapped_sql: Option<SqlQuery>,
-    pub request: Option<V1LoadRequestQuery>,
+    pub request: Option<TransportLoadRequestQuery>,
     pub member_fields: Option<Vec<MemberField>>,
     pub span_id: Option<Arc<SpanId>>,
     pub config_obj: Arc<dyn ConfigObj>,
@@ -229,7 +228,7 @@ impl CubeScanWrapperNode {
     pub fn with_sql_and_request(
         &self,
         sql: SqlQuery,
-        request: V1LoadRequestQuery,
+        request: TransportLoadRequestQuery,
         member_fields: Vec<MemberField>,
     ) -> Self {
         Self {
@@ -258,7 +257,7 @@ pub struct SqlGenerationResult {
     pub from_alias: Option<String>,
     pub column_remapping: Option<HashMap<Column, Column>>,
     pub sql: SqlQuery,
-    pub request: V1LoadRequestQuery,
+    pub request: TransportLoadRequestQuery,
 }
 
 lazy_static! {
@@ -925,7 +924,7 @@ impl CubeScanWrapperNode {
                     from_alias: None,
                     sql: SqlQuery::new("".to_string(), values.clone()),
                     column_remapping: None,
-                    request: V1LoadRequestQuery::new(),
+                    request: TransportLoadRequestQuery::new(),
                 }),
                 // LogicalPlan::Distinct(_) => {}
                 x => {
