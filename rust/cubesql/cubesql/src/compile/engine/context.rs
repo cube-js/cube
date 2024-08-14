@@ -12,9 +12,9 @@ use datafusion::{
 };
 
 use crate::{
-    compile::{DatabaseProtocolDetails, MetaContext},
+    compile::DatabaseProtocolDetails,
     sql::{ColumnType, SessionManager, SessionState},
-    transport::{CubeMeta, V1CubeMetaExt},
+    transport::{CubeMeta, MetaContext, V1CubeMetaExt},
     CubeError,
 };
 

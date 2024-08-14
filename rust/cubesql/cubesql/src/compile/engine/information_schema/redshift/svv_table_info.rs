@@ -1,5 +1,6 @@
 use std::{any::Any, sync::Arc};
 
+use crate::transport::CubeMetaTable;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -15,8 +16,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::compile::CubeMetaTable;
 
 struct RedshiftSvvTableInfoBuilder {
     databases: StringBuilder,

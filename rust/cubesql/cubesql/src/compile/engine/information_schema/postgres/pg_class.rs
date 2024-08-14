@@ -3,6 +3,7 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use bigdecimal::ToPrimitive;
 
+use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder},
@@ -14,8 +15,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::compile::CubeMetaTable;
 
 struct PgClass {
     oid: u32,

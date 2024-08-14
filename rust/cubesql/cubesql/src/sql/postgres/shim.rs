@@ -9,17 +9,16 @@ use crate::{
         convert_statement_to_cube_query,
         parser::{parse_sql_to_statement, parse_sql_to_statements},
         qtrace::Qtrace,
-        CompilationError, DatabaseProtocol, MetaContext, QueryPlan,
+        CommandCompletion, CompilationError, DatabaseProtocol, QueryPlan, StatusFlags,
     },
     sql::{
         df_type_to_pg_tid,
         extended::{Cursor, Portal, PortalBatch, PortalFrom},
         statement::{PostgresStatementParamsFinder, StatementPlaceholderReplacer},
-        types::CommandCompletion,
-        AuthContextRef, Session, SessionState, StatusFlags,
+        AuthContextRef, Session, SessionState,
     },
     telemetry::ContextLogger,
-    transport::SpanId,
+    transport::{MetaContext, SpanId},
     CubeError,
 };
 use futures::{pin_mut, FutureExt, StreamExt};

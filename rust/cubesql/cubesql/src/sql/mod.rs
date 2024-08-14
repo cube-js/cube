@@ -19,4 +19,4 @@ pub use postgres::*;
 pub use server_manager::ServerManager;
 pub use session::{Session, SessionProcessList, SessionProperties, SessionState};
 pub use session_manager::SessionManager;
-pub use types::{ColumnFlags, ColumnType, StatusFlags};
+pub use types::{ColumnFlags, ColumnType};
