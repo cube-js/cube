@@ -8,24 +8,9 @@ use datafusion::dataframe::DataFrame;
 use std::{fmt::Formatter, pin::Pin, sync::Arc};
 
 use datafusion::{
-    execution::context::{
-        default_session_builder, SessionConfig as DFSessionConfig,
-        SessionContext as DFSessionContext,
-    },
-    logical_plan::{
-        plan::{Analyze, Explain, Extension, ToStringifiedPlan},
-        LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
-    },
-    optimizer::{
-        optimizer::{OptimizerConfig, OptimizerRule},
-        projection_drop_out::ProjectionDropOut,
-        utils::from_plan,
-    },
-    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan, RecordBatchStream},
-    prelude::*,
-    scalar::ScalarValue,
-    sql::{parser::Statement as DFStatement, planner::SqlToRel},
-    variable::VarType,
+    execution::context::SessionContext as DFSessionContext,
+    logical_plan::LogicalPlan,
+    physical_plan::{ExecutionPlan, RecordBatchStream},
 };
 use futures_util::FutureExt;
 

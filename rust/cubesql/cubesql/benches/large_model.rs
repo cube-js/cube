@@ -3,12 +3,12 @@ use std::{env::set_var, sync::Arc, time::Duration};
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
-use cubesql::compile::{
-    test::{
+use cubesql::{
+    compile::test::{
         rewrite_engine::{cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner},
         sql_generator,
     },
-    MetaContext,
+    transport::MetaContext,
 };
 use egg::StopReason;
 use itertools::Itertools;
