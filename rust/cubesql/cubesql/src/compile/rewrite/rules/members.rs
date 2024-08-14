@@ -1494,6 +1494,10 @@ impl MemberRules {
                     if !empty_filters {
                         return false;
                     }
+                    if referenced_aggr_expr.len() == 0 {
+                        continue;
+                    }
+                    return false;
                 }
             }
 
