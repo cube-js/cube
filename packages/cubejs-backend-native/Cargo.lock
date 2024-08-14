@@ -751,7 +751,6 @@ dependencies = [
  "axum",
  "bytes",
  "convert_case",
- "cubeclient",
  "cubenativeutils",
  "cubesql",
  "cubesqlplanner",

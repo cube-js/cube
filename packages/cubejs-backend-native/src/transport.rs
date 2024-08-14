@@ -4,10 +4,12 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
-use cubesql::transport::{SpanId, SqlGenerator, SqlResponse};
+use cubesql::transport::{
+    SpanId, SqlGenerator, SqlResponse, TransportError, TransportLoadRequestQuery,
+    TransportLoadResponse, TransportMetaResponse,
+};
 use cubesql::{
     di_service,
     sql::AuthContextRef,
@@ -76,7 +78,7 @@ struct CanSwitchUserForSessionRequest {
 #[derive(Debug, Serialize)]
 struct LoadRequest {
     request: TransportRequest,
-    query: V1LoadRequestQuery,
+    query: TransportLoadRequestQuery,
     #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
     sql_query: Option<(String, Vec<Option<String>>)>,
     session: SessionContext,
@@ -129,7 +131,7 @@ impl TransportService for NodeBridgeTransport {
             only_compiler_id: false,
         })?;
 
-        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+        let response = call_js_with_channel_as_callback::<TransportMetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
             Some(extra.clone()),
@@ -229,7 +231,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: true,
         })?;
-        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+        let response = call_js_with_channel_as_callback::<TransportMetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
             Some(extra.clone()),
@@ -251,7 +253,7 @@ impl TransportService for NodeBridgeTransport {
     async fn sql(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
@@ -328,11 +330,11 @@ impl TransportService for NodeBridgeTransport {
     async fn load(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError> {
+    ) -> Result<TransportLoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -381,14 +383,14 @@ impl TransportService for NodeBridgeTransport {
             #[cfg(not(debug_assertions))]
             trace!("[transport] Request <- <hidden>");
 
-            let load_err = match serde_json::from_value::<V1LoadResponse>(response.clone()) {
+            let load_err = match serde_json::from_value::<TransportLoadResponse>(response.clone()) {
                 Ok(r) => {
                     return Ok(r);
                 }
                 Err(err) => err,
             };
 
-            if let Ok(res) = serde_json::from_value::<V1Error>(response) {
+            if let Ok(res) = serde_json::from_value::<TransportError>(response) {
                 if res.error.to_lowercase() == *"continue wait" {
                     debug!(
                         "[transport] load - retrying request (continue wait) requestId: {}",
@@ -413,7 +415,7 @@ impl TransportService for NodeBridgeTransport {
     async fn load_stream(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
