@@ -26,15 +26,14 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    compile::{
-        engine::df::{
-            scan::MemberField,
-            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
-        },
-        MetaContext,
+    compile::engine::df::{
+        scan::MemberField,
+        wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
     },
     sql::{AuthContextRef, HttpAuthContext},
-    transport::{TransportLoadRequest, TransportLoadRequestQuery, TransportLoadResponse},
+    transport::{
+        MetaContext, TransportLoadRequest, TransportLoadRequestQuery, TransportLoadResponse,
+    },
     CubeError, RWLockAsync,
 };
 

@@ -16,22 +16,27 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, CubeContext, DatabaseProtocol, MetaContext, QueryPlanner,
+        rewrite_statement, CubeContext, DatabaseProtocol, QueryPlanner,
     },
     config::{ConfigObj, ConfigObjImpl},
+    transport::MetaContext,
 };
 
 pub async fn cube_context(meta: Arc<MetaContext>) -> CubeContext {
     let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
-    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
+    let planner = QueryPlanner::new(
+        session.state.clone(),
+        meta.clone(),
+        session.session_manager.clone(),
+    );
     let ctx = planner.create_execution_ctx();
     let df_state = Arc::new(ctx.state.write().clone());
 
     CubeContext::new(
         df_state,
-        planner.meta.clone(),
-        planner.session_manager.clone(),
-        planner.state.clone(),
+        meta.clone(),
+        session.session_manager.clone(),
+        session.state.clone(),
     )
 }
 

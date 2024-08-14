@@ -1,13 +1,10 @@
 use crate::{
-    compile::{
-        rewrite::{
-            rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
-            DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
-            TimeDimensionGranularity, WrappedSelectUngroupedScan,
-        },
-        MetaContext,
+    compile::rewrite::{
+        rules::utils::granularity_str_to_int_order, CubeScanUngrouped, CubeScanWrapped,
+        DimensionName, LogicalPlanLanguage, MemberErrorPriority, ScalarUDFExprFun,
+        TimeDimensionGranularity, WrappedSelectUngroupedScan,
     },
-    transport::V1CubeMetaDimensionExt,
+    transport::{MetaContext, V1CubeMetaDimensionExt},
 };
 use egg::{CostFunction, Id, Language};
 use std::sync::Arc;

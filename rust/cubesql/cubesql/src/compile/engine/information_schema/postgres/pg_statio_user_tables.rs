@@ -2,6 +2,7 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
+use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt32Builder},
@@ -13,8 +14,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::compile::CubeMetaTable;
 
 struct PgCatalogStatioUserTablesBuilder {
     relid: UInt32Builder,

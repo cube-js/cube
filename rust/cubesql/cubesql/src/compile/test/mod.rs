@@ -1,24 +1,24 @@
 use std::{collections::HashMap, env, ops::Deref, sync::Arc};
 
 use crate::transport::{
-    CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment,
+    CubeMeta, CubeMetaDimension, CubeMetaJoin, CubeMetaMeasure, CubeMetaSegment, MetaContext,
     TransportLoadRequestQuery, TransportLoadResponse,
 };
 use async_trait::async_trait;
 use datafusion::{arrow::datatypes::SchemaRef, dataframe::DataFrame as DFDataFrame};
 use uuid::Uuid;
 
-use super::{convert_sql_to_cube_query, CompilationResult, MetaContext, QueryPlan};
+use super::{convert_sql_to_cube_query, CompilationResult, QueryPlan};
 use crate::{
     compile::{
         engine::df::{scan::MemberField, wrapper::SqlQuery},
-        DatabaseProtocol,
+        DatabaseProtocol, StatusFlags,
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
         compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe, AuthContextRef,
         AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
-        SqlAuthService, StatusFlags,
+        SqlAuthService,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,

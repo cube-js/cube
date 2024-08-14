@@ -31,8 +31,8 @@ use log::warn;
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
-        find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
+        test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -1326,11 +1326,9 @@ pub fn transform_response<V: ValueObject>(
 mod tests {
     use super::*;
     use crate::{
-        compile::{
-            engine::df::wrapper::SqlQuery, DatabaseProtocol, DatabaseProtocolDetails, MetaContext,
-        },
+        compile::{engine::df::wrapper::SqlQuery, DatabaseProtocol, DatabaseProtocolDetails},
         sql::HttpAuthContext,
-        transport::SqlResponse,
+        transport::{MetaContext, SqlResponse},
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
