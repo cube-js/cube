@@ -31,11 +31,11 @@ function decorateRedisClient(client: RedisClient): AsyncRedisClient {
   return <AsyncRedisClient>client;
 }
 
-redis.Multi.prototype.execAsync = function execAsync() {
-  return new Promise((resolve, reject) => this.exec((err, res) => (
-    err ? reject(err) : resolve(res)
-  )));
-};
+// redis.Multi.prototype.execAsync = function execAsync() {
+//   return new Promise((resolve, reject) => this.exec((err, res) => (
+//     err ? reject(err) : resolve(res)
+//   )));
+// };
 
 export async function createRedisClient(url: string, opts: ClientOpts = {}) {
   const options: ClientOpts = {
