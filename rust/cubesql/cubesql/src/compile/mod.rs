@@ -26,15 +26,6 @@ pub use datafusion::{self, arrow};
 
 #[cfg(test)]
 mod tests {
-    use chrono::Datelike;
-    use cubeclient::models::{
-        V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
-        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
-    };
-    use pretty_assertions::assert_eq;
-    use regex::Regex;
-    use std::env;
-
     use super::{
         test::{get_test_session, get_test_tenant_ctx},
         *,
@@ -46,9 +37,19 @@ mod tests {
             test::{get_sixteen_char_member_cube, get_string_cube_meta},
         },
         config::ConfigObjImpl,
+        CubeError,
+    };
+    use chrono::Datelike;
+    use cubeclient::models::{
+        V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
+        V1LoadResponse, V1LoadResult, V1LoadResultAnnotation,
     };
     use datafusion::{arrow::datatypes::DataType, physical_plan::displayable};
+    use itertools::Itertools;
+    use pretty_assertions::assert_eq;
+    use regex::Regex;
     use serde_json::json;
+    use std::{env, sync::Arc};
 
     use crate::compile::test::{
         convert_select_to_query_plan, convert_select_to_query_plan_customized,

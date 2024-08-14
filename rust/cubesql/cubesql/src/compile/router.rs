@@ -51,7 +51,7 @@ use datafusion::{
         projection_drop_out::ProjectionDropOut,
         utils::from_plan,
     },
-    physical_plan::{planner::DefaultPhysicalPlanner, ExecutionPlan},
+    physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
     sql::{parser::Statement as DFStatement, planner::SqlToRel},
     variable::VarType,
