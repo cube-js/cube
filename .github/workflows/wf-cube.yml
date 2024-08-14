@@ -27,6 +27,6 @@ jobs:
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:
           repository: '${{ github.repository }}/cube'
-          tag: 'latest'
+          tag: 'transai-latest'
           context: ./
           dockerfile: ./packages/cubejs-docker/transai.Dockerfile
