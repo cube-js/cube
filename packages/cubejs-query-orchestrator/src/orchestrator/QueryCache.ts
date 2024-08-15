@@ -995,7 +995,7 @@ export class QueryCache {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           const newRes = await fetchNew();
           this.emitEventWhenUpdatedUpdated(parsedResult.result, newRes, options);
-          return res;
+          return newRes;
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           fetchNew()
