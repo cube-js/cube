@@ -8,17 +8,14 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 
-use super::{
-    database_variables::DatabaseVariables, server_manager::ServerManager,
-    session_manager::SessionManager, AuthContextRef,
-};
+use super::{server_manager::ServerManager, session_manager::SessionManager, AuthContextRef};
 use crate::{
-    compile::{DatabaseProtocol, DatabaseProtocolDetails},
+    compile::{
+        DatabaseProtocol, DatabaseProtocolDetails, DatabaseVariable, DatabaseVariables,
+        DatabaseVariablesToUpdate,
+    },
     sql::{
-        database_variables::{
-            mysql_default_session_variables, postgres_default_session_variables, DatabaseVariable,
-            DatabaseVariablesToUpdate,
-        },
+        database_variables::{mysql_default_session_variables, postgres_default_session_variables},
         extended::PreparedStatement,
         temp_tables::TempTableManager,
     },
@@ -328,10 +325,7 @@ impl SessionState {
             _ => match &self.protocol {
                 DatabaseProtocol::MySQL => return MYSQL_DEFAULT_VARIABLES.clone(),
                 DatabaseProtocol::PostgreSQL => return POSTGRES_DEFAULT_VARIABLES.clone(),
-                DatabaseProtocol::Extension(ext) => unimplemented!(
-                    "Session.all_variables is not implemented for custom protocol: {:?}",
-                    ext
-                ),
+                DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
             },
         }
     }
@@ -349,10 +343,7 @@ impl SessionState {
                 DatabaseProtocol::PostgreSQL => {
                     POSTGRES_DEFAULT_VARIABLES.get(name).map(|v| v.clone())
                 }
-                DatabaseProtocol::Extension(ext) => unimplemented!(
-                    "Session.get_variable is not implemented for custom protocol: {:?}",
-                    ext
-                ),
+                DatabaseProtocol::Extension(ext) => ext.get_session_variable_default(name),
             },
         }
     }

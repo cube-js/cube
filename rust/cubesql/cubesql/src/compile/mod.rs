@@ -11,6 +11,7 @@ pub mod query_engine;
 pub mod rewrite;
 pub mod router;
 pub mod service;
+pub mod session;
 
 // Internal API
 pub mod test;
@@ -22,6 +23,7 @@ pub use protocol::*;
 pub use query_engine::*;
 pub use rewrite::rewriter::Rewriter;
 pub use router::*;
+pub use session::*;
 
 // Re-export base deps to minimise version maintenance for crate users such as cloud
 pub use datafusion::{self, arrow};
