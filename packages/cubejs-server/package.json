@@ -40,6 +40,7 @@
     "jest:shapshot": "jest --updateSnapshot test"
   },
   "dependencies": {
+    "@cubejs-backend/api-gateway": "file:../cubejs-api-gateway",
     "@cubejs-backend/cubestore-driver": "^0.35.68",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/native": "^0.35.70",
