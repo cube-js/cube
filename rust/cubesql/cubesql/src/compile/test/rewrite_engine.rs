@@ -6,10 +6,9 @@ use datafusion::{
 };
 use egg::Rewrite;
 
-use super::{get_test_session, get_test_tenant_ctx};
+use super::get_test_session;
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         parser::parse_sql_to_statement,
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -17,24 +16,27 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, QueryPlanner,
+        rewrite_statement, CubeContext, DatabaseProtocol, QueryPlanner,
     },
     config::{ConfigObj, ConfigObjImpl},
-    sql::session::DatabaseProtocol,
+    transport::MetaContext,
 };
 
-pub async fn cube_context() -> CubeContext {
-    let meta = get_test_tenant_ctx();
+pub async fn cube_context(meta: Arc<MetaContext>) -> CubeContext {
     let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
-    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
+    let planner = QueryPlanner::new(
+        session.state.clone(),
+        meta.clone(),
+        session.session_manager.clone(),
+    );
     let ctx = planner.create_execution_ctx();
     let df_state = Arc::new(ctx.state.write().clone());
 
     CubeContext::new(
         df_state,
-        planner.meta.clone(),
-        planner.session_manager.clone(),
-        planner.state.clone(),
+        meta.clone(),
+        session.session_manager.clone(),
+        session.state.clone(),
     )
 }
 

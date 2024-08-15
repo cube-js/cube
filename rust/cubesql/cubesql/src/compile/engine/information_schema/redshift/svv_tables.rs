@@ -1,7 +1,7 @@
 use std::{any::Any, sync::Arc};
 
+use crate::transport::CubeMeta;
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder},
@@ -68,7 +68,7 @@ pub struct RedshiftSvvTablesTableProvider {
 }
 
 impl RedshiftSvvTablesTableProvider {
-    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<CubeMeta>) -> Self {
         let mut builder = RedshiftSvvTablesBuilder::new(cubes.len());
 
         for cube in cubes {

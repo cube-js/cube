@@ -1,6 +1,8 @@
 use crate::{
-    compile::test::{execute_query, init_testing_logger},
-    sql::DatabaseProtocol,
+    compile::{
+        test::{execute_query, init_testing_logger},
+        DatabaseProtocol,
+    },
     CubeError,
 };
 

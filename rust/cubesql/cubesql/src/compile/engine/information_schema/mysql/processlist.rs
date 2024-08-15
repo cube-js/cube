@@ -16,7 +16,7 @@ use datafusion::{
 use crate::sql::{SessionManager, SessionProcessList};
 
 use super::utils::new_string_array_with_placeholder;
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 
 struct InformationSchemaProcesslistBuilder {
     id: UInt32Builder,

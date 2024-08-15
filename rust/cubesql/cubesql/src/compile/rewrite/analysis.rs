@@ -1,6 +1,5 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
@@ -10,6 +9,7 @@ use crate::{
             TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
             TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
+        CubeContext,
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var_iter, var_list_iter, CubeError,

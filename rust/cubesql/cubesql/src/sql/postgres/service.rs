@@ -8,8 +8,9 @@ use tokio::{
 use tokio_util::sync::CancellationToken;
 
 use crate::{
+    compile::DatabaseProtocol,
     config::processing_loop::{ProcessingLoop, ShutdownMode},
-    sql::{session::DatabaseProtocol, SessionManager},
+    sql::SessionManager,
     telemetry::{ContextLogger, SessionLogger},
     CubeError,
 };
