@@ -1,14 +1,14 @@
 use itertools::Itertools;
 
 use super::{Expr, From, OrderBy};
-use crate::planner::BaseField;
+use crate::planner::IndexedMember;
 use std::fmt;
 use std::rc::Rc;
 
 pub struct Select {
     pub projection: Vec<Expr>,
     pub from: From,
-    pub group_by: Vec<Rc<dyn BaseField>>,
+    pub group_by: Vec<Rc<dyn IndexedMember>>,
     pub order_by: Vec<OrderBy>,
 }
 

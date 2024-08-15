@@ -1,7 +1,9 @@
 use super::query_tools::QueryTools;
-use super::BaseField;
+use super::sql_evaluator::{MeasureEvaluator, MemberEvaluator};
+use super::{BaseMember, IndexedMember};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::utils::escape_column_name;
+use crate::cube_bridge::measure_definition::MeasureDefinition;
+use crate::cube_bridge::memeber_sql::MemberSql;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -9,26 +11,40 @@ use std::rc::Rc;
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
+    definition: Rc<dyn MeasureDefinition>,
+    member_evaluator: Rc<MeasureEvaluator>,
     index: usize,
 }
 
-impl BaseField for BaseMeasure {
+impl BaseMember for BaseMeasure {
     fn to_sql(&self) -> Result<String, CubeError> {
         self.sql()
     }
+}
 
+impl IndexedMember for BaseMeasure {
     fn index(&self) -> usize {
         self.index
     }
 }
 
 impl BaseMeasure {
-    pub fn new(measure: String, query_tools: Rc<QueryTools>, index: usize) -> Rc<Self> {
-        Rc::new(Self {
+    pub fn try_new(
+        measure: String,
+        query_tools: Rc<QueryTools>,
+        member_evaluator: Rc<MeasureEvaluator>,
+        index: usize,
+    ) -> Result<Rc<Self>, CubeError> {
+        let definition = query_tools
+            .cube_evaluator()
+            .measure_by_path(measure.clone())?;
+        Ok(Rc::new(Self {
             measure,
             query_tools,
+            definition,
+            member_evaluator,
             index,
-        })
+        }))
     }
 
     pub fn to_sql(&self) -> Result<String, CubeError> {
@@ -44,38 +60,18 @@ impl BaseMeasure {
     }
 
     fn sql(&self) -> Result<String, CubeError> {
-        let path = self.path()?;
-        let cube_name = &path[0];
-        let primary_keys = self
-            .query_tools
-            .cube_evaluator()
-            .static_data()
-            .primary_keys
-            .get(cube_name)
-            .unwrap();
-        let primary_key = primary_keys.first().unwrap();
-        let pk_sql = self.primary_key_sql(primary_key, cube_name)?;
+        let sql = self.member_evaluator.eveluate(self.query_tools.clone())?;
 
-        let measure_definition = self
-            .query_tools
-            .cube_evaluator()
-            .measure_by_path(self.measure.clone())?;
+        let measure_type = &self.definition.static_data().measure_type;
+        let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);
 
-        let measure_type = &measure_definition.static_data().measure_type;
-        let alias_name = escape_column_name(&self.alias_name()?);
-
-        Ok(format!("{}({}) {}", measure_type, pk_sql, alias_name))
+        Ok(format!("{} {}", sql, alias_name))
     }
 
     fn path(&self) -> Result<Vec<String>, CubeError> {
         self.query_tools
             .cube_evaluator()
             .parse_path("measures".to_string(), self.measure.clone())
-    }
-
-    //FIXME should be moved out from here
-    fn primary_key_sql(&self, key_name: &String, cube_name: &String) -> Result<String, CubeError> {
-        Ok(format!("{}.{}", escape_column_name(&cube_name), key_name))
     }
 
     fn alias_name(&self) -> Result<String, CubeError> {

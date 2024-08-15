@@ -86,7 +86,7 @@ export class CubeEvaluator extends CubeSymbols {
     for (const cube of validCubes) {
       this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
     }
-    
+
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -128,21 +128,21 @@ export class CubeEvaluator extends CubeSymbols {
     if (cube.isView && (cube.includedMembers || []).length) {
       const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
       const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
-      
+
       if (!cube.hierarchies) {
         for (const cubeName of includedCubeNames) {
           const { hierarchies } = this.evaluatedCubes[cubeName] || {};
-  
+
           if (Array.isArray(hierarchies) && hierarchies.length) {
             const filteredHierarchies = hierarchies.map(it => {
               const levels = it.levels.filter(level => includedMemberPaths.includes(level));
-  
+
               return {
                 ...it,
                 levels
               };
             }).filter(it => it.levels.length);
-  
+
             cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
           }
         }
@@ -415,15 +415,15 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   public isMeasure(measurePath: string): boolean {
-    return this.isInstanceOfType('measures', measurePath);
+    return this.isInstanceOfType('measures', measurePath) !== undefined;
   }
 
   public isDimension(path: string): boolean {
-    return this.isInstanceOfType('dimensions', path);
+    return this.isInstanceOfType('dimensions', path) !== undefined;
   }
 
   public isSegment(path: string): boolean {
-    return this.isInstanceOfType('segments', path);
+    return this.isInstanceOfType('segments', path) !== undefined;
   }
 
   public measureByPath(measurePath: string): MeasureDefinition {

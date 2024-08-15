@@ -1,9 +1,9 @@
-use crate::planner::BaseField;
+use crate::planner::IndexedMember;
 use std::fmt;
 use std::rc::Rc;
 
 pub enum Expr {
-    Field(Rc<dyn BaseField>),
+    Field(Rc<dyn IndexedMember>),
 }
 
 impl fmt::Display for Expr {

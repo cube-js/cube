@@ -1,5 +1,6 @@
 use super::query_tools::QueryTools;
-use super::{BaseCube, BaseDimension, BaseField, BaseMeasure, BaseTimeDimension};
+use super::sql_evaluator::Compiler;
+use super::{BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, IndexedMember};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::plan::{Expr, From, GenerationPlan, OrderBy, Select};
@@ -14,6 +15,7 @@ use std::rc::Rc;
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
     query_tools: Rc<QueryTools>,
+    evaluator_compiler: Rc<Compiler>,
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
@@ -26,14 +28,23 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
         let query_tools = QueryTools::new(options.cube_evaluator()?, options.base_tools()?);
+        let mut evaluator_compiler = Compiler::new(query_tools.cube_evaluator().clone());
 
         let mut base_index = 1;
         let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
             dimensions
                 .iter()
                 .enumerate()
-                .map(|(i, d)| BaseDimension::new(d.clone(), query_tools.clone(), i + base_index))
-                .collect::<Vec<_>>()
+                .map(|(i, d)| {
+                    let evaluator = evaluator_compiler.add_dimension_evaluator(d.clone())?;
+                    BaseDimension::try_new(
+                        d.clone(),
+                        query_tools.clone(),
+                        evaluator,
+                        i + base_index,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Vec::new()
         };
@@ -46,15 +57,18 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 .iter()
                 .enumerate()
                 .map(|(i, d)| {
-                    BaseTimeDimension::new(
+                    let evaluator =
+                        evaluator_compiler.add_dimension_evaluator(d.dimension.clone())?;
+                    BaseTimeDimension::try_new(
                         d.dimension.clone(),
                         query_tools.clone(),
+                        evaluator,
                         d.granularity.clone(),
                         d.date_range.clone(),
                         i + base_index,
                     )
                 })
-                .collect::<Vec<_>>()
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Vec::new()
         };
@@ -65,8 +79,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             measures
                 .iter()
                 .enumerate()
-                .map(|(i, m)| BaseMeasure::new(m.clone(), query_tools.clone(), i + base_index))
-                .collect::<Vec<_>>()
+                .map(|(i, m)| {
+                    let evaluator = evaluator_compiler.add_measure_evaluator(m.clone())?;
+                    BaseMeasure::try_new(m.clone(), query_tools.clone(), evaluator, i + base_index)
+                })
+                .collect::<Result<Vec<_>, _>>()?
         } else {
             Vec::new()
         };
@@ -74,6 +91,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(Self {
             context,
             query_tools,
+            evaluator_compiler: Rc::new(evaluator_compiler),
             measures,
             dimensions,
             time_dimensions,
@@ -112,14 +130,14 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(GenerationPlan::Select(select))
     }
 
-    fn group_by(&self) -> Vec<Rc<dyn BaseField>> {
+    fn group_by(&self) -> Vec<Rc<dyn IndexedMember>> {
         self.dimensions
             .iter()
-            .map(|f| -> Rc<dyn BaseField> { f.clone() })
+            .map(|f| -> Rc<dyn IndexedMember> { f.clone() })
             .chain(
                 self.time_dimensions
                     .iter()
-                    .map(|f| -> Rc<dyn BaseField> { f.clone() }),
+                    .map(|f| -> Rc<dyn IndexedMember> { f.clone() }),
             )
             .collect()
     }
@@ -137,7 +155,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             .query_tools
             .cube_evaluator()
             .cube_from_path(cube_path)?;
-        Ok(BaseCube::new(eval, def))
+        Ok(BaseCube::new(eval, def, self.query_tools.clone()))
     }
 
     fn default_order(&self) -> Vec<OrderBy> {

@@ -11,7 +11,7 @@ interface CreateCubeSchemaOptions {
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cube('${name}', {
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
@@ -35,6 +35,10 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           min: {
             sql: \`amount\`,
             type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
           }
         },
 
@@ -47,6 +51,14 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           type: {
             type: 'string',
             sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE}.type\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
           },
           createdAt: {
             type: 'time',
@@ -67,7 +79,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         preAggregations: {
             ${preAggregations}
         }
-      }) 
+      })
   `;
 }
 
@@ -81,11 +93,11 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
 }
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}
-    
+
         measures:
           - name: count
             type: count

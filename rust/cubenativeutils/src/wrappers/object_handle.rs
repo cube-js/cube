@@ -23,6 +23,9 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     pub fn into_struct(self) -> Result<IT::Struct, CubeError> {
         self.object.into_struct()
     }
+    pub fn into_function(self) -> Result<IT::Function, CubeError> {
+        self.object.into_function()
+    }
     pub fn into_array(self) -> Result<IT::Array, CubeError> {
         self.object.into_array()
     }
@@ -37,6 +40,9 @@ impl<IT: InnerTypes> NativeObjectHandle<IT> {
     }
     pub fn to_struct(&self) -> Result<IT::Struct, CubeError> {
         self.object.clone().into_struct()
+    }
+    pub fn to_function(&self) -> Result<IT::Function, CubeError> {
+        self.object.clone().into_function()
     }
     pub fn to_array(&self) -> Result<IT::Array, CubeError> {
         self.object.clone().into_array()

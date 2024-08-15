@@ -1,3 +1,4 @@
+use super::memeber_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -5,6 +6,7 @@ use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
+use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MeasureDefinitionStatic {
@@ -15,7 +17,9 @@ pub struct MeasureDefinitionStatic {
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]
 pub trait MeasureDefinition {
-    fn sql(&self) -> Result<String, CubeError>;
+    #[optional]
+    #[field]
+    fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }
 
 /*

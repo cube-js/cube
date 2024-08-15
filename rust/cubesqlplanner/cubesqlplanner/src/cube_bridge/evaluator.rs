@@ -29,4 +29,6 @@ pub trait CubeEvaluator {
         measure_path: String,
     ) -> Result<Rc<dyn DimensionDefinition>, CubeError>;
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
+    fn is_measure(&self, path: Vec<String>) -> Result<bool, CubeError>;
+    fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
 }

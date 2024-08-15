@@ -1,9 +1,11 @@
 pub mod base_types;
 pub mod neon_array;
+pub mod neon_function;
 pub mod neon_struct;
 
 use self::base_types::{NeonBoolean, NeonNumber, NeonString};
 use self::neon_array::NeonArray;
+use self::neon_function::NeonFunction;
 use self::neon_struct::NeonStruct;
 use super::inner_types::NeonInnerTypes;
 use crate::wrappers::neon::context::ContextHolder;
@@ -71,6 +73,14 @@ impl<'cx: 'static, C: Context<'cx> + 'cx> NativeObject<NeonInnerTypes<'cx, C>>
             )));
         }
         Ok(NeonStruct::new(self))
+    }
+    fn into_function(self) -> Result<NeonFunction<'cx, C>, CubeError> {
+        if !self.is_a::<JsFunction>() {
+            return Err(CubeError::internal(format!(
+                "NeonObject is not the JsFunction"
+            )));
+        }
+        Ok(NeonFunction::new(self))
     }
     fn into_array(self) -> Result<NeonArray<'cx, C>, CubeError> {
         if !self.is_a::<JsArray>() {
