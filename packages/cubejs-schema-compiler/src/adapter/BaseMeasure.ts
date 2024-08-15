@@ -176,7 +176,7 @@ export class BaseMeasure {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
-  public granularityFromInterval(interval) {
+  public granularityFromInterval(interval: string) {
     if (!interval) {
       return undefined;
     }

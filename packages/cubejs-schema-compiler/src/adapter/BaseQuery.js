@@ -16,7 +16,6 @@ import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, g
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
 } from '@cubejs-backend/native';
-import { eventNames } from 'process';
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseDimension } from './BaseDimension';
@@ -716,20 +715,52 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * @param {string} date
+   * @param {string} interval
+   * @returns {string}
+   */
   subtractInterval(date, interval) {
     return `${date} - interval '${interval}'`;
   }
 
+  /**
+   * @param {string} date
+   * @param {string} interval
+   * @returns {string}
+   */
   addInterval(date, interval) {
     return `${date} + interval '${interval}'`;
   }
 
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
   addTimestampInterval(timestamp, interval) {
     return this.addInterval(timestamp, interval);
   }
 
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
   subtractTimestampInterval(timestamp, interval) {
     return this.subtractInterval(timestamp, interval);
+  }
+
+  /**
+   * @param {string} stride (a value expression of type interval)
+   * @param {string} source (a value expression of type timestamp/date)
+   * @param {string} origin (a value expression of type timestamp/date)
+   * @returns {string}
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dateBin(stride, source, origin) {
+    throw new Error('Not implemented');
+    // Different syntax possible in different DBs
   }
 
   cumulativeMeasures() {
@@ -2868,6 +2899,14 @@ export class BaseQuery {
 
   nowTimestampSql() {
     return 'NOW()';
+  }
+
+  /**
+   * @returns {string}
+   */
+  startOfTheYearTimestampSql() {
+    // different DBs have different way of getting this
+    throw new Error('Not implemented');
   }
 
   unixTimestampSql() {

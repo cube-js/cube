@@ -15,6 +15,12 @@ export class BaseTimeDimension extends BaseFilter {
 
   public readonly baseGranularity: string | undefined;
 
+  public readonly leadingWindowPart: string | undefined;
+
+  public readonly trailingWindowPart: string | undefined;
+
+  public readonly binStride: { num: number, type: string } | undefined;
+
   public readonly granularitySql: Function | undefined;
 
   public readonly boundaryDateRange: any;
@@ -40,6 +46,18 @@ export class BaseTimeDimension extends BaseFilter {
 
       this.baseGranularity = customGranularity?.baseGranularity;
       this.granularitySql = customGranularity?.sql;
+      this.leadingWindowPart = customGranularity?.leading;
+      this.trailingWindowPart = customGranularity?.trailing;
+      if (customGranularity?.bin) {
+        // XXX: Potentially to use BaseQuery#parseInterval?
+        // But it's protected and expects duration to be specified, so no "bin: year" will be possible
+        const v = customGranularity.bin.trim().split(' ');
+        if (v.length === 1) {
+          this.binStride = { num: 1, type: v[0] };
+        } else {
+          this.binStride = { num: parseInt(v[0], 10), type: v[1] };
+        }
+      }
     }
     this.boundaryDateRange = timeDimension.boundaryDateRange;
     this.shiftInterval = timeDimension.shiftInterval;
@@ -105,7 +123,7 @@ export class BaseTimeDimension extends BaseFilter {
       if (this.isPredefined || !this.granularity) {
         return this.query.timeGroupedColumn(granularity, this.query.dimensionSql(this));
       } else {
-        return this.query.dimensionGranularitySql(this);
+        return this.dimensionGranularitySql();
       }
     }
 
@@ -136,7 +154,69 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public granularityConvertedToTz() {
-    return this.query.convertTz(`(${this.query.dimensionGranularitySql(this)})`);
+    return this.query.convertTz(`(${this.dimensionGranularitySql()})`);
+  }
+
+  public dimensionGranularitySql() {
+    if (this.granularitySql) { // Need to evaluate symbol's SQL
+      return this.query.dimensionGranularitySql(this);
+    }
+
+    let dtDate = this.query.dimensionSql(this);
+
+    // Need to construct SQL
+    if (this.binStride?.num === 1) { // range is aligned with natural calendar, so we can use DATE_TRUNC
+      if (this.leadingWindowPart) {
+        // Example: DATE_TRUNC('granularity', dimension - INTERVAL 'xxxx') + INTERVAL 'xxxx'
+        dtDate = this.query.subtractInterval(dtDate, this.leadingWindowPart);
+        dtDate = this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
+        dtDate = this.query.addInterval(dtDate, this.leadingWindowPart);
+
+        return dtDate;
+      } else if (this.trailingWindowPart) {
+        // Example: DATE_TRUNC('granularity', dimension + INTERVAL 'xxxx') - INTERVAL 'xxxx'
+        dtDate = this.query.addInterval(dtDate, this.trailingWindowPart);
+        dtDate = this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
+        dtDate = this.query.subtractInterval(dtDate, this.trailingWindowPart);
+
+        return dtDate;
+      }
+
+      // No window offsets
+      return this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
+    }
+
+    // need to use DATE_BIN
+    let origin = this.query.startOfTheYearTimestampSql();
+    if (this.leadingWindowPart) {
+      origin = this.query.addInterval(origin, this.leadingWindowPart);
+    } else if (this.trailingWindowPart) {
+      origin = this.query.subtractInterval(origin, this.trailingWindowPart);
+    }
+
+    return this.query.dateBin(`${this.binStride?.num} ${this.binStride?.type}`, dtDate, origin);
+  }
+
+  public granularityFromInterval(interval: string) {
+    if (!interval) {
+      return undefined;
+    }
+    if (interval.match(/day/)) {
+      return 'day';
+    } else if (interval.match(/month/)) {
+      return 'month';
+    } else if (interval.match(/year/)) {
+      return 'year';
+    } else if (interval.match(/week/)) {
+      return 'week';
+    } else if (interval.match(/hour/)) {
+      return 'hour';
+    } else if (interval.match(/minute/)) {
+      return 'minute';
+    } else if (interval.match(/second/)) {
+      return 'second';
+    }
+    return undefined;
   }
 
   public filterToWhere() {
