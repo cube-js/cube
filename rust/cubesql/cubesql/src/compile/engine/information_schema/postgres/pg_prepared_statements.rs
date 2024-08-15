@@ -51,7 +51,7 @@ impl PgPreparedStatementsBuilder {
             for param in parameters {
                 self.parameter_types
                     .values()
-                    .append_value(param.clone() as i32)
+                    .append_value(*param as i32)
                     .unwrap();
             }
         }
