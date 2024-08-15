@@ -42,11 +42,14 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
+const BaseGranularity = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year');
+const GranularityStep = Joi.string().pattern(/^(\d+\s+)?(second|minute|hour|day|week|month|year)s?(\s\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity step');
+
 const regexTimeInterval = Joi.string().custom((value, helper) => {
-  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/)) {
+  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)s?$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)s?$/` });
   }
 });
 
@@ -105,10 +108,19 @@ const BaseDimensionWithoutSubQuery = {
   granularities: Joi.when('type', {
     is: 'time',
     then: Joi.object().pattern(identifierRegex,
-      Joi.object().keys({
-        sql: Joi.func().required(),
-        baseGranularity: Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').optional(),
-      })).optional(),
+      Joi.alternatives([
+        Joi.object().keys({
+          sql: Joi.func().required(),
+          baseGranularity: BaseGranularity.optional(),
+        }),
+        Joi.object().keys({
+          leading: GranularityStep,
+          trailing: GranularityStep,
+          bin: GranularityStep.required(),
+          baseGranularity: BaseGranularity.optional(),
+        })
+          .oxor('leading', 'trailing')
+      ])).optional(),
     otherwise: Joi.forbidden()
   })
 };
