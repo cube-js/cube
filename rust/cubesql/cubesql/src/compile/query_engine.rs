@@ -295,8 +295,6 @@ pub trait QueryEngine {
 }
 
 pub struct SqlQueryEngine {
-    // state: Arc<SessionState>,
-    // meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
 }
 
