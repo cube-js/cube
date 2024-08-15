@@ -1,20 +1,23 @@
+use super::query_tools::QueryTools;
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::utils::escape_column_name;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub struct BaseCube {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     cube_definition: Rc<dyn CubeDefinition>,
+    query_tools: Rc<QueryTools>,
 }
 impl BaseCube {
     pub fn new(
         cube_evaluator: Rc<dyn CubeEvaluator>,
         cube_definition: Rc<dyn CubeDefinition>,
+        query_tools: Rc<QueryTools>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_evaluator,
             cube_definition,
+            query_tools,
         })
     }
 
@@ -27,6 +30,8 @@ impl BaseCube {
     }
 
     fn cube_alias(&self) -> Result<String, CubeError> {
-        Ok(escape_column_name(&self.cube_definition.static_data().name))
+        Ok(self
+            .query_tools
+            .escape_column_name(&self.cube_definition.static_data().name))
     }
 }

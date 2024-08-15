@@ -1,6 +1,7 @@
 use super::inner_types::InnerTypes;
 use super::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
+use regex::Regex;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {
     fn get_context(&self) -> IT::Context;
@@ -10,6 +11,7 @@ pub trait NativeObject<IT: InnerTypes>: Clone {
     fn into_string(self) -> Result<IT::String, CubeError>;
     fn into_number(self) -> Result<IT::Number, CubeError>;
     fn into_boolean(self) -> Result<IT::Boolean, CubeError>;
+    fn into_function(self) -> Result<IT::Function, CubeError>;
     fn is_null(&self) -> bool;
     fn is_undefined(&self) -> bool;
 }
@@ -29,6 +31,7 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     fn get_field(&self, field_name: &str) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn set_field(&self, field_name: &str, value: NativeObjectHandle<IT>)
         -> Result<bool, CubeError>;
+    fn has_field(&self, field_name: &str) -> Result<bool, CubeError>;
     fn get_own_property_names(&self) -> Result<Vec<NativeObjectHandle<IT>>, CubeError>;
 
     fn call_method(
@@ -38,9 +41,11 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
-/* pub trait NativeFunction<IT: InnerTypes> {
+pub trait NativeFunction<IT: InnerTypes> {
     fn call(&self, args: Vec<NativeObjectHandle<IT>>) -> Result<NativeObjectHandle<IT>, CubeError>;
-} */
+    fn definition(&self) -> Result<String, CubeError>;
+    fn args_names(&self) -> Result<Vec<String>, CubeError>;
+}
 
 pub trait NativeString<IT: InnerTypes>: NativeType<IT> {
     fn value(&self) -> Result<String, CubeError>;

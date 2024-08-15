@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
+use super::sql_evaluator::DimensionEvaluator;
 use super::BaseDimension;
-use super::BaseField;
-use crate::planner::utils::escape_column_name;
+use super::{BaseMember, IndexedMember};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -12,30 +12,38 @@ pub struct BaseTimeDimension {
     date_range: Vec<String>,
 }
 
-impl BaseField for BaseTimeDimension {
+impl BaseMember for BaseTimeDimension {
     fn to_sql(&self) -> Result<String, CubeError> {
         self.sql()
     }
+}
 
+impl IndexedMember for BaseTimeDimension {
     fn index(&self) -> usize {
         self.dimension.index()
     }
 }
 
 impl BaseTimeDimension {
-    pub fn new(
+    pub fn try_new(
         dimension: String,
         query_tools: Rc<QueryTools>,
+        member_evaluator: Rc<DimensionEvaluator>,
         granularity: Option<String>,
         date_range: Vec<String>,
         index: usize,
-    ) -> Rc<Self> {
-        Rc::new(Self {
-            dimension: BaseDimension::new(dimension, query_tools.clone(), index),
+    ) -> Result<Rc<Self>, CubeError> {
+        Ok(Rc::new(Self {
+            dimension: BaseDimension::try_new(
+                dimension,
+                query_tools.clone(),
+                member_evaluator,
+                index,
+            )?,
             query_tools,
             granularity,
             date_range,
-        })
+        }))
     }
 
     pub fn get_granularity(&self) -> Option<String> {
@@ -58,7 +66,7 @@ impl BaseTimeDimension {
         self.dimension.index()
     }
 
-    //FIXME May be should be part of BaseField Trait
+    //FIXME May be should be part of BaseMember Trait
     pub fn alias_name(&self) -> Result<String, CubeError> {
         let granularity = if let Some(granularity) = &self.granularity {
             granularity
@@ -71,7 +79,7 @@ impl BaseTimeDimension {
     }
 
     fn sql(&self) -> Result<String, CubeError> {
-        let alias_name = escape_column_name(&self.alias_name()?);
+        let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);
 
         let field_sql = if let Some(granularity) = &self.granularity {
             self.query_tools

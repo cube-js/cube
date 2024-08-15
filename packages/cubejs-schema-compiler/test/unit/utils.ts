@@ -38,6 +38,10 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           min: {
             sql: \`amount\`,
             type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
           }
         },
 
@@ -51,6 +55,14 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           type: {
             type: 'string',
             sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE}.type\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
           },
           createdAt: {
             type: 'time',

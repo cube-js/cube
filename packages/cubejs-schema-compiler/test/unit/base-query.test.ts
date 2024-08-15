@@ -43,7 +43,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query - measures', async () => {
+    it('Simple query - count measure', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -56,6 +56,25 @@ describe('SQL Generation', () => {
       const queryAndParams = query.buildSqlAndParams();
       const expected = 'SELECT\n' +
           '      count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+
+    it('Simple query - sum measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.sum'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      sum("cards".amount) "cards__sum"\n' +
           '    FROM\n' +
           '      card_tbl AS "cards" ';
       expect(queryAndParams[0]).toContain('card_tbl');
@@ -103,10 +122,48 @@ describe('SQL Generation', () => {
         filters: [],
       });
 
-      const queryAndParams = query.buildSqlAndParamsTest();
+      const queryAndParams = query.buildSqlAndParams();
+
       expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
       expect(queryAndParams[0]).toContain('ORDER BY 2');
+    });
+    it('Simple query - complex measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - complex dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_complex'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          `      CONCAT("cards".type, ' ', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n` +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
     });
   });
 

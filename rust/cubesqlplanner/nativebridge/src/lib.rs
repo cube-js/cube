@@ -4,9 +4,10 @@ use proc_macro2::Ident;
 use quote::{format_ident, quote, ToTokens};
 use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
+use syn::token::Colon2;
 use syn::{
     parse_macro_input, punctuated::Punctuated, FnArg, Item, Meta, Pat, Path, PathArguments,
-    ReturnType, TraitItem, TraitItemMethod, Type,
+    PathSegment, ReturnType, TraitItem, TraitItemMethod, Type,
 };
 #[proc_macro_attribute]
 pub fn native_bridge(args: TokenStream, input: TokenStream) -> proc_macro::TokenStream {
@@ -34,6 +35,20 @@ enum NativeMethodType {
     Getter,
 }
 
+struct NativeMethodParams {
+    pub method_type: NativeMethodType,
+    pub is_optional: bool,
+}
+
+impl Default for NativeMethodParams {
+    fn default() -> Self {
+        Self {
+            method_type: NativeMethodType::Call,
+            is_optional: false,
+        }
+    }
+}
+
 struct NativeOutputParams {
     type_path: Path,
     dynamic_container_path: Option<Path>,
@@ -41,11 +56,10 @@ struct NativeOutputParams {
 
 struct NativeMethod {
     ident: Ident,
-    asyncness: bool,
     args: Vec<FnArg>,
     output: ReturnType,
     output_params: NativeOutputParams,
-    method_type: NativeMethodType,
+    method_params: NativeMethodParams,
 }
 
 impl Parse for NativeService {
@@ -57,17 +71,20 @@ impl Parse for NativeService {
                     .items
                     .iter()
                     .filter_map(|item| match item {
-                        TraitItem::Method(method_item) => Some(NativeMethod {
-                            ident: method_item.sig.ident.clone(),
-                            args: method_item.sig.inputs.iter().cloned().collect::<Vec<_>>(),
-                            output: method_item.sig.output.clone(),
-                            output_params: Self::get_output_for_deserializer(
-                                &method_item.sig.output,
-                            )
-                            .unwrap(),
-                            asyncness: method_item.sig.asyncness.is_some(),
-                            method_type: Self::parse_method_type(method_item),
-                        }),
+                        TraitItem::Method(method_item) => {
+                            let method_params = Self::parse_method_params(method_item);
+                            Some(NativeMethod {
+                                ident: method_item.sig.ident.clone(),
+                                args: method_item.sig.inputs.iter().cloned().collect::<Vec<_>>(),
+                                output: method_item.sig.output.clone(),
+                                output_params: Self::get_output_for_deserializer(
+                                    &method_item.sig.output,
+                                    method_params.is_optional,
+                                )
+                                .unwrap(),
+                                method_params,
+                            })
+                        }
                         _ => None,
                     })
                     .collect::<Vec<_>>();
@@ -89,48 +106,123 @@ impl Parse for NativeService {
 }
 
 impl NativeService {
-    fn parse_method_type(method_item: &TraitItemMethod) -> NativeMethodType {
-        if method_item.attrs.len() == 1 {
+    fn parse_method_params(method_item: &TraitItemMethod) -> NativeMethodParams {
+        let mut method_params = NativeMethodParams::default();
+
+        if method_item.attrs.len() > 0 {
             let attr = method_item.attrs.first().unwrap();
-            let ident = attr.path.segments.last().unwrap().ident.clone();
-            if ident.to_string() == "field" {
-                NativeMethodType::Getter
-            } else {
-                NativeMethodType::Call
+            for attr in method_item.attrs.iter() {
+                let seg = attr.path.segments.last().unwrap();
+                match seg.ident.to_string().as_str() {
+                    "optional" => {
+                        method_params.is_optional = true;
+                    }
+                    "field" => {
+                        method_params.method_type = NativeMethodType::Getter;
+                    }
+                    _ => {}
+                }
             }
-        } else {
-            NativeMethodType::Call
         }
+        method_params
     }
-    fn get_output_for_deserializer(tp: &ReturnType) -> syn::Result<NativeOutputParams> {
+    fn get_output_for_deserializer(
+        tp: &ReturnType,
+        optional: bool,
+    ) -> syn::Result<NativeOutputParams> {
+        let expected_type = if optional {
+            "Result<_>"
+        } else {
+            "Result<Option<_>>"
+        };
         let s = match tp {
             ReturnType::Default => Err(syn::Error::new(
                 tp.span(),
-                "Return type should be Result<_>",
+                format!("Return type should be {}", expected_type),
             )),
             ReturnType::Type(_, tt) => match tt.as_ref() {
                 syn::Type::Path(tp) => {
                     let segs = &tp.path.segments;
-                    let seg = segs.last().ok_or(syn::Error::new(
-                        tp.span(),
-                        "Return type should be Result<_>",
-                    ))?;
-                    if seg.ident.to_string() != "Result" {
-                        return Err(syn::Error::new(
-                            tp.span(),
-                            "Return type should be Result<_>",
-                        ));
-                    }
-                    let args = &seg.arguments;
-                    Self::get_type_for_deserialize_from_result_args(args)
+                    Self::get_deserializer_output_for_result(segs, optional)
+                    /* if optional {
+                        Self::get_deserializer_output_for_optional_call(segs)
+                    } else {
+                        Self::get_deserializer_output_for_regular_call(segs)
+                    } */
                 }
                 _ => Err(syn::Error::new(
                     tp.span(),
-                    "Return type should be Result<_>",
+                    format!("Return type should be {}", expected_type),
                 )),
             },
         };
         s
+    }
+
+    fn get_deserializer_output_for_result(
+        segs: &Punctuated<PathSegment, Colon2>,
+        optional: bool,
+    ) -> syn::Result<NativeOutputParams> {
+        let seg = segs.last().ok_or(syn::Error::new(
+            segs.span(),
+            "Return type should be Result<_>",
+        ))?;
+        if seg.ident.to_string() == "Result" {
+            let args = &seg.arguments;
+            if optional {
+                Self::get_deserializer_output_for_option(args)
+            } else {
+                Self::get_type_for_deserialize_from_result_args(args)
+            }
+        } else {
+            Err(syn::Error::new(
+                seg.span(),
+                "Return type should be Result<_>",
+            ))
+        }
+    }
+
+    fn get_deserializer_output_for_option(args: &PathArguments) -> syn::Result<NativeOutputParams> {
+        match args {
+            syn::PathArguments::AngleBracketed(args) => {
+                let arg = args.args.first().ok_or(syn::Error::new(
+                    args.span(),
+                    "Return type should be Result<Option<_>>",
+                ))?;
+                match arg {
+                    syn::GenericArgument::Type(tp) => match tp {
+                        Type::Path(tp) => {
+                            let segs = &tp.path.segments;
+                            let seg = segs.last().ok_or(syn::Error::new(
+                                tp.span(),
+                                "Return type should be Result<Option<_>>",
+                            ))?;
+                            if seg.ident.to_string() == "Option" {
+                                let args = &seg.arguments;
+                                Self::get_type_for_deserialize_from_result_args(args)
+                            } else {
+                                Err(syn::Error::new(
+                                    seg.span(),
+                                    "Return type should be Result<Option<_>>",
+                                ))
+                            }
+                        }
+                        _ => Err(syn::Error::new(
+                            arg.span(),
+                            "Return type should be Result<Option<_>>",
+                        )),
+                    },
+                    _ => Err(syn::Error::new(
+                        arg.span(),
+                        "Return type should be Result<<Option<_>>",
+                    )),
+                }
+            }
+            _ => Err(syn::Error::new(
+                args.span(),
+                "Return type should be Result<_>",
+            )),
+        }
     }
 
     fn get_type_for_deserialize_from_result_args(
@@ -361,14 +453,17 @@ impl NativeMethod {
     fn original_method(&self) -> proc_macro2::TokenStream {
         let &Self {
             ident,
-            asyncness,
             args,
             output,
+            method_params,
             ..
         } = &self;
-        if *asyncness {
+        if method_params.is_optional {
+            let has_ident = format_ident!("has_{}", ident);
+
             quote! {
-                async fn #ident(#( #args ),*) #output;
+                fn #ident(#( #args ),*) #output;
+                fn #has_ident(&self) -> Result<bool, CubeError>;
             }
         } else {
             quote! {
@@ -383,7 +478,7 @@ impl NativeMethod {
             args,
             output,
             output_params,
-            method_type,
+            method_params,
             ..
         } = &self;
         let typed_args = args
@@ -404,32 +499,81 @@ impl NativeMethod {
 
         let deseralization = Self::deserialization_impl(&output_params);
 
-        match method_type {
+        match method_params.method_type {
             NativeMethodType::Call => {
-                quote! {
-                    fn #ident(#( #args ),*) #output {
-                        let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
-                        let args = vec![#( #js_args_set ),*];
+                if !method_params.is_optional {
+                    quote! {
+                        fn #ident(#( #args ),*) #output {
+                            let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
+                            let args = vec![#( #js_args_set ),*];
 
 
-                        let res = self.native_object.to_struct()?
-                            .call_method(
-                                #js_method_name,
-                                args
-                            )?;
-                        #deseralization
+                            let res = self.native_object.to_struct()?
+                                .call_method(
+                                    #js_method_name,
+                                    args
+                                )?;
+                            Ok(#deseralization)
+                        }
+                    }
+                } else {
+                    let has_ident = format_ident!("has_{}", ident);
+                    quote! {
+                        fn #ident(#( #args ),*) #output {
+                            let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
+                            let native_struct = self.native_object.to_struct()?;
+                            if native_struct.has_field(#js_method_name)? {
+                                let args = vec![#( #js_args_set ),*];
+
+
+                                let res = self.native_object.to_struct()?
+                                    .call_method(
+                                        #js_method_name,
+                                        args
+                                    )?;
+                                Ok(Some(#deseralization))
+                            } else {
+                                Ok(None)
+                            }
+                        }
+                        fn #has_ident(&self) -> Result<bool, CubeError> {
+                            let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
+                            let native_struct = self.native_object.to_struct()?;
+                            native_struct.has_field(#js_method_name)
+                        }
                     }
                 }
             }
             NativeMethodType::Getter => {
-                quote! {
-                    fn #ident(#( #args ),*) #output {
-                        let res = self.native_object.to_struct()?
-                            .get_field(
-                                #js_method_name,
-                            )?;
+                if !method_params.is_optional {
+                    quote! {
+                        fn #ident(#( #args ),*) #output {
+                            let res = self.native_object.to_struct()?
+                                .get_field(
+                                    #js_method_name,
+                                )?;
 
-                        #deseralization
+                            Ok(#deseralization)
+                        }
+                    }
+                } else {
+                    let has_ident = format_ident!("has_{}", ident);
+                    quote! {
+                        fn #ident(#( #args ),*) #output {
+                            let native_struct = self.native_object.to_struct()?;
+                            if native_struct.has_field(#js_method_name)? {
+                                let res = native_struct.get_field(#js_method_name)?;
+                                Ok(Some(#deseralization))
+                            } else {
+                                Ok(None)
+                            }
+                        }
+
+                        fn #has_ident(&self) -> Result<bool, CubeError> {
+                            let context_holder = NativeContextHolder::<IT>::new(self.native_object.get_context());
+                            let native_struct = self.native_object.to_struct()?;
+                            native_struct.has_field(#js_method_name)
+                        }
                     }
                 }
             }
@@ -441,11 +585,11 @@ impl NativeMethod {
 
         if let Some(dynamic_container_path) = &output_params.dynamic_container_path {
             quote! {
-                Ok(#dynamic_container_path::new(NativeDeserializer::deserialize::<IT, #output_type<IT>>(res)?))
+                #dynamic_container_path::new(NativeDeserializer::deserialize::<IT, #output_type<IT>>(res)?)
             }
         } else {
             quote! {
-                NativeDeserializer::deserialize::<IT, #output_type>(res)
+                NativeDeserializer::deserialize::<IT, #output_type>(res)?
             }
         }
     }
