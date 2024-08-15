@@ -108,7 +108,7 @@ pub struct PgCatalogStatsProvider {
 }
 
 impl PgCatalogStatsProvider {
-    pub fn new(tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogStatsBuilder::new();
 
         for table in tables {

@@ -135,7 +135,7 @@ pub struct PgCatalogStatUserTablesProvider {
 
 // https://www.postgresql.org/docs/14/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW
 impl PgCatalogStatUserTablesProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogStatUserTablesBuilder::new(cube_tables.len());
 
         for table in cube_tables.iter() {

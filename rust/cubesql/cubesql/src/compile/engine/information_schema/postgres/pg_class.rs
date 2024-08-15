@@ -199,7 +199,7 @@ pub struct PgCatalogClassProvider {
 }
 
 impl PgCatalogClassProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogClassBuilder::new();
 
         for table in cube_tables.iter() {

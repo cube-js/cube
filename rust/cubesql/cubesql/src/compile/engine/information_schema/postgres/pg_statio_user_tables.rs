@@ -84,7 +84,7 @@ pub struct PgCatalogStatioUserTablesProvider {
 }
 
 impl PgCatalogStatioUserTablesProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogStatioUserTablesBuilder::new(cube_tables.len());
 
         for table in cube_tables.iter() {
