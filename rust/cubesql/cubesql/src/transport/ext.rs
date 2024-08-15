@@ -1,7 +1,9 @@
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaSegment};
 use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
-use crate::sql::ColumnType;
+use crate::{
+    sql::ColumnType,
+    transport::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, CubeMetaSegment},
+};
 
 pub trait V1CubeMetaMeasureExt {
     fn get_real_name(&self) -> String;
@@ -11,7 +13,7 @@ pub trait V1CubeMetaMeasureExt {
     fn get_sql_type(&self) -> ColumnType;
 }
 
-impl V1CubeMetaMeasureExt for V1CubeMetaMeasure {
+impl V1CubeMetaMeasureExt for CubeMetaMeasure {
     fn get_real_name(&self) -> String {
         let (_, dimension_name) = self.name.split_once('.').unwrap();
 
@@ -83,7 +85,7 @@ pub trait V1CubeMetaSegmentExt {
     fn get_real_name(&self) -> String;
 }
 
-impl V1CubeMetaSegmentExt for V1CubeMetaSegment {
+impl V1CubeMetaSegmentExt for CubeMetaSegment {
     fn get_real_name(&self) -> String {
         let (_, segment_name) = self.name.split_once('.').unwrap();
 
@@ -101,7 +103,7 @@ pub trait V1CubeMetaDimensionExt {
     fn is_time(&self) -> bool;
 }
 
-impl V1CubeMetaDimensionExt for V1CubeMetaDimension {
+impl V1CubeMetaDimensionExt for CubeMetaDimension {
     fn get_real_name(&self) -> String {
         let (_, dimension_name) = self.name.split_once('.').unwrap();
 
@@ -167,15 +169,15 @@ pub trait V1CubeMetaExt {
 
     fn member_name(&self, column_name: &str) -> String;
 
-    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension>;
+    fn lookup_dimension(&self, column_name: &str) -> Option<&CubeMetaDimension>;
 
-    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension>;
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&CubeMetaDimension>;
 
-    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure>;
+    fn lookup_measure(&self, column_name: &str) -> Option<&CubeMetaMeasure>;
 
-    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure>;
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&CubeMetaMeasure>;
 
-    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment>;
+    fn lookup_segment(&self, column_name: &str) -> Option<&CubeMetaSegment>;
 
     fn df_data_type(&self, member_name: &str) -> Option<DataType>;
 
@@ -189,7 +191,7 @@ pub enum MemberType {
     Boolean,
 }
 
-impl V1CubeMetaExt for V1CubeMeta {
+impl V1CubeMetaExt for CubeMeta {
     fn get_columns(&self) -> Vec<CubeColumn> {
         let mut columns = Vec::new();
 
@@ -282,29 +284,29 @@ impl V1CubeMetaExt for V1CubeMeta {
         format!("{}.{}", self.name, column_name)
     }
 
-    fn lookup_measure(&self, column_name: &str) -> Option<&V1CubeMetaMeasure> {
+    fn lookup_measure(&self, column_name: &str) -> Option<&CubeMetaMeasure> {
         let member_name = self.member_name(column_name);
         self.lookup_measure_by_member_name(&member_name)
     }
 
-    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaMeasure> {
+    fn lookup_measure_by_member_name(&self, member_name: &str) -> Option<&CubeMetaMeasure> {
         self.measures
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(&member_name))
     }
 
-    fn lookup_dimension(&self, column_name: &str) -> Option<&V1CubeMetaDimension> {
+    fn lookup_dimension(&self, column_name: &str) -> Option<&CubeMetaDimension> {
         let member_name = self.member_name(column_name);
         self.lookup_dimension_by_member_name(&member_name)
     }
 
-    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&V1CubeMetaDimension> {
+    fn lookup_dimension_by_member_name(&self, member_name: &str) -> Option<&CubeMetaDimension> {
         self.dimensions
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(&member_name))
     }
 
-    fn lookup_segment(&self, column_name: &str) -> Option<&V1CubeMetaSegment> {
+    fn lookup_segment(&self, column_name: &str) -> Option<&CubeMetaSegment> {
         let member_name = self.member_name(column_name);
         self.segments
             .iter()

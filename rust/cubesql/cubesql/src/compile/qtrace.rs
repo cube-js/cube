@@ -1,20 +1,17 @@
 use std::{env, fs, sync::Arc};
 
+use super::rewrite::{
+    analysis::{LogicalPlanAnalysis, LogicalPlanData},
+    rewriter::IterInfo,
+    LogicalPlanLanguage,
+};
+use crate::compile::test::find_cube_scans_deep_search;
 use cubeclient::models::V1LoadRequestQuery;
 use datafusion::logical_plan::LogicalPlan;
 use egg::{EClass, EGraph, Iteration, Language};
 use serde::Serialize;
 use sqlparser::ast::Statement;
 use uuid::Uuid;
-
-use super::{
-    find_cube_scans_deep_search,
-    rewrite::{
-        analysis::{LogicalPlanAnalysis, LogicalPlanData},
-        rewriter::IterInfo,
-        LogicalPlanLanguage,
-    },
-};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

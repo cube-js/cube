@@ -66,7 +66,7 @@ impl CubeConfigPy {
     }
 
     pub fn attr(&mut self, config_module: &PyAny, key: &str) -> PyResult<()> {
-        let v = config_module.getattr(&*key)?;
+        let v = config_module.getattr(key)?;
         if !v.is_none() {
             let value = CLRepr::from_python_ref(v)?;
             self.properties.insert(key.to_case(Case::Camel), value);

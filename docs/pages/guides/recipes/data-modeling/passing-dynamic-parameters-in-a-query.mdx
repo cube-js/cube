@@ -10,7 +10,7 @@ redirect_from:
 In some cases we may want to let a user select a filter value and be able to 
 use that value in calculations without filtering the entire query.
 
-In this exmaple, we want to know the ratio between the number of people in a particular city and
+In this example, we want to know the ratio between the number of people in a particular city and
 the total number of women in the country. The user can specify the city for the
 filter. The trick is to get the value of the city from the user and use it in
 the calculation. In the recipe below, we can learn how to join the data table
@@ -77,7 +77,7 @@ cubes:
         sql: id
         type: count
         filters:
-          - sql: "gender = 'female'"
+          - sql: "gender = 'female' and city = city_filter" 
 
       - name: number_of_people_of_any_gender_in_the_city:
         sql: id

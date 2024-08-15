@@ -1,11 +1,8 @@
 use crate::{
     compile::{
-        engine::{
-            df::{
-                scan::{CubeScanNode, CubeScanOptions, MemberField, WrappedSelectNode},
-                wrapper::CubeScanWrapperNode,
-            },
-            provider::CubeContext,
+        engine::df::{
+            scan::{CubeScanNode, CubeScanOptions, MemberField, WrappedSelectNode},
+            wrapper::CubeScanWrapperNode,
         },
         rewrite::{
             analysis::LogicalPlanAnalysis, extract_exprlist_from_groupping_set, rewriter::Rewriter,
@@ -30,6 +27,7 @@ use crate::{
             WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
             WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
         },
+        CubeContext,
     },
     sql::AuthContextRef,
     transport::{SpanId, V1CubeMetaExt},

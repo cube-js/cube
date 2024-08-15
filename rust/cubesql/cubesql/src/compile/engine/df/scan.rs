@@ -31,8 +31,8 @@ use log::warn;
 use crate::{
     compile::{
         engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
-        find_cube_scans_deep_search,
         rewrite::WrappedSelectType,
+        test::find_cube_scans_deep_search,
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -1326,9 +1326,9 @@ pub fn transform_response<V: ValueObject>(
 mod tests {
     use super::*;
     use crate::{
-        compile::{engine::df::wrapper::SqlQuery, MetaContext},
-        sql::{session::DatabaseProtocol, HttpAuthContext},
-        transport::SqlResponse,
+        compile::{engine::df::wrapper::SqlQuery, DatabaseProtocol, DatabaseProtocolDetails},
+        sql::HttpAuthContext,
+        transport::{MetaContext, SqlResponse},
         CubeError,
     };
     use cubeclient::models::V1LoadResponse;
@@ -1348,7 +1348,7 @@ mod tests {
 
     fn get_test_load_meta(protocol: DatabaseProtocol) -> LoadRequestMeta {
         LoadRequestMeta::new(
-            protocol.to_string(),
+            protocol.get_name().to_string(),
             "sql".to_string(),
             Some("SQL API Unit Testing".to_string()),
         )
