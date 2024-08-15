@@ -133,7 +133,7 @@ impl TableProvider for PgPreparedStatementsProvider {
         let mut builder = PgPreparedStatementsBuilder::new(statements.len());
 
         for (name, statement) in statements.iter() {
-            builder.add_prepared_statement(&name, statement);
+            builder.add_prepared_statement(name, statement);
         }
 
         let batch = RecordBatch::try_new(self.schema(), builder.finish())?;

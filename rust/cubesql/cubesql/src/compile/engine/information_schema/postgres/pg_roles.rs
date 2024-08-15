@@ -94,7 +94,7 @@ pub struct PgCatalogRolesProvider {
 impl PgCatalogRolesProvider {
     pub fn new(role: &str) -> Self {
         let mut builder = PgCatalogRolesBuilder::new(1);
-        builder.add_role(&role);
+        builder.add_role(role);
 
         Self {
             data: Arc::new(builder.finish()),
