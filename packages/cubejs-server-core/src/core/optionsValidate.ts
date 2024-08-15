@@ -70,6 +70,7 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
+  eventEmitterOptions: Joi.object(),
   cacheAndQueueDriver: Joi.string().valid('cubestore', 'redis', 'memory'),
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),

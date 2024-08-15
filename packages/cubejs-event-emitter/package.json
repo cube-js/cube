@@ -41,7 +41,8 @@
     "jsonwebtoken": "^8.5.1",
     "ioredis": "^4.27.8",
     "request": "^2.88.2",
-    "request-promise": "^4.2.5"
+    "request-promise": "^4.2.5",
+    "redis": "^3.0.2"
   },
   "publishConfig": {
     "access": "public"

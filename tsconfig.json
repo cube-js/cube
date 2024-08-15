@@ -5,7 +5,7 @@
       "path": "packages/cubejs-backend-shared"
     },
     {
-      "path": "packages/cubejs-backend-event-emitter"
+      "path": "packages/cubejs-event-emitter"
     },
     {
       "path": "packages/cubejs-templates"

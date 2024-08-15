@@ -1,7 +1,6 @@
 /* eslint-disable no-throw-literal */
 import * as stream from 'stream';
 import pt from 'promise-timeout';
-import { EventEmitter } from 'events';
 import {
   QueryOrchestrator,
   ContinueWaitError,
@@ -10,7 +9,7 @@ import {
   QueryOrchestratorOptions,
   QueryBody,
 } from '@cubejs-backend/query-orchestrator';
-
+import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { DatabaseType, RequestContext } from './types';
 
 export interface OrchestratorApiOptions extends QueryOrchestratorOptions {
@@ -29,7 +28,7 @@ export class OrchestratorApi {
   public constructor(
     protected readonly driverFactory: DriverFactoryByDataSource,
     protected readonly logger,
-    protected readonly eventEmitter: EventEmitter,
+    protected readonly eventEmitter: EventEmitterInterface,
     protected readonly options: OrchestratorApiOptions
   ) {
     this.continueWaitTimeout = this.options.continueWaitTimeout || 5;
@@ -95,7 +94,7 @@ export class OrchestratorApi {
         const job = await fetchQueryPromise;
         return job;
       }
-      
+
       fetchQueryPromise = pt.timeout(fetchQueryPromise, this.continueWaitTimeout * 1000);
 
       const data = await fetchQueryPromise;

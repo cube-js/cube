@@ -12,6 +12,12 @@ import {
 } from '@cubejs-backend/api-gateway';
 import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
+import {
+  DefaultEventEmitterOptions,
+  EventEmitterInterface,
+  EventEmitterOptions,
+  RedisEventEmitterOptions
+} from "@cubejs-backend/event-emitter";
 
 export interface QueueOptions {
   concurrency?: number;
@@ -154,8 +160,8 @@ export type DialectFactoryFn = (context: DialectContext) => BaseQuery;
 
 // external
 export type ExternalDbTypeFn = (context: RequestContext) => DatabaseType;
-export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 export type ExternalDialectFactoryFn = (context: RequestContext) => BaseQuery;
+export type ExternalDriverFactoryFn = (context: RequestContext) => Promise<BaseDriver> | BaseDriver;
 
 export type LoggerFn = (msg: string, params: Record<string, any>) => void;
 
@@ -173,6 +179,7 @@ export interface CreateOptions {
   devServer?: boolean;
   apiSecret?: string;
   logger?: LoggerFn;
+  eventEmitterOptions?: RedisEventEmitterOptions | DefaultEventEmitterOptions;
   driverFactory?: DriverFactoryFn;
   dialectFactory?: DialectFactoryFn;
   externalDriverFactory?: ExternalDriverFactoryFn;

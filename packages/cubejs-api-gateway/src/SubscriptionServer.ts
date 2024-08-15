@@ -23,17 +23,21 @@ const calcMessageLength = (message: unknown) => Buffer.byteLength(
 
 export type WebSocketSendMessageFn = (connectionId: string, message: any) => void;
 
+const ensureArray = (value: any) => (Array.isArray(value) ? value : [value]);
+
 export class SubscriptionServer {
   readonly #cubeRenewSubject = new Subject<unknown>();
 
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
+    tap((val) => console.log('Cube renewed received:', val)),
+    map((val) => ensureArray(val)),
     // Map only the renewedCube property
-    map((val) => val as { renewedCube: string }),
-    map((val) => val.renewedCube),
-    // Filter out any empty values
-    filter((val) => !!val),
+    map((val) => val as Array<{ renewedCube: string | undefined }>),
+    map((val) => val.map(v => v.renewedCube)),
     // Buffer the values for 300ms
     bufferTime(300),
+    map((renewedCubes) => renewedCubes.flat()),
+    map((val) => val.filter(v => v !== undefined)),
     // Filter out any empty arrays
     filter((renewedCubes) => renewedCubes.length > 0),
     tap((val) => console.log('Cube renewed:', val)),

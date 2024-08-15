@@ -15,7 +15,11 @@ import {
 import type { Application as ExpressApplication } from 'express';
 
 import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orchestrator';
-import { DefaultEventEmitter } from '@cubejs-backend/event-emitter';
+import {
+  DefaultEventEmitter,
+  EventEmitterInterface,
+  RedisEventEmitter
+} from '@cubejs-backend/event-emitter';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
 import { CompilerApi } from './CompilerApi';
@@ -102,7 +106,7 @@ export class CubejsServerCore {
    */
   public static getDriverMaxPool = getDriverMaxPool;
 
-  private readonly eventEmitter = new DefaultEventEmitter();
+  private readonly eventEmitter: EventEmitterInterface;
 
   public repository: FileRepository;
 
@@ -172,6 +176,13 @@ export class CubejsServerCore {
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
+    if (opts.eventEmitterOptions?.type === 'redis') {
+      console.log('Redis Event Emitter');
+      this.eventEmitter = new RedisEventEmitter(opts.eventEmitterOptions);
+    } else {
+      console.log('Memory Event Emitter');
+      this.eventEmitter = new DefaultEventEmitter();
+    }
     this.contextToDbType = this.options.dbType;
     this.contextToExternalDbType = wrapToFnIfNeeded(this.options.externalDbType);
     this.preAggregationsSchema = wrapToFnIfNeeded(this.options.preAggregationsSchema);
