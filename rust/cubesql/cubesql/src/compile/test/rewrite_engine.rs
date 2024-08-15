@@ -16,7 +16,7 @@ use crate::{
             rewriter::Rewriter,
             LogicalPlanLanguage,
         },
-        rewrite_statement, CubeContext, DatabaseProtocol, QueryPlanner,
+        rewrite_statement, CubeContext, DatabaseProtocol, QueryRouter,
     },
     config::{ConfigObj, ConfigObjImpl},
     transport::MetaContext,
@@ -24,7 +24,7 @@ use crate::{
 
 pub async fn cube_context(meta: Arc<MetaContext>) -> CubeContext {
     let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
-    let planner = QueryPlanner::new(
+    let planner = QueryRouter::new(
         session.state.clone(),
         meta.clone(),
         session.session_manager.clone(),

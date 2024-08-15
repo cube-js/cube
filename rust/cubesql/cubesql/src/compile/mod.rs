@@ -7,6 +7,7 @@ pub mod parser;
 pub mod plan;
 mod protocol;
 pub mod qtrace;
+pub mod query_engine;
 pub mod rewrite;
 pub mod router;
 pub mod service;
@@ -18,6 +19,7 @@ pub mod test;
 pub use error::*;
 pub use plan::*;
 pub use protocol::*;
+pub use query_engine::*;
 pub use rewrite::rewriter::Rewriter;
 pub use router::*;
 
