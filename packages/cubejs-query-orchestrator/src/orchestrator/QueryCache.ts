@@ -1068,14 +1068,14 @@ export class QueryCache {
     const resHash = getCacheHash(JSON.stringify(res));
 
     if (prevResHash !== resHash) {
-      console.log('DATA UPDATED');
-    }
+      console.log('cubeRenewed', {
+        renewedCube: options.renewedCube,
+      });
 
-    // console.log(prevRes, res);
-    this.eventEmitter.emit('cubeRenewed', {
-      renewedCube: options.renewedCube,
-      requestContext: options.requestContext,
-    });
-    // }
+      this.eventEmitter.emit('cubeRenewed', {
+        renewedCube: options.renewedCube,
+        requestContext: options.requestContext,
+      });
+    }
   }
 }
