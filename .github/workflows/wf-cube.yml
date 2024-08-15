@@ -2,10 +2,19 @@ on:
   push:
     branches:
       - master
+  workflow_call:
+    inputs:
+      app:
+        type: string
+        default: 'cube'
+      tag:
+        type: string
+        default: '${{ github.sha }}'
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  tag: '${{ inputs.app }}-${{ inputs.tag }}'
 
 jobs:
   build-and-push-image:
@@ -27,6 +36,6 @@ jobs:
         uses: xip-online-applications/gha-workflow-templates/ghcr-build-push@main
         with:
           repository: '${{ github.repository }}/cube'
-          tag: 'transai-stable'
+          tag: ${{ env.tag }}
           context: ./
           dockerfile: ./packages/cubejs-docker/transai.Dockerfile
