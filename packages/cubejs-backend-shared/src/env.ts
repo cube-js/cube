@@ -1571,6 +1571,14 @@ const variables: Record<string, (...args: any) => any> = {
     .default('30')
     .asInt(),
 
+  // EventEmitter
+  eventEmitterSetting: () => get('CUBEJS_EVENT_EMITTER_TYPE')
+    .default('memory')
+    .asString(),
+  eventEmitterRedisUrl: () => get('CUBEJS_EVENT_EMITTER_REDIS_URL')
+    .default('')
+    .asString(),
+
   // Redis
   redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
     .default('2')

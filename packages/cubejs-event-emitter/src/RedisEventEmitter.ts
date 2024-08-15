@@ -1,8 +1,8 @@
-import { ClientOpts, RedisClient } from 'redis';
+import { RedisClient } from 'redis';
 import { EventEmitterInterface, EventEmitterOptions } from './EventEmitter.interface';
 import { createRedisClient } from './RedisFactory';
 
-export interface RedisEventEmitterOptions extends EventEmitterOptions, ClientOpts {
+export interface RedisEventEmitterOptions extends EventEmitterOptions {
   type: 'redis';
   url: string;
 }
@@ -14,18 +14,18 @@ export class RedisEventEmitter implements EventEmitterInterface {
 
     readonly #subscriptions = new Map<string, ((args: any) => void)[]>();
 
-    readonly #options: RedisEventEmitterOptions;
+    readonly #url: string;
 
-    public constructor(options: RedisEventEmitterOptions) {
-      this.#options = options;
+    public constructor(url: string) {
+      this.#url = url;
       this.init().then(() => {
         console.log('Redis client is initialized');
       });
     }
 
     public async init() {
-      this.#sub = await createRedisClient(this.#options);
-      this.#pub = await createRedisClient(this.#options);
+      this.#sub = await createRedisClient(this.#url);
+      this.#pub = await createRedisClient(this.#url);
     }
 
     public on(event: string, listener: (...args: any[]) => void): this {

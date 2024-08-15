@@ -38,7 +38,11 @@ function decorateRedisClient(client: RedisClient): AsyncRedisClient {
 //   )));
 // };
 
-export async function createRedisClient(options: RedisEventEmitterOptions) {
+export async function createRedisClient(url: string) {
+  const options: RedisOptions = {
+    url
+  };
+
   if (getEnv('redisTls')) {
     options.tls = {};
   }

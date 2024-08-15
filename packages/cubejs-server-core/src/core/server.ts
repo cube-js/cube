@@ -18,7 +18,7 @@ import { BaseDriver, DriverFactoryByDataSource } from '@cubejs-backend/query-orc
 import {
   DefaultEventEmitter,
   EventEmitterInterface,
-  RedisEventEmitter
+  RedisEventEmitter, RedisEventEmitterOptions
 } from '@cubejs-backend/event-emitter';
 import { RefreshScheduler, ScheduledRefreshOptions } from './RefreshScheduler';
 import { OrchestratorApi, OrchestratorApiOptions } from './OrchestratorApi';
@@ -176,9 +176,11 @@ export class CubejsServerCore {
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
-    if (opts.eventEmitterOptions?.type === 'redis') {
+    if (opts.eventEmitterOptions?.type || getEnv('eventEmitterSetting') === 'redis') {
       console.log('Redis Event Emitter');
-      this.eventEmitter = new RedisEventEmitter(opts.eventEmitterOptions);
+      const options = opts.eventEmitterOptions as RedisEventEmitterOptions | undefined;
+      const url = options?.url || getEnv('eventEmitterRedisUrl');
+      this.eventEmitter = new RedisEventEmitter(url);
     } else {
       console.log('Memory Event Emitter');
       this.eventEmitter = new DefaultEventEmitter();

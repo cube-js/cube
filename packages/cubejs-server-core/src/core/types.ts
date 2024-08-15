@@ -14,8 +14,6 @@ import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-b
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 import {
   DefaultEventEmitterOptions,
-  EventEmitterInterface,
-  EventEmitterOptions,
   RedisEventEmitterOptions
 } from "@cubejs-backend/event-emitter";
 
