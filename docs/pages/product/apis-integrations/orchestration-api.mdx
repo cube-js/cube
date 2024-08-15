@@ -70,8 +70,18 @@ rebuild:
 - Pre-aggregations using cubes from specific data sources (e.g., refresh data
   from some Snowflake connection)
 
-[ref-scheduled-refresh]:
-  /reference/data-model/pre-aggregations#scheduled_refresh
+For [partitioned pre-aggregations][ref-pre-agg-partitions], all partitions will
+be rebuilt.
+
+<ReferenceBox>
+
+Currently, rebuilding only select partitions is not supported.
+Please [track this issue](https://github.com/cube-js/cube/issues/6722).
+
+</ReferenceBox>
+
+
+[ref-scheduled-refresh]: /reference/data-model/pre-aggregations#scheduled_refresh
 [cube-ea]: https://cube.dev/use-cases/embedded-analytics
 [cube-issbi]: https://cube.dev/use-cases/semantic-layer
 [cube-rta]: https://cube.dev/use-cases/real-time-analytics
@@ -79,3 +89,4 @@ rebuild:
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-api-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
 [ref-ref-jobs-endpoint]: /reference/rest-api#v1pre-aggregationsjobs
+[ref-pre-agg-partitions]: /product/caching/using-pre-aggregations#partitioning
