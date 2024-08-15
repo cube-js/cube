@@ -1064,19 +1064,12 @@ export class QueryCache {
       return;
     }
 
-    // const prevResHash = getCacheHash(JSON.stringify(prevRes));
-    // const resHash = getCacheHash(JSON.stringify(res));
-    //
-    // // if (prevResHash !== resHash) {
-    this.logger('Emitting cubeUpdated', {
-      renewedCube: options.renewedCube,
-      requestContext: options.requestContext,
-    });
+    const prevResHash = getCacheHash(JSON.stringify(prevRes));
+    const resHash = getCacheHash(JSON.stringify(res));
 
-    console.log('Emitting cubeUpdated', {
-      renewedCube: options.renewedCube,
-      requestContext: options.requestContext,
-    });
+    if (prevResHash !== resHash) {
+      console.log('DATA UPDATED');
+    }
 
     // console.log(prevRes, res);
     this.eventEmitter.emit('cubeRenewed', {

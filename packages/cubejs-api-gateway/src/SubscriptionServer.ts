@@ -27,7 +27,6 @@ export class SubscriptionServer {
   readonly #cubeRenewSubject = new Subject<unknown>();
 
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
-    tap((val) => console.log('Cube renewed:', val)),
     // Map only the renewedCube property
     map((val) => val as { renewedCube: string }),
     map((val) => val.renewedCube),
@@ -37,6 +36,7 @@ export class SubscriptionServer {
     bufferTime(300),
     // Filter out any empty arrays
     filter((renewedCubes) => renewedCubes.length > 0),
+    tap((val) => console.log('Cube renewed:', val)),
     // Convert the array of arrays to an array of unique arrays
     map((renewedCubes) => Array.from(new Set(renewedCubes))),
   );
