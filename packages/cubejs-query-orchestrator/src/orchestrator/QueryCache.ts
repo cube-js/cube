@@ -21,7 +21,6 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
-import * as console from "node:console";
 
 type QueryOptions = {
   external?: boolean;
@@ -990,6 +989,8 @@ export class QueryCache {
           parsedResult.renewalKey !== renewalKey
         )
       ) {
+
+        // RENE CHECK
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
           const newRes = await fetchNew();
