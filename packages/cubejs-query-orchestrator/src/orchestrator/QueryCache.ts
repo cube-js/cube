@@ -1016,7 +1016,7 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      const newRes = fetchNew();
+      const newRes = await fetchNew();
       this.emitEventWhenUpdatedUpdated(null, newRes, options);
       return newRes;
     }
