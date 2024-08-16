@@ -51,7 +51,5 @@ export async function createRedisClient(url: string) {
     options.password = getEnv('redisPassword');
   }
 
-  return decorateRedisClient(
-    redis.createClient(options)
-  );
+  return redis.createClient(options);
 }
