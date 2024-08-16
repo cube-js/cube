@@ -65,9 +65,7 @@ impl TableProvider for PerfSchemaVariablesProvider {
             values.append_value(variable.value.to_string()).unwrap();
         }
 
-        let mut data: Vec<Arc<dyn Array>> = vec![];
-        data.push(Arc::new(names.finish()));
-        data.push(Arc::new(values.finish()));
+        let data: Vec<Arc<dyn Array>> = vec![Arc::new(names.finish()), Arc::new(values.finish())];
 
         let batch = RecordBatch::try_new(self.schema(), data)?;
 
