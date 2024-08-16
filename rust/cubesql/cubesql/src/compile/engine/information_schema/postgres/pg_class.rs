@@ -154,41 +154,42 @@ impl PgCatalogClassBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.relname.finish()));
-        columns.push(Arc::new(self.relnamespace.finish()));
-        columns.push(Arc::new(self.reltype.finish()));
-        columns.push(Arc::new(self.reloftype.finish()));
-        columns.push(Arc::new(self.relowner.finish()));
-        columns.push(Arc::new(self.relam.finish()));
-        columns.push(Arc::new(self.relfilenode.finish()));
-        columns.push(Arc::new(self.reltablespace.finish()));
-        columns.push(Arc::new(self.relpages.finish()));
-        columns.push(Arc::new(self.reltuples.finish()));
-        columns.push(Arc::new(self.relallvisible.finish()));
-        columns.push(Arc::new(self.reltoastrelid.finish()));
-        columns.push(Arc::new(self.relhasindex.finish()));
-        columns.push(Arc::new(self.relisshared.finish()));
-        columns.push(Arc::new(self.relpersistence.finish()));
-        columns.push(Arc::new(self.relkind.finish()));
-        columns.push(Arc::new(self.relnatts.finish()));
-        columns.push(Arc::new(self.relchecks.finish()));
-        columns.push(Arc::new(self.relhasrules.finish()));
-        columns.push(Arc::new(self.relhastriggers.finish()));
-        columns.push(Arc::new(self.relhassubclass.finish()));
-        columns.push(Arc::new(self.relrowsecurity.finish()));
-        columns.push(Arc::new(self.relforcerowsecurity.finish()));
-        columns.push(Arc::new(self.relispopulated.finish()));
-        columns.push(Arc::new(self.relreplident.finish()));
-        columns.push(Arc::new(self.relispartition.finish()));
-        columns.push(Arc::new(self.relrewrite.finish()));
-        columns.push(Arc::new(self.relfrozenxid.finish()));
-        columns.push(Arc::new(self.relminmxid.finish()));
-        columns.push(Arc::new(self.relacl.finish()));
-        columns.push(Arc::new(self.reloptions.finish()));
-        columns.push(Arc::new(self.relpartbound.finish()));
-        columns.push(Arc::new(self.relhasoids.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.relname.finish()),
+            Arc::new(self.relnamespace.finish()),
+            Arc::new(self.reltype.finish()),
+            Arc::new(self.reloftype.finish()),
+            Arc::new(self.relowner.finish()),
+            Arc::new(self.relam.finish()),
+            Arc::new(self.relfilenode.finish()),
+            Arc::new(self.reltablespace.finish()),
+            Arc::new(self.relpages.finish()),
+            Arc::new(self.reltuples.finish()),
+            Arc::new(self.relallvisible.finish()),
+            Arc::new(self.reltoastrelid.finish()),
+            Arc::new(self.relhasindex.finish()),
+            Arc::new(self.relisshared.finish()),
+            Arc::new(self.relpersistence.finish()),
+            Arc::new(self.relkind.finish()),
+            Arc::new(self.relnatts.finish()),
+            Arc::new(self.relchecks.finish()),
+            Arc::new(self.relhasrules.finish()),
+            Arc::new(self.relhastriggers.finish()),
+            Arc::new(self.relhassubclass.finish()),
+            Arc::new(self.relrowsecurity.finish()),
+            Arc::new(self.relforcerowsecurity.finish()),
+            Arc::new(self.relispopulated.finish()),
+            Arc::new(self.relreplident.finish()),
+            Arc::new(self.relispartition.finish()),
+            Arc::new(self.relrewrite.finish()),
+            Arc::new(self.relfrozenxid.finish()),
+            Arc::new(self.relminmxid.finish()),
+            Arc::new(self.relacl.finish()),
+            Arc::new(self.reloptions.finish()),
+            Arc::new(self.relpartbound.finish()),
+            Arc::new(self.relhasoids.finish()),
+        ];
 
         columns
     }
@@ -199,7 +200,7 @@ pub struct PgCatalogClassProvider {
 }
 
 impl PgCatalogClassProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogClassBuilder::new();
 
         for table in cube_tables.iter() {
