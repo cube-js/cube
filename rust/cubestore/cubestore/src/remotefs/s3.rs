@@ -21,6 +21,9 @@ use tokio::fs;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
+use tokio::spawn;
+use aws_sdk_sts::{Client, Config, Region};
+use aws_sdk_sts::model::{AssumeRoleRequest, Credentials};
 
 pub struct S3RemoteFs {
     dir: PathBuf,
@@ -42,53 +45,30 @@ impl fmt::Debug for S3RemoteFs {
 }
 
 impl S3RemoteFs {
-    pub fn new(
+    pub async fn new(
         dir: PathBuf,
         region: String,
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        let role_name = env::var("CUBESTORE_AWS_IAM_ROLE").ok();
+        let region = region.parse::<Region>().map_err(|err| {
+            CubeError::internal(format!(
+                "Failed to parse Region '{}': {}",
+                region,
+                err.to_string()
+            ))
+        })?;
+    
+        let role_name = env::var("CUBESTORE_AWS_ROLE").ok();
         let (access_key, secret_key) = match role_name {
             Some(role_name) => {
-                let region = env::var("CUBESTORE_AWS_REGION").expect("CUBESTORE_AWS_REGION must be set");
-                let account_id = Command::new("aws")
-                   .args(&["sts", "get-caller-identity", "--query", "Account", "--output", "text"])
-                   .output()
-                   .expect("Failed to get account ID")
-                   .stdout
-                   .trim()
-                   .to_string();
-    
-                let assume_role_output = Command::new("aws")
-                   .args(&[
-                        "sts",
-                        "assume-role",
-                        "--role-arn",
-                        &format!("arn:aws:iam::{}:role/{}", account_id, role_name),
-                        "--role-session-name",
-                        &format!("session-{}", role_name),
-                        "--query",
-                        "Credentials",
-                        "--output",
-                        "text",
-                    ])
-                   .output()
-                   .expect("Failed to assume role")
-                   .stdout
-                   .trim()
-                   .to_string();
-    
-                let access_key = assume_role_output.split_whitespace().nth(1).unwrap().trim_matches('"');
-                let secret_key = assume_role_output.split_whitespace().nth(3).unwrap().trim_matches('"');
-    
-                (Some(access_key), Some(secret_key))
+                assume_role(&role_name, &region.to_string()).await
             }
             None => (
                 env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok(),
                 env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok(),
             ),
-        };
+        }?;
     
         let credentials = Credentials::new(
             access_key.as_deref(),
@@ -97,16 +77,9 @@ impl S3RemoteFs {
             None,
             None,
         )
-       .map_err(|err| {
+        .map_err(|err| {
             CubeError::internal(format!(
                 "Failed to create S3 credentials: {}",
-                err.to_string()
-            ))
-        })?;
-        let region = region.parse::<Region>().map_err(|err| {
-            CubeError::internal(format!(
-                "Failed to parse Region '{}': {}",
-                region,
                 err.to_string()
             ))
         })?;
@@ -130,6 +103,34 @@ impl S3RemoteFs {
     }
 }
 
+async fn assume_role(
+    role_or_access_key: &str,
+    region: &str,
+) -> Result<(String, String), CubeError> {
+    let account_id = Client::new(Config::builder().region(Region::new(region)).build())
+        .get_caller_identity()
+        .send()
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to get account ID: {}", e)))?
+        .account;
+
+    let assume_role_output = Client::new(Config::builder().region(Region::new(region)).build())
+        .assume_role(AssumeRoleRequest::builder()
+            .role_arn(format!("arn:aws:iam::{}:role/{}", account_id, role_or_access_key))
+            .duration_seconds(28800)
+            .build())
+        .send()
+        .await
+        .map_err(|e| CubeError::internal(format!("Failed to assume role: {}", e)))?
+        .credentials
+        .ok_or_else(|| CubeError::internal("Failed to get credentials".to_string()))?;
+
+    let access_key = assume_role_output.access_key_id.ok_or_else(|| CubeError::internal("Failed to get access key".to_string()))?;
+    let secret_key = assume_role_output.secret_access_key.ok_or_else(|| CubeError::internal("Failed to get secret key".to_string()))?;
+
+    Ok((access_key, secret_key))
+}
+
 fn spawn_creds_refresh_loop(
     role_or_access_key: Option<String>,
     is_role: bool,
@@ -144,10 +145,10 @@ fn spawn_creds_refresh_loop(
     }
 
     let fs = Arc::downgrade(fs);
-    std::thread::spawn(move || {
+    spawn(async move {
         log::debug!("Started S3 credentials refresh loop");
         loop {
-            std::thread::sleep(refresh_every);
+            tokio::time::sleep(refresh_every).await;
             let fs = match fs.upgrade() {
                 None => {
                     log::debug!("Stopping S3 credentials refresh loop");
@@ -155,38 +156,9 @@ fn spawn_creds_refresh_loop(
                 }
                 Some(fs) => fs,
             };
+
             let (access_key, secret_key) = if is_role {
-                let region = env::var("CUBESTORE_AWS_REGION").expect("CUBESTORE_AWS_REGION must be set");
-                let account_id = Command::new("aws")
-                  .args(&["sts", "get-caller-identity", "--query", "Account", "--output", "text"])
-                  .output()
-                  .expect("Failed to get account ID")
-                  .stdout
-                  .trim()
-                  .to_string();
-
-                let assume_role_output = Command::new("aws")
-                  .args(&[
-                        "sts",
-                        "assume-role",
-                        "--role-arn",
-                        &format!("arn:aws:iam::{}:role/{}", account_id, role_or_access_key.as_ref().unwrap()),
-                        "--role-session-name",
-                        &format!("session-{}", role_or_access_key.as_ref().unwrap()),
-                        "--query",
-                        "Credentials",
-                        "--output",
-                        "text",
-                    ])
-                  .output()
-                  .expect("Failed to assume role")
-                  .stdout
-                  .trim()
-                  .to_string();
-
-                let access_key = assume_role_output.split_whitespace().nth(1).unwrap().trim_matches('"');
-                let secret_key = assume_role_output.split_whitespace().nth(3).unwrap().trim_matches('"');
-
+                let (access_key, secret_key) = assume_role(&role_or_access_key.as_ref().unwrap(), &region.to_string()).await;
                 (Some(access_key), Some(secret_key))
             } else {
                 let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
