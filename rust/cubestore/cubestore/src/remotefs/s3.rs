@@ -189,7 +189,8 @@ fn spawn_creds_refresh_loop(
 
                 (Some(access_key), Some(secret_key))
             } else {
-                (role_or_access_key, None)
+                let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
+                (role_or_access_key, secret_key)
             };
 
             let c = match Credentials::new(
