@@ -7,7 +7,6 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::Syste
 
 use crate::{
     compile::{
-        engine::{df::planner::CubeQueryPlanner, udf::*, VariablesProvider},
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
         DatabaseVariable, DatabaseVariablesToUpdate,
@@ -23,16 +22,11 @@ use crate::{
     transport::{MetaContext, SpanId},
 };
 use datafusion::{
-    execution::context::{
-        default_session_builder, SessionConfig as DFSessionConfig,
-        SessionContext as DFSessionContext,
-    },
     logical_plan::{
         plan::{Analyze, Explain, ToStringifiedPlan},
         LogicalPlan, PlanType, ToDFSchema,
     },
     scalar::ScalarValue,
-    variable::VarType,
 };
 use itertools::Itertools;
 use sqlparser::ast::{escape_single_quote_string, ObjectName};
@@ -669,153 +663,6 @@ impl QueryRouter {
             .map_err(|err| CompilationError::internal(err.to_string()))?;
         let flags = StatusFlags::empty();
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::DropTable))
-    }
-
-    pub fn create_execution_ctx(&self) -> DFSessionContext {
-        let query_planner = Arc::new(CubeQueryPlanner::new(
-            self.session_manager.server.transport.clone(),
-            self.state.get_load_request_meta(),
-            self.session_manager.server.config_obj.clone(),
-        ));
-        let mut ctx = DFSessionContext::with_state(
-            default_session_builder(
-                DFSessionConfig::new()
-                    .create_default_catalog_and_schema(false)
-                    .with_information_schema(false)
-                    .with_default_catalog_and_schema("db", "public"),
-            )
-            .with_query_planner(query_planner),
-        );
-
-        if self.state.protocol == DatabaseProtocol::MySQL {
-            let system_variable_provider =
-                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
-            let user_defined_variable_provider =
-                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
-
-            ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
-            ctx.register_variable(
-                VarType::UserDefined,
-                Arc::new(user_defined_variable_provider),
-            );
-        }
-
-        // udf
-        if self.state.protocol == DatabaseProtocol::MySQL {
-            ctx.register_udf(create_version_udf("8.0.25".to_string()));
-            ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
-            ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
-            ctx.register_udf(create_current_user_udf(
-                self.state.clone(),
-                "current_user",
-                true,
-            ));
-            ctx.register_udf(create_user_udf(self.state.clone()));
-        } else if self.state.protocol == DatabaseProtocol::PostgreSQL {
-            ctx.register_udf(create_version_udf(
-                "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
-            ));
-            ctx.register_udf(create_db_udf(
-                "current_database".to_string(),
-                self.state.clone(),
-            ));
-            ctx.register_udf(create_db_udf(
-                "current_schema".to_string(),
-                self.state.clone(),
-            ));
-            ctx.register_udf(create_current_user_udf(
-                self.state.clone(),
-                "current_user",
-                false,
-            ));
-            ctx.register_udf(create_current_user_udf(self.state.clone(), "user", false));
-            ctx.register_udf(create_session_user_udf(self.state.clone()));
-        }
-
-        ctx.register_udf(create_connection_id_udf(self.state.clone()));
-        ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
-        ctx.register_udf(create_instr_udf());
-        ctx.register_udf(create_ucase_udf());
-        ctx.register_udf(create_isnull_udf());
-        ctx.register_udf(create_if_udf());
-        ctx.register_udf(create_least_udf());
-        ctx.register_udf(create_greatest_udf());
-        ctx.register_udf(create_convert_tz_udf());
-        ctx.register_udf(create_timediff_udf());
-        ctx.register_udf(create_time_format_udf());
-        ctx.register_udf(create_locate_udf());
-        ctx.register_udf(create_date_udf());
-        ctx.register_udf(create_makedate_udf());
-        ctx.register_udf(create_year_udf());
-        ctx.register_udf(create_quarter_udf());
-        ctx.register_udf(create_hour_udf());
-        ctx.register_udf(create_minute_udf());
-        ctx.register_udf(create_second_udf());
-        ctx.register_udf(create_dayofweek_udf());
-        ctx.register_udf(create_dayofmonth_udf());
-        ctx.register_udf(create_dayofyear_udf());
-        ctx.register_udf(create_date_sub_udf());
-        ctx.register_udf(create_date_add_udf());
-        ctx.register_udf(create_str_to_date_udf());
-        ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
-        ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
-        ctx.register_udf(create_current_schema_udf());
-        ctx.register_udf(create_current_schemas_udf());
-        ctx.register_udf(create_format_type_udf());
-        ctx.register_udf(create_pg_datetime_precision_udf());
-        ctx.register_udf(create_pg_numeric_precision_udf());
-        ctx.register_udf(create_pg_numeric_scale_udf());
-        ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
-        ctx.register_udf(create_pg_get_expr_udf());
-        ctx.register_udf(create_pg_table_is_visible_udf());
-        ctx.register_udf(create_pg_type_is_visible_udf());
-        ctx.register_udf(create_pg_get_constraintdef_udf());
-        ctx.register_udf(create_pg_truetypid_udf());
-        ctx.register_udf(create_pg_truetypmod_udf());
-        ctx.register_udf(create_to_char_udf());
-        ctx.register_udf(create_array_lower_udf());
-        ctx.register_udf(create_array_upper_udf());
-        ctx.register_udf(create_pg_my_temp_schema());
-        ctx.register_udf(create_pg_is_other_temp_schema());
-        ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_has_table_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_has_any_column_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_pg_total_relation_size_udf());
-        ctx.register_udf(create_cube_regclass_cast_udf());
-        ctx.register_udf(create_pg_get_serial_sequence_udf());
-        ctx.register_udf(create_json_build_object_udf());
-        ctx.register_udf(create_regexp_substr_udf());
-        ctx.register_udf(create_ends_with_udf());
-        ctx.register_udf(create_position_udf());
-        ctx.register_udf(create_date_to_timestamp_udf());
-        ctx.register_udf(create_to_date_udf());
-        ctx.register_udf(create_sha1_udf());
-        ctx.register_udf(create_current_setting_udf());
-        ctx.register_udf(create_quote_ident_udf());
-        ctx.register_udf(create_pg_encoding_to_char_udf());
-        ctx.register_udf(create_array_to_string_udf());
-        ctx.register_udf(create_charindex_udf());
-        ctx.register_udf(create_to_regtype_udf());
-        ctx.register_udf(create_pg_get_indexdef_udf());
-        ctx.register_udf(create_inet_server_addr_udf());
-
-        // udaf
-        ctx.register_udaf(create_measure_udaf());
-
-        // udtf
-        ctx.register_udtf(create_generate_series_udtf());
-        ctx.register_udtf(create_unnest_udtf());
-        ctx.register_udtf(create_generate_subscripts_udtf());
-        ctx.register_udtf(create_pg_expandarray_udtf());
-
-        // redshift
-        ctx.register_udf(create_datediff_udf());
-        ctx.register_udf(create_dateadd_udf());
-
-        // fn stubs
-        ctx = register_fun_stubs(ctx);
-
-        ctx
     }
 
     async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
