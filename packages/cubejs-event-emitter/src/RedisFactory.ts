@@ -1,8 +1,8 @@
-import redis, { ClientOpts, RedisClient } from 'redis';
+import * as redis from 'redis';
+import { ClientOpts, RedisClient } from 'redis';
 import { getEnv } from '@cubejs-backend/shared';
 import { promisify } from 'util';
 import AsyncRedisClient from './AsyncRedisClient';
-import { RedisEventEmitterOptions } from "./RedisEventEmitter";
 
 export type RedisOptions = ClientOpts;
 

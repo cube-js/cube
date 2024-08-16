@@ -4072,7 +4072,7 @@
 "@cubejs-backend/api-gateway@file:packages/cubejs-api-gateway":
   version "0.35.70"
   dependencies:
-    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-api-gateway-0.35.70-36accb2c-a4d1-4438-87f1-11b0d3381f0b-1723709352074/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-api-gateway-0.35.70-b4157ea2-8cb3-4cf6-8131-d448ea6fa253-1723828876131/node_modules/@cubejs-backend/cubejs-event-emitter"
     "@cubejs-backend/native" "^0.35.70"
     "@cubejs-backend/shared" "^0.35.67"
     "@ungap/structured-clone" "^0.3.4"
@@ -4100,6 +4100,31 @@
   resolved "https://registry.npmjs.org/@cubejs-backend/apla-clickhouse/-/apla-clickhouse-1.7.0.tgz"
   integrity sha512-qwXapTC/qosA6RprElRjnl8gmlDQaxtJPtbgcdjyNvkmiyao1HI+w5QkjHWCiVm6aTzE0gjFr6/2y87TZ9fojg==
 
+"@cubejs-backend/base-driver@file:packages/cubejs-base-driver":
+  version "0.35.67"
+  dependencies:
+    "@aws-sdk/client-s3" "^3.49.0"
+    "@aws-sdk/s3-request-presigner" "^3.49.0"
+    "@cubejs-backend/shared" "^0.35.67"
+    ramda "^0.27.0"
+
+"@cubejs-backend/cubestore-driver@file:packages/cubejs-cubestore-driver":
+  version "0.35.68"
+  dependencies:
+    "@cubejs-backend/base-driver" "^0.35.67"
+    "@cubejs-backend/cubestore" "^0.35.68"
+    "@cubejs-backend/shared" "^0.35.67"
+    csv-write-stream "^2.0.0"
+    flatbuffers "23.3.3"
+    fs-extra "^9.1.0"
+    generic-pool "^3.6.0"
+    moment-timezone "^0.5.31"
+    node-fetch "^2.6.1"
+    sqlstring "^2.3.3"
+    tempy "^1.0.1"
+    uuid "^8.3.2"
+    ws "^7.4.3"
+
 "@cubejs-backend/dotenv@^9.0.2":
   version "9.0.2"
   resolved "https://registry.npmjs.org/@cubejs-backend/dotenv/-/dotenv-9.0.2.tgz"
@@ -4115,8 +4140,10 @@
     fs-extra "^9.1.0"
     ioredis "^4.27.8"
     jsonwebtoken "^8.5.1"
+    redis "^3.0.2"
     request "^2.88.2"
     request-promise "^4.2.5"
+    rxjs "^7.8.1"
 
 "@cubejs-backend/jdbc@^0.8.0":
   version "0.8.0"
@@ -4145,6 +4172,49 @@
     moment-timezone "^0.5.33"
     ramda "^0.27.2"
     redis "^3.0.2"
+
+"@cubejs-backend/query-orchestrator@file:packages/cubejs-query-orchestrator":
+  version "0.35.67"
+  dependencies:
+    "@cubejs-backend/base-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-base-driver"
+    "@cubejs-backend/cubestore-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-cubestore-driver"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/shared" "^0.35.67"
+    csv-write-stream "^2.0.0"
+    es5-ext "0.10.53"
+    generic-pool "^3.7.1"
+    ioredis "^4.27.8"
+    lru-cache "^6.0.0"
+    moment-timezone "^0.5.33"
+    ramda "^0.27.2"
+    redis "^3.0.2"
+
+"@cubejs-backend/schema-compiler@file:packages/cubejs-schema-compiler":
+  version "0.35.70"
+  dependencies:
+    "@babel/code-frame" "^7.24"
+    "@babel/core" "^7.24"
+    "@babel/generator" "^7.24"
+    "@babel/parser" "^7.24"
+    "@babel/preset-env" "^7.24"
+    "@babel/standalone" "^7.24"
+    "@babel/traverse" "^7.24"
+    "@babel/types" "^7.24"
+    "@cubejs-backend/native" "^0.35.70"
+    "@cubejs-backend/shared" "^0.35.67"
+    antlr4ts "0.5.0-alpha.4"
+    camelcase "^6.2.0"
+    cron-parser "^4.9.0"
+    humps "^2.0.1"
+    inflection "^1.12.0"
+    joi "^17.8.3"
+    js-yaml "^4.1.0"
+    lru-cache "^5.1.1"
+    moment-timezone "^0.5.33"
+    node-dijkstra "^2.5.0"
+    ramda "^0.27.2"
+    syntax-error "^1.3.0"
+    uuid "^8.3.2"
 
 "@cubejs-backend/server-core@^0.35.70":
   version "0.35.70"
@@ -4178,10 +4248,59 @@
     uuid "^8.3.2"
     ws "^7.5.3"
 
+"@cubejs-backend/server-core@file:packages/cubejs-server-core":
+  version "0.35.67"
+  dependencies:
+    "@cubejs-backend/api-gateway" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-api-gateway"
+    "@cubejs-backend/cloud" "^0.35.67"
+    "@cubejs-backend/dotenv" "^9.0.2"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/native" "^0.35.67"
+    "@cubejs-backend/query-orchestrator" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-query-orchestrator"
+    "@cubejs-backend/schema-compiler" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-schema-compiler"
+    "@cubejs-backend/shared" "^0.35.67"
+    "@cubejs-backend/templates" "^0.35.67"
+    codesandbox-import-utils "^2.1.12"
+    cross-spawn "^7.0.1"
+    fs-extra "^8.1.0"
+    is-docker "^2.1.1"
+    joi "^17.8.3"
+    jsonwebtoken "^8.4.0"
+    lodash.clonedeep "^4.5.0"
+    lru-cache "^5.1.1"
+    moment "^2.29.1"
+    node-fetch "^2.6.0"
+    p-limit "^3.1.0"
+    promise-timeout "^1.3.0"
+    ramda "^0.27.0"
+    semver "^6.3.0"
+    serve-static "^1.13.2"
+    sqlstring "^2.3.1"
+    uuid "^8.3.2"
+    ws "^7.5.3"
+
 "@cubejs-backend/shared@0.33.20":
   version "0.33.20"
   resolved "https://registry.npmjs.org/@cubejs-backend/shared/-/shared-0.33.20.tgz"
   integrity sha512-PANWng9VLr6+55QVHQv23TyDO2o1nwEWMAXd/ujUmD7AyyCHih7UllgoHYZW18vyyQm3qPxR/J7TLOACW2OcLw==
+  dependencies:
+    "@oclif/color" "^0.1.2"
+    bytes "^3.1.0"
+    cli-progress "^3.9.0"
+    cross-spawn "^7.0.3"
+    decompress "^4.2.1"
+    env-var "^6.3.0"
+    fs-extra "^9.1.0"
+    http-proxy-agent "^4.0.1"
+    moment-range "^4.0.1"
+    moment-timezone "^0.5.33"
+    node-fetch "^2.6.1"
+    shelljs "^0.8.5"
+    throttle-debounce "^3.0.1"
+    uuid "^8.3.2"
+
+"@cubejs-backend/shared@file:packages/cubejs-backend-shared":
+  version "0.35.67"
   dependencies:
     "@oclif/color" "^0.1.2"
     bytes "^3.1.0"
