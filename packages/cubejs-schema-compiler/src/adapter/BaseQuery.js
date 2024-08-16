@@ -575,6 +575,7 @@ export class BaseQuery {
 
     return false;
   }
+
   buildSqlAndParamsTest(exportAnnotatedSql) {
     const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
 
@@ -595,10 +596,11 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
-    console.log("!! rust result: ", r);
-    console.log("!! js result: ", rr);
+    console.log('!! rust result: ', r);
+    console.log('!! js result: ', rr);
     return rr;
   }
+
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -637,7 +639,6 @@ export class BaseQuery {
       joinRoot: this.join.root,
       cubeEvaluator: this.cubeEvaluator,
       baseTools: this,
-
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
@@ -2029,7 +2030,6 @@ export class BaseQuery {
     if (R.isEmpty(this.order)) {
       return '';
     }
-
 
     const orderByString = R.pipe(
       R.map(this.orderHashToString),
