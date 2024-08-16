@@ -10,9 +10,9 @@ use crate::{
         engine::{df::planner::CubeQueryPlanner, udf::*, VariablesProvider},
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
+        DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
-        database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,

@@ -1,5 +1,6 @@
 use std::{any::Any, sync::Arc};
 
+use crate::compile::DatabaseVariables;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -12,8 +13,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::sql::database_variables::DatabaseVariables;
 
 pub struct PgCatalogSettingsProvider {
     vars: DatabaseVariables,

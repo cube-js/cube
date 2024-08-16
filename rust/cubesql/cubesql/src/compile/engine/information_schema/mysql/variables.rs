@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::compile::engine::context::TableName;
+use crate::compile::{engine::context::TableName, DatabaseVariables};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -13,8 +13,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::sql::database_variables::DatabaseVariables;
 
 pub struct PerfSchemaVariablesProvider {
     table_name: String,
