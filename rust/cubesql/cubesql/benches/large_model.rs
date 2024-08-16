@@ -6,7 +6,8 @@ use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
 use cubesql::{
     compile::test::{
         rewrite_engine::{
-            create_test_cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
+            create_test_postgresql_cube_context, query_to_logical_plan, rewrite_rules,
+            rewrite_runner,
         },
         sql_generator,
     },
@@ -19,9 +20,9 @@ use uuid::Uuid;
 macro_rules! bench_large_model {
     ($DIMS:expr, $NAME:expr, $QUERY_FN:expr, $CRITERION:expr) => {{
         let context = Arc::new(
-            futures::executor::block_on(create_test_cube_context(get_large_model_test_tenant_ctx(
-                $DIMS,
-            )))
+            futures::executor::block_on(create_test_cube_context(
+                create_test_postgresql_cube_context($DIMS),
+            ))
             .unwrap(),
         );
 

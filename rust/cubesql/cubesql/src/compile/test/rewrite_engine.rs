@@ -23,7 +23,7 @@ use crate::{
     transport::MetaContext,
 };
 
-pub async fn create_test_cube_context(
+pub async fn create_test_postgresql_cube_context(
     meta: Arc<MetaContext>,
 ) -> Result<CubeContext, CompilationError> {
     let session = get_test_session(DatabaseProtocol::PostgreSQL, meta.clone()).await;
