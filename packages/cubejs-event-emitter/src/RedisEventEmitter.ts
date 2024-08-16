@@ -1,8 +1,7 @@
+import {createClient, RedisClientType} from 'redis';
 import { Subject } from 'rxjs';
 import { take } from 'rxjs/operators';
-import { RedisClient } from 'redis';
 import { EventEmitterInterface, EventEmitterOptions } from './EventEmitter.interface';
-import { createRedisClient } from './RedisFactory';
 
 export interface RedisEventEmitterOptions extends EventEmitterOptions {
   type: 'redis';
@@ -10,11 +9,9 @@ export interface RedisEventEmitterOptions extends EventEmitterOptions {
 }
 
 export class RedisEventEmitter implements EventEmitterInterface {
-    #sub: RedisClient | null = null;
+    #sub: RedisClientType | null = null;
 
-    #pub: RedisClient | null = null;
-
-    readonly #subscriptions = new Map<string, ((args: any) => void)[]>();
+    #pub: RedisClientType | null = null;
 
     readonly #url: string;
 
@@ -28,38 +25,32 @@ export class RedisEventEmitter implements EventEmitterInterface {
     }
 
     public async init() {
-      this.#sub = await createRedisClient(this.#url);
-      this.#pub = await createRedisClient(this.#url);
+      const options = { url: this.#url };
+      this.#sub = createClient(options);
+      this.#pub = createClient(options);
 
-      this.#sub.on('message', (channel, message) => {
-        const subscribers = this.#subscriptions.get(channel);
-        if (subscribers) {
-          subscribers.forEach((l) => l(JSON.parse(message)));
-        }
-      });
+      await this.#sub.connect();
+      await this.#pub.connect();
 
       this.#initSubject.next(null);
     }
 
     public on(event: string, listener: (...args: any[]) => void) {
-      if (this.#sub) {
-        console.log('Subscribing to', event);
-        this.#sub.subscribe(event);
-      } else {
+      if (!this.#sub) {
         this.#initSubject
           .pipe(
             take(1)
           )
           .subscribe(() => {
-          console.log('Subscribing to', event);
-          this.#sub!.subscribe(event);
-        });
+            this.on(event, listener);
+          });
+        return;
       }
 
-      if (!this.#subscriptions.has(event)) {
-        this.#subscriptions.set(event, []);
-      }
-      this.#subscriptions.get(event)!.push(listener);
+      console.log('Subscribing to', event);
+      this.#sub.subscribe(event, (message) => {
+        listener(JSON.parse(message));
+      });
     }
 
     public emit(event: string, ...args: any[]): boolean {

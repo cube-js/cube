@@ -15,7 +15,6 @@ import {
 
 import { QueryQueue } from './QueryQueue';
 import { ContinueWaitError } from './ContinueWaitError';
-import { RedisCacheDriver } from './RedisCacheDriver';
 import { LocalCacheDriver } from './LocalCacheDriver';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
@@ -157,9 +156,6 @@ export class QueryCache {
     public readonly options: QueryCacheOptions = {}
   ) {
     switch (options.cacheAndQueueDriver || 'memory') {
-      case 'redis':
-        this.cacheDriver = new RedisCacheDriver({ pool: options.redisPool });
-        break;
       case 'memory':
         this.cacheDriver = new LocalCacheDriver();
         break;

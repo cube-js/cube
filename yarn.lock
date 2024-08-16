@@ -4072,7 +4072,7 @@
 "@cubejs-backend/api-gateway@file:packages/cubejs-api-gateway":
   version "0.35.70"
   dependencies:
-    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-api-gateway-0.35.70-b4157ea2-8cb3-4cf6-8131-d448ea6fa253-1723828876131/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-api-gateway-0.35.70-07c6e196-354d-4614-846b-519a102bb707-1723835077718/node_modules/@cubejs-backend/cubejs-event-emitter"
     "@cubejs-backend/native" "^0.35.70"
     "@cubejs-backend/shared" "^0.35.67"
     "@ungap/structured-clone" "^0.3.4"
@@ -4138,9 +4138,8 @@
     chokidar "^3.5.1"
     env-var "^6.3.0"
     fs-extra "^9.1.0"
-    ioredis "^4.27.8"
     jsonwebtoken "^8.5.1"
-    redis "^3.0.2"
+    redis "^4.6.14"
     request "^2.88.2"
     request-promise "^4.2.5"
     rxjs "^7.8.1"
@@ -4176,18 +4175,17 @@
 "@cubejs-backend/query-orchestrator@file:packages/cubejs-query-orchestrator":
   version "0.35.67"
   dependencies:
-    "@cubejs-backend/base-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-base-driver"
-    "@cubejs-backend/cubestore-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-cubestore-driver"
-    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-2d0d9e0a-3133-472d-8f6f-9e177c9fd6c2-1723828876135/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/base-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-06cdcf4d-f6bd-48cf-bd83-acb93861c7d1-1723835077717/node_modules/@cubejs-backend/cubejs-base-driver"
+    "@cubejs-backend/cubestore-driver" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-06cdcf4d-f6bd-48cf-bd83-acb93861c7d1-1723835077717/node_modules/@cubejs-backend/cubejs-cubestore-driver"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-query-orchestrator-0.35.67-06cdcf4d-f6bd-48cf-bd83-acb93861c7d1-1723835077717/node_modules/@cubejs-backend/cubejs-event-emitter"
     "@cubejs-backend/shared" "^0.35.67"
     csv-write-stream "^2.0.0"
     es5-ext "0.10.53"
     generic-pool "^3.7.1"
-    ioredis "^4.27.8"
     lru-cache "^6.0.0"
     moment-timezone "^0.5.33"
     ramda "^0.27.2"
-    redis "^3.0.2"
+    redis "^4.6.14"
 
 "@cubejs-backend/schema-compiler@file:packages/cubejs-schema-compiler":
   version "0.35.70"
@@ -4251,13 +4249,13 @@
 "@cubejs-backend/server-core@file:packages/cubejs-server-core":
   version "0.35.67"
   dependencies:
-    "@cubejs-backend/api-gateway" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-api-gateway"
+    "@cubejs-backend/api-gateway" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-6e4a81ea-f06f-46dd-89c4-6a212a5559dd-1723835077723/node_modules/@cubejs-backend/cubejs-api-gateway"
     "@cubejs-backend/cloud" "^0.35.67"
     "@cubejs-backend/dotenv" "^9.0.2"
-    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-event-emitter"
+    "@cubejs-backend/event-emitter" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-6e4a81ea-f06f-46dd-89c4-6a212a5559dd-1723835077723/node_modules/@cubejs-backend/cubejs-event-emitter"
     "@cubejs-backend/native" "^0.35.67"
-    "@cubejs-backend/query-orchestrator" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-query-orchestrator"
-    "@cubejs-backend/schema-compiler" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-e238d558-cd22-4528-ab4a-19a68928f326-1723828876133/node_modules/@cubejs-backend/cubejs-schema-compiler"
+    "@cubejs-backend/query-orchestrator" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-6e4a81ea-f06f-46dd-89c4-6a212a5559dd-1723835077723/node_modules/@cubejs-backend/cubejs-query-orchestrator"
+    "@cubejs-backend/schema-compiler" "file:../../Library/Caches/Yarn/v6/npm-@cubejs-backend-server-core-0.35.67-6e4a81ea-f06f-46dd-89c4-6a212a5559dd-1723835077723/node_modules/@cubejs-backend/cubejs-schema-compiler"
     "@cubejs-backend/shared" "^0.35.67"
     "@cubejs-backend/templates" "^0.35.67"
     codesandbox-import-utils "^2.1.12"
@@ -7766,6 +7764,40 @@
     "@react-types/overlays" "^3.8.4"
     "@react-types/shared" "^3.22.0"
 
+"@redis/bloom@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@redis/bloom/-/bloom-1.2.0.tgz#d3fd6d3c0af3ef92f26767b56414a370c7b63b71"
+  integrity sha512-HG2DFjYKbpNmVXsa0keLHp/3leGJz1mjh09f2RLGGLQZzSHpkmZWuwJbAvo3QcRY8p80m5+ZdXZdYOSBLlp7Cg==
+
+"@redis/client@1.6.0":
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/@redis/client/-/client-1.6.0.tgz#dcf4ae1319763db6fdddd6de7f0af68a352c30ea"
+  integrity sha512-aR0uffYI700OEEH4gYnitAnv3vzVGXCFvYfdpu/CJKvk4pHfLPEy/JSZyrpQ+15WhXe1yJRXLtfQ84s4mEXnPg==
+  dependencies:
+    cluster-key-slot "1.1.2"
+    generic-pool "3.9.0"
+    yallist "4.0.0"
+
+"@redis/graph@1.1.1":
+  version "1.1.1"
+  resolved "https://registry.yarnpkg.com/@redis/graph/-/graph-1.1.1.tgz#8c10df2df7f7d02741866751764031a957a170ea"
+  integrity sha512-FEMTcTHZozZciLRl6GiiIB4zGm5z5F3F6a6FZCyrfxdKOhFlGkiAqlexWMBzCi4DcRoyiOsuLfW+cjlGWyExOw==
+
+"@redis/json@1.0.7":
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/@redis/json/-/json-1.0.7.tgz#016257fcd933c4cbcb9c49cde8a0961375c6893b"
+  integrity sha512-6UyXfjVaTBTJtKNG4/9Z8PSpKE6XgSyEb8iwaqDcy+uKrd/DGYHTWkUdnQDyzm727V7p21WUMhsqz5oy65kPcQ==
+
+"@redis/search@1.2.0":
+  version "1.2.0"
+  resolved "https://registry.yarnpkg.com/@redis/search/-/search-1.2.0.tgz#50976fd3f31168f585666f7922dde111c74567b8"
+  integrity sha512-tYoDBbtqOVigEDMAcTGsRlMycIIjwMCgD8eR2t0NANeQmgK/lvxNAvYyb6bZDD4frHRhIHkJu2TBRvB0ERkOmw==
+
+"@redis/time-series@1.1.0":
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/@redis/time-series/-/time-series-1.1.0.tgz#cba454c05ec201bd5547aaf55286d44682ac8eb5"
+  integrity sha512-c1Q99M5ljsIuc4YdaCwfUEXsofakb9c8+Zse2qxTadu8TalLXuAESzLvFAvNVbkmSlvlzIQOLpBCmWI9wTOt+g==
+
 "@rollup/plugin-alias@^3.1.2":
   version "3.1.8"
   resolved "https://registry.npmjs.org/@rollup/plugin-alias/-/plugin-alias-3.1.8.tgz"
@@ -8791,13 +8823,6 @@
     "@types/through" "*"
     rxjs "^6.4.0"
 
-"@types/ioredis@^4.19.3":
-  version "4.28.4"
-  resolved "https://registry.npmjs.org/@types/ioredis/-/ioredis-4.28.4.tgz"
-  integrity sha512-pIIR1f1HmtbSMiQkMBoJwi7ZFj00OmxLwlZ3cuvgqc9m61+q7cVN3uAsYIZu07pmXw8A8V+apLvkd+ckgGdxwg==
-  dependencies:
-    "@types/node" "*"
-
 "@types/istanbul-lib-coverage@*", "@types/istanbul-lib-coverage@^2.0.0", "@types/istanbul-lib-coverage@^2.0.1":
   version "2.0.3"
   resolved "https://registry.npmjs.org/@types/istanbul-lib-coverage/-/istanbul-lib-coverage-2.0.3.tgz"
@@ -9054,13 +9079,6 @@
   dependencies:
     "@types/node" "*"
     safe-buffer "~5.1.1"
-
-"@types/redis@^2.8.28":
-  version "2.8.32"
-  resolved "https://registry.npmjs.org/@types/redis/-/redis-2.8.32.tgz"
-  integrity sha512-7jkMKxcGq9p242exlbsVzuJb57KqHRhNl4dHoQu2Y5v9bCAbtIXXH0R3HleSQW4CTOqpHIYUW3t6tpUj4BVQ+w==
-  dependencies:
-    "@types/node" "*"
 
 "@types/request-promise@^4.1.46":
   version "4.1.48"
@@ -12497,6 +12515,11 @@ clsx@^2.0.0:
   version "2.1.0"
   resolved "https://registry.npmjs.org/clsx/-/clsx-2.1.0.tgz"
   integrity sha512-m3iNNWpd9rl3jvvcBnu70ylMdrXt8Vlq4HYadnU5fwcOtvkSQWPmj7amUcDT2qYI7risszBjI5AUIUox9D16pg==
+
+cluster-key-slot@1.1.2:
+  version "1.1.2"
+  resolved "https://registry.yarnpkg.com/cluster-key-slot/-/cluster-key-slot-1.1.2.tgz#88ddaa46906e303b5de30d3153b7d9fe0a0c19ac"
+  integrity sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==
 
 cluster-key-slot@^1.1.0:
   version "1.1.0"
@@ -16487,6 +16510,11 @@ generate-object-property@^1.0.0:
   integrity sha1-nA4cQDCM6AT0eDYYuTf6iPmdUNA=
   dependencies:
     is-property "^1.0.0"
+
+generic-pool@3.9.0:
+  version "3.9.0"
+  resolved "https://registry.yarnpkg.com/generic-pool/-/generic-pool-3.9.0.tgz#36f4a678e963f4fdb8707eab050823abc4e8f5e4"
+  integrity sha512-hymDOu5B53XvN4QT9dBmZxPX4CWhBPPLguTZ9MMFeFa/Kg0xWVfylOVNlJji/E7yTZWFd/q9GO5TxDLq156D7g==
 
 generic-pool@^3.1.7, generic-pool@^3.6.0, generic-pool@^3.7.1, generic-pool@^3.8.2:
   version "3.8.2"
@@ -25080,6 +25108,18 @@ redis@^3.0.2:
     redis-errors "^1.2.0"
     redis-parser "^3.0.0"
 
+redis@^4.6.14:
+  version "4.7.0"
+  resolved "https://registry.yarnpkg.com/redis/-/redis-4.7.0.tgz#b401787514d25dd0cfc22406d767937ba3be55d6"
+  integrity sha512-zvmkHEAdGMn+hMRXuMBtu4Vo5P6rHQjLoHftu+lBqq8ZTA3RCVC/WzD790bkKKiNFp7d5/9PcSD19fJyyRvOdQ==
+  dependencies:
+    "@redis/bloom" "1.2.0"
+    "@redis/client" "1.6.0"
+    "@redis/graph" "1.1.1"
+    "@redis/json" "1.0.7"
+    "@redis/search" "1.2.0"
+    "@redis/time-series" "1.1.0"
+
 redux@^4.0.0, redux@^4.0.4:
   version "4.1.2"
   resolved "https://registry.npmjs.org/redux/-/redux-4.1.2.tgz"
@@ -29466,6 +29506,11 @@ y18n@^5.0.5:
   resolved "https://registry.npmjs.org/y18n/-/y18n-5.0.8.tgz"
   integrity sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==
 
+yallist@4.0.0, yallist@^4.0.0:
+  version "4.0.0"
+  resolved "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz"
+  integrity sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==
+
 yallist@^2.1.2:
   version "2.1.2"
   resolved "https://registry.npmjs.org/yallist/-/yallist-2.1.2.tgz"
@@ -29475,11 +29520,6 @@ yallist@^3.0.0, yallist@^3.0.2, yallist@^3.1.1:
   version "3.1.1"
   resolved "https://registry.npmjs.org/yallist/-/yallist-3.1.1.tgz"
   integrity sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g==
-
-yallist@^4.0.0:
-  version "4.0.0"
-  resolved "https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz"
-  integrity sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==
 
 yaml@^1.10.0, yaml@^1.10.2:
   version "1.10.2"

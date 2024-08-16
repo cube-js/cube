@@ -6,9 +6,7 @@ import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
 import { QueryCache, QueryBody, TempTable } from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
-import { RedisPool, RedisPoolOptions } from './RedisPool';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
-import { RedisQueueEventsBus } from './RedisQueueEventsBus';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 import { QueryStream } from './QueryStream';
 
@@ -23,7 +21,6 @@ export enum DriverType {
 export interface QueryOrchestratorOptions {
   externalDriverFactory?: DriverFactory;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
-  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: any;
   preAggregationsOptions?: any;
   rollupOnlyMode?: boolean;
@@ -43,10 +40,6 @@ function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQ
     return cacheAndQueueDriver;
   }
 
-  if (getEnv('redisUrl') || getEnv('redisUseIORedis')) {
-    return 'redis';
-  }
-
   if (getEnv('nodeEnv') === 'production') {
     return 'cubestore';
   }
@@ -59,11 +52,9 @@ export class QueryOrchestrator {
 
   protected readonly preAggregations: PreAggregations;
 
-  protected readonly redisPool: RedisPool | undefined;
-
   protected readonly rollupOnlyMode: boolean;
 
-  private queueEventsBus: RedisQueueEventsBus | LocalQueueEventsBus;
+  private queueEventsBus: LocalQueueEventsBus;
 
   protected readonly cacheAndQueueDriver: string;
 
@@ -95,8 +86,6 @@ export class QueryOrchestrator {
 
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
 
-    const redisPool = cacheAndQueueDriver === 'redis' ? new RedisPool(options.redisPoolOptions) : undefined;
-    this.redisPool = redisPool;
     this.cacheAndQueueDriver = cacheAndQueueDriver;
 
     const cubeStoreDriverFactory = cacheAndQueueDriver === 'cubestore' ? async () => {
@@ -120,7 +109,6 @@ export class QueryOrchestrator {
       {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool,
         cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
@@ -135,7 +123,6 @@ export class QueryOrchestrator {
       {
         externalDriverFactory,
         cacheAndQueueDriver,
-        redisPool,
         cubeStoreDriverFactory,
         continueWaitTimeout,
         skipExternalCacheAndQueue,
@@ -149,10 +136,7 @@ export class QueryOrchestrator {
 
   private getQueueEventsBus() {
     if (!this.queueEventsBus) {
-      const isRedis = this.cacheAndQueueDriver === 'redis';
-      this.queueEventsBus = isRedis ?
-        new RedisQueueEventsBus({ redisPool: this.redisPool }) :
-        new LocalQueueEventsBus();
+      this.queueEventsBus = new LocalQueueEventsBus();
     }
     return this.queueEventsBus;
   }

@@ -20,7 +20,7 @@
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
     "lerna": "^4.0.0",
-    "redis": "^3.0.2"
+    "redis": "^4.6.14"
   },
   "resolutions": {
     "colors": "1.4.0"
