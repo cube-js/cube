@@ -16,7 +16,6 @@
     "@cubejs-backend/postgres-driver": "file:/cube-build/packages/cubejs-postgres-driver",
     "@cubejs-backend/server": "file:/cube-build/packages/cubejs-server",
     "cubejs-cli": "file:/cube-build/packages/cubejs-cli",
-    "@cubejs-backend/server": "file:/cube-build/packages/cubejs-server",
     "typescript": "~4.1.5",
     "@typescript-eslint/eslint-plugin": "^4.17.0",
     "core-js": "^3.34.0",
