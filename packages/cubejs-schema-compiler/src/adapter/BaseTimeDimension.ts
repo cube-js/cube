@@ -36,7 +36,7 @@ export class BaseTimeDimension extends BaseFilter {
       return null;
     }
 
-    const res =  super.selectColumns();
+    const res = super.selectColumns();
     return res;
   }
 

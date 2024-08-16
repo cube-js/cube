@@ -1,11 +1,11 @@
 import moment from 'moment-timezone';
+import {
+  setupLogger
+} from '@cubejs-backend/native';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
-import {
-  setupLogger
-} from '@cubejs-backend/native';
 
 describe('SQL Generation', () => {
   describe('Common - Yaml - syntax sugar', () => {
@@ -91,7 +91,7 @@ describe('SQL Generation', () => {
       const expected = 'SELECT\n' +
           '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
           '    FROM\n' +
-          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC'
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
     it('Simple query - time dimension', async () => {
@@ -106,9 +106,9 @@ describe('SQL Generation', () => {
         ],
         timeDimensions: [
           {
-          dimension: 'cards.createdAt',
-          granularity: 'day',
-          dateRange: ['2021-01-01', '2021-01-02']
+            dimension: 'cards.createdAt',
+            granularity: 'day',
+            dateRange: ['2021-01-01', '2021-01-02']
           }
         ],
         timezone: 'America/Los_Angeles',
@@ -153,7 +153,7 @@ describe('SQL Generation', () => {
 
       const queryAndParams = query.buildSqlAndParams();
       const expected = 'SELECT\n' +
-          `      CONCAT("cards".type, ' ', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n` +
+          '      CONCAT("cards".type, \' \', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
           '    FROM\n' +
           '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
       expect(queryAndParams[0]).toEqual(expected);
