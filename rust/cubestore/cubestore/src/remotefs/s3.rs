@@ -48,10 +48,48 @@ impl S3RemoteFs {
         bucket_name: String,
         sub_path: Option<String>,
     ) -> Result<Arc<Self>, CubeError> {
-        // Incorrect naming for ENV variables...
-        let access_key = env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok();
-        let secret_key = env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok();
-
+        let role_name = env::var("CUBESTORE_AWS_IAM_ROLE").ok();
+        let (access_key, secret_key) = match role_name {
+            Some(role_name) => {
+                let region = env::var("CUBESTORE_AWS_REGION").expect("CUBESTORE_AWS_REGION must be set");
+                let account_id = Command::new("aws")
+                   .args(&["sts", "get-caller-identity", "--query", "Account", "--output", "text"])
+                   .output()
+                   .expect("Failed to get account ID")
+                   .stdout
+                   .trim()
+                   .to_string();
+    
+                let assume_role_output = Command::new("aws")
+                   .args(&[
+                        "sts",
+                        "assume-role",
+                        "--role-arn",
+                        &format!("arn:aws:iam::{}:role/{}", account_id, role_name),
+                        "--role-session-name",
+                        &format!("session-{}", role_name),
+                        "--query",
+                        "Credentials",
+                        "--output",
+                        "text",
+                    ])
+                   .output()
+                   .expect("Failed to assume role")
+                   .stdout
+                   .trim()
+                   .to_string();
+    
+                let access_key = assume_role_output.split_whitespace().nth(1).unwrap().trim_matches('"');
+                let secret_key = assume_role_output.split_whitespace().nth(3).unwrap().trim_matches('"');
+    
+                (Some(access_key), Some(secret_key))
+            }
+            None => (
+                env::var("CUBESTORE_AWS_ACCESS_KEY_ID").ok(),
+                env::var("CUBESTORE_AWS_SECRET_ACCESS_KEY").ok(),
+            ),
+        };
+    
         let credentials = Credentials::new(
             access_key.as_deref(),
             secret_key.as_deref(),
@@ -59,7 +97,7 @@ impl S3RemoteFs {
             None,
             None,
         )
-        .map_err(|err| {
+       .map_err(|err| {
             CubeError::internal(format!(
                 "Failed to create S3 credentials: {}",
                 err.to_string()
@@ -79,15 +117,22 @@ impl S3RemoteFs {
             sub_path,
             delete_mut: Mutex::new(()),
         });
-        spawn_creds_refresh_loop(access_key, secret_key, bucket_name, region, &fs);
-
+    
+        spawn_creds_refresh_loop(
+            role_name.or(access_key.clone()),
+            role_name.is_some(),
+            bucket_name,
+            region,
+            &fs,
+        );
+    
         Ok(fs)
     }
 }
 
 fn spawn_creds_refresh_loop(
-    access_key: Option<String>,
-    secret_key: Option<String>,
+    role_or_access_key: Option<String>,
+    is_role: bool,
     bucket_name: String,
     region: Region,
     fs: &Arc<S3RemoteFs>,
@@ -110,6 +155,43 @@ fn spawn_creds_refresh_loop(
                 }
                 Some(fs) => fs,
             };
+            let (access_key, secret_key) = if is_role {
+                let region = env::var("CUBESTORE_AWS_REGION").expect("CUBESTORE_AWS_REGION must be set");
+                let account_id = Command::new("aws")
+                  .args(&["sts", "get-caller-identity", "--query", "Account", "--output", "text"])
+                  .output()
+                  .expect("Failed to get account ID")
+                  .stdout
+                  .trim()
+                  .to_string();
+
+                let assume_role_output = Command::new("aws")
+                  .args(&[
+                        "sts",
+                        "assume-role",
+                        "--role-arn",
+                        &format!("arn:aws:iam::{}:role/{}", account_id, role_or_access_key.as_ref().unwrap()),
+                        "--role-session-name",
+                        &format!("session-{}", role_or_access_key.as_ref().unwrap()),
+                        "--query",
+                        "Credentials",
+                        "--output",
+                        "text",
+                    ])
+                  .output()
+                  .expect("Failed to assume role")
+                  .stdout
+                  .trim()
+                  .to_string();
+
+                let access_key = assume_role_output.split_whitespace().nth(1).unwrap().trim_matches('"');
+                let secret_key = assume_role_output.split_whitespace().nth(3).unwrap().trim_matches('"');
+
+                (Some(access_key), Some(secret_key))
+            } else {
+                (role_or_access_key, None)
+            };
+
             let c = match Credentials::new(
                 access_key.as_deref(),
                 secret_key.as_deref(),
@@ -138,12 +220,24 @@ fn spawn_creds_refresh_loop(
 
 fn refresh_interval_from_env() -> Duration {
     let mut mins = 180; // 3 hours by default.
-    if let Ok(s) = std::env::var("CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS") {
-        match s.parse::<u64>() {
-            Ok(i) => mins = i,
-            Err(e) => log::error!("Could not parse CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
+    if let Ok(_) = std::env::var("CUBESTORE_AWS_IAM_ROLE") {
+        if let Ok(s) = std::env::var("CUBESTORE_AWS_IAM_REFRESH_EVERY_MINS") {
+            // 14 mins by default if IAM role present
+            match s.parse::<u64>() {
+                Ok(i) => mins = i,
+                Err(e) => log::error!("Could not parse CUBESTORE_AWS_IAM_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
+            };
+        } else {
+            mins = 14;
+        }
+    } else {
+        if let Ok(s) = std::env::var("CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS") {
+            match s.parse::<u64>() {
+                Ok(i) => mins = i,
+                Err(e) => log::error!("Could not parse CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS. Refreshing every {} minutes. Error: {}", mins, e),
+            };
         };
-    };
+    }
     Duration::from_secs(60 * mins)
 }
 
