@@ -13,6 +13,8 @@ export class RedisEventEmitter implements EventEmitterInterface {
 
     #pub: RedisClientType | null = null;
 
+    #initialized = false;
+
     readonly #url: string;
 
     readonly #initSubject = new Subject<null>();
@@ -32,11 +34,13 @@ export class RedisEventEmitter implements EventEmitterInterface {
       await this.#sub.connect();
       await this.#pub.connect();
 
+      this.#initialized = true;
       this.#initSubject.next(null);
+      this.#initSubject.complete();
     }
 
     public on(event: string, listener: (...args: any[]) => void) {
-      if (!this.#sub) {
+      if (!this.#initialized || !this.#sub) {
         this.#initSubject
           .pipe(
             take(1)
@@ -54,7 +58,7 @@ export class RedisEventEmitter implements EventEmitterInterface {
     }
 
     public emit(event: string, ...args: any[]): boolean {
-      if (!this.#pub) {
+      if (!this.#initialized || !this.#pub) {
         return false;
       }
 
