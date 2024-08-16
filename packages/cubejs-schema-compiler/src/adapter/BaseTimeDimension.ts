@@ -15,11 +15,9 @@ export class BaseTimeDimension extends BaseFilter {
 
   public readonly baseRollupGranularity: string | undefined;
 
-  public readonly leadingWindowPart: string | undefined;
+  public readonly granularityInterval: string[];
 
-  public readonly trailingWindowPart: string | undefined;
-
-  public readonly binStride: { num: number, type: string } | undefined;
+  public readonly granularityOffset: string | undefined;
 
   public readonly granularitySql: Function | undefined;
 
@@ -39,25 +37,16 @@ export class BaseTimeDimension extends BaseFilter {
     this.dateRange = timeDimension.dateRange;
     this.granularity = timeDimension.granularity;
     this.isPredefined = isPredefinedGranularity(this.granularity);
+    this.granularityInterval = [];
     if (!this.isPredefined) {
       const customGranularity = this.query.cubeEvaluator
         .byPath('dimensions', timeDimension.dimension)
         .granularities?.[this.granularity];
 
-      this.baseRollupGranularity = customGranularity?.baseGranularity;
+      this.baseRollupGranularity = customGranularity?.rollupGranularity;
       this.granularitySql = customGranularity?.sql;
-      this.leadingWindowPart = customGranularity?.leading;
-      this.trailingWindowPart = customGranularity?.trailing;
-      if (customGranularity?.bin) {
-        // XXX: Potentially to use BaseQuery#parseInterval?
-        // But it's protected and expects duration to be specified, so no "bin: year" will be possible
-        const v = customGranularity.bin.trim().split(' ');
-        if (v.length === 1) {
-          this.binStride = { num: 1, type: v[0] };
-        } else {
-          this.binStride = { num: parseInt(v[0], 10), type: v[1] };
-        }
-      }
+      this.granularityInterval = customGranularity?.interval.split(' ');
+      this.granularityOffset = customGranularity?.offset;
     }
     this.boundaryDateRange = timeDimension.boundaryDateRange;
     this.shiftInterval = timeDimension.shiftInterval;
@@ -165,42 +154,37 @@ export class BaseTimeDimension extends BaseFilter {
     let dtDate = this.query.dimensionSql(this);
 
     // Need to construct SQL
-    if (this.binStride?.num === 1) { // range is aligned with natural calendar, so we can use DATE_TRUNC
-      if (this.leadingWindowPart) {
+    // range is aligned with natural calendar, so we can use DATE_TRUNC
+    if (this.isGranularityNaturalAligned()) {
+      if (this.granularityOffset) {
         // Example: DATE_TRUNC('granularity', dimension - INTERVAL 'xxxx') + INTERVAL 'xxxx'
-        dtDate = this.query.subtractInterval(dtDate, this.leadingWindowPart);
-        dtDate = this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
-        dtDate = this.query.addInterval(dtDate, this.leadingWindowPart);
-
-        return dtDate;
-      } else if (this.trailingWindowPart) {
-        // Example: DATE_TRUNC('granularity', dimension + INTERVAL 'xxxx') - INTERVAL 'xxxx'
-        dtDate = this.query.addInterval(dtDate, this.trailingWindowPart);
-        dtDate = this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
-        dtDate = this.query.subtractInterval(dtDate, this.trailingWindowPart);
+        dtDate = this.query.subtractInterval(dtDate, this.granularityOffset);
+        dtDate = this.query.timeGroupedColumn(this.granularityFromInterval(this.granularityInterval[1]), dtDate);
+        dtDate = this.query.addInterval(dtDate, this.granularityOffset);
 
         return dtDate;
       }
 
       // No window offsets
-      return this.query.timeGroupedColumn(this.granularityFromInterval(this.binStride.type), dtDate);
+      return this.query.timeGroupedColumn(this.granularityFromInterval(this.granularityInterval[1]), dtDate);
     }
 
     // need to use DATE_BIN
     let origin = this.query.startOfTheYearTimestampSql();
-    if (this.leadingWindowPart) {
-      origin = this.query.addInterval(origin, this.leadingWindowPart);
-    } else if (this.trailingWindowPart) {
-      origin = this.query.subtractInterval(origin, this.trailingWindowPart);
+    if (this.granularityOffset) {
+      origin = this.query.addInterval(origin, this.granularityOffset);
     }
 
-    return this.query.dateBin(`${this.binStride?.num} ${this.binStride?.type}`, dtDate, origin);
+    return this.query.dateBin(`${this.granularityInterval.join(' ')}`, dtDate, origin);
+  }
+
+  private isGranularityNaturalAligned(): boolean {
+    if (!this.granularityInterval) { return false; }
+
+    return !(this.granularityInterval.length !== 2 || this.granularityInterval[0] !== '1');
   }
 
   public granularityFromInterval(interval: string) {
-    if (!interval) {
-      return undefined;
-    }
     if (interval.match(/day/)) {
       return 'day';
     } else if (interval.match(/month/)) {
@@ -213,10 +197,9 @@ export class BaseTimeDimension extends BaseFilter {
       return 'hour';
     } else if (interval.match(/minute/)) {
       return 'minute';
-    } else if (interval.match(/second/)) {
+    } else /* if (interval.match(/second/)) */ {
       return 'second';
     }
-    return undefined;
   }
 
   public filterToWhere() {
