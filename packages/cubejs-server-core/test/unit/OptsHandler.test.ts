@@ -54,9 +54,6 @@ const conf = {
     testConnection: async () => undefined,
   }),
   orchestratorOptions: () => ({
-    redisPoolOptions: {
-      createClient: async () => undefined
-    },
   }),
 };
 
@@ -789,7 +786,7 @@ describe('OptsHandler class', () => {
     });
     opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
-    
+
     expect(driver.pool.options.max).toEqual(8);
     expect(driver.testConnectionTimeout()).toEqual(testConnectionTimeout);
 
@@ -1020,9 +1017,6 @@ describe('OptsHandler class', () => {
           database: 'database',
         }),
         orchestratorOptions: () => ({
-          redisPoolOptions: {
-            createClient: async () => undefined
-          },
           preAggregationsOptions: {
             externalRefresh: true,
           },
