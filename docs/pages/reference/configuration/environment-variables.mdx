@@ -676,6 +676,15 @@ The username used to connect to the database.
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
 
+## `CUBEJS_DB_QUERY_DEFAULT_LIMIT`
+
+The default [row limit][ref-row-limit] in the result set if it's not explicitly
+specified in an API query.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `10000`                | `10000`               |
+
 ## `CUBEJS_DB_QUERY_LIMIT`
 
 The maximum [row limit][ref-row-limit] in the result set.
