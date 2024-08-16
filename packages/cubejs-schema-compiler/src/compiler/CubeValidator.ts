@@ -42,9 +42,6 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
-const RollupGranularity = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year');
-const GranularityStep = Joi.string().pattern(/^(\d+\s+)?(second|minute|hour|day|week|month|year)s?(\s\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity step');
-
 const regexTimeInterval = Joi.string().custom((value, helper) => {
   if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)s?$/)) {
     return value;
@@ -85,6 +82,11 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
   }
 });
 
+const RollupGranularity = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year');
+const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|year)s?(\s\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity interval');
+// Do not allow negative intervals for granularities, while offsets could be negative
+const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity offset');
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -111,15 +113,13 @@ const BaseDimensionWithoutSubQuery = {
       Joi.alternatives([
         Joi.object().keys({
           sql: Joi.func().required(),
-          rollupGranularity: RollupGranularity.optional(),
+          rollupGranularity: RollupGranularity.required(),
+          interval: GranularityInterval.required(),
         }),
         Joi.object().keys({
-          leading: GranularityStep,
-          trailing: GranularityStep,
-          bin: GranularityStep.required(),
-          rollupGranularity: RollupGranularity.optional(),
+          offset: GranularityOffset.optional(),
+          interval: GranularityInterval.required(),
         })
-          .oxor('leading', 'trailing')
       ])).optional(),
     otherwise: Joi.forbidden()
   })
