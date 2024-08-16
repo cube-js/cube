@@ -1,6 +1,7 @@
 import { RedisClient } from 'redis';
 import { EventEmitterInterface, EventEmitterOptions } from './EventEmitter.interface';
 import { createRedisClient } from './RedisFactory';
+import { Subject } from 'rxjs';
 
 export interface RedisEventEmitterOptions extends EventEmitterOptions {
   type: 'redis';
@@ -16,6 +17,8 @@ export class RedisEventEmitter implements EventEmitterInterface {
 
     readonly #url: string;
 
+    readonly #initSubject = new Subject<null>();
+
     public constructor(url: string) {
       this.#url = url;
       this.init().then(() => {
@@ -26,31 +29,37 @@ export class RedisEventEmitter implements EventEmitterInterface {
     public async init() {
       this.#sub = await createRedisClient(this.#url);
       this.#pub = await createRedisClient(this.#url);
+
+      this.#sub.on('message', (channel, message) => {
+        const subscribers = this.#subscriptions.get(channel);
+        if (subscribers) {
+          subscribers.forEach((l) => l(JSON.parse(message)));
+        }
+      });
+
+      this.#initSubject.next(null);
     }
 
-    public on(event: string, listener: (...args: any[]) => void): this {
-      if (!this.#sub) {
-        throw new Error('Redis client is not initialized');
+    public on(event: string, listener: (...args: any[]) => void) {
+      if (this.#sub) {
+        console.log('Subscribing to', event);
+        this.#sub.subscribe(event);
+      } else {
+        this.#initSubject.subscribe(() => {
+          console.log('Subscribing to', event);
+          this.#sub!.subscribe(event);
+        });
       }
 
       if (!this.#subscriptions.has(event)) {
         this.#subscriptions.set(event, []);
-        this.#sub.subscribe(event);
-        this.#sub.on('message', (channel, message) => {
-          const subscribers = this.#subscriptions.get(channel);
-          if (subscribers) {
-            subscribers.forEach((l) => l(JSON.parse(message)));
-          }
-        });
       }
       this.#subscriptions.get(event)!.push(listener);
-
-      return this;
     }
 
     public emit(event: string, ...args: any[]): boolean {
       if (!this.#pub) {
-        throw new Error('Redis client is not initialized');
+        return false;
       }
 
       this.#pub.publish(event, JSON.stringify(args));

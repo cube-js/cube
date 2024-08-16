@@ -5,6 +5,6 @@ export type EventEmitterOptions = {
 };
 
 export interface EventEmitterInterface {
-    on (event: string, listener: (args: any) => void): this
+    on (event: string, listener: (args: any) => void): void
     emit (event: string, ...args: any): boolean
 }
