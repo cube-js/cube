@@ -42,7 +42,7 @@ function formatStatePath(state: Joi.State): string {
   return '<unknown path>';
 }
 
-const BaseGranularity = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year');
+const RollupGranularity = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year');
 const GranularityStep = Joi.string().pattern(/^(\d+\s+)?(second|minute|hour|day|week|month|year)s?(\s\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity step');
 
 const regexTimeInterval = Joi.string().custom((value, helper) => {
@@ -111,13 +111,13 @@ const BaseDimensionWithoutSubQuery = {
       Joi.alternatives([
         Joi.object().keys({
           sql: Joi.func().required(),
-          baseGranularity: BaseGranularity.optional(),
+          rollupGranularity: RollupGranularity.optional(),
         }),
         Joi.object().keys({
           leading: GranularityStep,
           trailing: GranularityStep,
           bin: GranularityStep.required(),
-          baseGranularity: BaseGranularity.optional(),
+          rollupGranularity: RollupGranularity.optional(),
         })
           .oxor('leading', 'trailing')
       ])).optional(),

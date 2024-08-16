@@ -13,7 +13,7 @@ export class BaseTimeDimension extends BaseFilter {
 
   public readonly isPredefined: boolean;
 
-  public readonly baseGranularity: string | undefined;
+  public readonly baseRollupGranularity: string | undefined;
 
   public readonly leadingWindowPart: string | undefined;
 
@@ -44,7 +44,7 @@ export class BaseTimeDimension extends BaseFilter {
         .byPath('dimensions', timeDimension.dimension)
         .granularities?.[this.granularity];
 
-      this.baseGranularity = customGranularity?.baseGranularity;
+      this.baseRollupGranularity = customGranularity?.baseGranularity;
       this.granularitySql = customGranularity?.sql;
       this.leadingWindowPart = customGranularity?.leading;
       this.trailingWindowPart = customGranularity?.trailing;
@@ -324,8 +324,8 @@ export class BaseTimeDimension extends BaseFilter {
               return this.query.minGranularity(this.granularity, this.dateRangeGranularity());
             }
 
-            if (this.baseGranularity) {
-              return this.query.minGranularity(this.baseGranularity, this.dateRangeGranularity());
+            if (this.baseRollupGranularity) {
+              return this.query.minGranularity(this.baseRollupGranularity, this.dateRangeGranularity());
             }
 
             // Trying to get granularity from the date range if it was provided
