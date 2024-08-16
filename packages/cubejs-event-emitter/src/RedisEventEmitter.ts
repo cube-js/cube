@@ -1,7 +1,8 @@
+import { Subject } from 'rxjs';
+import { take } from 'rxjs/operators';
 import { RedisClient } from 'redis';
 import { EventEmitterInterface, EventEmitterOptions } from './EventEmitter.interface';
 import { createRedisClient } from './RedisFactory';
-import { Subject } from 'rxjs';
 
 export interface RedisEventEmitterOptions extends EventEmitterOptions {
   type: 'redis';
@@ -45,7 +46,11 @@ export class RedisEventEmitter implements EventEmitterInterface {
         console.log('Subscribing to', event);
         this.#sub.subscribe(event);
       } else {
-        this.#initSubject.subscribe(() => {
+        this.#initSubject
+          .pipe(
+            take(1)
+          )
+          .subscribe(() => {
           console.log('Subscribing to', event);
           this.#sub!.subscribe(event);
         });
