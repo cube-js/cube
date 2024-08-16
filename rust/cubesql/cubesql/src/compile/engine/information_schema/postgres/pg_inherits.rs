@@ -32,12 +32,12 @@ impl PgCatalogInheritsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.inhrelid.finish()));
-        columns.push(Arc::new(self.inhparent.finish()));
-        columns.push(Arc::new(self.inhseqno.finish()));
-        columns.push(Arc::new(self.inhdetachpending.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.inhrelid.finish()),
+            Arc::new(self.inhparent.finish()),
+            Arc::new(self.inhseqno.finish()),
+            Arc::new(self.inhdetachpending.finish()),
+        ];
 
         columns
     }

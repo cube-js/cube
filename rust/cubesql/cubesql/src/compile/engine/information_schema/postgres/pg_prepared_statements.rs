@@ -69,15 +69,15 @@ impl PgPreparedStatementsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.name.finish()));
-        columns.push(Arc::new(self.statement.finish()));
-        columns.push(Arc::new(self.prepare_time.finish()));
-        columns.push(Arc::new(self.parameter_types.finish()));
-        columns.push(Arc::new(self.from_sql.finish()));
-        columns.push(Arc::new(self.generic_plans.finish()));
-        columns.push(Arc::new(self.custom_plans.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.name.finish()),
+            Arc::new(self.statement.finish()),
+            Arc::new(self.prepare_time.finish()),
+            Arc::new(self.parameter_types.finish()),
+            Arc::new(self.from_sql.finish()),
+            Arc::new(self.generic_plans.finish()),
+            Arc::new(self.custom_plans.finish()),
+        ];
 
         columns
     }

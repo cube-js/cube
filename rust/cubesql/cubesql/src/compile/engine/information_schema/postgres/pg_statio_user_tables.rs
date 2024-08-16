@@ -61,19 +61,19 @@ impl PgCatalogStatioUserTablesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.relid.finish()));
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.relname.finish()));
-        columns.push(Arc::new(self.heap_blks_read.finish()));
-        columns.push(Arc::new(self.heap_blks_hit.finish()));
-        columns.push(Arc::new(self.idx_blks_read.finish()));
-        columns.push(Arc::new(self.idx_blks_hit.finish()));
-        columns.push(Arc::new(self.toast_blks_read.finish()));
-        columns.push(Arc::new(self.toast_blks_hit.finish()));
-        columns.push(Arc::new(self.tidx_blks_read.finish()));
-        columns.push(Arc::new(self.tidx_blks_hit.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.relid.finish()),
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.relname.finish()),
+            Arc::new(self.heap_blks_read.finish()),
+            Arc::new(self.heap_blks_hit.finish()),
+            Arc::new(self.idx_blks_read.finish()),
+            Arc::new(self.idx_blks_hit.finish()),
+            Arc::new(self.toast_blks_read.finish()),
+            Arc::new(self.toast_blks_hit.finish()),
+            Arc::new(self.tidx_blks_read.finish()),
+            Arc::new(self.tidx_blks_hit.finish()),
+        ];
 
         columns
     }

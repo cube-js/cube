@@ -58,15 +58,15 @@ impl InformationSchemaSchemataBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.catalog_names.finish()));
-        columns.push(Arc::new(self.schema_names.finish()));
-        columns.push(Arc::new(self.schema_owners.finish()));
-        columns.push(Arc::new(self.default_character_set_catalogs.finish()));
-        columns.push(Arc::new(self.default_character_set_schemas.finish()));
-        columns.push(Arc::new(self.default_character_set_names.finish()));
-        columns.push(Arc::new(self.sql_paths.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.catalog_names.finish()),
+            Arc::new(self.schema_names.finish()),
+            Arc::new(self.schema_owners.finish()),
+            Arc::new(self.default_character_set_catalogs.finish()),
+            Arc::new(self.default_character_set_schemas.finish()),
+            Arc::new(self.default_character_set_names.finish()),
+            Arc::new(self.sql_paths.finish()),
+        ];
 
         columns
     }

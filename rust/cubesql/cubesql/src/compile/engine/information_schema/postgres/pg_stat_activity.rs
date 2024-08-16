@@ -101,30 +101,30 @@ impl PgStatActivityBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.datname.finish()));
-        columns.push(Arc::new(self.pid.finish()));
-        columns.push(Arc::new(self.leader_pid.finish()));
-        columns.push(Arc::new(self.usesysid.finish()));
-        columns.push(Arc::new(self.usename.finish()));
-        columns.push(Arc::new(self.application_name.finish()));
-        columns.push(Arc::new(self.client_addr.finish()));
-        columns.push(Arc::new(self.client_hostname.finish()));
-        columns.push(Arc::new(self.client_port.finish()));
-        columns.push(Arc::new(self.backend_start.finish()));
-        columns.push(Arc::new(self.xact_start.finish()));
-        columns.push(Arc::new(self.query_start.finish()));
-        columns.push(Arc::new(self.state_change.finish()));
-        columns.push(Arc::new(self.wait_event_type.finish()));
-        columns.push(Arc::new(self.wait_event.finish()));
-        columns.push(Arc::new(self.state.finish()));
-        columns.push(Arc::new(self.backend_xid.finish()));
-        columns.push(Arc::new(self.backend_xmin.finish()));
-        columns.push(Arc::new(self.query_id.finish()));
-        columns.push(Arc::new(self.query.finish()));
-        columns.push(Arc::new(self.backend_type.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.datname.finish()),
+            Arc::new(self.pid.finish()),
+            Arc::new(self.leader_pid.finish()),
+            Arc::new(self.usesysid.finish()),
+            Arc::new(self.usename.finish()),
+            Arc::new(self.application_name.finish()),
+            Arc::new(self.client_addr.finish()),
+            Arc::new(self.client_hostname.finish()),
+            Arc::new(self.client_port.finish()),
+            Arc::new(self.backend_start.finish()),
+            Arc::new(self.xact_start.finish()),
+            Arc::new(self.query_start.finish()),
+            Arc::new(self.state_change.finish()),
+            Arc::new(self.wait_event_type.finish()),
+            Arc::new(self.wait_event.finish()),
+            Arc::new(self.state.finish()),
+            Arc::new(self.backend_xid.finish()),
+            Arc::new(self.backend_xmin.finish()),
+            Arc::new(self.query_id.finish()),
+            Arc::new(self.query.finish()),
+            Arc::new(self.backend_type.finish()),
+        ];
 
         columns
     }

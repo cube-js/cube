@@ -149,38 +149,38 @@ impl PgCatalogProcBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.proname.finish()));
-        columns.push(Arc::new(self.pronamespace.finish()));
-        columns.push(Arc::new(self.proowner.finish()));
-        columns.push(Arc::new(self.prolang.finish()));
-        columns.push(Arc::new(self.procost.finish()));
-        columns.push(Arc::new(self.prorows.finish()));
-        columns.push(Arc::new(self.provariadic.finish()));
-        columns.push(Arc::new(self.prosupport.finish()));
-        columns.push(Arc::new(self.prokind.finish()));
-        columns.push(Arc::new(self.prosecdef.finish()));
-        columns.push(Arc::new(self.proleakproof.finish()));
-        columns.push(Arc::new(self.proisstrict.finish()));
-        columns.push(Arc::new(self.proretset.finish()));
-        columns.push(Arc::new(self.provolatile.finish()));
-        columns.push(Arc::new(self.proparallel.finish()));
-        columns.push(Arc::new(self.pronargs.finish()));
-        columns.push(Arc::new(self.pronargdefaults.finish()));
-        columns.push(Arc::new(self.prorettype.finish()));
-        columns.push(Arc::new(self.proargtypes.finish()));
-        columns.push(Arc::new(self.proallargtypes.finish()));
-        columns.push(Arc::new(self.proargmodes.finish()));
-        columns.push(Arc::new(self.proargnames.finish()));
-        columns.push(Arc::new(self.proargdefaults.finish()));
-        columns.push(Arc::new(self.protrftypes.finish()));
-        columns.push(Arc::new(self.prosrc.finish()));
-        columns.push(Arc::new(self.probin.finish()));
-        columns.push(Arc::new(self.prosqlbody.finish()));
-        columns.push(Arc::new(self.proconfig.finish()));
-        columns.push(Arc::new(self.proacl.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.proname.finish()),
+            Arc::new(self.pronamespace.finish()),
+            Arc::new(self.proowner.finish()),
+            Arc::new(self.prolang.finish()),
+            Arc::new(self.procost.finish()),
+            Arc::new(self.prorows.finish()),
+            Arc::new(self.provariadic.finish()),
+            Arc::new(self.prosupport.finish()),
+            Arc::new(self.prokind.finish()),
+            Arc::new(self.prosecdef.finish()),
+            Arc::new(self.proleakproof.finish()),
+            Arc::new(self.proisstrict.finish()),
+            Arc::new(self.proretset.finish()),
+            Arc::new(self.provolatile.finish()),
+            Arc::new(self.proparallel.finish()),
+            Arc::new(self.pronargs.finish()),
+            Arc::new(self.pronargdefaults.finish()),
+            Arc::new(self.prorettype.finish()),
+            Arc::new(self.proargtypes.finish()),
+            Arc::new(self.proallargtypes.finish()),
+            Arc::new(self.proargmodes.finish()),
+            Arc::new(self.proargnames.finish()),
+            Arc::new(self.proargdefaults.finish()),
+            Arc::new(self.protrftypes.finish()),
+            Arc::new(self.prosrc.finish()),
+            Arc::new(self.probin.finish()),
+            Arc::new(self.prosqlbody.finish()),
+            Arc::new(self.proconfig.finish()),
+            Arc::new(self.proacl.finish()),
+        ];
 
         columns
     }

@@ -83,21 +83,22 @@ impl PgCatalogStatsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.tablename.finish()));
-        columns.push(Arc::new(self.attname.finish()));
-        columns.push(Arc::new(self.inherited.finish()));
-        columns.push(Arc::new(self.null_frac.finish()));
-        columns.push(Arc::new(self.avg_width.finish()));
-        columns.push(Arc::new(self.n_distinct.finish()));
-        columns.push(Arc::new(self.most_common_vals.finish()));
-        columns.push(Arc::new(self.most_common_freqs.finish()));
-        columns.push(Arc::new(self.histogram_bounds.finish()));
-        columns.push(Arc::new(self.correlation.finish()));
-        columns.push(Arc::new(self.most_common_elems.finish()));
-        columns.push(Arc::new(self.most_common_elem_freqs.finish()));
-        columns.push(Arc::new(self.elem_count_histogram.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.tablename.finish()),
+            Arc::new(self.attname.finish()),
+            Arc::new(self.inherited.finish()),
+            Arc::new(self.null_frac.finish()),
+            Arc::new(self.avg_width.finish()),
+            Arc::new(self.n_distinct.finish()),
+            Arc::new(self.most_common_vals.finish()),
+            Arc::new(self.most_common_freqs.finish()),
+            Arc::new(self.histogram_bounds.finish()),
+            Arc::new(self.correlation.finish()),
+            Arc::new(self.most_common_elems.finish()),
+            Arc::new(self.most_common_elem_freqs.finish()),
+            Arc::new(self.elem_count_histogram.finish()),
+        ];
 
         columns
     }

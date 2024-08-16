@@ -136,39 +136,40 @@ impl PgCatalogTypeBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.typname.finish()));
-        columns.push(Arc::new(self.typnamespace.finish()));
-        columns.push(Arc::new(self.typowner.finish()));
-        columns.push(Arc::new(self.typlen.finish()));
-        columns.push(Arc::new(self.typbyval.finish()));
-        columns.push(Arc::new(self.typtype.finish()));
-        columns.push(Arc::new(self.typcategory.finish()));
-        columns.push(Arc::new(self.typisprefered.finish()));
-        columns.push(Arc::new(self.typisdefined.finish()));
-        columns.push(Arc::new(self.typdelim.finish()));
-        columns.push(Arc::new(self.typrelid.finish()));
-        columns.push(Arc::new(self.typsubscript.finish()));
-        columns.push(Arc::new(self.typelem.finish()));
-        columns.push(Arc::new(self.typarray.finish()));
-        columns.push(Arc::new(self.typinput.finish()));
-        columns.push(Arc::new(self.typoutput.finish()));
-        columns.push(Arc::new(self.typreceive.finish()));
-        columns.push(Arc::new(self.typsend.finish()));
-        columns.push(Arc::new(self.typmodin.finish()));
-        columns.push(Arc::new(self.typmodout.finish()));
-        columns.push(Arc::new(self.typanalyze.finish()));
-        columns.push(Arc::new(self.typalign.finish()));
-        columns.push(Arc::new(self.typstorage.finish()));
-        columns.push(Arc::new(self.typnotnull.finish()));
-        columns.push(Arc::new(self.typbasetype.finish()));
-        columns.push(Arc::new(self.typtypmod.finish()));
-        columns.push(Arc::new(self.typndims.finish()));
-        columns.push(Arc::new(self.typcollation.finish()));
-        columns.push(Arc::new(self.typdefaultbin.finish()));
-        columns.push(Arc::new(self.typdefault.finish()));
-        columns.push(Arc::new(self.typacl.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.typname.finish()),
+            Arc::new(self.typnamespace.finish()),
+            Arc::new(self.typowner.finish()),
+            Arc::new(self.typlen.finish()),
+            Arc::new(self.typbyval.finish()),
+            Arc::new(self.typtype.finish()),
+            Arc::new(self.typcategory.finish()),
+            Arc::new(self.typisprefered.finish()),
+            Arc::new(self.typisdefined.finish()),
+            Arc::new(self.typdelim.finish()),
+            Arc::new(self.typrelid.finish()),
+            Arc::new(self.typsubscript.finish()),
+            Arc::new(self.typelem.finish()),
+            Arc::new(self.typarray.finish()),
+            Arc::new(self.typinput.finish()),
+            Arc::new(self.typoutput.finish()),
+            Arc::new(self.typreceive.finish()),
+            Arc::new(self.typsend.finish()),
+            Arc::new(self.typmodin.finish()),
+            Arc::new(self.typmodout.finish()),
+            Arc::new(self.typanalyze.finish()),
+            Arc::new(self.typalign.finish()),
+            Arc::new(self.typstorage.finish()),
+            Arc::new(self.typnotnull.finish()),
+            Arc::new(self.typbasetype.finish()),
+            Arc::new(self.typtypmod.finish()),
+            Arc::new(self.typndims.finish()),
+            Arc::new(self.typcollation.finish()),
+            Arc::new(self.typdefaultbin.finish()),
+            Arc::new(self.typdefault.finish()),
+            Arc::new(self.typacl.finish()),
+        ];
 
         columns
     }

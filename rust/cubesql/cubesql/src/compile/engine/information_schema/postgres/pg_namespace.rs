@@ -48,11 +48,12 @@ impl PgCatalogNamespaceBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.nspname.finish()));
-        columns.push(Arc::new(self.nspowner.finish()));
-        columns.push(Arc::new(self.nspacl.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.nspname.finish()),
+            Arc::new(self.nspowner.finish()),
+            Arc::new(self.nspacl.finish()),
+        ];
 
         columns
     }
