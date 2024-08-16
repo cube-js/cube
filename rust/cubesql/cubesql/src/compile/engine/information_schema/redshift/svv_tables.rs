@@ -52,12 +52,13 @@ impl RedshiftSvvTablesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.catalog_names.finish()));
-        columns.push(Arc::new(self.schema_names.finish()));
-        columns.push(Arc::new(self.table_names.finish()));
-        columns.push(Arc::new(self.table_types.finish()));
-        columns.push(Arc::new(self.remarks.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.catalog_names.finish()),
+            Arc::new(self.schema_names.finish()),
+            Arc::new(self.table_names.finish()),
+            Arc::new(self.table_types.finish()),
+            Arc::new(self.remarks.finish()),
+        ];
 
         columns
     }
