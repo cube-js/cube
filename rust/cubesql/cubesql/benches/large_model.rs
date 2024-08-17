@@ -20,8 +20,8 @@ use uuid::Uuid;
 macro_rules! bench_large_model {
     ($DIMS:expr, $NAME:expr, $QUERY_FN:expr, $CRITERION:expr) => {{
         let context = Arc::new(
-            futures::executor::block_on(create_test_cube_context(
-                create_test_postgresql_cube_context($DIMS),
+            futures::executor::block_on(create_test_postgresql_cube_context(
+                get_large_model_test_tenant_ctx($DIMS),
             ))
             .unwrap(),
         );
