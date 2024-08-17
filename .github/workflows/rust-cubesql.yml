@@ -43,6 +43,9 @@ jobs:
         run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
+      # TODO replace with clippy once cubesql is ready
+      - name: Check CubeSQL
+        run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
       - name: Clippy Native (with Python)
