@@ -327,7 +327,11 @@ impl DatabaseProtocol {
                         context.session_state.all_variables(),
                     )))
                 }
-                "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
+                "pg_description" => {
+                    return Some(Arc::new(PgCatalogDescriptionProvider::new(
+                        &context.meta.tables,
+                    )))
+                }
                 "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),

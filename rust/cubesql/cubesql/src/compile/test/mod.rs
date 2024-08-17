@@ -43,7 +43,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
     vec![
         CubeMeta {
             name: "KibanaSampleDataEcommerce".to_string(),
-            description: None,
+            description: Some("Sample data for tracking eCommerce orders from Kibana".to_string()),
             title: None,
             dimensions: vec![
                 CubeMetaDimension {
@@ -58,7 +58,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    description: None,
+                    description: Some("Customer gender".to_string()),
                     _type: "string".to_string(),
                 },
                 CubeMetaDimension {
@@ -81,7 +81,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.count".to_string(),
                     title: None,
-                    description: None,
+                    description: Some("Events count".to_string()),
                     _type: "number".to_string(),
                     agg_type: Some("count".to_string()),
                 },
@@ -263,24 +263,24 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
-            description: None,
+            description: Some("Test cube with a little bit of everything".to_string()),
             title: None,
             dimensions: (0..10)
                 .flat_map(|i| {
                     [
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_num{}", i),
-                            description: None,
+                            description: Some(format!("Test numeric dimention {i}")),
                             _type: "number".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
-                            description: None,
+                            description: Some(format!("Test string dimention {i}")),
                             _type: "string".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
-                            description: None,
+                            description: Some(format!("Test time dimention {i}")),
                             _type: "time".to_string(),
                         },
                     ]
@@ -294,21 +294,21 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             _type: "number".to_string(),
                             agg_type: Some("number".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test number measure {i}")),
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
                             _type: "string".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(string) measure {i}")),
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
                             _type: "time".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(time) measure {i}")),
                         },
                     ]
                 })
@@ -317,35 +317,35 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                         CubeMetaMeasure {
                             name: "MultiTypeCube.count".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test count measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test maxPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test minPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test avgPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test countDistinct measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                         },
