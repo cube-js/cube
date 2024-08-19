@@ -155,6 +155,8 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMeta"
+        compilerId:
+          type: "string"
     V1LoadResultAnnotation:
       type: "object"
       required:
