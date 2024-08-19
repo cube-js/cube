@@ -1056,7 +1056,7 @@ export class QueryCache {
       isScheduledRefresh?: boolean,
     }
   ) {
-    if (!options.isScheduledRefresh) {
+    if (!options.isScheduledRefresh || !options.renewedCube) {
       return;
     }
 
@@ -1064,10 +1064,6 @@ export class QueryCache {
     const resHash = getCacheHash(JSON.stringify(res));
 
     if (prevResHash !== resHash) {
-      console.log('cubeRenewed', {
-        renewedCube: options.renewedCube,
-      });
-
       this.eventEmitter.emit('cubeRenewed', {
         renewedCube: options.renewedCube,
         requestContext: options.requestContext,

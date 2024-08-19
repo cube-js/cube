@@ -29,7 +29,6 @@ export class SubscriptionServer {
   readonly #cubeRenewSubject = new Subject<unknown>();
 
   readonly #cubeRenewedPipe = this.#cubeRenewSubject.pipe(
-    tap((val) => console.log('Cube renewed received:', val)),
     map((val) => ensureArray(val)),
     // Map only the renewedCube property
     map((val) => val as Array<{ renewedCube: string | undefined }>),
