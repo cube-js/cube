@@ -47,9 +47,9 @@ jobs:
       - name: Check CubeSQL
         run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
       - name: Clippy Native
-        run: cd packages/cubejs-backend-native && cargo clippy -- -D warnings
+        run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
-        run: cd packages/cubejs-backend-native && cargo clippy --features python -- -D warnings
+        run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
       # CubeSQL is not ready for Clippy
       #- name: Clippy CubeSQL
       #  run: cd rust/cubesql && cargo clippy -- -D warnings
