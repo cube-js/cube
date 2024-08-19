@@ -268,6 +268,32 @@ describe('Schema Testing', () => {
     expect(dimensions.find((dimension) => dimension.name === 'CubeA.type').primaryKey).toBe(false);
   });
 
+  it('descriptions', async () => {
+    const { compiler, metaTransformer } = prepareCompiler([
+      createCubeSchema({
+        name: 'CubeA',
+        publicly: false,
+      }),
+    ]);
+    await compiler.compile();
+
+    const { description, dimensions, measures, segments } = metaTransformer.cubes[0].config;
+
+    expect(description).toBe('test cube from createCubeSchema');
+
+    expect(dimensions).toBeDefined();
+    expect(dimensions.length).toBeGreaterThan(0);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').description).toBe('id dimension from createCubeSchema');
+
+    expect(measures).toBeDefined();
+    expect(measures.length).toBeGreaterThan(0);
+    expect(measures.find((measure) => measure.name === 'CubeA.count').description).toBe('count measure from createCubeSchema');
+
+    expect(segments).toBeDefined();
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
+  });
+
   it('join types', async () => {
     const { compiler, cubeEvaluator } = prepareCompiler([
       createCubeSchema({
