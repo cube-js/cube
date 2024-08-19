@@ -81,7 +81,8 @@ export const devLogger = (level) => (type, { error, warning, ...message }) => {
 };
 
 export const prodLogger = (level) => (msg, params) => {
-  const { error, warning } = params;
+  const error = params.error;
+  const warning = params.warning;
 
   const logMessage = () => console.log(JSON.stringify({ message: msg, ...params }));
   // eslint-disable-next-line default-case
