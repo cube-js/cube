@@ -1409,14 +1409,13 @@ macro_rules! convert_array {
     }};
 }
 
-pub fn batch_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
+pub fn batches_to_dataframe(batches: Vec<RecordBatch>) -> Result<DataFrame, CubeError> {
     let mut cols = vec![];
     let mut all_rows = vec![];
 
     for batch in batches.into_iter() {
         if cols.len() == 0 {
-            let schema = batch.schema().clone();
-            for (i, field) in schema.fields().iter().enumerate() {
+            for (i, field) in batch.schema().fields().iter().enumerate() {
                 cols.push(Column::new(
                     field.name().clone(),
                     arrow_to_column_type(field.data_type().clone())?,
@@ -1771,7 +1770,7 @@ mod tests {
             Field::new("int32", DataType::Int32, true),
             Field::new("str32", DataType::Utf8, true),
         ]));
-        let result = batch_to_dataframe(vec![RecordBatch::try_new(
+        let result = batches_to_dataframe(vec![RecordBatch::try_new(
             schema,
             vec![
                 Arc::new(UInt32Array::from_iter(vec![Some(1), None])) as ArrayRef,
