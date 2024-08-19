@@ -2,6 +2,10 @@ interface LocalSubscriptionStoreOptions {
   heartBeatInterval?: number;
 }
 
+const haveCommonElement = (arr1: string[], arr2: string[]): boolean => {
+  return arr1.some(element => arr2.includes(element));
+}
+
 // TODO: Check whether this is the correct way to get cube names
 const getCubeNames = (query) => {
   if (!query) {
@@ -62,7 +66,7 @@ export class LocalSubscriptionStore {
 
   public async getSubscriptionsByCubeName(cubes: Array<string>) {
     // TODO: Implement cube filtering by auth context
-    return (await this.getAllSubscriptions()).filter(subscription => cubes.includes(subscription.cubes[0]));
+    return (await this.getAllSubscriptions()).filter(subscription => haveCommonElement(cubes, subscription.cubes));
   }
 
   public async cleanupSubscriptions(connectionId: string) {
