@@ -751,18 +751,6 @@ export class BaseQuery {
     return this.subtractInterval(timestamp, interval);
   }
 
-  /**
-   * @param {string} stride (a value expression of type interval)
-   * @param {string} source (a value expression of type timestamp/date)
-   * @param {string} origin (a value expression of type timestamp/date)
-   * @returns {string}
-   */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  dateBin(stride, source, origin) {
-    throw new Error('Not implemented');
-    // Different syntax possible in different DBs
-  }
-
   cumulativeMeasures() {
     return this.measures.filter(m => m.isCumulative());
   }
@@ -2769,6 +2757,71 @@ export class BaseQuery {
   }
 
   /**
+   * @param {string} dimension
+   * @param {string} interval
+   * @param {string | undefined} offset
+   * @return {string}
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dimensionTimeGroupedColumn(dimension, interval, offset) {
+    let dtDate;
+
+    // Interval is aligned with natural calendar, so we can use DATE_TRUNC
+    if (this.isGranularityNaturalAligned(interval)) {
+      if (offset) {
+        // Example: DATE_TRUNC(interval, dimension - INTERVAL 'offset') + INTERVAL 'offset'
+        dtDate = this.subtractInterval(dimension, offset);
+        dtDate = this.timeGroupedColumn(this.granularityFromInterval(interval), dtDate);
+        dtDate = this.addInterval(dtDate, offset);
+
+        return dtDate;
+      }
+
+      return this.timeGroupedColumn(this.granularityFromInterval(interval), dimension);
+    }
+
+    throw new Error('Complex time grouped queries with arbitrary interval is not implemented');
+  }
+
+  /**
+   * @protected
+   * @param {string} interval
+   * @returns {boolean}
+   */
+  isGranularityNaturalAligned(interval) {
+    const intParsed = interval.split(' ');
+
+    return !(intParsed.length !== 2 || intParsed[0] !== '1');
+  }
+
+  /**
+   * Returns the smallest granularity for the provided interval string
+   * Interval may be presented as `1 year 2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds
+   * It is important to bubble up from the smallest, as this is used e.g. for minimum rollup granularity
+   * @param {string} interval
+   * @returns {string}
+   */
+  granularityFromInterval(interval) {
+    if (interval.match(/second/)) {
+      return 'second';
+    } else if (interval.match(/minute/)) {
+      return 'minute';
+    } else if (interval.match(/hour/)) {
+      return 'hour';
+    } else if (interval.match(/day/)) {
+      return 'day';
+    } else if (interval.match(/week/)) {
+      return 'week';
+    } else if (interval.match(/month/)) {
+      return 'month';
+    } else if (interval.match(/quarter/)) {
+      return 'quarter';
+    } else /* if (interval.match(/year/)) */ {
+      return 'year';
+    }
+  }
+
+  /**
    * Evaluate alias for specific cube's property.
    * @param {string} name Property name.
    * @param {boolean?} isPreAggregationName Pre-agg flag.
@@ -2904,14 +2957,6 @@ export class BaseQuery {
 
   nowTimestampSql() {
     return 'NOW()';
-  }
-
-  /**
-   * @returns {string}
-   */
-  startOfTheYearTimestampSql() {
-    // different DBs have different way of getting this
-    throw new Error('Not implemented');
   }
 
   unixTimestampSql() {

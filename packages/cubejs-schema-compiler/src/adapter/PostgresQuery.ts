@@ -23,16 +23,37 @@ export class PostgresQuery extends BaseQuery {
     return new PostgresParamAllocator(expressionParams);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string): string {
     return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  public dateBin(stride: string, source: string, origin: string): string {
-    return `date_bin('${stride}', ${source}, ${origin})`;
+  public dimensionTimeGroupedColumn(dimension: string, interval: string, offset: string): string {
+    if (this.isGranularityNaturalAligned(interval)) {
+      return super.dimensionTimeGroupedColumn(dimension, interval, offset);
+    }
+
+    // Formula:
+    // SELECT ((DATE_TRUNC('year', dimension) + offset?) +
+    //        FLOOR(
+    //          EXTRACT(EPOCH FROM (dimension - (DATE_TRUNC('year', dimension) + offset?))) /
+    //          EXTRACT(EPOCH FROM interval)
+    //        ) * interval)
+    //
+    // Should also work for AWS RedShift
+
+    let dtDate = this.timeGroupedColumn('year', dimension);
+    if (offset) {
+      dtDate = this.addInterval(dtDate, offset);
+    }
+
+    return `${dtDate} + FLOOR(
+      EXTRACT(EPOCH FROM (${dimension} - (${dtDate}))) /
+      EXTRACT(EPOCH FROM INTERVAL '${interval}')
+    ) * INTERVAL '${interval}'`;
   }
 
   public startOfTheYearTimestampSql() {
