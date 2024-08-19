@@ -30,7 +30,6 @@ impl V1CubeMeta {
         measures: Vec<crate::models::V1CubeMetaMeasure>,
         dimensions: Vec<crate::models::V1CubeMetaDimension>,
         segments: Vec<crate::models::V1CubeMetaSegment>,
-        joins: Option<Vec<crate::models::V1CubeMetaJoin>>,
     ) -> V1CubeMeta {
         V1CubeMeta {
             name,
@@ -38,7 +37,7 @@ impl V1CubeMeta {
             measures,
             dimensions,
             segments,
-            joins,
+            joins: None,
         }
     }
 }
