@@ -40,7 +40,7 @@ jobs:
           key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Lint CubeSQL
-        run: cd rust/cubesql/cubesql && cargo fmt --all -- --check
+        run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
       # TODO replace with clippy once cubesql is ready
