@@ -839,7 +839,7 @@ impl TestContext {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
-                    let frame = batches_to_dataframe(&df.schema().into(), &batches)?;
+                    let frame = batches_to_dataframe(&df.schema().into(), batches)?;
 
                     output.push(frame.print());
                     output_flags = flags;

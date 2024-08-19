@@ -390,7 +390,7 @@ impl Portal {
             }
         };
 
-        let frame = batches_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
+        let frame = batches_to_dataframe(batch_for_write.schema().as_ref(), vec![batch_for_write])?;
 
         Ok((unused, self.dataframe_to_writer(frame)?))
     }
