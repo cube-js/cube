@@ -579,7 +579,11 @@ describe('API Gateway', () => {
       .expect(200);
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
@@ -592,7 +596,11 @@ describe('API Gateway', () => {
 
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   describe('multi query support', () => {
