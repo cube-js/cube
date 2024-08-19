@@ -1,7 +1,7 @@
 use crate::{
     compile::QueryPlan,
     sql::{
-        dataframe::{batch_to_dataframe, DataFrame, TableValue},
+        dataframe::{batches_to_dataframe, DataFrame, TableValue},
         statement::PostgresStatementParamsBinder,
         temp_tables::TempTable,
         writer::BatchWriter,
@@ -390,7 +390,7 @@ impl Portal {
             }
         };
 
-        let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
+        let frame = batches_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
 
         Ok((unused, self.dataframe_to_writer(frame)?))
     }

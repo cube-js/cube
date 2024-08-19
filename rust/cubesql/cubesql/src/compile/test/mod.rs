@@ -16,7 +16,7 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe, AuthContextRef,
+        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe, AuthContextRef,
         AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
         SqlAuthService,
     },
@@ -839,7 +839,7 @@ impl TestContext {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
-                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+                    let frame = batches_to_dataframe(&df.schema().into(), &batches)?;
 
                     output.push(frame.print());
                     output_flags = flags;
