@@ -183,7 +183,7 @@ export class SubscriptionServer {
     this.subscriptionStore.clear();
   }
 
-  public async renewCubes(cubes: string[]) {
+  public async renewCubes(cubes) {
     if (cubes.length === 0) {
       return;
     }
