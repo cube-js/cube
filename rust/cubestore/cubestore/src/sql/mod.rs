@@ -1072,7 +1072,7 @@ impl SqlService for SqlServiceImpl {
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
+                                            let df = batch_to_dataframe(records)?;
                                             Ok(df)
                                         },
                                     )

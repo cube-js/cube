@@ -432,7 +432,7 @@ mod tests {
         let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batch_to_dataframe(batches).unwrap();
         res.get_rows()[0].values()[0].clone()
     }
 
@@ -462,7 +462,7 @@ mod tests {
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batch_to_dataframe(batches).unwrap();
         res.get_rows().to_vec()
     }
 

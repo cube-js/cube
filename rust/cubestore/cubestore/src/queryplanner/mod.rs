@@ -168,7 +168,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
-        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(&results)).await??;
+        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(results)).await??;
         Ok(data_frame)
     }
 }
