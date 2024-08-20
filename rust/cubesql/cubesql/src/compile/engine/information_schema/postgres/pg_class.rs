@@ -3,7 +3,6 @@ use std::{any::Any, sync::Arc};
 use async_trait::async_trait;
 use bigdecimal::ToPrimitive;
 
-use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, BooleanBuilder, Int32Builder, StringBuilder, UInt32Builder},
@@ -14,6 +13,11 @@ use datafusion::{
     error::DataFusionError,
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
+};
+
+use crate::{
+    compile::engine::information_schema::postgres::PG_NAMESPACE_PUBLIC_OID,
+    transport::CubeMetaTable,
 };
 
 struct PgClass {
@@ -207,7 +211,7 @@ impl PgCatalogClassProvider {
             builder.add_class(&PgClass {
                 oid: table.oid,
                 relname: table.name.clone(),
-                relnamespace: 2200,
+                relnamespace: PG_NAMESPACE_PUBLIC_OID,
                 reltype: table.record_oid,
                 relam: 2,
                 relfilenode: 0,

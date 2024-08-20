@@ -14,6 +14,13 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+// https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_namespace.dat#L15-L17
+pub const PG_NAMESPACE_CATALOG_OID: u32 = 11;
+// https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_namespace.dat#L18-L20
+pub const PG_NAMESPACE_TOAST_OID: u32 = 99;
+// https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_namespace.dat#L21-L24
+pub const PG_NAMESPACE_PUBLIC_OID: u32 = 2200;
+
 struct PgNamespace {
     oid: u32,
     nspname: &'static str,
@@ -67,13 +74,13 @@ impl PgCatalogNamespaceProvider {
     pub fn new() -> Self {
         let mut builder = PgCatalogNamespaceBuilder::new();
         builder.add_namespace(&PgNamespace {
-            oid: 11,
+            oid: PG_NAMESPACE_CATALOG_OID,
             nspname: "pg_catalog",
             nspowner: 10,
             nspacl: "{test=UC/test,=U/test}",
         });
         builder.add_namespace(&PgNamespace {
-            oid: 2200,
+            oid: PG_NAMESPACE_PUBLIC_OID,
             nspname: "public",
             nspowner: 10,
             nspacl: "{test=UC/test,=U/test}",

@@ -14,6 +14,8 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 
+use crate::compile::engine::information_schema::postgres::PG_NAMESPACE_CATALOG_OID;
+
 struct PgProc {
     oid: u32,
     proname: String,
@@ -106,7 +108,9 @@ impl PgCatalogProcBuilder {
     fn add_proc(&mut self, proc: &PgProc) {
         self.oid.append_value(proc.oid).unwrap();
         self.proname.append_value(proc.proname.clone()).unwrap();
-        self.pronamespace.append_value(11).unwrap();
+        self.pronamespace
+            .append_value(PG_NAMESPACE_CATALOG_OID)
+            .unwrap();
         self.proowner.append_value(10).unwrap();
         self.prolang.append_value(12).unwrap();
         self.procost.append_value(1).unwrap();
