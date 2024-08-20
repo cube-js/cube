@@ -96,8 +96,8 @@ macro_rules! define_pg_types {
                 }
             }
 
-            pub fn get_all() -> Vec<&'static PgType<'static>> {
-                vec![
+            pub fn get_all() -> &'static [&'static PgType<'static>] {
+                &[
                     $($NAME,)*
                 ]
             }
