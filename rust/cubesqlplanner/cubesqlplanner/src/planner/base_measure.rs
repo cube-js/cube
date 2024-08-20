@@ -60,7 +60,7 @@ impl BaseMeasure {
     }
 
     fn sql(&self) -> Result<String, CubeError> {
-        let sql = self.member_evaluator.eveluate(self.query_tools.clone())?;
+        let sql = self.member_evaluator.evaluate(self.query_tools.clone())?;
 
         let measure_type = &self.definition.static_data().measure_type;
         let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);

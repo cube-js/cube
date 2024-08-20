@@ -1,6 +1,7 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
+use super::memeber_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -17,6 +18,12 @@ pub struct CubeEvaluatorStatic {
     pub primary_keys: HashMap<String, Vec<String>>,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct CallDep {
+    pub name: String,
+    pub parent: Option<usize>,
+}
+
 #[nativebridge::native_bridge(CubeEvaluatorStatic)]
 pub trait CubeEvaluator {
     #[field]
@@ -31,4 +38,9 @@ pub trait CubeEvaluator {
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
     fn is_measure(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
+    fn resolve_symbols_call_deps(
+        &self,
+        cube_name: String,
+        sql: Rc<dyn MemberSql>,
+    ) -> Result<Vec<CallDep>, CubeError>;
 }

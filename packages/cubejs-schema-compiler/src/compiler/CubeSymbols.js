@@ -477,6 +477,7 @@ export class CubeSymbols {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
       const match = funcDefinition.match(FunctionRegex);
+
       if (match && (match[1] || match[2] || match[3])) {
         this.funcArgumentsValues[funcDefinition] = (match[1] || match[2] || match[3]).split(',').map(s => s.trim());
       } else if (match) {
@@ -493,8 +494,28 @@ export class CubeSymbols {
     return joinHints;
   }
 
+  resolveSymbolsCallDeps(cubeName, sql) {
+    const deps = [];
+    this.resolveSymbolsCall(sql, (name) => {
+      const resolvedSymbol = this.resolveSymbol(
+        cubeName,
+        name
+      );
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return '';
+    }, {
+      depsResolveFn: (name, parent) => {
+        deps.push({ name, parent });
+        return deps.length - 1;
+      },
+    });
+    return deps;
+  }
+
   resolveSymbol(cubeName, name) {
-    const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
+    const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn } = this.resolveSymbolsCallContext || {};
 
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
@@ -527,6 +548,15 @@ export class CubeSymbols {
           undefined,
           name
         );
+      }
+    } else if (depsResolveFn) {
+      if (cube) {
+        const newCubeName = this.isCurrentCube(name) ? cubeName : name;
+        const parentIndex = depsResolveFn(name, undefined);
+        cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
+        return cube;
+      } else if (this.symbols[cubeName]?.[name]) {
+        depsResolveFn(name, undefined);
       }
     }
 
@@ -621,6 +651,44 @@ export class CubeSymbols {
     }
 
     return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
+  }
+
+  cubeDependenciesProxy(parentIndex, cubeName) {
+    const self = this;
+    const { depsResolveFn } = self.resolveSymbolsCallContext || {};
+    return new Proxy({}, {
+      get: (v, propertyName) => {
+        if (propertyName === '__cubeName') {
+          depsResolveFn('__cubeName', parentIndex);
+          return cubeName;
+        }
+        const cube = self.symbols[cubeName];
+
+        if (propertyName === 'toString') {
+          depsResolveFn('toString', parentIndex);
+          return () => '';
+        }
+        if (propertyName === 'sql') {
+          depsResolveFn('sql', parentIndex);
+          return () => '';
+        }
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (cube[propertyName]) {
+          depsResolveFn(propertyName, parentIndex);
+          return '';
+        }
+        if (self.symbols[propertyName]) {
+          const index = depsResolveFn(propertyName, parentIndex);
+          return this.cubeDependenciesProxy(index, propertyName);
+        }
+        if (typeof propertyName === 'string') {
+          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
+        }
+        return undefined;
+      }
+    });
   }
 
   isCurrentCube(name) {
