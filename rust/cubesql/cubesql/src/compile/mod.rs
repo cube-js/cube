@@ -15146,6 +15146,273 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_extract_epoch_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan.clone(),
+                simple_load_response(vec![
+                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
+                ]),
+            )
+            .await;
+
+        // "extract(EPOCH FROM dim_date0)" expression gets typed Int32 in schema by DF, but executed as Float64
+        // https://github.com/apache/datafusion/blob/e088945c38b74bb1d86dcbb88a69dfc21d59e375/datafusion/functions/src/datetime/date_part.rs#L131-L133
+        // https://github.com/cube-js/arrow-datafusion/blob/a78e52154e63bed2b7546bb250959239b020036f/datafusion/expr/src/function.rs#L126-L133
+        // Without + 0.0 execution will fail with "column types must match schema types, expected Int32 but found Float64 at column index 0"
+        // TODO Remove + 0.0 on fresh DF
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT EXTRACT(EPOCH FROM dim_date0) + 0.0 AS result
+            FROM MultiTypeCube
+            GROUP BY 1
+        "#;
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Expect proper epoch in floating point
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_extract_granularity_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // This date should be idempotent for every expected granularity, so mocked response would stay correct
+        // At the same time, it should generate different extractions for different tokens
+        let base_date = "2024-10-01T00:00:00.000Z";
+
+        // TODO qtr is not supported in EXTRACT for now, probably in sqlparser
+        let tokens = [
+            ("day", "day"),
+            ("dow", "day"),
+            ("doy", "day"),
+            ("quarter", "quarter"),
+            // ("qtr", "quarter"),
+        ];
+
+        for (token, expected_granularity) in tokens {
+            // language=PostgreSQL
+            let query = format!(
+                r#"
+                SELECT EXTRACT({token} FROM dim_date0) AS result
+                FROM MultiTypeCube
+                GROUP BY 1
+            "#
+            );
+
+            let expected_cube_scan = V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "MultiTypeCube.dim_date0".to_string(),
+                    granularity: Some(expected_granularity.to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            };
+
+            context
+                .add_cube_load_mock(
+                    expected_cube_scan.clone(),
+                    simple_load_response(vec![
+                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
+                    ]),
+                )
+                .await;
+
+            assert_eq!(
+                context
+                    .convert_sql_to_cube_query(&query)
+                    .await
+                    .unwrap()
+                    .as_logical_plan()
+                    .find_cube_scan()
+                    .request,
+                expected_cube_scan
+            );
+
+            // Expect different values for different tokens
+            insta::assert_snapshot!(
+                format!("extract_{token}_from_dimension"),
+                context.execute_query(query).await.unwrap()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_date_part_epoch_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan.clone(),
+                simple_load_response(vec![
+                    json!({"MultiTypeCube.dim_date0": "2024-12-31T01:02:03.500"}),
+                ]),
+            )
+            .await;
+
+        // "extract(EPOCH FROM dim_date0)" expression gets typed Int32 in schema by DF, but executed as Float64
+        // https://github.com/apache/datafusion/blob/e088945c38b74bb1d86dcbb88a69dfc21d59e375/datafusion/functions/src/datetime/date_part.rs#L131-L133
+        // https://github.com/cube-js/arrow-datafusion/blob/a78e52154e63bed2b7546bb250959239b020036f/datafusion/expr/src/function.rs#L126-L133
+        // Without + 0.0 execution will fail with "column types must match schema types, expected Int32 but found Float64 at column index 0"
+        // TODO Remove + 0.0 on fresh DF
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT date_part('epoch', dim_date0) + 0.0 AS result
+            FROM MultiTypeCube
+            GROUP BY 1
+        "#;
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Expect proper epoch in floating point
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_date_part_granularity_from_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // This date should be idempotent for every expected granularity, so mocked response would stay correct
+        // At the same time, it should generate different extractions for different tokens
+        let base_date = "2024-10-01T00:00:00.000Z";
+
+        let tokens = [
+            ("day", "day"),
+            ("dow", "day"),
+            ("doy", "day"),
+            ("quarter", "quarter"),
+            ("qtr", "quarter"),
+        ];
+
+        for (token, expected_granularity) in tokens {
+            // language=PostgreSQL
+            let query = format!(
+                r#"
+                SELECT date_part('{token}', dim_date0) AS result
+                FROM MultiTypeCube
+                GROUP BY 1
+            "#
+            );
+
+            let expected_cube_scan = V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![]),
+                time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                    dimension: "MultiTypeCube.dim_date0".to_string(),
+                    granularity: Some(expected_granularity.to_string()),
+                    date_range: None,
+                }]),
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            };
+
+            context
+                .add_cube_load_mock(
+                    expected_cube_scan.clone(),
+                    simple_load_response(vec![
+                        json!({format!("MultiTypeCube.dim_date0.{expected_granularity}"): base_date}),
+                    ]),
+                )
+                .await;
+
+            assert_eq!(
+                context
+                    .convert_sql_to_cube_query(&query)
+                    .await
+                    .unwrap()
+                    .as_logical_plan()
+                    .find_cube_scan()
+                    .request,
+                expected_cube_scan
+            );
+
+            // Expect different values for different tokens
+            insta::assert_snapshot!(
+                format!("date_part_{token}_from_dimension"),
+                context.execute_query(query).await.unwrap()
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_wrapper_tableau_sunday_week() {
         if !Rewriter::sql_push_down_enabled() {
             return;
