@@ -1,7 +1,8 @@
+use super::dependecy::Dependency;
 use super::{evaluate_sql, MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::memeber_sql::{self, MemberSql};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -12,7 +13,7 @@ pub struct DimensionEvaluator {
     name: String,
     member_sql: Rc<dyn MemberSql>,
     definition: Rc<dyn DimensionDefinition>,
-    deps: Vec<Rc<dyn MemberEvaluator>>,
+    deps: Vec<Dependency>,
 }
 
 impl DimensionEvaluator {
@@ -21,7 +22,7 @@ impl DimensionEvaluator {
         name: String,
         member_sql: Rc<dyn MemberSql>,
         definition: Rc<dyn DimensionDefinition>,
-        deps: Vec<Rc<dyn MemberEvaluator>>,
+        deps: Vec<Dependency>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
@@ -34,7 +35,7 @@ impl DimensionEvaluator {
 }
 
 impl MemberEvaluator for DimensionEvaluator {
-    fn eveluate(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
+    fn evaluate(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
         let sql = tools.auto_prefix_with_cube_name(
             &self.cube_name,
             &evaluate_sql(tools.clone(), self.member_sql.clone(), &self.deps)?,
@@ -49,6 +50,7 @@ impl MemberEvaluator for DimensionEvaluator {
 pub struct DimensionEvaluatorFactory {
     cube_name: String,
     name: String,
+    sql: Rc<dyn MemberSql>,
     definition: Rc<dyn DimensionDefinition>,
 }
 
@@ -68,6 +70,7 @@ impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
         Ok(Self {
             cube_name,
             name,
+            sql: definition.sql()?,
             definition,
         })
     }
@@ -80,18 +83,19 @@ impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
         Ok(self.definition.sql()?.args_names().clone())
     }
 
-    fn build(self, deps: Vec<Rc<dyn MemberEvaluator>>) -> Result<Rc<Self::Result>, CubeError> {
+    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
+        Some(self.sql.clone())
+    }
+
+    fn build(self, deps: Vec<Dependency>) -> Result<Rc<Self::Result>, CubeError> {
         let Self {
             cube_name,
             name,
+            sql,
             definition,
         } = self;
         Ok(DimensionEvaluator::new(
-            cube_name,
-            name,
-            definition.sql()?,
-            definition,
-            deps,
+            cube_name, name, sql, definition, deps,
         ))
     }
 }

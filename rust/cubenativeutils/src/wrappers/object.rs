@@ -41,7 +41,7 @@ pub trait NativeStruct<IT: InnerTypes>: NativeType<IT> {
     ) -> Result<NativeObjectHandle<IT>, CubeError>;
 }
 
-pub trait NativeFunction<IT: InnerTypes> {
+pub trait NativeFunction<IT: InnerTypes>: NativeType<IT> {
     fn call(&self, args: Vec<NativeObjectHandle<IT>>) -> Result<NativeObjectHandle<IT>, CubeError>;
     fn definition(&self) -> Result<String, CubeError>;
     fn args_names(&self) -> Result<Vec<String>, CubeError>;

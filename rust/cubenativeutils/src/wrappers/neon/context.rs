@@ -2,6 +2,7 @@
 use super::inner_types::NeonInnerTypes;
 use super::object::base_types::*;
 use super::object::neon_array::NeonArray;
+use super::object::neon_function::NeonFunction;
 use super::object::neon_struct::NeonStruct;
 use super::object::NeonObject;
 use crate::wrappers::context::NativeContext;
@@ -108,6 +109,17 @@ impl<'cx, C: Context<'cx> + 'cx> NativeContext<NeonInnerTypes<'cx, C>> for Conte
             self.with_context(|cx| cx.empty_object().upcast()),
         );
         obj.into_struct().unwrap()
+    }
+    fn to_string_fn(&self, result: String) -> NeonFunction<'cx, C> {
+        let obj = NeonObject::new(
+            self.clone(),
+            self.with_context(|cx| {
+                JsFunction::new(cx, move |mut c| Ok(c.string(result.clone())))
+                    .unwrap()
+                    .upcast()
+            }),
+        );
+        obj.into_function().unwrap()
     }
 }
 

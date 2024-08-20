@@ -158,6 +158,46 @@ describe('SQL Generation', () => {
           '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+    it('Simple query - CUBE dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_with_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type_with_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - CUBE id', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.id_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".id "cards__id_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
   });
 
   describe('Common - JS', () => {

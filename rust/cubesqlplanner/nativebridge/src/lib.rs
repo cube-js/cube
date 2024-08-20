@@ -54,9 +54,25 @@ struct NativeOutputParams {
     dynamic_container_path: Option<Path>,
 }
 
+impl NativeOutputParams {
+    fn type_path_if_dynamic(&self) -> Option<Path> {
+        if self.dynamic_container_path.is_some() {
+            Some(self.type_path.clone())
+        } else {
+            None
+        }
+    }
+}
+
+struct NativeArgumentTyped {
+    ident: Ident,
+    downcast_type_path: Option<Path>,
+}
+
 struct NativeMethod {
     ident: Ident,
     args: Vec<FnArg>,
+    typed_args: Vec<NativeArgumentTyped>,
     output: ReturnType,
     output_params: NativeOutputParams,
     method_params: NativeMethodParams,
@@ -73,9 +89,12 @@ impl Parse for NativeService {
                     .filter_map(|item| match item {
                         TraitItem::Method(method_item) => {
                             let method_params = Self::parse_method_params(method_item);
+                            let args = method_item.sig.inputs.iter().cloned().collect::<Vec<_>>();
+                            let typed_args = Self::parse_method_typed_args(&args).unwrap();
                             Some(NativeMethod {
                                 ident: method_item.sig.ident.clone(),
-                                args: method_item.sig.inputs.iter().cloned().collect::<Vec<_>>(),
+                                args,
+                                typed_args,
                                 output: method_item.sig.output.clone(),
                                 output_params: Self::get_output_for_deserializer(
                                     &method_item.sig.output,
@@ -106,11 +125,31 @@ impl Parse for NativeService {
 }
 
 impl NativeService {
+    fn parse_method_typed_args(args: &Vec<FnArg>) -> syn::Result<Vec<NativeArgumentTyped>> {
+        args.iter()
+            .filter_map(|a| match a {
+                FnArg::Typed(ty) => match ty.pat.as_ref() {
+                    Pat::Ident(id) => {
+                        let dyn_type = Self::get_type_from_possible_dyn_type(&ty.ty);
+                        match dyn_type {
+                            Ok(dyn_type) => Some(Ok(NativeArgumentTyped {
+                                ident: id.ident.clone(),
+                                downcast_type_path: dyn_type.type_path_if_dynamic(),
+                            })),
+                            Err(e) => Some(Err(e)),
+                        }
+                    }
+                    x => panic!("Unexpected pattern: {:?}", x),
+                },
+                FnArg::Receiver(_) => None,
+            })
+            .collect::<Result<Vec<_>, _>>()
+    }
+
     fn parse_method_params(method_item: &TraitItemMethod) -> NativeMethodParams {
         let mut method_params = NativeMethodParams::default();
 
         if method_item.attrs.len() > 0 {
-            let attr = method_item.attrs.first().unwrap();
             for attr in method_item.attrs.iter() {
                 let seg = attr.path.segments.last().unwrap();
                 match seg.ident.to_string().as_str() {
@@ -144,11 +183,6 @@ impl NativeService {
                 syn::Type::Path(tp) => {
                     let segs = &tp.path.segments;
                     Self::get_deserializer_output_for_result(segs, optional)
-                    /* if optional {
-                        Self::get_deserializer_output_for_optional_call(segs)
-                    } else {
-                        Self::get_deserializer_output_for_regular_call(segs)
-                    } */
                 }
                 _ => Err(syn::Error::new(
                     tp.span(),
@@ -235,47 +269,7 @@ impl NativeService {
                     "Return type should be Result<_>",
                 ))?;
                 match arg {
-                    syn::GenericArgument::Type(tp) => match tp {
-                        Type::Path(tp) => {
-                            let segs = &tp.path.segments;
-                            let seg = segs.last().ok_or(syn::Error::new(
-                                tp.span(),
-                                "Return type should be Result<_>",
-                            ))?;
-                            let ident = &seg.ident;
-                            if ident.to_string() == "Rc"
-                                || ident.to_string() == "Arc"
-                                || ident.to_string() == "Box"
-                            {
-                                if let Some(dyn_path) =
-                                    Self::get_dyn_type_for_deserialize(&seg.arguments)
-                                {
-                                    let mut dynamic_container_path = tp.path.clone();
-                                    let last_seg =
-                                        dynamic_container_path.segments.last_mut().unwrap();
-                                    last_seg.arguments = syn::PathArguments::None;
-                                    Ok(NativeOutputParams {
-                                        type_path: dyn_path,
-                                        dynamic_container_path: Some(dynamic_container_path),
-                                    })
-                                } else {
-                                    Ok(NativeOutputParams {
-                                        type_path: tp.path.clone(),
-                                        dynamic_container_path: None,
-                                    })
-                                }
-                            } else {
-                                Ok(NativeOutputParams {
-                                    type_path: tp.path.clone(),
-                                    dynamic_container_path: None,
-                                })
-                            }
-                        }
-                        _ => Err(syn::Error::new(
-                            arg.span(),
-                            "Return type should be Result<_>",
-                        )),
-                    },
+                    syn::GenericArgument::Type(tp) => Self::get_type_from_possible_dyn_type(tp),
                     _ => Err(syn::Error::new(
                         arg.span(),
                         "Return type should be Result<_>",
@@ -286,6 +280,44 @@ impl NativeService {
                 args.span(),
                 "Return type should be Result<_>",
             )),
+        }
+    }
+
+    fn get_type_from_possible_dyn_type(tp: &Type) -> syn::Result<NativeOutputParams> {
+        match tp {
+            Type::Path(tp) => {
+                let segs = &tp.path.segments;
+                let seg = segs.last().ok_or(syn::Error::new(
+                    tp.span(),
+                    "Type path does not have a segment",
+                ))?;
+                let ident = &seg.ident;
+                if ident.to_string() == "Rc"
+                    || ident.to_string() == "Arc"
+                    || ident.to_string() == "Box"
+                {
+                    if let Some(dyn_path) = Self::get_dyn_type_for_deserialize(&seg.arguments) {
+                        let mut dynamic_container_path = tp.path.clone();
+                        let last_seg = dynamic_container_path.segments.last_mut().unwrap();
+                        last_seg.arguments = syn::PathArguments::None;
+                        Ok(NativeOutputParams {
+                            type_path: dyn_path,
+                            dynamic_container_path: Some(dynamic_container_path),
+                        })
+                    } else {
+                        Ok(NativeOutputParams {
+                            type_path: tp.path.clone(),
+                            dynamic_container_path: None,
+                        })
+                    }
+                } else {
+                    Ok(NativeOutputParams {
+                        type_path: tp.path.clone(),
+                        dynamic_container_path: None,
+                    })
+                }
+            }
+            _ => Err(syn::Error::new(tp.span(), "Type::Path is expected")),
         }
     }
 
@@ -476,24 +508,15 @@ impl NativeMethod {
         let &Self {
             ident,
             args,
+            typed_args,
             output,
             output_params,
             method_params,
             ..
         } = &self;
-        let typed_args = args
-            .iter()
-            .filter_map(|a| match a {
-                FnArg::Typed(ty) => match ty.pat.as_ref() {
-                    Pat::Ident(id) => Some(id.ident.clone()),
-                    x => panic!("Unexpected pattern: {:?}", x),
-                },
-                FnArg::Receiver(_) => None,
-            })
-            .collect::<Vec<_>>();
         let js_args_set = typed_args
             .iter()
-            .map(|a| Self::js_agr_set(a))
+            .map(|arg| Self::js_agr_set(&arg.ident, &arg.downcast_type_path))
             .collect::<Vec<_>>();
         let js_method_name = self.camel_case_name();
 
@@ -594,9 +617,19 @@ impl NativeMethod {
         }
     }
 
-    fn js_agr_set(arg: &Ident) -> proc_macro2::TokenStream {
-        quote! {
-            #arg.to_native(context_holder.clone())?
+    fn js_agr_set(arg: &Ident, downcast_type_path: &Option<Path>) -> proc_macro2::TokenStream {
+        if let Some(downcast_type_path) = downcast_type_path {
+            quote! {
+                if let Some(arg) = #arg.as_any().downcast_ref::<#downcast_type_path<IT>>() {
+                    arg.to_native(context_holder.clone())?
+                } else {
+                    return Err(CubeError::internal(format!("Cannot dowcast arg to native type")))
+                }
+            }
+        } else {
+            quote! {
+                #arg.to_native(context_holder.clone())?
+            }
         }
     }
 

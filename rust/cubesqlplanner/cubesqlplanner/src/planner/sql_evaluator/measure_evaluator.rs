@@ -1,3 +1,4 @@
+use super::dependecy::Dependency;
 use super::{evaluate_sql, MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
@@ -13,7 +14,7 @@ pub struct MeasureEvaluator {
     definition: Rc<dyn MeasureDefinition>,
     member_sql: Rc<dyn MemberSql>,
 
-    deps: Vec<Rc<dyn MemberEvaluator>>,
+    deps: Vec<Dependency>,
 }
 
 impl MeasureEvaluator {
@@ -22,7 +23,7 @@ impl MeasureEvaluator {
         name: String,
         member_sql: Rc<dyn MemberSql>,
         definition: Rc<dyn MeasureDefinition>,
-        deps: Vec<Rc<dyn MemberEvaluator>>,
+        deps: Vec<Dependency>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_name,
@@ -42,7 +43,7 @@ impl MeasureEvaluator {
 }
 
 impl MemberEvaluator for MeasureEvaluator {
-    fn eveluate(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
+    fn evaluate(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
         let primary_keys = tools
             .cube_evaluator()
             .static_data()
@@ -113,6 +114,10 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
         &self.cube_name
     }
 
+    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
+        Some(self.sql.clone())
+    }
+
     fn deps_names(&self) -> Result<Vec<String>, CubeError> {
         if let Some(member_sql) = self.definition.sql()? {
             Ok(member_sql.args_names().clone())
@@ -121,7 +126,7 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
         }
     }
 
-    fn build(self, deps: Vec<Rc<dyn MemberEvaluator>>) -> Result<Rc<Self::Result>, CubeError> {
+    fn build(self, deps: Vec<Dependency>) -> Result<Rc<Self::Result>, CubeError> {
         let Self {
             cube_name,
             name,

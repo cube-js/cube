@@ -63,7 +63,7 @@ impl BaseDimension {
     }
 
     pub fn dimension_sql(&self) -> Result<String, CubeError> {
-        self.member_evaluator.eveluate(self.query_tools.clone())
+        self.member_evaluator.evaluate(self.query_tools.clone())
     }
 
     fn sql(&self) -> Result<String, CubeError> {

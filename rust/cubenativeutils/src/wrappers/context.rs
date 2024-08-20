@@ -8,6 +8,7 @@ pub trait NativeContext<IT: InnerTypes>: Clone {
     fn undefined(&self) -> NativeObjectHandle<IT>;
     fn empty_array(&self) -> IT::Array;
     fn empty_struct(&self) -> IT::Struct;
+    fn to_string_fn(&self, result: String) -> IT::Function;
 }
 
 #[derive(Clone)]
@@ -39,5 +40,9 @@ impl<IT: InnerTypes> NativeContextHolder<IT> {
     }
     pub fn empty_struct(&self) -> IT::Struct {
         self.context.empty_struct()
+    }
+    #[allow(dead_code)]
+    pub fn to_string_fn(&self, result: String) -> IT::Function {
+        self.context.to_string_fn(result)
     }
 }

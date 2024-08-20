@@ -48,13 +48,17 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             sql: 'id',
             primaryKey: true
           },
+          id_cube: {
+            type: 'number',
+            sql: \`\${CUBE}.id\`,
+          },
           type: {
             type: 'string',
             sql: 'type'
           },
           type_with_cube: {
             type: 'string',
-            sql: \`\${CUBE}.type\`,
+            sql: \`\${CUBE.type}\`,
           },
           type_complex: {
             type: 'string',

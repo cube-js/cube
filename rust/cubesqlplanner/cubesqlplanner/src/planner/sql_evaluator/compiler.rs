@@ -1,3 +1,4 @@
+use super::dependecy::DependenciesBuilder;
 use super::{
     DimensionEvaluator, DimensionEvaluatorFactory, MeasureEvaluator, MeasureEvaluatorFactory,
     MemberEvaluator, MemberEvaluatorFactory,
@@ -45,24 +46,8 @@ impl Compiler {
         let mut factory = T::try_new(full_name.clone(), self.cube_evaluator.clone())?;
         let dep_names = factory.deps_names()?;
         let cube_name = factory.cube_name();
-        let deps = dep_names
-            .into_iter()
-            .map(|name| -> Result<Rc<dyn MemberEvaluator>, CubeError> {
-                let dep_full_name = format!("{}.{}", cube_name, name);
-                //FIXME avoid cloning
-                let dep_path = vec![cube_name.clone(), name.clone()];
-                if self.cube_evaluator.is_measure(dep_path.clone())? {
-                    Ok(self.add_evaluator::<MeasureEvaluatorFactory>(dep_full_name)?)
-                } else if self.cube_evaluator.is_dimension(dep_path.clone())? {
-                    Ok(self.add_evaluator::<DimensionEvaluatorFactory>(dep_full_name)?)
-                } else {
-                    Err(CubeError::internal(format!(
-                        "Cannot resolve dependency {} of member {}",
-                        name, full_name
-                    )))
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
+        let deps = dep_builder.build(cube_name.clone(), factory.member_sql())?;
 
         factory.build(deps)
     }
