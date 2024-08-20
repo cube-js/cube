@@ -63,7 +63,7 @@ impl<'a> PgType<'a> {
         }
     }
 
-    pub fn is_binary_supported(&self) -> bool {
+    pub const fn is_binary_supported(&self) -> bool {
         // Right now, We assume that all types have binary encoding support
         true
     }
@@ -79,7 +79,7 @@ macro_rules! define_pg_types {
         }
 
         impl PgTypeId {
-            pub fn from_oid(oid: u32) -> Option<Self> {
+            pub const fn from_oid(oid: u32) -> Option<Self> {
                 match oid {
                     0 => Some(Self::UNSPECIFIED),
                     $($OID => Some(Self::$NAME),)*
@@ -89,14 +89,14 @@ macro_rules! define_pg_types {
         }
 
         impl<'a> PgType<'a> {
-            pub fn get_by_tid(oid: PgTypeId) -> &'static PgType<'static> {
+            pub const fn get_by_tid(oid: PgTypeId) -> &'static PgType<'static> {
                 match oid {
                     PgTypeId::UNSPECIFIED => UNSPECIFIED,
                     $(PgTypeId::$NAME => $NAME,)*
                 }
             }
 
-            pub fn get_all() -> &'static [&'static PgType<'static>] {
+            pub const fn get_all() -> &'static [&'static PgType<'static>] {
                 &[
                     $($NAME,)*
                 ]
@@ -2061,7 +2061,7 @@ define_pg_types![
 ];
 
 impl PgTypeId {
-    pub fn to_type(self) -> &'static PgType<'static> {
+    pub const fn to_type(self) -> &'static PgType<'static> {
         PgType::get_by_tid(self)
     }
 }
