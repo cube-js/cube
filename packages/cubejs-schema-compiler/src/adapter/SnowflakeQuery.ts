@@ -42,6 +42,55 @@ export class SnowflakeQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  public dimensionTimeGroupedColumn(dimension: string, interval: string, offset: string): string {
+    if (offset) {
+      offset = this.formatInterval(offset);
+    }
+
+    if (this.isGranularityNaturalAligned(interval)) {
+      return super.dimensionTimeGroupedColumn(dimension, interval, offset);
+    }
+
+    // Formula:
+    // SELECT DATEADD(second,
+    //         FLOOR(
+    //           DATEDIFF(seconds, DATE_TRUNC('year', dimension) + offset?, dimension) /
+    //           DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval))
+    //         ) * DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval)),
+    //         DATE_TRUNC('year', dimension) + offset?)
+    //
+    // The formula operates with seconds so it won't produce dates aligned with offset date parts, like:
+    // if offset is "6 months 3 days" - the result won't always be the 3rd of July. It will add
+    // exact number of seconds in the "6 months 3 days" without aligning with natural calendar.
+
+    let dtDate = this.timeGroupedColumn('year', dimension);
+    if (offset) {
+      dtDate = this.addInterval(dtDate, offset);
+    }
+
+    interval = this.formatInterval(interval);
+
+    return `DATEADD(second,
+        FLOOR(
+          DATEDIFF(seconds, ${dtDate}, CURRENT_TIMESTAMP) /
+          DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval '${interval}'))
+        ) * DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval '${interval}')),
+        ${dtDate})`;
+  }
+
+  /**
+   * The input interval in format "2 years 3 months 4 weeks 5 days...."
+   * will be converted to Snowflake dialect "2 years, 3 months, 4 weeks, 5 days...."
+   */
+  private formatInterval(interval: string): string {
+    return interval.split(' ').map((word, index, arr) => {
+      if (index % 2 !== 0 && index < arr.length - 1) {
+        return `${word},`;
+      }
+      return word;
+    }).join(' ');
+  }
+
   public timeStampCast(value) {
     return `${value}::timestamp_tz`;
   }
