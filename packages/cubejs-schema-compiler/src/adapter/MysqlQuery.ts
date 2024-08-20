@@ -60,6 +60,38 @@ export class MysqlQuery extends BaseQuery {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
   }
 
+  public dimensionTimeGroupedColumn(dimension: string, interval: string, offset: string): string {
+    if (this.isGranularityNaturalAligned(interval)) {
+      return super.dimensionTimeGroupedColumn(dimension, interval, offset);
+    }
+
+    // Formula:
+    // SELECT TIMESTAMPADD(
+    //            SECOND,
+    //            FLOOR(TIMESTAMPDIFF(SECOND, DATE_ADD(DATE_FORMAT(dimension, '%Y-01-01 00:00:00'), INTERVAL offset),
+    //                                dimension) /
+    //                  TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL interval))
+    //                * TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL interval),
+    //            DATE_ADD(DATE_FORMAT(dimension, '%Y-01-01 00:00:00'), INTERVAL offset)
+    //        )
+    //
+    // The formula operates with seconds so it won't produce dates aligned with offset date parts, like:
+    // if offset is "6 months 3 days" - the result won't always be the 3rd of July. It will add
+    // exact number of seconds in the "6 months 3 days" without aligning with natural calendar.
+
+    let dtDate = this.timeGroupedColumn('year', dimension);
+    if (offset) {
+      dtDate = this.addInterval(dtDate, offset);
+    }
+
+    return `TIMESTAMPADD(
+                SECOND,
+                FLOOR(TIMESTAMPDIFF(SECOND, ${dtDate}, ${dimension}) /
+                      TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${interval}))
+                    * TIMESTAMPDIFF(SECOND, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${interval}),
+                ${dtDate})`;
+  }
+
   public escapeColumnName(name) {
     return `\`${name}\``;
   }
