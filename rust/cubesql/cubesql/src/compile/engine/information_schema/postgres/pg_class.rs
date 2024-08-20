@@ -14,11 +14,18 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
+use pg_srv::PgTypeId;
 
 use crate::{
-    compile::engine::information_schema::postgres::PG_NAMESPACE_PUBLIC_OID,
+    compile::engine::information_schema::postgres::{
+        PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID,
+    },
     transport::CubeMetaTable,
 };
+
+// See https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_class.h#L32
+pub const PG_CLASS_CLASS_OID: u32 = 1259;
+const PG_CLASS_ROWTYPE_OID: u32 = PgTypeId::PGCLASS.to_type().oid;
 
 struct PgClass {
     oid: u32,
@@ -206,6 +213,28 @@ pub struct PgCatalogClassProvider {
 impl PgCatalogClassProvider {
     pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogClassBuilder::new();
+
+        // TODO add all pg_catalog tables to pg_class
+
+        // See https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_class.h#L32-L142
+        // See https://github.com/postgres/postgres/blob/REL_16_4/src/include/catalog/pg_class.dat
+        builder.add_class(&PgClass {
+            oid: PG_CLASS_CLASS_OID,
+            relname: "pg_class".to_string(),
+            relnamespace: PG_NAMESPACE_CATALOG_OID,
+            reltype: PG_CLASS_ROWTYPE_OID,
+            relam: 2,
+            relfilenode: 0,
+            reltoastrelid: 0,
+            relisshared: false,
+            relkind: "r".to_string(),
+            // Number of fields in PgCatalogClassProvider::schema()
+            relnatts: 34,
+            relhasrules: false,
+            relreplident: "p".to_string(),
+            relfrozenxid: 0,
+            relminmxid: 1,
+        });
 
         for table in cube_tables.iter() {
             builder.add_class(&PgClass {
