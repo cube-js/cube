@@ -2880,6 +2880,7 @@ async fn physical_plan_flags(service: Box<dyn SqlClient>) {
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test')", true),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test') OR (url = 'test_2' AND day = 'test_2' AND category = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test') OR (url = 'test_2' AND day = 'test_2' AND category > 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
         ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
