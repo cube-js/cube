@@ -114,6 +114,7 @@ impl<'a> DependenciesBuilder<'a> {
         Ok(result)
     }
 
+    //FIXME may be should be moved to BaseTools
     fn is_current_cube(&self, name: &str) -> bool {
         match name {
             "CUBE" | "TABLE" => true,
