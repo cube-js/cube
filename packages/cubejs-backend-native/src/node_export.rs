@@ -191,12 +191,6 @@ async fn handle_sql_query(
         .get_service_typed::<dyn ConfigObj>()
         .await;
 
-    if !config.stream_mode() {
-        return Err(CubeError::internal(
-            "Stream mode is required for this operation. Please set CUBESQL_STREAM_MODE environment variable".to_string(),
-        ));
-    }
-
     let transport_service = services
         .injector()
         .get_service_typed::<dyn TransportService>()
