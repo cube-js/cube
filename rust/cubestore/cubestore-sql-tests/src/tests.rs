@@ -2867,23 +2867,26 @@ async fn physical_plan_flags(service: Box<dyn SqlClient>) {
     // (query, is_optimal)
     let cases = vec![
         ("SELECT SUM(hits) FROM s.Data", true),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR category = 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test' AND category = 'test')", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day = 'test_2')", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test') OR (url = 'test_2' AND day = 'test_2' AND category = 'test_2')", true),
         ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
         ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
         ("SELECT SUM(hits), url, day FROM s.Data GROUP BY url, day", true),
         ("SELECT SUM(hits), day FROM s.Data GROUP BY day", false),
         ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false),
+        ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false)
     ];
 
     for (query, expected_optimal) in cases {

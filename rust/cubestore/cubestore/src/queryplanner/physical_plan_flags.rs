@@ -81,10 +81,12 @@ impl PhysicalPlanFlags {
 
             if let Some(input_exec_any) = maybe_input_exec {
                 if let Some(cte) = input_exec_any.downcast_ref::<CubeTableExec>() {
-                    let index_columns = cte.index_snapshot.index.row.columns();
+                    let sort_key_size = cte.index_snapshot.index.row.sort_key_size() as usize;
+                    let index_columns =
+                        cte.index_snapshot.index.row.columns()[..sort_key_size].to_vec();
                     flags.predicate_sorted = Some(check_predicate_order(
                         predicate_column_groups,
-                        index_columns,
+                        &index_columns,
                     ));
                 }
             }
@@ -127,13 +129,13 @@ fn check_predicate_order(
         for index_name in &index_column_names {
             if eq_column_names.contains(index_name) {
                 checked_length += 1;
-            } else {
-                if eq_column_names.len() > checked_length {
-                    return false;
-                }
-                continue 'group_loop;
             }
         }
+
+        if index_column_names.len() > checked_length {
+            return false;
+        }
+        continue 'group_loop;
     }
 
     true
