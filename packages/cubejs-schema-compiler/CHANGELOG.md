@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+
+### Features
+
+* **cubejs-schema-compiler:** Support FILTER_GROUP in YAML models ([#8574](https://github.com/cube-js/cube/issues/8574)) ([f3b8b19](https://github.com/cube-js/cube/commit/f3b8b19daff7f1b8dcfd73abf0d1f20e74e5a847))
+
+
+
+
+
 ## [0.35.72](https://github.com/cube-js/cube/compare/v0.35.71...v0.35.72) (2024-08-16)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler

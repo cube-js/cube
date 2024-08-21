@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+
+### Bug Fixes
+
+* **cubesql:** Reduce memory usage while converting to DataFrame ([#8598](https://github.com/cube-js/cube/issues/8598)) ([604085e](https://github.com/cube-js/cube/commit/604085e5a2066414eb91128ae020b6e4b92b449f))
+* **cubesql:** Use date_part => date_part + date_trunc split only with appropriate date_part argument ([#8552](https://github.com/cube-js/cube/issues/8552)) ([9387072](https://github.com/cube-js/cube/commit/93870720ac872ab06266d4a65a0f9b4aec384f6a))
+* **cubestore:** Reduce memory usage while converting to DataFrame ([#8599](https://github.com/cube-js/cube/issues/8599)) ([15f9a0f](https://github.com/cube-js/cube/commit/15f9a0f6791a5128c426c452ea180ffa757f8bc3))
+
+
+### Features
+
+* **cubejs-schema-compiler:** Support FILTER_GROUP in YAML models ([#8574](https://github.com/cube-js/cube/issues/8574)) ([f3b8b19](https://github.com/cube-js/cube/commit/f3b8b19daff7f1b8dcfd73abf0d1f20e74e5a847))
+
+
+
+
+
 ## [0.35.72](https://github.com/cube-js/cube/compare/v0.35.71...v0.35.72) (2024-08-16)
 
 **Note:** Version bump only for package cubejs
