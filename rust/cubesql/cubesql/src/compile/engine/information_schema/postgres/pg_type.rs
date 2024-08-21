@@ -2,7 +2,6 @@ use std::{any::Any, sync::Arc};
 
 use async_trait::async_trait;
 
-use crate::transport::CubeMetaTable;
 use datafusion::{
     arrow::{
         array::{
@@ -18,6 +17,11 @@ use datafusion::{
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
 use pg_srv::PgType;
+
+use crate::{
+    compile::engine::information_schema::postgres::PG_NAMESPACE_PUBLIC_OID,
+    transport::CubeMetaTable,
+};
 
 struct PgCatalogTypeBuilder {
     oid: UInt32Builder,
@@ -192,7 +196,7 @@ impl PgCatalogTypeProvider {
                 oid: table.record_oid,
                 typname: table.name.as_str(),
                 regtype: table.name.as_str(),
-                typnamespace: 2200,
+                typnamespace: PG_NAMESPACE_PUBLIC_OID,
                 typowner: 10,
                 typlen: -1,
                 typbyval: false,
@@ -218,7 +222,7 @@ impl PgCatalogTypeProvider {
                 oid: table.array_handler_oid,
                 typname: format!("_{}", table.name).as_str(),
                 regtype: format!("{}[]", table.name).as_str(),
-                typnamespace: 2200,
+                typnamespace: PG_NAMESPACE_PUBLIC_OID,
                 typowner: 10,
                 typlen: -1,
                 typbyval: false,

@@ -41,6 +41,7 @@ use sha1_smol::Sha1;
 use crate::{
     compile::engine::{
         df::{coerce::common_type_coercion, columar::if_then_else},
+        information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
         udf::utils::*,
     },
     sql::SessionState,
@@ -2206,7 +2207,7 @@ pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
                     }
 
                     match PgTypeId::from_oid(oid)?.to_type().typnamespace {
-                        11 | 2200 => Some(true),
+                        PG_NAMESPACE_CATALOG_OID | PG_NAMESPACE_PUBLIC_OID => Some(true),
                         _ => Some(false),
                     }
                 }
