@@ -31,6 +31,8 @@ pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_df_execution;
+#[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
