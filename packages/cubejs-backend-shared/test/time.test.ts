@@ -141,6 +141,10 @@ describe('time', () => {
     expect(inDbTimeZone('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-01T00:00:00.000000')).toEqual(
       '2020-01-01T00:00:00.000000Z'
     );
+
+    expect(inDbTimeZone('UTC', 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]', '2020-01-31T23:59:59.999999')).toEqual(
+      '2020-01-31T23:59:59.999999Z'
+    );
   });
 
   it('isPredefinedGranularity', () => {
