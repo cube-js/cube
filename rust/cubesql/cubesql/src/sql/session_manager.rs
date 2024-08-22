@@ -10,14 +10,14 @@ use std::{
 
 use super::{
     server_manager::ServerManager,
-    session::{Session, SessionProcessList, SessionStatActivity, SessionState},
+    session::{Session, SessionState},
 };
 use crate::compile::DatabaseProtocol;
 
 #[derive(Debug)]
 struct SessionManagerInner {
     sessions: HashMap<u32, Arc<Session>>,
-    uid_to_session: HashMap<String, Arc<Session>>
+    uid_to_session: HashMap<String, Arc<Session>>,
 }
 
 #[derive(Debug)]
@@ -76,7 +76,7 @@ impl SessionManager {
                 return Err(CubeError::user(format!(
                     "Session cannot be created, because extra_id: {} already exists",
                     extra_id
-                )))
+                )));
             }
 
             guard.uid_to_session.insert(extra_id, session_ref.clone());
@@ -87,20 +87,14 @@ impl SessionManager {
         Ok(session_ref)
     }
 
-    pub async fn stat_activity(self: &Arc<Self>) -> Vec<SessionStatActivity> {
+    pub async fn map_sessions<T: for<'a> From<&'a Arc<Session>>>(self: &Arc<Self>) -> Vec<T> {
         let guard = self.sessions.read().await;
 
-        guard.sessions.values()
-            .map(Session::to_stat_activity)
-            .collect::<Vec<SessionStatActivity>>()
-    }
-
-    pub async fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
-        let guard = self.sessions.read().await;
-
-        guard.uid_to_session.values()
-            .map(Session::to_process_list)
-            .collect::<Vec<SessionProcessList>>()
+        guard
+            .sessions
+            .values()
+            .map(|session| T::from(session))
+            .collect::<Vec<T>>()
     }
 
     pub async fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
