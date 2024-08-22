@@ -12,12 +12,12 @@ use super::{
     server_manager::ServerManager,
     session::{Session, SessionState},
 };
-use crate::compile::DatabaseProtocol;
+use crate::{compile::DatabaseProtocol, sql::session::SessionExtraId};
 
 #[derive(Debug)]
 struct SessionManagerInner {
     sessions: HashMap<u32, Arc<Session>>,
-    uid_to_session: HashMap<String, Arc<Session>>,
+    uid_to_session: HashMap<SessionExtraId, Arc<Session>>,
 }
 
 #[derive(Debug)]
@@ -50,7 +50,7 @@ impl SessionManager {
         protocol: DatabaseProtocol,
         client_addr: String,
         client_port: u16,
-        extra_id: Option<String>,
+        extra_id: Option<SessionExtraId>,
     ) -> Result<Arc<Session>, CubeError> {
         let connection_id = self.last_id.fetch_add(1, Ordering::SeqCst);
 
@@ -71,10 +71,17 @@ impl SessionManager {
 
         let mut guard = self.sessions.write().await;
 
+        if guard.sessions.len() > self.server.config_obj.max_sessions() {
+            return Err(CubeError::user(format!(
+                "Too many sessions, limit reached: {}",
+                self.server.config_obj.max_sessions()
+            )));
+        }
+
         if let Some(extra_id) = extra_id {
             if guard.uid_to_session.contains_key(&extra_id) {
                 return Err(CubeError::user(format!(
-                    "Session cannot be created, because extra_id: {} already exists",
+                    "Session cannot be created, because extra_id: {:?} already exists",
                     extra_id
                 )));
             }
@@ -87,7 +94,7 @@ impl SessionManager {
         Ok(session_ref)
     }
 
-    pub async fn map_sessions<T: for<'a> From<&'a Arc<Session>>>(self: &Arc<Self>) -> Vec<T> {
+    pub async fn map_sessions<T: for<'a> From<&'a Session>>(self: &Arc<Self>) -> Vec<T> {
         let guard = self.sessions.read().await;
 
         guard
@@ -103,7 +110,7 @@ impl SessionManager {
         guard.sessions.get(&connection_id).map(|s| s.clone())
     }
 
-    pub async fn get_session_by_extra_id(&self, extra_id: String) -> Option<Arc<Session>> {
+    pub async fn get_session_by_extra_id(&self, extra_id: SessionExtraId) -> Option<Arc<Session>> {
         let guard = self.sessions.read().await;
         guard.uid_to_session.get(&extra_id).map(|s| s.clone())
     }
