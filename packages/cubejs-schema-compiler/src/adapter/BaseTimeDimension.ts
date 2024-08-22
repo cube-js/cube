@@ -1,5 +1,13 @@
 import moment from 'moment-timezone';
-import { timeSeries, isPredefinedGranularity, FROM_PARTITION_RANGE, TO_PARTITION_RANGE, BUILD_RANGE_START_LOCAL, BUILD_RANGE_END_LOCAL } from '@cubejs-backend/shared';
+import {
+  timeSeries,
+  isPredefinedGranularity,
+  timeSeriesFromCustomInterval,
+  FROM_PARTITION_RANGE,
+  TO_PARTITION_RANGE,
+  BUILD_RANGE_START_LOCAL,
+  BUILD_RANGE_END_LOCAL
+} from '@cubejs-backend/shared';
 
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -278,9 +286,13 @@ export class BaseTimeDimension extends BaseFilter {
       ];
     }
 
-    return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()], {
-      timestampPrecision: this.query.timestampPrecision(),
-    });
+    if (this.isPredefined) {
+      return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()], {
+        timestampPrecision: this.query.timestampPrecision(),
+      });
+    }
+
+    return timeSeriesFromCustomInterval(this.granularityInterval, [this.dateFromFormatted(), this.dateToFormatted()], this.granularityOffset, { timestampPrecision: this.query.timestampPrecision() });
   }
 
   public wildcardRange() {
