@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.75](https://github.com/cube-js/cube/compare/v0.35.74...v0.35.75) (2024-08-22)
+
+
+### Bug Fixes
+
+* Internal: ParserError("Expected AND, found: INTERVAL") in case of trailing and leading window parts are defined for pre-aggregated rolling window measure ([#8611](https://github.com/cube-js/cube/issues/8611)) ([18d0620](https://github.com/cube-js/cube/commit/18d0620e69c9a43a9d0e0d1634132959e40f6860))
+
+
+
+
+
 ## [0.35.74](https://github.com/cube-js/cube/compare/v0.35.73...v0.35.74) (2024-08-22)
 
 **Note:** Version bump only for package @cubejs-backend/schema-compiler
