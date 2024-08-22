@@ -38,13 +38,16 @@ export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: 
  * E.g. '-2 months 5 days -10 hours'
  */
 function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
-  const regex = /(-?\d+)\s+(year|quarter|month|week|day|hour|minute|second)s?/g;
   const interval: ParsedInterval = {};
+  const parts = intervalStr.split(/\s+/);
 
-  for (const match of intervalStr.matchAll(regex)) {
-    const value = parseInt(match[1], 10);
-    const unit = match[2] as unitOfTime.DurationConstructor;
-    interval[unit] = value;
+  for (let i = 0; i < parts.length; i += 2) {
+    const value = parseInt(parts[i], 10);
+    const unit = parts[i + 1];
+
+    // Remove ending 's' (e.g., 'days' -> 'day')
+    const singularUnit = (unit.endsWith('s') ? unit.slice(0, -1) : unit) as unitOfTime.DurationConstructor;
+    interval[singularUnit] = value;
   }
 
   return interval;
