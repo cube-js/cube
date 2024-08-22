@@ -1,7 +1,13 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
+import {
+  createCubeSchema,
+  createCubeSchemaWithCustomGranularities,
+  createCubeSchemaYaml,
+  createJoinedCubesSchema,
+  createSchemaYaml
+} from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
 describe('SQL Generation', () => {
@@ -45,6 +51,225 @@ describe('SQL Generation', () => {
       });
       const queryAndParams = query.buildSqlAndParams();
       expect(queryAndParams[0]).toContain('card_tbl');
+    });
+  });
+
+  describe('Custom granularities', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchemaWithCustomGranularities('orders')
+    );
+
+    const queries = [
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      }
+    ];
+
+    it('Test time series with different granularities', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BaseQuery(compilers, queries[0]);
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000', '2021-06-30T23:59:59.999'],
+          ['2021-07-01T00:00:00.000', '2021-12-31T23:59:59.999']
+        ]);
+      }
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2020-10-01T00:00:00.000', '2021-03-31T23:59:59.999'],
+          ['2021-04-01T00:00:00.000', '2021-09-30T23:59:59.999'],
+          ['2021-10-01T00:00:00.000', '2022-03-31T23:59:59.999']
+        ]);
+      }
+    });
+
+    describe('via PostgresQuery', () => {
+      beforeAll(async () => {
+        await compilers.compiler.compile();
+      });
+
+      queries.forEach(q => {
+        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
+          const query = new PostgresQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+          console.log('Generated query: ', queryString);
+
+          if (q.measures[0].includes('count')) {
+            expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
+            expect(queryString.includes('- interval \'2 day\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
+            expect(queryString.includes('+ interval \'3 day\'')).toBeTruthy();
+          }
+        });
+      });
     });
   });
 
