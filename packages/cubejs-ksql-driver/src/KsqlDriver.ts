@@ -304,13 +304,23 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         url: this.config.url
       }
     };
+    const types = await this.tableColumnTypes(streamingTable, describe);
+    streamingTable = kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable;
+
     return {
-      types: await this.tableColumnTypes(streamingTable, describe),
+      types: [
+        // TODO: Output types from select statement
+        // { name: '...', type: 'int }
+      ],
       partitions: describe.sourceDescription?.partitions,
-      streamingTable: kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable,
+      streamingTable,
       streamOffset,
       selectStatement,
-      streamingSource
+      streamingSource,
+      sourceTable: {
+        types,
+        tableName: streamingTable
+      }
     };
   }
 
@@ -344,7 +354,8 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   public capabilities(): DriverCapabilities {
     return {
-      streamingSource: true
+      streamingSource: true,
+      unloadWithoutTempTable: true,
     };
   }
 }

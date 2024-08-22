@@ -189,7 +189,7 @@ export class PreAggregations {
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
-      rollup: () => queryForSqlEvaluation.dimensionColumns(),
+      rollup: () => preAggregation.uniqueKeyColumns || queryForSqlEvaluation.dimensionColumns(),
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 

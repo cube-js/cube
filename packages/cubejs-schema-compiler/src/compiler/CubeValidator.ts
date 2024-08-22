@@ -390,6 +390,7 @@ const RollUpSchema = condition(
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
     condition(
       (s) => defined(s.timeDimension),
@@ -402,6 +403,7 @@ const RollUpSchema = condition(
         measures: Joi.func(),
         dimensions: Joi.func(),
         segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
       }),
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
@@ -414,6 +416,7 @@ const RollUpSchema = condition(
         measures: Joi.func(),
         dimensions: Joi.func(),
         segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
       })
     )
   ),
@@ -422,14 +425,16 @@ const RollUpSchema = condition(
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func()
+      segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
-      segments: Joi.func()
+      segments: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     })
   )
 );

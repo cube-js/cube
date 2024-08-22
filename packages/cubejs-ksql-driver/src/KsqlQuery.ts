@@ -55,6 +55,10 @@ export class KsqlQuery extends BaseQuery {
     return `\`${name}\``;
   }
 
+  public castToString(sql: string) {
+    return `CAST(${sql} as varchar(255))`;
+  }
+
   public concatStringsSql(strings: string[]) {
     return `CONCAT(${strings.join(', ')})`;
   }
@@ -101,9 +105,7 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
-    const [sql] = this.preAggregationSql(cube, preAggregation);
-    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql)) ||
-      preAggregation.type === 'rollup' && !!this.dimensionsForSelect().find(d => d.definition().primaryKey);
+    return true;
   }
 
   public preAggregationAllowUngroupingWithPrimaryKey(_cube: any, _preAggregation: any) {
@@ -111,7 +113,7 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public static extractTableFromSimpleSelectAsteriskQuery(sql: string) {
-    const match = sql.match(/^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
+    const match = sql.replace(/\n/g, ' ').match(/^\s*select\s+.*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*/i);
     return match && match[1];
   }
 }
