@@ -295,6 +295,14 @@ export class BaseTimeDimension extends BaseFilter {
     return timeSeriesFromCustomInterval(this.granularityInterval, [this.dateFromFormatted(), this.dateToFormatted()], this.granularityOffset, { timestampPrecision: this.query.timestampPrecision() });
   }
 
+  public resolvedGranularity() {
+    if (this.isPredefined) {
+      return this.granularity;
+    }
+
+    return this.query.granularityFromInterval(this.granularityInterval);
+  }
+
   public wildcardRange() {
     return [FROM_PARTITION_RANGE, TO_PARTITION_RANGE];
   }

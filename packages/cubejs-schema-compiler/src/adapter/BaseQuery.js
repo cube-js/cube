@@ -1365,7 +1365,7 @@ export class BaseQuery {
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
       !cumulativeMeasure.shouldUngroupForCumulative() && this.minGranularity(
-        cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).granularity
+        cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).resolvedGranularity()
       ) || undefined
     );
     const baseQueryAlias = this.cubeAlias('base');
