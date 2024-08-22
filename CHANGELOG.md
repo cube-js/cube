@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.74](https://github.com/cube-js/cube/compare/v0.35.73...v0.35.74) (2024-08-22)
+
+
+### Bug Fixes
+
+* allow non-stream mode for sql over http ([#8610](https://github.com/cube-js/cube/issues/8610)) ([6a16e67](https://github.com/cube-js/cube/commit/6a16e67a45b05eb5c0aad469fb2f7c47f87aaa74))
+
+
+### Features
+
+* **cubesql:** Add pg_class self-reference ([#8603](https://github.com/cube-js/cube/issues/8603)) ([05ea7e2](https://github.com/cube-js/cube/commit/05ea7e25014b7ac72e32fa0391ce3ea99ab3e01f))
+
+
+
+
+
 ## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
 
 
