@@ -105,6 +105,41 @@ Array [
 ]
 `;
 
+exports[`postgresql HTTP Transport Rolling Prev Period: Rolling Prev Period 1`] = `
+Array [
+  Object {
+    "visitors.checkinsPrevMonth": "1",
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.source": "google",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "3",
+    "visitors.createdAt": "2017-02-02T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-02T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "3",
+    "visitors.createdAt": "2017-02-03T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-03T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "5",
+    "visitors.createdAt": "2017-02-04T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-04T00:00:00.000",
+    "visitors.source": "some",
+  },
+  Object {
+    "visitors.checkinsPrevMonth": "5",
+    "visitors.createdAt": "2017-02-05T00:00:00.000",
+    "visitors.createdAt.day": "2017-02-05T00:00:00.000",
+    "visitors.source": "some",
+  },
+]
+`;
+
 exports[`postgresql HTTP Transport Rolling with Quarter granularity: Rolling with Quarter granularity 1`] = `
 Array [
   Object {
