@@ -565,8 +565,8 @@ async fn get_test_session_with_config_and_transport(
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
-        .create_session(protocol, "127.0.0.1".to_string(), 1234)
-        .await;
+        .create_session(protocol, "127.0.0.1".to_string(), 1234, None)
+        .await.unwrap();
 
     // Populate like shims
     session.state.set_database(Some(db_name.to_string()));

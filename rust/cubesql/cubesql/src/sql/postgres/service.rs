@@ -14,7 +14,7 @@ use crate::{
     telemetry::{ContextLogger, SessionLogger},
     CubeError,
 };
-
+use crate::sql::Session;
 use super::shim::AsyncPostgresShim;
 
 pub struct PostgresServer {
@@ -98,10 +98,14 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
-            let session = self
-                .session_manager
-                .create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port)
-                .await;
+            let session = match self.session_manager.create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port, None).await {
+                Ok(r) => r,
+                Err(err) => {
+                    error!("Session creation error: {}", err);
+                    continue;
+                }
+            };
+
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
 
             trace!("[pg] New connection {}", session.state.connection_id);
@@ -147,7 +151,7 @@ impl ProcessingLoop for PostgresServer {
 
         // Close the listening socket (so we _visibly_ stop accepting incoming connections) before
         // we wait for the outstanding connection tasks finish.
-        std::mem::drop(listener);
+        drop(listener);
 
         // Now that we've had the stop signal, wait for outstanding connection tasks to finish
         // cleanly.

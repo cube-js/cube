@@ -62,6 +62,8 @@ pub enum QueryState {
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
+    // Can be UUID or anything else. MDX uses UUID
+    pub extra_id: Option<String>,
     // secret for this session
     pub secret: u32,
     // client ip, immutable
@@ -95,6 +97,7 @@ pub struct SessionState {
 impl SessionState {
     pub fn new(
         connection_id: u32,
+        extra_id: Option<String>,
         client_ip: String,
         client_port: u16,
         protocol: DatabaseProtocol,
@@ -106,6 +109,7 @@ impl SessionState {
 
         Self {
             connection_id,
+            extra_id,
             secret: rng.gen(),
             client_ip,
             client_port,

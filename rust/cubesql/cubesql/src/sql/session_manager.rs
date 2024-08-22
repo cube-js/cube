@@ -15,10 +15,16 @@ use super::{
 use crate::compile::DatabaseProtocol;
 
 #[derive(Debug)]
+struct SessionManagerInner {
+    sessions: HashMap<u32, Arc<Session>>,
+    uid_to_session: HashMap<String, Arc<Session>>
+}
+
+#[derive(Debug)]
 pub struct SessionManager {
     // Sessions
     last_id: AtomicU32,
-    sessions: RWLockAsync<HashMap<u32, Arc<Session>>>,
+    sessions: RWLockAsync<SessionManagerInner>,
     pub temp_table_size: AtomicUsize,
     // Backref
     pub server: Arc<ServerManager>,
@@ -30,7 +36,10 @@ impl SessionManager {
     pub fn new(server: Arc<ServerManager>) -> Self {
         Self {
             last_id: AtomicU32::new(1),
-            sessions: RWLockAsync::new(HashMap::new()),
+            sessions: RWLockAsync::new(SessionManagerInner {
+                sessions: HashMap::new(),
+                uid_to_session: HashMap::new(),
+            }),
             temp_table_size: AtomicUsize::new(0),
             server,
         }
@@ -41,14 +50,16 @@ impl SessionManager {
         protocol: DatabaseProtocol,
         client_addr: String,
         client_port: u16,
-    ) -> Arc<Session> {
+        extra_id: Option<String>,
+    ) -> Result<Arc<Session>, CubeError> {
         let connection_id = self.last_id.fetch_add(1, Ordering::SeqCst);
 
-        let sess = Session {
+        let session_ref = Arc::new(Session {
             session_manager: self.clone(),
             server: self.server.clone(),
             state: Arc::new(SessionState::new(
                 connection_id,
+                extra_id.clone(),
                 client_addr,
                 client_port,
                 protocol,
@@ -56,22 +67,30 @@ impl SessionManager {
                 Duration::from_secs(self.server.config_obj.auth_expire_secs()),
                 Arc::downgrade(self),
             )),
-        };
-
-        let session_ref = Arc::new(sess);
+        });
 
         let mut guard = self.sessions.write().await;
 
-        guard.insert(connection_id, session_ref.clone());
+        if let Some(extra_id) = extra_id {
+            if guard.uid_to_session.contains_key(&extra_id) {
+                return Err(CubeError::user(format!(
+                    "Session cannot be created, because extra_id: {} already exists",
+                    extra_id
+                )))
+            }
 
-        session_ref
+            guard.uid_to_session.insert(extra_id, session_ref.clone());
+        }
+
+        guard.sessions.insert(connection_id, session_ref.clone());
+
+        Ok(session_ref)
     }
 
     pub async fn stat_activity(self: &Arc<Self>) -> Vec<SessionStatActivity> {
         let guard = self.sessions.read().await;
 
-        guard
-            .values()
+        guard.sessions.values()
             .map(Session::to_stat_activity)
             .collect::<Vec<SessionStatActivity>>()
     }
@@ -79,8 +98,7 @@ impl SessionManager {
     pub async fn process_list(self: &Arc<Self>) -> Vec<SessionProcessList> {
         let guard = self.sessions.read().await;
 
-        guard
-            .values()
+        guard.uid_to_session.values()
             .map(Session::to_process_list)
             .collect::<Vec<SessionProcessList>>()
     }
@@ -88,13 +106,22 @@ impl SessionManager {
     pub async fn get_session(&self, connection_id: u32) -> Option<Arc<Session>> {
         let guard = self.sessions.read().await;
 
-        guard.get(&connection_id).map(|s| s.clone())
+        guard.sessions.get(&connection_id).map(|s| s.clone())
+    }
+
+    pub async fn get_session_by_extra_id(&self, extra_id: String) -> Option<Arc<Session>> {
+        let guard = self.sessions.read().await;
+        guard.uid_to_session.get(&extra_id).map(|s| s.clone())
     }
 
     pub async fn drop_session(&self, connection_id: u32) {
         let mut guard = self.sessions.write().await;
 
-        if let Some(connection) = guard.remove(&connection_id) {
+        if let Some(connection) = guard.sessions.remove(&connection_id) {
+            if let Some(extra_id) = &connection.state.extra_id {
+                guard.uid_to_session.remove(extra_id);
+            }
+
             self.temp_table_size.fetch_sub(
                 connection.state.temp_tables().physical_size(),
                 Ordering::SeqCst,
