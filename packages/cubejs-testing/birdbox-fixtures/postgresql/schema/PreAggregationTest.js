@@ -42,6 +42,15 @@ cube(`visitors`, {
       }
     },
 
+    checkinsPrevMonth: {
+      sql: `${checkinsCount}`,
+      type: 'sum',
+      rollingWindow: {
+        trailing: '60 day',
+        leading: '-30 day'
+      }
+    },
+
     uniqueSourceCount: {
       sql: 'source',
       type: 'countDistinct'
@@ -174,7 +183,7 @@ cube(`visitors`, {
     },
     partitionedRolling: {
       type: 'rollup',
-      measureReferences: [checkinsRollingTotal, checkinsRolling2day, count],
+      measureReferences: [checkinsRollingTotal, checkinsRolling2day, checkinsPrevMonth, count],
       dimensionReferences: [source],
       timeDimensionReference: createdAt,
       granularity: 'hour',
