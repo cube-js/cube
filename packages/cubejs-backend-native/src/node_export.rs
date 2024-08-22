@@ -216,8 +216,8 @@ async fn handle_sql_query(
     };
 
     let session = session_manager
-        .create_session(DatabaseProtocol::PostgreSQL, host, port)
-        .await;
+        .create_session(DatabaseProtocol::PostgreSQL, host, port, None)
+        .await?;
 
     session
         .state
