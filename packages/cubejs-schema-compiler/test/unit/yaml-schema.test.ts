@@ -310,5 +310,40 @@ describe('Yaml Schema Testing', () => {
         expect(e.message).toContain('dimension.granularitys must be defined as array');
       }
     });
+
+    it('4 correct granularities', async () => {
+      const { compiler } = prepareYamlCompiler(
+        `
+        cubes:
+        - name: Orders
+          sql: "select * from tbl"
+          dimensions:
+            - name: created_at
+              sql: created_at
+              type: time
+              granularities:
+                - name: six_months
+                  interval: 6 months
+                - name: three_months_offset
+                  interval: 3 months
+                  offset: 2 weeks
+                - name: fiscal_year_1st_april
+                  interval: 1 year
+                  origin: >
+                    2024-04-01
+                - name: timestamp_offseted_3_weeks
+                  interval: 3 weeks
+                  origin: "2024-02-15 10:15:25"
+            - name: status
+              sql: status
+              type: string
+          measures:
+            - name: count
+              type: count
+        `
+      );
+
+      await compiler.compile();
+    });
   });
 });

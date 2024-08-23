@@ -4,7 +4,7 @@ import { ErrorReporter } from '../../src/compiler/ErrorReporter';
 
 describe('Cube Validation', () => {
   class ConsoleErrorReporter extends ErrorReporter {
-    public error(message, e) {
+    public error(message: any, _e: any) {
       console.log(message);
     }
   }
@@ -107,7 +107,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('You must use either sql or sqlTable within a model, but not both');
       }
@@ -126,7 +126,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
       }
     } as any);
@@ -146,7 +146,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('(refreshKey.every = 12h)');
         expect(message).toContain('does not match regexp');
@@ -170,7 +170,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('unknown timezone');
       }
@@ -193,7 +193,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('must be one of [count, number,');
       }
@@ -217,7 +217,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('timeDimension) is required');
       }
@@ -240,7 +240,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('granularity) is required');
         expect(message).toContain('rollups) is required');
@@ -275,7 +275,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('granularity) is required');
       }
@@ -300,7 +300,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('(preAggregations.eventsByType.scheduledRefresh = true) must be [false]');
       }
@@ -328,7 +328,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('number.sql) is required');
         expect(message).toContain('number.columns) is required');
@@ -363,7 +363,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (_message: any, _e: any) => {
         // this callback should not be invoked
         expect(true).toBeFalsy();
       }
@@ -386,7 +386,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('must be');
       }
@@ -410,7 +410,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         expect(message).toContain('are deprecated, please, use');
       }
@@ -434,7 +434,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         // this callback should not be invoked
         expect(true).toBeFalsy();
       }
@@ -468,7 +468,7 @@ describe('Cube Validation', () => {
     };
 
     const validationResult = cubeValidator.validate(cube, {
-      error: (message, e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
         // this callback should not be invoked
         expect(true).toBeFalsy();
@@ -537,7 +537,7 @@ describe('Cube Validation', () => {
     const cubeValidator = new CubeValidator(cubeSymbols);
     const validationResult = cubeValidator.validate(cubeSymbols.getCubeDefinition('CubeA'), {
       inContext: () => false,
-      error: (message, _e) => {
+      error: (message: any, _e: any) => {
         console.log(message);
       }
     } as any);
@@ -742,7 +742,7 @@ describe('Cube Validation', () => {
         });
 
         const validationResult = cubeValidator.validate(cube, {
-          error: (message: any, e: any) => {
+          error: (message: any, _e: any) => {
             console.log(message);
             expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
           }
@@ -761,7 +761,7 @@ describe('Cube Validation', () => {
         });
 
         const validationResult = cubeValidator.validate(cube, {
-          error: (message: any, e: any) => {
+          error: (message: any, _e: any) => {
             console.log(message);
             expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
           }
@@ -780,7 +780,7 @@ describe('Cube Validation', () => {
       });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message: any, e: any) => {
+        error: (message: any, _e: any) => {
           console.log(message);
           expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
         }
@@ -799,7 +799,7 @@ describe('Cube Validation', () => {
       });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message: any, e: any) => {
+        error: (message: any, _e: any) => {
           console.log(message);
           expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
         }
@@ -818,7 +818,7 @@ describe('Cube Validation', () => {
       });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message: any, e: any) => {
+        error: (message: any, _e: any) => {
           console.log(message);
           expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
         }
