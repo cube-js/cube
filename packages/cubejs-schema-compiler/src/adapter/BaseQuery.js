@@ -2743,30 +2743,43 @@ export class BaseQuery {
   }
 
   /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point
+   * @param {string} interval (a value expression of type interval)
+   * @param {string} source (a value expression of type timestamp/date)
+   * @param {string} origin (a value expression of type timestamp/date)
+   * @returns {string}
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dateBin(interval, source, origin) {
+    throw new Error('Date bin function is not implemented');
+    // Different syntax possible in different DBs
+  }
+
+  /**
    * @param {string} dimension
-   * @param {string} interval
-   * @param {string | undefined} offset
+   * @param {import('./Granularity').Granularity} granularity
    * @return {string}
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  dimensionTimeGroupedColumn(dimension, interval, offset) {
+  dimensionTimeGroupedColumn(dimension, granularity) {
     let dtDate;
 
     // Interval is aligned with natural calendar, so we can use DATE_TRUNC
-    if (this.isGranularityNaturalAligned(interval)) {
-      if (offset) {
+    if (this.isGranularityNaturalAligned(granularity.granularityInterval)) {
+      if (granularity.granularityOffset) {
         // Example: DATE_TRUNC(interval, dimension - INTERVAL 'offset') + INTERVAL 'offset'
-        dtDate = this.subtractInterval(dimension, offset);
-        dtDate = this.timeGroupedColumn(this.granularityFromInterval(interval), dtDate);
-        dtDate = this.addInterval(dtDate, offset);
+        dtDate = this.subtractInterval(dimension, granularity.granularityOffset);
+        dtDate = this.timeGroupedColumn(this.granularityFromInterval(granularity.granularityInterval), dtDate);
+        dtDate = this.addInterval(dtDate, granularity.granularityOffset);
 
         return dtDate;
       }
 
-      return this.timeGroupedColumn(this.granularityFromInterval(interval), dimension);
+      return this.timeGroupedColumn(this.granularityFromInterval(granularity.granularityInterval), dimension);
     }
 
-    throw new Error('Complex time grouped queries with arbitrary interval is not implemented');
+    return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
   }
 
   /**

@@ -31,33 +31,13 @@ export class PostgresQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  public dimensionTimeGroupedColumn(dimension: string, interval: string, offset: string): string {
-    if (this.isGranularityNaturalAligned(interval)) {
-      return super.dimensionTimeGroupedColumn(dimension, interval, offset);
-    }
-
-    // Formula:
-    // SELECT ((DATE_TRUNC('year', dimension) + offset?) +
-    //        FLOOR(
-    //          EXTRACT(EPOCH FROM (dimension - (DATE_TRUNC('year', dimension) + offset?))) /
-    //          EXTRACT(EPOCH FROM interval)
-    //        ) * interval)
-    //
+  public dateBin(interval: string, source: string, origin: string): string {
     // Should also work for AWS RedShift
-
-    let dtDate = this.timeGroupedColumn('year', dimension);
-    if (offset) {
-      dtDate = this.addInterval(dtDate, offset);
-    }
-
-    return `${dtDate} + FLOOR(
-      EXTRACT(EPOCH FROM (${dimension} - (${dtDate}))) /
-      EXTRACT(EPOCH FROM INTERVAL '${interval}')
-    ) * INTERVAL '${interval}'`;
-  }
-
-  public startOfTheYearTimestampSql() {
-    return 'date_trunc(\'year\', CURRENT_TIMESTAMP)';
+    return `'${origin}'::timestamp + INTERVAL '${interval}' *
+      FLOOR(
+        EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
+        EXTRACT(EPOCH FROM INTERVAL '${interval}')
+      )`;
   }
 
   public hllInit(sql) {

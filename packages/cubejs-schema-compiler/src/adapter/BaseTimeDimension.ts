@@ -1,8 +1,5 @@
 import moment from 'moment-timezone';
 import {
-  timeSeries,
-  isPredefinedGranularity,
-  timeSeriesFromCustomInterval,
   FROM_PARTITION_RANGE,
   TO_PARTITION_RANGE,
   BUILD_RANGE_START_LOCAL,
@@ -13,21 +10,12 @@ import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseQuery } from './BaseQuery';
 import { DimensionDefinition, SegmentDefinition } from '../compiler/CubeEvaluator';
+import { Granularity } from './Granularity';
 
 export class BaseTimeDimension extends BaseFilter {
   public readonly dateRange: any;
 
-  public readonly granularity: string;
-
-  public readonly isPredefined: boolean;
-
-  public readonly baseRollupGranularity: string | undefined;
-
-  public readonly granularityInterval: string;
-
-  public readonly granularityOffset: string | undefined;
-
-  public readonly granularitySql: Function | undefined;
+  public readonly granularityObj: Granularity | undefined;
 
   public readonly boundaryDateRange: any;
 
@@ -43,29 +31,21 @@ export class BaseTimeDimension extends BaseFilter {
       values: timeDimension.dateRange
     });
     this.dateRange = timeDimension.dateRange;
-    this.granularity = timeDimension.granularity;
-    this.isPredefined = isPredefinedGranularity(this.granularity);
-    if (this.granularity && !this.isPredefined) {
-      const customGranularity = this.query.cubeEvaluator
-        .byPath('dimensions', timeDimension.dimension)
-        .granularities?.[this.granularity];
-
-      this.baseRollupGranularity = customGranularity?.rollupGranularity;
-      this.granularitySql = customGranularity?.sql;
-      this.granularityInterval = customGranularity?.interval;
-      this.granularityOffset = customGranularity?.offset;
-    } else if (this.granularity) {
-      this.granularityInterval = `1 ${this.granularity}`;
-    } else {
-      this.granularityInterval = '1 hour';
+    if (timeDimension.granularity) {
+      this.granularityObj = new Granularity(query, timeDimension);
     }
     this.boundaryDateRange = timeDimension.boundaryDateRange;
     this.shiftInterval = timeDimension.shiftInterval;
   }
 
+  // TODO: find and fix all hidden references to granularity to rely on granularityObj instead?
+  public get granularity(): string | undefined {
+    return this.granularityObj?.granularity;
+  }
+
   public selectColumns() {
     const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularity) {
+    if (!context.granularityOverride && !this.granularityObj) {
       return null;
     }
 
@@ -74,7 +54,7 @@ export class BaseTimeDimension extends BaseFilter {
 
   public hasNoRemapping() {
     const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularity) {
+    if (!context.granularityOverride && !this.granularityObj) {
       return false;
     }
 
@@ -83,7 +63,7 @@ export class BaseTimeDimension extends BaseFilter {
 
   public aliasName() {
     const context = this.query.safeEvaluateSymbolContext();
-    if (!context.granularityOverride && !this.granularity) {
+    if (!context.granularityOverride && !this.granularityObj) {
       return null;
     }
 
@@ -92,7 +72,7 @@ export class BaseTimeDimension extends BaseFilter {
 
   // @ts-ignore
   public unescapedAliasName(granularity: string) {
-    const actualGranularity = granularity || this.granularity || 'day';
+    const actualGranularity = granularity || this.granularityObj?.granularity || 'day';
 
     return `${this.query.aliasName(this.dimension)}_${actualGranularity}`; // TODO date here for rollups
   }
@@ -102,7 +82,7 @@ export class BaseTimeDimension extends BaseFilter {
   }
 
   public dateSeriesSelectColumn(dateSeriesAliasName) {
-    if (!this.granularity) {
+    if (!this.granularityObj) {
       return null;
     }
     return `${dateSeriesAliasName || this.dateSeriesAliasName()}.${this.query.escapeColumnName('date_from')} ${this.aliasName()}`;
@@ -110,26 +90,31 @@ export class BaseTimeDimension extends BaseFilter {
 
   public dimensionSql() {
     const context = this.query.safeEvaluateSymbolContext();
-    const granularity = context.granularityOverride || this.granularity;
-    const path = granularity ? `${this.expressionPath()}.${granularity}` : this.expressionPath();
-    const granularityInterval = isPredefinedGranularity(granularity) ? `1 ${granularity}` : this.granularityInterval;
+    const granularityName = context.granularityOverride || this.granularityObj?.granularity;
+    const path = granularityName ? `${this.expressionPath()}.${granularityName}` : this.expressionPath();
+    const granularity = granularityName && this.granularityObj?.granularity !== granularityName ?
+      new Granularity(this.query, {
+        dimension: this.dimension,
+        granularity: granularityName
+      }) : this.granularityObj;
+
     if ((context.renderedReference || {})[path]) {
       return context.renderedReference[path];
     }
 
     if (context.rollupQuery || context.wrapQuery) {
-      if (context.rollupGranularity === this.granularity) {
+      if (context.rollupGranularity === this.granularityObj?.granularity) {
         return super.dimensionSql();
       }
 
-      return this.query.dimensionTimeGroupedColumn(this.query.dimensionSql(this), granularityInterval, this.granularityOffset);
+      return this.query.dimensionTimeGroupedColumn(this.query.dimensionSql(this), <Granularity>granularity);
     }
 
     if (context.ungrouped) {
       return this.convertedToTz();
     }
 
-    return this.query.dimensionTimeGroupedColumn(this.convertedToTz(), granularityInterval, this.granularityOffset);
+    return this.query.dimensionTimeGroupedColumn(this.convertedToTz(), <Granularity>granularity);
   }
 
   public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
@@ -246,28 +231,13 @@ export class BaseTimeDimension extends BaseFilter {
     if (!this.rollupGranularityValue) {
       this.rollupGranularityValue =
         this.query.cacheValue(
-          ['rollupGranularity', this.granularity].concat(this.dateRange),
+          ['rollupGranularity', this.granularityObj?.granularity].concat(this.dateRange),
           () => {
-            if (!this.granularity) {
+            if (!this.granularityObj) {
               return this.dateRangeGranularity();
-            } else if (this.isPredefined) {
-              return this.query.minGranularity(this.granularity, this.dateRangeGranularity());
-            } else if (this.granularityInterval && !this.granularityOffset) {
-              return this.query.minGranularity(
-                this.query.granularityFromInterval(this.granularityInterval),
-                this.dateRangeGranularity()
-              );
-            } else if (this.granularityInterval && this.granularityOffset) { // There is offset too
-              return this.query.minGranularity(
-                this.query.minGranularity(
-                  this.query.granularityFromInterval(this.granularityInterval),
-                  this.query.granularityFromInterval(this.granularityOffset)
-                ),
-                this.dateRangeGranularity()
-              );
             }
 
-            return this.dateRangeGranularity();
+            return this.query.minGranularity(this.granularityObj.minGranularity(), this.dateRangeGranularity());
           }
         );
     }
@@ -280,27 +250,15 @@ export class BaseTimeDimension extends BaseFilter {
       throw new UserError('Time series queries without dateRange aren\'t supported');
     }
 
-    if (!this.granularity) {
-      return [
-        [this.dateFromFormatted(), this.dateToFormatted()]
-      ];
+    if (!this.granularityObj) {
+      return [[this.dateFromFormatted(), this.dateToFormatted()]];
     }
 
-    if (this.isPredefined) {
-      return timeSeries(this.granularity, [this.dateFromFormatted(), this.dateToFormatted()], {
-        timestampPrecision: this.query.timestampPrecision(),
-      });
-    }
-
-    return timeSeriesFromCustomInterval(this.granularityInterval, [this.dateFromFormatted(), this.dateToFormatted()], this.granularityOffset, { timestampPrecision: this.query.timestampPrecision() });
+    return this.granularityObj.timeSeriesForInterval([this.dateFromFormatted(), this.dateToFormatted()], { timestampPrecision: this.query.timestampPrecision() });
   }
 
   public resolvedGranularity() {
-    if (this.isPredefined) {
-      return this.granularity;
-    }
-
-    return this.query.granularityFromInterval(this.granularityInterval);
+    return this.granularityObj?.resolvedGranularity();
   }
 
   public wildcardRange() {

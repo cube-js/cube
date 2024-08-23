@@ -5,9 +5,9 @@ const Moment = require('moment-timezone');
 
 const moment = extendMoment(Moment);
 
-type QueryDateRange = [string, string];
+export type QueryDateRange = [string, string];
 type SqlInterval = string;
-type TimeSeriesOptions = {
+export type TimeSeriesOptions = {
   timestampPrecision: number
 };
 type ParsedInterval = Partial<Record<unitOfTime.DurationConstructor, number>>;
@@ -37,7 +37,7 @@ export const TIME_SERIES: Record<string, (range: DateRange, timestampPrecision: 
  * Negative units are also supported
  * E.g. '-2 months 5 days -10 hours'
  */
-function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
+export function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
   const interval: ParsedInterval = {};
   const parts = intervalStr.split(/\s+/);
 
@@ -53,7 +53,7 @@ function parseSqlInterval(intervalStr: SqlInterval): ParsedInterval {
   return interval;
 }
 
-function addInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
+export function addInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
   const res = date.clone();
 
   Object.entries(interval).forEach(([key, value]) => {
@@ -63,7 +63,7 @@ function addInterval(date: moment.Moment, interval: ParsedInterval): moment.Mome
   return res;
 }
 
-function subtractInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
+export function subtractInterval(date: moment.Moment, interval: ParsedInterval): moment.Moment {
   const res = date.clone();
 
   Object.entries(interval).forEach(([key, value]) => {
@@ -133,6 +133,9 @@ export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, end
   return dates;
 };
 
+/**
+ * Returns array of date ranges for a predefined granularity aligned with the start of the year as pivot point
+ */
 export const timeSeries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
   if (!TIME_SERIES[granularity]) {
     // TODO error
