@@ -131,6 +131,7 @@ export type StreamOptions = {
 
 export type StreamingSourceOptions = {
   streamOffset?: boolean;
+  outputColumnTypes?: TableColumn[]
 };
 
 export interface DownloadQueryResultsBase {

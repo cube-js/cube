@@ -10,7 +10,7 @@ import {
 } from '@cubejs-backend/shared';
 import {
   BaseDriver, DriverCapabilities,
-  DriverInterface, QueryOptions,
+  DriverInterface, TableColumn,
 } from '@cubejs-backend/base-driver';
 import { Kafka } from 'kafkajs';
 import sqlstring, { format as formatSql } from 'sqlstring';
@@ -62,6 +62,12 @@ type KsqlDescribeResponse = {
     partitions: number;
     topic: string;
   }
+};
+
+type KsqlQueryOptions = {
+  outputColumnTypes?: TableColumn[],
+  streamOffset?: string,
+  selectStatement?: string,
 };
 
 /**
@@ -161,7 +167,7 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async query<R = unknown>(query: string, values?: unknown[], options: { streamOffset?: string } = {}): Promise<R> {
+  public async query<R = unknown>(query: string, values?: unknown[], options: KsqlQueryOptions = {}): Promise<R> {    
     if (query.toLowerCase().startsWith('select')) {
       throw new Error('Select queries for ksql allowed only from Cube Store. In order to query ksql create pre-aggregation first.');
     }
@@ -261,13 +267,15 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: any): Promise<any> {
-    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset: options?.streamOffset });
+  public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: KsqlQueryOptions): Promise<any> {
+    const { streamOffset, outputColumnTypes } = options || {};
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset, outputColumnTypes });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
-    return this.getStreamingTableData(this.tableDashName(table), { streamOffset: options?.streamOffset });
+    const { streamOffset, outputColumnTypes } = options || {};
+    return this.getStreamingTableData(this.tableDashName(table), { streamOffset, outputColumnTypes });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -278,11 +286,12 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
     }
 
     const selectStatement = sqlstring.format(query, params);
-    return this.getStreamingTableData(table, { selectStatement, streamOffset: options?.streamOffset });
+    const { streamOffset, outputColumnTypes } = options || {};
+    return this.getStreamingTableData(table, { selectStatement, streamOffset, outputColumnTypes });
   }
 
-  private async getStreamingTableData(streamingTable: string, options: { selectStatement?: string, streamOffset?: string } = {}) {
-    const { selectStatement, streamOffset } = options;
+  private async getStreamingTableData(streamingTable: string, options: KsqlQueryOptions = {}) {
+    const { selectStatement, streamOffset, outputColumnTypes } = options;
     const describe = await this.describeTable(streamingTable);
     const name = this.config.streamingSourceName || 'default';
     const kafkaDirectDownload = !!this.config.kafkaHost;
@@ -304,21 +313,18 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
         url: this.config.url
       }
     };
-    const types = await this.tableColumnTypes(streamingTable, describe);
+    const sourceTableTypes = await this.tableColumnTypes(streamingTable, describe);
     streamingTable = kafkaDirectDownload ? describe.sourceDescription?.topic : streamingTable;
 
     return {
-      types: [
-        // TODO: Output types from select statement
-        // { name: '...', type: 'int }
-      ],
+      types: outputColumnTypes || sourceTableTypes,
       partitions: describe.sourceDescription?.partitions,
       streamingTable,
       streamOffset,
       selectStatement,
       streamingSource,
       sourceTable: {
-        types,
+        types: sourceTableTypes,
         tableName: streamingTable
       }
     };

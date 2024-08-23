@@ -2941,6 +2941,53 @@ export class BaseQuery {
     );
   }
 
+  preAggregationOutputColumnTypes(cube, preAggregation) {
+    return this.cacheValue(
+      ['preAggregationSqlOutputSchema', cube, JSON.stringify(preAggregation)],
+      () => {
+        if (!preAggregation.outputColumnTypes) {
+          return null;
+        }
+
+        if (preAggregation.type === 'rollup') {
+          const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
+
+          const findSchemaType = name => {
+            const outputSchemaType = preAggregation.outputColumnTypes.find(os => os.name === name);
+            if (!outputSchemaType) {
+              throw new UserError(`Output schema type for ${name} not found in pre-aggregation ${preAggregation}`);
+            }
+            return {
+              name: this.aliasName(`${cube}.${outputSchemaType.name}`),
+              type: outputSchemaType.type,
+            };
+          };
+      
+          const outputColumnTypes = [
+            ...(query.dimensions || []).map(d => findSchemaType(this.cubeEvaluator.parsePath('dimensions', d.dimension)[1])),
+            ...(query.timeDimensions || []).map(t => ({
+              name: `${this.aliasName(t.dimension)}_${t.granularity}`,
+              type: 'TIMESTAMP'
+            })),
+            ...(query.measures || []).map(m => findSchemaType(this.cubeEvaluator.parsePath('measures', m.measure)[1]))
+          ];
+      
+          return outputColumnTypes;
+        }
+        throw new UserError('Output schema is only supported for rollup pre-aggregations');
+      },
+      { inputProps: { }, cache: this.queryCache }
+    );
+  }
+
+  preAggregationUniqueKeyColumns(cube, preAggregation) {
+    if (preAggregation.uniqueKeyColumns) {
+      return preAggregation.uniqueKeyColumns.map(key => this.aliasName(`${cube}.${key}`));
+    }
+
+    return this.dimensionColumns();
+  }
+
   preAggregationReadOnly(_cube, _preAggregation) {
     return false;
   }

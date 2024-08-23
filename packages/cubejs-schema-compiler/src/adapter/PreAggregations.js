@@ -189,7 +189,7 @@ export class PreAggregations {
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
-      rollup: () => preAggregation.uniqueKeyColumns || queryForSqlEvaluation.dimensionColumns(),
+      rollup: () => queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation),
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
@@ -209,6 +209,7 @@ export class PreAggregations {
       preAggregationsSchema: queryForSqlEvaluation.preAggregationSchema(),
       loadSql: queryForSqlEvaluation.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: queryForSqlEvaluation.preAggregationSql(cube, preAggregation),
+      outputColumnTypes: queryForSqlEvaluation.preAggregationOutputColumnTypes(cube, preAggregation),
       uniqueKeyColumns,
       aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,

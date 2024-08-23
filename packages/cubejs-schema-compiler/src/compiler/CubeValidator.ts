@@ -248,6 +248,10 @@ const BasePreAggregationWithoutPartitionGranularity = {
   },
   readOnly: Joi.boolean().strict(),
   streamOffset: Joi.any().valid('earliest', 'latest'),
+  outputColumnTypes: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    type: Joi.string().required()
+  })),
 };
 
 const BasePreAggregation = {
