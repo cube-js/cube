@@ -351,7 +351,7 @@ export const buildSqlAndParams = (cubeEvaluator: any): String => {
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
-  checkAuth?: (req: unknown, authorization: string) => Promise<{ securityContext?: unknown }>
+  checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
 }
@@ -382,9 +382,9 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
         simplifyExpressRequest(req),
         authorization,
       );
-      const securityContext = nativeResult?.securityContext;
+      const securityContext = nativeResult?.security_context;
       return {
-        ...(securityContext ? { securityContext } : {})
+        ...(securityContext ? { security_context: securityContext } : {})
       };
     };
   }

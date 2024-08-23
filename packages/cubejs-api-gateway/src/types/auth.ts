@@ -40,7 +40,7 @@ interface JWTOptions {
 }
 
 type CheckAuthResponse = {
-  securityContext?: unknown,
+  'security_context'?: unknown,
 };
 
 /**

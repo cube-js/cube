@@ -58,7 +58,7 @@ suite('Python Config', () => {
     );
 
     expect(result).toEqual({
-      securityContext: {
+      security_context: {
         sub: '1234567890',
         iat: 1516239022,
         user_id: 42

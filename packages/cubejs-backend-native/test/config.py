@@ -16,7 +16,7 @@ def query_rewrite(query, ctx):
 async def check_auth(req, authorization):
     print('[python] check_auth req=', req, ' authorization=', authorization)
     return {
-      'securityContext': {
+      'security_context': {
         'sub': '1234567890',
         'iat': 1516239022,
         'user_id': 42

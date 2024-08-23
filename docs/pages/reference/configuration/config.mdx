@@ -1085,7 +1085,7 @@ payload to the `securityContext`. [Read more][ref-sec-ctx] about JWT generation.
 
 Called on each request.
 
-You can return an object with the `securityContext` field if you want to
+You can return an object with the `security_context` field if you want to
 customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].
 
 You can use empty `check_auth` function to disable built-in security or
@@ -1098,11 +1098,9 @@ from cube import config
 
 @config('check_auth')
 def check_auth(ctx: dict, token: str) -> None:
-  context = ctx['securityContext']
-
   if token == 'my_secret_token':
     return {
-      'securityContext': {
+      'security_context': {
         'user_id': 42
       }
     }
@@ -1112,10 +1110,10 @@ def check_auth(ctx: dict, token: str) -> None:
 
 ```javascript
 module.exports = {
-  checkAuth: ({ securityContext }, token) => {
+  checkAuth: (ctx, token) => {
     if (token === 'my_secret_token') {
       return {
-        securityContext: {
+        security_context: {
           user_id: 42
         }
       }

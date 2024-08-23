@@ -249,7 +249,7 @@ module.exports = {
   checkAuth: async (req, auth) => {
     try {
       const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"));
-      return { securityContext: userInfo };
+      return { security_context: userInfo };
     } catch {
       throw new Error("Could not authenticate user from LDAP");
     }

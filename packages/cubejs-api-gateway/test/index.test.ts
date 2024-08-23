@@ -279,7 +279,7 @@ describe('API Gateway', () => {
         checkAuth: (req: Request, authorization) => {
           if (authorization) {
             return {
-              securityContext: jwt.verify(authorization, API_SECRET),
+              security_context: jwt.verify(authorization, API_SECRET),
             };
           }
 

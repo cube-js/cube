@@ -277,7 +277,7 @@ describe('test authorization', () => {
           };
 
           return {
-            securityContext,
+            security_context: securityContext,
           };
         }
 

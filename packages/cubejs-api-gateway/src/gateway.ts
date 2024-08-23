@@ -2161,8 +2161,8 @@ class ApiGateway {
       const result = await fn(req, auth);
 
       // checkAuth from config can return new security context, e.g from Python config
-      if (result?.securityContext) {
-        req.securityContext = result?.securityContext;
+      if (result?.security_context) {
+        req.securityContext = result?.security_context;
       }
 
       // We renamed authInfo to securityContext, but users can continue to use both ways
