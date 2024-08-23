@@ -546,37 +546,39 @@ describe('Cube Validation', () => {
   });
 
   describe('Custom dimension granularities: ', () => {
+    const newCube = (granularities) => ({
+      name: 'Orders',
+      fileName: 'fileName',
+      sql: () => 'select * from tbl',
+      public: true,
+      dimensions: {
+        createdAt: {
+          public: true,
+          sql: () => 'created_at',
+          type: 'time',
+          granularities
+        },
+        status: {
+          type: 'string',
+          sql: () => 'status',
+        }
+      },
+      measures: {
+        count: {
+          sql: () => 'count',
+          type: 'count'
+        }
+      }
+    });
+
     it('no granularity interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {}
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
-          }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
-        }
-      };
+      const cube = newCube({
+        half_year: {}
+      });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message, e) => {
+        error: (message: any, e: any) => {
           console.log(message);
           expect(message).toContain('(dimensions.createdAt.granularities.half_year.interval) is required');
         }
@@ -585,236 +587,344 @@ describe('Cube Validation', () => {
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('granularity with interval', async () => {
+    it('granularity with aligned interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                interval: '6 months'
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years' // useless, but still valid
           }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
-        }
-      };
+        });
 
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeFalsy();
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 months'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '1 day'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 hours'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
     });
 
-    it('granularity with interval+offset', async () => {
+    it('granularity with aligned interval + offset', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                interval: '6 months',
-                offset: '2 months 3 weeks 4 days',
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years', // useless, but still valid
+            offset: '2 months 3 weeks 4 days',
           }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
-        }
-      };
+        });
 
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeFalsy();
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 months',
+            offset: '4 weeks 5 days 6 hours',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '1 day',
+            offset: '5 days 6 hours 7 minutes',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '6 hours',
+            offset: '5 days 6 hours 7 minutes 8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes',
+            offset: '1 hours 7 minutes 8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds',
+            offset: '8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
     });
 
-    it('granularity with sql, no interval', async () => {
+    it('granularity with unaligned interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                sql: () => 'some-sql',
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '5 months',
           }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
           }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      // Offset doesn't matter in this case
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 days',
+            offset: '1 hours 7 minutes 8 seconds',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+    });
+
+    it('granularity with invalid interval', async () => {
+      const cubeValidator = new CubeValidator(new CubeSymbols());
+      const cube = newCube({
+        half_year: {
+          interval: 'invalid',
         }
-      };
+      });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message, e) => {
+        error: (message: any, e: any) => {
           console.log(message);
-          expect(message).toContain('(dimensions.createdAt.granularities.half_year.interval) is required');
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
         }
       } as any);
 
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('granularity with sql, interval, no rollup_granularity', async () => {
+    it('granularity with origin + invalid interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                sql: () => 'some-sql',
-                interval: '6 months',
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
-          }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
+      const cube = newCube({
+        half_year: {
+          origin: '2024',
+          interval: 'invalid',
         }
-      };
+      });
 
       const validationResult = cubeValidator.validate(cube, {
-        error: (message, e) => {
+        error: (message: any, e: any) => {
           console.log(message);
-          expect(message).toContain('(dimensions.createdAt.granularities.half_year.rollupGranularity) is required');
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
         }
       } as any);
 
       expect(validationResult.error).toBeTruthy();
     });
 
-    it('granularity with sql, interval, rollupGranularity', async () => {
+    it('granularity with invalid origin + interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                sql: () => 'some-sql',
-                interval: '6 months',
-                rollupGranularity: 'month',
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
-          }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
+      const cube = newCube({
+        half_year: {
+          origin: 'invalid',
+          interval: '3 months',
         }
-      };
+      });
 
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeFalsy();
+      const validationResult = cubeValidator.validate(cube, {
+        error: (message: any, e: any) => {
+          console.log(message);
+          expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+        }
+      } as any);
+
+      expect(validationResult.error).toBeTruthy();
     });
 
-    it('2 granularities: simple + sql', async () => {
+    it('granularity with origin + interval', async () => {
       const cubeValidator = new CubeValidator(new CubeSymbols());
-      const cube = {
-        name: 'Orders',
-        fileName: 'fileName',
-        sql: () => 'select * from tbl',
-        public: true,
-        dimensions: {
-          createdAt: {
-            public: true,
-            sql: () => 'created_at',
-            type: 'time',
-            granularities: {
-              half_year: {
-                sql: () => 'some-sql',
-                interval: '6 months',
-                rollupGranularity: 'month',
-              },
-              half_year_by_1st_april: {
-                interval: '6 months',
-                offset: '3 months'
-              }
-            }
-          },
-          status: {
-            type: 'string',
-            sql: () => 'status',
-          }
-        },
-        measures: {
-          count: {
-            sql: () => 'count',
-            type: 'count'
-          }
-        }
-      };
 
-      const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
-      expect(validationResult.error).toBeFalsy();
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 years', // useless, but still valid
+            origin: '2024',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '10 months',
+            origin: '2024-04',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 day',
+            origin: '2024-05-25',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '8 hours',
+            origin: '2024-09-20 10:00'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '15 minutes',
+            origin: '2024-09-20 16:40'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '30 seconds',
+            origin: '2024-09-20 16:40:33'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 months 30 seconds',
+            origin: '2024-09-20T16:40:33.345'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 months 12 days 14 hours 30 seconds',
+            origin: '2024-09-20T16:40:33.345Z'
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
     });
   });
 });
