@@ -172,7 +172,7 @@ export class BaseMeasure {
     return undefined;
   }
 
-  public minGranularity(granularityA, granularityB) {
+  public minGranularity(granularityA: string | undefined, granularityB: string | undefined) {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
