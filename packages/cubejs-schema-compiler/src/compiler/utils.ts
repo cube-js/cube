@@ -51,3 +51,33 @@ export function camelizeCube(cube: any): unknown {
 
   return cube;
 }
+
+export function isGranularityNaturalAligned(interval: string): boolean {
+  const intParsed = interval.split(' ');
+
+  if (intParsed.length !== 2) {
+    return false;
+  }
+
+  const v = parseInt(intParsed[0], 10);
+  const unit = intParsed[1];
+
+  const validIntervals = {
+    // Any number of years is valid
+    year: () => true,
+    // Only months divisible by a year with no remainder are valid
+    month: () => 12 % v === 0,
+    // Only quarters divisible by a year with no remainder are valid
+    quarter: () => 4 % v === 0,
+    // Only 1 day is valid
+    day: () => v === 1,
+    // Only hours divisible by a day with no remainder are valid
+    hour: () => 24 % v === 0,
+    // Only minutes divisible by an hour with no remainder are valid
+    minute: () => 60 % v === 0,
+    // Only seconds divisible by a minute with no remainder are valid
+    second: () => 60 % v === 0,
+  };
+
+  return Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
+}

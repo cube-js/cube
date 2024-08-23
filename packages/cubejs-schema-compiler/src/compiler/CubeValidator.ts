@@ -3,6 +3,7 @@ import cronParser from 'cron-parser';
 
 import type { CubeSymbols } from './CubeSymbols';
 import type { ErrorReporter } from './ErrorReporter';
+import {isGranularityNaturalAligned} from "./utils";
 
 /* *****************************
  * ATTENTION:
@@ -123,34 +124,8 @@ const BaseDimensionWithoutSubQuery = {
         }),
         Joi.object().keys({
           interval: GranularityInterval.required().custom((value, helper) => {
-            const intParsed = value.split(' ');
+            const isValid = isGranularityNaturalAligned(value);
             const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
-
-            if (intParsed.length !== 2) {
-              return helper.message(msg);
-            }
-
-            const v = parseInt(intParsed[0], 10);
-            const unit = intParsed[1];
-
-            const validIntervals = {
-              // Any number of years is valid
-              year: () => true,
-              // Only months divisible by a year with no remainder are valid
-              month: () => 12 % v === 0,
-              // Only quarters divisible by a year with no remainder are valid
-              quarter: () => 4 % v === 0,
-              // Only 1 day is valid
-              day: () => v === 1,
-              // Only hours divisible by a day with no remainder are valid
-              hour: () => 24 % v === 0,
-              // Only minutes divisible by an hour with no remainder are valid
-              minute: () => 60 % v === 0,
-              // Only seconds divisible by a minute with no remainder are valid
-              second: () => 60 % v === 0,
-            };
-
-            const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
 
             return isValid ? value : helper.message(msg);
           }),
