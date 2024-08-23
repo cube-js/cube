@@ -134,9 +134,12 @@ cubes:
 
 ### `description`
 
-Use a description in your cubes to allow your team to better understand what
-this cube is about. It is a very simple and yet useful tool that gives a hint to
-everyone and makes sure data is interpreted correctly by users.
+This parameter provides a human-readable description of a cube.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+A description can give a hint both to your team and end users, making sure they
+interpret the data correctly. 
 
 <CodeTabs>
 
@@ -144,7 +147,7 @@ everyone and makes sure data is interpreted correctly by users.
 cube(`orders`, {
   sql_table: `orders`,
   title: `Product Orders`,
-  description: `All orders related information`,
+  description: `All orders-related information`,
 });
 ```
 
@@ -153,7 +156,7 @@ cubes:
   - name: orders
     sql_table: orders
     title: Product Orders
-    description: All orders related information
+    description: All orders-related information
 ```
 
 </CodeTabs>
@@ -577,6 +580,7 @@ cubes:
 
 </CodeTabs>
 
+
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
 [ref-config-ext-ctx]: /reference/configuration/config#extend_context
 [ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
@@ -588,3 +592,5 @@ cubes:
 [ref-restapi-sql]: /reference/rest-api#v1sql
 [ref-sec-ctx]: /product/auth/context
 [ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations
