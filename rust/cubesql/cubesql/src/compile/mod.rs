@@ -15686,6 +15686,57 @@ ORDER BY "source"."str0" ASC
     }
 
     #[tokio::test]
+    async fn test_cube_scan_time_measure() {
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // language=PostgreSQL
+        let query = r#"
+            SELECT
+                dim_date0 "start",
+                max(measure_date1) "end"
+            FROM MultiTypeCube
+            GROUP BY "start"
+        "#;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec!["MultiTypeCube.measure_date1".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan,
+        );
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan,
+                simple_load_response(vec![json!({
+                    "MultiTypeCube.dim_date0": "2024-12-01T00:00:00.000",
+                    "MultiTypeCube.measure_date1": "2024-12-31T00:00:00.000",
+                })]),
+            )
+            .await;
+
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
+    }
+
+    #[tokio::test]
     async fn test_wrapper_tableau_week_number() {
         if !Rewriter::sql_push_down_enabled() {
             return;

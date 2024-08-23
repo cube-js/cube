@@ -64,16 +64,16 @@ expression: "execute_query(\"SELECT\\n          n.nspname || '.' || c.relname AS
 | public.MultiTypeCube             | dim_str8           | text                        |
 | public.MultiTypeCube             | dim_str9           | text                        |
 | public.MultiTypeCube             | maxPrice           | numeric                     |
-| public.MultiTypeCube             | measure_date0      | numeric                     |
-| public.MultiTypeCube             | measure_date1      | numeric                     |
-| public.MultiTypeCube             | measure_date2      | numeric                     |
-| public.MultiTypeCube             | measure_date3      | numeric                     |
-| public.MultiTypeCube             | measure_date4      | numeric                     |
-| public.MultiTypeCube             | measure_date5      | numeric                     |
-| public.MultiTypeCube             | measure_date6      | numeric                     |
-| public.MultiTypeCube             | measure_date7      | numeric                     |
-| public.MultiTypeCube             | measure_date8      | numeric                     |
-| public.MultiTypeCube             | measure_date9      | numeric                     |
+| public.MultiTypeCube             | measure_date0      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date1      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date2      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date3      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date4      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date5      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date6      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date7      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date8      | timestamp without time zone |
+| public.MultiTypeCube             | measure_date9      | timestamp without time zone |
 | public.MultiTypeCube             | measure_num0       | numeric                     |
 | public.MultiTypeCube             | measure_num1       | numeric                     |
 | public.MultiTypeCube             | measure_num2       | numeric                     |

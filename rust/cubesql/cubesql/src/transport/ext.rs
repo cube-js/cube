@@ -67,15 +67,20 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
             _ => ColumnType::String,
         };
 
-        match self.agg_type.as_deref() {
-            Some("count") => ColumnType::Int64,
-            Some("countDistinct") => ColumnType::Int64,
-            Some("countDistinctApprox") => ColumnType::Int64,
-            Some("sum") => ColumnType::Double,
-            Some("avg") => ColumnType::Double,
-            Some("min") => ColumnType::Double,
-            Some("max") => ColumnType::Double,
-            Some("runningTotal") => ColumnType::Double,
+        match (self_type, &self.agg_type.as_deref()) {
+            (_, Some("count")) => ColumnType::Int64,
+            (_, Some("countDistinct")) => ColumnType::Int64,
+            (_, Some("countDistinctApprox")) => ColumnType::Int64,
+
+            // TODO is Timestamp ok here?
+            ("time", Some("min")) => ColumnType::Timestamp,
+            ("time", Some("max")) => ColumnType::Timestamp,
+
+            (_, Some("sum")) => ColumnType::Double,
+            (_, Some("avg")) => ColumnType::Double,
+            (_, Some("min")) => ColumnType::Double,
+            (_, Some("max")) => ColumnType::Double,
+            (_, Some("runningTotal")) => ColumnType::Double,
             _ => from_type,
         }
     }
