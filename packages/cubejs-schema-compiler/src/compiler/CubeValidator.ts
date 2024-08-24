@@ -21,6 +21,7 @@ export const nonStringFields = new Set([
   'public',
   'subQuery',
   'propagateFiltersToSubQuery',
+  'propagateTimeDimensionToSubQuery',
   'incremental',
   'external',
   'useOriginalSqlPreAggregations',
@@ -106,7 +107,8 @@ const BaseDimensionWithoutSubQuery = {
 
 const BaseDimension = Object.assign({
   subQuery: Joi.boolean().strict(),
-  propagateFiltersToSubQuery: Joi.boolean().strict()
+  propagateFiltersToSubQuery: Joi.boolean().strict(),
+  propagateTimeDimensionToSubQuery: Joi.boolean().strict(),
 }, BaseDimensionWithoutSubQuery);
 
 const FixedRollingWindow = {

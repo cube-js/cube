@@ -1592,6 +1592,15 @@ export class BaseQuery {
     let filters;
     let segments;
     let timeDimensions;
+    const propagateTimeDimensionToSubQuery = (symbol.propagateTimeDimensionToSubQuery || symbol.propagateFiltersToSubQuery);
+    if (propagateTimeDimensionToSubQuery) {
+      timeDimensions = this.filtersWithoutSubQueries.filter(
+        f => f instanceof BaseTimeDimension
+      ).map(f => ({
+        dimension: f.dimension,
+        dateRange: f.dateRange
+      }));
+    }
     if (symbol.propagateFiltersToSubQuery) {
       filters = this.filtersWithoutSubQueries.filter(
         f => f instanceof BaseFilter && !(f instanceof BaseTimeDimension)
@@ -1599,13 +1608,6 @@ export class BaseQuery {
         dimension: f.dimension,
         operator: f.operator,
         values: f.values
-      }));
-
-      timeDimensions = this.filtersWithoutSubQueries.filter(
-        f => f instanceof BaseTimeDimension
-      ).map(f => ({
-        dimension: f.dimension,
-        dateRange: f.dateRange
       }));
 
       segments = this.filtersWithoutSubQueries.filter(
