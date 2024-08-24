@@ -18,7 +18,9 @@ use crate::table::{Row, TableValue, TimestampValue};
 use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
-use arrow::array::{
+use async_trait::async_trait;
+use core::fmt;
+use datafusion::arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
     Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
     Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
@@ -26,12 +28,10 @@ use arrow::array::{
     Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
-use arrow::ipc::reader::StreamReader;
-use arrow::ipc::writer::MemStreamWriter;
-use arrow::record_batch::RecordBatch;
-use async_trait::async_trait;
-use core::fmt;
+use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::ipc::reader::StreamReader;
+use datafusion::arrow::ipc::writer::MemStreamWriter;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
@@ -1761,7 +1761,7 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::datatypes::Field;
+    use datafusion::arrow::datatypes::Field;
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

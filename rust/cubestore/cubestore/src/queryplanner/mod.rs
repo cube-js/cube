@@ -51,12 +51,12 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
-use arrow::array::ArrayRef;
-use arrow::datatypes::Field;
-use arrow::record_batch::RecordBatch;
-use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::Field;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::{datatypes::Schema, datatypes::SchemaRef};
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
@@ -480,15 +480,15 @@ macro_rules! base_info_schema_table_def {
     ($table: ty) => {
         #[async_trait]
         impl crate::queryplanner::BaseInfoSchemaTableDef for $table {
-            fn schema_ref(&self) -> arrow::datatypes::SchemaRef {
-                Arc::new(arrow::datatypes::Schema::new(self.schema()))
+            fn schema_ref(&self) -> datafusion::arrow::datatypes::SchemaRef {
+                Arc::new(datafusion::arrow::datatypes::Schema::new(self.schema()))
             }
 
             async fn scan(
                 &self,
                 ctx: crate::queryplanner::InfoSchemaTableDefContext,
                 limit: Option<usize>,
-            ) -> Result<arrow::record_batch::RecordBatch, crate::CubeError> {
+            ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
                 let columns = self.columns();
@@ -496,7 +496,9 @@ macro_rules! base_info_schema_table_def {
                     .into_iter()
                     .map(|c| c(rows.clone()))
                     .collect::<Vec<_>>();
-                Ok(arrow::record_batch::RecordBatch::try_new(schema, columns)?)
+                Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
+                    schema, columns,
+                )?)
             }
         }
     };
