@@ -117,6 +117,27 @@ const asserts: [options: QueryTestOptions, query: Query][] = [
     }
   ],
   [
+    { name: 'Rolling Prev Period ratio' },
+    {
+      measures: [
+        'visitors.currentMonthToPrevRatio'
+      ],
+      dimensions: [
+        'visitors.source'
+      ],
+      timezone: 'UTC',
+      timeDimensions: [{
+        dimension: 'visitors.createdAt',
+        granularity: 'day',
+        dateRange: ['2017-02-02', '2017-02-05']
+      }],
+      order: {
+        'visitors.createdAt': 'asc',
+        'visitors.source': 'asc'
+      }
+    }
+  ],
+  [
     { name: 'Rolling Mixed With Dimension No Granularity' },
     {
       measures: [
