@@ -1,5 +1,5 @@
-use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::cube_match_array;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::ColumnarValue;
@@ -147,5 +147,7 @@ fn do_coalesce(start: &ArrayRef, rest: &[ColumnarValue]) -> Result<ArrayRef, Dat
             Ok(Arc::new(b.finish()))
         }};
     }
+    //TODO improve cube_match_array! hygiene instead
+    use datafusion::arrow;
     cube_match_array!(start, apply_coalesce)
 }
