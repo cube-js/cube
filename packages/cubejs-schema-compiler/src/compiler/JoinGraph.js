@@ -145,6 +145,7 @@ export class JoinGraph {
       let prevNode = root;
       return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
         if (nodesJoined[toJoin]) {
+          prevNode = toJoin;
           return { joins: [] };
         }
         const path = this.graph.path(prevNode, toJoin);
