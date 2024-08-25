@@ -1,4 +1,3 @@
-import { PostgresQuery } from '../../../src/adapter/PostgresQuery';
 import { prepareYamlCompiler } from '../../unit/PrepareCompiler';
 import { dbRunner } from './PostgresDBRunner';
 
@@ -78,21 +77,7 @@ views:
           - sum_cube2
     `);
 
-  async function runQueryTest(q, expectedResult) {
-    await compiler.compile();
-    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
-
-    console.log(query.buildSqlAndParams());
-
-    const res = await dbRunner.testQuery(query.buildSqlAndParams());
-    console.log(JSON.stringify(res));
-
-    expect(res).toEqual(
-      expectedResult
-    );
-  }
-
-  it('works if called in view', async () => runQueryTest({
+  it('works if called in view', async () => dbRunner.runQueryTest({
     measures: ['test.sum_cube1', 'test.sum_cube2'],
     dimensions: [
       'test.date'
@@ -106,5 +91,5 @@ views:
     test__date: 'b',
     test__sum_cube1: '7',
     test__sum_cube2: '6',
-  }]));
+  }], { joinGraph, cubeEvaluator, compiler }));
 });
