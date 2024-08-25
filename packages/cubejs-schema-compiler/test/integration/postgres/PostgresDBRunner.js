@@ -1,4 +1,6 @@
 // eslint-disable-next-line import/no-extraneous-dependencies
+import { PostgresQuery } from '../../../src';
+
 const pgPromise = require('pg-promise');
 // eslint-disable-next-line import/no-extraneous-dependencies
 const { GenericContainer, Wait } = require('testcontainers');
@@ -153,6 +155,10 @@ export class PostgresDBRunner extends BaseDbRunner {
 
   port() {
     return 5432;
+  }
+
+  newTestQuery(compilers, query) {
+    return new PostgresQuery(compilers, query);
   }
 }
 
