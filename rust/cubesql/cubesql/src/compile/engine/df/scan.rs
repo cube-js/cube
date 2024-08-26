@@ -478,11 +478,11 @@ impl ValueObject for JsonValueObject {
         Ok(self.rows.len())
     }
 
-    fn get<'a>(
-        &'a mut self,
+    fn get(
+        &mut self,
         index: usize,
         field_name: &str,
-    ) -> std::result::Result<FieldValue<'a>, CubeError> {
+    ) -> std::result::Result<FieldValue, CubeError> {
         let as_object = if let Some(as_object) = self.rows[index].as_object() {
             as_object
         } else {
@@ -1399,11 +1399,11 @@ mod tests {
                             "timeDimensions": []
                         },
                         "data": [
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null},
-                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000"},
-                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null}
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": null, "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": "City 1"},
+                            {"KibanaSampleDataEcommerce.count": 5, "KibanaSampleDataEcommerce.maxPrice": 5.05, "KibanaSampleDataEcommerce.isBool": true, "KibanaSampleDataEcommerce.orderDate": "2022-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 2"},
+                            {"KibanaSampleDataEcommerce.count": "5", "KibanaSampleDataEcommerce.maxPrice": "5.05", "KibanaSampleDataEcommerce.isBool": false, "KibanaSampleDataEcommerce.orderDate": "2023-01-01 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 3"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "true", "KibanaSampleDataEcommerce.orderDate": "9999-12-31 00:00:00.000", "KibanaSampleDataEcommerce.city": "City 4"},
+                            {"KibanaSampleDataEcommerce.count": null, "KibanaSampleDataEcommerce.maxPrice": null, "KibanaSampleDataEcommerce.isBool": "false", "KibanaSampleDataEcommerce.orderDate": null, "KibanaSampleDataEcommerce.city": null}
                         ]
                     }
                 "#;
@@ -1479,6 +1479,7 @@ mod tests {
                 DataType::Boolean,
                 false,
             ),
+            Field::new("KibanaSampleDataEcommerce.city", DataType::Utf8, false),
         ]));
 
         let scan_node = CubeScanExecutionPlan {
@@ -1502,6 +1503,7 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.isBool".to_string(),
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
+                    "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
                 segments: None,
                 time_dimensions: None,
@@ -1581,6 +1583,13 @@ mod tests {
                         Some(false)
                     ])) as ArrayRef,
                     Arc::new(BooleanArray::from(vec![None, None, None, None, None,])) as ArrayRef,
+                    Arc::new(StringArray::from(vec![
+                        Some("City 1"),
+                        Some("City 2"),
+                        Some("City 3"),
+                        Some("City 4"),
+                        None
+                    ])) as ArrayRef,
                 ],
             )
             .unwrap()
