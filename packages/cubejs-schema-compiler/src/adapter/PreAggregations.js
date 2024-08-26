@@ -34,7 +34,7 @@ export class PreAggregations {
 
   preAggregationsDescriptionLocal() {
     const isInPreAggregationQuery = this.query.options.preAggregationQuery;
-    if (!isInPreAggregationQuery) {
+    if (!isInPreAggregationQuery || this.query.options.useRollupLambdaInPreAggregation) {
       const preAggregationForQuery = this.findPreAggregationForQuery();
       if (preAggregationForQuery) {
         return this.preAggregationDescriptionsFor(preAggregationForQuery);
@@ -76,7 +76,7 @@ export class PreAggregations {
           preAggregation.cube, this.addPartitionRangeTo(
             preAggregation,
             dimension,
-            partitionDimension.wildcardRange(),
+            partitionDimension.dateRange || partitionDimension.wildcardRange(),
             partitionDimension.boundaryDateRange || partitionDimension.dateRange
           )
         );
@@ -998,6 +998,7 @@ export class PreAggregations {
             unionWithSourceData: i === referencedPreAggregations.length - 1 ? preAggObj.preAggregation.unionWithSourceData : false,
             rollupLambdaId: `${cube}.${preAggregationName}`,
             lastRollupLambda: i === referencedPreAggregations.length - 1,
+            useRollupLambdaInPreAggregation: referencedPreAggregations[i].cube !== cube,
           }
         };
         if (i > 0) {
@@ -1112,6 +1113,14 @@ export class PreAggregations {
         timeDimensions: this.mergePartitionTimeDimensions(references, aggregation.partitionTimeDimensions),
         preAggregationQuery: true,
         useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
+        ...(
+          aggregation.useRollupLambdaInPreAggregation
+            ? {
+              useRollupLambdaInPreAggregation: true,
+              paramAllocator: null
+            }
+            : {}
+        ),
         ungrouped: cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(cube, aggregation) &&
           !!references.dimensions.find(d => this.query.cubeEvaluator.dimensionByPath(d).primaryKey)
       }
