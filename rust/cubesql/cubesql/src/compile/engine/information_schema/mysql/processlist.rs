@@ -68,19 +68,19 @@ impl InformationSchemaProcesslistBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.id.finish()));
-        columns.push(Arc::new(self.user.finish()));
-        columns.push(Arc::new(self.host.finish()));
-        columns.push(Arc::new(self.db.finish()));
-        columns.push(Arc::new(self.command.finish()));
-        columns.push(Arc::new(self.time.finish()));
-
         let state = self.state.finish();
         let total = state.len();
-        columns.push(Arc::new(state));
 
-        columns.push(Arc::new(new_string_array_with_placeholder(total, None)));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.id.finish()),
+            Arc::new(self.user.finish()),
+            Arc::new(self.host.finish()),
+            Arc::new(self.db.finish()),
+            Arc::new(self.command.finish()),
+            Arc::new(self.time.finish()),
+            Arc::new(state),
+            Arc::new(new_string_array_with_placeholder(total, None)),
+        ];
 
         columns
     }
@@ -134,7 +134,7 @@ impl TableProvider for InfoSchemaProcesslistProvider {
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
         let mut builder = InformationSchemaProcesslistBuilder::new();
 
-        for process_list in self.sessions.process_list().await {
+        for process_list in self.sessions.map_sessions::<SessionProcessList>().await {
             builder.add_row(process_list);
         }
 

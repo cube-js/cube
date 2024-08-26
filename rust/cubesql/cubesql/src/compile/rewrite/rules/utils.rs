@@ -1,5 +1,6 @@
 use std::{
     cmp::{max, min},
+    str::FromStr,
     sync::Arc,
 };
 
@@ -23,6 +24,282 @@ use crate::{
 
 type IntervalDayTime = <IntervalDayTimeType as ArrowPrimitiveType>::Native;
 type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native;
+
+// TODO merge these with date_part and date_trunc on new arrow
+// See https://github.com/apache/arrow-rs/blob/63a6209b87d9fb2d06265fa5d4c72817b6f47394/arrow-arith/src/temporal.rs#
+
+#[derive(Debug)]
+pub enum DatePartToken {
+    Delta(DeltaTimeUnitToken),
+    Special(SpecialTimeUnitToken),
+}
+
+impl FromStr for DatePartToken {
+    // TODO proper type for err
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        input
+            .parse::<DeltaTimeUnitToken>()
+            .map(DatePartToken::Delta)
+            .or_else(|_| {
+                input
+                    .parse::<SpecialTimeUnitToken>()
+                    .map(DatePartToken::Special)
+            })
+            .map_err(|_| format!("Unexpected value for DatePartToken: {input}"))
+    }
+}
+
+impl DatePartToken {
+    // Must return standard representations where it can
+    pub fn as_str(&self) -> &str {
+        use DatePartToken::*;
+        // Each representation chosen as it is documented
+        // https://www.postgresql.org/docs/16/functions-datetime.html
+        match self {
+            Delta(token) => token.as_str(),
+            Special(token) => token.as_str(),
+        }
+    }
+
+    pub fn delta_for_trunc(&self) -> Option<DeltaTimeUnitToken> {
+        // Get suitable argument for date_trunc, so we could turn date_part(self, ...) to date_part(date_trunc(result, ...))
+        // Not every first arg of date_part is suitable for this
+        // For example, date_part supports 'epoch', while for date_trunc it does not make sense
+        // See https://www.postgresql.org/docs/16/functions-datetime.html#FUNCTIONS-DATETIME-EXTRACT
+        // See https://www.postgresql.org/docs/16/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+
+        use DatePartToken::*;
+        use DeltaTimeUnitToken::*;
+        use SpecialTimeUnitToken::*;
+
+        match self {
+            Delta(Microseconds) => Some(Microseconds),
+            Delta(Milliseconds) => Some(Milliseconds),
+            Delta(Second) => Some(Second),
+            Delta(Minute) => Some(Minute),
+            Delta(Hour) => Some(Hour),
+            Delta(Day) => Some(Day),
+            Delta(Week) => Some(Week),
+            Delta(Month) => Some(Month),
+            Delta(Quarter) => Some(Quarter),
+            Delta(Year) => Some(Year),
+            Delta(Decade) => Some(Decade),
+            Delta(Century) => Some(Century),
+            Delta(Millennium) => Some(Millennium),
+
+            // Does not really make sense
+            Delta(Timezone) => None,
+            Delta(TimezoneHour) => None,
+            Delta(TimezoneMinute) => None,
+
+            Special(DayOfWeek) => Some(Day),
+            Special(DayOfYear) => Some(Day),
+            // No possible truncation here
+            Special(Epoch) => None,
+            Special(IsoDayOfWeek) => Some(Day),
+            Special(IsoDayOfYear) => Some(Day),
+            // Results of extract(julian from ...) can be fractional, no possible truncation
+            Special(Julian) => None,
+        }
+    }
+}
+
+// Special delta token
+// Adapted from datetktbl in PostgreSQL src/backend/utils/adt/datetime.c
+// Only entries with type UNITS or value DTK_EPOCH are present, and that are not covered by DeltaTimeUnitToken
+// Only those are relevant to date_part and date_trunc
+#[derive(Debug)]
+pub enum SpecialTimeUnitToken {
+    DayOfWeek,
+    DayOfYear,
+    Epoch,
+    IsoDayOfWeek,
+    IsoDayOfYear,
+    Julian,
+}
+
+impl SpecialTimeUnitToken {
+    // Must return standard representations where it can
+    pub fn as_str(&self) -> &str {
+        use SpecialTimeUnitToken::*;
+        // Each representation chosen as it is documented
+        // https://www.postgresql.org/docs/16/functions-datetime.html
+        match self {
+            DayOfWeek => "dow",
+            DayOfYear => "doy",
+            Epoch => "epoch",
+            IsoDayOfWeek => "isodow",
+            IsoDayOfYear => "isoyear",
+            Julian => "julian",
+        }
+    }
+}
+
+impl FromStr for SpecialTimeUnitToken {
+    // TODO proper type for err
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        use SpecialTimeUnitToken::*;
+
+        // TODO try to remove allocation and use direct parsing
+        let lower = input.to_ascii_lowercase();
+
+        // See https://github.com/postgres/postgres/blob/ca6fde92258a328a98c1d9e41da5462b73da8529/src/backend/utils/adt/datetime.c#L92-L179
+        Ok(match lower.as_str() {
+            "dow" => DayOfWeek,
+            "doy" => DayOfYear,
+            "epoch" => Epoch,
+            "isodow" => IsoDayOfWeek,
+            "isoyear" => IsoDayOfYear,
+            "j" => Julian,
+            "jd" => Julian,
+            "julian" => Julian,
+
+            _ => {
+                return Err(format!(
+                    "Unexpected value for SpecialTimeUnitToken: {input}"
+                ))
+            }
+        })
+    }
+}
+
+// Time delta token
+// Adapted from deltatktbl in PostgreSQL src/backend/utils/adt/datetime.c
+// Only entries with type UNITS are present
+// Only those are relevant to date_part and date_trunc
+// Use this for date_trunc arguments
+#[derive(Debug)]
+pub enum DeltaTimeUnitToken {
+    Microseconds,
+    Milliseconds,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Quarter,
+    Year,
+    Decade,
+    Century,
+    Millennium,
+
+    Timezone,
+    TimezoneHour,
+    TimezoneMinute,
+}
+
+impl FromStr for DeltaTimeUnitToken {
+    // TODO proper type for err
+    type Err = String;
+    fn from_str(input: &str) -> Result<Self, Self::Err> {
+        // postgres does support non-standard granularities, but doesn't document it
+        // See https://github.com/postgres/postgres/blob/ca6fde92258a328a98c1d9e41da5462b73da8529/src/backend/utils/adt/datetime.c#L227-L228
+        // See https://github.com/postgres/postgres/blob/ca6fde92258a328a98c1d9e41da5462b73da8529/src/backend/utils/adt/timestamp.c#L4698-L4700
+        // See https://www.postgresql.org/docs/16/functions-datetime.html#FUNCTIONS-DATETIME-TRUNC
+
+        use DeltaTimeUnitToken::*;
+
+        // TODO try to remove allocation and use direct parsing
+        let lower = input.to_ascii_lowercase();
+
+        // Beware that postgres truncates identifiers before comparison
+        // TODO implement truncation for more complete behavior match
+        // See https://github.com/postgres/postgres/blob/ca6fde92258a328a98c1d9e41da5462b73da8529/src/backend/utils/adt/datetime.c#L183-L250
+        Ok(match lower.as_str() {
+            "c" => Century,
+            "cent" => Century,
+            "centuries" => Century,
+            "century" => Century,
+            "d" => Day,
+            "day" => Day,
+            "days" => Day,
+            "dec" => Decade,
+            "decade" => Decade,
+            "decades" => Decade,
+            "decs" => Decade,
+            "h" => Hour,
+            "hour" => Hour,
+            "hours" => Hour,
+            "hr" => Hour,
+            "hrs" => Hour,
+            "m" => Minute,
+            "microseconds" => Microseconds,
+            "mil" => Millennium,
+            "millennia" => Millennium,
+            "millennium" => Millennium,
+            "milliseconds" => Milliseconds,
+            "mils" => Millennium,
+            "min" => Minute,
+            "mins" => Minute,
+            "minute" => Minute,
+            "minutes" => Minute,
+            "mon" => Month,
+            "mons" => Month,
+            "month" => Month,
+            "months" => Month,
+            "ms" => Milliseconds,
+            "msec" => Milliseconds,
+            "msecond" => Milliseconds,
+            "mseconds" => Milliseconds,
+            "msecs" => Milliseconds,
+            "qtr" => Quarter,
+            "quarter" => Quarter,
+            "s" => Second,
+            "sec" => Second,
+            "second" => Second,
+            "seconds" => Second,
+            "secs" => Second,
+            "timezone" => Timezone,
+            "timezone_hour" => TimezoneHour,
+            "timezone_minute" => TimezoneMinute,
+            "us" => Microseconds,
+            "usec" => Microseconds,
+            "usecond" => Microseconds,
+            "useconds" => Microseconds,
+            "usecs" => Microseconds,
+            "w" => Week,
+            "week" => Week,
+            "weeks" => Week,
+            "y" => Year,
+            "year" => Year,
+            "years" => Year,
+            "yr" => Year,
+            "yrs" => Year,
+
+            _ => return Err(format!("Unexpected value for DeltaTimeUnitToken: {input}")),
+        })
+    }
+}
+
+impl DeltaTimeUnitToken {
+    // Must return standard representations where it can
+    pub fn as_str(&self) -> &str {
+        use DeltaTimeUnitToken::*;
+        // Each representation chosen as it is documented
+        // https://www.postgresql.org/docs/16/functions-datetime.html
+        match self {
+            Microseconds => "microseconds",
+            Milliseconds => "milliseconds",
+            Second => "second",
+            Minute => "minute",
+            Hour => "hour",
+            Day => "day",
+            Week => "week",
+            Month => "month",
+            Quarter => "quarter",
+            Year => "year",
+            Decade => "decade",
+            Century => "century",
+            Millennium => "millennium",
+            Timezone => "timezone",
+            TimezoneHour => "timezone_hour",
+            TimezoneMinute => "timezone_minute",
+        }
+    }
+}
 
 pub fn parse_granularity_string(granularity: &str, to_normalize: bool) -> Option<String> {
     if to_normalize {

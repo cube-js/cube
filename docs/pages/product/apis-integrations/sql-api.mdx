@@ -211,6 +211,18 @@ error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit rea
 Use the following environment variables to allocate more resources for query planning:
 `CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
+## Streaming
+
+By default, query results are loaded in a single batch. However, a more effective
+*streaming mode* can be used for large result sets. To enable it, set the
+`CUBESQL_STREAM_MODE` environment variable to `true`.
+
+<InfoBox>
+
+When the streaming mode is enabled, the maximum [row limit][ref-queries-row-limit]
+does not apply to SQL API queries. They can return an unlimited number of rows.
+
+</InfoBox>
 
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
@@ -242,3 +254,4 @@ Use the following environment variables to allocate more resources for query pla
 [link-postgres-backslash-commands]: https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS
 [postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
 [cube-bi-use-case]: https://cube.dev/use-cases/connected-bi
+[ref-queries-row-limit]: /product/apis-integrations/queries#row-limit

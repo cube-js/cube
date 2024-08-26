@@ -7,6 +7,7 @@ use tokio::{
 };
 use tokio_util::sync::CancellationToken;
 
+use super::shim::AsyncPostgresShim;
 use crate::{
     compile::DatabaseProtocol,
     config::processing_loop::{ProcessingLoop, ShutdownMode},
@@ -14,8 +15,6 @@ use crate::{
     telemetry::{ContextLogger, SessionLogger},
     CubeError,
 };
-
-use super::shim::AsyncPostgresShim;
 
 pub struct PostgresServer {
     // options
@@ -98,10 +97,18 @@ impl ProcessingLoop for PostgresServer {
                 }
             };
 
-            let session = self
+            let session = match self
                 .session_manager
-                .create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port)
-                .await;
+                .create_session(DatabaseProtocol::PostgreSQL, client_addr, client_port, None)
+                .await
+            {
+                Ok(r) => r,
+                Err(err) => {
+                    error!("Session creation error: {}", err);
+                    continue;
+                }
+            };
+
             let logger = Arc::new(SessionLogger::new(session.state.clone()));
 
             trace!("[pg] New connection {}", session.state.connection_id);
@@ -147,7 +154,7 @@ impl ProcessingLoop for PostgresServer {
 
         // Close the listening socket (so we _visibly_ stop accepting incoming connections) before
         // we wait for the outstanding connection tasks finish.
-        std::mem::drop(listener);
+        drop(listener);
 
         // Now that we've had the stop signal, wait for outstanding connection tasks to finish
         // cleanly.

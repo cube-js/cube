@@ -40,16 +40,16 @@ impl PgCatalogSequenceBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.seqrelid.finish()));
-        columns.push(Arc::new(self.seqtypid.finish()));
-        columns.push(Arc::new(self.seqstart.finish()));
-        columns.push(Arc::new(self.seqincrement.finish()));
-        columns.push(Arc::new(self.seqmax.finish()));
-        columns.push(Arc::new(self.seqmin.finish()));
-        columns.push(Arc::new(self.seqcache.finish()));
-        columns.push(Arc::new(self.seqcycle.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.seqrelid.finish()),
+            Arc::new(self.seqtypid.finish()),
+            Arc::new(self.seqstart.finish()),
+            Arc::new(self.seqincrement.finish()),
+            Arc::new(self.seqmax.finish()),
+            Arc::new(self.seqmin.finish()),
+            Arc::new(self.seqcache.finish()),
+            Arc::new(self.seqcycle.finish()),
+        ];
 
         columns
     }

@@ -858,6 +858,132 @@ describe('SQL Generation', () => {
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
   });
+
+  describe('FILTER_GROUP', () => {
+    /** @type {Compilers} */
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: `select * from order where {FILTER_GROUP(
+              FILTER_PARAMS.Order.dim0.filter('dim0'),
+              FILTER_PARAMS.Order.dim1.filter('dim1')
+            )}`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'dim0',
+                sql: 'dim0',
+                type: 'string'
+              },
+              {
+                name: 'dim1',
+                sql: 'dim1',
+                type: 'string'
+              }
+            ]
+          },
+        ]
+      })
+    );
+
+    it('inserts "or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) OR (dim1 = $1$)))');
+    });
+
+    it('inserts "and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) AND (dim1 = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['val1'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['another_val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['another_val1'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
+  });
 });
 
 describe('Class unit tests', () => {
