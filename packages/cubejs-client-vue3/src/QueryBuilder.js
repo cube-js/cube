@@ -393,6 +393,9 @@ export default {
         this.skipHeuristics = false;
       }
 
+      if (JSON.stringify(this.prevValidatedQuery) !== JSON.stringify(validatedQuery)) {
+        this.prevValidatedQuery = validatedQuery;
+      }
       return validatedQuery;
     },
   },

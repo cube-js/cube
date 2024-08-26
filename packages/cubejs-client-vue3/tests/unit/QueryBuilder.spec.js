@@ -506,9 +506,9 @@ describe('QueryBuilder.vue', () => {
     it('filters with boolean logical operators without explicit set', async () => {
       const cube = createCubeApi();
       jest
-          .spyOn(cube, 'request')
-          .mockImplementation(fetchMock(load))
-          .mockImplementationOnce(fetchMock(meta));
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
 
       const filter = {
         or: [
@@ -901,18 +901,20 @@ describe('QueryBuilder.vue', () => {
 
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           propsData: {
             cubeApi: cube,
             query: {
               measures: ['Orders.count'],
-              timeDimensions: [{
-                dimension: 'Orders.createdAt',
-              }],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
             },
           },
         });
@@ -928,23 +930,99 @@ describe('QueryBuilder.vue', () => {
         expect(wrapper.vm.pivotConfig).toEqual(expectedPivotForLine);
         expect(wrapper.vm.chartType).toBe('line');
       });
+      it('should not reassign validatedQuery if it has not changed', async () => {
+        const cube = createCubeApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubeApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
+            },
+          },
+        });
+
+        const initialValidatedQuery = {
+          measures: ['measure1'],
+          dimensions: ['dimension1'],
+        };
+        wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+
+        wrapper.setData({
+          measures: [{ name: 'measure1' }],
+          dimensions: [{ name: 'dimension1' }],
+        });
+
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.prevValidatedQuery.measures).toEqual(initialValidatedQuery.measures);
+        expect(wrapper.vm.prevValidatedQuery.dimensions).toEqual(initialValidatedQuery.dimensions);
+      });
+
+      it('should reassign validatedQuery if it has changed', async () => {
+        const cube = createCubeApi();
+        jest
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
+
+        const wrapper = shallowMount(QueryBuilder, {
+          propsData: {
+            cubeApi: cube,
+            query: {
+              measures: ['Orders.count'],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
+            },
+          },
+        });
+        const initialValidatedQuery = {
+          measures: ['measure1'],
+          dimensions: ['dimension1'],
+        };
+        wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+
+        wrapper.setData({
+          measures: [{ name: 'measure2' }],
+          dimensions: [{ name: 'dimension1' }],
+        });
+
+        await wrapper.vm.$nextTick();
+
+        expect(wrapper.vm.prevValidatedQuery.measures).not.toEqual(initialValidatedQuery.measures);
+        expect(wrapper.vm.prevValidatedQuery.dimensions).toEqual(initialValidatedQuery.dimensions);
+      });
     });
     describe('orderMembers', () => {
       it('does not contain time dimension if granularity is set to none', async () => {
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           props: {
             cubeApi: cube,
             query: {
               measures: ['Orders.count'],
-              timeDimensions: [{
-                dimension: 'Orders.createdAt',
-              }],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                },
+              ],
             },
           },
         });
@@ -953,32 +1031,34 @@ describe('QueryBuilder.vue', () => {
 
         expect(wrapper.vm.orderMembers.length).toBe(1);
         expect(wrapper.vm.orderMembers).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                id: 'Orders.count',
-                title: 'Orders Count',
-                order: 'none',
-              }),
-            ])
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            }),
+          ])
         );
       });
 
       it('contains time dimension if granularity is not none', async () => {
         const cube = createCubeApi();
         jest
-            .spyOn(cube, 'request')
-            .mockImplementation(fetchMock(load))
-            .mockImplementationOnce(fetchMock(meta));
+          .spyOn(cube, 'request')
+          .mockImplementation(fetchMock(load))
+          .mockImplementationOnce(fetchMock(meta));
 
         const wrapper = shallowMount(QueryBuilder, {
           props: {
             cubeApi: cube,
             query: {
               measures: ['Orders.count'],
-              timeDimensions: [{
-                dimension: 'Orders.createdAt',
-                granularity: 'day',
-              }],
+              timeDimensions: [
+                {
+                  dimension: 'Orders.createdAt',
+                  granularity: 'day',
+                },
+              ],
             },
           },
         });
@@ -987,18 +1067,18 @@ describe('QueryBuilder.vue', () => {
 
         expect(wrapper.vm.orderMembers.length).toBe(2);
         expect(wrapper.vm.orderMembers).toEqual(
-            expect.arrayContaining([
-              expect.objectContaining({
-                id: 'Orders.createdAt',
-                title: 'Orders Created at',
-                order: 'none'
-              }),
-              expect.objectContaining({
-                id: 'Orders.count',
-                title: 'Orders Count',
-                order: 'none',
-              })
-            ])
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: 'Orders.createdAt',
+              title: 'Orders Created at',
+              order: 'none',
+            }),
+            expect.objectContaining({
+              id: 'Orders.count',
+              title: 'Orders Count',
+              order: 'none',
+            }),
+          ])
         );
       });
     });
