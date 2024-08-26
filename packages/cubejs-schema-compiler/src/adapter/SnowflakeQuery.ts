@@ -42,41 +42,22 @@ export class SnowflakeQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
-  // public dimensionTimeGroupedColumn(dimension: string, interval: string, offset: string): string {
-  //   if (offset) {
-  //     offset = this.formatInterval(offset);
-  //   }
-  //
-  //   if (this.isGranularityNaturalAligned(interval)) {
-  //     return super.dimensionTimeGroupedColumn(dimension, interval, offset);
-  //   }
-  //
-  //   // Formula:
-  //   // SELECT DATEADD(second,
-  //   //         FLOOR(
-  //   //           DATEDIFF(seconds, DATE_TRUNC('year', dimension) + offset?, dimension) /
-  //   //           DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval))
-  //   //         ) * DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval)),
-  //   //         DATE_TRUNC('year', dimension) + offset?)
-  //   //
-  //   // The formula operates with seconds so it won't produce dates aligned with offset date parts, like:
-  //   // if offset is "6 months 3 days" - the result won't always be the 3rd of July. It will add
-  //   // exact number of seconds in the "6 months 3 days" without aligning with natural calendar.
-  //
-  //   let dtDate = this.timeGroupedColumn('year', dimension);
-  //   if (offset) {
-  //     dtDate = this.addInterval(dtDate, offset);
-  //   }
-  //
-  //   interval = this.formatInterval(interval);
-  //
-  //   return `DATEADD(second,
-  //       FLOOR(
-  //         DATEDIFF(seconds, ${dtDate}, CURRENT_TIMESTAMP) /
-  //         DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval '${interval}'))
-  //       ) * DATE_PART(epoch_seconds FROM (TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0) + interval '${interval}')),
-  //       ${dtDate})`;
-  // }
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = 'TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0)';
+
+    return `DATEADD(${timeUnit},
+        FLOOR(
+          DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}'))
+        ) * DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}')),
+        ${this.timeStampCast(`'${origin}'`)})`;
+  }
 
   /**
    * The input interval in format "2 years 3 months 4 weeks 5 days...."
@@ -89,6 +70,26 @@ export class SnowflakeQuery extends BaseQuery {
       }
       return word;
     }).join(' ');
+  }
+
+  private diffTimeUnitForInterval(interval: string): string {
+    if (/second/i.test(interval)) {
+      return 'second';
+    } else if (/minute/i.test(interval)) {
+      return 'minute';
+    } else if (/hour/i.test(interval)) {
+      return 'hour';
+    } else if (/day/i.test(interval)) {
+      return 'day';
+    } else if (/week/i.test(interval)) {
+      return 'day';
+    } else if (/month/i.test(interval)) {
+      return 'month';
+    } else if (/quarter/i.test(interval)) {
+      return 'month';
+    } else /* if (/year/i.test(interval)) */ {
+      return 'year';
+    }
   }
 
   public timeStampCast(value) {
