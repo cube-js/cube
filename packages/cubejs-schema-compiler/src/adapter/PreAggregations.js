@@ -34,7 +34,7 @@ export class PreAggregations {
 
   preAggregationsDescriptionLocal() {
     const isInPreAggregationQuery = this.query.options.preAggregationQuery;
-    if (!isInPreAggregationQuery || this.query.options.useRollupLambdaInPreAggregation) {
+    if (!isInPreAggregationQuery) {
       const preAggregationForQuery = this.findPreAggregationForQuery();
       if (preAggregationForQuery) {
         return this.preAggregationDescriptionsFor(preAggregationForQuery);
@@ -114,9 +114,14 @@ export class PreAggregations {
     return { dimension, partitionDimension };
   }
 
-  preAggregationDescriptionsForRecursive(cube, foundPreAggregation) {
+  preAggregationDescriptionsForRecursive(cube, foundPreAggregation, debug) {
     const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
+    
+    if (foundPreAggregation.preAggregation.lastRollupLambda && !descriptions.length && query !== this.query) {
+      return [query.preAggregations.preAggregationDescriptionFor(cube, foundPreAggregation)];
+    }
+
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
 
@@ -998,7 +1003,6 @@ export class PreAggregations {
             unionWithSourceData: i === referencedPreAggregations.length - 1 ? preAggObj.preAggregation.unionWithSourceData : false,
             rollupLambdaId: `${cube}.${preAggregationName}`,
             lastRollupLambda: i === referencedPreAggregations.length - 1,
-            useRollupLambdaInPreAggregation: referencedPreAggregations[i].cube !== cube,
           }
         };
         if (i > 0) {
@@ -1114,11 +1118,8 @@ export class PreAggregations {
         preAggregationQuery: true,
         useOriginalSqlPreAggregationsInPreAggregation: aggregation.useOriginalSqlPreAggregations,
         ...(
-          aggregation.useRollupLambdaInPreAggregation
-            ? {
-              useRollupLambdaInPreAggregation: true,
-              paramAllocator: null
-            }
+          aggregation.lastRollupLambda
+            ? { paramAllocator: null }
             : {}
         ),
         ungrouped: cubeQuery.preAggregationAllowUngroupingWithPrimaryKey(cube, aggregation) &&
