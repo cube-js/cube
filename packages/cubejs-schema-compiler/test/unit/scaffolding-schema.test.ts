@@ -1,6 +1,6 @@
 import { ScaffoldingSchema } from '../../src/scaffolding/ScaffoldingSchema';
 
-describe.only('ScaffoldingSchema', () => {
+describe('ScaffoldingSchema', () => {
   const schemas = {
     public: {
       orders: [{
@@ -17,7 +17,7 @@ describe.only('ScaffoldingSchema', () => {
         attributes: []
       }, {
         name: 'bool_value',
-        type: 'bool',
+        type: 'boolean',
         attributes: []
       }],
       customers: [{
