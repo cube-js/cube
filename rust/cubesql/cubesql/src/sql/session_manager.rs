@@ -71,7 +71,7 @@ impl SessionManager {
 
         let mut guard = self.sessions.write().await;
 
-        if guard.sessions.len() > self.server.config_obj.max_sessions() {
+        if guard.sessions.len() >= self.server.config_obj.max_sessions() {
             return Err(CubeError::user(format!(
                 "Too many sessions, limit reached: {}",
                 self.server.config_obj.max_sessions()
