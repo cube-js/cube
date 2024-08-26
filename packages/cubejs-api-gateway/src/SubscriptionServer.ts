@@ -34,12 +34,11 @@ export class SubscriptionServer {
     map((val) => val as Array<{ renewedCube: string | undefined }>),
     map((val) => val.map(v => v.renewedCube)),
     // Buffer the values for 300ms
-    bufferTime(300),
+    bufferTime(100),
     map((renewedCubes) => renewedCubes.flat()),
     map((val) => val.filter(v => v !== undefined)),
     // Filter out any empty arrays
     filter((renewedCubes) => renewedCubes.length > 0),
-    tap((val) => console.log('Cube renewed:', val)),
     // Convert the array of arrays to an array of unique arrays
     map((renewedCubes) => Array.from(new Set(renewedCubes))),
   );
