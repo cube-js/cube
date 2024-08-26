@@ -365,18 +365,42 @@ describe('Custom Granularities', () => {
       }],
       dimensions: ['orders.status'],
       filters: [],
+      order: [
+        ['orders.createdAt', 'asc'],
+        ['orders.status', 'asc'],
+      ],
       timezone: 'Europe/London'
     },
     [
+      {
+        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '14',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '18',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '13',
+        orders__status: 'completed',
+      },
+      {
+        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '9',
+        orders__status: 'completed',
+      },
       {
         orders__created_at_half_year: '2024-01-01T00:00:00.000Z',
         orders__rolling_count_by_unbounded: '4',
         orders__status: 'completed',
       },
       {
-        orders__created_at_half_year: '2024-01-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '4',
-        orders__status: 'shipped',
+        orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '18',
+        orders__status: 'completed',
       },
       {
         orders__created_at_half_year: '2024-01-01T00:00:00.000Z',
@@ -384,39 +408,9 @@ describe('Custom Granularities', () => {
         orders__status: 'processing',
       },
       {
-        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '9',
-        orders__status: 'processing',
-      },
-      {
-        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '9',
+        orders__created_at_half_year: '2024-01-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '4',
         orders__status: 'shipped',
-      },
-      {
-        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '9',
-        orders__status: 'completed',
-      },
-      {
-        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '14',
-        orders__status: 'processing',
-      },
-      {
-        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '13',
-        orders__status: 'shipped',
-      },
-      {
-        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '13',
-        orders__status: 'completed',
-      },
-      {
-        orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '18',
-        orders__status: 'completed',
       },
       {
         orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
@@ -424,8 +418,18 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
       {
-        orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '18',
+        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '9',
+        orders__status: 'shipped',
+      },
+      {
+        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '13',
+        orders__status: 'shipped',
+      },
+      {
+        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '9',
         orders__status: 'processing',
       },
     ],
@@ -442,22 +446,16 @@ describe('Custom Granularities', () => {
       }],
       dimensions: ['orders.status'],
       filters: [],
+      order: [
+        ['orders.createdAt', 'asc'],
+        ['orders.status', 'asc'],
+      ],
       timezone: 'Europe/London'
     },
     [
       {
-        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '3',
-        orders__status: 'processing',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '2',
-        orders__status: 'shipped',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '2',
+        orders__created_at_half_year_by_1st_april: '2024-04-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '7',
         orders__status: 'completed',
       },
       {
@@ -466,39 +464,9 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
       {
-        orders__created_at_half_year_by_1st_april: '2024-04-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '7',
-        orders__status: 'completed',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2024-04-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '7',
-        orders__status: 'processing',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2024-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '11',
-        orders__status: 'processing',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2024-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '11',
-        orders__status: 'completed',
-      },
-      {
         orders__created_at_half_year_by_1st_april: '2024-10-01T00:00:00.000Z',
         orders__rolling_count_by_unbounded: '11',
         orders__status: 'shipped',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2025-04-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '15',
-        orders__status: 'shipped',
-      },
-      {
-        orders__created_at_half_year_by_1st_april: '2025-04-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '16',
-        orders__status: 'processing',
       },
       {
         orders__created_at_half_year_by_1st_april: '2025-04-01T00:00:00.000Z',
@@ -511,14 +479,54 @@ describe('Custom Granularities', () => {
         orders__status: 'shipped',
       },
       {
-        orders__created_at_half_year_by_1st_april: '2025-10-01T00:00:00.000Z',
-        orders__rolling_count_by_unbounded: '20',
-        orders__status: 'completed',
+        orders__created_at_half_year_by_1st_april: '2024-04-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '7',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2025-04-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '15',
+        orders__status: 'shipped',
       },
       {
         orders__created_at_half_year_by_1st_april: '2025-10-01T00:00:00.000Z',
         orders__rolling_count_by_unbounded: '20',
         orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '3',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2025-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '20',
+        orders__status: 'completed',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2025-04-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '16',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '2',
+        orders__status: 'shipped',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2024-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '11',
+        orders__status: 'processing',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2024-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '11',
+        orders__status: 'completed',
+      },
+      {
+        orders__created_at_half_year_by_1st_april: '2023-10-01T00:00:00.000Z',
+        orders__rolling_count_by_unbounded: '2',
+        orders__status: 'completed',
       },
     ],
     { joinGraph, cubeEvaluator, compiler }
