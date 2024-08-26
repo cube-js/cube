@@ -25,7 +25,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
-    this.origin = moment.tz(this.query.timezone).startOf('year'); // Defaults to current year start
+    this.origin = moment().startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {
       this.granularityInterval = `1 ${this.granularity}`;
@@ -44,7 +44,7 @@ export class Granularity {
       this.granularityInterval = customGranularity.interval;
 
       if (customGranularity.origin) {
-        this.origin = moment.tz(new Date(origin), this.query.timezone);
+        this.origin = moment(new Date(origin));
       } else if (customGranularity.offset) {
         this.granularityOffset = customGranularity.offset;
         this.origin = addInterval(this.origin, parseSqlInterval(customGranularity.offset));
