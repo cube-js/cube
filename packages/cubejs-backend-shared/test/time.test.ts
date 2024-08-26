@@ -132,6 +132,13 @@ describe('time', () => {
     ]);
   });
 
+  it('time series - custom: interval - 6 months, origin - 2021-01-01', () => {
+    expect(timeSeriesFromCustomInterval('6 months', ['2021-01-01', '2021-12-31'], moment('2021-01-01'))).toEqual([
+      ['2021-01-01T00:00:00.000', '2021-06-30T23:59:59.999'],
+      ['2021-07-01T00:00:00.000', '2021-12-31T23:59:59.999']
+    ]);
+  });
+
   it('time series - custom: interval - 2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds, origin - 2021-01-01', () => {
     expect(timeSeriesFromCustomInterval('2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds', ['2021-01-01', '2021-12-31'], moment('2021-01-01'))).toEqual([
       ['2021-01-01T00:00:00.000', '2021-03-26T05:06:06.999'],
