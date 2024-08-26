@@ -1,6 +1,6 @@
 import { ScaffoldingSchema } from '../../src/scaffolding/ScaffoldingSchema';
 
-describe('ScaffoldingSchema', () => {
+describe.only('ScaffoldingSchema', () => {
   const schemas = {
     public: {
       orders: [{
@@ -14,6 +14,10 @@ describe('ScaffoldingSchema', () => {
       }, {
         name: 'customer_id',
         type: 'integer',
+        attributes: []
+      }, {
+        name: 'bool_value',
+        type: 'bool',
         attributes: []
       }],
       customers: [{
@@ -301,6 +305,14 @@ describe('ScaffoldingSchema', () => {
             ],
             title: 'Id',
             isPrimaryKey: true
+          },
+          {
+            isPrimaryKey: false,
+            name: 'bool_value',
+            title: 'Bool Value',
+            types: [
+              'boolean'
+            ],
           }
         ],
         joins: [
@@ -433,6 +445,14 @@ describe('ScaffoldingSchema', () => {
             ],
             title: 'Id',
             isPrimaryKey: true
+          },
+          {
+            isPrimaryKey: false,
+            name: 'bool_value',
+            title: 'Bool Value',
+            types: [
+              'boolean'
+            ],
           }
         ],
         joins: [
