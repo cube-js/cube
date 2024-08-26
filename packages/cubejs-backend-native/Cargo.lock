@@ -768,7 +768,6 @@ dependencies = [
  "pyo3-asyncio",
  "regex",
  "serde",
- "serde_derive",
  "serde_json",
  "simple_logger",
  "tokio",
