@@ -1978,6 +1978,7 @@ class ApiGateway {
         return;
       }
 
+      // TODO: RENE
       // TODO subscribe to refreshKeys instead of constantly firing load
       await this.load({
         query,

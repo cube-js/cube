@@ -188,6 +188,11 @@ export class SubscriptionServer {
     }
 
     const subs = await this.subscriptionStore.getSubscriptionsByCubeName(cubes);
+
+    if (subs.length === 0) {
+      return;
+    }
+
     console.log('Renewing subs based on changed cubes', cubes, subs.length);
     subs.map(async subscription => {
       this.processMessage(subscription.connectionId, subscription.message, true);
