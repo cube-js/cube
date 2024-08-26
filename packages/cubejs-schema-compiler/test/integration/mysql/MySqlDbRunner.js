@@ -2,7 +2,7 @@ import { promisify } from 'util';
 import { GenericContainer } from 'testcontainers';
 import mysql from 'mysql';
 
-import { BaseDbRunner } from '../postgres/BaseDbRunner';
+import { BaseDbRunner } from '../utils/BaseDbRunner';
 
 export class MySqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {

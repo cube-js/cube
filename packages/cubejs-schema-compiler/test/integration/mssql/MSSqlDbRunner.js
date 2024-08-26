@@ -2,7 +2,7 @@
 import { GenericContainer, Wait } from 'testcontainers';
 import sql from 'mssql';
 
-import { BaseDbRunner } from '../postgres/BaseDbRunner';
+import { BaseDbRunner } from '../utils/BaseDbRunner';
 
 export class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
