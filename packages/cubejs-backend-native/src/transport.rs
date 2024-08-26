@@ -16,7 +16,7 @@ use cubesql::{
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
