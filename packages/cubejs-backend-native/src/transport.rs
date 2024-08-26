@@ -410,10 +410,10 @@ impl TransportService for NodeBridgeTransport {
                         ));
                     }
                 }
-            }
+            };
 
-            serde_json::from_value::<TransportLoadResponse>(response)
-                .map_err(|err| CubeError::user(err.to_string()))
+            break serde_json::from_value::<TransportLoadResponse>(response)
+                .map_err(|err| CubeError::user(err.to_string()));
         }
     }
 
