@@ -885,7 +885,7 @@ async fn load_data(
             data
         } else {
             return Err(ArrowError::ComputeError(
-                "Unable to extract result from Cube.js response, empty results".to_string(),
+                "Unable to extract results from response: results is empty".to_string(),
             ));
         }
     };
