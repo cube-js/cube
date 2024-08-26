@@ -51,11 +51,11 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
