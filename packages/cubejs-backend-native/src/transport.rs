@@ -396,7 +396,7 @@ impl TransportService for NodeBridgeTransport {
 
                             continue;
                         } else {
-                            return Err(CubeError::internal(error.clone()));
+                            return Err(CubeError::user(error.clone()));
                         }
                     }
                     other => {
