@@ -1,7 +1,7 @@
-use std::borrow::Cow;
 use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
+use std::borrow::Cow;
 
 use std::cell::RefCell;
 use std::future::Future;
