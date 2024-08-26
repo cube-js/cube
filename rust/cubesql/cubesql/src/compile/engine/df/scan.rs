@@ -1,10 +1,3 @@
-use std::{
-    any::Any,
-    fmt,
-    sync::Arc,
-    task::{Context, Poll},
-};
-
 use async_trait::async_trait;
 use cubeclient::models::{V1LoadRequestQuery, V1LoadResult, V1LoadResultAnnotation};
 pub use datafusion::{
@@ -27,6 +20,13 @@ pub use datafusion::{
 };
 use futures::Stream;
 use log::warn;
+use std::{
+    any::Any,
+    borrow::Cow,
+    fmt,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use crate::{
     compile::{
@@ -447,10 +447,11 @@ struct CubeScanExecutionPlan {
 
 #[derive(Debug)]
 pub enum FieldValue<'a> {
-    // Neon doesn't allow us to build string reference, because V8 uses UTF-16, while Rust uses UTF-8
-    String(String),
-    // Best variant for us with strings, because we dont need to clone string
-    StringRef(&'a String),
+    // Why Cow?
+    // We use N-API via Neon (only for streaming), which doesn't allow us to build string reference,
+    // because V8 uses UTF-16 It allocates/converts a new strings while doing JsString.value()
+    // @see v8 WriteUtf8 for more details. Cow::Owned is used for this variant
+    String(Cow<'a, str>),
     Number(f64),
     Bool(bool),
     Null,
@@ -483,9 +484,7 @@ impl ValueObject for JsonValueObject {
         index: usize,
         field_name: &str,
     ) -> std::result::Result<FieldValue, CubeError> {
-        let as_object = if let Some(as_object) = self.rows[index].as_object() {
-            as_object
-        } else {
+        let Some(as_object) = self.rows[index].as_object() else {
             return Err(CubeError::user(format!(
                 "Unexpected response from Cube, row is not an object: {:?}",
                 self.rows[index]
@@ -495,7 +494,7 @@ impl ValueObject for JsonValueObject {
         let value = as_object.get(field_name).unwrap_or(&Value::Null);
 
         Ok(match value {
-            Value::String(s) => FieldValue::StringRef(s),
+            Value::String(s) => FieldValue::String(Cow::Borrowed(s)),
             Value::Number(n) => FieldValue::Number(n.as_f64().ok_or(
                 DataFusionError::Execution(format!("Can't convert {:?} to float", n)),
             )?),
@@ -948,7 +947,6 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::String(v), builder) => builder.append_value(v)?,
-                        (FieldValue::StringRef(v), builder) => builder.append_value(v)?,
                         (FieldValue::Bool(v), builder) => builder.append_value(if v { "true" } else { "false" })?,
                         (FieldValue::Number(v), builder) => builder.append_value(v.to_string())?,
                     },
@@ -965,7 +963,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i16)?,
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => match s.parse::<i16>() {
+                        (FieldValue::String(s), builder) => match s.parse::<i16>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -990,7 +988,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i32)?,
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => match s.parse::<i32>() {
+                        (FieldValue::String(s), builder) => match s.parse::<i32>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1015,7 +1013,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number.round() as i64)?,
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => match s.parse::<i64>() {
+                        (FieldValue::String(s), builder)  => match s.parse::<i64>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1040,7 +1038,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number as f32)?,
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => match s.parse::<f32>() {
+                        (FieldValue::String(s), builder) => match s.parse::<f32>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1065,7 +1063,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Number(number), builder) => builder.append_value(number)?,
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => match s.parse::<f64>() {
+                        (FieldValue::String(s), builder) => match s.parse::<f64>() {
                             Ok(v) => builder.append_value(v)?,
                             Err(error) => {
                                 warn!(
@@ -1090,7 +1088,7 @@ pub fn transform_response<V: ValueObject>(
                     field_name,
                     {
                         (FieldValue::Bool(v), builder) => builder.append_value(v)?,
-                        (FieldValue::String(ref v), builder) | (FieldValue::StringRef(&ref v), builder)  => match v.as_str() {
+                        (FieldValue::String(v), builder)  => match v.as_ref() {
                             "true" | "1" => builder.append_value(true)?,
                             "false" | "0" => builder.append_value(false)?,
                             _ => {
@@ -1112,13 +1110,13 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                        (FieldValue::String(s), builder) => {
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
                                 .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
                                         date.and_hms_opt(0, 0, 0).unwrap()
                                     })
                                 })
@@ -1148,13 +1146,13 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => {
-                            let timestamp = NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.f")
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%d %H:%M:%S%.f"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S"))
-                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_str(), "%Y-%m-%dT%H:%M:%S%.fZ"))
+                        (FieldValue::String(s), builder) => {
+                            let timestamp = NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.f")
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%d %H:%M:%S%.f"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S"))
+                                .or_else(|_| NaiveDateTime::parse_from_str(s.as_ref(), "%Y-%m-%dT%H:%M:%S%.fZ"))
                                 .or_else(|_| {
-                                    NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d").map(|date| {
+                                    NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d").map(|date| {
                                         date.and_hms_opt(0, 0, 0).unwrap()
                                     })
                                 })
@@ -1184,11 +1182,11 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => {
-                            let date = NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%d")
+                        (FieldValue::String(s), builder) => {
+                            let date = NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%d")
                                 // FIXME: temporary solution for cases when expected type is Date32
                                 // but underlying data is a Timestamp
-                                .or_else(|_| NaiveDate::parse_from_str(s.as_str(), "%Y-%m-%dT00:00:00.000"))
+                                .or_else(|_| NaiveDate::parse_from_str(s.as_ref(), "%Y-%m-%dT00:00:00.000"))
                                 .map_err(|e| {
                                     DataFusionError::Execution(format!(
                                         "Can't parse date: '{}': {}",
@@ -1228,7 +1226,7 @@ pub fn transform_response<V: ValueObject>(
                     response,
                     field_name,
                     {
-                        (FieldValue::String(ref s), builder) | (FieldValue::StringRef(&ref s), builder) => {
+                        (FieldValue::String(s), builder) => {
                             let mut parts = s.split(".");
                             match parts.next() {
                                 None => builder.append_null()?,
@@ -1460,6 +1458,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_df_cube_scan_execute() {
+        assert_eq!(std::mem::size_of::<FieldValue>(), 24);
+
         let schema = Arc::new(Schema::new(vec![
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
             Field::new("KibanaSampleDataEcommerce.count", DataType::Utf8, false),
