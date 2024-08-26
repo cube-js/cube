@@ -13,7 +13,7 @@
     "@testing-library/react": "^11.2.5",
     "@testing-library/user-event": "^12.8.3",
     "ag-grid-community": "^25.1.0",
-    "ag-grid-enterprise": "^25.1.0",
+    "ag-grid-enterprise": "^31.3.4",
     "ag-grid-react": "^25.1.0",
     "antd": "^4.14.0",
     "apollo-cache-inmemory": "^1.6.6",

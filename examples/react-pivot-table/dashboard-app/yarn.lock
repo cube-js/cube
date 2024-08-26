@@ -2652,15 +2652,28 @@ adjust-sourcemap-loader@3.0.0:
     loader-utils "^2.0.0"
     regex-parser "^2.2.11"
 
+ag-charts-community@9.3.2:
+  version "9.3.2"
+  resolved "https://registry.yarnpkg.com/ag-charts-community/-/ag-charts-community-9.3.2.tgz#f3229fb0a8077441b1accee19a5373635e0e44ce"
+  integrity sha512-jw2llxTYzGAZ24m7eQsKS24BnJBhspZKsL03DbqH0wxLepbEcC3eeWICe+02TBQCbFVsWmSsYukjzQg3FkVWRw==
+
+ag-grid-community@31.3.4:
+  version "31.3.4"
+  resolved "https://registry.yarnpkg.com/ag-grid-community/-/ag-grid-community-31.3.4.tgz#d9397672d6941aebc633a37b2b32e3637aa05642"
+  integrity sha512-jOxQO86C6eLnk1GdP24HB6aqaouFzMWizgfUwNY5MnetiWzz9ZaAmOGSnW/XBvdjXvC5Fpk3gSbvVKKQ7h9kBw==
+
 ag-grid-community@^25.1.0:
   version "25.3.0"
   resolved "https://registry.yarnpkg.com/ag-grid-community/-/ag-grid-community-25.3.0.tgz#9a0acce6d35f0c23313aa559dbd8acd737d5ef19"
   integrity sha512-Xe4NZG0PP9kvhila1uHU4BeVfLDCWBmcuBYLBZ+49jvK+jYpuwdAjV3AwIlxpZGRR3WTdBUvUkSz9rmi2DRE3Q==
 
-ag-grid-enterprise@^25.1.0:
-  version "25.3.0"
-  resolved "https://registry.yarnpkg.com/ag-grid-enterprise/-/ag-grid-enterprise-25.3.0.tgz#13f24b29a12b835b7e0afdbf8b7822cc161e02cc"
-  integrity sha512-eIC0kjPkDnS6nJEsueIT3HbPwr+vFunNiJY7DMEB5D4fAh7GEK9Ds0VMYtqZobLcKQgbqcJAH8ZhFRAHS+bIDA==
+ag-grid-enterprise@^31.3.4:
+  version "31.3.4"
+  resolved "https://registry.yarnpkg.com/ag-grid-enterprise/-/ag-grid-enterprise-31.3.4.tgz#239ab3807f4babb993a2b091a01211af56cc9628"
+  integrity sha512-kreGRsFjz41APXXchLcQFtginnrmIGQYH48p7ydz33x8v+aja06HS5yEM6NP8j+VVHX43LeXnsl5Y4TLRgSoeg==
+  dependencies:
+    ag-charts-community "9.3.2"
+    ag-grid-community "31.3.4"
 
 ag-grid-react@^25.1.0:
   version "25.3.0"
