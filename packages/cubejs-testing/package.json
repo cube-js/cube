@@ -92,7 +92,7 @@
     "@cubejs-backend/cubestore-driver": "^0.35.68",
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/postgres-driver": "^0.35.70",
-    "@cubejs-backend/query-orchestrator": "^0.35.68",
+    "@cubejs-backend/query-orchestrator": "file:../cubejs-query-orchestrator",
     "@cubejs-backend/schema-compiler": "^0.35.70",
     "@cubejs-backend/shared": "^0.35.67",
     "@cubejs-backend/testing-shared": "^0.35.70",

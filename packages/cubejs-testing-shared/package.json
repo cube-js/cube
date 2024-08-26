@@ -21,7 +21,7 @@
   ],
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/query-orchestrator": "^0.35.68",
+    "@cubejs-backend/query-orchestrator": "file:../cubejs-query-orchestrator",
     "@cubejs-backend/schema-compiler": "^0.35.70",
     "@cubejs-backend/shared": "^0.35.67",
     "dedent": "^0.7.0",

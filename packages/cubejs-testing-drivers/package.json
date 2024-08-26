@@ -57,7 +57,7 @@
     "@cubejs-backend/mssql-driver": "^0.35.67",
     "@cubejs-backend/mysql-driver": "^0.35.70",
     "@cubejs-backend/postgres-driver": "^0.35.70",
-    "@cubejs-backend/query-orchestrator": "^0.35.68",
+    "@cubejs-backend/query-orchestrator": "file:../cubejs-query-orchestrator",
     "@cubejs-backend/server-core": "^0.35.70",
     "@cubejs-backend/shared": "^0.35.67",
     "@cubejs-backend/snowflake-driver": "^0.35.67",

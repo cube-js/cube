@@ -189,6 +189,7 @@ export class SubscriptionServer {
     }
 
     const subs = await this.subscriptionStore.getSubscriptionsByCubeName(cubes);
+    console.log('Renewing subs based on changed cubes', cubes, subs.length);
     await Promise.all(subs.map(async subscription => {
       await this.processMessage(subscription.connectionId, subscription.message, true);
     }));
