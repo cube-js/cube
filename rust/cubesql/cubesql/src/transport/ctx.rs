@@ -222,6 +222,7 @@ mod tests {
         let test_cubes = vec![
             CubeMeta {
                 name: "test1".to_string(),
+                description: None,
                 title: None,
                 dimensions: vec![],
                 measures: vec![],
@@ -230,6 +231,7 @@ mod tests {
             },
             CubeMeta {
                 name: "test2".to_string(),
+                description: None,
                 title: None,
                 dimensions: vec![],
                 measures: vec![],
