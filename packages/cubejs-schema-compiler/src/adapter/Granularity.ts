@@ -76,7 +76,7 @@ export class Granularity {
       return timeSeries(this.granularity, dateRange, options);
     }
 
-    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, this.granularityOffset, options);
+    return timeSeriesFromCustomInterval(this.granularityInterval, dateRange, this.origin, options);
   }
 
   public resolvedGranularity(): string {

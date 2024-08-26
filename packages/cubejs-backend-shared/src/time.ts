@@ -74,48 +74,50 @@ export function subtractInterval(date: moment.Moment, interval: ParsedInterval):
 }
 
 /**
- * Returns the closest date prior to date parameter aligned with the offset and interval
- * If no offset provided, the beginning of the year will be taken as pivot point
+ * Returns the closest date prior to date parameter aligned with the origin point
  */
-function alignToOffset(date: moment.Moment, interval: ParsedInterval, offset?: ParsedInterval): moment.Moment {
-  let alignedDate = date.clone();
+function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origin: moment.Moment): moment.Moment {
+  let alignedDate = startDate.clone();
   let intervalOp;
+  let isIntervalNegative = false;
 
-  const startOfYear = moment().year(date.year()).startOf('year');
-  let offsetDate = offset ? addInterval(startOfYear, offset) : startOfYear;
+  let offsetDate = addInterval(origin, interval);
 
-  if (date.isBefore(offsetDate)) {
-    intervalOp = offsetDate.isBefore(startOfYear) ? addInterval : subtractInterval;
+  // The easiest way to check the interval sign
+  if (offsetDate.isBefore(origin)) {
+    isIntervalNegative = true;
+  }
 
-    while (date.isBefore(offsetDate)) {
+  offsetDate = origin.clone();
+
+  if (startDate.isBefore(origin)) {
+    intervalOp = isIntervalNegative ? addInterval : subtractInterval;
+
+    while (offsetDate.isAfter(startDate)) {
       offsetDate = intervalOp(offsetDate, interval);
     }
     alignedDate = offsetDate;
-  } else if (offsetDate.isBefore(startOfYear)) {
-    intervalOp = offsetDate.isBefore(startOfYear) ? addInterval : subtractInterval;
+  } else {
+    intervalOp = isIntervalNegative ? subtractInterval : addInterval;
 
-    while (date.isAfter(offsetDate)) {
+    while (offsetDate.isBefore(startDate)) {
       alignedDate = offsetDate.clone();
       offsetDate = intervalOp(offsetDate, interval);
     }
-  } else {
-    intervalOp = offsetDate.isBefore(startOfYear) ? subtractInterval : addInterval;
 
-    while (date.isAfter(offsetDate)) {
-      alignedDate = offsetDate.clone();
-      offsetDate = intervalOp(offsetDate, interval);
+    if (offsetDate.isSame(startDate)) {
+      alignedDate = offsetDate;
     }
   }
 
   return alignedDate;
 }
 
-export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, endStr]: QueryDateRange, offsetStr?: string, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
+export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, endStr]: QueryDateRange, origin: moment.Moment, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
   const intervalParsed = parseSqlInterval(intervalStr);
-  const offsetParsed = offsetStr ? parseSqlInterval(offsetStr) : undefined;
   const start = moment(startStr);
   const end = moment(endStr);
-  let alignedStart = alignToOffset(start, intervalParsed, offsetParsed);
+  let alignedStart = alignToOrigin(start, intervalParsed, origin);
 
   const dates: QueryDateRange[] = [];
 
