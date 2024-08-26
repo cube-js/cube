@@ -30,7 +30,7 @@ use datafusion::{
 };
 use itertools::Itertools;
 use regex::{Captures, Regex};
-use serde_derive::*;
+use serde::{Deserialize, Serialize};
 use std::{
     any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
     pin::Pin, result, sync::Arc,

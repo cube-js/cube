@@ -836,7 +836,6 @@ dependencies = [
  "regex",
  "rust_decimal",
  "serde",
- "serde_derive",
  "serde_json",
  "sha1_smol",
  "sha2",
