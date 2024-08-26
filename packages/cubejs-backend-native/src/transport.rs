@@ -385,7 +385,7 @@ impl TransportService for NodeBridgeTransport {
             #[cfg(not(debug_assertions))]
             trace!("[transport] Request <- <hidden>");
 
-            if let Some(error_value) = response.as_object().map(|r| r.get("error")).flatten() {
+            if let Some(error_value) = response.get("error") {
                 match error_value {
                     serde_json::Value::String(error) => {
                         if error.to_lowercase() == *"continue wait" {
