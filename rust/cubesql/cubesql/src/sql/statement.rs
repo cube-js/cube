@@ -1,4 +1,4 @@
-use crate::sql::shim::ConnectionError;
+use crate::{compile::rewrite::rules::utils::DatePartToken, sql::shim::ConnectionError};
 use itertools::Itertools;
 use log::trace;
 use pg_srv::{
@@ -797,6 +797,70 @@ impl<'ast> Visitor<'ast, ConnectionError> for CastReplacer {
                 _ => self.visit_expr(&mut *cast_expr)?,
             }
         };
+
+        Ok(())
+    }
+}
+
+// This approach is limited to literals-in-query, but it's better than nothing
+// It would be simpler to do in rewrite rules, by relying on constant folding, but would require cumbersome top-down extraction
+// TODO remove this if/when DF starts supporting all of PostgreSQL aliases
+#[derive(Debug)]
+pub struct DateTokenNormalizeReplacer {}
+
+impl DateTokenNormalizeReplacer {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
+        let mut result = stmt.clone();
+
+        self.visit_statement(&mut result).unwrap();
+
+        result
+    }
+}
+
+impl<'ast> Visitor<'ast, ConnectionError> for DateTokenNormalizeReplacer {
+    // TODO support EXTRACT normalization after support in sqlparser
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        for res in fun.name.0.iter_mut() {
+            self.visit_identifier(res)?;
+        }
+
+        let fn_name = fun.name.to_string().to_lowercase();
+        match (fn_name.as_str(), fun.args.len()) {
+            ("date_trunc", 2) | ("date_part", 2) => {
+                match &mut fun.args[0] {
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(
+                        Value::SingleQuotedString(token),
+                    ))) => {
+                        if let Ok(parsed) = token.parse::<DatePartToken>() {
+                            *token = parsed.as_str().to_string();
+                        } else {
+                            // Do nothing
+                        };
+                    }
+                    _ => {
+                        // Do nothing
+                    }
+                }
+            }
+            _ => {
+                // Do nothing
+            }
+        }
+
+        self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
 
         Ok(())
     }
