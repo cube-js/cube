@@ -1082,5 +1082,47 @@ describe('QueryBuilder.vue', () => {
         );
       });
     });
+    it('calls copyQueryFromProps if query is changed', async () => {
+      const cube = createCubeApi();
+      jest
+        .spyOn(cube, 'request')
+        .mockImplementation(fetchMock(load))
+        .mockImplementationOnce(fetchMock(meta));
+
+      const copyQueryFromProps = jest.spyOn(QueryBuilder.methods, 'copyQueryFromProps');
+
+      const wrapper = shallowMount(QueryBuilder, {
+        propsData: {
+          cubeApi: cube,
+          query: {
+            measures: ['Orders.count'],
+            timeDimensions: [
+              {
+                dimension: 'Orders.createdAt',
+              },
+            ],
+          },
+        },
+      });
+      await flushPromises();
+
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.measures.length).toEqual(1);
+      expect(wrapper.vm.measures[0].name).toEqual('Orders.count');
+
+      await wrapper.vm.$nextTick();
+
+      expect(copyQueryFromProps).toHaveBeenCalled();
+      expect(copyQueryFromProps).toHaveBeenCalledTimes(1);
+      const initialValidatedQuery = {
+        measures: ['measure1'],
+        dimensions: ['dimension1'],
+      };
+      wrapper.setData({ prevValidatedQuery: initialValidatedQuery });
+      await wrapper.vm.$nextTick();
+
+      expect(copyQueryFromProps).toHaveBeenCalledTimes(2);
+      copyQueryFromProps.mockRestore();
+    });
   });
 });
