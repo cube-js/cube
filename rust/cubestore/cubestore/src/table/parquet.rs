@@ -1,12 +1,12 @@
 use crate::config::injection::DIService;
 use crate::metastore::Index;
 use crate::CubeError;
-use arrow::array::ArrayRef;
-use arrow::datatypes::Schema;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
+use datafusion::parquet::file::properties::{WriterProperties, WriterVersion};
 use datafusion::physical_plan::parquet::{NoopParquetMetadataCache, ParquetMetadataCache};
-use parquet::arrow::{ArrowReader, ArrowWriter, ParquetFileArrowReader};
-use parquet::file::properties::{WriterProperties, WriterVersion};
 use std::fs::File;
 use std::sync::Arc;
 
@@ -111,16 +111,16 @@ mod tests {
     use crate::table::parquet::{arrow_schema, ParquetTableStore};
     use crate::table::{Row, TableValue};
     use crate::util::decimal::Decimal;
-    use arrow::array::{
+    use datafusion::arrow::array::{
         ArrayRef, BooleanArray, Float64Array, Int64Array, Int64Decimal4Array, StringArray,
         TimestampMicrosecondArray,
     };
-    use arrow::record_batch::RecordBatch;
+    use datafusion::arrow::record_batch::RecordBatch;
+    use datafusion::parquet::data_type::DataType;
+    use datafusion::parquet::file::reader::FileReader;
+    use datafusion::parquet::file::reader::SerializedFileReader;
+    use datafusion::parquet::file::statistics::{Statistics, TypedStatistics};
     use itertools::Itertools;
-    use parquet::data_type::DataType;
-    use parquet::file::reader::FileReader;
-    use parquet::file::reader::SerializedFileReader;
-    use parquet::file::statistics::{Statistics, TypedStatistics};
     use pretty_assertions::assert_eq;
     use std::sync::Arc;
     use tempfile::NamedTempFile;

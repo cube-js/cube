@@ -1,7 +1,7 @@
 pub mod compaction;
 
-use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use async_trait::async_trait;
+use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
 use datafusion::physical_plan::collect;
 use datafusion::physical_plan::common::collect as common_collect;
 use datafusion::physical_plan::empty::EmptyExec;
@@ -24,7 +24,7 @@ use crate::remotefs::{ensure_temp_file_is_dropped, RemoteFs};
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::columns_vec_buffer_size;
 use crate::CubeError;
-use arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
 use std::{
     fs::File,
     io::{BufReader, BufWriter, Write},
@@ -39,9 +39,9 @@ use crate::metastore::chunks::chunk_file_name;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::table::data::cmp_partition_key;
 use crate::table::parquet::{arrow_schema, ParquetTableStore};
-use arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
-use arrow::record_batch::RecordBatch;
 use compaction::{merge_chunks, merge_replay_handles};
+use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
 use datafusion::cube_ext::util::lexcmp_array_rows;
 use deepsize::DeepSizeOf;
@@ -447,7 +447,7 @@ impl ChunkDataStore for ChunkStore {
 
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
-            columns.push(arrow::compute::concat(
+            columns.push(datafusion::arrow::compute::concat(
                 &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
             )?)
         }
@@ -512,7 +512,7 @@ impl ChunkDataStore for ChunkStore {
         }
         let mut columns = Vec::new();
         for i in 0..batches[0].num_columns() {
-            columns.push(arrow::compute::concat(
+            columns.push(datafusion::arrow::compute::concat(
                 &batches.iter().map(|b| b.column(i).as_ref()).collect_vec(),
             )?)
         }
@@ -635,7 +635,7 @@ impl ChunkDataStore for ChunkStore {
             let num_columns = data[0].num_columns();
             let mut columns = Vec::with_capacity(num_columns);
             for i in 0..num_columns {
-                let v = arrow::compute::concat(
+                let v = datafusion::arrow::compute::concat(
                     &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
                 )?;
                 columns.push(v);
@@ -654,7 +654,11 @@ impl ChunkDataStore for ChunkStore {
             let indices = lexsort_to_indices(&sort_key, None)?;
             let mut new = Vec::with_capacity(num_columns);
             for c in columns {
-                new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+                new.push(datafusion::arrow::compute::take(
+                    c.as_ref(),
+                    &indices,
+                    None,
+                )?)
             }
             Ok(new)
         })
@@ -798,8 +802,8 @@ mod tests {
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
     use crate::{metastore::ColumnType, table::TableValue};
-    use arrow::array::{Int64Array, StringArray};
     use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::arrow::array::{Int64Array, StringArray};
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1210,7 +1214,7 @@ impl ChunkStore {
                 let to_write = UInt64Array::from(to_write);
                 let columns = columns
                     .iter()
-                    .map(|c| arrow::compute::take(c.as_ref(), &to_write, None))
+                    .map(|c| datafusion::arrow::compute::take(c.as_ref(), &to_write, None))
                     .collect::<Result<Vec<_>, _>>()?;
                 let columns = self.post_process_columns(index.clone(), columns).await?;
 
@@ -1330,7 +1334,7 @@ impl ChunkStore {
         }
     }
 
-    /// Processes data into parquet files in the current task and schedules an async file upload.
+    /// Processes data intuet files in the current task and schedules an async file upload.
     /// Join the returned handle to wait for the upload to finish.
     async fn add_chunk_columns(
         &self,

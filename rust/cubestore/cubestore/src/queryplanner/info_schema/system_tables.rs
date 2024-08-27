@@ -1,9 +1,11 @@
 use crate::metastore::table::TablePath;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
-use arrow::array::{ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array};
-use arrow::datatypes::{DataType, Field, TimeUnit};
 use async_trait::async_trait;
+use datafusion::arrow::array::{
+    ArrayRef, BooleanArray, StringArray, TimestampNanosecondArray, UInt64Array,
+};
+use datafusion::arrow::datatypes::{DataType, Field, TimeUnit};
 use std::sync::Arc;
 
 pub struct SystemTablesTableDef;
