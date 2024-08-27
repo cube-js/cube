@@ -114,11 +114,11 @@ export class PreAggregations {
     return { dimension, partitionDimension };
   }
 
-  preAggregationDescriptionsForRecursive(cube, foundPreAggregation, debug) {
+  preAggregationDescriptionsForRecursive(cube, foundPreAggregation) {
     const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
     
-    if (foundPreAggregation.preAggregation.lastRollupLambda && !descriptions.length && query !== this.query) {
+    if (foundPreAggregation.preAggregation.lastRollupLambda && query !== this.query) {
       return [query.preAggregations.preAggregationDescriptionFor(cube, foundPreAggregation)];
     }
 

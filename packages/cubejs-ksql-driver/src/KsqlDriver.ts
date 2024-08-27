@@ -268,14 +268,14 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public loadPreAggregationIntoTable(preAggregationTableName: string, loadSql: string, params: any[], options: KsqlQueryOptions): Promise<any> {
-    const { streamOffset, outputColumnTypes } = options || {};
-    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset, outputColumnTypes });
+    const { streamOffset } = options || {};
+    return this.query(loadSql.replace(preAggregationTableName, this.tableDashName(preAggregationTableName)), params, { streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   public async downloadTable(table: string, options: any): Promise<any> {
-    const { streamOffset, outputColumnTypes } = options || {};
-    return this.getStreamingTableData(this.tableDashName(table), { streamOffset, outputColumnTypes });
+    const { streamOffset } = options || {};
+    return this.getStreamingTableData(this.tableDashName(table), { streamOffset });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
