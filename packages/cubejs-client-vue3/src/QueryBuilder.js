@@ -381,11 +381,17 @@ export default {
         };
 
         this.chartType = chartType || this.chartType;
-        this.pivotConfig = ResultSet.getNormalizedPivotConfig(
+        let pivot = ResultSet.getNormalizedPivotConfig(
           validatedQuery,
           pivotConfig !== undefined ? pivotConfig : this.pivotConfig
         );
-        this.copyQueryFromProps(validatedQuery);
+        if (!areQueriesEqual(this.pivotConfig, pivot)) {
+          this.pivotConfig = pivot;
+        }
+
+        if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
+          this.copyQueryFromProps(validatedQuery);
+        }
       }
 
       // query heuristics should only apply on query change (not applied to the initial query)
@@ -393,7 +399,7 @@ export default {
         this.skipHeuristics = false;
       }
 
-      if (JSON.stringify(this.prevValidatedQuery) !== JSON.stringify(validatedQuery)) {
+      if (!areQueriesEqual(this.prevValidatedQuery, validatedQuery)) {
         this.prevValidatedQuery = validatedQuery;
       }
       return validatedQuery;
