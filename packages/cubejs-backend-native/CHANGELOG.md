@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+
+### Bug Fixes
+
+* **cubesql:** Don't clone response, improve performance ([#8638](https://github.com/cube-js/cube/issues/8638)) ([4366299](https://github.com/cube-js/cube/commit/436629901d1643193cd52c6af948112c7bc0c838))
+
+
+### Features
+
+* **cubesql:** Upgrade serde, serde_json - performance boost ([#8636](https://github.com/cube-js/cube/issues/8636)) ([b4754db](https://github.com/cube-js/cube/commit/b4754dbd7898d928844558adece42668fe6e728f))
+
+
+
+
+
 ## [0.35.77](https://github.com/cube-js/cube/compare/v0.35.76...v0.35.77) (2024-08-26)
 
 
