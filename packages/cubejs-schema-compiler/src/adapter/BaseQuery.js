@@ -2770,13 +2770,13 @@ export class BaseQuery {
       if (granularity.granularityOffset) {
         // Example: DATE_TRUNC(interval, dimension - INTERVAL 'offset') + INTERVAL 'offset'
         dtDate = this.subtractInterval(dimension, granularity.granularityOffset);
-        dtDate = this.timeGroupedColumn(this.granularityFromInterval(granularity.granularityInterval), dtDate);
+        dtDate = this.timeGroupedColumn(granularity.granularityFromInterval(), dtDate);
         dtDate = this.addInterval(dtDate, granularity.granularityOffset);
 
         return dtDate;
       }
 
-      return this.timeGroupedColumn(this.granularityFromInterval(granularity.granularityInterval), dimension);
+      return this.timeGroupedColumn(granularity.granularityFromInterval(), dimension);
     }
 
     return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
@@ -2791,33 +2791,6 @@ export class BaseQuery {
     const intParsed = interval.split(' ');
 
     return !(intParsed.length !== 2 || intParsed[0] !== '1');
-  }
-
-  /**
-   * Returns the smallest granularity for the provided interval string
-   * Interval may be presented as `1 year 2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds
-   * It is important to bubble up from the smallest, as this is used e.g. for minimum rollup granularity
-   * @param {string} interval
-   * @returns {string}
-   */
-  granularityFromInterval(interval) {
-    if (interval.match(/second/)) {
-      return 'second';
-    } else if (interval.match(/minute/)) {
-      return 'minute';
-    } else if (interval.match(/hour/)) {
-      return 'hour';
-    } else if (interval.match(/day/)) {
-      return 'day';
-    } else if (interval.match(/week/)) {
-      return 'week';
-    } else if (interval.match(/month/)) {
-      return 'month';
-    } else if (interval.match(/quarter/)) {
-      return 'quarter';
-    } else /* if (interval.match(/year/)) */ {
-      return 'year';
-    }
   }
 
   /**

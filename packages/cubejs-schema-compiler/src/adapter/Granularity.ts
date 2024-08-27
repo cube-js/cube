@@ -63,12 +63,12 @@ export class Granularity {
 
     if (this.granularityOffset) {
       return this.query.minGranularity(
-        this.query.granularityFromInterval(this.granularityInterval),
-        this.query.granularityFromInterval(this.granularityOffset)
+        this.granularityFromInterval(),
+        this.granularityFromOffset()
       );
     }
 
-    return this.query.granularityFromInterval(this.granularityInterval);
+    return this.granularityFromInterval();
   }
 
   public timeSeriesForInterval(dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] {
@@ -84,6 +84,46 @@ export class Granularity {
       return this.granularity;
     }
 
-    return this.query.granularityFromInterval(this.granularityInterval);
+    return this.granularityFromInterval();
   }
+
+  /**
+   * Returns the smallest granularity for the granularityInterval
+   */
+  public granularityFromInterval(): string {
+    return this.granularityFromIntervalString(this.granularityInterval);
+  }
+
+  /**
+   * Returns the smallest granularity for the granularityOffset
+   */
+  public granularityFromOffset(): string {
+    return this.granularityOffset ? this.granularityFromIntervalString(this.granularityOffset) : '';
+  }
+
+  /**
+   * Returns the smallest granularity for the provided interval string
+   * Interval may be presented as `1 year 2 months 3 weeks 4 days 5 hours 6 minutes 7 seconds
+   * It is important to bubble up from the smallest, as this is used e.g. for minimum rollup granularity
+   */
+  private granularityFromIntervalString(interval: string): string {
+    if (interval.match(/second/)) {
+      return 'second';
+    } else if (interval.match(/minute/)) {
+      return 'minute';
+    } else if (interval.match(/hour/)) {
+      return 'hour';
+    } else if (interval.match(/day/)) {
+      return 'day';
+    } else if (interval.match(/week/)) {
+      return 'week';
+    } else if (interval.match(/month/)) {
+      return 'month';
+    } else if (interval.match(/quarter/)) {
+      return 'quarter';
+    } else /* if (interval.match(/year/)) */ {
+      return 'year';
+    }
+  }
+
 }
