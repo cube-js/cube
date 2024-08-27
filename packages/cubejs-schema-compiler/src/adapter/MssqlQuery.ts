@@ -1,7 +1,7 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 
-import { QueryAlias } from '@cubejs-backend/shared';
+import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
@@ -70,11 +70,11 @@ export class MssqlQuery extends BaseQuery {
     return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  public timeStampCast(value) {
-    return `CAST(${value} AS DATETIME2)`; // TODO
+  public timeStampCast(value: string) {
+    return this.dateTimeCast(value);
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `CAST(${value} AS DATETIME2)`;
   }
 
@@ -178,15 +178,26 @@ export class MssqlQuery extends BaseQuery {
     )} date_to FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
-  public subtractInterval(date, interval) {
-    const amountInterval = interval.split(' ', 2);
-    const negativeInterval = (amountInterval[0]) * -1;
-    return `DATEADD(${amountInterval[1]}, ${negativeInterval}, ${date})`;
+  public subtractInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    for (const [key, value] of Object.entries(intervalParsed)) {
+      res = `DATEADD(${key}, ${value * -1}, ${res})`;
+    }
+
+    return res;
   }
 
-  public addInterval(date, interval) {
-    const amountInterval = interval.split(' ', 2);
-    return `DATEADD(${amountInterval[1]}, ${amountInterval[0]}, ${date})`;
+  public addInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    for (const [key, value] of Object.entries(intervalParsed)) {
+      res = `DATEADD(${key}, ${value}, ${res})`;
+    }
+
+    return res;
   }
 
   public sqlTemplates() {
