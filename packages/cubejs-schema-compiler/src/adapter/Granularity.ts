@@ -107,23 +107,29 @@ export class Granularity {
    * It is important to bubble up from the smallest, as this is used e.g. for minimum rollup granularity
    */
   private granularityFromIntervalString(interval: string): string {
-    if (interval.match(/second/)) {
+    const intervalParsed = parseSqlInterval(interval);
+    const intervalKeys = Object.keys(intervalParsed);
+
+    if (intervalKeys.length === 1) {
+      return intervalKeys[0];
+    }
+
+    if (intervalParsed.second) {
       return 'second';
-    } else if (interval.match(/minute/)) {
+    } else if (intervalParsed.minute) {
       return 'minute';
-    } else if (interval.match(/hour/)) {
+    } else if (intervalParsed.hour) {
       return 'hour';
-    } else if (interval.match(/day/)) {
+    } else if (intervalParsed.day) {
       return 'day';
-    } else if (interval.match(/week/)) {
-      return 'week';
-    } else if (interval.match(/month/)) {
+    } else if (intervalParsed.week) {
+      return 'day';
+    } else if (intervalParsed.month) {
       return 'month';
-    } else if (interval.match(/quarter/)) {
-      return 'quarter';
-    } else /* if (interval.match(/year/)) */ {
+    } else if (intervalParsed.quarter) { // Only quarter+years possible
+      return 'month';
+    } else /* if (intervalParsed.year) */ {
       return 'year';
     }
   }
-
 }
