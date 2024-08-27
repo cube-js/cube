@@ -1116,7 +1116,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let replacer = CastReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmts[0].clone());
 
         assert_eq!(res.to_string(), output);
 
@@ -1144,7 +1144,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let replacer = RedshiftDatePartReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmts[0].clone());
 
         assert_eq!(res.to_string(), output);
 
@@ -1356,7 +1356,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let binder = StatementPlaceholderReplacer::new();
-        let result = binder.replace(&stmts[0]).unwrap();
+        let result = binder.replace(stmts[0].clone()).unwrap();
 
         assert_eq!(result.to_string(), output);
 
@@ -1380,7 +1380,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let binder = SensitiveDataSanitizer::new();
-        let result = binder.replace(&stmts[0]);
+        let result = binder.replace(stmts[0].clone());
 
         assert_eq!(result.to_string(), output);
 
