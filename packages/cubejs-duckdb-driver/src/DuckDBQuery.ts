@@ -23,8 +23,49 @@ export class DuckDBQuery extends BaseQuery {
     return `timezone('${this.timezone}', ${field}::timestamptz)`;
   }
 
+  public timeStampCast(value: string) {
+    return `'${value}'::TIMESTAMPTZ`;
+  }
+
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * DuckDB operates with whole intervals as is without measuring them in plain seconds,
+   * so the resulting date will be human-expected aligned with intervals.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = this.timeStampCast('1970-01-01 00:00:00.000');
+
+    return `${this.timeStampCast(origin)}' + INTERVAL '${interval}' *
+      floor(
+        date_diff('${timeUnit}', ${this.timeStampCast(origin)}, ${source}) /
+        date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
+      )::int`;
+  }
+
+  private diffTimeUnitForInterval(interval: string): string {
+    if (/second/i.test(interval)) {
+      return 'second';
+    } else if (/minute/i.test(interval)) {
+      return 'minute';
+    } else if (/hour/i.test(interval)) {
+      return 'hour';
+    } else if (/day/i.test(interval)) {
+      return 'day';
+    } else if (/week/i.test(interval)) {
+      return 'day';
+    } else if (/month/i.test(interval)) {
+      return 'month';
+    } else if (/quarter/i.test(interval)) {
+      return 'month';
+    } else /* if (/year/i.test(interval)) */ {
+      return 'year';
+    }
   }
 
   public countDistinctApprox(sql: string) {
