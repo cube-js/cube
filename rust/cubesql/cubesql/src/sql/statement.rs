@@ -813,8 +813,8 @@ impl DateTokenNormalizeReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
