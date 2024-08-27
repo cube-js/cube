@@ -632,8 +632,8 @@ impl StatementPlaceholderReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> Result<ast::Statement, ConnectionError> {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> Result<ast::Statement, ConnectionError> {
+        let mut result = stmt;
 
         self.visit_statement(&mut result)?;
 
@@ -671,8 +671,8 @@ impl CastReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -874,8 +874,8 @@ impl RedshiftDatePartReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -930,8 +930,8 @@ impl ToTimestampReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -957,8 +957,8 @@ impl UdfWildcardArgReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1046,8 +1046,8 @@ impl ApproximateCountDistinctVisitor {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1075,8 +1075,8 @@ impl SensitiveDataSanitizer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 

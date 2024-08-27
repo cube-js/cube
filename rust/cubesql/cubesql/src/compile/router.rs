@@ -213,7 +213,9 @@ impl QueryRouter {
                     ("query".to_string(), stmt.to_string()),
                     (
                         "sanitizedQuery".to_string(),
-                        SensitiveDataSanitizer::new().replace(stmt).to_string(),
+                        SensitiveDataSanitizer::new()
+                            .replace(stmt.clone())
+                            .to_string(),
                     ),
                 ]));
                 let msg = err.message();
@@ -712,25 +714,26 @@ impl QueryRouter {
     }
 }
 
-pub fn rewrite_statement(stmt: &ast::Statement) -> ast::Statement {
+pub fn rewrite_statement(stmt: ast::Statement) -> ast::Statement {
     let stmt = CastReplacer::new().replace(stmt);
-    let stmt = ToTimestampReplacer::new().replace(&stmt);
-    let stmt = UdfWildcardArgReplacer::new().replace(&stmt);
-    let stmt = DateTokenNormalizeReplacer::new().replace(&stmt);
-    let stmt = RedshiftDatePartReplacer::new().replace(&stmt);
-    let stmt = ApproximateCountDistinctVisitor::new().replace(&stmt);
+    let stmt = ToTimestampReplacer::new().replace(stmt);
+    let stmt = UdfWildcardArgReplacer::new().replace(stmt);
+    let stmt = DateTokenNormalizeReplacer::new().replace(stmt);
+    let stmt = RedshiftDatePartReplacer::new().replace(stmt);
+    let stmt = ApproximateCountDistinctVisitor::new().replace(stmt);
 
     stmt
 }
 
 pub async fn convert_statement_to_cube_query(
-    stmt: &ast::Statement,
+    stmt: ast::Statement,
     meta: Arc<MetaContext>,
     session: Arc<Session>,
     qtrace: &mut Option<Qtrace>,
     span_id: Option<Arc<SpanId>>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = rewrite_statement(stmt);
+
     if let Some(qtrace) = qtrace {
         qtrace.set_visitor_replaced_statement(&stmt);
     }
@@ -745,5 +748,5 @@ pub async fn convert_sql_to_cube_query(
     session: Arc<Session>,
 ) -> CompilationResult<QueryPlan> {
     let stmt = parse_sql_to_statement(&query, session.state.protocol.clone(), &mut None)?;
-    convert_statement_to_cube_query(&stmt, meta, session, &mut None, None).await
+    convert_statement_to_cube_query(stmt, meta, session, &mut None, None).await
 }
