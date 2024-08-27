@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
 use cubesql::transport::{
-    SpanId, SqlGenerator, SqlResponse, TransportError, TransportLoadRequestQuery,
-    TransportLoadResponse, TransportMetaResponse,
+    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
+    TransportMetaResponse,
 };
 use cubesql::{
     di_service,
@@ -377,38 +377,43 @@ impl TransportService for NodeBridgeTransport {
                     continue;
                 }
             }
+
             let response: serde_json::Value = result?;
+
             #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
             #[cfg(not(debug_assertions))]
             trace!("[transport] Request <- <hidden>");
 
-            let load_err = match serde_json::from_value::<TransportLoadResponse>(response.clone()) {
-                Ok(r) => {
-                    return Ok(r);
+            if let Some(error_value) = response.get("error") {
+                match error_value {
+                    serde_json::Value::String(error) => {
+                        if error.to_lowercase() == *"continue wait" {
+                            debug!(
+                                "[transport] load - retrying request (continue wait) requestId: {}",
+                                request_id
+                            );
+
+                            continue;
+                        } else {
+                            return Err(CubeError::user(error.clone()));
+                        }
+                    }
+                    other => {
+                        error!(
+                            "[transport] load - strange response, success which contains error: {:?}",
+                            other
+                        );
+
+                        return Err(CubeError::internal(
+                            "Error response with broken data inside".to_string(),
+                        ));
+                    }
                 }
-                Err(err) => err,
             };
 
-            if let Ok(res) = serde_json::from_value::<TransportError>(response) {
-                if res.error.to_lowercase() == *"continue wait" {
-                    debug!(
-                        "[transport] load - retrying request (continue wait) requestId: {}",
-                        request_id
-                    );
-
-                    continue;
-                } else {
-                    error!(
-                        "[transport] load - strange response, success which contains error: {:?}",
-                        res
-                    );
-
-                    return Err(CubeError::internal(res.error));
-                }
-            };
-
-            return Err(CubeError::user(load_err.to_string()));
+            break serde_json::from_value::<TransportLoadResponse>(response)
+                .map_err(|err| CubeError::user(err.to_string()));
         }
     }
 
