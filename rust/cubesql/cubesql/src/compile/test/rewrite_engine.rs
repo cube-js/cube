@@ -38,12 +38,12 @@ pub async fn create_test_postgresql_cube_context(
 
 pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPlan {
     let stmt = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL, &mut None).unwrap();
-    let stmt = rewrite_statement(&stmt);
+    let stmt = rewrite_statement(stmt);
     let df_query_planner = SqlToRel::new_with_options(context, true);
 
-    return df_query_planner
-        .statement_to_plan(Statement::Statement(Box::new(stmt.clone())))
-        .unwrap();
+    df_query_planner
+        .statement_to_plan(Statement::Statement(Box::new(stmt)))
+        .unwrap()
 }
 
 pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunner {

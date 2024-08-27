@@ -632,8 +632,8 @@ impl StatementPlaceholderReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> Result<ast::Statement, ConnectionError> {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> Result<ast::Statement, ConnectionError> {
+        let mut result = stmt;
 
         self.visit_statement(&mut result)?;
 
@@ -671,8 +671,8 @@ impl CastReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -813,8 +813,8 @@ impl DateTokenNormalizeReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -874,8 +874,8 @@ impl RedshiftDatePartReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -930,8 +930,8 @@ impl ToTimestampReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -957,8 +957,8 @@ impl UdfWildcardArgReplacer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1046,8 +1046,8 @@ impl ApproximateCountDistinctVisitor {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1075,8 +1075,8 @@ impl SensitiveDataSanitizer {
         Self {}
     }
 
-    pub fn replace(mut self, stmt: &ast::Statement) -> ast::Statement {
-        let mut result = stmt.clone();
+    pub fn replace(mut self, stmt: ast::Statement) -> ast::Statement {
+        let mut result = stmt;
 
         self.visit_statement(&mut result).unwrap();
 
@@ -1113,10 +1113,13 @@ mod tests {
     use sqlparser::{dialect::PostgreSqlDialect, parser::Parser};
 
     fn run_cast_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let replacer = CastReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmt);
 
         assert_eq!(res.to_string(), output);
 
@@ -1144,7 +1147,7 @@ mod tests {
         let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
 
         let replacer = RedshiftDatePartReplacer::new();
-        let res = replacer.replace(&stmts[0]);
+        let res = replacer.replace(stmts[0].clone());
 
         assert_eq!(res.to_string(), output);
 
@@ -1176,10 +1179,13 @@ mod tests {
         output: &str,
         values: Vec<BindValue>,
     ) -> Result<(), ConnectionError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = PostgresStatementParamsBinder::new(values);
-        let mut res = stmts[0].clone();
+        let mut res = stmt;
         binder.bind(&mut res)?;
 
         assert_eq!(res.to_string(), output);
@@ -1353,10 +1359,13 @@ mod tests {
     }
 
     fn assert_placeholder_replacer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = StatementPlaceholderReplacer::new();
-        let result = binder.replace(&stmts[0]).unwrap();
+        let result = binder.replace(stmt).unwrap();
 
         assert_eq!(result.to_string(), output);
 
@@ -1377,10 +1386,13 @@ mod tests {
     }
 
     fn assert_sensitive_data_sanitizer(input: &str, output: &str) -> Result<(), CubeError> {
-        let stmts = Parser::parse_sql(&PostgreSqlDialect {}, &input).unwrap();
+        let stmt = Parser::parse_sql(&PostgreSqlDialect {}, &input)
+            .unwrap()
+            .pop()
+            .expect("must contain at least one statement");
 
         let binder = SensitiveDataSanitizer::new();
-        let result = binder.replace(&stmts[0]);
+        let result = binder.replace(stmt);
 
         assert_eq!(result.to_string(), output);
 
