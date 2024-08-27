@@ -78,8 +78,47 @@ export class MssqlQuery extends BaseQuery {
     return `CAST(${value} AS DATETIME2)`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const beginOfTime = this.timeStampCast('DATEFROMPARTS(1970, 1, 1)');
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+
+    // Need to explicitly cast one argument of floor to float to trigger correct sign logic
+    return `DATEADD(${timeUnit},
+        FLOOR(
+          CAST(DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
+        ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
+        ${this.timeStampCast(`'${origin}'`)}
+    )`;
+  }
+
+  private diffTimeUnitForInterval(interval: string): string {
+    if (/second/i.test(interval)) {
+      return 'second';
+    } else if (/minute/i.test(interval)) {
+      return 'minute';
+    } else if (/hour/i.test(interval)) {
+      return 'hour';
+    } else if (/day/i.test(interval)) {
+      return 'day';
+    } else if (/week/i.test(interval)) {
+      return 'day';
+    } else if (/month/i.test(interval)) {
+      return 'month';
+    } else if (/quarter/i.test(interval)) {
+      return 'month';
+    } else /* if (/year/i.test(interval)) */ {
+      return 'year';
+    }
   }
 
   public newParamAllocator(expressionParams) {
