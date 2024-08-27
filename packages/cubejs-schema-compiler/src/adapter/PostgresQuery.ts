@@ -31,8 +31,14 @@ export class PostgresQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * Postgres operates with whole intervals as is without measuring them in plain seconds,
+   * so the resulting date will be human-expected aligned with intervals.
+   * This implementation should also work for AWS RedShift.
+   */
   public dateBin(interval: string, source: string, origin: string): string {
-    // Should also work for AWS RedShift
     return `'${origin}'::timestamp + INTERVAL '${interval}' *
       FLOOR(
         EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
