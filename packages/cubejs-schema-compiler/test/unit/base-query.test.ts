@@ -436,7 +436,7 @@ describe('SQL Generation', () => {
       const queryString = queryAndParams[0];
       expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
       expect(queryString.includes('cards__created_at_quarter')).toBeTruthy();
-      expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
+      expect(queryString.includes('date_trunc(\'month\'')).toBeTruthy();
       expect(queryString.includes('cards__created_at_month')).toBeTruthy();
     });
 
