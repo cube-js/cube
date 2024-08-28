@@ -2887,16 +2887,16 @@ pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option
     }
 }
 
-fn find_column_by_alias(
-    column_name: &String,
-    member_names_to_expr: &mut MemberNamesToExpr,
-    cube_alias: &String,
-) -> Option<String> {
+fn find_column_by_alias<'mn>(
+    column_name: &str,
+    member_names_to_expr: &'mn mut MemberNamesToExpr,
+    cube_alias: &str,
+) -> Option<&'mn str> {
     if let Some((tuple, _)) = LogicalPlanData::do_find_member_by_alias(
         member_names_to_expr,
         &format!("{}.{}", cube_alias, column_name),
     ) {
-        return tuple.0.clone();
+        return tuple.0.as_deref();
     }
     None
 }
@@ -2933,14 +2933,13 @@ fn is_proper_cube_join_condition(
                         .as_mut()
                         .unwrap();
 
-                    // TODO: Avoid the join_on.*.clone() calls (should be trivial).
-                    let mut column_name = join_on.name.clone();
+                    let mut column_name = join_on.name.as_str();
                     if let Some(name) = find_column_by_alias(
-                        &column_name,
+                        column_name,
                         member_names_to_expr_left,
-                        &join_on.relation.clone().unwrap_or_default(),
+                        join_on.relation.as_deref().unwrap_or_default(),
                     ) {
-                        column_name = name.split(".").last().unwrap().to_string();
+                        column_name = name.rsplit_once(".").unwrap().1;
                     }
 
                     if column_name == "__cubeJoinField" {
@@ -2957,13 +2956,13 @@ fn is_proper_cube_join_condition(
                                     .as_mut()
                                     .unwrap();
 
-                                let mut column_name = join_on.name.clone();
+                                let mut column_name = join_on.name.as_str();
                                 if let Some(name) = find_column_by_alias(
-                                    &column_name,
+                                    column_name,
                                     member_names_to_expr_right,
-                                    &join_on.relation.clone().unwrap_or_default(),
+                                    join_on.relation.as_deref().unwrap_or_default(),
                                 ) {
-                                    column_name = name.split(".").last().unwrap().to_string();
+                                    column_name = name.rsplit_once(".").unwrap().1;
                                 }
 
                                 if column_name == "__cubeJoinField" {
