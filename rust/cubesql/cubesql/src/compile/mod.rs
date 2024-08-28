@@ -135,6 +135,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_coalesce_two_dimensions() {
+        init_testing_logger();
+
         let query_plan = convert_select_to_query_plan(
             // language=PostgreSQL
             r#"
