@@ -6,3 +6,4 @@ pub mod evaluator;
 pub mod measure_definition;
 pub mod member_definition;
 pub mod memeber_sql;
+pub mod sql_templates_render;

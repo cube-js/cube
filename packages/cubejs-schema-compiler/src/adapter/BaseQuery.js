@@ -639,6 +639,7 @@ export class BaseQuery {
       timezone: this.options.timezone,
       joinRoot: this.join.root,
       cubeEvaluator: this.cubeEvaluator,
+      filters: this.options.filters,
       baseTools: this,
 
     };
@@ -3088,6 +3089,15 @@ export class BaseQuery {
         not: 'NOT ({{ expr }})',
         true: 'TRUE',
         false: 'FALSE',
+      },
+      filters: {
+        equals: '{{ column }} = {{ value }}{{ is_null_check }}',
+        not_equals: '{{ column }} <> {{ value }}{{ is_null_check }}',
+        or_is_null_check: ' OR {{ column }} IS NULL',
+        set_where: '{{ column }} IS NOT NULL',
+        not_set_where: '{{ column }} IS NULL',
+        in: '{{ column }} IN ({{ values_concat }}){{ is_null_check }}',
+        not_in: '{{ column }} NOT IN ({{ values_concat }}){{ is_null_check }}'
       },
       quotes: {
         identifiers: '"',

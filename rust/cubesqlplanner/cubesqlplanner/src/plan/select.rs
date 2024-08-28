@@ -1,6 +1,6 @@
 use itertools::Itertools;
 
-use super::{Expr, From, OrderBy};
+use super::{Expr, Filter, From, OrderBy};
 use crate::planner::IndexedMember;
 use std::fmt;
 use std::rc::Rc;
@@ -8,7 +8,9 @@ use std::rc::Rc;
 pub struct Select {
     pub projection: Vec<Expr>,
     pub from: From,
+    pub filter: Option<Filter>,
     pub group_by: Vec<Rc<dyn IndexedMember>>,
+    pub having: Option<Filter>,
     pub order_by: Vec<OrderBy>,
 }
 
@@ -26,6 +28,10 @@ impl fmt::Display for Select {
         writeln!(f, "")?;
         write!(f, "{}", self.from)?;
 
+        if let Some(filter) = &self.filter {
+            write!(f, " WHERE {}", filter);
+        }
+
         if !self.group_by.is_empty() {
             let str = self
                 .group_by
@@ -33,6 +39,10 @@ impl fmt::Display for Select {
                 .map(|d| format!("{}", d.index()))
                 .join(", ");
             write!(f, " GROUP BY {}", str)?;
+        }
+
+        if let Some(having) = &self.having {
+            write!(f, " HAVING {}", having)?;
         }
 
         if !self.order_by.is_empty() {

@@ -790,6 +790,7 @@ dependencies = [
  "datafusion 7.0.0 (git+https://github.com/cube-js/arrow-datafusion.git?rev=4fc9df9367b3a1be158805f763d847f6f3ae72b0)",
  "itertools",
  "lazy_static",
+ "minijinja",
  "nativebridge",
  "neon",
  "regex",

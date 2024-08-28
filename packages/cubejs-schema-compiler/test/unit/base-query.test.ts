@@ -198,6 +198,164 @@ describe('SQL Generation', () => {
           '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
       expect(queryAndParams[0]).toEqual(expected);
     });
+    it('Simple query - simple filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.type',
+            operator: 'equals',
+            values: ['type_value']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) AND ("cards".type = $3) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', 'type_value'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+    it('Simple query - null and many equals filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: [null]
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: [null]
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', 't2']
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', null, 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', null, 't2']
+              },
+
+            ]
+
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type IS NULL) OR ("cards".type IS NOT NULL)) AND (("cards".type IN ($1, $2)) OR ("cards".type NOT IN ($3, $4) OR "cards".type IS NULL)) AND (("cards".type IN ($5, $6) OR "cards".type IS NULL) OR ("cards".type NOT IN ($7, $8))) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      // let expectedParams = [ 'type_value', 'not_type_value', 'type_value' ];
+      // expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+
+    it('Simple query - dimension and measure filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.count',
+            operator: 'equals',
+            values: ['3']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', '3'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
+    });
   });
 
   describe('Common - JS', () => {

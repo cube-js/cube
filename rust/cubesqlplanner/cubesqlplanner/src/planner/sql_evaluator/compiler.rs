@@ -13,11 +13,6 @@ pub struct Compiler {
     members: HashMap<String, Rc<dyn MemberEvaluator>>,
 }
 
-pub enum EvalType {
-    Measure,
-    Dimension,
-}
-
 impl Compiler {
     pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
         Self {
