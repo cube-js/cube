@@ -92,6 +92,14 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
               half_year_by_1st_april: {
                 interval: '6 months',
                 offset: '3 months'
+              },
+              half_year_by_1st_march: {
+                interval: '6 months',
+                origin: '2020-03-01'
+              },
+              half_year_by_1st_june: {
+                interval: '6 months',
+                origin: '2020-06-01 10:00:00'
               }
             }
           },

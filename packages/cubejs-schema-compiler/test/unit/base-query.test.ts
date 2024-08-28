@@ -98,6 +98,42 @@ describe('SQL Generation', () => {
       },
       {
         measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_march',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
           'orders.rollingCountByUnbounded'
         ],
         timeDimensions: [
