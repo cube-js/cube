@@ -14369,7 +14369,11 @@ ORDER BY "source"."str0" ASC
                 .wrapped_sql
                 .unwrap()
                 .sql;
-            assert!(sql.contains("\"limit\":1000"));
+            if Rewriter::top_down_extractor_enabled() {
+                assert!(sql.contains("LIMIT 1000"));
+            } else {
+                assert!(sql.contains("\"limit\":1000"));
+            }
             assert!(sql.contains("% 7"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -16547,7 +16551,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measure(count) AS cnt,
                 date_trunc('month', order_date) AS dt
             FROM KibanaSampleDataEcommerce
-            WHERE order_date IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
+            WHERE date_trunc('month', order_date) IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
             GROUP BY 2
             ;"#
             .to_string(),
@@ -16565,10 +16569,18 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
-                    date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-01-01T00:00:00.000Z".to_string()
-                    ]))
+                    date_range: if Rewriter::top_down_extractor_enabled() {
+                        Some(json!(vec![
+                            "2019-01-01T00:00:00.000Z".to_string(),
+                            "2019-01-31T23:59:59.999Z".to_string()
+                        ]))
+                    } else {
+                        // Non-optimal variant with top down extractor disabled
+                        Some(json!(vec![
+                            "2019-01-01 00:00:00.000".to_string(),
+                            "2019-01-31 23:59:59.999".to_string()
+                        ]))
+                    }
                 }]),
                 order: Some(vec![]),
                 limit: None,
@@ -16914,5 +16926,36 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_limit_zero() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT MAX(order_date) FROM KibanaSampleDataEcommerce LIMIT 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("LIMIT 0"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 }
