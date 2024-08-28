@@ -1,24 +1,34 @@
-use super::{BaseDimension, BaseMeasure, BaseMember};
+use super::{BaseDimension, BaseMeasure, BaseMember, ParamsAllocator};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
     base_tools: Rc<dyn BaseTools>,
+    templates_render: Rc<dyn SqlTemplatesRender>,
+    params_allocator: Rc<RefCell<ParamsAllocator>>,
 }
 
 impl QueryTools {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, base_tools: Rc<dyn BaseTools>) -> Rc<Self> {
-        Rc::new(Self {
+    pub fn try_new(
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let templates_render = base_tools.sql_templates()?;
+        Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
-        })
+            templates_render,
+            params_allocator: Rc::new(RefCell::new(ParamsAllocator::new())),
+        }))
     }
 
     pub fn cube_evaluator(&self) -> &Rc<dyn CubeEvaluator> {
@@ -43,7 +53,19 @@ impl QueryTools {
             sql.to_string()
         }
     }
+
     pub fn escape_column_name(&self, column_name: &str) -> String {
         format!("\"{}\"", column_name)
+    }
+
+    pub fn templates_render(&self) -> Rc<dyn SqlTemplatesRender> {
+        self.templates_render.clone()
+    }
+
+    pub fn allocaate_param(&self, name: &str) -> usize {
+        self.params_allocator.borrow_mut().allocate_param(name)
+    }
+    pub fn get_allocated_params(&self) -> Vec<String> {
+        self.params_allocator.borrow().get_params().clone()
     }
 }

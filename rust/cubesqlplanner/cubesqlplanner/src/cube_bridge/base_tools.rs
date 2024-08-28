@@ -1,6 +1,7 @@
 use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
 use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
+use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -19,4 +20,5 @@ pub trait BaseTools {
         granularity: String,
         dimension: String,
     ) -> Result<String, CubeError>;
+    fn sql_templates(&self) -> Result<Rc<dyn SqlTemplatesRender>, CubeError>;
 }

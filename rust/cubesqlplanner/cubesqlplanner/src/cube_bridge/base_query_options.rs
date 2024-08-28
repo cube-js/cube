@@ -18,12 +18,22 @@ pub struct TimeDimension {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct FilterItem {
+    pub or: Option<Vec<FilterItem>>,
+    pub and: Option<Vec<FilterItem>>,
+    pub member: Option<String>,
+    pub operator: Option<String>,
+    pub values: Option<Vec<Option<String>>>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BaseQueryOptionsStatic {
     pub measures: Option<Vec<String>>,
     pub dimensions: Option<Vec<String>>,
     #[serde(rename = "timeDimensions")]
     pub time_dimensions: Option<Vec<TimeDimension>>,
     pub timezone: Option<String>,
+    pub filters: Option<Vec<FilterItem>>,
     #[serde(rename = "joinRoot")]
     pub join_root: Option<String>, //TODO temporaty. join graph should be rewrited in rust or taked
                                    //from Js CubeCompiller

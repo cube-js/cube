@@ -752,6 +752,7 @@ dependencies = [
  "datafusion",
  "itertools",
  "lazy_static",
+ "minijinja",
  "nativebridge",
  "neon",
  "regex",

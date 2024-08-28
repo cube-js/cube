@@ -4,8 +4,11 @@ pub mod base_measure;
 pub mod base_member;
 pub mod base_query;
 pub mod base_time_dimension;
+pub mod filter;
+pub mod params_allocator;
 mod query_tools;
 pub mod sql_evaluator;
+pub mod sql_templates;
 pub mod utils;
 
 pub use base_cube::BaseCube;
@@ -14,3 +17,4 @@ pub use base_measure::BaseMeasure;
 pub use base_member::{BaseMember, IndexedMember};
 pub use base_query::BaseQuery;
 pub use base_time_dimension::BaseTimeDimension;
+pub use params_allocator::ParamsAllocator;
