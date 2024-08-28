@@ -142,7 +142,7 @@
     ]
   },
   "skip": [
-    "SKIPED FOR ALL",
+    "SKIPPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -157,6 +157,19 @@
     "--------------------",
     "querying BigECommerce: rolling window by 2 day",
     "querying BigECommerce: rolling window by 2 week",
-    "querying BigECommerce: rolling window by 2 month"
+    "querying BigECommerce: rolling window by 2 month",
+
+    "---------------------------------------",
+    "Custom Granularities                   ",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by half_year + no dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by half_year + dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading"
   ]
 }
