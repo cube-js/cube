@@ -13,34 +13,22 @@ analytics in Power BI:
 
 <YouTubeVideo url="https://www.youtube.com/embed/RD_HZ7xE8G0" />
 
-## Semantic Layer Sync
+## Connect from Cube Cloud
 
-It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube to
-Power BI. It automatically synchronizes the [data model][ref-data-model] between
-Cube and Power BI.
+It is recommended to use [Semantic Layer Sync][ref-sls] to connect Cube Cloud to
+Power BI. It automatically synchronizes the [data model][ref-data-model] with Power BI.
 
-## SQL API
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Microsoft Power BI</Btn> to get
+detailed instructions.
 
-You can also use the [SQL API][ref-sql-api] to connect Cube to Tableau.
+## Connect from Cube Core
 
-### Cube Cloud
+You can connect a Cube deployment to Power BI using the [SQL API][ref-sql-api].
 
-Click **How to connect your BI tool** link on the Overview page, navigate to the
-SQL API tab and enable it. Once enabled, you should see the screen like the one
-below with your connection credentials:
-
-<Screenshot src="https://ucarecdn.com/fc74ee91-b8a9-4c46-81ed-cb3daeef6b83/" />
-
-### Self-hosted Cube
-
-You need to set the following environment variables to enable the Cube SQL API.
-These credentials will be required to connect to Cube from PowerBI later.
-
-```dotenv
-CUBEJS_PG_SQL_PORT=5432
-CUBEJS_SQL_USER=myusername
-CUBEJS_SQL_PASSWORD=mypassword
-```
+In Cube Core, the SQL API is disabled by default. Enable it and [configure
+the credentials](/product/apis-integrations/sql-api#configuration) to
+connect to Power BI.
 
 ## Connecting from Power BI
 
@@ -55,7 +43,7 @@ querying performance and manage data freshness upstream of Power BI.
 
 </InfoBox>
 
-## Querying data
+### Querying data
 
 Your cubes will be exposed as tables, where both your measures and dimensions
 are columns.
@@ -63,7 +51,7 @@ are columns.
 [ref-getting-started]: /product/getting-started/cloud
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
-[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-data-model]: /product/data-modeling/overview
 [ref-ksqldb]: /product/configuration/data-sources/ksqldb
 [link-powerbi-directquery]: https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-use-directquery

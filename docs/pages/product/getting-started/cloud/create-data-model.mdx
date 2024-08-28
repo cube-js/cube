@@ -55,7 +55,7 @@ cubes:
 
     joins:
       - name: users
-        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        sql: "{CUBE}.USER_ID = {users}.ID"
         relationship: many_to_one
 
     dimensions:
@@ -127,7 +127,7 @@ cubes:
 
     joins:
       - name: users
-        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        sql: "{CUBE}.USER_ID = {users}.ID"
         relationship: many_to_one
 
     dimensions:

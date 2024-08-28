@@ -2,30 +2,21 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use itertools::Itertools;
-use serde::{ser::SerializeStruct, Serialize, Serializer};
+use serde::Serialize;
 
 use crate::sql::ColumnType;
 
-use super::CompiledQuery;
-
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize)]
 pub struct CompiledQueryFieldMeta {
     pub column_from: String,
     pub column_to: String,
     pub column_type: ColumnType,
 }
 
-impl Serialize for CompiledQueryFieldMeta {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("CompiledQueryFieldMeta", 3)?;
-        state.serialize_field("column_from", &self.column_from)?;
-        state.serialize_field("column_to", &self.column_to)?;
-        state.serialize_field("column_type", &format!("{:?}", self.column_type))?;
-        state.end()
-    }
+#[derive(Debug, PartialEq, Serialize)]
+pub struct CompiledQuery {
+    pub request: V1LoadRequestQuery,
+    pub meta: Vec<CompiledQueryFieldMeta>,
 }
 
 #[derive(Debug)]
@@ -136,7 +127,7 @@ impl QueryBuilder {
         self.filters.push(filter);
     }
 
-    pub fn build(self) -> super::CompiledQuery {
+    pub fn build(self) -> CompiledQuery {
         CompiledQuery {
             request: V1LoadRequestQuery {
                 measures: Some(self.measures.into_iter().unique().collect()),

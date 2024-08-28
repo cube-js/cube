@@ -4,7 +4,7 @@ pub mod processing_loop;
 use crate::{
     config::{
         injection::{DIService, Injector},
-        processing_loop::ProcessingLoop,
+        processing_loop::{ProcessingLoop, ShutdownMode},
     },
     sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
     transport::{HttpTransport, TransportService},
@@ -22,24 +22,14 @@ use std::{
 use std::sync::Arc;
 
 use crate::sql::compiler_cache::{CompilerCache, CompilerCacheImpl};
-use tokio::task::JoinHandle;
+use tokio::{sync::RwLock, task::JoinHandle};
 
-#[derive(Clone)]
 pub struct CubeServices {
     pub injector: Arc<Injector>,
+    pub processing_loop_handles: RwLock<Vec<LoopHandle>>,
 }
 
 impl CubeServices {
-    pub async fn start_processing_loops(&self) -> Result<(), CubeError> {
-        let futures = self.spawn_processing_loops().await?;
-        tokio::spawn(async move {
-            if let Err(e) = Self::wait_loops(futures).await {
-                error!("Error in processing loop: {}", e);
-            }
-        });
-        Ok(())
-    }
-
     pub async fn wait_processing_loops(&self) -> Result<(), CubeError> {
         let processing_loops = self.spawn_processing_loops().await?;
         Self::wait_loops(processing_loops).await
@@ -57,9 +47,9 @@ impl CubeServices {
         let mut futures = Vec::new();
 
         if self.injector.has_service_typed::<PostgresServer>().await {
-            let mysql_server = self.injector.get_service_typed::<PostgresServer>().await;
+            let postgres_server = self.injector.get_service_typed::<PostgresServer>().await;
             futures.push(tokio::spawn(async move {
-                if let Err(e) = mysql_server.processing_loop().await {
+                if let Err(e) = postgres_server.processing_loop().await {
                     error!("{}", e.to_string());
                 };
 
@@ -70,12 +60,15 @@ impl CubeServices {
         Ok(futures)
     }
 
-    pub async fn stop_processing_loops(&self) -> Result<(), CubeError> {
+    pub async fn stop_processing_loops(
+        &self,
+        shutdown_mode: ShutdownMode,
+    ) -> Result<(), CubeError> {
         if self.injector.has_service_typed::<PostgresServer>().await {
             self.injector
                 .get_service_typed::<PostgresServer>()
                 .await
-                .stop_processing()
+                .stop_processing(shutdown_mode)
                 .await?;
         }
 
@@ -115,6 +108,10 @@ pub trait ConfigObj: DIService + Debug {
     fn stream_mode(&self) -> bool;
 
     fn non_streaming_query_max_row_limit(&self) -> i32;
+
+    fn max_sessions(&self) -> usize;
+
+    fn no_implicit_order(&self) -> bool;
 }
 
 #[derive(Debug, Clone)]
@@ -133,6 +130,8 @@ pub struct ConfigObjImpl {
     pub push_down_pull_up_split: bool,
     pub stream_mode: bool,
     pub non_streaming_query_max_row_limit: i32,
+    pub max_sessions: usize,
+    pub no_implicit_order: bool,
 }
 
 impl ConfigObjImpl {
@@ -168,6 +167,8 @@ impl ConfigObjImpl {
                 .unwrap_or(sql_push_down),
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
+            max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
         }
     }
 }
@@ -226,6 +227,14 @@ impl ConfigObj for ConfigObjImpl {
     fn non_streaming_query_max_row_limit(&self) -> i32 {
         self.non_streaming_query_max_row_limit
     }
+
+    fn no_implicit_order(&self) -> bool {
+        self.no_implicit_order
+    }
+
+    fn max_sessions(&self) -> usize {
+        self.max_sessions
+    }
 }
 
 lazy_static! {
@@ -261,6 +270,8 @@ impl Config {
                 push_down_pull_up_split: true,
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
+                max_sessions: 1024,
+                no_implicit_order: false,
             }),
         }
     }
@@ -287,17 +298,17 @@ impl Config {
     pub async fn configure_injector(&self) {
         let config_obj_to_register = self.config_obj.clone();
         self.injector
-            .register_typed::<dyn ConfigObj, _, _, _>(async move |_| config_obj_to_register)
+            .register_typed::<dyn ConfigObj, _, _, _>(|_| async move { config_obj_to_register })
             .await;
 
         self.injector
-            .register_typed::<dyn TransportService, _, _, _>(async move |_| {
+            .register_typed::<dyn TransportService, _, _, _>(|_| async move {
                 Arc::new(HttpTransport::new())
             })
             .await;
 
         self.injector
-            .register_typed::<dyn CompilerCache, _, _, _>(async move |i| {
+            .register_typed::<dyn CompilerCache, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(CompilerCacheImpl::new(
                     config.clone(),
@@ -307,7 +318,7 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<ServerManager, _, _, _>(async move |i| {
+            .register_typed::<ServerManager, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
                     i.get_service_typed().await,
@@ -320,20 +331,20 @@ impl Config {
             .await;
 
         self.injector
-            .register_typed::<SessionManager, _, _, _>(async move |i| {
+            .register_typed::<SessionManager, _, _, _>(|i| async move {
                 Arc::new(SessionManager::new(i.get_service_typed().await))
             })
             .await;
 
         self.injector
-            .register_typed::<dyn SqlAuthService, _, _, _>(async move |_| {
+            .register_typed::<dyn SqlAuthService, _, _, _>(|_| async move {
                 Arc::new(SqlAuthDefaultImpl)
             })
             .await;
 
         if self.config_obj.postgres_bind_address().is_some() {
             self.injector
-                .register_typed::<PostgresServer, _, _, _>(async move |i| {
+                .register_typed::<PostgresServer, _, _, _>(|i| async move {
                     let config = i.get_service_typed::<dyn ConfigObj>().await;
                     PostgresServer::new(
                         config.postgres_bind_address().as_ref().unwrap().to_string(),
@@ -347,6 +358,7 @@ impl Config {
     pub async fn cube_services(&self) -> CubeServices {
         CubeServices {
             injector: self.injector.clone(),
+            processing_loop_handles: RwLock::new(Vec::new()),
         }
     }
 
@@ -381,4 +393,4 @@ where
     })
 }
 
-type LoopHandle = JoinHandle<Result<(), CubeError>>;
+pub type LoopHandle = JoinHandle<Result<(), CubeError>>;

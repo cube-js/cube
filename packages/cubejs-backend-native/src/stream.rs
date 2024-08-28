@@ -1,6 +1,7 @@
 use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
+use std::borrow::Cow;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -16,7 +17,7 @@ use cubesql::CubeError;
 use neon::prelude::*;
 use tokio::sync::{oneshot, Semaphore};
 
-#[cfg(build = "debug")]
+#[cfg(feature = "neon-debug")]
 use log::trace;
 
 use neon::types::JsDate;
@@ -211,7 +212,7 @@ impl ValueObject for JsValueObject<'_> {
                 CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
             })?;
         if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
-            Ok(FieldValue::String(s.value(&mut self.cx)))
+            Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
         } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
             Ok(FieldValue::Number(n.value(&mut self.cx)))
         } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {
@@ -241,7 +242,7 @@ impl ValueObject for JsValueObject<'_> {
 }
 
 fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.push_chunk");
 
     let this = cx
@@ -267,7 +268,7 @@ fn js_stream_push_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.start");
 
     let this = cx
@@ -279,7 +280,7 @@ fn js_stream_start(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.end");
 
     let this = cx
@@ -293,7 +294,7 @@ fn js_stream_end(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 }
 
 fn js_stream_reject(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-    #[cfg(build = "debug")]
+    #[cfg(feature = "neon-debug")]
     trace!("JsWriteStream.reject");
 
     let this = cx

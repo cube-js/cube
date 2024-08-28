@@ -18,13 +18,14 @@ use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::record_batch_buffer_size;
 use crate::CubeError;
-use arrow::array::{ArrayRef, UInt64Array};
-use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use chrono::Utc;
+use datafusion::arrow::array::{ArrayRef, UInt64Array};
+use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
+use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{Column, Count, Literal};
@@ -43,7 +44,6 @@ use futures::StreamExt;
 use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
-use parquet::arrow::ArrowWriter;
 use std::cmp::Ordering;
 use std::fs::File;
 use std::mem::take;
@@ -611,7 +611,7 @@ impl CompactionService for CompactionServiceImpl {
             // Concat rows from all chunks.
             let mut columns = Vec::with_capacity(num_columns);
             for i in 0..num_columns {
-                let v = arrow::compute::concat(
+                let v = datafusion::arrow::compute::concat(
                     &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
                 )?;
                 columns.push(v);
@@ -630,7 +630,11 @@ impl CompactionService for CompactionServiceImpl {
             let indices = lexsort_to_indices(&sort_key, None)?;
             let mut new = Vec::with_capacity(num_columns);
             for c in columns {
-                new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+                new.push(datafusion::arrow::compute::take(
+                    c.as_ref(),
+                    &indices,
+                    None,
+                )?)
             }
             Ok((store, new))
         })
@@ -1395,10 +1399,10 @@ mod tests {
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
     use crate::table::{cmp_same_types, Row, TableValue};
-    use arrow::array::{Int64Array, StringArray};
-    use arrow::datatypes::Schema;
-    use arrow::record_batch::RecordBatch;
     use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::arrow::array::{Int64Array, StringArray};
+    use datafusion::arrow::datatypes::Schema;
+    use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::collect;
     use std::fs;
     use std::path::{Path, PathBuf};

@@ -62,7 +62,11 @@ export class PostgresQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'timestamptz \'{{ value }}\'';
     templates.window_frame_types.groups = 'GROUPS';
-
+    templates.types.string = 'TEXT';
+    templates.types.tinyint = 'SMALLINT';
+    templates.types.float = 'REAL';
+    templates.types.double = 'DOUBLE PRECISION';
+    templates.types.binary = 'BYTEA';
     return templates;
   }
 

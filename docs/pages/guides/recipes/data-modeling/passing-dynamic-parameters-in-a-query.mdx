@@ -7,13 +7,22 @@ redirect_from:
 
 ## Use case
 
-We want to know the ratio between the number of people in a particular city and
+In some cases we may want to let a user select a filter value and be able to 
+use that value in calculations without filtering the entire query.
+
+In this example, we want to know the ratio between the number of people in a particular city and
 the total number of women in the country. The user can specify the city for the
 filter. The trick is to get the value of the city from the user and use it in
 the calculation. In the recipe below, we can learn how to join the data table
 with itself and reshape the dataset!
 
 ## Data modeling
+
+Essentially what we will be doing is cross joining all city values with the rows in the data table. 
+This will duplicate each row for every city in the dataset. Then, we will require the user 
+to choose a city to filter on, and this will bring us back to our original number of rows. What this 
+gives us is a new column in the dataset with the value that the user chose, which we can reference in our metrics. 
+In this case, we will use that value to filter a single metric so that we can compare that metric with the whole population.
 
 Let's explore the `users` cube data that contains various information about
 users, including city and gender:
@@ -68,7 +77,7 @@ cubes:
         sql: id
         type: count
         filters:
-          - sql: "gender = 'female'"
+          - sql: "gender = 'female' and city = city_filter" 
 
       - name: number_of_people_of_any_gender_in_the_city:
         sql: id

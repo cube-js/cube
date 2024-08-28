@@ -6,9 +6,10 @@ pub mod rewriter;
 pub mod rules;
 
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, Member, OriginalExpr},
+    compile::rewrite::analysis::{LogicalPlanAnalysis, OriginalExpr},
     CubeError,
 };
+use analysis::MemberNamesToExpr;
 use datafusion::{
     arrow::datatypes::DataType,
     error::DataFusionError,
@@ -29,7 +30,6 @@ use itertools::Itertools;
 use std::{
     borrow::Cow,
     fmt::{self, Display, Formatter},
-    ops::Index,
     str::FromStr,
     sync::Arc,
 };
@@ -545,62 +545,92 @@ impl ExprRewriter for WithColumnRelation {
     }
 }
 
-// TODO(mwillsey) this should one day be replaced by LogicalPlan::find_member
 pub fn column_name_to_member_vec(
-    member_name_to_expr: Vec<(Option<String>, Member, Expr)>,
+    member_names_to_expr: &mut MemberNamesToExpr,
 ) -> Vec<(String, Option<String>)> {
     let mut relation = WithColumnRelation(None);
-    member_name_to_expr
-        .into_iter()
-        .flat_map(|(member, _, expr)| {
-            [
-                (expr_column_name(&expr, &None), member.clone()),
-                (expr_column_name_with_relation(&expr, &mut relation), member),
-            ]
+    for (index, _tuple @ (_, _member, expr)) in member_names_to_expr
+        .list
+        .iter()
+        .enumerate()
+        .skip(member_names_to_expr.uncached_lookups_offset)
+    {
+        {
+            let column_name = expr_column_name(&expr, &None);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+        {
+            let column_name = expr_column_name_with_relation(&expr, &mut relation);
+            let _ = member_names_to_expr
+                .cached_lookups
+                .try_insert(column_name, index);
+        }
+    }
+    member_names_to_expr.uncached_lookups_offset = member_names_to_expr.list.len();
+
+    member_names_to_expr
+        .cached_lookups
+        .iter()
+        .map(|(column_name, &index)| {
+            (
+                column_name.clone(),
+                member_names_to_expr.list[index].0.clone(),
+            )
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
 
 impl LogicalPlanData {
-    fn find_member(
-        &self,
-        f: impl Fn(&MemberNameToExpr, &str) -> bool,
-    ) -> Option<(&MemberNameToExpr, String)> {
-        let mut relation = WithColumnRelation(None);
-        for tuple @ (_, _member, expr) in self.member_name_to_expr.as_ref()?.iter() {
-            let column_name = expr_column_name(&expr, &None);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
-            }
-            let column_name = expr_column_name_with_relation(&expr, &mut relation);
-            if f(tuple, &column_name) {
-                return Some((tuple, column_name));
-            }
+    fn find_member_by_alias(&mut self, name: &str) -> Option<(&MemberNameToExpr, String)> {
+        if let Some(member_names_to_expr) = &mut self.member_name_to_expr {
+            Self::do_find_member_by_alias(member_names_to_expr, name)
+        } else {
+            None
         }
-        None
     }
-}
 
-fn column_name_to_member_to_aliases(
-    column_name_to_member: Vec<(String, Option<String>)>,
-) -> Vec<(String, String)> {
-    column_name_to_member
-        .into_iter()
-        .filter(|(_, member)| member.is_some())
-        .map(|(column_name, member)| (column_name, member.unwrap()))
-        .collect::<Vec<_>>()
-}
+    fn do_find_member_by_alias<'a>(
+        member_names_to_expr: &'a mut MemberNamesToExpr,
+        name: &str,
+    ) -> Option<(&'a MemberNameToExpr, String)> {
+        if let Some(cached_index) = member_names_to_expr.cached_lookups.get(name) {
+            return Some((&member_names_to_expr.list[*cached_index], name.to_string()));
+        }
+        let mut relation = WithColumnRelation(None);
+        for (index, tuple @ (_, _member, expr)) in member_names_to_expr
+            .list
+            .iter()
+            .enumerate()
+            .skip(member_names_to_expr.uncached_lookups_offset)
+        {
+            {
+                let column_name = expr_column_name(&expr, &None);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
 
-fn member_name_by_alias(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    id: Id,
-    alias: &str,
-) -> Option<String> {
-    egraph
-        .index(id)
-        .data
-        .find_member(|_, a| a == alias)
-        .and_then(|(m, _a)| m.0.clone())
+                if equal {
+                    return Some((tuple, name.to_string()));
+                }
+            }
+            {
+                let column_name = expr_column_name_with_relation(&expr, &mut relation);
+                let equal = name == &column_name;
+                let _ = member_names_to_expr
+                    .cached_lookups
+                    .try_insert(column_name, index);
+
+                if equal {
+                    return Some((tuple, name.to_string()));
+                }
+            }
+            member_names_to_expr.uncached_lookups_offset = index + 1;
+        }
+        return None;
+    }
 }
 
 fn referenced_columns(referenced_expr: &[Expr]) -> Vec<String> {
@@ -1534,6 +1564,10 @@ fn binary_expr(left: impl Display, op: impl Display, right: impl Display) -> Str
 
 fn inlist_expr(expr: impl Display, list: impl Display, negated: impl Display) -> String {
     format!("(InListExpr {} {} {})", expr, list, negated)
+}
+
+fn inlist_expr_list(exprs: Vec<impl Display>, is_flat: bool) -> String {
+    flat_list_expr("InListExprList", exprs, is_flat)
 }
 
 fn insubquery_expr(expr: impl Display, subquery: impl Display, negated: impl Display) -> String {

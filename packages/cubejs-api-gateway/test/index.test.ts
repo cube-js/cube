@@ -6,7 +6,8 @@ import express from 'express';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import * as console from 'console';
+import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
@@ -284,7 +285,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 10000,
               limit: 10000,
@@ -297,7 +297,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 10000,
             limit: 10000,
@@ -345,7 +344,6 @@ describe('API Gateway', () => {
           {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [{
               member: 'Foo.bar',
               operator: 'gte',
@@ -400,7 +398,7 @@ describe('API Gateway', () => {
             req.authInfo = authorization;
           }
         },
-        queryRewrite: async (query, context) => {
+        queryRewrite: async (query, _context) => {
           query.limit = 2;
           return query;
         }
@@ -421,7 +419,6 @@ describe('API Gateway', () => {
             {
               measures: ['Foo.bar'],
               timezone: 'UTC',
-              order: [],
               filters: [],
               rowLimit: 2,
               limit: 2,
@@ -434,7 +431,6 @@ describe('API Gateway', () => {
           pivotQuery: {
             measures: ['Foo.bar'],
             timezone: 'UTC',
-            order: [],
             filters: [],
             rowLimit: 2,
             limit: 2,
@@ -582,7 +578,11 @@ describe('API Gateway', () => {
       .expect(200);
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
@@ -595,7 +595,11 @@ describe('API Gateway', () => {
 
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   describe('multi query support', () => {
@@ -672,6 +676,91 @@ describe('API Gateway', () => {
     });
   });
 
+  describe('sql api member expressions evaluations', () => {
+    test('throw error if expressions are not allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          const errorMessage = message as { error: string };
+          expect(errorMessage.error).toEqual('Error: Expressions are not allowed in this context');
+        },
+        query: {
+          measures: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
+          ],
+          dimensions: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
+          ],
+          segments: [],
+          order: []
+        },
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: false,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+
+    test('no error if expressions are allowed', async () => {
+      const { apiGateway } = await createApiGateway();
+      const request: QueryRequest = {
+        // eslint-disable-next-line @typescript-eslint/no-empty-function
+        res(message) {
+          expect(message.hasOwnProperty('sql')).toBe(true);
+        },
+        query: {
+          measures: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"sum_sales_line_i","cube_params":["sales"],"expr":"SUM(${sales.line_items_price})","grouping_set":null}'
+          ],
+          dimensions: [
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"users_age","cube_params":["sales"],"expr":"${sales.users_age}","grouping_set":null}',
+            // eslint-disable-next-line no-template-curly-in-string
+            '{"cube_name":"sales","alias":"cast_sales_users","cube_params":["sales"],"expr":"CAST(${sales.users_first_name} AS TEXT)","grouping_set":null}'
+          ],
+          segments: [],
+          order: []
+        },
+        expressionParams: [],
+        exportAnnotatedSql: true,
+        memberExpressions: true,
+        disableExternalPreAggregations: true,
+        queryType: 'multi',
+        disableLimitEnforcing: true,
+        context: {
+          securityContext: {},
+          signedWithPlaygroundAuthSecret: false,
+          requestId: 'd592f44e-9c26-4187-aa09-e9d39ca19a88-span-1',
+          protocol: 'postgres',
+          apiType: 'sql',
+          appName: 'NULL'
+        },
+        apiType: 'sql'
+      };
+
+      await apiGateway.sql(request);
+    });
+  });
+
   describe('/cubejs-system/v1', () => {
     const scheduledRefreshContextsFactory = () => ([
       { securityContext: { foo: 'bar' } },
@@ -736,7 +825,9 @@ describe('API Gateway', () => {
       const res = await req;
       expect(res.body).toMatchObject(successResult);
     };
-       
+
+    /*
+     Test using this is commented out below
     const wrongPayloadsTestFactory = ({ route, wrongPayloads, scope }: {
       route: string,
       method: string,
@@ -762,6 +853,7 @@ describe('API Gateway', () => {
         expect(res.body.error).toBe(payload.result.error);
       }
     };
+    */
 
     const testConfigs = [
       { route: 'context', successResult: { basePath: 'awesomepathtotest' } },

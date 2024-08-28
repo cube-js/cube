@@ -1,6 +1,5 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         qtrace::{Qtrace, QtraceEclass, QtraceEgraphIteration},
         rewrite::{
             analysis::LogicalPlanAnalysis,
@@ -13,6 +12,7 @@ use crate::{
             },
             LiteralExprValue, LogicalPlanLanguage, QueryParamIndex,
         },
+        CubeContext,
     },
     config::ConfigObj,
     sql::AuthContextRef,
@@ -221,7 +221,7 @@ impl Rewriter {
         ))
         .with_scheduler(IncrementalScheduler::default())
         .with_hook(|runner| {
-            runner.egraph.analysis.time = runner.iterations.len();
+            runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
             Ok(())
         })
         .with_egraph(egraph)
@@ -584,11 +584,10 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
         if iteration != self.current_iter {
             self.current_iter = iteration;
             self.current_eclasses.clear();
-            self.current_eclasses.extend(
-                egraph
-                    .classes()
-                    .filter_map(|class| (class.data.time + 1 >= iteration).then(|| class.id)),
-            );
+            self.current_eclasses
+                .extend(egraph.classes().filter_map(|class| {
+                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
+                }));
         };
         assert_eq!(iteration, self.current_iter);
         rewrite.searcher.search_eclasses_with_limit(

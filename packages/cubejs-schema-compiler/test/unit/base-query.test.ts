@@ -60,7 +60,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with 6 digits timestamp presicion - bigquery', async () => {
+    it('Test time series with 6 digits timestamp precision - bigquery', async () => {
       await compilers.compiler.compile();
 
       const query = new BigqueryQuery(compilers, {
@@ -185,6 +185,34 @@ describe('SQL Generation', () => {
           ])
         );
       }
+    });
+
+    it('Test same dimension with different granularities - postgres', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'quarter',
+          },
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'month',
+          }
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_quarter')).toBeTruthy();
+      expect(queryString.includes('date_trunc(\'month\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_month')).toBeTruthy();
     });
 
     it('Test for everyRefreshKeySql', async () => {
@@ -830,6 +858,132 @@ describe('SQL Generation', () => {
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
   });
+
+  describe('FILTER_GROUP', () => {
+    /** @type {Compilers} */
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: `select * from order where {FILTER_GROUP(
+              FILTER_PARAMS.Order.dim0.filter('dim0'),
+              FILTER_PARAMS.Order.dim1.filter('dim1')
+            )}`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'dim0',
+                sql: 'dim0',
+                type: 'string'
+              },
+              {
+                name: 'dim1',
+                sql: 'dim1',
+                type: 'string'
+              }
+            ]
+          },
+        ]
+      })
+    );
+
+    it('inserts "or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) OR (dim1 = $1$)))');
+    });
+
+    it('inserts "and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) AND (dim1 = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['val1'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['another_val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['another_val1'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
+  });
 });
 
 describe('Class unit tests', () => {
@@ -866,19 +1020,20 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('camel_case_cube__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('camel_case_cube__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('camel_case_cube');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('camel_case_cube_id');
     expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('camel_case_cube_description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', true)).toEqual('camel_case_cube_grant_total');
-    
+
     // cubeAlias
     expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"camel_case_cube"');
     expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"camel_case_cube__id"');
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
   });
+
   it('Test BaseQuery with aliased cube', async () => {
     const set = /** @type Compilers */ prepareCompiler(`
       cube('CamelCaseCube', {
@@ -914,7 +1069,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('t1__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('t1__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('t1__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('t1');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('t1_id');
@@ -927,6 +1082,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
   });
+
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();

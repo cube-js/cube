@@ -89,22 +89,39 @@ export class MSSqlDbRunner extends BaseDbRunner {
     return process.env.TEST_DB_PASSWORD || 'Test1test';
   }
 
+  sqlcmdPrefix(version) {
+    if (version === '2017-latest') {
+      return '/opt/mssql-tools/bin/';
+    }
+
+    // Thanks, Microsoft the last 2019 Version that has same path is "2019-CU27-ubuntu-20.04"
+    // Starting with "2019-latest" published on 08/01/2024 - new path is "/opt/mssql-tools18/bin/"
+    // @see https://learn.microsoft.com/en-us/troubleshoot/sql/releases/sqlserver-2019/cumulativeupdate28#3217207
+    return '/opt/mssql-tools18/bin/';
+  }
+
   async containerLazyInit() {
     const version = process.env.TEST_MSSQL_VERSION || '2017-latest';
 
     return new GenericContainer(`mcr.microsoft.com/mssql/server:${version}`)
-      .withEnv('ACCEPT_EULA', 'Y')
-      .withEnv('MSSQL_PID', 'Developer')
-      .withEnv('MSSQL_SA_PASSWORD', this.password())
-      .withHealthCheck({
-        test: `/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`,
-        interval: 2 * 1000,
-        timeout: 3 * 1000,
-        retries: 5,
-        startPeriod: 10 * 1000,
+      .withEnvironment({
+        ACCEPT_EULA: 'Y',
+        MSSQL_PID: 'Developer',
+        MSSQL_SA_PASSWORD: this.password(),
       })
       .withExposedPorts(this.port())
+      .withHealthCheck({
+        test: [
+          'CMD-SHELL',
+          `${this.sqlcmdPrefix(version)}sqlcmd -C -l 1 -S localhost -U sa -P ${this.password()} -Q "SELECT 1" || exit 1`
+        ],
+        interval: 1000,
+        timeout: 1100,
+        retries: 20,
+        startPeriod: 2 * 1000,
+      })
       .withWaitStrategy(Wait.forHealthCheck())
+      .withStartupTimeout(10 * 1000)
       .start();
   }
 

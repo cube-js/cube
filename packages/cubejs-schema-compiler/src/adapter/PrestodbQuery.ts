@@ -119,8 +119,13 @@ export class PrestodbQuery extends BaseQuery {
       '{% if offset %}\nOFFSET {{ offset }}{% endif %}' +
       '{% if limit %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
-    templates.expressions.interval = 'INTERVAL \'{{ num }}\' {{ date_part }}';
+    templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
+    templates.types.string = 'VARCHAR';
+    templates.types.float = 'REAL';
+    // Presto intervals have a YearMonth or DayTime type variants, but no universal type
+    delete templates.types.interval;
+    templates.types.binary = 'VARBINARY';
     return templates;
   }
 }

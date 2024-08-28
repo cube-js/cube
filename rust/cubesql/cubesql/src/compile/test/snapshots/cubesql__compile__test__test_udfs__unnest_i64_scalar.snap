@@ -1,0 +1,13 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"SELECT unnest(ARRAY[1,2,3,4,5]);\".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------------------------+
+| unnest(List([1,2,3,4,5])) |
++---------------------------+
+| 1                         |
+| 2                         |
+| 3                         |
+| 4                         |
+| 5                         |
++---------------------------+

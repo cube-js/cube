@@ -3,7 +3,7 @@ redirect_from:
   - /apis-integrations
 ---
 
-# APIs & Integrations
+# APIs & integrations
 
 With a rich set of APIs, Cube can power and deliver data to all kinds of data
 applications.
@@ -27,12 +27,23 @@ SQL API allows querying Cube with a Postgres-compatible [dialect of
 SQL][ref-sql-syntax], either by writing queries manually or generating them with
 BI tools.
 
+To connect to Microsoft Excel, use the [MDX API][ref-mdx-api].
+
 When implementing [embedded analytics][cube-ea] and [real-time
 analytics][cube-rta] use cases, pick [REST API][ref-rest-api] or [GraphQL
 API][ref-graphql-api]. Also, the [JavaScript SDK][ref-js-sdk] will simplify
 integration with your front-end code. The REST API uses a [JSON-based query
 format][ref-json-syntax], and the GraphQL API accepts [GraphQL
 queries][ref-graphql-syntax].
+
+For AI use cases, consider using the [AI API][ref-ai-api].
+
+<ReferenceBox>
+
+See this [GitHub issue](https://github.com/cube-js/cube/issues/1744#issuecomment-2291680777)
+for an unofficial, community-maintained [client library for Python](https://github.com/mharrisb1/cube-http-client).
+
+</ReferenceBox>
 
 ## Management APIs
 
@@ -47,8 +58,10 @@ API][ref-orchestration-api].
 [ref-sql-api]: /product/apis-integrations/sql-api
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-graphql-api]: /product/apis-integrations/graphql-api
+[ref-mdx-api]: /product/apis-integrations/mdx-api
+[ref-ai-api]: /product/apis-integrations/ai-api
 [ref-orchestration-api]: /product/apis-integrations/orchestration-api
-[ref-sls]: /product/workspace/semantic-layer-sync
+[ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-js-sdk]: /product/apis-integrations/javascript-sdk
 [ref-sql-syntax]: /product/apis-integrations/sql-api#querying-fundamentals
 [ref-json-syntax]: /product/apis-integrations/rest-api/query-format

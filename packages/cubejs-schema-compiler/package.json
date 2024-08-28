@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/schema-compiler",
   "description": "Cube schema compiler",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.49",
+  "version": "0.35.78",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -40,8 +40,8 @@
     "@babel/standalone": "^7.24",
     "@babel/traverse": "^7.24",
     "@babel/types": "^7.24",
-    "@cubejs-backend/native": "^0.35.49",
-    "@cubejs-backend/shared": "^0.35.43",
+    "@cubejs-backend/native": "^0.35.78",
+    "@cubejs-backend/shared": "^0.35.67",
     "antlr4ts": "0.5.0-alpha.4",
     "camelcase": "^6.2.0",
     "cron-parser": "^4.9.0",
@@ -59,7 +59,7 @@
   "devDependencies": {
     "@cubejs-backend/apla-clickhouse": "^1.7.0",
     "@cubejs-backend/linter": "^0.35.0",
-    "@cubejs-backend/query-orchestrator": "^0.35.48",
+    "@cubejs-backend/query-orchestrator": "^0.35.78",
     "@types/babel__code-frame": "^7.0.6",
     "@types/babel__generator": "^7.6.8",
     "@types/babel__traverse": "^7.20.5",
@@ -80,7 +80,7 @@
     "request-promise": "^4.2.4",
     "source-map-support": "^0.5.19",
     "sqlstring": "^2.3.1",
-    "testcontainers": "^8.12",
+    "testcontainers": "^10.10.4",
     "typescript": "~5.2.2",
     "uuid": "^8.3.2"
   },
