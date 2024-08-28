@@ -382,6 +382,7 @@ impl RewriteRules for MemberRules {
                     "?right_on",
                     "?join_type",
                     "?join_constraint",
+                    "?null_equals_null",
                 ),
                 cross_join(
                     cube_scan(
