@@ -186,7 +186,13 @@ pub trait QueryEngine {
         let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
 
         let result = rewriter
-            .find_best_plan(root, state.auth_context().unwrap(), qtrace, span_id.clone())
+            .find_best_plan(
+                root,
+                state.auth_context().unwrap(),
+                qtrace,
+                span_id.clone(),
+                self.config_ref().top_down_extractor(),
+            )
             .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(

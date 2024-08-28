@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::LanguageToLogicalPlanConverter,
-            cost::BestCubePlan,
+            cost::{BestCubePlan, CubePlanTopDownState, TopDownExtractor},
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
@@ -314,6 +314,7 @@ impl Rewriter {
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
+        top_down_extractor: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -337,9 +338,26 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let extractor =
-                    Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
-                let (best_cost, best) = extractor.find_best(root);
+                let best = if top_down_extractor {
+                    let mut extractor = TopDownExtractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                        CubePlanTopDownState::new(),
+                    );
+                    let Some((best_cost, best)) = extractor.find_best(root) else {
+                        return Err(CubeError::internal("Unable to find best plan".to_string()));
+                    };
+                    log::debug!("Best cost: {:?}", best_cost);
+                    best
+                } else {
+                    let extractor = Extractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                    );
+                    let (best_cost, best) = extractor.find_best(root);
+                    log::debug!("Best cost: {:?}", best_cost);
+                    best
+                };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
                 } else {
@@ -354,14 +372,13 @@ impl Rewriter {
                         .map(|(i, n)| format!("{}: {:?}", i, n))
                         .join(", ")
                 );
-                log::debug!("Best cost: {:?}", best_cost);
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
                     auth_context,
                     span_id.clone(),
                 );
-                Ok::<_, CubeError>((
+                Ok((
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,
                     qtrace_best_graph,
@@ -499,6 +516,12 @@ impl Rewriter {
         env::var("CUBESQL_SQL_PUSH_DOWN")
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(false)
+    }
+
+    pub fn top_down_extractor_enabled() -> bool {
+        env::var("CUBESQL_TOP_DOWN_EXTRACTOR")
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(true)
     }
 
     pub fn rewrite_rules(
