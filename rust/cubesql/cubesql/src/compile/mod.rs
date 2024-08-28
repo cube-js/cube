@@ -135,6 +135,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_coalesce_two_dimensions() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan(
