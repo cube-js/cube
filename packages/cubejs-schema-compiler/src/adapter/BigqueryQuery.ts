@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { BaseTimeDimension } from './BaseTimeDimension';
@@ -60,6 +61,79 @@ export class BigqueryQuery extends BaseQuery {
     return `DATETIME_TRUNC(${dimension}, ${GRANULARITY_TO_INTERVAL[granularity]})`;
   }
 
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * BigQuery operates with whole intervals as is without measuring them in plain seconds.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const [intervalFormatted, timeUnit] = this.formatInterval(interval);
+    const beginOfTime = this.dateTimeCast('\'1970-01-01T00:00:00\'');
+
+    return `${this.dateTimeCast(`'${origin}'`)} + INTERVAL ${intervalFormatted} *
+      CAST(FLOOR(
+        DATETIME_DIFF(${source}, ${this.dateTimeCast(`'${origin}'`)}, ${timeUnit}) /
+        DATETIME_DIFF(${beginOfTime} + INTERVAL ${intervalFormatted}, ${beginOfTime}, ${timeUnit})
+      ) AS INT64))`;
+  }
+
+  /**
+   * The input interval with (possible) plural units, like "2 years", "3 months", "4 weeks", "5 days"...
+   * will be converted to BigQuery dialect.
+   * @see https://cloud.google.com/bigquery/docs/reference/standard-sql/data-types#interval_type
+   * It returns a tuple of (formatted interval, timeUnit to use in datediff functions)
+   */
+  private formatInterval(interval: string): [string, string] {
+    const intervalParsed = parseSqlInterval(interval);
+    const intKeys = Object.keys(intervalParsed).length;
+
+    if (intervalParsed.year && intKeys === 1) {
+      return [`${intervalParsed.year} YEAR`, 'YEAR'];
+    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
+      return [`'${intervalParsed.year}-${intervalParsed.month}' YEAR TO MONTH`, 'MONTH'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intKeys === 3) {
+      return [`'${intervalParsed.year}-${intervalParsed.month} ${intervalParsed.day}' YEAR TO DAY`, 'DAY'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 4) {
+      return [`'${intervalParsed.year}-${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}' YEAR TO HOUR`, 'HOUR'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 5) {
+      return [`'${intervalParsed.year}-${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}' YEAR TO MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.year && intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 6) {
+      return [`'${intervalParsed.year}-${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' YEAR TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.quarter && intKeys === 1) {
+      return [`${intervalParsed.quarter} QUARTER`, 'QUARTER'];
+    } else if (intervalParsed.month && intKeys === 1) {
+      return [`${intervalParsed.month} MONTH`, 'MONTH'];
+    } else if (intervalParsed.month && intervalParsed.day && intKeys === 2) {
+      return [`'${intervalParsed.month} ${intervalParsed.day}' MONTH TO DAY`, 'DAY'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intKeys === 3) {
+      return [`'${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}' MONTH TO HOUR`, 'HOUR'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 4) {
+      return [`'${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}' MONTH TO MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.month && intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 5) {
+      return [`'${intervalParsed.month} ${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' MONTH TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.week && intKeys === 1) {
+      return [`${intervalParsed.week} WEEK`, 'DAY'];
+    } else if (intervalParsed.day && intKeys === 1) {
+      return [`${intervalParsed.day} DAY`, 'DAY'];
+    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
+      return [`'${intervalParsed.day} ${intervalParsed.hour}' DAY TO HOUR`, 'HOUR'];
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
+      return [`'${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}' DAY TO MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
+      return [`'${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' DAY TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
+      return [`'${intervalParsed.hour}:${intervalParsed.minute}' HOUR TO MINUTE`, 'MINUTE'];
+    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
+      return [`'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR TO SECOND`, 'SECOND'];
+    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
+      return [`'${intervalParsed.minute}:${intervalParsed.second}' MINUTE TO SECOND`, 'SECOND'];
+    }
+
+    // No need to support microseconds.
+
+    throw new Error(`Cannot transform interval expression "${interval}" to BigQuery dialect`);
+  }
+
   public newFilter(filter) {
     return new BigqueryFilter(this, filter);
   }
@@ -104,19 +178,19 @@ export class BigqueryQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATETIME_SUB(${date}, INTERVAL ${interval})`;
+    return `DATETIME_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
   }
 
   public addInterval(date, interval) {
-    return `DATETIME_ADD(${date}, INTERVAL ${interval})`;
+    return `DATETIME_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
   }
 
   public subtractTimestampInterval(date, interval) {
-    return `TIMESTAMP_SUB(${date}, INTERVAL ${interval})`;
+    return `TIMESTAMP_SUB(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
   }
 
   public addTimestampInterval(date, interval) {
-    return `TIMESTAMP_ADD(${date}, INTERVAL ${interval})`;
+    return `TIMESTAMP_ADD(${date}, INTERVAL ${this.formatInterval(interval)[0]})`;
   }
 
   public nowTimestampSql() {
