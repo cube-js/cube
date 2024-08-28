@@ -230,7 +230,7 @@ Cube caches JWKS by default when
 
 Cube also allows you to provide your own JWT verification logic by setting a
 [`checkAuth()`][ref-config-check-auth] function in the `cube.js` configuration
-file. This function is expected to verify a JWT and assigns its' claims to the
+file. This function is expected to verify a JWT and return its claims as the
 security context.
 
 <WarningBox>
@@ -249,7 +249,7 @@ module.exports = {
   checkAuth: async (req, auth) => {
     try {
       const userInfo = await getUserFromLDAP(req.get("X-LDAP-User-ID"));
-      req.securityContext = userInfo;
+      return { security_context: userInfo };
     } catch {
       throw new Error("Could not authenticate user from LDAP");
     }

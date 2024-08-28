@@ -255,6 +255,54 @@ describe('API Gateway', () => {
     expect(queryRewrite.mock.calls.length).toEqual(1);
   });
 
+  test('query transform with checkAuth with return', async () => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
+      expect(context.securityContext).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      expect(context.authInfo).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      return query;
+    });
+
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            return {
+              security_context: jwt.verify(authorization, API_SECRET),
+            };
+          }
+
+          return {};
+        },
+        queryRewrite
+      }
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+
+    expect(queryRewrite.mock.calls.length).toEqual(1);
+  });
+
   test('null filter values', async () => {
     const { app } = await createApiGateway();
 
