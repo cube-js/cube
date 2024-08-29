@@ -25,6 +25,10 @@ export class DatabricksQuery extends BaseQuery {
     return new DatabricksFilter(this, filter);
   }
 
+  public castToString(sql: string): string {
+    return `CAST(${sql} as STRING)`;
+  }
+
   public hllInit(sql: string) {
     return `hll_sketch_agg(${sql})`;
   }
