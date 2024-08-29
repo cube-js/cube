@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{DimensionEvaluator, MemberEvaluator};
+use super::sql_evaluator::{default_evaluate, DimensionEvaluator, EvaluationNode, MemberEvaluator};
 use super::{BaseMember, IndexedMember};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
@@ -11,7 +11,7 @@ pub struct BaseDimension {
     dimension: String,
     query_tools: Rc<QueryTools>,
     definition: Rc<dyn DimensionDefinition>,
-    member_evaluator: Rc<DimensionEvaluator>,
+    member_evaluator: Rc<EvaluationNode>,
     index: usize,
 }
 
@@ -31,7 +31,7 @@ impl BaseDimension {
     pub fn try_new(
         dimension: String,
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<DimensionEvaluator>,
+        member_evaluator: Rc<EvaluationNode>,
         index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
@@ -63,7 +63,7 @@ impl BaseDimension {
     }
 
     pub fn dimension_sql(&self) -> Result<String, CubeError> {
-        self.member_evaluator.evaluate(self.query_tools.clone())
+        default_evaluate(&self.member_evaluator, self.query_tools.clone())
     }
 
     fn sql(&self) -> Result<String, CubeError> {

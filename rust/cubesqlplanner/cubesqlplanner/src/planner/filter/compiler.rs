@@ -60,7 +60,7 @@ impl<'a> FilterCompiler<'a> {
             Ok(FilterItem::Group(Rc::new(FilterGroup::new(op, items))))
         } else {
             if let (Some(member), Some(operator)) = (&item.member, &item.operator) {
-                let evaluator: Rc<dyn MemberEvaluator> = match item_type {
+                let evaluator = match item_type {
                     FilterType::Dimension => self
                         .evaluator_compiler
                         .add_dimension_evaluator(member.clone())?,

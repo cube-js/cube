@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{MeasureEvaluator, MemberEvaluator};
+use super::sql_evaluator::{default_evaluate, EvaluationNode, MeasureEvaluator, MemberEvaluator};
 use super::{BaseMember, IndexedMember};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
@@ -12,7 +12,7 @@ pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
     definition: Rc<dyn MeasureDefinition>,
-    member_evaluator: Rc<MeasureEvaluator>,
+    member_evaluator: Rc<EvaluationNode>,
     index: usize,
 }
 
@@ -32,7 +32,7 @@ impl BaseMeasure {
     pub fn try_new(
         measure: String,
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<MeasureEvaluator>,
+        member_evaluator: Rc<EvaluationNode>,
         index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
@@ -60,7 +60,7 @@ impl BaseMeasure {
     }
 
     fn sql(&self) -> Result<String, CubeError> {
-        let sql = self.member_evaluator.evaluate(self.query_tools.clone())?;
+        let sql = default_evaluate(&self.member_evaluator, self.query_tools.clone())?;
 
         let measure_type = &self.definition.static_data().measure_type;
         let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);

@@ -1,3 +1,4 @@
+use super::join_graph::{JoinGraph, NativeJoinGraph};
 use crate::cube_bridge::base_tools::{BaseTools, NativeBaseTools};
 use crate::cube_bridge::evaluator::{CubeEvaluator, NativeCubeEvaluator};
 use cubenativeutils::wrappers::serializer::{
@@ -49,4 +50,6 @@ pub trait BaseQueryOptions {
     fn cube_evaluator(&self) -> Result<Rc<dyn CubeEvaluator>, CubeError>;
     #[field]
     fn base_tools(&self) -> Result<Rc<dyn BaseTools>, CubeError>;
+    #[field]
+    fn join_graph(&self) -> Result<Rc<dyn JoinGraph>, CubeError>;
 }

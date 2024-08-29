@@ -3,7 +3,7 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::MemberEvaluator;
+use crate::planner::sql_evaluator::{default_evaluate, EvaluationNode, MemberEvaluator};
 use crate::planner::sql_templates::filter::FilterTemplates;
 use crate::planner::{BaseMember, IndexedMember};
 use convert_case::{Case, Casing};
@@ -19,7 +19,7 @@ pub enum FilterType {
 
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
-    member_evaluator: Rc<dyn MemberEvaluator>,
+    member_evaluator: Rc<EvaluationNode>,
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
@@ -29,7 +29,7 @@ pub struct BaseFilter {
 impl BaseFilter {
     pub fn try_new(
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<dyn MemberEvaluator>,
+        member_evaluator: Rc<EvaluationNode>,
         filter_type: FilterType,
         filter_operator: String,
         values: Option<Vec<Option<String>>>,
@@ -51,7 +51,7 @@ impl BaseFilter {
     }
 
     pub fn to_sql(&self) -> Result<String, CubeError> {
-        let member_sql = self.member_evaluator.evaluate(self.query_tools.clone())?;
+        let member_sql = default_evaluate(&self.member_evaluator, self.query_tools.clone())?;
         let res = match self.filter_operator {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,

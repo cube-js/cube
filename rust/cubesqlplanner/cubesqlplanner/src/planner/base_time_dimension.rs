@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::DimensionEvaluator;
+use super::sql_evaluator::{DimensionEvaluator, EvaluationNode};
 use super::BaseDimension;
 use super::{BaseMember, IndexedMember};
 use cubenativeutils::CubeError;
@@ -28,7 +28,7 @@ impl BaseTimeDimension {
     pub fn try_new(
         dimension: String,
         query_tools: Rc<QueryTools>,
-        member_evaluator: Rc<DimensionEvaluator>,
+        member_evaluator: Rc<EvaluationNode>,
         granularity: Option<String>,
         date_range: Vec<String>,
         index: usize,

@@ -1,8 +1,9 @@
 use super::dependecy::Dependency;
-use super::{evaluate_sql, MemberEvaluator, MemberEvaluatorFactory};
+use super::{EvaluationNode, MemberEvaluatorType};
+use super::{MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -13,8 +14,6 @@ pub struct MeasureEvaluator {
     name: String,
     definition: Rc<dyn MeasureDefinition>,
     member_sql: Rc<dyn MemberSql>,
-
-    deps: Vec<Dependency>,
 }
 
 impl MeasureEvaluator {
@@ -23,15 +22,13 @@ impl MeasureEvaluator {
         name: String,
         member_sql: Rc<dyn MemberSql>,
         definition: Rc<dyn MeasureDefinition>,
-        deps: Vec<Dependency>,
-    ) -> Rc<Self> {
-        Rc::new(Self {
+    ) -> Self {
+        Self {
             cube_name,
             name,
             member_sql,
             definition,
-            deps,
-        })
+        }
     }
 
     fn is_calculated(&self) -> bool {
@@ -40,22 +37,13 @@ impl MeasureEvaluator {
             _ => false,
         }
     }
-}
 
-impl MemberEvaluator for MeasureEvaluator {
-    fn evaluate(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
-        let primary_keys = tools
-            .cube_evaluator()
-            .static_data()
-            .primary_keys
-            .get(&self.cube_name)
-            .unwrap();
-
-        let sql = tools.auto_prefix_with_cube_name(
-            &self.cube_name,
-            &evaluate_sql(tools.clone(), self.member_sql.clone(), &self.deps)?,
-        );
-
+    pub fn default_evaluate_sql(
+        &self,
+        args: Vec<MemberSqlArg>,
+        tools: Rc<QueryTools>,
+    ) -> Result<String, CubeError> {
+        let sql = tools.auto_prefix_with_cube_name(&self.cube_name, &self.member_sql.call(args)?);
         if self.is_calculated() {
             Ok(sql)
         } else {
@@ -63,9 +51,11 @@ impl MemberEvaluator for MeasureEvaluator {
             Ok(format!("{}({})", measure_type, sql))
         }
     }
+}
 
-    fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
-        self.clone()
+impl MemberEvaluator for MeasureEvaluator {
+    fn cube_name(&self) -> &String {
+        &self.cube_name
     }
 }
 
@@ -76,11 +66,9 @@ pub struct MeasureEvaluatorFactory {
     definition: Rc<dyn MeasureDefinition>,
 }
 
-impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
-    type Result = MeasureEvaluator;
-
-    fn try_new(
-        full_name: String,
+impl MeasureEvaluatorFactory {
+    pub fn try_new(
+        full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
     ) -> Result<Self, CubeError> {
         let mut iter = cube_evaluator
@@ -109,7 +97,9 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
             definition,
         })
     }
+}
 
+impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
@@ -126,15 +116,16 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
         }
     }
 
-    fn build(self, deps: Vec<Dependency>) -> Result<Rc<Self::Result>, CubeError> {
+    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self {
             cube_name,
             name,
             sql,
             definition,
         } = self;
-        Ok(MeasureEvaluator::new(
-            cube_name, name, sql, definition, deps,
+        Ok(EvaluationNode::new_measure(
+            MeasureEvaluator::new(cube_name, name, sql, definition),
+            deps,
         ))
     }
 }

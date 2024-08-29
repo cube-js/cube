@@ -1,7 +1,7 @@
 use super::{
     Compiler, CubeNameEvaluator, CubeNameEvaluatorFactory, DimensionEvaluator,
-    DimensionEvaluatorFactory, MeasureEvaluator, MeasureEvaluatorFactory, MemberEvaluator,
-    MemberEvaluatorFactory,
+    DimensionEvaluatorFactory, EvaluationNode, MeasureEvaluator, MeasureEvaluatorFactory,
+    MemberEvaluator, MemberEvaluatorFactory,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{self, MemberSql};
@@ -10,15 +10,15 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct StructDependency {
-    pub sql_fn: Option<Rc<dyn MemberEvaluator>>,
-    pub to_string_fn: Option<Rc<dyn MemberEvaluator>>,
+    pub sql_fn: Option<Rc<EvaluationNode>>,
+    pub to_string_fn: Option<Rc<EvaluationNode>>,
     pub properties: HashMap<String, Dependency>,
 }
 
 impl StructDependency {
     pub fn new(
-        sql_fn: Option<Rc<dyn MemberEvaluator>>,
-        to_string_fn: Option<Rc<dyn MemberEvaluator>>,
+        sql_fn: Option<Rc<EvaluationNode>>,
+        to_string_fn: Option<Rc<EvaluationNode>>,
         properties: HashMap<String, Dependency>,
     ) -> Self {
         StructDependency {
@@ -30,7 +30,7 @@ impl StructDependency {
 }
 
 pub enum Dependency {
-    SingleDependency(Rc<dyn MemberEvaluator>),
+    SingleDependency(Rc<EvaluationNode>),
     StructDependency(StructDependency),
 }
 
@@ -83,7 +83,7 @@ impl<'a> DependenciesBuilder<'a> {
                     unimplemented!()
                 };
                 let mut sql_fn = None;
-                let mut to_string_fn: Option<Rc<dyn MemberEvaluator>> = None;
+                let mut to_string_fn: Option<Rc<EvaluationNode>> = None;
                 let mut properties = HashMap::new();
                 for child_ind in childs[i].iter() {
                     let name = &call_deps[*child_ind].name;
@@ -92,7 +92,7 @@ impl<'a> DependenciesBuilder<'a> {
                     } else if name.as_str() == "toString" {
                         to_string_fn = Some(
                             self.compiler
-                                .add_evaluator::<CubeNameEvaluatorFactory>(new_cube_name.clone())?,
+                                .add_cube_name_evaluator(new_cube_name.clone())?,
                         );
                     } else {
                         properties.insert(
@@ -126,18 +126,14 @@ impl<'a> DependenciesBuilder<'a> {
         &mut self,
         cube_name: &String,
         name: &String,
-    ) -> Result<Rc<dyn MemberEvaluator>, CubeError> {
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
         let dep_full_name = format!("{}.{}", cube_name, name);
         //FIXME avoid cloning
         let dep_path = vec![cube_name.clone(), name.clone()];
         if self.cube_evaluator.is_measure(dep_path.clone())? {
-            Ok(self
-                .compiler
-                .add_evaluator::<MeasureEvaluatorFactory>(dep_full_name)?)
+            Ok(self.compiler.add_measure_evaluator(dep_full_name)?)
         } else if self.cube_evaluator.is_dimension(dep_path.clone())? {
-            Ok(self
-                .compiler
-                .add_evaluator::<DimensionEvaluatorFactory>(dep_full_name)?)
+            Ok(self.compiler.add_dimension_evaluator(dep_full_name)?)
         } else {
             Err(CubeError::internal(format!(
                 "Cannot resolve dependency {} of member {}.{}",

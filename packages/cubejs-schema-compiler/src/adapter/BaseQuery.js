@@ -262,6 +262,10 @@ export class BaseQuery {
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
+
+    /* console.log("!!!! join hints ", this.allJoinHints);
+    console.log("!!!! join ", this.join);
+    console.log("!!!! join 2 ", this.join.joins[0].join); */
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -637,6 +641,7 @@ export class BaseQuery {
       timeDimensions: this.options.timeDimensions,
       timezone: this.options.timezone,
       joinRoot: this.join.root,
+      joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
       filters: this.options.filters,
       baseTools: this,

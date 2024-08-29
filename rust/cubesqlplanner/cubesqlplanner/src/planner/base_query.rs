@@ -4,6 +4,7 @@ use super::sql_evaluator::Compiler;
 use super::{BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, IndexedMember};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::plan::{Expr, Filter, FilterItem, From, GenerationPlan, OrderBy, Select};
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -16,13 +17,13 @@ use std::rc::Rc;
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
     query_tools: Rc<QueryTools>,
-    evaluator_compiler: Rc<Compiler>,
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
-    join_root: String, //TODO temporary
+    all_join_hints: Vec<String>,
+    join: Rc<dyn JoinDefinition>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -30,8 +31,13 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
-        let query_tools = QueryTools::try_new(options.cube_evaluator()?, options.base_tools()?)?;
-        let mut evaluator_compiler = Compiler::new(query_tools.cube_evaluator().clone());
+        let query_tools = QueryTools::try_new(
+            options.cube_evaluator()?,
+            options.base_tools()?,
+            options.join_graph()?,
+        )?;
+        let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
 
         let mut base_index = 1;
         let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
@@ -99,16 +105,21 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         }
         let (dimensions_filters, measures_filters) = filter_compiler.extract_result();
 
+        let all_join_hints = evaluator_compiler.join_hints();
+        let join = query_tools
+            .join_graph()
+            .build_join(all_join_hints.clone())?;
+
         Ok(Self {
             context,
             query_tools,
-            evaluator_compiler: Rc::new(evaluator_compiler),
             measures,
             dimensions,
             time_dimensions,
             dimensions_filters,
             measures_filters,
-            join_root: options.static_data().join_root.clone().unwrap(),
+            all_join_hints,
+            join,
         })
     }
 
@@ -149,7 +160,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         };
         let select = Select {
             projection: self.simple_projection()?,
-            from: From::Cube(self.cube_from_path(self.join_root.clone())?),
+            from: From::Cube(self.cube_from_path(self.join.static_data().root.clone())?),
             filter,
             group_by: self.group_by(),
             having,

@@ -56,6 +56,10 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             type: 'number',
             sql: \`\${CUBE}.id\`,
           },
+          other_id: {
+            type: 'number',
+            sql: 'other_id',
+          },
           type: {
             type: 'string',
             sql: 'type'

@@ -50,7 +50,7 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
       });
-      const queryAndParams = query.buildSqlAndParams();
+      const queryAndParams = query.buildSqlAndParamsTest();
       const expected = 'SELECT\n' +
           '      count("cards".id) "cards__count"\n' +
           '    FROM\n' +
@@ -875,6 +875,48 @@ describe('SQL Generation', () => {
     });
   });
 
+  describe('Base joins', () => {
+    const compilers = /** @type Compilers */ prepareCompiler([
+      createCubeSchema({
+        name: 'cardsA',
+        sqlTable: 'card_tbl',
+        joins: `{
+          cardsB: {
+            sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+            relationship: 'one_to_one'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsB',
+        sqlTable: 'card2_tbl',
+      }),
+
+    ]);
+
+    it('Base joins - one-one join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsA.type',
+          'cardsB.type'
+        ],
+        measures: [
+          'cardsA.count',
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParamsTest();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
+      /* expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', '3'];
+      expect(queryAndParams[1]).toEqual(expectedParams); */
+    });
+  });
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
