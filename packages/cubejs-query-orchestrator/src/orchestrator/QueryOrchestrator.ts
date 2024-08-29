@@ -4,7 +4,7 @@ import { EventEmitterInterface } from '@cubejs-backend/event-emitter';
 import { getEnv } from '@cubejs-backend/shared';
 import { CubeStoreDriver } from '@cubejs-backend/cubestore-driver';
 
-import { QueryCache, QueryBody, TempTable } from './QueryCache';
+import {QueryCache, QueryBody, TempTable, Query} from './QueryCache';
 import { PreAggregations, PreAggregationDescription, getLastUpdatedAtTimestamp } from './PreAggregations';
 import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
@@ -310,7 +310,7 @@ export class QueryOrchestrator {
     };
   }
 
-  public async loadRefreshKeys(query) {
+  public async loadRefreshKeys(query: QueryBody) {
     return this.queryCache.loadRefreshKeysFromQuery(query);
   }
 
