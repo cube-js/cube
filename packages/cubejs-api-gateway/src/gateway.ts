@@ -545,7 +545,6 @@ class ApiGateway {
     res: ResponseResultFn,
     queryingOptions: any
   }) {
-    console.log('Scheduled Refresh Requested');
     const requestStarted = new Date();
     try {
       await this.assertApiScope('jobs', context.securityContext);

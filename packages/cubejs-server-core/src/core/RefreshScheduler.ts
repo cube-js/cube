@@ -337,8 +337,7 @@ export class RefreshScheduler {
     const compilers = await compilerApi.getCompilers();
     const queryForEvaluation = await compilerApi.createQueryByDataSource(compilers, {});
     const cubeNames = queryForEvaluation.cubeEvaluator.cubeNames();
-    console.log('running refresh for cubes', cubeNames);
-
+    console.log('running refresh for cubes', cubeNames.length);
     await Promise.all(cubeNames.map(async cube => {
       const cubeFromPath = queryForEvaluation.cubeEvaluator.cubeFromPath(cube);
       const measuresCount = Object.keys(cubeFromPath.measures || {}).length;
