@@ -922,7 +922,6 @@ export class QueryCache {
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      console.log('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       return fetchNew();
     }
 
