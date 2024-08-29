@@ -920,14 +920,6 @@ export class QueryCache {
       })
     );
 
-    if (options.forceNoCache) {
-      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      const prevValue = await this.cacheDriver.get(redisKey);
-      const newRes = await fetchNew();
-      this.emitEventWhenUpdatedUpdated(prevValue.result, newRes, options);
-      return newRes;
-    }
-
     let res;
 
     const inMemoryCacheDisablePeriod = 5 * 60 * 1000;
@@ -967,6 +959,13 @@ export class QueryCache {
 
     if (!res) {
       res = await this.cacheDriver.get(redisKey);
+    }
+
+    if (options.forceNoCache) {
+      this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+      const newRes = await fetchNew();
+      this.emitEventWhenUpdatedUpdated(res?.result ?? null, newRes, options);
+      return newRes;
     }
 
     if (res) {
