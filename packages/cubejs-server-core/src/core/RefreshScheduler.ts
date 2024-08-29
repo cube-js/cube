@@ -373,6 +373,7 @@ export class RefreshScheduler {
           cube,
           loadRefreshKeysOnly: true,
           forceNoCache: true,
+          isJob: true,
         });
       }));
     }));

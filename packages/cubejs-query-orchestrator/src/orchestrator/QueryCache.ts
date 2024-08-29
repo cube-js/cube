@@ -814,7 +814,6 @@ export class QueryCache {
       forceNoCache?: boolean;
     }
   ) {
-    console.log('run loadRefreshKeys with options;', JSON.stringify(options));
     return cacheKeyQueries.map((q) => {
       const [query, values, queryOptions]: QueryTuple = Array.isArray(q) ? q : [q, [], {}];
       return this.cacheQueryResult(
