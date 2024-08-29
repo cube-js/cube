@@ -36,6 +36,10 @@ class BigqueryFilter extends BaseFilter {
 }
 
 export class BigqueryQuery extends BaseQuery {
+  public castToString(sql) {
+    return `CAST(${sql} as STRING)`;
+  }
+
   public convertTz(field) {
     return `DATETIME(${field}, '${this.timezone}')`;
   }
