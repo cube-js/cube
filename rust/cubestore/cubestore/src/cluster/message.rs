@@ -2,7 +2,7 @@ use crate::metastore::{MetaStoreRpcMethodCall, MetaStoreRpcMethodResult};
 use crate::queryplanner::query_executor::SerializedRecordBatchStream;
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::CubeError;
-use arrow::datatypes::SchemaRef;
+use datafusion::arrow::datatypes::SchemaRef;
 use serde::{Deserialize, Serialize};
 use std::io::ErrorKind;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

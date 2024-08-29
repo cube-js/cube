@@ -11,8 +11,10 @@ interface CreateCubeSchemaOptions {
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cube('${name}', {
+        description: 'test cube from createCubeSchema',
+
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
         ${publicly !== undefined ? `public: ${publicly},` : ''}
@@ -22,6 +24,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         measures: {
           count: {
+            description: 'count measure from createCubeSchema',
             type: 'count'
           },
           sum: {
@@ -41,6 +44,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         dimensions: {
           id: {
             type: 'number',
+            description: 'id dimension from createCubeSchema',
             sql: 'id',
             primaryKey: true
           },
@@ -60,6 +64,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         segments: {
           sfUsers: {
+            description: 'SF users segment from createCubeSchema',
             sql: \`\${CUBE}.location = 'San Francisco'\`
           }
         },
@@ -67,7 +72,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         preAggregations: {
             ${preAggregations}
         }
-      }) 
+      })
   `;
 }
 
@@ -81,11 +86,11 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
 }
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}
-    
+
         measures:
           - name: count
             type: count

@@ -20,8 +20,8 @@ use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use arrow::datatypes::{Field, SchemaRef};
 use async_trait::async_trait;
+use datafusion::arrow::datatypes::{Field, SchemaRef};
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, Operator, UserDefinedLogicalNode};
@@ -1311,7 +1311,7 @@ fn pick_partitions(
     Ok(partition_snapshots)
 }
 
-fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
+fn partition_filter_schema(index: &IdRow<Index>) -> datafusion::arrow::datatypes::Schema {
     let schema_fields: Vec<Field>;
     schema_fields = index
         .get_row()
@@ -1320,7 +1320,7 @@ fn partition_filter_schema(index: &IdRow<Index>) -> arrow::datatypes::Schema {
         .map(|c| c.clone().into())
         .take(index.get_row().sort_key_size() as usize)
         .collect();
-    arrow::datatypes::Schema::new(schema_fields)
+    datafusion::arrow::datatypes::Schema::new(schema_fields)
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -1640,8 +1640,8 @@ pub fn get_worker_plan(
 pub mod tests {
     use std::sync::Arc;
 
-    use arrow::datatypes::Schema as ArrowSchema;
     use async_trait::async_trait;
+    use datafusion::arrow::datatypes::Schema as ArrowSchema;
     use datafusion::datasource::TableProvider;
     use datafusion::execution::context::ExecutionContext;
     use datafusion::logical_plan::LogicalPlan;
