@@ -1,8 +1,8 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
-import { parseSqlInterval } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
