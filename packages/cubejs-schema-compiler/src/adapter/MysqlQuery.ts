@@ -28,6 +28,10 @@ export class MysqlQuery extends BaseQuery {
     return new MysqlFilter(this, filter);
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as CHAR)`;
+  }
+
   public convertTz(field) {
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
