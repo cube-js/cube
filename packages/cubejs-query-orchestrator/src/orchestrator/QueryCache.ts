@@ -46,6 +46,7 @@ export type Query = {
   groupedPartitionPreAggregations?: PreAggregationDescription[][];
   preAggregationsLoadCacheByDataSource?: any;
   renewQuery?: boolean;
+  forceNoCache?: boolean;
   securityContext?: any;
   compilerCacheFn?: <T>(subKey: string[], cacheFn: () => T) => T;
 };
@@ -795,6 +796,7 @@ export class QueryCache {
           dataSource: query.dataSource,
           renewedCube: query.cube,
           requestContext: query.requestContext,
+          forceNoCache: query.forceNoCache,
         }
       )
     );
@@ -809,6 +811,7 @@ export class QueryCache {
       dataSource: string;
       renewedCube?: string;
       requestContext?: any;
+      forceNoCache?: boolean;
     }
   ) {
     return cacheKeyQueries.map((q) => {
@@ -829,6 +832,7 @@ export class QueryCache {
           renewedCube: options.renewedCube,
           requestContext: options.requestContext,
           isScheduledRefresh: true,
+          forceNoCache: options.forceNoCache,
         },
       );
     });
