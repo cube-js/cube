@@ -58,6 +58,14 @@ export class MssqlQuery extends BaseQuery {
     return new MssqlFilter(this, filter);
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as VARCHAR)`;
+  }
+
+  public concatStringsSql(strings: string[]) {
+    return strings.join(' + ');
+  }
+
   public convertTz(field) {
     return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
