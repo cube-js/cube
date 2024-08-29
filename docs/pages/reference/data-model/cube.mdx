@@ -6,9 +6,12 @@ redirect_from:
 
 # Cubes
 
-A `cube` represents a table of data in Cube. Cubes are typically declared in
-separate files with one cube per file. Within each cube are definitions of
-measures, dimensions, and joins between cubes.
+A `cube` represents a table of data in Cube.
+
+Cubes are typically declared in separate files with one cube per file.
+Within each cube are definitions of [measures][ref-ref-measures],
+[dimensions][ref-ref-dimensions], [segments][ref-ref-segments],
+[joins][ref-ref-joins] between cubes, and [pre-aggregations][ref-ref-pre-aggs].
 
 <CodeTabs>
 
@@ -588,3 +591,8 @@ cubes:
 [ref-restapi-sql]: /reference/rest-api#v1sql
 [ref-sec-ctx]: /product/auth/context
 [ref-naming]: /product/data-modeling/syntax#naming
+[ref-ref-measures]: /reference/data-model/measures
+[ref-ref-dimensions]: /reference/data-model/dimensions
+[ref-ref-segments]: /reference/data-model/segments
+[ref-ref-joins]: /reference/data-model/joins
+[ref-ref-pre-aggs]: /reference/data-model/pre-aggregations
