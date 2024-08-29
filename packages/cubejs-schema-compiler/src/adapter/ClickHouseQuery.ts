@@ -2,6 +2,7 @@ import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
 import { BaseTimeDimension } from './BaseTimeDimension';
+import { parseSqlInterval } from '@cubejs-backend/shared';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'Day',
@@ -61,38 +62,72 @@ export class ClickHouseQuery extends BaseQuery {
     }
   }
 
-  public calcInterval(operation, date, interval) {
-    const [intervalValue, intervalUnit] = interval.split(' ');
-    // eslint-disable-next-line prefer-template
-    const fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + 's';
-    return `${fn}(${date}, ${intervalValue})`;
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = 'fromUnixTimestamp(0)';
+
+    return `date_add(${timeUnit},
+        FLOOR(
+          date_diff(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
+        ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
+        ${this.timeStampCast(`'${origin}'`)}
+    )`;
   }
 
-  public subtractInterval(date, interval) {
-    return this.calcInterval('subtract', date, interval);
+  private diffTimeUnitForInterval(interval: string): string {
+    if (/second/i.test(interval)) {
+      return 'second';
+    } else if (/minute/i.test(interval)) {
+      return 'minute';
+    } else if (/hour/i.test(interval)) {
+      return 'hour';
+    } else if (/day/i.test(interval)) {
+      return 'day';
+    } else if (/week/i.test(interval)) {
+      return 'day';
+    } else if (/month/i.test(interval)) {
+      return 'month';
+    } else if (/quarter/i.test(interval)) {
+      return 'month';
+    } else /* if (/year/i.test(interval)) */ {
+      return 'year';
+    }
   }
 
-  public addInterval(date, interval) {
-    return this.calcInterval('add', date, interval);
+  public subtractInterval(date: string, interval: string): string {
+    return `subDate(${date}, ${this.formatInterval(interval)})`;
   }
 
-  public timeStampCast(value) {
+  public addInterval(date: string, interval: string): string {
+    return `addDate(${date}, ${this.formatInterval(interval)})`;
+  }
+
+  /**
+   * The input interval with (possible) plural units, like "2 years", "3 months", "4 weeks", "5 days"...
+   * will be converted to ClickHouse form of sum of single intervals.
+   * @see https://clickhouse.com/docs/en/sql-reference/data-types/special-data-types/interval
+   */
+  private formatInterval(interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+
+    return Object.entries(intervalParsed)
+      .map(([key, value]) => `INTERVAL ${value} ${key.toUpperCase()}`)
+      .join(' + ');
+  }
+
+  public timeStampCast(value: string): string {
+    return this.dateTimeCast(value);
+  }
+
+  public dateTimeCast(value: string): string {
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-
-    //
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    //
-    // However parseDateTimeBestEffort works with ISO8601
-    //
-    return `parseDateTimeBestEffort(${value})`;
-  }
-
-  public dateTimeCast(value) {
-    // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-
-    //
-    // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    //
     // However parseDateTimeBestEffort works with ISO8601
     //
     return `parseDateTimeBestEffort(${value})`;
