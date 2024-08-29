@@ -372,6 +372,7 @@ export class RefreshScheduler {
           scheduledRefresh: true,
           cube,
           loadRefreshKeysOnly: true,
+          forceNoCache: true,
         });
       }));
     }));
