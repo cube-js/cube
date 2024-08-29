@@ -922,7 +922,10 @@ export class QueryCache {
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      const prevValue = await this.cacheDriver.get(redisKey);
+      const newRes = await fetchNew();
+      this.emitEventWhenUpdatedUpdated(prevValue.result, newRes, options);
+      return newRes;
     }
 
     let res;
@@ -989,7 +992,6 @@ export class QueryCache {
           parsedResult.renewalKey !== renewalKey
         )
       ) {
-
         // RENE CHECK
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
@@ -1060,7 +1062,7 @@ export class QueryCache {
       isScheduledRefresh?: boolean,
     }
   ) {
-    if (!options.isScheduledRefresh || !options.renewedCube) {
+    if (!options.renewedCube) {
       return;
     }
 
