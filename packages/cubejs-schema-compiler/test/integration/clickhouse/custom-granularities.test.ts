@@ -16,7 +16,7 @@ describe('Custom Granularities', () => {
       sql: >
         SELECT
             num + 1 AS order_id,
-            DATE_ADD(TIMESTAMP ('2024-01-01'), INTERVAL (num * 2) WEEK) AS created_at,
+            DATE_ADD(toDateTime('2024-01-01'), INTERVAL (num * 2) WEEK) AS created_at,
             CASE
                 WHEN (num + 1) % 3 = 1 THEN 'processing'
                 WHEN (num + 1) % 3 = 2 THEN 'completed'
