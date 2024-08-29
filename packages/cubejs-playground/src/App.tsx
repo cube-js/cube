@@ -103,24 +103,28 @@ class App extends Component<RouteComponentProps, AppState> {
       <LivePreviewContextProvider
         disabled={context!.livePreview == null || !context!.livePreview}
       >
-        <Root>
-          <Layout>
-            <GlobalStyles />
+        <Root
+          styles={{
+            height: 'min 100vh',
+            display: 'grid',
+            gridTemplateRows: 'min-content 1fr',
+          }}
+        >
+          <GlobalStyles />
 
-            <Header selectedKeys={[location.pathname]} />
+          <Header selectedKeys={[location.pathname]} />
 
-            <StyledLayoutContent>
-              {fatalError ? (
-                <Alert
-                  message="Error occured while rendering"
-                  description={fatalError.stack || ''}
-                  type="error"
-                />
-              ) : (
-                children
-              )}
-            </StyledLayoutContent>
-          </Layout>
+          <StyledLayoutContent>
+            {fatalError ? (
+              <Alert
+                message="Error occured while rendering"
+                description={fatalError.stack || ''}
+                type="error"
+              />
+            ) : (
+              children
+            )}
+          </StyledLayoutContent>
         </Root>
       </LivePreviewContextProvider>
     );
