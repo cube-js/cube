@@ -14,15 +14,15 @@ export function PivotAxes({
 }) {
   return (
     <DragDropContext
-      onDragEnd={({ source, destination }: fakeAny) => {
+      onDragEnd={({ source, destination }) => {
         if (!destination) {
           return;
         }
         onMove({
           sourceIndex: source.index,
           destinationIndex: destination.index,
-          sourceAxis: source.droppableId,
-          destinationAxis: destination.droppableId,
+          sourceAxis: source.droppableId as 'x' | 'y',
+          destinationAxis: destination.droppableId as 'x' | 'y',
         });
       }}
     >

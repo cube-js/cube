@@ -81,7 +81,7 @@ const LegendTextElement = tasty({
 function isValidISOTimestamp(timestamp: string) {
   try {
     return new Date(timestamp + 'Z').toISOString() === timestamp + 'Z';
-  } catch (e) {
+  } catch (e: any) {
     return false;
   }
 }
@@ -133,7 +133,7 @@ function CartesianChart({
     (item) => {
       try {
         return formatDate(item);
-      } catch (e) {
+      } catch (e: any) {
         return item;
       }
     },
@@ -453,7 +453,7 @@ const TypeToChartComponent = {
                           granularity as TimeDimensionGranularity
                         )
                       : text;
-                  } catch (e) {
+                  } catch (e: any) {
                     return text;
                   }
                 }

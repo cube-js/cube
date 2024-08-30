@@ -62,8 +62,8 @@
     "vite-plugin-environment": "^1.1.3"
   },
   "devDependencies": {
-    "@ant-design/compatible": "^1.0.2",
-    "@ant-design/icons": "^4.7.0",
+    "@ant-design/compatible": "^1.0.1",
+    "@ant-design/icons": "^5.3.5",
     "@cube-dev/ui-kit": "0.37.2",
     "@cubejs-client/core": "^0.35.23",
     "@cubejs-client/react": "^0.35.48",
@@ -72,7 +72,6 @@
     "@types/react": "^18.3.4",
     "@types/react-beautiful-dnd": "^13.0.0",
     "@types/react-dom": "^18.3.0",
-    "@types/react-router": "^5.1.20",
     "@types/react-router-dom": "^5.3.3",
     "@types/styled-components": "^5.1.34",
     "@types/uuid": "^8.3.1",

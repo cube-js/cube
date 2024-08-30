@@ -1,7 +1,7 @@
 import { Filter, Query } from '@cubejs-client/core';
 
 export function getJoinedCubesAndMembers(query: Query) {
-  const joinedMembers = [];
+  const joinedMembers: string[] = [];
 
   joinedMembers.push(...(query?.dimensions || []));
   joinedMembers.push(...(query?.measures || []));

@@ -81,7 +81,7 @@ export function SecurityContext() {
     try {
       JSON.parse(value);
       setIsJsonValid(true);
-    } catch (error) {
+    } catch (error: any) {
       setIsJsonValid(false);
     }
   }
@@ -100,7 +100,7 @@ export function SecurityContext() {
         await saveToken(
           await onTokenPayloadChange(JSON.parse(tmpPayload || '{}'), null)
         );
-      } catch (error) {
+      } catch (error: any) {
         console.error(error);
       }
 

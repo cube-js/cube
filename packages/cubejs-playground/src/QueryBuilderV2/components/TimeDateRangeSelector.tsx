@@ -11,7 +11,7 @@ export function TimeDateRangeSelector(props: TimeDateRangeSelectorProps) {
   const { value, onChange } = props;
 
   const onChangeHandler = useCallback(
-    (val: fakeAny) => {
+    (val: any) => {
       onChange([
         val.start.toString().split(/[+\]]/)[0].replace('T00:00:00', ''),
         val.end.toString().split(/[+\]]/)[0].replace('T00:00:00', ''),

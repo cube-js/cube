@@ -13,7 +13,7 @@ export function TimeDateSelector(props: TimeDateSelectorProps) {
   const { value, onChange } = props;
 
   const onChangeHandler = useCallback(
-    (val: fakeAny) => {
+    (val: any) => {
       onChange(val.toString().split(/[+\]]/)[0]);
     },
     [onChange]

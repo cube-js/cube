@@ -18,7 +18,7 @@ interface PasteQueryDialogFormProps {
 function validateJsonQuery(json: string) {
   try {
     return validateQuery(JSON.parse(json));
-  } catch (e) {
+  } catch (e: any) {
     throw 'Invalid query';
   }
 }
@@ -69,7 +69,7 @@ const JSON_VALIDATOR = {
   async validator(rule: ValidationRule, value: string) {
     try {
       JSON.parse(value);
-    } catch (e) {
+    } catch (e: any) {
       throw ''; // do not show any error message
     }
   },
@@ -129,7 +129,7 @@ export function EditQueryDialogForm(props: PasteQueryDialogFormProps) {
           throw '';
         }
       );
-    } catch (e) {
+    } catch (e: any) {
       // do nothing
     }
   }, [meta]);

@@ -109,7 +109,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
   if (firstRun) {
     try {
       defaultQuery = queryValidation(defaultQuery || {});
-    } catch (e) {
+    } catch (e: any) {
       console.error('Invalid default query', e);
       defaultQuery = {};
     }
@@ -350,7 +350,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
         return originalHash !== getQueryHash(validatedQuery)
           ? validatedQuery
           : originalQuery;
-      } catch (e) {
+      } catch (e: any) {
         console.error('An invalid query has been set', query);
 
         return originalQuery;
@@ -395,7 +395,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
         });
 
         return originalHash !== getQueryHash(query) ? query : originalQuery;
-      } catch (e) {
+      } catch (e: any) {
         console.error('An invalid query has been set', query);
 
         return originalQuery;

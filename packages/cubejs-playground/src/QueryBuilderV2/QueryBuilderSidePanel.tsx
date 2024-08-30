@@ -296,7 +296,7 @@ export function QueryBuilderSidePanel({
       const validatedQuery = validateQuery(query);
 
       setQuery(validatedQuery);
-    } catch (e) {
+    } catch (e: any) {
       throw 'Invalid query';
     }
   }, []);

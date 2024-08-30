@@ -36,7 +36,7 @@ export function QueryBuilderSQL() {
         const converter = new CubeSQLConverter(query, meta.meta);
 
         sqlQuery = sqlFormatter.format(converter.buildQuery());
-      } catch (e) {
+      } catch (e: any) {
         return (
           <Block padding="1x">
             <Alert theme="danger">{e.message}</Alert>

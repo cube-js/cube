@@ -1,7 +1,7 @@
 /* eslint-disable no-undef,react/jsx-no-target-blank */
 import '@ant-design/compatible/assets/index.css';
 import { Alert, Layout } from 'antd';
-import { Component, useEffect } from 'react';
+import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
 import { Root, tasty } from '@cube-dev/ui-kit';
@@ -30,7 +30,7 @@ type AppState = {
   isAppContextSet: boolean;
 };
 
-class App extends Component<RouteComponentProps, AppState> {
+class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
   static getDerivedStateFromError(error) {
     return { fatalError: error };
   }

@@ -404,7 +404,7 @@ const ColumnHeader = tasty({
   },
 });
 
-const EMPTY_DATA: fakeAny[] = [];
+const EMPTY_DATA: any[] = [];
 
 const ReorderableMemberListElement = tasty({
   as: 'ul',
@@ -548,7 +548,7 @@ const ReorderableMemberElement = tasty({
 
 interface ReorderableMemberProps {
   item: AriaOptionProps;
-  state: ListState<fakeAny>;
+  state: ListState<any>;
   dragState: DraggableCollectionState;
   dropState: DroppableCollectionState;
 }
@@ -780,7 +780,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
           } else {
             return [formatDateByGranularity(new Date(value), 'second'), 'time'];
           }
-        } catch (e) {
+        } catch (e: any) {
           return [value, 'unknown'];
         }
       case 'boolean':
@@ -860,7 +860,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
                     value != null
                       ? formatDateByGranularity(new Date(value), timeDimension.granularity)
                       : '–';
-                } catch (e) {}
+                } catch (e: any) {}
 
                 const copyButton =
                   isSelected && value !== '–' ? <StyledCopyButton value={value} /> : null;

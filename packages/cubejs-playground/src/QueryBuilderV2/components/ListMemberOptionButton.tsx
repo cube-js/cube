@@ -47,7 +47,7 @@ export function ListMemberOptionButton(props: ListMemberOptionButtonProps) {
     }
   }
 
-  const disabledKeys = [];
+  const disabledKeys: string[] = [];
 
   if (!onAddFilter) {
     disabledKeys.push('filter');

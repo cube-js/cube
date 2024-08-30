@@ -3,9 +3,6 @@ import { SerializedResult } from '@cubejs-client/core';
 import { Button, Flex, Space, tasty, TooltipProvider } from '@cube-dev/ui-kit';
 import { PlayCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 
-import { RequestStatus } from '../RequestStatus';
-import { PreAggregationStatus } from '../PreAggregationStatus';
-
 import { QueryBuilderError } from './QueryBuilderError';
 import { useQueryBuilderContext } from './context';
 import { PreAggregationAlerts } from './components/PreAggregationAlerts';

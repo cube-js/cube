@@ -63,7 +63,7 @@ export function convertJsonQueryToGraphQL({
     const converter = new CubeGraphQLConverter(query, types);
 
     return converter.convert();
-  } catch (error) {
+  } catch (error: any) {
     return `# ${error}\n`;
   }
 }
