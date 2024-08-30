@@ -552,7 +552,9 @@ class ApiGateway {
       const refreshScheduler = this.refreshScheduler();
       res(await refreshScheduler.runScheduledRefresh(context, {
         ...this.parseQueryParam(queryingOptions || {}),
-        throwErrors: true
+        throwErrors: true,
+        forceNoCache: true,
+        isJob: true,
       }));
     } catch (e: any) {
       this.handleError({

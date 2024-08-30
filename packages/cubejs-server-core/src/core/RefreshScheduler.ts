@@ -24,7 +24,9 @@ type ScheduledRefreshQueryingOptions = Required<ScheduledRefreshOptions, 'concur
     securityContext: object,
   };
   cacheOnly?: boolean,
-  timezones: string[]
+  timezones: string[],
+  forceNoCache?: boolean,
+  isJob?: boolean,
 };
 
 type PreAggregationsQueryingOptions = {
@@ -371,8 +373,8 @@ export class RefreshScheduler {
           scheduledRefresh: true,
           cube,
           loadRefreshKeysOnly: true,
-          forceNoCache: true,
-          isJob: true,
+          forceNoCache: queryingOptions.forceNoCache ?? false,
+          isJob: queryingOptions.isJob ?? false,
         });
       }));
     }));
