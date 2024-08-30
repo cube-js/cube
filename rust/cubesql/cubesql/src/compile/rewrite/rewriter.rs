@@ -560,40 +560,35 @@ pub trait RewriteRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
 }
 
-struct IncrementalScheduler {
-    current_iter: usize,
-    current_eclasses: Vec<Id>,
-}
-
-impl Default for IncrementalScheduler {
-    fn default() -> Self {
-        Self {
-            current_iter: usize::MAX, // force an update on the first iteration
-            current_eclasses: Default::default(),
-        }
-    }
-}
+#[derive(Default)]
+struct IncrementalScheduler;
 
 impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for IncrementalScheduler {
-    fn search_rewrite<'a>(
+    fn search_rewrites<'a>(
         &mut self,
         iteration: usize,
         egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        rewrite: &'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> Vec<egg::SearchMatches<'a, LogicalPlanLanguage>> {
-        if iteration != self.current_iter {
-            self.current_iter = iteration;
-            self.current_eclasses.clear();
-            self.current_eclasses
-                .extend(egraph.classes().filter_map(|class| {
-                    (class.data.iteration_timestamp >= iteration).then(|| class.id)
-                }));
+        rewrites: &[&'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>],
+        _limits: &egg::RunnerLimits,
+    ) -> egg::RunnerResult<Vec<Vec<egg::SearchMatches<'a, LogicalPlanLanguage>>>> {
+        use rayon::prelude::*;
+        let eclasses: Vec<Id> = egraph
+            .classes()
+            .filter_map(|class| (class.data.iteration_timestamp >= iteration).then(|| class.id))
+            .collect();
+        let f = |rewrite: &&'a Rewrite<_, _>| {
+            rewrite.searcher.search_eclasses_with_limit(
+                egraph,
+                &mut eclasses.iter().copied(),
+                usize::MAX,
+            )
         };
-        assert_eq!(iteration, self.current_iter);
-        rewrite.searcher.search_eclasses_with_limit(
-            egraph,
-            &mut self.current_eclasses.iter().copied(),
-            usize::MAX,
-        )
+        let do_parallel = true;
+        let matches = if do_parallel {
+            rewrites.par_iter().map(f).collect()
+        } else {
+            rewrites.iter().map(f).collect()
+        };
+        Ok(matches)
     }
 }
