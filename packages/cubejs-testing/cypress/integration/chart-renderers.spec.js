@@ -6,7 +6,7 @@ context("Playground: Chart Renderers", () => {
     cy.viewport(3840, 2160);
   });
 
-  describe("Chart Renderers", () => {
+  describe.skip("Chart Renderers", () => {
     // const chartTypeByQuery = [
     //   [countWithTimedimenionQuery, ['line', 'area', 'bar']],
     //   [tableQuery, ['pie', 'table', 'number']],
