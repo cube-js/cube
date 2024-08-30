@@ -16,15 +16,16 @@ class DruidFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type: string) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `${column}${not ? ' NOT' : ''} LIKE CONCAT('${p}', ${this.allocateParam(param)}, '${s}')`;
+    return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}')`;
   }
+
 }
 
 export class DruidQuery extends BaseQuery {
   public newFilter(filter) {
     return new DruidFilter(this, filter);
   }
-  
+
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
   }
