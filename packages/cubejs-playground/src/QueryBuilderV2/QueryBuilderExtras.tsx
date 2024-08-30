@@ -336,6 +336,7 @@ export function QueryBuilderExtras() {
     return (
       <DialogTrigger type="popover" placement="bottom end">
         <Button
+          qa="OrderButton"
           type={sortedFields.length ? 'primary' : 'secondary'}
           size="small"
           rightIcon={<ArrowIcon direction="bottom" />}

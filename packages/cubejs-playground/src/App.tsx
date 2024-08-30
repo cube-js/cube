@@ -19,6 +19,8 @@ import {
   trackImpl,
 } from './events';
 import { useAppContext } from './hooks';
+import { QUERY_BUILDER_COLOR_TOKENS } from './QueryBuilderV2';
+
 const StyledLayoutContent = styled(Layout.Content)`
   height: 100%;
 `;
@@ -28,6 +30,13 @@ type AppState = {
   context: PlaygroundContext | null;
   showLoader: boolean;
   isAppContextSet: boolean;
+};
+
+const ROOT_STYLES = {
+  height: 'min 100vh',
+  display: 'grid',
+  gridTemplateRows: 'min-content 1fr',
+  ...QUERY_BUILDER_COLOR_TOKENS,
 };
 
 class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
@@ -103,13 +112,7 @@ class App extends Component<PropsWithChildren<RouteComponentProps>, AppState> {
       <LivePreviewContextProvider
         disabled={context!.livePreview == null || !context!.livePreview}
       >
-        <Root
-          styles={{
-            height: 'min 100vh',
-            display: 'grid',
-            gridTemplateRows: 'min-content 1fr',
-          }}
-        >
+        <Root styles={ROOT_STYLES}>
           <GlobalStyles />
 
           <Header selectedKeys={[location.pathname]} />
