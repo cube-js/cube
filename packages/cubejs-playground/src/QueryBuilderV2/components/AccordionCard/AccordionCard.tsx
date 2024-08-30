@@ -4,6 +4,7 @@ import { Accordion, AccordionItemProps } from '../Accordion';
 
 export interface AccordionCardProps extends AccordionItemProps {
   noPadding?: boolean;
+  qa?: string;
 }
 
 const TITLE_STYLES = {
@@ -16,7 +17,7 @@ const CONTENT_STYLES = {
 };
 
 export function AccordionCard(props: AccordionCardProps) {
-  const { children, noPadding, ...restProps } = props;
+  const { qa, children, noPadding, ...restProps } = props;
 
   return (
     <Card padding="0" border={false}>
@@ -26,8 +27,10 @@ export function AccordionCard(props: AccordionCardProps) {
         titleStyles={TITLE_STYLES}
         contentStyles={CONTENT_STYLES}
       >
-        <Accordion.Item key="card" {...restProps}>
-          <Block>{typeof children === 'function' ? children() : children}</Block>
+        <Accordion.Item key="card" qa={qa} {...restProps}>
+          <Block>
+            {typeof children === 'function' ? children() : children}
+          </Block>
         </Accordion.Item>
       </Accordion>
     </Card>

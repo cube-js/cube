@@ -27,43 +27,52 @@
 // Cypress.Commands.overwrite("visit", (originalFn, url, options) => { ... })
 
 Cypress.on(
-  'uncaught:exception',
-  (err) => !err.message.includes('ResizeObserver')
+  "uncaught:exception",
+  (err) => !err.message.includes("ResizeObserver")
 );
 
-Cypress.Commands.add('getByTestId', (selector, ...args) => cy.get(`[data-testid='${selector}']`, ...args));
+Cypress.Commands.add("getByTestId", (selector, ...args) =>
+  cy.get(`[data-testid='${selector}']`, ...args)
+);
+Cypress.Commands.add("getByQa", (selector, ...args) =>
+  cy.get(`[data-qa='${selector}']`, ...args)
+);
 
-Cypress.Commands.add('setQuery', (query, ...args) => {
+Cypress.Commands.add("setQuery", (query, ...args) => {
   cy.clearLocalStorage(/queryTabs/);
   cy.visit(`/#/build?query=${JSON.stringify(query)}`, ...args);
   cy.wait(100);
 });
 
-Cypress.Commands.add('setChartType', (chartType) => {
-  cy.getByTestId('chart-type-btn').click();
-  cy.getByTestId('chart-type-dropdown').contains(chartType, { matchCase: false }).click();
+Cypress.Commands.add("setChartType", (chartType) => {
+  cy.getByTestId("[data-qa=RadioWrapper]")
+    .contains(chartType, { matchCase: false })
+    .click();
 });
 
-Cypress.Commands.add('runQuery', () => {
+Cypress.Commands.add("runQuery", () => {
   // it's currently not possible to wait for iframe requests to load
   // cy.intercept('get', '/cubejs-api/v1/load').as('load');
   // cy.wait(['@load']);
 
-  cy.getByTestId('run-query-btn', { timeout: 5 * 1000 })
-    .should('be.visible')
+  cy.getByQa("RunQueryButton", { timeout: 5 * 1000 })
+    .should("be.visible")
     .click();
-  cy.getByTestId('cube-loader', { timeout: 10 * 1000 }).should('not.exist');
+  cy.getByQa("RunQueryButton", { timeout: 10 * 1000 }).should(
+    "not.have.attr",
+    "disabled"
+  );
   cy.wait(100);
 });
 
-Cypress.Commands.add('addMeasure', (name) => {
-  cy.getByTestId('Measure', { timeout: 5 * 1000 }).click();
+Cypress.Commands.add("addMeasure", (name) => {
+  cy.getByTestId("Measure", { timeout: 5 * 1000 }).click();
   // Click bottom as top can be overflowed by the Search input
-  cy.getByTestId(name).click('bottom');
+  cy.getByTestId(name).click("bottom");
 });
 
-Cypress.Commands.add('addDimension', (name) => {
-  cy.getByTestId('Dimension', { timeout: 5 * 1000 }).click();
+Cypress.Commands.add("addDimension", (name) => {
+  cy.getByTestId("Dimension", { timeout: 5 * 1000 }).click();
   // Click bottom as top can be overflowed by the Search input
-  cy.getByTestId(name).click('bottom');
+  cy.getByTestId(name).click("bottom");
 });

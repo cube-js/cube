@@ -21,6 +21,7 @@ const StyledAccordionItemContent = tasty({
 
 export function AccordionItem(props: AccordionItemProps) {
   let {
+    qa,
     isExpanded,
     isDefaultExpanded,
     onToggle,
@@ -105,6 +106,7 @@ export function AccordionItem(props: AccordionItemProps) {
   return (
     <>
       <AccordionItemTitle
+        qa={qa}
         titleID={titleID}
         contentID={contentID}
         isExpanded={expanded}

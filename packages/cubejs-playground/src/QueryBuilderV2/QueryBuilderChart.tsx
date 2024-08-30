@@ -40,7 +40,10 @@ const ALLOWED_CHART_TYPES = ['table', 'line', 'bar', 'area'];
 
 export function QueryBuilderChart(props: QueryBuilderChartProps) {
   const [isVizardLoaded, setIsVizardLoaded] = useState(false);
-  const [isExpanded, setIsExpanded] = useLocalStorage('QueryBuilder:Chart:expanded', false);
+  const [isExpanded, setIsExpanded] = useLocalStorage(
+    'QueryBuilder:Chart:expanded',
+    false
+  );
   const { maxHeight = CHART_HEIGHT, onToggle } = props;
   let {
     query,
@@ -135,6 +138,7 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
 
   return (
     <AccordionCard
+      qa="QueryBuilderChart"
       isExpanded={isExpanded}
       title="Chart"
       subtitle={
@@ -222,7 +226,9 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
       }}
     >
       <>
-        {isLoading ? <Skeleton height={400} layout="chart" padding="0 1x 1x 1x" /> : undefined}
+        {isLoading ? (
+          <Skeleton height={400} layout="chart" padding="0 1x 1x 1x" />
+        ) : undefined}
         {chart}
       </>
     </AccordionCard>

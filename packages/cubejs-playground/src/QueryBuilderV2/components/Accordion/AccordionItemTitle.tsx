@@ -1,5 +1,11 @@
 import { memo, PropsWithChildren, ReactText, useState } from 'react';
-import { useFocus, useFocusVisible, useFocusWithin, useHover, usePress } from 'react-aria';
+import {
+  useFocus,
+  useFocusVisible,
+  useFocusWithin,
+  useHover,
+  usePress,
+} from 'react-aria';
 import { mergeProps, Styles, tasty, Text } from '@cube-dev/ui-kit';
 
 import { Arrow } from '../Arrow';
@@ -7,6 +13,7 @@ import { Arrow } from '../Arrow';
 import { AccordionItemProps, AccordionProps } from './types';
 
 export type AccordionItemTitleProps = {
+  qa?: string;
   title: AccordionItemProps['title'];
   subtitle: AccordionItemProps['subtitle'];
   extra: AccordionItemProps['extra'];
@@ -79,6 +86,7 @@ const ExpandArrowSection = tasty({
 
 export function AccordionItemTitle(props: AccordionItemTitleProps) {
   const {
+    qa,
     title,
     subtitle,
     extra,
@@ -97,14 +105,18 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
   const { hoverProps, isHovered } = useHover({});
   const { isFocusVisible } = useFocusVisible({});
   const { focusProps } = useFocus({ onFocusChange: setIsFocused });
-  const { focusWithinProps } = useFocusWithin({ onFocusWithinChange: setIsFocusWithin });
+  const { focusWithinProps } = useFocusWithin({
+    onFocusWithinChange: setIsFocusWithin,
+  });
   const { pressProps } = usePress({ onPress: onExpand });
 
   const shouldShowFocus = isFocusVisible && isFocused;
-  const hasUserHovered = isHovered || shouldShowFocus || (isFocusWithin && isFocusVisible);
+  const hasUserHovered =
+    isHovered || shouldShowFocus || (isFocusWithin && isFocusVisible);
 
   return (
     <StyledAccordionItemTitleWrap
+      qa={qa}
       data-size={size}
       aria-labelledby={titleID}
       mods={{ subtitle: !!subtitle }}
@@ -132,7 +144,9 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
   );
 }
 
-const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: { isExpanded: boolean }) {
+const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: {
+  isExpanded: boolean;
+}) {
   const { isExpanded } = props;
 
   return (
@@ -158,7 +172,10 @@ const AccordionItemContent = memo(function AccordionItemContent(props: {
 });
 
 function AccordionItemExtra(
-  props: PropsWithChildren<{ showExtra: AccordionItemProps['showExtra']; isHovered: boolean }>
+  props: PropsWithChildren<{
+    showExtra: AccordionItemProps['showExtra'];
+    isHovered: boolean;
+  }>
 ) {
   const { children, showExtra, isHovered } = props;
 
@@ -171,7 +188,10 @@ function AccordionItemExtra(
   return <ExtraSection mods={{ show }}>{children}</ExtraSection>;
 }
 
-function shouldShowExtra(showExtra: AccordionItemProps['showExtra'], isHovered: boolean) {
+function shouldShowExtra(
+  showExtra: AccordionItemProps['showExtra'],
+  isHovered: boolean
+) {
   if (typeof showExtra === 'boolean') {
     return showExtra;
   }

@@ -9,17 +9,26 @@ const StyledAccordion = tasty({
 });
 
 export function Accordion(props: AccordionProps) {
-  const { children, isLazy, size, isSeparated, titleStyles, contentStyles } = props;
+  const {
+    children,
+    qa,
+    isLazy,
+    size,
+    isSeparated,
+    titleStyles,
+    contentStyles,
+  } = props;
 
   return (
     <AccordionProvider
+      qa={qa}
       isLazy={isLazy}
       size={size}
       isSeparated={isSeparated}
       titleStyles={titleStyles}
       contentStyles={contentStyles}
     >
-      <StyledAccordion>{children}</StyledAccordion>
+      <StyledAccordion qa={qa}>{children}</StyledAccordion>
     </AccordionProvider>
   );
 }
