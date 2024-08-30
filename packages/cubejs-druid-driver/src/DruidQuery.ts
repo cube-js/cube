@@ -18,7 +18,6 @@ class DruidFilter extends BaseFilter {
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
     return `LOWER(${column})${not ? ' NOT' : ''} LIKE CONCAT('${p}', LOWER(${this.allocateParam(param)}), '${s}')`;
   }
-
 }
 
 export class DruidQuery extends BaseQuery {
