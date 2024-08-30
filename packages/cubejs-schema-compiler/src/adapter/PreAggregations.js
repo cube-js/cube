@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 
@@ -76,7 +77,7 @@ export class PreAggregations {
           preAggregation.cube, this.addPartitionRangeTo(
             preAggregation,
             dimension,
-            partitionDimension.dateRange || partitionDimension.wildcardRange(),
+            partitionDimension.wildcardRange(),
             partitionDimension.boundaryDateRange || partitionDimension.dateRange
           )
         );
@@ -166,7 +167,7 @@ export class PreAggregations {
 
     const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
       this.query.timeDimensions.find(td => {
-        if (!td.dateRange) {
+        if (!td.dateRange || (!td.boundaryDateRange && td.dateRange[0] === FROM_PARTITION_RANGE && td.dateRange[1] === TO_PARTITION_RANGE)) {
           return false;
         }
 
@@ -832,7 +833,7 @@ export class PreAggregations {
 
     const canUsePreAggregation = this.canUsePreAggregationFn(query);
 
-    return R.pipe(
+    const d = R.pipe(
       R.map(cube => {
         const preAggregations =
           this.query.cubeEvaluator.preAggregationsForCube(cube);
@@ -855,6 +856,8 @@ export class PreAggregations {
       }),
       R.unnest
     )(query.collectCubeNames());
+
+    return d;
   }
 
   findRollupPreAggregationsForCube(cube, canUsePreAggregation, preAggregations) {
@@ -1107,6 +1110,7 @@ export class PreAggregations {
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
+
     return this.query.newSubQueryForCube(
       cube,
       {
