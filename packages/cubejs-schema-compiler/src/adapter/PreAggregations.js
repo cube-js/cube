@@ -833,7 +833,7 @@ export class PreAggregations {
 
     const canUsePreAggregation = this.canUsePreAggregationFn(query);
 
-    const d = R.pipe(
+    return R.pipe(
       R.map(cube => {
         const preAggregations =
           this.query.cubeEvaluator.preAggregationsForCube(cube);
@@ -856,8 +856,6 @@ export class PreAggregations {
       }),
       R.unnest
     )(query.collectCubeNames());
-
-    return d;
   }
 
   findRollupPreAggregationsForCube(cube, canUsePreAggregation, preAggregations) {
@@ -1110,7 +1108,6 @@ export class PreAggregations {
   rollupPreAggregationQuery(cube, aggregation) {
     const references = this.evaluateAllReferences(cube, aggregation);
     const cubeQuery = this.query.newSubQueryForCube(cube, {});
-
     return this.query.newSubQueryForCube(
       cube,
       {
