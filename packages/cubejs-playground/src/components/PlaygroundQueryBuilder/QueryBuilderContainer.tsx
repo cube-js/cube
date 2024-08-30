@@ -33,10 +33,20 @@ const StyledCard = styled(Card)`
   }
 `;
 
-function RequestStatusComponent({ isAggregated }: RequestStatusProps) {
+function RequestStatusComponent({
+  isAggregated,
+  external,
+  extDbType,
+  preAggregationType,
+}: RequestStatusProps) {
   return (
     <Space direction="vertical" gap="0" placeItems="end" margin="-1x 0">
-      <PreAggregationStatus isAggregated={isAggregated} />
+      <PreAggregationStatus
+        preAggregationType={preAggregationType}
+        isAggregated={isAggregated}
+        external={external}
+        extDbType={extDbType}
+      />
     </Space>
   );
 }
@@ -165,7 +175,7 @@ function QueryTabsRenderer({
             defaultQuery={query}
             defaultChartType={chartType}
             schemaVersion={props.schemaVersion}
-            extra={props.extra}
+            extra={props.extra ?? null}
             RequestStatusComponent={RequestStatusComponent}
             onSchemaChange={props.onSchemaChange}
             onQueryChange={(data) => {

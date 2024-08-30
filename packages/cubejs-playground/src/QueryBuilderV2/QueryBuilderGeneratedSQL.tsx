@@ -16,8 +16,14 @@ const EditSQLQueryButton = tasty(Button, {
 });
 
 export function QueryBuilderGeneratedSQL() {
-  let { query, queryHash, cubeApi, isQueryEmpty, verificationError, openSqlRunner } =
-    useQueryBuilderContext();
+  let {
+    query,
+    queryHash,
+    cubeApi,
+    isQueryEmpty,
+    verificationError,
+    openSqlRunner,
+  } = useQueryBuilderContext();
 
   return useDeepMemo(() => {
     if (!isQueryEmpty) {
@@ -55,7 +61,9 @@ export function QueryBuilderGeneratedSQL() {
                       Copy
                     </CopyButton>
                     {openSqlRunner ? (
-                      <EditSQLQueryButton onPress={() => openSqlRunner(value)} />
+                      <EditSQLQueryButton
+                        onPress={() => openSqlRunner?.(value)}
+                      />
                     ) : undefined}
                   </>
                 }

@@ -43,7 +43,9 @@ export function QueryBuilderToolBar() {
 
   const {
     requestId,
-    // dbType,
+    external,
+    dbType,
+    extDbType,
     usedPreAggregations = {},
   } = useMemo(() => {
     if (resultSet) {
@@ -55,6 +57,9 @@ export function QueryBuilderToolBar() {
     return {} as SerializedResult['loadResponse'];
   }, [resultSet]);
 
+  // @ts-ignore
+  const preAggregationType = Object.values(usedPreAggregations || {})[0]?.type;
+
   const isAggregated = Object.keys(usedPreAggregations).length > 0;
 
   return (
@@ -64,8 +69,9 @@ export function QueryBuilderToolBar() {
           <TooltipProvider
             title={
               <>
-                <kbd>⌘</kbd> + <kbd>Enter</kbd> <span style={{ padding: '0 16px' }}>OR</span>{' '}
-                <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
+                <kbd>⌘</kbd> + <kbd>Enter</kbd>{' '}
+                <span style={{ padding: '0 16px' }}>OR</span> <kbd>Ctrl</kbd> +{' '}
+                <kbd>Enter</kbd>
               </>
             }
           >
@@ -73,7 +79,12 @@ export function QueryBuilderToolBar() {
               qa="RunQueryButton"
               type="primary"
               size="small"
-              isDisabled={isQueryEmpty || !!verificationError || isVerifying || isApiBlocked}
+              isDisabled={
+                isQueryEmpty ||
+                !!verificationError ||
+                isVerifying ||
+                isApiBlocked
+              }
               isLoading={isLoading}
               icon={
                 !isQueryEmpty && (isLoading || !isQueryTouched) ? (
@@ -103,6 +114,10 @@ export function QueryBuilderToolBar() {
           <RequestStatusComponent
             requestId={requestId}
             isAggregated={isAggregated}
+            preAggregationType={preAggregationType}
+            external={external}
+            dbType={dbType}
+            extDbType={extDbType}
             error={error ?? undefined}
           />
         ) : undefined}

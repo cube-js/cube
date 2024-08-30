@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Block, Button, Divider, Flow, Menu, MenuTrigger, Space, tasty } from '@cube-dev/ui-kit';
+import {
+  Block,
+  Button,
+  Divider,
+  Flow,
+  Menu,
+  MenuTrigger,
+  Space,
+  tasty,
+} from '@cube-dev/ui-kit';
 import { PlusOutlined } from '@ant-design/icons';
 import { TCubeDimension, TCubeMeasure } from '@cubejs-client/core';
 
@@ -24,7 +33,11 @@ const BadgeContainer = tasty(Space, {
   },
 });
 
-export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: boolean) => void }) {
+export function QueryBuilderFilters({
+  onToggle,
+}: {
+  onToggle?: (isExpanded: boolean) => void;
+}) {
   const [listMode] = useListMode();
   const filtersRef = useRef<HTMLElement>(null);
   const {
@@ -39,7 +52,9 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
 
   const isCompact =
     Object.keys(queryStats).length === 1 &&
-    ((selectedCube && selectedCube === queryStats[selectedCube?.name]?.instance) || !selectedCube);
+    ((selectedCube &&
+      selectedCube === queryStats[selectedCube?.name]?.instance) ||
+      !selectedCube);
   const timeDimensions = query.timeDimensions || [];
   const filters = query.filters || [];
   const segments = query.segments || [];
@@ -67,7 +82,8 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
       return member.type === 'time' && !dateRanges.list.includes(member.name);
     }) || [];
 
-  const isFiltered = filters.length > 0 || segments.length > 0 || dateRanges.list.length > 0;
+  const isFiltered =
+    filters.length > 0 || segments.length > 0 || dateRanges.list.length > 0;
 
   const [isExpanded, setIsExpanded] = useState(isFiltered);
 
@@ -115,24 +131,29 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
 
   useEffect(() => {
     (
-      filtersRef?.current?.querySelector('button[data-is-invalid]') as HTMLButtonElement | undefined
+      filtersRef?.current?.querySelector('button[data-is-invalid]') as
+        | HTMLButtonElement
+        | undefined
     )?.click();
   }, [dateRanges.list.length]);
 
   useEffect(() => {
-    const invalidTime = filtersRef?.current?.querySelector('button[data-is-invalid]') as
-      | HTMLButtonElement
-      | undefined;
+    const invalidTime = filtersRef?.current?.querySelector(
+      'button[data-is-invalid]'
+    ) as HTMLButtonElement | undefined;
 
     if (invalidTime) {
       return;
     }
 
-    (
-      [...(filtersRef?.current?.querySelectorAll('button') ?? [])].slice(-1)[0] as
-        | HTMLButtonElement
-        | undefined
-    )?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const buttons = filtersRef?.current?.querySelectorAll('button');
+    const lastButton =
+      buttons && buttons.length > 0 ? buttons[buttons.length - 1] : undefined;
+
+    (lastButton as HTMLButtonElement | undefined)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   }, [query?.filters?.length, dateRanges.list.length, segments?.length]);
 
   return (
@@ -194,7 +215,9 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
               return null;
             }
 
-            const member = members.measures[filter.member] || members.dimensions[filter.member];
+            const member =
+              members.measures[filter.member] ||
+              members.dimensions[filter.member];
 
             return (
               <MemberFilter
@@ -242,14 +265,22 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                 >
                   Filter
                 </Button>
-                <Menu height="max 44x" onAction={(name) => addFilter(name as string)}>
+                <Menu
+                  height="max 44x"
+                  onAction={(name) => addFilter(name as string)}
+                >
                   {availableMeasuresAndDimensions.map((dimension) => {
                     return (
-                      <Menu.Item key={dimension.name} textValue={dimension.name}>
+                      <Menu.Item
+                        key={dimension.name}
+                        textValue={dimension.name}
+                      >
                         <Space
                           gap="1x"
                           color={`#${
-                            members.dimensions[dimension.name] ? 'dimension' : 'measure'
+                            members.dimensions[dimension.name]
+                              ? 'dimension'
+                              : 'measure'
                           }-text`}
                         >
                           {getTypeIcon(dimension.type)}
@@ -269,10 +300,16 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                 >
                   Date Range
                 </Button>
-                <Menu height="max 44x" onAction={(name) => addDateRange(name as string)}>
+                <Menu
+                  height="max 44x"
+                  onAction={(name) => addDateRange(name as string)}
+                >
                   {availableTimeDimensions.map((dimension) => {
                     return (
-                      <Menu.Item key={dimension.name} textValue={dimension.name}>
+                      <Menu.Item
+                        key={dimension.name}
+                        textValue={dimension.name}
+                      >
                         <Space color="#time-dimension-text">
                           {getTypeIcon('time')}
                           {dimension.name.split('.')[1]}
@@ -293,11 +330,19 @@ export function QueryBuilderFilters({ onToggle }: { onToggle?: (isExpanded: bool
                 </Button>
                 <Menu onAction={(name) => addSegment(name as string)}>
                   {availableSegments.map((segment) => {
-                    return <Menu.Item key={segment.name}>{segment.name.split('.')[1]}</Menu.Item>;
+                    return (
+                      <Menu.Item key={segment.name}>
+                        {segment.name.split('.')[1]}
+                      </Menu.Item>
+                    );
                   })}
                 </Menu>
               </MenuTrigger>
-              {!selectedCube && <Block preset="t3m">Select a cube or a view to add filters</Block>}
+              {!selectedCube && (
+                <Block preset="t3m">
+                  Select a cube or a view to add filters
+                </Block>
+              )}
             </Space>
           </>
         ) : null}

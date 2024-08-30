@@ -485,12 +485,7 @@ export function PlaygroundQueryBuilder({
                       />
                     ) : null}
                     {queryStatus ? (
-                      <PreAggregationStatus
-                        apiUrl={apiUrl}
-                        availableMembers={availableMembers}
-                        query={query}
-                        {...(queryStatus as QueryStatus)}
-                      />
+                      <PreAggregationStatus {...(queryStatus as QueryStatus)} />
                     ) : null}
 
                     {resultSetExists && queriesEqual ? (

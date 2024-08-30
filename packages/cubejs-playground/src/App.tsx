@@ -4,7 +4,7 @@ import { Alert, Layout } from 'antd';
 import { Component, PropsWithChildren, useEffect } from 'react';
 import { RouteComponentProps, withRouter } from 'react-router-dom';
 import styled from 'styled-components';
-import { Root, tasty } from '@cube-dev/ui-kit';
+import { Root } from '@cube-dev/ui-kit';
 
 import { CubeLoader } from './atoms';
 import { AppContextConsumer, PlaygroundContext } from './components/AppContext';
