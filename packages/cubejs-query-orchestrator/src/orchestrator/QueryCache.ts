@@ -962,6 +962,7 @@ export class QueryCache {
     }
 
     if (options.forceNoCache) {
+      console.log('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       const newRes = await fetchNew();
       this.emitEventWhenUpdatedUpdated(res?.result ?? null, newRes, options);
