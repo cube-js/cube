@@ -80,7 +80,7 @@ impl<'a> DependenciesBuilder<'a> {
                 let new_cube_name = if self.is_current_cube(&dep.name) {
                     cube_name.clone()
                 } else {
-                    unimplemented!()
+                    dep.name.clone()
                 };
                 let mut sql_fn = None;
                 let mut to_string_fn: Option<Rc<EvaluationNode>> = None;
@@ -88,7 +88,8 @@ impl<'a> DependenciesBuilder<'a> {
                 for child_ind in childs[i].iter() {
                     let name = &call_deps[*child_ind].name;
                     if name.as_str() == "sql" {
-                        unimplemented!();
+                        self.compiler
+                            .add_cube_table_evaluator(new_cube_name.clone());
                     } else if name.as_str() == "toString" {
                         to_string_fn = Some(
                             self.compiler

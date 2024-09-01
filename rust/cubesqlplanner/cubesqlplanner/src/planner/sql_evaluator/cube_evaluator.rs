@@ -1,9 +1,10 @@
 use super::dependecy::Dependency;
 use super::{EvaluationNode, MemberEvaluatorType};
 use super::{MemberEvaluator, MemberEvaluatorFactory};
+use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::any::Any;
@@ -18,7 +19,7 @@ impl CubeNameEvaluator {
         Self { cube_name }
     }
     pub fn default_evaluate_sql(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
-        Ok(tools.escape_column_name(&self.cube_name))
+        Ok(tools.escape_column_name(&tools.cube_alias_name(&self.cube_name)))
     }
 }
 
@@ -45,6 +46,10 @@ impl CubeNameEvaluatorFactory {
 }
 
 impl MemberEvaluatorFactory for CubeNameEvaluatorFactory {
+    fn evaluator_name() -> String {
+        "cube_name".to_string()
+    }
+
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
@@ -62,5 +67,88 @@ impl MemberEvaluatorFactory for CubeNameEvaluatorFactory {
         Ok(EvaluationNode::new_cube_name(CubeNameEvaluator::new(
             cube_name,
         )))
+    }
+}
+
+pub struct CubeTableEvaluator {
+    cube_name: String,
+    member_sql: Rc<dyn MemberSql>,
+    definition: Rc<dyn CubeDefinition>,
+}
+
+impl CubeTableEvaluator {
+    pub fn new(
+        cube_name: String,
+        member_sql: Rc<dyn MemberSql>,
+        definition: Rc<dyn CubeDefinition>,
+    ) -> Self {
+        Self {
+            cube_name,
+            member_sql,
+            definition,
+        }
+    }
+    pub fn default_evaluate_sql(
+        &self,
+        args: Vec<MemberSqlArg>,
+        tools: Rc<QueryTools>,
+    ) -> Result<String, CubeError> {
+        self.member_sql.call(args)
+    }
+}
+
+impl MemberEvaluator for CubeTableEvaluator {
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+}
+
+pub struct CubeTableEvaluatorFactory {
+    cube_name: String,
+    sql: Rc<dyn MemberSql>,
+    definition: Rc<dyn CubeDefinition>,
+}
+
+impl CubeTableEvaluatorFactory {
+    pub fn try_new(
+        cube_name: &String,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+    ) -> Result<Self, CubeError> {
+        let definition = cube_evaluator.cube_from_path(cube_name.clone())?;
+        Ok(Self {
+            cube_name: cube_name.clone(),
+            sql: definition.sql_table()?,
+            definition,
+        })
+    }
+}
+
+impl MemberEvaluatorFactory for CubeTableEvaluatorFactory {
+    fn evaluator_name() -> String {
+        "cube_table".to_string()
+    }
+
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
+        Ok(self.sql.args_names().clone())
+    }
+
+    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
+        Some(self.sql.clone())
+    }
+
+    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError> {
+        let Self {
+            cube_name,
+            sql,
+            definition,
+        } = self;
+        Ok(EvaluationNode::new_cube_table(
+            CubeTableEvaluator::new(cube_name, sql, definition),
+            deps,
+        ))
     }
 }

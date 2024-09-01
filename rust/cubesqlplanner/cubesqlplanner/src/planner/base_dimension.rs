@@ -59,7 +59,7 @@ impl BaseDimension {
 
     //FIXME May be should be part of BaseMember Trait
     pub fn alias_name(&self) -> Result<String, CubeError> {
-        self.query_tools.alias_name(&self.dimension)
+        Ok(self.query_tools.alias_name(&self.dimension))
     }
 
     pub fn dimension_sql(&self) -> Result<String, CubeError> {

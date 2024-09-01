@@ -38,6 +38,7 @@ pub trait CubeEvaluator {
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<dyn CubeDefinition>, CubeError>;
     fn is_measure(&self, path: Vec<String>) -> Result<bool, CubeError>;
     fn is_dimension(&self, path: Vec<String>) -> Result<bool, CubeError>;
+    fn cube_exists(&self, name: String) -> Result<bool, CubeError>;
     fn resolve_symbols_call_deps(
         &self,
         cube_name: String,

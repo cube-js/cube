@@ -100,6 +100,9 @@ impl MeasureEvaluatorFactory {
 }
 
 impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
+    fn evaluator_name() -> String {
+        "measure".to_string()
+    }
     fn cube_name(&self) -> &String {
         &self.cube_name
     }

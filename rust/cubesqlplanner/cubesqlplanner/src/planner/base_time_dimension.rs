@@ -66,7 +66,6 @@ impl BaseTimeDimension {
         self.dimension.index()
     }
 
-    //FIXME May be should be part of BaseMember Trait
     pub fn alias_name(&self) -> Result<String, CubeError> {
         let granularity = if let Some(granularity) = &self.granularity {
             granularity
@@ -74,8 +73,9 @@ impl BaseTimeDimension {
             "day"
         };
 
-        self.query_tools
-            .alias_name(&format!("{}_{}", self.dimension.dimension(), granularity))
+        Ok(self
+            .query_tools
+            .alias_name(&format!("{}_{}", self.dimension.dimension(), granularity)))
     }
 
     fn sql(&self) -> Result<String, CubeError> {

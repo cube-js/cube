@@ -263,9 +263,6 @@ export class BaseQuery {
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
 
-    /* console.log("!!!! join hints ", this.allJoinHints);
-    console.log("!!!! join ", this.join);
-    console.log("!!!! join 2 ", this.join.joins[0].join); */
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;

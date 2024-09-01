@@ -26,6 +26,7 @@ impl fmt::Display for Select {
         }
 
         writeln!(f, "")?;
+        writeln!(f, "    FROM")?;
         write!(f, "{}", self.from)?;
 
         if let Some(filter) = &self.filter {

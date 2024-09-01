@@ -29,7 +29,13 @@ impl EvaluatorVisitor for DefaultEvaluatorVisitor {
             MemberEvaluatorType::Measure(ev) => {
                 ev.default_evaluate_sql(args, self.query_tools.clone())
             }
+            MemberEvaluatorType::CubeTable(ev) => {
+                ev.default_evaluate_sql(args, self.query_tools.clone())
+            }
             MemberEvaluatorType::CubeName(ev) => ev.default_evaluate_sql(self.query_tools.clone()),
+            MemberEvaluatorType::JoinCondition(ev) => {
+                ev.default_evaluate_sql(args, self.query_tools.clone())
+            }
         }
     }
 }

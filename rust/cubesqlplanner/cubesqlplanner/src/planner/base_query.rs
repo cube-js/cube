@@ -1,11 +1,16 @@
 use super::filter::compiler::FilterCompiler;
 use super::query_tools::QueryTools;
-use super::sql_evaluator::Compiler;
-use super::{BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, IndexedMember};
+use super::sql_evaluator::{Compiler, EvaluationNode};
+use super::{
+    BaseCube, BaseDimension, BaseJoinCondition, BaseMeasure, BaseTimeDimension, IndexedMember,
+};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
-use crate::plan::{Expr, Filter, FilterItem, From, GenerationPlan, OrderBy, Select};
+use crate::cube_bridge::memeber_sql::MemberSql;
+use crate::plan::{
+    Expr, Filter, FilterItem, From, GenerationPlan, Join, JoinItem, OrderBy, Select,
+};
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -160,7 +165,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         };
         let select = Select {
             projection: self.simple_projection()?,
-            from: From::Cube(self.cube_from_path(self.join.static_data().root.clone())?),
+            from: self.make_from_node()?,
             filter,
             group_by: self.group_by(),
             having,
@@ -188,13 +193,56 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         Ok(dimensions.chain(time_dimensions).chain(measures).collect())
     }
 
+    fn make_from_node(&self) -> Result<From, CubeError> {
+        let root = From::Cube(self.cube_from_path(self.join.static_data().root.clone())?);
+        let joins = self.join.joins()?;
+        if joins.items().is_empty() {
+            Ok(root)
+        } else {
+            let join_items = joins
+                .items()
+                .iter()
+                .map(|join| {
+                    let definition = join.join()?;
+                    let evaluator = self.compile_join_condition(
+                        &join.static_data().original_from,
+                        definition.sql()?,
+                    )?;
+                    Ok(JoinItem {
+                        from: From::Cube(
+                            self.cube_from_path(join.static_data().original_to.clone())?,
+                        ),
+                        on: BaseJoinCondition::try_new(
+                            join.static_data().original_from.clone(),
+                            self.query_tools.clone(),
+                            evaluator,
+                        )?,
+                    })
+                })
+                .collect::<Result<Vec<_>, CubeError>>()?;
+            Ok(From::Join(Rc::new(Join {
+                root,
+                joins: join_items,
+            })))
+        }
+    }
+
+    fn compile_join_condition(
+        &self,
+        cube_name: &String,
+        sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
+        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+        evaluator_compiler.add_join_condition_evaluator(cube_name.clone(), sql)
+    }
+
     fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
-        let eval = self.query_tools.cube_evaluator().clone();
-        let def = self
-            .query_tools
-            .cube_evaluator()
-            .cube_from_path(cube_path)?;
-        Ok(BaseCube::new(eval, def, self.query_tools.clone()))
+        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
+        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
+
+        let evaluator = evaluator_compiler.add_cube_table_evaluator(cube_path.to_string())?;
+        BaseCube::try_new(cube_path.to_string(), self.query_tools.clone(), evaluator)
     }
 
     fn default_order(&self) -> Vec<OrderBy> {

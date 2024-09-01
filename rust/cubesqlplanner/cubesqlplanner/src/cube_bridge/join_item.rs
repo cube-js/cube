@@ -12,12 +12,12 @@ use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct JoinItemStatic {
-    from: String,
-    to: String,
+    pub from: String,
+    pub to: String,
     #[serde(rename = "originalFrom")]
-    original_from: String,
+    pub original_from: String,
     #[serde(rename = "originalTo")]
-    original_to: String,
+    pub original_to: String,
 }
 
 #[nativebridge::native_bridge(JoinItemStatic)]

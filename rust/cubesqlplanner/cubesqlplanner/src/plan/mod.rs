@@ -3,12 +3,14 @@ pub mod builder;
 pub mod expression;
 pub mod filter;
 pub mod from;
+pub mod join;
 pub mod order;
 pub mod select;
 
 pub use expression::Expr;
 pub use filter::{Filter, FilterItem};
 pub use from::From;
+pub use join::{Join, JoinItem};
 pub use order::OrderBy;
 pub use select::Select;
 

@@ -74,6 +74,10 @@ impl DimensionEvaluatorFactory {
 }
 
 impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
+    fn evaluator_name() -> String {
+        "dimension".to_string()
+    }
+
     fn cube_name(&self) -> &String {
         &self.cube_name
     }

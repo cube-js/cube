@@ -21,24 +21,3 @@ pub trait MeasureDefinition {
     #[field]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 }
-
-/*
-export type MeasureDefinition = {
-  type: string,
-  sql: Function,
-  ownedByCube: boolean,
-  rollingWindow?: any
-  filters?: any
-  primaryKey?: true,
-  drillFilters?: any,
-  postAggregate?: boolean,
-  groupBy?: Function,
-  reduceBy?: Function,
-  addGroupBy?: Function,
-  timeShift?: TimeShiftDefinition[],
-  groupByReferences?: string[],
-  reduceByReferences?: string[],
-  addGroupByReferences?: string[],
-  timeShiftReferences?: TimeShiftDefinitionReference[],
-};
- */

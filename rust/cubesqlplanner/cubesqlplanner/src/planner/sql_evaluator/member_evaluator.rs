@@ -1,5 +1,8 @@
 use super::dependecy::Dependency;
-use super::{CubeNameEvaluator, DimensionEvaluator, MeasureEvaluator};
+use super::{
+    CubeNameEvaluator, CubeTableEvaluator, CubeTableEvaluatorFactory, DimensionEvaluator,
+    JoinConditionEvaluator, MeasureEvaluator,
+};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
@@ -14,6 +17,8 @@ pub enum MemberEvaluatorType {
     Dimension(DimensionEvaluator),
     Measure(MeasureEvaluator),
     CubeName(CubeNameEvaluator),
+    CubeTable(CubeTableEvaluator),
+    JoinCondition(JoinConditionEvaluator),
 }
 
 pub struct EvaluationNode {
@@ -47,6 +52,23 @@ impl EvaluationNode {
         })
     }
 
+    pub fn new_cube_table(evaluator: CubeTableEvaluator, deps: Vec<Dependency>) -> Rc<Self> {
+        Rc::new(Self {
+            evaluator: MemberEvaluatorType::CubeTable(evaluator),
+            deps,
+        })
+    }
+
+    pub fn new_join_condition(
+        evaluator: JoinConditionEvaluator,
+        deps: Vec<Dependency>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            evaluator: MemberEvaluatorType::JoinCondition(evaluator),
+            deps,
+        })
+    }
+
     pub fn deps(&self) -> &Vec<Dependency> {
         &self.deps
     }
@@ -57,6 +79,10 @@ impl EvaluationNode {
 }
 
 pub trait MemberEvaluatorFactory: Sized {
+    fn evaluator_name() -> String; //FIXME maybe Enum should be used
+    fn is_cachable() -> bool {
+        true
+    }
     fn cube_name(&self) -> &String;
     fn deps_names(&self) -> Result<Vec<String>, CubeError>;
     fn member_sql(&self) -> Option<Rc<dyn MemberSql>>;

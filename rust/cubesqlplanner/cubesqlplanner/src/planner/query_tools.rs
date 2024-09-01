@@ -55,8 +55,12 @@ impl QueryTools {
         &self.evaluator_compiler
     }
 
-    pub fn alias_name(&self, name: &str) -> Result<String, CubeError> {
-        Ok(name.to_case(Case::Snake).replace(".", "__"))
+    pub fn alias_name(&self, name: &str) -> String {
+        name.to_case(Case::Snake).replace(".", "__")
+    }
+
+    pub fn cube_alias_name(&self, name: &str) -> String {
+        self.alias_name(name)
     }
 
     pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str) -> String {
@@ -64,7 +68,11 @@ impl QueryTools {
             static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
         }
         if SINGLE_MEMBER_RE.is_match(sql) {
-            format!("{}.{}", self.escape_column_name(cube_name), sql)
+            format!(
+                "{}.{}",
+                self.escape_column_name(&self.cube_alias_name(&cube_name)),
+                sql
+            )
         } else {
             sql.to_string()
         }

@@ -1,3 +1,4 @@
+use super::Join;
 use crate::planner::BaseCube;
 use std::fmt;
 use std::rc::Rc;
@@ -5,6 +6,7 @@ use std::rc::Rc;
 pub enum From {
     Empty,
     Cube(Rc<BaseCube>),
+    Join(Rc<Join>),
 }
 
 impl fmt::Display for From {
@@ -12,9 +14,11 @@ impl fmt::Display for From {
         match self {
             From::Empty => write!(f, ""),
             From::Cube(cube) => {
-                writeln!(f, "    FROM")?;
                 let cubesql = cube.to_sql().map_err(|_| fmt::Error)?;
                 write!(f, "      {} ", cubesql)
+            }
+            From::Join(j) => {
+                write!(f, "{}", j)
             }
         }
     }

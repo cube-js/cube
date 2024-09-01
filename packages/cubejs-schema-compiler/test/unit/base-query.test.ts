@@ -890,6 +890,16 @@ describe('SQL Generation', () => {
       createCubeSchema({
         name: 'cardsB',
         sqlTable: 'card2_tbl',
+        joins: `{
+          cardsC: {
+            sql: \`\${CUBE}.other_id = \${cardsC}.id\`,
+            relationship: 'hasMany'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsC',
+        sqlTable: 'card3_tbl',
       }),
 
     ]);
@@ -903,18 +913,34 @@ describe('SQL Generation', () => {
           'cardsB.type'
         ],
         measures: [
-          'cardsA.count',
+          'cardsC.count',
         ],
       });
 
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id');
+    });
+
+    it('Base joins - multiplied join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsB.type',
+        ],
+        measures: [
+          'cardsB.sum',
+          'cardsC.count',
+        ],
+        timezone: 'America/Los_Angeles',
+      });
+
       const queryAndParams = query.buildSqlAndParamsTest();
-      const expected = 'SELECT\n' +
-          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
-          '    FROM\n' +
-          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
-      /* expect(queryAndParams[0]).toEqual(expected);
-      const expectedParams = ['type_value', 'not_type_value', '3'];
-      expect(queryAndParams[1]).toEqual(expectedParams); */
+
+      /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
     });
   });
   describe('Common - JS', () => {
