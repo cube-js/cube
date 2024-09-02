@@ -2191,12 +2191,15 @@ export class BaseQuery {
     return this.evaluateSymbolContext || {};
   }
 
-  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, internalPropertyName) {
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
     const memberPathArray = [cubeName, name];
+    if (internalPropertyName && symbol.type === 'time' && symbol.granularities[internalPropertyName]) {
+      memberPathArray.push('granularities', internalPropertyName);
+    }
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
     if (!type) {
@@ -2295,26 +2298,38 @@ export class BaseQuery {
         }
         if (symbol.case) {
           return this.renderDimensionCase(symbol, cubeName);
-        } else if (symbol.type === 'geo') {
+        }
+        if (symbol.type === 'geo') {
           return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
-        } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
-          if (symbol.shiftInterval) {
-            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
-          }
-          if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
-            !memberExpressionType &&
-            symbol.type === 'time' &&
-            this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
-          ) {
-            res = this.convertTz(res);
-          }
-          return res;
         }
+
+        let res;
+
+        if (symbol.type === 'time' && internalPropertyName) {
+          const td = this.newTimeDimension({
+            dimension: this.cubeEvaluator.pathFromArray([cubeName, name]),
+            granularity: internalPropertyName
+          });
+          res = td.dimensionSql();
+        } else {
+          res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+        }
+
+        if (symbol.shiftInterval) {
+          res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+        }
+        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+          !memberExpressionType &&
+          symbol.type === 'time' &&
+          this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+        ) {
+          res = this.convertTz(res);
+        }
+        return res;
       } else if (type === 'segment') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
@@ -2364,7 +2379,7 @@ export class BaseQuery {
       }
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
     }, {
-      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol)),
+      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, pn, ppn) => self.evaluateSymbolSql(cube, pn, symbol, false, ppn)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
       query: this,
