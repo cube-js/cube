@@ -103,14 +103,34 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
               }
             }
           },
+          createdAtHalfYear: {
+            public: true,
+            sql: \`\${createdAt.half_year}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stJune: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_june}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stMarch: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_march}\`,
+            type: 'string',
+          },
           status: {
             type: 'string',
             sql: 'status',
+          },
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
           }
         },
         measures: {
           count: {
-            sql: 'count',
             type: 'count'
           },
           rollingCountByTrailing2Day: {

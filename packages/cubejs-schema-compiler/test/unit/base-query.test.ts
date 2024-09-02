@@ -59,7 +59,7 @@ describe('SQL Generation', () => {
       createCubeSchemaWithCustomGranularities('orders')
     );
 
-    const queries = [
+    const granularityQueries = [
       {
         measures: [
           'orders.count'
@@ -254,10 +254,71 @@ describe('SQL Generation', () => {
       }
     ];
 
+    const proxiedGranularitiesQueries = [
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYearBy1stJune'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtHalfYearBy1stMarch'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+    ];
+
     it('Test time series with different granularities', async () => {
       await compilers.compiler.compile();
 
-      const query = new BaseQuery(compilers, queries[0]);
+      const query = new BaseQuery(compilers, granularityQueries[0]);
 
       {
         const timeDimension = query.newTimeDimension({
@@ -290,7 +351,7 @@ describe('SQL Generation', () => {
         await compilers.compiler.compile();
       });
 
-      queries.forEach(q => {
+      granularityQueries.forEach(q => {
         it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
           const query = new PostgresQuery(compilers, q);
           const queryAndParams = query.buildSqlAndParams();
@@ -304,6 +365,18 @@ describe('SQL Generation', () => {
           } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
             expect(queryString.includes('+ interval \'3 day\'')).toBeTruthy();
           }
+        });
+      });
+
+      proxiedGranularitiesQueries.forEach(q => {
+        it(`proxy granularity reference "${q.dimensions[0]}"`, () => {
+          const query = new PostgresQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+          console.log('Generated query: ', queryString);
+
+          expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          expect(queryString.includes('count("orders".id')).toBeTruthy();
         });
       });
     });
