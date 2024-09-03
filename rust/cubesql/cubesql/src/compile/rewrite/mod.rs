@@ -2075,7 +2075,7 @@ fn cube_scan(
     ungrouped: impl Display,
 ) -> String {
     format!(
-        "(Extension (CubeScan {} {} {} {} {} {} {} {} {} {}))",
+        "(CubeScan {} {} {} {} {} {} {} {} {} {})",
         alias_to_cube,
         members,
         filters,
