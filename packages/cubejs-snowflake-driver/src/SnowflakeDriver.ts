@@ -22,7 +22,6 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
   DriverCapabilities,
-  QueryTablesResult,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { Storage } from '@google-cloud/storage';
@@ -356,7 +355,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
       await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
-
+      /**
+       * Because snowflake has an opinion about the shape of data returns over the api.
+       * we have to set this value to false in order for our schema requests to succeed.
+       *
+       * You can learn more here.
+       * https://docs.snowflake.com/en/sql-reference/identifiers-syntax#double-quoted-identifiers
+       */
+      await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE', [], false);
       return connection;
     } catch (e) {
       this.connection = null;
