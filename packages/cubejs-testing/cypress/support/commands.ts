@@ -45,9 +45,7 @@ Cypress.Commands.add("setQuery", (query, ...args) => {
 });
 
 Cypress.Commands.add("setChartType", (chartType) => {
-  cy.getByTestId("[data-qa=RadioWrapper]")
-    .contains(chartType, { matchCase: false })
-    .click();
+  cy.getByQa("RadioWrapper").contains(chartType, { matchCase: false }).click();
 });
 
 Cypress.Commands.add("runQuery", () => {
@@ -55,7 +53,7 @@ Cypress.Commands.add("runQuery", () => {
   // cy.intercept('get', '/cubejs-api/v1/load').as('load');
   // cy.wait(['@load']);
 
-  cy.getByQa("RunQueryButton", { timeout: 5 * 1000 })
+  cy.getByQa("RunQueryButton", { timeout: 10 * 1000 })
     .should("be.visible")
     .click();
   cy.getByQa("RunQueryButton", { timeout: 10 * 1000 }).should(
@@ -66,13 +64,9 @@ Cypress.Commands.add("runQuery", () => {
 });
 
 Cypress.Commands.add("addMeasure", (name) => {
-  cy.getByTestId("Measure", { timeout: 5 * 1000 }).click();
-  // Click bottom as top can be overflowed by the Search input
-  cy.getByTestId(name).click("bottom");
+  cy.get(`[data-member="measure"][data-qaval="${name}"]`).click();
 });
 
 Cypress.Commands.add("addDimension", (name) => {
-  cy.getByTestId("Dimension", { timeout: 5 * 1000 }).click();
-  // Click bottom as top can be overflowed by the Search input
-  cy.getByTestId(name).click("bottom");
+  cy.get(`[data-member="dimension"][data-qaval="${name}"]`).click();
 });

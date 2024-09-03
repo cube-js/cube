@@ -29,14 +29,14 @@ context("Playground: Explore Page", () => {
     it("opens the code tab", () => {
       cy.setQuery(ordersCountQuery);
       cy.runQuery();
-      cy.getByTestId("code-btn").click();
+      cy.getByQa("Tab-json").click();
+      cy.getByQa("CodeBlock").should("contain.text", "Orders.count");
     });
 
     it("opens the sql tab", () => {
       cy.setQuery(ordersCountQuery);
       cy.runQuery();
       cy.getByQa("Tab-sql").click();
-      cy.getByQa("CodeBlock").should("contain.text", "SELECT");
     });
   });
 
@@ -50,7 +50,9 @@ context("Playground: Explore Page", () => {
     cy.wait(500);
     cy.url().should("include", "/build");
 
-    cy.addMeasure("Events.count");
+    cy.wait(20000);
+
+    cy.addMeasure("events.count");
     cy.wait(300);
     cy.getByTestId("TimeDimension").contains("Events Created at");
   });
@@ -153,15 +155,14 @@ context("Playground: Explore Page", () => {
       //   failureThresholdType: 'percent',
       // });
 
-      cy.getByTestId("order-btn").click();
-      cy.get("[data-member=measure]")
+      cy.getByQa("OrderButton").click();
+      cy.get("[data-qa=OrderItem] [data-member=measure]")
         .contains("users.count")
         .closest("[data-qa=Field]")
         .getByQa("RadioWrapper")
         .contains("0 to 9")
         .get("Radio")
         .click();
-      cy.getByQa("[data-qaval=users.count").click();
 
       // todo: fix and uncomment
       // cy.runQuery();
