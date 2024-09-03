@@ -45,13 +45,14 @@ Cypress.Commands.add("setQuery", (query, ...args) => {
 });
 
 Cypress.Commands.add("setChartType", (chartType) => {
-  cy.get("[data-qa=QueryBuilderChart] > div").then(($title) => {
+  cy.get("[data-qa=QueryBuilderChart] > div[aria-expanded]").then(($title) => {
     const expanded = $title.attr("aria-expanded");
 
     if (expanded && expanded.includes("false")) {
-      cy.wrap($title).click();
+      return cy.wrap($title).click();
     }
   });
+  cy.wait(500);
   cy.getByQa("ChartType")
     .getByQa("RadioWrapper")
     .contains(chartType, { matchCase: false })
