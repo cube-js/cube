@@ -205,9 +205,17 @@ trait Visitor<'ast, E: Error> {
                 }
             }
             Expr::ArraySubquery(query) => self.visit_query(query)?,
-            Expr::DotExpr { expr, field } => {
+            Expr::JsonAccess {
+                left,
+                operator: _,
+                right,
+            } => {
+                self.visit_expr(left)?;
+                self.visit_expr(right)?;
+            }
+            Expr::CompositeAccess { expr, key } => {
                 self.visit_expr(expr)?;
-                self.visit_identifier(field)?;
+                self.visit_identifier(key)?;
             }
             Expr::TypedString { .. } => (),
             Expr::AtTimeZone { timestamp, .. } => self.visit_expr(timestamp)?,

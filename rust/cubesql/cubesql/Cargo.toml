@@ -10,12 +10,14 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "400fa0d889a8a38ca69f36d5750dfb572fc6018e", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "840267ed3142db45d3989a31141a003896f7a893", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
+# TODO use sqlparser re-exported from datafusion after updating to 10.0+
+# See https://github.com/apache/datafusion/commit/ffa3687ae632390c9ce86e570b20d71d4cdf3a3a
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "a593b14adc8cda9a95952fe5a09b038ba94d6f8b" }
 lazy_static = "1.4.0"
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }

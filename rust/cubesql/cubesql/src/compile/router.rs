@@ -434,20 +434,20 @@ impl QueryRouter {
                             _ => {
                                 return Err(CompilationError::user(format!(
                                     "invalid {} variable format",
-                                    key_value.key.value
+                                    key_value.key
                                 )))
                             }
                         },
                         _ => {
                             return Err(CompilationError::user(format!(
                                 "invalid {} variable format",
-                                key_value.key.value
+                                key_value.key
                             )))
                         }
                     };
 
                     session_columns_to_update.push(DatabaseVariable::system(
-                        key_value.key.value.to_lowercase(),
+                        key_value.key.to_string().to_lowercase(),
                         ScalarValue::Utf8(Some(value.clone())),
                         None,
                     ));
@@ -455,13 +455,13 @@ impl QueryRouter {
             }
             DatabaseProtocol::MySQL => {
                 for key_value in key_values.iter() {
-                    if key_value.key.value.to_lowercase() == "autocommit".to_string() {
+                    if key_value.key.to_string().eq_ignore_ascii_case("autocommit") {
                         flags |= StatusFlags::AUTOCOMMIT;
 
                         break;
                     }
 
-                    let symbols: Vec<char> = key_value.key.value.chars().collect();
+                    let symbols: Vec<char> = key_value.key.to_string().chars().collect();
                     if symbols.len() < 2 {
                         continue;
                     }
@@ -483,23 +483,23 @@ impl QueryRouter {
                             _ => {
                                 return Err(CompilationError::user(format!(
                                     "invalid {} variable format",
-                                    key_value.key.value
+                                    key_value.key
                                 )))
                             }
                         },
                         _ => {
                             return Err(CompilationError::user(format!(
                                 "invalid {} variable format",
-                                key_value.key.value
+                                key_value.key
                             )))
                         }
                     };
 
                     if is_global_var {
                         let key = if symbols[0] == '@' {
-                            key_value.key.value[2..].to_lowercase()
+                            key_value.key.to_string()[2..].to_lowercase()
                         } else {
-                            key_value.key.value.to_lowercase()
+                            key_value.key.to_string().to_lowercase()
                         };
                         global_columns_to_update.push(DatabaseVariable::system(
                             key.to_lowercase(),
@@ -507,7 +507,7 @@ impl QueryRouter {
                             None,
                         ));
                     } else if is_user_defined_var {
-                        let key = key_value.key.value[1..].to_lowercase();
+                        let key = key_value.key.to_string()[1..].to_lowercase();
                         session_columns_to_update.push(DatabaseVariable::user_defined(
                             key.to_lowercase(),
                             ScalarValue::Utf8(Some(value.clone())),
