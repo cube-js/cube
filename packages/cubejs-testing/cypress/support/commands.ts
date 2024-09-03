@@ -46,8 +46,10 @@ Cypress.Commands.add("setQuery", (query, ...args) => {
 
 Cypress.Commands.add("setChartType", (chartType) => {
   cy.get("[data-qa=QueryBuilderChart] > div").then(($title) => {
-    if ($title.attr("aria-expanded")?.includes("false")) {
-      cy.get("[data-qa=QueryBuilderChart] > div").click();
+    const expanded = $title.attr("aria-expanded");
+
+    if (expanded && expanded.includes("false")) {
+      cy.wrap($title).click();
     }
   });
   cy.getByQa("ChartType")

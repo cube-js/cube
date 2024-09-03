@@ -73,11 +73,11 @@ export function convertJsonQueryToGraphQL({
 
 const singleValueOperators = ['gt', 'gte', 'lt', 'lte'];
 
-const operatorsMap = {
+const OPERATORS_MAP = {
   equals: 'in',
   notEquals: 'notIn',
   notSet: 'set',
-};
+} as const;
 
 enum FilterKind {
   AND = 'AND',
@@ -158,9 +158,18 @@ export class CubeGraphQLConverter {
   private resolveFilter(
     filter: Record<string, any> | Record<string, any>[],
     parent?: any
-  ) {
+  ): (
+    | t.ObjectValueNode
+    | t.ObjectFieldNode
+    | t.ObjectFieldNode[]
+    | {
+        kind: 'ObjectField';
+        name: { kind: 'Name'; value: string };
+        value: { kind: 'ObjectValue'; fields: t.ObjectFieldNode[] };
+      }
+  )[] {
     const plainFilters = Object.values(
-      filter.reduce((memo, f) => {
+      filter.reduce((memo: any, f: any) => {
         if (f.or || f.and) {
           return memo;
         }
@@ -183,7 +192,7 @@ export class CubeGraphQLConverter {
     );
 
     const booleanFilters = filter
-      .map((f) => {
+      .map((f: any) => {
         if (f.and || f.or) {
           return {
             kind: f.and ? FilterKind.AND : FilterKind.OR,
@@ -203,14 +212,14 @@ export class CubeGraphQLConverter {
           return this.objectValue([
             this.booleanFilter(
               item.kind,
-              this.resolveFilter(item.filters, item)
+              this.resolveFilter(item.filters, item) as t.ObjectValueNode[]
             ),
           ]);
         }
 
         return this.booleanFilter(
           item.kind,
-          this.resolveFilter(item.filters, item)
+          this.resolveFilter(item.filters, item) as t.ObjectValueNode[]
         );
       }
 
@@ -230,7 +239,7 @@ export class CubeGraphQLConverter {
         return this.objectField(
           this.booleanFilter(
             parent?.kind || 'AND',
-            item.filters.map((f) => {
+            item.filters.map((f: any) => {
               if (f.and || f.or) {
                 this.resolveFilter(item.filters, item.kind);
               }
@@ -279,7 +288,7 @@ export class CubeGraphQLConverter {
   ): t.ObjectFieldNode[] {
     const filters = Array.isArray(filter) ? filter : [filter];
 
-    const value = (f): t.ValueNode => {
+    const value = (f: any): t.ValueNode => {
       const kind =
         this.types[f.member || f.dimension] === 'number'
           ? t.Kind.FLOAT
@@ -308,14 +317,14 @@ export class CubeGraphQLConverter {
 
       return {
         kind: t.Kind.LIST,
-        values: f.values.map((v) => ({
+        values: f.values.map((v: any) => ({
           kind,
           value: v,
         })),
       };
     };
 
-    const fields = filters.map<t.ObjectFieldNode>((f) => {
+    const fields = filters.map<t.ObjectFieldNode>((f: any) => {
       const memberName = f.member || f.dimension;
       if (!this.types[memberName]) {
         throw new Error(
@@ -353,14 +362,16 @@ export class CubeGraphQLConverter {
                       // value: operatorsMap[f.operator] || f.operator,
                       value:
                         f.operator === 'equals' && (f.values || []).length <= 1
-                          ? f.operator
-                          : operatorsMap[f.operator] || f.operator,
+                          ? f.operator in OPERATORS_MAP
+                          : OPERATORS_MAP[
+                              f.operator as keyof typeof OPERATORS_MAP
+                            ] || f.operator,
                     },
                     value: value(f),
                   },
                 ],
         },
-      };
+      } as t.ObjectFieldNode;
     });
 
     if (parentName) {
@@ -518,7 +529,7 @@ export class CubeGraphQLConverter {
 
     const filters = [...(this.cubeQuery.filters || [])];
 
-    (this.cubeQuery.timeDimensions || []).forEach((td) => {
+    (this.cubeQuery.timeDimensions || []).forEach((td: any) => {
       if (td.dateRange) {
         filters.push({
           member: td.dimension,
@@ -537,7 +548,7 @@ export class CubeGraphQLConverter {
         },
         value: {
           kind: t.Kind.OBJECT,
-          fields: this.resolveFilter(filters),
+          fields: this.resolveFilter(filters) as t.ObjectFieldNode[],
         },
       });
     }
@@ -546,7 +557,7 @@ export class CubeGraphQLConverter {
   }
 
   private prepareCubes() {
-    const initCube = (cubeName) => {
+    const initCube = (cubeName: string) => {
       if (!this.cubes[cubeName]) {
         this.cubes[cubeName] = {
           fields: [],
@@ -561,7 +572,7 @@ export class CubeGraphQLConverter {
         return;
       }
 
-      this.cubeQuery[key].forEach((value) => {
+      this.cubeQuery[key].forEach((value: string) => {
         const [name, field, granularity] = value.split('.');
         const cubeName = unCapitalize(name);
 
@@ -592,7 +603,7 @@ export class CubeGraphQLConverter {
     });
 
     const map: Record<string, string[]> = {};
-    this.cubeQuery.timeDimensions?.forEach((td) => {
+    this.cubeQuery.timeDimensions?.forEach((td: any) => {
       const [name, field] = td.dimension.split('.');
       const cubeFieldName = `${name}.${field}`;
       if (td.granularity) {
