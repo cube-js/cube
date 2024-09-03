@@ -1,5 +1,6 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{default_evaluate, EvaluationNode, MemberEvaluator};
+use super::sql_evaluator::{default_evaluate, DimensionEvaluator, EvaluationNode, MemberEvaluator};
+use super::{evaluate_with_context, Context};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use cubenativeutils::CubeError;
@@ -25,19 +26,19 @@ impl BaseCube {
         }))
     }
 
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        let cube_sql = self.table_sql()?;
-        let cube_alias = self.cube_alias()?;
+    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        let cube_sql = self.table_sql(context.clone())?;
+        let cube_alias = self.query_tools.escape_column_name(
+            &self
+                .query_tools
+                .cube_alias_name(&self.cube_name, context.cube_alias_prefix()),
+        );
         let as_syntax_join = "AS"; //FIXME should be from JS BaseQuery
 
         Ok(format!("{} {} {}", cube_sql, as_syntax_join, cube_alias))
     }
 
-    pub fn table_sql(&self) -> Result<String, CubeError> {
-        default_evaluate(&self.member_evaluator, self.query_tools.clone())
-    }
-
-    fn cube_alias(&self) -> Result<String, CubeError> {
-        Ok(self.query_tools.cube_alias_name(&self.cube_name))
+    pub fn table_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 }

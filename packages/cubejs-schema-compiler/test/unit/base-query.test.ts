@@ -135,7 +135,7 @@ describe('SQL Generation', () => {
         filters: [],
       });
 
-      const queryAndParams = query.buildSqlAndParams();
+      const queryAndParams = query.buildSqlAndParamsTest();
       const expected = 'SELECT\n' +
           '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
           '    FROM\n' +

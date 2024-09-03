@@ -1,3 +1,4 @@
+use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
 use super::memeber_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
@@ -20,4 +21,6 @@ pub trait MeasureDefinition {
     #[optional]
     #[field]
     fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
+
+    fn cube(&self) -> Result<Rc<dyn CubeDefinition>, CubeError>;
 }

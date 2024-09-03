@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{default_evaluate, DimensionEvaluator, EvaluationNode, MemberEvaluator};
-use super::{BaseMember, IndexedMember};
+use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::MemberSql;
@@ -16,8 +16,16 @@ pub struct BaseDimension {
 }
 
 impl BaseMember for BaseDimension {
-    fn to_sql(&self) -> Result<String, CubeError> {
-        self.sql()
+    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        let alias_name = self.alias_name()?;
+
+        Ok(format!("{} {}", self.dimension_sql(context)?, alias_name))
+    }
+
+    fn alias_name(&self) -> Result<String, CubeError> {
+        Ok(self
+            .query_tools
+            .escape_column_name(&self.unescaped_alias_name()?))
     }
 }
 
@@ -58,17 +66,11 @@ impl BaseDimension {
     }
 
     //FIXME May be should be part of BaseMember Trait
-    pub fn alias_name(&self) -> Result<String, CubeError> {
+    pub fn unescaped_alias_name(&self) -> Result<String, CubeError> {
         Ok(self.query_tools.alias_name(&self.dimension))
     }
 
-    pub fn dimension_sql(&self) -> Result<String, CubeError> {
-        default_evaluate(&self.member_evaluator, self.query_tools.clone())
-    }
-
-    fn sql(&self) -> Result<String, CubeError> {
-        let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);
-
-        Ok(format!("{} {}", self.dimension_sql()?, alias_name))
+    pub fn dimension_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 }

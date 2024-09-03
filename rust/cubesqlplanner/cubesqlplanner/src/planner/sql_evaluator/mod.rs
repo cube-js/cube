@@ -7,6 +7,8 @@ pub mod join_evaluator;
 pub mod join_hints_collector;
 pub mod measure_evaluator;
 pub mod member_evaluator;
+pub mod multiplied_measures_collector;
+pub mod render_references;
 pub mod visitor;
 
 pub use compiler::Compiler;

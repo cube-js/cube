@@ -1,15 +1,17 @@
 use super::filter::compiler::FilterCompiler;
+use super::full_key_query_aggregate::{self, FullKeyAggregateQueryBuilder};
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{Compiler, EvaluationNode};
 use super::{
-    BaseCube, BaseDimension, BaseJoinCondition, BaseMeasure, BaseTimeDimension, IndexedMember,
+    BaseCube, BaseDimension, BaseJoinCondition, BaseMeasure, BaseTimeDimension, Context,
+    IndexedMember, SqlJoinCondition,
 };
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{
-    Expr, Filter, FilterItem, From, GenerationPlan, Join, JoinItem, OrderBy, Select,
+    Expr, Filter, FilterItem, From, FromSource, GenerationPlan, Join, JoinItem, OrderBy, Select,
 };
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -28,7 +30,6 @@ pub struct BaseQuery<IT: InnerTypes> {
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
     all_join_hints: Vec<String>,
-    join: Rc<dyn JoinDefinition>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -114,6 +115,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let join = query_tools
             .join_graph()
             .build_join(all_join_hints.clone())?;
+        query_tools.cached_data_mut().set_join(join);
 
         Ok(Self {
             context,
@@ -124,13 +126,12 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             dimensions_filters,
             measures_filters,
             all_join_hints,
-            join,
         })
     }
 
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
-        let sql = plan.to_string();
+        let sql = plan.to_sql()?;
         let params = self.get_params()?;
         let res = self.context.empty_array();
         res.set(0, sql.to_native(self.context.clone())?)?;
@@ -141,7 +142,17 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<GenerationPlan, CubeError> {
-        self.simple_query()
+        let mut full_key_aggregate_query_builder = FullKeyAggregateQueryBuilder::new(
+            self.query_tools.clone(),
+            self.measures.clone(),
+            self.dimensions.clone(),
+            self.time_dimensions.clone(),
+        );
+        if let Some(select) = full_key_aggregate_query_builder.build()? {
+            Ok(GenerationPlan::Select(select))
+        } else {
+            self.simple_query()
+        }
     }
 
     fn get_params(&self) -> Result<Vec<String>, CubeError> {
@@ -170,6 +181,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             group_by: self.group_by(),
             having,
             order_by: self.default_order(),
+            context: Context::default(),
+            is_distinct: false,
         };
         Ok(GenerationPlan::Select(select))
     }
@@ -194,8 +207,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn make_from_node(&self) -> Result<From, CubeError> {
-        let root = From::Cube(self.cube_from_path(self.join.static_data().root.clone())?);
-        let joins = self.join.joins()?;
+        let join = self.query_tools.cached_data().join()?.clone();
+        let root = From::new(FromSource::Cube(
+            self.cube_from_path(join.static_data().root.clone())?,
+        ));
+        let joins = join.joins()?;
         if joins.items().is_empty() {
             Ok(root)
         } else {
@@ -209,21 +225,23 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                         definition.sql()?,
                     )?;
                     Ok(JoinItem {
-                        from: From::Cube(
+                        from: From::new(FromSource::Cube(
                             self.cube_from_path(join.static_data().original_to.clone())?,
-                        ),
-                        on: BaseJoinCondition::try_new(
+                        )),
+                        on: SqlJoinCondition::try_new(
                             join.static_data().original_from.clone(),
                             self.query_tools.clone(),
                             evaluator,
                         )?,
+                        is_inner: false,
                     })
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
-            Ok(From::Join(Rc::new(Join {
+            let result = From::new(FromSource::Join(Rc::new(Join {
                 root,
                 joins: join_items,
-            })))
+            })));
+            Ok(result)
         }
     }
 

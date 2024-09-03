@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{DimensionEvaluator, EvaluationNode};
 use super::BaseDimension;
-use super::{BaseMember, IndexedMember};
+use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -13,8 +13,27 @@ pub struct BaseTimeDimension {
 }
 
 impl BaseMember for BaseTimeDimension {
-    fn to_sql(&self) -> Result<String, CubeError> {
-        self.sql()
+    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        let alias_name = self.alias_name()?;
+
+        let field_sql = if let Some(granularity) = &self.granularity {
+            let converted_tz = self
+                .query_tools
+                .base_tools()
+                .convert_tz(self.dimension.dimension_sql(context)?)?;
+            self.query_tools
+                .base_tools()
+                .time_grouped_column(granularity.clone(), converted_tz)?
+        } else {
+            unimplemented!("Time dimensions without granularity not supported yet")
+        };
+        Ok(format!("{} {}", field_sql, alias_name))
+    }
+
+    fn alias_name(&self) -> Result<String, CubeError> {
+        Ok(self
+            .query_tools
+            .escape_column_name(&self.unescaped_alias_name()?))
     }
 }
 
@@ -66,7 +85,7 @@ impl BaseTimeDimension {
         self.dimension.index()
     }
 
-    pub fn alias_name(&self) -> Result<String, CubeError> {
+    pub fn unescaped_alias_name(&self) -> Result<String, CubeError> {
         let granularity = if let Some(granularity) = &self.granularity {
             granularity
         } else {
@@ -76,24 +95,5 @@ impl BaseTimeDimension {
         Ok(self
             .query_tools
             .alias_name(&format!("{}_{}", self.dimension.dimension(), granularity)))
-    }
-
-    fn sql(&self) -> Result<String, CubeError> {
-        let alias_name = self.query_tools.escape_column_name(&self.alias_name()?);
-
-        let field_sql = if let Some(granularity) = &self.granularity {
-            self.query_tools
-                .base_tools()
-                .time_grouped_column(granularity.clone(), self.convert_tz()?)?
-        } else {
-            unimplemented!("Time dimensions without granularity not supported yet")
-        };
-        Ok(format!("{} {}", field_sql, alias_name))
-    }
-
-    fn convert_tz(&self) -> Result<String, CubeError> {
-        self.query_tools
-            .base_tools()
-            .convert_tz(self.dimension.dimension_sql()?)
     }
 }

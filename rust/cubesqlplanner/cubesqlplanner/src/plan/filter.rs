@@ -1,6 +1,7 @@
 use itertools::Itertools;
 
 use crate::planner::filter::BaseFilter;
+use cubenativeutils::CubeError;
 use std::boxed::Box;
 use std::fmt;
 use std::rc::Rc;
@@ -39,6 +40,27 @@ impl fmt::Display for FilterGroupOperator {
         }
     }
 }
+
+impl FilterItem {
+    pub fn to_sql(&self) -> Result<String, CubeError> {
+        let res = match self {
+            FilterItem::Group(group) => {
+                let operator = format!(" {} ", group.operator.to_string());
+                let items_sql = group
+                    .items
+                    .iter()
+                    .map(|itm| itm.to_sql())
+                    .collect::<Result<Vec<_>, _>>()?;
+                format!("({})", items_sql.join(&operator))
+            }
+            FilterItem::Item(item) => {
+                let sql = item.to_sql()?;
+                format!("({})", sql)
+            }
+        };
+        Ok(res)
+    }
+}
 impl fmt::Display for FilterItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -59,6 +81,18 @@ impl fmt::Display for FilterItem {
                 write!(f, "({})", sql)
             }
         }
+    }
+}
+
+impl Filter {
+    pub fn to_sql(&self) -> Result<String, CubeError> {
+        let res = self
+            .items
+            .iter()
+            .map(|itm| itm.to_sql())
+            .collect::<Result<Vec<_>, _>>()?
+            .join(" AND ");
+        Ok(res)
     }
 }
 

@@ -2,15 +2,37 @@ use super::sql_evaluator::Compiler;
 use super::{BaseDimension, BaseMeasure, BaseMember, ParamsAllocator};
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
+use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
+use datafusion::logical_plan::ExprSchema;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cell::{Ref, RefCell, RefMut};
 use std::collections::HashMap;
 use std::rc::Rc;
+
+pub struct QueryToolsCachedData {
+    join: Option<Rc<dyn JoinDefinition>>,
+}
+
+impl QueryToolsCachedData {
+    pub fn new() -> Self {
+        Self { join: None }
+    }
+
+    pub fn join(&self) -> Result<Rc<dyn JoinDefinition>, CubeError> {
+        self.join.clone().ok_or(CubeError::internal(
+            "Join not set in QueryToolsCachedData".to_string(),
+        ))
+    }
+
+    pub fn set_join(&mut self, join: Rc<dyn JoinDefinition>) {
+        self.join = Some(join);
+    }
+}
 
 pub struct QueryTools {
     cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -19,6 +41,7 @@ pub struct QueryTools {
     templates_render: Rc<dyn SqlTemplatesRender>,
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
+    cached_data: RefCell<QueryToolsCachedData>,
 }
 
 impl QueryTools {
@@ -36,6 +59,7 @@ impl QueryTools {
             templates_render,
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new())),
             evaluator_compiler,
+            cached_data: RefCell::new(QueryToolsCachedData::new()),
         }))
     }
 
@@ -51,6 +75,14 @@ impl QueryTools {
         &self.join_graph
     }
 
+    pub fn cached_data(&self) -> Ref<'_, QueryToolsCachedData> {
+        self.cached_data.borrow()
+    }
+
+    pub fn cached_data_mut(&self) -> RefMut<'_, QueryToolsCachedData> {
+        self.cached_data.borrow_mut()
+    }
+
     pub fn evaluator_compiler(&self) -> &Rc<RefCell<Compiler>> {
         &self.evaluator_compiler
     }
@@ -59,18 +91,27 @@ impl QueryTools {
         name.to_case(Case::Snake).replace(".", "__")
     }
 
-    pub fn cube_alias_name(&self, name: &str) -> String {
-        self.alias_name(name)
+    pub fn cube_alias_name(&self, name: &str, prefix: &Option<String>) -> String {
+        if let Some(prefix) = prefix {
+            self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))
+        } else {
+            self.alias_name(name)
+        }
     }
 
-    pub fn auto_prefix_with_cube_name(&self, cube_name: &str, sql: &str) -> String {
+    pub fn auto_prefix_with_cube_name(
+        &self,
+        cube_name: &str,
+        sql: &str,
+        prefix: &Option<String>,
+    ) -> String {
         lazy_static! {
             static ref SINGLE_MEMBER_RE: Regex = Regex::new(r"^[_a-zA-Z][_a-zA-Z0-9]*$").unwrap();
         }
         if SINGLE_MEMBER_RE.is_match(sql) {
             format!(
                 "{}.{}",
-                self.escape_column_name(&self.cube_alias_name(&cube_name)),
+                self.escape_column_name(&self.cube_alias_name(&cube_name, prefix)),
                 sql
             )
         } else {

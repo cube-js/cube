@@ -1,8 +1,9 @@
 use itertools::Itertools;
 
 use super::{Expr, Filter, From, OrderBy};
-use crate::planner::IndexedMember;
-use std::fmt;
+use crate::planner::{Context, IndexedMember};
+use cubenativeutils::CubeError;
+use std::fmt::{self, format};
 use std::rc::Rc;
 
 pub struct Select {
@@ -12,49 +13,70 @@ pub struct Select {
     pub group_by: Vec<Rc<dyn IndexedMember>>,
     pub having: Option<Filter>,
     pub order_by: Vec<OrderBy>,
+    pub context: Rc<Context>,
+    pub is_distinct: bool,
 }
 
-impl fmt::Display for Select {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "SELECT")?;
-        write!(f, "      ");
-        for expr in self.projection.iter().take(1) {
-            write!(f, "{}", expr)?;
-        }
-        for expr in self.projection.iter().skip(1) {
-            write!(f, ", {}", expr)?;
-        }
+impl Select {
+    pub fn to_sql(&self) -> Result<String, CubeError> {
+        let projection = self
+            .projection
+            .iter()
+            .map(|p| p.to_sql(self.context.clone()))
+            .collect::<Result<Vec<_>, _>>()?
+            .join(", ");
+        let where_condition = if let Some(filter) = &self.filter {
+            format!(" WHERE {}", filter.to_sql()?)
+        } else {
+            format!("")
+        };
 
-        writeln!(f, "")?;
-        writeln!(f, "    FROM")?;
-        write!(f, "{}", self.from)?;
-
-        if let Some(filter) = &self.filter {
-            write!(f, " WHERE {}", filter);
-        }
-
-        if !self.group_by.is_empty() {
+        let group_by = if !self.group_by.is_empty() {
             let str = self
                 .group_by
                 .iter()
-                .map(|d| format!("{}", d.index()))
+                .enumerate()
+                .map(|(i, _)| format!("{}", i + 1))
                 .join(", ");
-            write!(f, " GROUP BY {}", str)?;
-        }
+            format!(" GROUP BY {}", str)
+        } else {
+            format!("")
+        };
 
-        if let Some(having) = &self.having {
-            write!(f, " HAVING {}", having)?;
-        }
+        let having = if let Some(having) = &self.having {
+            format!(" HAVING {}", having.to_sql()?)
+        } else {
+            format!("")
+        };
 
-        if !self.order_by.is_empty() {
-            write!(f, " ORDER BY ")?;
-            for order in self.order_by.iter().take(1) {
-                write!(f, "{}", order)?;
-            }
-            for order in self.order_by.iter().skip(1) {
-                write!(f, ", {}", order)?;
-            }
-        }
-        Ok(())
+        let order_by = if !self.order_by.is_empty() {
+            let order_sql = self
+                .order_by
+                .iter()
+                .enumerate()
+                .map(|(i, itm)| format!("{} {}", i + 1, itm.asc_str()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(" ORDER BY {}", order_sql)
+        } else {
+            format!("")
+        };
+
+        let distinct = if self.is_distinct { "DISTINCT " } else { "" };
+
+        let res = format!(
+            "SELECT\
+            \n      {}{}\
+            \n    FROM\
+            \n{}{}{}{}{}",
+            distinct,
+            projection,
+            self.from.to_sql(self.context.clone())?,
+            where_condition,
+            group_by,
+            having,
+            order_by
+        );
+        Ok(res)
     }
 }

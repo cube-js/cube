@@ -578,7 +578,6 @@ export class BaseQuery {
   }
 
   buildSqlAndParamsTest(exportAnnotatedSql) {
-    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
 
     if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
       if (this.externalPreAggregationQuery()) { // TODO performance
@@ -597,8 +596,9 @@ export class BaseQuery {
         { cache: this.queryCache }
       )
     );
-    console.log('!! rust result: ', r);
     console.log('!! js result: ', rr);
+    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
+    console.log('!! rust result: ', r);
     return rr;
   }
 

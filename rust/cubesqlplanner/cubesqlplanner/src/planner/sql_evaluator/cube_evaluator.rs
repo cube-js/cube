@@ -1,5 +1,5 @@
 use super::dependecy::Dependency;
-use super::{EvaluationNode, MemberEvaluatorType};
+use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
 use super::{MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
@@ -18,8 +18,14 @@ impl CubeNameEvaluator {
     pub fn new(cube_name: String) -> Self {
         Self { cube_name }
     }
-    pub fn default_evaluate_sql(&self, tools: Rc<QueryTools>) -> Result<String, CubeError> {
-        Ok(tools.escape_column_name(&tools.cube_alias_name(&self.cube_name)))
+    pub fn default_evaluate_sql(
+        &self,
+        visitor: &DefaultEvaluatorVisitor,
+        tools: Rc<QueryTools>,
+    ) -> Result<String, CubeError> {
+        Ok(tools.escape_column_name(
+            &tools.cube_alias_name(&self.cube_name, visitor.cube_alias_prefix()),
+        ))
     }
 }
 

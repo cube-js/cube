@@ -4,11 +4,12 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub trait TraversalVisitor {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError>;
+    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError>;
 
     fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
-        self.on_node_traverse(node)?;
-        self.travese_deps(node)?;
+        if self.on_node_traverse(node)? {
+            self.travese_deps(node)?;
+        }
         Ok(())
     }
 

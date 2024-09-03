@@ -24,22 +24,26 @@ impl JoinHintsCollector {
 }
 
 impl TraversalVisitor for JoinHintsCollector {
-    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
-        match node.evaluator() {
+    fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
+        let res = match node.evaluator() {
             MemberEvaluatorType::Dimension(e) => {
                 self.hints.insert(e.cube_name().clone());
+                true
             }
             MemberEvaluatorType::Measure(e) => {
                 self.hints.insert(e.cube_name().clone());
+                true
             }
             MemberEvaluatorType::CubeName(e) => {
                 self.hints.insert(e.cube_name().clone());
+                true
             }
             MemberEvaluatorType::CubeTable(e) => {
                 self.hints.insert(e.cube_name().clone());
+                true
             }
-            MemberEvaluatorType::JoinCondition(_) => {}
+            MemberEvaluatorType::JoinCondition(_) => false,
         };
-        Ok(())
+        Ok(res)
     }
 }
