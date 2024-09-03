@@ -1,12 +1,19 @@
 import { PlayCircleOutlined } from '@ant-design/icons';
-import { ApolloClient, ApolloLink, gql, HttpLink, InMemoryCache, useQuery } from '@apollo/client';
+import {
+  ApolloClient,
+  ApolloLink,
+  gql,
+  HttpLink,
+  InMemoryCache,
+  useQuery,
+} from '@apollo/client';
 import { RetryLink } from '@apollo/client/link/retry';
 import { Alert, Block, Button, Grid, tasty } from '@cube-dev/ui-kit';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useDeepMemo } from './hooks';
 import { useQueryBuilderContext } from './context';
-import { convertJsonQueryToGraphQL } from './utils/graphql-converters';
+import { convertJsonQueryToGraphQL } from './utils';
 import { CopyButton } from './components/CopyButton';
 import { TabPaneWithToolbar } from './components/TabPaneWithToolbar';
 import { ScrollableCodeContainer } from './components/ScrollableCodeContainer';
@@ -46,8 +53,16 @@ function cleanServiceKeys(obj: any) {
 }
 
 export function QueryBuilderGraphQL() {
-  const { query, isQueryTouched, joinedMembers, queryHash, isQueryEmpty, apiUrl, apiToken, meta } =
-    useQueryBuilderContext();
+  const {
+    query,
+    isQueryTouched,
+    joinedMembers,
+    queryHash,
+    isQueryEmpty,
+    apiUrl,
+    apiToken,
+    meta,
+  } = useQueryBuilderContext();
   const [isFetching, setIsFetching] = useState(false);
 
   const gqlQuery = useDeepMemo(() => {
@@ -112,7 +127,9 @@ export function QueryBuilderGraphQL() {
               size="small"
               onPress={() => setIsFetching(true)}
             >
-              {isFetching && !rawData && !queryError ? 'Fetching...' : 'Fetch Raw Response'}
+              {isFetching && !rawData && !queryError
+                ? 'Fetching...'
+                : 'Fetch Raw Response'}
             </Button>
           ) : null
         }
@@ -129,7 +146,11 @@ export function QueryBuilderGraphQL() {
           {rawData || queryError ? (
             <Container>
               <ScrollableCodeContainer
-                value={queryError ? queryError.toString() : JSON.stringify(rawData, null, 2)}
+                value={
+                  queryError
+                    ? queryError.toString()
+                    : JSON.stringify(rawData, null, 2)
+                }
               />
             </Container>
           ) : null}

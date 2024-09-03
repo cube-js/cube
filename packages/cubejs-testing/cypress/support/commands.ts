@@ -45,7 +45,15 @@ Cypress.Commands.add("setQuery", (query, ...args) => {
 });
 
 Cypress.Commands.add("setChartType", (chartType) => {
-  cy.getByQa("RadioWrapper").contains(chartType, { matchCase: false }).click();
+  cy.get("[data-qa=QueryBuilderChart] > div").then(($title) => {
+    if ($title.attr("aria-expanded")?.includes("false")) {
+      cy.get("[data-qa=QueryBuilderChart] > div").click();
+    }
+  });
+  cy.getByQa("ChartType")
+    .getByQa("RadioWrapper")
+    .contains(chartType, { matchCase: false })
+    .click();
 });
 
 Cypress.Commands.add("runQuery", () => {

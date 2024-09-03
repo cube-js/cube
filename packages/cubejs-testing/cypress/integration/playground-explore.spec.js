@@ -52,7 +52,7 @@ context("Playground: Explore Page", () => {
 
     cy.wait(20000);
 
-    cy.addMeasure("events.count");
+    cy.addMeasure("Events.count");
     cy.wait(300);
     cy.getByTestId("TimeDimension").contains("Events Created at");
   });
