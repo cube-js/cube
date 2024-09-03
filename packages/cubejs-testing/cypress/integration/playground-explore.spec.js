@@ -161,7 +161,7 @@ context("Playground: Explore Page", () => {
         .closest("[data-qa=Field]")
         .getByQa("RadioWrapper")
         .contains("0 to 9")
-        .get("Radio")
+        .getByQa("Radio")
         .click();
 
       // todo: fix and uncomment
