@@ -310,6 +310,28 @@ type conversions in this case.
 
 </InfoBox>
 
+In the example above, the filter on a time dimension accepts two values: the
+lower and the upper bounds of a date range. If a filter accepts multiple values,
+they are passed to the function as individual parameters:
+
+```javascript
+cube(`multi_filter`, {
+  sql: `
+    SELECT 123 AS value
+    -- Multiple values: ${FILTER_PARAMS.multi_filter.dummy.filter(
+      (...args) => JSON.stringify(args)
+    )}
+  `,
+
+  dimensions: {
+    dummy: {
+      sql: `1`,
+      type: `number`
+    }
+  }
+})
+```
+
 ## `FILTER_GROUP`
 
 If you use `FILTER_PARAMS` in your query more than once, you must wrap them

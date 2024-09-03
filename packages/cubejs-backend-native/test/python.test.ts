@@ -52,10 +52,18 @@ suite('Python Config', () => {
       throw new Error('checkAuth was not defined in config.py');
     }
 
-    await config.checkAuth(
+    const result = await config.checkAuth(
       { requestId: 'test' },
       'MY_SECRET_TOKEN'
     );
+
+    expect(result).toEqual({
+      security_context: {
+        sub: '1234567890',
+        iat: 1516239022,
+        user_id: 42
+      },
+    });
   });
 
   test('context_to_api_scopes', async () => {

@@ -2,9 +2,9 @@ use crate::metastore::Column;
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
-use arrow::array::ArrayRef;
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{
     Column as DFColumn, DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
 };
@@ -434,7 +434,7 @@ impl KafkaPostProcessPlanner {
             Arc::new(schema.join(&DFSchema::new(vec![DFField::new(
                 None,
                 self.seq_column.get_name(),
-                arrow::datatypes::DataType::Int64,
+                datafusion::arrow::datatypes::DataType::Int64,
                 true,
             )])?)?)
         } else {

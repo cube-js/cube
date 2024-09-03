@@ -134,6 +134,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_coalesce_two_dimensions() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            // language=PostgreSQL
+            r#"
+            SELECT COALESCE(dim_str0, dim_str1, '(none)')
+            FROM MultiTypeCube
+            GROUP BY 1
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                segments: Some(vec![]),
+                dimensions: Some(vec![
+                    "MultiTypeCube.dim_str0".to_string(),
+                    "MultiTypeCube.dim_str1".to_string(),
+                ]),
+                time_dimensions: None,
+                order: None,
+                limit: None,
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn test_select_number() {
         let query_plan = convert_select_to_query_plan(
             "SELECT MEASURE(someNumber) as s1, SUM(someNumber) as s2, MIN(someNumber) as s3, MAX(someNumber) as s4, COUNT(someNumber) as s5 FROM NumberCube".to_string(),
@@ -6895,6 +6934,89 @@ ORDER BY
         }
 
         Ok(())
+    }
+
+    // Tests that incoming query with 'qtr' (or another synonym) that is not reachable
+    // by any rewrites in egraph will be executable anyway
+    // TODO implement and test more complex queries, like dynamic granularity
+    #[tokio::test]
+    async fn test_nonrewritable_date_trunc() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // language=PostgreSQL
+        let query = r#"
+            WITH count_by_month AS (
+                SELECT
+                    DATE_TRUNC('month', dim_date0) month0,
+                    COUNT(*) month_count
+                FROM MultiTypeCube
+                GROUP BY month0
+            )
+            SELECT
+                DATE_TRUNC('qtr', count_by_month.month0) quarter0,
+                MIN(month_count) min_month_count
+            FROM count_by_month
+            GROUP BY quarter0
+        "#;
+
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec!["MultiTypeCube.count".to_string()]),
+            segments: Some(vec![]),
+            dimensions: Some(vec![]),
+            time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
+                dimension: "MultiTypeCube.dim_date0".to_owned(),
+                granularity: Some("month".to_string()),
+                date_range: None,
+            }]),
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan.clone(),
+                simple_load_response(vec![
+                    json!({
+                        "MultiTypeCube.dim_date0.month": "2024-01-01T00:00:00",
+                        "MultiTypeCube.count": "3",
+                    }),
+                    json!({
+                        "MultiTypeCube.dim_date0.month": "2024-02-01T00:00:00",
+                        "MultiTypeCube.count": "2",
+                    }),
+                    json!({
+                        "MultiTypeCube.dim_date0.month": "2024-03-01T00:00:00",
+                        "MultiTypeCube.count": "1",
+                    }),
+                    json!({
+                        "MultiTypeCube.dim_date0.month": "2024-04-01T00:00:00",
+                        "MultiTypeCube.count": "10",
+                    }),
+                ]),
+            )
+            .await;
+
+        assert_eq!(
+            context
+                .convert_sql_to_cube_query(&query)
+                .await
+                .unwrap()
+                .as_logical_plan()
+                .find_cube_scan()
+                .request,
+            expected_cube_scan
+        );
+
+        // Expect that query is executable, and properly groups months by quarter
+        insta::assert_snapshot!(context.execute_query(query).await.unwrap());
     }
 
     #[tokio::test]
@@ -15072,7 +15194,7 @@ ORDER BY "source"."str0" ASC
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan(
-            "SELECT CASE WHEN taxful_total_price IS NULL THEN NULL WHEN taxful_total_price < taxful_total_price * 2 THEN COALESCE(taxful_total_price, 0, 0) END FROM KibanaSampleDataEcommerce GROUP BY 1"
+            "SELECT CASE WHEN taxful_total_price IS NULL THEN NULL WHEN taxful_total_price < taxful_total_price * 2 THEN COALESCE(taxful_total_price, 0, 0) END, AVG(avgPrice) FROM KibanaSampleDataEcommerce GROUP BY 1"
                 .to_string(),
             DatabaseProtocol::PostgreSQL,
         )
@@ -15122,7 +15244,7 @@ ORDER BY "source"."str0" ASC
         init_testing_logger();
 
         let query_plan = convert_select_to_query_plan_customized(
-            "SELECT CASE WHEN customer_gender = '\\`' THEN COALESCE(customer_gender, 'N/A', 'NN') ELSE 'N/A' END as \"\\`\" FROM KibanaSampleDataEcommerce a".to_string(),
+            "SELECT CASE WHEN customer_gender = '\\`' THEN COALESCE(customer_gender, 'N/A', 'NN') ELSE 'N/A' END as \"\\`\", AVG(avgPrice) FROM KibanaSampleDataEcommerce a GROUP BY 1".to_string(),
             DatabaseProtocol::PostgreSQL,
             vec![
                 ("expressions/binary".to_string(), "{{ left }} \\`{{ op }} {{ right }}".to_string())
@@ -15407,6 +15529,78 @@ ORDER BY "source"."str0" ASC
             // Expect different values for different tokens
             insta::assert_snapshot!(
                 format!("date_part_{token}_from_dimension"),
+                context.execute_query(query).await.unwrap()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_noninjective_call_dimension() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let context = TestContext::new(DatabaseProtocol::PostgreSQL).await;
+
+        // Expected scan is same for every query
+        let expected_cube_scan = V1LoadRequestQuery {
+            measures: Some(vec![]),
+            segments: Some(vec![]),
+            dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
+            time_dimensions: None,
+            order: None,
+            limit: None,
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        };
+
+        context
+            .add_cube_load_mock(
+                expected_cube_scan.clone(),
+                simple_load_response(vec![
+                    json!({"MultiTypeCube.dim_str0": "foo"}),
+                    json!({"MultiTypeCube.dim_str0": null}),
+                    json!({"MultiTypeCube.dim_str0": "(none)"}),
+                    json!({"MultiTypeCube.dim_str0": "abcd"}),
+                    json!({"MultiTypeCube.dim_str0": "ab__cd"}),
+                ]),
+            )
+            .await;
+
+        let exprs = [
+            ("coalesce", "COALESCE(dim_str0, '(none)')"),
+            ("nullif", "NULLIF(dim_str0, '(none)')"),
+            ("left", "LEFT(dim_str0, 2)"),
+            ("right", "RIGHT(dim_str0, 2)"),
+        ];
+
+        for (name, expr) in exprs {
+            // language=PostgreSQL
+            let query = format!(
+                r#"
+                SELECT {expr} AS result
+                FROM MultiTypeCube
+                GROUP BY 1
+                ORDER BY result
+            "#
+            );
+
+            assert_eq!(
+                context
+                    .convert_sql_to_cube_query(&query)
+                    .await
+                    .unwrap()
+                    .as_logical_plan()
+                    .find_cube_scan()
+                    .request,
+                expected_cube_scan
+            );
+
+            // Expect no dublicates in result set
+            insta::assert_snapshot!(
+                format!("noninjective_{name}_from_dimension"),
                 context.execute_query(query).await.unwrap()
             );
         }

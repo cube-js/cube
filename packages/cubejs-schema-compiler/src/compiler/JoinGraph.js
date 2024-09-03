@@ -114,11 +114,18 @@ export class JoinGraph {
       this.builtJoins[key] = Object.assign(join, {
         multiplicationFactor: R.compose(
           R.fromPairs,
-          R.map(v => [v, this.findMultiplicationFactorFor(v, join.joins)])
+          R.map(v => [this.cubeFromPath(v), this.findMultiplicationFactorFor(this.cubeFromPath(v), join.joins)])
         )(cubesToJoin)
       });
     }
     return this.builtJoins[key];
+  }
+
+  cubeFromPath(cubePath) {
+    if (Array.isArray(cubePath)) {
+      return cubePath[cubePath.length - 1];
+    }
+    return cubePath;
   }
 
   buildJoinTreeForRoot(root, cubesToJoin) {
@@ -138,6 +145,7 @@ export class JoinGraph {
       let prevNode = root;
       return joinHints.filter(toJoin => toJoin !== prevNode).map(toJoin => {
         if (nodesJoined[toJoin]) {
+          prevNode = toJoin;
           return { joins: [] };
         }
         const path = this.graph.path(prevNode, toJoin);

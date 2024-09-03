@@ -490,7 +490,7 @@ impl QueryEngine for SqlQueryEngine {
     }
 
     fn sanitize_statement(&self, stmt: &Self::AstStatementType) -> Self::AstStatementType {
-        SensitiveDataSanitizer::new().replace(&stmt)
+        SensitiveDataSanitizer::new().replace(stmt.clone())
     }
 }
 

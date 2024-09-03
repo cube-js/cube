@@ -28,8 +28,6 @@ cubehll = { path = "../cubehll" }
 cubezetasketch = { path = "../cubezetasketch" }
 cubedatasketches = { path = "../cubedatasketches" }
 cuberpc = { path = "../cuberpc" }
-parquet = { git = "https://github.com/cube-js/arrow-rs", branch = "cube", features = ["arrow"] }
-arrow = { git = "https://github.com/cube-js/arrow-rs", branch = "cube" }
 datafusion = { git = "https://github.com/cube-js/arrow-datafusion", branch = "cube", features = ["default_nulls_last"] }
 csv = "1.1.3"
 bytes = "1.6.0"

@@ -13,8 +13,8 @@ use crate::queryplanner::udfs::{
 use crate::queryplanner::InfoSchemaTableProvider;
 use crate::table::Row;
 use crate::CubeError;
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext::alias::LogicalAlias;
 use datafusion::cube_ext::join::SkewedLeftCrossJoin;
 use datafusion::cube_ext::joinagg::CrossJoinAgg;

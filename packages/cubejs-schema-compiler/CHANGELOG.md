@@ -3,6 +3,41 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+
+### Features
+
+* **cubejs-api-gateway:** Add description to V1CubeMeta, V1CubeMetaDimension and V1CubeMetaMeasure in OpenAPI ([#8597](https://github.com/cube-js/cube/issues/8597)) ([1afa934](https://github.com/cube-js/cube/commit/1afa934b1db7379a87ee913816e9ce855783d2bb))
+* **schema-compiler:** detect boolean columns for schema generation ([#8637](https://github.com/cube-js/cube/issues/8637)) ([178d98f](https://github.com/cube-js/cube/commit/178d98fbc35b1744d0e83e0e4103ce0465ca2244))
+
+
+
+
+
+## [0.35.77](https://github.com/cube-js/cube/compare/v0.35.76...v0.35.77) (2024-08-26)
+
+
+### Bug Fixes
+
+* Row deduplication query isn't triggered in views if multiple entry join path is used ([#8631](https://github.com/cube-js/cube/issues/8631)) ([1668175](https://github.com/cube-js/cube/commit/16681754acfd23f1005838f83e8333ac1da1c6c3))
+* View builds incorrect join graph if join paths partially shared ([#8632](https://github.com/cube-js/cube/issues/8632)) Thanks [@barakcoh](https://github.com/barakcoh) for the fix hint! ([5ca76db](https://github.com/cube-js/cube/commit/5ca76dbd66c8b0227d3107a1b1c3f1f9316dbd86)), closes [#8499](https://github.com/cube-js/cube/issues/8499)
+
+
+
+
+
+## [0.35.76](https://github.com/cube-js/cube/compare/v0.35.75...v0.35.76) (2024-08-24)
+
+
+### Bug Fixes
+
+* Invalid interval when querying multiple negative interval windows within Cube Store ([#8626](https://github.com/cube-js/cube/issues/8626)) ([716b26a](https://github.com/cube-js/cube/commit/716b26a7fa5c43d1b7970461c5007c872b0ca184))
+
+
+
+
+
 ## [0.35.75](https://github.com/cube-js/cube/compare/v0.35.74...v0.35.75) (2024-08-22)
 
 
