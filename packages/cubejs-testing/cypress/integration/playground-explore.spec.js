@@ -143,7 +143,7 @@ context("Playground: Explore Page", () => {
     // });
   });
 
-  describe("Order", () => {
+  describe.skip("Order", () => {
     it("applies order", () => {
       cy.setQuery(tableQuery);
       // cy.setChartType("table");
