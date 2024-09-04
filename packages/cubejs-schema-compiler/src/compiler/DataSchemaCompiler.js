@@ -8,7 +8,6 @@ import babelTraverse from '@babel/traverse';
 import R from 'ramda';
 
 import { isNativeSupported } from '@cubejs-backend/shared';
-import { AbstractExtension } from '../extensions';
 import { UserError } from './UserError';
 import { ErrorReporter } from './ErrorReporter';
 

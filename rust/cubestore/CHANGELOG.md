@@ -3,6 +3,206 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+
+### Bug Fixes
+
+* **cubestore:** Reduce memory usage while converting to DataFrame ([#8599](https://github.com/cube-js/cube/issues/8599)) ([15f9a0f](https://github.com/cube-js/cube/commit/15f9a0f6791a5128c426c452ea180ffa757f8bc3))
+
+
+
+
+
+## [0.35.68](https://github.com/cube-js/cube/compare/v0.35.67...v0.35.68) (2024-08-12)
+
+
+### Bug Fixes
+
+* **cubestore:** Docker - install ca-certificates ([#8571](https://github.com/cube-js/cube/issues/8571)) ([da40ff6](https://github.com/cube-js/cube/commit/da40ff6efca4822c907631a594380cced4f22978))
+
+
+
+
+
+## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Skip HEAD requests for AWS S3, fix [#8536](https://github.com/cube-js/cube/issues/8536) ([#8542](https://github.com/cube-js/cube/issues/8542)) ([41e3070](https://github.com/cube-js/cube/commit/41e30704fa0d9c72bb2aea9f64d5bddcdf71b796))
+
+
+
+
+
+## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
+
+
+### Bug Fixes
+
+* **cubestore:** Import - validate http response for error ([#8520](https://github.com/cube-js/cube/issues/8520)) ([d462b89](https://github.com/cube-js/cube/commit/d462b89410ef94f33b4827384ec4f3f845d56a9f))
+
+
+
+
+
+## [0.35.63](https://github.com/cube-js/cube/compare/v0.35.62...v0.35.63) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.58](https://github.com/cube-js/cube/compare/v0.35.57...v0.35.58) (2024-07-10)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.53](https://github.com/cube-js/cube/compare/v0.35.52...v0.35.53) (2024-06-26)
+
+
+### Features
+
+* **cubestore:** Docker - upgrade to bookworm ([bfd560c](https://github.com/cube-js/cube/commit/bfd560c5532c2a6c88546853cd7294a9ca1ce1db))
+* **cubestore:** Support openssl 3 (upgrade rdkafka) ([f4874d6](https://github.com/cube-js/cube/commit/f4874d64c1bbf9989735bbdc35b504a2e451470e))
+
+
+
+
+
+## [0.35.46](https://github.com/cube-js/cube.js/compare/v0.35.45...v0.35.46) (2024-06-06)
+
+
+### Bug Fixes
+
+* **cubestore:** Channel closed in query queue cache ([#8327](https://github.com/cube-js/cube.js/issues/8327)) ([8898fb1](https://github.com/cube-js/cube.js/commit/8898fb19bb39dd4778fee695df1ef8497ee28eb2))
+
+
+
+
+
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.34](https://github.com/cube-js/cube/compare/v0.35.33...v0.35.34) (2024-05-15)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - STS credentials (align aws-creds to 0.36 in fork) ([#8264](https://github.com/cube-js/cube/issues/8264)) ([1a5b27d](https://github.com/cube-js/cube/commit/1a5b27d1775691456a90d34130841ee03b5edef6))
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube.js/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+**Note:** Version bump only for package @cubejs-backend/cubestore
+
+
+
+
+
+## [0.35.31](https://github.com/cube-js/cube/compare/v0.35.30...v0.35.31) (2024-05-13)
+
+
+### Features
+
+* **cubestore:** Support HLL from Apache DataSketches (for DataBricks) ([#8241](https://github.com/cube-js/cube/issues/8241)) ([baf2667](https://github.com/cube-js/cube/commit/baf26677a0ceb50102516d3a7cce7543be4a57a2))
+
+
+
+
+
+## [0.35.27](https://github.com/cube-js/cube/compare/v0.35.26...v0.35.27) (2024-05-02)
+
+
+### Bug Fixes
+
+* **cubestore:** Queue - remove queue item payload on ack (reduce compaction) ([#8225](https://github.com/cube-js/cube/issues/8225)) ([ac58583](https://github.com/cube-js/cube/commit/ac5858384e26b9b9077e9ffeb42d64da874d1f62))
+* **cubestore:** Queue - truncate unused queue rows via TTL ([#8227](https://github.com/cube-js/cube/issues/8227)) ([70ecbef](https://github.com/cube-js/cube/commit/70ecbefadc00eb857362ae647f136873a708bb80))
+
+
+### Features
+
+* **cubestore:** Allow to truncate queue item payloads via system command ([#8226](https://github.com/cube-js/cube/issues/8226)) ([75d4eac](https://github.com/cube-js/cube/commit/75d4eac3b48acfc02c8affacdf28f1f0897087b0))
+
+
+
+
+
+## [0.35.25](https://github.com/cube-js/cube.js/compare/v0.35.24...v0.35.25) (2024-04-29)
+
+
+### Bug Fixes
+
+* **cubestore:** Error in optimization for nested boolean expressions ([#7891](https://github.com/cube-js/cube.js/issues/7891)) ([e5d20d2](https://github.com/cube-js/cube.js/commit/e5d20d228ac07849dbcd4df2f713ea01fc74f0fe))
+
+
+
+
+
+## [0.35.24](https://github.com/cube-js/cube/compare/v0.35.23...v0.35.24) (2024-04-26)
+
+
+### Bug Fixes
+
+* **cubestore:** S3 - STS credentials (backport fix for 0.32.3) ([#8195](https://github.com/cube-js/cube/issues/8195)) ([9d9cb4a](https://github.com/cube-js/cube/commit/9d9cb4a025931da24d560220878b7450f81de22c))
+
+
+
+
+
 ## [0.35.22](https://github.com/cube-js/cube/compare/v0.35.21...v0.35.22) (2024-04-22)
 
 

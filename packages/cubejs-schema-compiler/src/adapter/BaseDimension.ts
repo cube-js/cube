@@ -45,6 +45,7 @@ export class BaseDimension {
     return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.dimensionSql(this));
   }
 
+  // We need this for dimensions however we don't for filters for performance reasons
   public convertTzForRawTimeDimensionIfNeeded(sql) {
     if (this.query.options.convertTzForRawTimeDimension) {
       return this.query.evaluateSymbolSqlWithContext(sql, {

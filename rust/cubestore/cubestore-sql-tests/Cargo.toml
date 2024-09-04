@@ -8,6 +8,7 @@ description = "Tests for CubeStore that can run in multiple configurations."
 documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
+resolver = "2"
 
 [lib]
 test = false
@@ -41,7 +42,7 @@ itertools = "0.9.0"
 lazy_static = "1.4.0"
 log = "0.4.11"
 pretty_assertions = "0.7.1"
-reqwest = { version = "0.12.3", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
+reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 scopeguard = "1.1.0"
 serde = "1.0.115"
 serde_derive = "1.0.115"

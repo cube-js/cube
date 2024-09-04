@@ -23,6 +23,44 @@ describe('Yaml Schema Testing', () => {
     }
   });
 
+  it('pre-aggregations - success', async () => {
+    const { compiler } = prepareYamlCompiler(
+      `
+      cubes:
+      - name: Orders
+        sql: "select * from tbl"
+        dimensions:
+          - name: created_at
+            sql: created_at
+            type: time
+          - name: completed_at
+            sql: completed_at
+            type: time
+        measures:
+          - name: count
+            type: count
+        pre_aggregations:
+          - name: multiple_time_dimensions
+            measures:
+              - count
+            time_dimensions:
+              - dimension: created_at
+                granularity: day
+              - dimension: completed_at
+                granularity: day
+            partition_granularity: day
+            build_range_start:
+              sql: SELECT NOW() - INTERVAL '600 day'
+            build_range_end:
+              sql: SELECT NOW()
+            refresh_key:
+              every: '1 day'
+      `
+    );
+
+    await compiler.compile();
+  });
+
   it('commented file crash', async () => {
     const { compiler } = prepareYamlCompiler(
       `
@@ -141,5 +179,47 @@ describe('Yaml Schema Testing', () => {
     );
 
     await compiler.compile();
+  });
+
+  it('descriptions', async () => {
+    const { compiler, metaTransformer } = prepareYamlCompiler(
+      `
+      cubes:
+      - name: CubeA
+        description: "YAML schema test cube"
+        sql: "select * from tbl"
+        dimensions:
+        - name: id
+          description: "id dimension from YAML test cube"
+          sql: id
+          type: number
+        measures:
+        - name: count
+          description: "count measure from YAML test cube"
+          type: count
+        segments:
+        - name: sfUsers
+          description: "SF users segment from createCubeSchema"
+          sql: "{CUBE}.location = 'San Francisco'"
+      `
+    );
+
+    await compiler.compile();
+
+    const { description, dimensions, measures, segments } = metaTransformer.cubes[0].config;
+
+    expect(description).toBe('YAML schema test cube');
+
+    expect(dimensions).toBeDefined();
+    expect(dimensions.length).toBeGreaterThan(0);
+    expect(dimensions.find((dimension) => dimension.name === 'CubeA.id').description).toBe('id dimension from YAML test cube');
+
+    expect(measures).toBeDefined();
+    expect(measures.length).toBeGreaterThan(0);
+    expect(measures.find((measure) => measure.name === 'CubeA.count').description).toBe('count measure from YAML test cube');
+
+    expect(segments).toBeDefined();
+    expect(segments.length).toBeGreaterThan(0);
+    expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
   });
 });

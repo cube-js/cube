@@ -34,9 +34,12 @@ views:
 
 ### `description`
 
-A description of the view allows your team to better understand what its purpose
-is. It is a very simple and yet useful tool that gives a hint to everyone and
-ensures that data is interpreted correctly by users.
+This parameter provides a human-readable description of a view.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+A description can give a hint both to your team and end users, making sure they
+interpret the data correctly. 
 
 <CodeTabs>
 
@@ -302,8 +305,11 @@ matching algorithm used for Cubes. As a consequence, all measures and dimensions
 included in pre-aggregation should be leaf members in order to be matched by
 view query.
 
+
 [ref-recipe-control-access-cubes-views]:
   /guides/recipes/access-control/controlling-access-to-cubes-and-views
 [ref-schema-joins-direction]:
   /product/data-modeling/concepts/working-with-joins#directions-of-joins
 [ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations

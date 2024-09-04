@@ -1,5 +1,5 @@
 export function removeEmpty(obj) {
-  if (typeof obj !== 'object') {
+  if (Array.isArray(obj) || typeof obj !== 'object') {
     return obj;
   }
 

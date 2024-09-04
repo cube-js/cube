@@ -8,14 +8,19 @@
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
       "CUBEJS_DB_USER": "root",
-      "CUBEJS_DB_PASS": "123-Strong-Password-321"
+      "CUBEJS_DB_PASS": "123-Strong-Password-321",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
-    "image": "mysql:8",
+    "image": "mysql:8.0.22",
+    "platform": "linux/amd64",
     "environment": {
       "MYSQL_DATABASE": "test",
       "MYSQL_ROOT_PASSWORD": "123-Strong-Password-321"
@@ -85,14 +90,32 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ],
+        "sqlAlias": "mtdfc"
       }
     ]
   },
   "skip": [
     "MySQL doesn't support offset wo limit",
     "---------------------------------------",
-    "querying ECommerce: dimentions + order + total + offset",
-    "querying Customers: dimentions + order + total + offset",
+    "querying ECommerce: dimensions + order + total + offset",
+    "querying Customers: dimensions + order + total + offset",
     "SKIPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -103,6 +126,18 @@
     "querying ECommerce: partitioned pre-agg higher granularity",
     "querying BigECommerce: partitioned pre-agg",
     "querying BigECommerce: null sum",
-    "querying BigECommerce: null boolean"
+    "querying BigECommerce: null boolean",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: reuse params",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

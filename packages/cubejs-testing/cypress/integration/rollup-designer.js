@@ -19,7 +19,7 @@ context('Playground: Rollup Designer', () => {
       cy.getByTestId('rd-query-tab').should('exist');
 
       cy.getByTestId('member-tag-Orders.Count').should('exist');
-      cy.getByTestId('rd-query-tab').click({ timeout: 60 * 1000 });
+      cy.getByTestId('rd-query-tab').click({ timeout: 120 * 1000 });
       cy.getByTestId('rd-incompatible-query').should('not.exist');
 
       cy.getByTestId('member-tag-Orders.Count').find('.anticon-close').click();

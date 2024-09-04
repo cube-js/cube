@@ -84,11 +84,13 @@ pub struct QueueItem {
     pub(crate) heartbeat: Option<DateTime<Utc>>,
     #[serde(with = "ts_seconds_option")]
     orphaned: Option<DateTime<Utc>>,
+    #[serde(with = "ts_seconds")]
+    expire: DateTime<Utc>,
 }
 
 impl RocksEntity for QueueItem {
     fn version() -> u32 {
-        3
+        4
     }
 }
 
@@ -148,6 +150,11 @@ impl QueueItem {
             } else {
                 None
             },
+            expire: if let Some(orphaned) = orphaned {
+                created + Duration::seconds(orphaned as i64) + Duration::hours(2)
+            } else {
+                created.clone() + Duration::hours(4)
+            },
             created,
         }
     }
@@ -200,6 +207,10 @@ impl QueueItem {
 
     pub fn get_orphaned(&self) -> &Option<DateTime<Utc>> {
         &self.orphaned
+    }
+
+    pub fn get_expire(&self) -> &DateTime<Utc> {
+        &self.expire
     }
 
     pub fn status_default() -> QueueItemStatus {
@@ -414,11 +425,7 @@ impl RocksSecondaryIndex<QueueItem, QueueItemIndexKey> for QueueItemRocksIndex {
     }
 
     fn get_expire(&self, row: &QueueItem) -> Option<DateTime<Utc>> {
-        if let Some(orphaned) = row.orphaned {
-            Some(orphaned.clone() + Duration::hours(1))
-        } else {
-            Some(row.get_created().clone() + Duration::hours(2))
-        }
+        Some(row.expire.clone())
     }
 
     fn get_id(&self) -> IndexId {

@@ -1,5 +1,6 @@
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
+import { BaseTimeDimension } from './BaseTimeDimension';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'DAY',
@@ -35,6 +36,10 @@ class BigqueryFilter extends BaseFilter {
 }
 
 export class BigqueryQuery extends BaseQuery {
+  public castToString(sql) {
+    return `CAST(${sql} as STRING)`;
+  }
+
   public convertTz(field) {
     return `DATETIME(${field}, '${this.timezone}')`;
   }
@@ -59,15 +64,23 @@ export class BigqueryQuery extends BaseQuery {
     return new BigqueryFilter(this, filter);
   }
 
-  public dateSeriesSql(timeDimension) {
+  public dateSeriesSql(timeDimension: BaseTimeDimension) {
     return `${timeDimension.dateSeriesAliasName()} AS (${this.seriesSql(timeDimension)})`;
   }
 
-  public seriesSql(timeDimension) {
+  public seriesSql(timeDimension: BaseTimeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
     return `SELECT ${this.dateTimeCast('dates.f')} date_from, ${this.dateTimeCast('dates.t')} date_to FROM (${values}) AS dates`;
+  }
+
+  public timestampFormat() {
+    return 'YYYY-MM-DD[T]HH:mm:ss.SSSSSS[Z]';
+  }
+
+  public timestampPrecision(): number {
+    return 6;
   }
 
   public overTimeSeriesSelect(cumulativeMeasures, dateSeriesSql, baseQuery, dateJoinConditionSql, baseQueryAlias) {
@@ -156,11 +169,17 @@ export class BigqueryQuery extends BaseQuery {
     templates.functions.DATEDIFF = 'DATETIME_DIFF(CAST({{ args[2] }} AS DATETIME), CAST({{ args[1] }} AS DATETIME), {{ date_part }})';
     // DATEADD is being rewritten to DATE_ADD
     // templates.functions.DATEADD = 'DATETIME_ADD(CAST({{ args[2] }} AS DATETTIME), INTERVAL {{ interval }} {{ date_part }})';
+    templates.functions.CURRENTDATE = 'CURRENT_DATE';
     delete templates.functions.TO_CHAR;
     templates.expressions.binary = '{% if op == \'%\' %}MOD({{ left }}, {{ right }}){% else %}({{ left }} {{ op }} {{ right }}){% endif %}';
     templates.expressions.interval = 'INTERVAL {{ interval }}';
     templates.expressions.extract = 'EXTRACT({% if date_part == \'DOW\' %}DAYOFWEEK{% elif date_part == \'DOY\' %}DAYOFYEAR{% else %}{{ date_part }}{% endif %} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'TIMESTAMP(\'{{ value }}\')';
+    templates.types.boolean = 'BOOL';
+    templates.types.float = 'FLOAT64';
+    templates.types.double = 'FLOAT64';
+    templates.types.decimal = 'BIGDECIMAL({{ precision }},{{ scale }})';
+    templates.types.binary = 'BYTES';
     return templates;
   }
 }

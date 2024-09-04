@@ -1,7 +1,7 @@
 use crate::compile::rewrite::{
     analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules,
     window, wrapped_select, wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer, LogicalPlanLanguage,
+    wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -15,6 +15,7 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             wrapped_select_window_expr_empty_tail(),
@@ -44,6 +45,13 @@ impl WrapperRules {
                     "?select_type",
                     wrapper_pullup_replacer(
                         "?projection_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?subqueries",
                         "?alias_to_cube",
                         "?ungrouped",
                         "?in_projection",
@@ -104,11 +112,20 @@ impl WrapperRules {
             ),
         )]);
 
-        Self::list_pushdown_pullup_rules(
-            rules,
-            "wrapper-window-expr",
-            "WindowWindowExpr",
-            "WrappedSelectWindowExpr",
-        );
+        if self.config_obj.push_down_pull_up_split() {
+            Self::flat_list_pushdown_pullup_rules(
+                rules,
+                "wrapper-window-expr",
+                ListType::WindowWindowExpr,
+                ListType::WrappedSelectWindowExpr,
+            );
+        } else {
+            Self::list_pushdown_pullup_rules(
+                rules,
+                "wrapper-window-expr",
+                "WindowWindowExpr",
+                "WrappedSelectWindowExpr",
+            );
+        }
     }
 }

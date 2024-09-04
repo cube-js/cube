@@ -11,8 +11,12 @@ import cronParser from 'cron-parser';
 
 import moment from 'moment-timezone';
 import inflection from 'inflection';
-import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias } from '@cubejs-backend/shared';
+import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, getEnv } from '@cubejs-backend/shared';
 
+import {
+  buildSqlAndParams as nativeBuildSqlAndParams,
+} from '@cubejs-backend/native';
+import { eventNames } from 'process';
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseDimension } from './BaseDimension';
@@ -233,7 +237,7 @@ export class BaseQuery {
     this.postAggregateDimensions = (this.options.postAggregateDimensions || []).map(this.newDimension.bind(this));
     this.postAggregateTimeDimensions = (this.options.postAggregateTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
-    this.order = this.options.order || [];
+
     const filters = this.extractFiltersAsTree(this.options.filters || []);
 
     // measure_filter (the one extracted from filters parameter on measure and
@@ -260,14 +264,13 @@ export class BaseQuery {
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
-    this.preAggregationsSchemaOption =
-      this.options.preAggregationsSchema != null ? this.options.preAggregationsSchema : DEFAULT_PREAGGREGATIONS_SCHEMA;
-
-    if (this.order.length === 0) {
-      this.order = this.defaultOrder();
-    }
-
+    this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
+
+    // Set the default order only when options.order is not provided at all
+    // if options.order is set (empty array [] or with data) - use it as is
+    this.order = this.options.order ?? this.defaultOrder();
+
     this.initUngrouped();
   }
 
@@ -399,12 +402,7 @@ export class BaseQuery {
       });
     } else if (this.measures.length > 0 && this.dimensions.length > 0) {
       const firstMeasure = this.measures[0];
-
-      let id = firstMeasure.measure;
-
-      if (firstMeasure.expressionName) {
-        id = firstMeasure.expressionName;
-      }
+      const id = firstMeasure.expressionName ?? firstMeasure.measure;
 
       res.push({ id, desc: true });
     } else if (this.dimensions.length > 0) {
@@ -452,6 +450,10 @@ export class BaseQuery {
     return new BaseGroupFilter(filter);
   }
 
+  /**
+   * @param timeDimension
+   * @return {BaseTimeDimension}
+   */
   newTimeDimension(timeDimension) {
     return new BaseTimeDimension(this, timeDimension);
   }
@@ -581,23 +583,43 @@ export class BaseQuery {
    * @returns {Array<string>}
    */
   buildSqlAndParams(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+    if (getEnv('nativeSqlPlanner')) {
+      return this.buildSqlAndParamsRust(exportAnnotatedSql);
+    } else {
+      if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+        if (this.externalPreAggregationQuery()) { // TODO performance
+          return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+        }
       }
+      return this.compilers.compiler.withQuery(
+        this,
+        () => this.cacheValue(
+          ['buildSqlAndParams', exportAnnotatedSql],
+          () => this.paramAllocator.buildSqlAndParams(
+            this.buildParamAnnotatedSql(),
+            exportAnnotatedSql,
+            this.shouldReuseParams
+          ),
+          { cache: this.queryCache }
+        )
+      );
     }
+  }
 
-    return this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql
-        ),
-        { cache: this.queryCache }
-      )
-    );
+  buildSqlAndParamsRust(exportAnnotatedSql) {
+    const queryParams = {
+      measures: this.options.measures,
+      dimensions: this.options.dimensions,
+      joinRoot: this.join.root,
+      cubeEvaluator: this.cubeEvaluator,
+
+    };
+    const res = nativeBuildSqlAndParams(queryParams);
+    return res;
+  }
+
+  get shouldReuseParams() {
+    return false;
   }
 
   /**
@@ -658,6 +680,15 @@ export class BaseQuery {
         d,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo) => `${dateField} >= ${dimensionDateFrom} AND ${dateField} <= ${dateTo}`
+      ]
+    );
+  }
+
+  rollingWindowToDateJoinCondition(granularity) {
+    return this.timeDimensions.map(
+      d => [
+        d,
+        (dateFrom, dateTo, dateField, dimensionDateFrom, dimensionDateTo, isFromStartToEnd) => `${dateField} >= ${this.timeGroupedColumn(granularity, dateFrom)} AND ${dateField} <= ${dateTo}`
       ]
     );
   }
@@ -937,7 +968,7 @@ export class BaseQuery {
   }
 
   wrapInParenthesis(select) {
-    return select.trim().match(/^SELECT/ig) ? `(${select})` : select;
+    return select.trim().match(/^[a-zA-Z0-9_\-`".*]+$/i) ? select : `(${select})`;
   }
 
   withQueries(select, withQueries) {
@@ -1097,6 +1128,24 @@ export class BaseQuery {
     if (memberDef.addGroupByReferences) {
       queryContext = { ...queryContext, dimensions: R.uniq(queryContext.dimensions.concat(memberDef.addGroupByReferences)) };
     }
+    if (memberDef.timeShiftReferences) {
+      queryContext = {
+        ...queryContext,
+        timeDimensions: queryContext.timeDimensions.map(td => {
+          const timeShift = memberDef.timeShiftReferences.find(r => r.timeDimension === td.dimension);
+          if (timeShift) {
+            if (td.shiftInterval) {
+              throw new UserError(`Hierarchical time shift is not supported but was provided for '${td.dimension}'. Parent time shift is '${td.shiftInterval}' and current is '${timeShift.interval}'`);
+            }
+            return {
+              ...td,
+              shiftInterval: timeShift.type === 'next' ? this.negateInterval(timeShift.interval) : timeShift.interval
+            };
+          }
+          return td;
+        })
+      };
+    }
     queryContext = {
       ...queryContext,
       // TODO can't remove filters from OR expression
@@ -1177,7 +1226,8 @@ export class BaseQuery {
       postAggregateTimeDimensions: withQuery.postAggregateTimeDimensions,
       filters: withQuery.filters,
       // TODO do we need it?
-      postAggregateQuery: true // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      postAggregateQuery: true, // !!fromDimensions.find(d => this.newDimension(d).isPostAggregate())
+      disableExternalPreAggregations: true,
     });
 
     const measures = fromSubQuery && fromMeasures.map(m => fromSubQuery.newMeasure(m));
@@ -1205,6 +1255,7 @@ export class BaseQuery {
         const { type } = this.newMeasure(d).definition();
         return type === 'rank' || BaseQuery.isCalculatedMeasureType(type);
       }),
+      disableExternalPreAggregations: true,
     };
     const subQuery = this.newSubQuery(subQueryOptions);
 
@@ -1361,10 +1412,18 @@ export class BaseQuery {
     return this.timeDimensions.map(d => d.dateSeriesSelectColumn());
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   dateSeriesSql(timeDimension) {
     return `(${this.seriesSql(timeDimension)}) ${this.asSyntaxTable} ${timeDimension.dateSeriesAliasName()}`;
   }
 
+  /**
+   * @param {import('./BaseTimeDimension').BaseTimeDimension} timeDimension
+   * @return {string}
+   */
   seriesSql(timeDimension) {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `('${from}', '${to}')`
@@ -1482,6 +1541,7 @@ export class BaseQuery {
     ).reduce((a, b) => a.concat(b), []);
 
     const [cubeSql, cubeAlias] = this.rewriteInlineCubeSql(join.root);
+
     return this.joinSql([
       { sql: cubeSql, alias: cubeAlias },
       ...(subQueryDimensionsByCube[join.root] || []).map(d => this.subQueryJoin(d)),
@@ -1734,8 +1794,9 @@ export class BaseQuery {
   }
 
   keyDimensions(primaryKeyDimensions) {
+    // The same dimension with different granularities maybe requested, so it's not enough to filter only by dimension
     return R.uniqBy(
-      (d) => d.dimension, this.dimensionsForSelect()
+      (d) => `${d.dimension}${d.granularity ?? ''}`, this.dimensionsForSelect()
         .concat(primaryKeyDimensions)
     );
   }
@@ -1865,7 +1926,11 @@ export class BaseQuery {
       return '';
     }
     const dimensionColumns = this.dimensionColumns();
-    return dimensionColumns.length ? ` GROUP BY ${dimensionColumns.map((c, i) => `${i + 1}`).join(', ')}` : '';
+    if (!dimensionColumns.length) {
+      return '';
+    }
+    const dimensionNames = dimensionColumns.map((c, i) => `${i + 1}`);
+    return this.rollupGroupByClause(dimensionNames);
   }
 
   getFieldIndex(id) {
@@ -1947,15 +2012,74 @@ export class BaseQuery {
   }
 
   groupByDimensionLimit() {
-    let limitClause = '';
+    let limit = null;
     if (this.rowLimit !== null) {
       if (this.rowLimit === MAX_SOURCE_ROW_LIMIT) {
-        limitClause = ` LIMIT ${this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT)}`;
+        limit = this.paramAllocator.allocateParam(MAX_SOURCE_ROW_LIMIT);
       } else if (typeof this.rowLimit === 'number') {
-        limitClause = ` LIMIT ${this.rowLimit}`;
+        limit = this.rowLimit;
       }
     }
-    const offsetClause = this.offset ? ` OFFSET ${parseInt(this.offset, 10)}` : '';
+    const offset = this.offset ? parseInt(this.offset, 10) : null;
+    return this.limitOffsetClause(limit, offset);
+  }
+
+  /**
+   * @protected
+   * @param {Array<string>} dimensionNames
+   * @returns {string}
+   */
+  rollupGroupByClause(dimensionNames) {
+    if (this.ungrouped) {
+      return '';
+    }
+    const dimensionColumns = this.dimensionColumns();
+    if (!dimensionColumns.length) {
+      return '';
+    }
+
+    const groupingSets = R.flatten(this.dimensionsForSelect().map(d => d.dimension).filter(d => !!d)).map(d => d.groupingSet);
+
+    let result = ' GROUP BY ';
+
+    dimensionColumns.forEach((c, i) => {
+      const groupingSet = groupingSets[i];
+      const comma = i > 0 ? ', ' : '';
+      const prevId = i > 0 ? (groupingSets[i - 1] || { id: null }).id : null;
+      const currId = (groupingSet || { id: null }).id;
+
+      if (prevId !== null && currId !== prevId) {
+        result += ')';
+      }
+
+      if ((prevId === null || currId !== prevId) && groupingSet != null) {
+        if (groupingSet.groupType === 'Rollup') {
+          result += `${comma}ROLLUP(`;
+        } else if (groupingSet.groupType === 'Cube') {
+          result += `${comma}CUBE(`;
+        }
+      } else {
+        result += `${comma}`;
+      }
+
+      result += dimensionNames[i];
+    });
+    if (groupingSets[groupingSets.length - 1] != null) {
+      result += ')';
+    }
+
+    return result;
+  }
+
+  /**
+   * @protected
+   * @param limit
+   * @param offset
+   * @returns {string}
+   */
+  limitOffsetClause(limit, offset) {
+    const limitClause = limit != null ? ` LIMIT ${limit}` : '';
+    const offsetClause = offset != null ? ` OFFSET ${offset}` : '';
     return `${limitClause}${offsetClause}`;
   }
 
@@ -2000,8 +2124,8 @@ export class BaseQuery {
     return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
   }
 
-  autoPrefixWithCubeName(cubeName, sql) {
-    if (sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
+  autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
+    if (!isMemberExpr && sql.match(/^[_a-zA-Z][_a-zA-Z0-9]*$/)) {
       return `${this.cubeAlias(cubeName)}.${sql}`;
     }
     return sql;
@@ -2049,6 +2173,7 @@ export class BaseQuery {
   }
 
   evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+    const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
@@ -2112,7 +2237,8 @@ export class BaseQuery {
           sql && this.applyMeasureFilters(
             this.autoPrefixWithCubeName(
               cubeName,
-              sql
+              sql,
+              isMemberExpr,
             ),
             symbol,
             cubeName
@@ -2150,12 +2276,15 @@ export class BaseQuery {
           return this.renderDimensionCase(symbol, cubeName);
         } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql),
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
-            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql)
+            this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
         } else {
-          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql);
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          if (symbol.shiftInterval) {
+            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          }
           if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
             !memberExpressionType &&
             symbol.type === 'time' &&
@@ -2169,7 +2298,7 @@ export class BaseQuery {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
         }
-        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql));
+        return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, symbol.sql), isMemberExpr);
       }
       return this.evaluateSql(cubeName, symbol.sql);
     } finally {
@@ -2177,8 +2306,8 @@ export class BaseQuery {
     }
   }
 
-  autoPrefixAndEvaluateSql(cubeName, sql) {
-    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql));
+  autoPrefixAndEvaluateSql(cubeName, sql, isMemberExpr = false) {
+    return this.autoPrefixWithCubeName(cubeName, this.evaluateSql(cubeName, sql), isMemberExpr);
   }
 
   concatStringsSql(strings) {
@@ -2273,6 +2402,10 @@ export class BaseQuery {
     return R.uniq(context.memberNames);
   }
 
+  collectAllMemberNames() {
+    return R.flatten(this.collectFromMembers(false, this.collectMemberNamesFor.bind(this), 'collectAllMemberNames'));
+  }
+
   collectMultipliedMeasures(context) {
     return (fn) => {
       const foundCompositeCubeMeasures = {};
@@ -2320,7 +2453,7 @@ export class BaseQuery {
   }
 
   renderSqlMeasure(name, evaluateSql, symbol, cubeName, parentMeasure, orderBySql) {
-    const multiplied = this.multipliedJoinRowResult(cubeName);
+    const multiplied = this.multipliedJoinRowResult(cubeName) || false;
     const measurePath = `${cubeName}.${name}`;
     let resultMultiplied = multiplied;
     if (multiplied && (
@@ -2420,6 +2553,13 @@ export class BaseQuery {
 
   static isCalculatedMeasureType(type) {
     return type === 'number' || type === 'string' || type === 'time' || type === 'boolean';
+  }
+
+  /**
+   TODO: support type qualifiers on min and max
+  */
+  static toMemberDataType(type) {
+    return this.isCalculatedMeasureType(type) ? type : 'number';
   }
 
   aggregateOnGroupedColumn(symbol, evaluateSql, topLevelMerge, measurePath) {
@@ -2553,6 +2693,13 @@ export class BaseQuery {
    */
   timestampFormat() {
     return 'YYYY-MM-DD[T]HH:mm:ss.SSS[Z]';
+  }
+
+  /**
+   * @return {number}
+   */
+  timestampPrecision() {
+    return 3;
   }
 
   /**
@@ -2826,7 +2973,16 @@ export class BaseQuery {
         FLOOR: 'FLOOR({{ args_concat }})',
         CEIL: 'CEIL({{ args_concat }})',
         TRUNC: 'TRUNC({{ args_concat }})',
-        LEAST: 'LEAST({{ args_concat }})',
+
+        // There is a difference in behaviour of these function processing in different DBs and DWHs.
+        // The SQL standard requires greatest and least to return null in case one argument is null.
+        // However, many DBMS ignore NULL values (mostly because greatest and least were often supported
+        // decades before they were added to the SQL standard in 2023).
+        // Cube follows the Postgres implementation (as we mimic the Postgres protocol) and ignores NULL values.
+        // So these functions are enabled on a driver-specific basis for databases that ignores NULLs.
+        // LEAST: 'LEAST({{ args_concat }})',
+        // GREATEST: 'GREATEST({{ args_concat }})',
+
         LOWER: 'LOWER({{ args_concat }})',
         UPPER: 'UPPER({{ args_concat }})',
         LEFT: 'LEFT({{ args_concat }})',
@@ -2848,7 +3004,6 @@ export class BaseQuery {
         REPEAT: 'REPEAT({{ args_concat }})',
         NULLIF: 'NULLIF({{ args_concat }})',
         ROUND: 'ROUND({{ args_concat }})',
-        GREATEST: 'GREATEST({{ args_concat }})',
 
         STDDEV: 'STDDEV_SAMP({{ args_concat }})',
         SUBSTR: 'SUBSTRING({{ args_concat }})',
@@ -2874,15 +3029,16 @@ export class BaseQuery {
       },
       statements: {
         select: 'SELECT {% if distinct %}DISTINCT {% endif %}' +
-          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} \n' +
+          '{{ select_concat | map(attribute=\'aliased\') | join(\', \') }} {% if from %}\n' +
           'FROM (\n' +
           '{{ from | indent(2, true) }}\n' +
-          ') AS {{ from_alias }}' +
+          ') AS {{ from_alias }}{% endif %}' +
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
-          '{% if group_by %}\nGROUP BY {{ group_by | map(attribute=\'index\') | join(\', \') }}{% endif %}' +
+          '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
           '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
+        group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },
       expressions: {
         column_aliased: '{{expr}} {{quoted_alias}}',
@@ -2891,8 +3047,13 @@ export class BaseQuery {
         binary: '({{ left }} {{ op }} {{ right }})',
         sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
-        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% endif %})',
+        window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
+        window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',
         in_list: '{{ expr }} {% if negated %}NOT {% endif %}IN ({{ in_exprs_concat }})',
+        subquery: '({{ expr }})',
+        in_subquery: '{{ expr }} {% if negated %}NOT {% endif %}IN {{ subquery_expr }}',
+        rollup: 'ROLLUP({{ exprs_concat }})',
+        cube: 'CUBE({{ exprs_concat }})',
         negative: '-({{ expr }})',
         not: 'NOT ({{ expr }})',
         true: 'TRUE',
@@ -2904,7 +3065,32 @@ export class BaseQuery {
       },
       params: {
         param: '?'
-      }
+      },
+      window_frame_types: {
+        rows: 'ROWS',
+        range: 'RANGE',
+      },
+      window_frame_bounds: {
+        preceding: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} PRECEDING',
+        current_row: 'CURRENT ROW',
+        following: '{% if n is not none %}{{ n }}{% else %}UNBOUNDED{% endif %} FOLLOWING',
+      },
+      types: {
+        string: 'STRING',
+        boolean: 'BOOLEAN',
+        tinyint: 'TINYINT',
+        smallint: 'SMALLINT',
+        integer: 'INTEGER',
+        bigint: 'BIGINT',
+        float: 'FLOAT',
+        double: 'DOUBLE',
+        decimal: 'DECIMAL({{ precision }},{{ scale }})',
+        timestamp: 'TIMESTAMP',
+        date: 'DATE',
+        time: 'TIME',
+        interval: 'INTERVAL',
+        binary: 'BINARY',
+      },
     };
   }
 
@@ -3059,17 +3245,20 @@ export class BaseQuery {
    * @return {[number, string]}
    */
   parseInterval(interval) {
-    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
+    const intervalMatch = interval.match(/^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }
 
     const duration = parseInt(intervalMatch[1], 10);
-    if (duration < 1) {
-      throw new UserError(`Duration should be positive: ${interval}`);
-    }
 
     return [duration, intervalMatch[2]];
+  }
+
+  negateInterval(interval) {
+    const [duration, grunularity] = this.parseInterval(interval);
+
+    return `${duration * -1} ${grunularity}`;
   }
 
   parseSecondDuration(interval) {

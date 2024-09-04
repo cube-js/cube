@@ -106,9 +106,7 @@ jobs:
         with:
           node-version: 14.x
       - name: Deploy to Cube Cloud
-        run: npx cubejs-cli deploy
-        env:
-          CUBE_CLOUD_DEPLOY_AUTH: ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
+        run: npx cubejs-cli deploy --token ${{ secrets.CUBE_CLOUD_DEPLOY_AUTH }}
 ```
 
 [ref-workspace-cli]: /product/workspace/cli

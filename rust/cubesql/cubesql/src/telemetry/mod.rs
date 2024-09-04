@@ -1,4 +1,4 @@
-use crate::{sql::SessionState, CubeError};
+use crate::{compile::DatabaseProtocolDetails, sql::SessionState, CubeError};
 use arc_swap::ArcSwap;
 use log::{Level, LevelFilter};
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
@@ -67,7 +67,8 @@ impl SessionLogger {
         if let Some(name) = self.session_state.get_variable("application_name") {
             meta_fields.insert("appName".to_string(), name.value.to_string());
         }
-        let protocol = self.session_state.protocol.to_string();
+
+        let protocol = self.session_state.protocol.get_name().to_string();
         meta_fields.insert("protocol".to_string(), protocol);
         meta_fields.insert("apiType".to_string(), "sql".to_string());
 

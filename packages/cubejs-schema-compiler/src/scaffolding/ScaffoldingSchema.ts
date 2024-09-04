@@ -7,6 +7,7 @@ enum ColumnType {
   Time = 'time',
   Number = 'number',
   String = 'string',
+  Boolean = 'boolean',
 }
 
 export enum MemberType {
@@ -281,7 +282,7 @@ export class ScaffoldingSchema {
 
   protected dimensionColumns(tableDefinition: any) {
     const dimensionColumns = tableDefinition.filter(
-      column => !column.name.startsWith('_') && this.columnType(column) === 'string' ||
+      column => !column.name.startsWith('_') && ['string', 'boolean'].includes(this.columnType(column)) ||
         column.attributes?.includes('primaryKey') ||
         this.fixCase(column.name) === 'id'
     );
@@ -297,18 +298,17 @@ export class ScaffoldingSchema {
 
     return dimensionColumns.concat(timeColumns);
   }
-  
+
   private fixCase(value: string) {
     if (this.options.snakeCase) {
       return toSnakeCase(value);
     }
-    
+
     return value.toLocaleLowerCase();
   }
 
   protected joins(tableName: TableName, tableDefinition: ColumnData[]) {
     const cubeName = (name: string) => (this.options.snakeCase ? toSnakeCase(name) : inflection.camelize(name));
-    
     return R.unnest(tableDefinition
       .map(column => {
         let columnsToJoin: ColumnsToJoin[] = [];
@@ -330,7 +330,6 @@ export class ScaffoldingSchema {
           this.tableNamesToTables[inflection.tableize(withoutId)] ||
           this.tableNamesToTables[this.fixCase(withoutId)] ||
           this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
-          
           if (!tablesToJoin) {
             return null;
           }
@@ -380,13 +379,16 @@ export class ScaffoldingSchema {
 
   protected columnType(column): ColumnType {
     const type = this.fixCase(column.type);
-    if (['time', 'date'].find(t => type.indexOf(t) !== -1)) {
+
+    if (['time', 'date'].find(t => type.includes(t))) {
       return ColumnType.Time;
-    } else if (['int', 'dec', 'double', 'numb'].find(t => type.indexOf(t) !== -1)) {
+    } else if (['int', 'dec', 'double', 'numb'].find(t => type.includes(t))) {
       // enums are not Numbers
       return ColumnType.Number;
-    } else {
-      return ColumnType.String;
+    } else if (['bool'].find(t => type.includes(t))) {
+      return ColumnType.Boolean;
     }
+
+    return ColumnType.String;
   }
 }

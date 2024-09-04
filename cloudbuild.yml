@@ -1,0 +1,13 @@
+tags: ["cube"]
+timeout: "2400s"
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _TAG: ""
+steps:
+  - name: "gcr.io/kaniko-project/executor:latest"
+    args:
+      - --dockerfile=packages/cubejs-docker/dev.Dockerfile
+      - --context=.
+      - --cache=true
+      - --destination=us-docker.pkg.dev/definite-371419/cube/cube:${_TAG}

@@ -21,9 +21,6 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver,
-  DownloadQueryResultsOptions,
-  DownloadQueryResultsResult,
-  DownloadTableCSVData,
   DriverCapabilities,
   DriverInterface,
   QueryColumnsResult,
@@ -33,8 +30,9 @@ import {
   StreamTableData,
   TableCSVData,
 } from '@cubejs-backend/base-driver';
-import { Query } from '@google-cloud/bigquery/build/src/bigquery';
-import { HydrationStream } from './HydrationStream';
+import type { Query } from '@google-cloud/bigquery/build/src/bigquery';
+
+import { HydrationStream, transformRow } from './HydrationStream';
 
 interface BigQueryDriverOptions extends BigQueryOptions {
   readOnly?: boolean
@@ -178,7 +176,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
 
     return <any>(
       data[0] && data[0].map(
-        row => R.map(value => (value && value.value && typeof value.value === 'string' ? value.value : value), row)
+        row => transformRow(row)
       )
     );
   }

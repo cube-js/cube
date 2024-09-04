@@ -49,6 +49,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "runningTotal",
           "type": "count",
           "rolling_window": {
@@ -83,6 +88,11 @@
         {
           "name": "orderDate",
           "sql": "order_date",
+          "type": "time"
+        },
+        {
+          "name": "completedDate",
+          "sql": "completed_date",
           "type": "time"
         },
         {
@@ -125,6 +135,11 @@
         {
           "name": "count",
           "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
           "sql": "customer_id"
         },
         {
@@ -198,6 +213,11 @@
           "type": "time"
         },
         {
+          "name": "completedDate",
+          "sql": "completed_date",
+          "type": "time"
+        },
+        {
           "name": "customerId",
           "sql": "customer_id",
           "type": "string"
@@ -245,6 +265,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "totalQuantity",
           "sql": "quantity",
           "type": "sum"
@@ -263,6 +288,30 @@
           "name": "totalProfit",
           "sql": "profit",
           "type": "sum"
+        },
+        {
+          "name": "totalProfitYearAgo",
+          "type": "number",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "time_shift": [{
+            "time_dimension": "orderDate",
+            "interval": "366 day",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalProfitForStatus",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "reduce_by": ["category"]
+        },
+        {
+          "name": "percentageOfTotalForStatus",
+          "type": "number",
+          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
+          "post_aggregate": true
         },
         {
           "name": "hiddenSum",
@@ -287,6 +336,30 @@
         {
           "name": "rollingCountBy2Month",
           "type": "count",
+          "rolling_window": {
+            "trailing": "2 month"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Day",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 day"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Week",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 week"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Month",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
           "rolling_window": {
             "trailing": "2 month"
           }

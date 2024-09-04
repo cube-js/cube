@@ -99,11 +99,11 @@ impl JinjaEngine {
     }
 
     fn render_template(mut cx: FunctionContext) -> JsResult<JsPromise> {
-        #[cfg(build = "debug")]
+        #[cfg(feature = "neon-debug")]
         trace!("JinjaEngine.render_template");
 
         let this = cx
-            .this()
+            .this::<JsValue>()?
             .downcast_or_throw::<BoxedJinjaEngine, _>(&mut cx)?;
 
         let template_name = cx.argument::<JsString>(0)?;
@@ -138,11 +138,11 @@ impl JinjaEngine {
     }
 
     fn load_template(mut cx: FunctionContext) -> JsResult<JsUndefined> {
-        #[cfg(build = "debug")]
+        #[cfg(feature = "neon-debug")]
         trace!("JinjaEngine.load_template");
 
         let this = cx
-            .this()
+            .this::<JsValue>()?
             .downcast_or_throw::<BoxedJinjaEngine, _>(&mut cx)?;
 
         let template_name = cx.argument::<JsString>(0)?;

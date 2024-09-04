@@ -23,6 +23,7 @@ import { QueryStream } from './QueryStream';
 const GenericTypeToPostgres: Record<GenericDataBaseType, string> = {
   string: 'text',
   double: 'decimal',
+  int: 'int8',
   // Revert mapping for internal pre-aggregations
   HLL_POSTGRES: 'hll',
 };
@@ -32,6 +33,8 @@ const NativeTypeToPostgresType: Record<string, string> = {};
 Object.entries(types.builtins).forEach(([key, value]) => {
   NativeTypeToPostgresType[value] = key;
 });
+// pg-types lacks the default `unknown` type since it's a pseudo-type
+NativeTypeToPostgresType['705'] = 'UNKNOWN';
 
 const PostgresToGenericType: Record<string, GenericDataBaseType> = {
   // bpchar (“blank-padded char”, the internal name of the character data type)
@@ -151,7 +154,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
     JOIN information_schema.columns AS columns ON columns.table_schema = tc.constraint_schema
       AND tc.table_name = columns.table_name AND ccu.column_name = columns.column_name
-    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
+    WHERE constraint_type = 'PRIMARY KEY' AND columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')${conditionString ? ` AND (${conditionString})` : ''}`;
   }
 
   protected foreignKeysQuery(conditionString?: string): string | null {
@@ -169,7 +172,7 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
         ON columns.constraint_name = tc.constraint_name
       WHERE
          constraint_type = 'FOREIGN KEY'
-         AND ${this.getColumnNameForSchemaName()} NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+         AND ${this.getColumnNameForSchemaName()} NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
          ${conditionString ? ` AND (${conditionString})` : ''}
     `;
   }

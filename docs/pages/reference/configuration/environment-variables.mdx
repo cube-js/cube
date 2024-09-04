@@ -602,7 +602,7 @@ indefinitely][snowflake-docs-connection-options].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | N/A                    | N/A                   |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`
 
@@ -675,6 +675,15 @@ The username used to connect to the database.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
+
+## `CUBEJS_DB_QUERY_DEFAULT_LIMIT`
+
+The default [row limit][ref-row-limit] in the result set if it's not explicitly
+specified in an API query.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `10000`                | `10000`               |
 
 ## `CUBEJS_DB_QUERY_LIMIT`
 
@@ -1038,14 +1047,78 @@ A username required to access the [SQL API][ref-sql-api].
 | --------------- | ---------------------- | --------------------- |
 | A valid string  | N/A                    | N/A                   |
 
-## `CUBEJS_TELEMETRY`
+## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
-If `true`, then send telemetry to Cube.
+If `true`, disables the primary key inclusion check for
+[ungrouped queries](/product/apis-integrations/queries#ungrouped-query).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                 | `true`                |
+| `true`, `false` | `false`                | `false`               |
 
+It can be also set using the [`allow_ungrouped_without_primary_key` configuration
+option](/reference/configuration/config#allow_ungrouped_without_primary_key).
+
+<InfoBox>
+
+When query push-own in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
+environment variable, this option is enabled as well for the best user experience.
+
+</InfoBox>
+
+## `CUBESQL_SQL_PUSH_DOWN`
+
+If `true`, enables query pushdown in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
+
+If `true`, prevents adding implicit [default `ORDER BY`
+clause](/product/apis-integrations/queries#order) for [SQL API][ref-sql-api] queries.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+## `CUBESQL_REWRITE_MAX_NODES`
+
+Specifies the maximum number of e-graph nodes that are allocated during
+the creation of a query plan in the [SQL API][ref-sql-api].
+
+Should be increased if you get the following error:
+`Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 10000                  | 10000                 |
+
+## `CUBESQL_REWRITE_MAX_ITERATIONS`
+
+Specifies the maximum number of e-graph term rewriting iterations that are performed
+during the creation of a query plan in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 300                    | 300                   |
+
+## `CUBESQL_REWRITE_TIMEOUT`
+
+Specifies the maximum time, in seconds, that is allocated for
+the creation of a query plan in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 30                     | 30                    |
 
 ## `CUBESQL_AUTH_EXPIRE_SECS`
 
@@ -1054,6 +1127,14 @@ Number of seconds before session's SQL API security context will be invalidated.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid integer number | `300`                 | `300`                |
+
+## `CUBEJS_TELEMETRY`
+
+If `true`, then send telemetry to Cube.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBESTORE_METRICS_FORMAT`
 
@@ -1210,7 +1291,7 @@ The logging level for Cube Store.
 
 ## `CUBESTORE_META_ADDR`
 
-The address/port pair for the **router** node in the cluster.
+The address/port pair for the Cube Store **router** node in the cluster.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1218,8 +1299,8 @@ The address/port pair for the **router** node in the cluster.
 
 ## `CUBESTORE_META_PORT`
 
-The port for the **router** node to listen for connections on. Ignored when
-`CUBESTORE_META_ADDR` is set.
+The port for the Cube Store **router** node to listen for connections on.
+Ignored when `CUBESTORE_META_ADDR` is set.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1346,8 +1427,10 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 
 ## `CUBESTORE_SERVER_NAME`
 
-The full name and port number of the Cube Store server. Must be unique for each
-instance in cluster mode.
+The full name and port number of the Cube Store node (either the router
+or a worker). Must be unique for each instance in the Cube Store cluster.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1373,7 +1456,7 @@ insertion.
 ## `CUBESTORE_WORKER_PORT`
 
 The port for Cube Store workers to listen to connections on. When set, the node
-will start as a **worker** in the cluster
+will start as a Cube Store **worker** in the cluster
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1381,7 +1464,9 @@ will start as a **worker** in the cluster
 
 ## `CUBESTORE_WORKERS`
 
-A comma-separated list of address/port pairs for Cube Store workers.
+A comma-separated list of address/port pairs of Cube Store workers.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values                              | Default in Development | Default in Production |
 | -------------------------------------------- | ---------------------- | --------------------- |
@@ -1390,6 +1475,12 @@ A comma-separated list of address/port pairs for Cube Store workers.
 ```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
+
+Used to implement stateless addressing within a Cube Store cluster.
+By analyzing `CUBESTORE_WORKERS` and `CUBESTORE_SERVER_NAME`, each node
+is able to determine its position within a Cube Store cluster.
+This allows each worker to know which pre-aggregation partitions it owns
+and how the load is distributed across all workers.
 
 ## `DEBUG_LOG`
 
@@ -1464,4 +1555,4 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /product/apis-integrations/sql-api
-[ref-row-limit]: /product/data-modeling/queries#row-limit
+[ref-row-limit]: /product/apis-integrations/queries#row-limit

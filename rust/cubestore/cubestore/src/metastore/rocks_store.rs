@@ -90,6 +90,7 @@ enum_from_primitive! {
 }
 
 impl TableId {
+    #[inline]
     pub fn has_ttl(&self) -> bool {
         match self {
             TableId::Schemas => false,
@@ -109,6 +110,11 @@ impl TableId {
             TableId::TraceObjects => false,
             TableId::QueueItemPayload => true,
         }
+    }
+
+    #[inline]
+    pub fn get_ttl_field(&self) -> &'static str {
+        "expire"
     }
 }
 

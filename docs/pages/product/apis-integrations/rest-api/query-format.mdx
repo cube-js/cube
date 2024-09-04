@@ -3,7 +3,7 @@ redirect_from:
   - /query-format
 ---
 
-# Query format
+# Query format in the REST API
 
 Cube Queries are plain JavaScript objects, describing an analytics query. The
 basic elements of a query (query members) are `measures`, `dimensions`, and
@@ -42,7 +42,9 @@ The default value is `false`.
   value is `0`.
 - `order`: An object, where the keys are measures or dimensions to order by and
   their corresponding values are either `asc` or `desc`. The order of the fields
-  to order on is based on the order of the keys in the object.
+  to order on is based on the order of the keys in the object. If not provided,
+  [default ordering][ref-default-order] is applied. If an empty object (`[]`) is
+  provided, no ordering is applied.
 - `timezone`: A [time zone][ref-time-zone] for your query. You can set the
 desired time zone in the [TZ Database Name](https://en.wikipedia.org/wiki/Tz_database)
 format, e.g., `America/Los_Angeles`.
@@ -610,8 +612,9 @@ refer to its documentation for more examples.
   /reference/data-model/pre-aggregations#time_dimension
 [ref-relative-date-range]: #relative-date-range
 [chrono-website]: https://github.com/wanasit/chrono
-[ref-row-limit]: /product/data-modeling/queries#row-limit
-[ref-time-zone]: /product/data-modeling/queries#time-zone
-[ref-compare-date-range]: /product/data-modeling/queries#compare-date-range-query
-[ref-total-query]: /product/data-modeling/queries#total-query
-[ref-ungrouped-query]: /product/data-modeling/queries#ungrouped-query
+[ref-row-limit]: /product/apis-integrations/queries#row-limit
+[ref-time-zone]: /product/apis-integrations/queries#time-zone
+[ref-compare-date-range]: /product/apis-integrations/queries#compare-date-range-query
+[ref-total-query]: /product/apis-integrations/queries#total-query
+[ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query
+[ref-default-order]: /product/apis-integrations/queries#order

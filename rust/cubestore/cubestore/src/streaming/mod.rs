@@ -17,11 +17,11 @@ use crate::table::data::{append_row, create_array_builders};
 use crate::table::{Row, TableValue, TimestampValue};
 use crate::util::decimal::Decimal;
 use crate::{app_metrics, CubeError};
-use arrow::array::ArrayBuilder;
-use arrow::array::ArrayRef;
 use async_trait::async_trait;
 use buffered_stream::BufferedStream;
 use chrono::Utc;
+use datafusion::arrow::array::ArrayBuilder;
+use datafusion::arrow::array::ArrayRef;
 use datafusion::cube_ext::ordfloat::OrdF64;
 use futures::future::join_all;
 use futures::stream::StreamExt;
@@ -1653,14 +1653,14 @@ mod tests {
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
-                                            \\'UTC\\', 
-                                            \\'UTC\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
-                                        \\'UTC\\' 
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
+                                            \\'UTC\\',
+                                            \\'UTC\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
+                                        \\'UTC\\'
                                     ) minute_timestamp
                                    FROM EVENTS_BY_TYPE \
                             WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
@@ -1685,14 +1685,14 @@ mod tests {
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
-                                            \\'UTC\\', 
-                                            \\'UTC\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
-                                        \\'UTC\\' 
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
+                                            \\'UTC\\',
+                                            \\'UTC\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
+                                        \\'UTC\\'
                                     ) minute_timestamp
                                    FROM EVENTS_BY_TYPE \
                             WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \
@@ -1749,14 +1749,14 @@ mod tests {
                                   PARSE_TIMESTAMP(\
                                     FORMAT_TIMESTAMP(\
                                         CONVERT_TZ(\
-                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'), 
-                                            \\'UTC\\', 
-                                            \\'UTC\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\' 
-                                        ), 
-                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\', 
-                                        \\'UTC\\' 
+                                            PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\'),
+                                            \\'UTC\\',
+                                            \\'UTC\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:00.000\\'
+                                        ),
+                                        \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSS\\',
+                                        \\'UTC\\'
                                     ) minute_timestamp
                                    FROM EVENTS_BY_TYPE \
                             WHERE  PARSE_TIMESTAMP(TIMESTAMP, \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') >= PARSE_TIMESTAMP(\\'1970-01-01T01:00:00.000Z\\', \\'yyyy-MM-dd\\'\\'T\\'\\'HH:mm:ss.SSSX\\', \\'UTC\\') \

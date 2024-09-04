@@ -1,0 +1,351 @@
+.Button {
+  --loader_time: 700ms;
+  --hover_transition: 0.2s;
+
+  transition: background-color var(--hover_transition), color var(--hover_transition),
+    box-shadow var(--hover_transition), opacity var(--loader_time);
+  font-family: inherit;
+  font-weight: 700;
+  border: none;
+  margin: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.Button:hover {
+  cursor: pointer;
+}
+
+.Button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* transparent */
+
+.Button--transparent {
+  background-color: transparent;
+  color: var(--dark);
+}
+
+.Button--transparent.Button--variant-outline {
+  box-shadow: inset 0 0 0 1px var(--dark_05);
+}
+
+.Button--transparent.Button--variant-outline:hover,
+.Button--transparent.Button--variant-outline.Button--pseudoHover {
+  background-color: var(--dark_bg_a04);
+}
+
+.Button--transparent.Button--variant-outline:focus-visible,
+.Button--transparent.Button--variant-outline.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--transparent.Button--variant-outline:active,
+.Button--transparent.Button--variant-outline.Button--pseudoActive {
+  background-color: var(--dark_bg_a04);
+  box-shadow: inset 0 0 0 1px var(--dark_03);
+}
+
+/* transparent-dark */
+
+.Button--appearance-dark.Button--transparent {
+  background-color: transparent;
+  color: var(--white);
+}
+
+.Button--appearance-dark.Button--transparent.Button--variant-outline {
+  box-shadow: inset 0 0 0 1px var(--dark_03);
+}
+
+.Button--appearance-dark.Button--transparent.Button--variant-outline:hover,
+.Button--appearance-dark.Button--transparent.Button--variant-outline.Button--pseudoHover {
+  background-color: var(--white_a08);
+}
+
+.Button--appearance-dark.Button--transparent.Button--variant-outline:focus-visible,
+.Button--appearance-dark.Button--transparent.Button--variant-outline.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--appearance-dark.Button--transparent.Button--variant-outline:active,
+.Button--appearance-dark.Button--transparent.Button--variant-outline.Button--pseudoActive {
+  background-color: var(--white_a08);
+  box-shadow: inset 0 0 0 1px var(--dark_05);
+}
+
+/* purple */
+
+.Button--purple {
+  background-color: var(--purple);
+  color: var(--white);
+}
+
+.Button--purple:hover,
+.Button--purple.Button--pseudoHover {
+  background-color: var(--purple_bright);
+  color: var(--white);
+}
+
+.Button--purple:focus-visible,
+.Button--purple.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--purple_04_a30);
+}
+
+.Button--purple:active,
+.Button--purple.Button--pseudoActive {
+  background-color: var(--purple);
+  box-shadow: inset 0 0 0 1px var(--purple_bright);
+  color: var(--white);
+}
+
+/* purple-outline */
+
+.Button--purple.Button--variant-outline {
+  background-color: var(--white);
+  color: var(--purple_bright);
+  box-shadow: inset 0 0 0 1px var(--purple_04_a30);
+}
+
+.Button--purple.Button--variant-outline:hover,
+.Button--purple.Button--variant-outline.Button--pseudoHover {
+  background-color: var(--purple_bg_a08);
+  color: var(--purple_bright);
+}
+
+.Button--purple.Button--variant-outline:focus-visible,
+.Button--purple.Button--variant-outline.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--purple_04_a30);
+}
+
+.Button--purple.Button--variant-outline:active,
+.Button--purple.Button--variant-outline.Button--pseudoActive {
+  background-color: var(--purple_bg_a08);
+  box-shadow: inset 0 0 0 1px var(--purple_bright);
+  color: var(--purple_bright);
+}
+
+/* autoprefixer: ignore next */
+@supports not selector(:focus-visible) {
+  .Button--purple:focus {
+    box-shadow: 0 0 0 3px var(--purple_04_a30);
+  }
+}
+
+/* pink */
+
+.Button--pink {
+  background-color: var(--pink);
+  color: var(--white);
+}
+
+.Button--pink:hover,
+.Button--pink.Button--pseudoHover {
+  background-color: var(--pink_bright);
+  color: var(--white);
+}
+
+.Button--pink:focus-visible,
+.Button--pink.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--pink:active,
+.Button--pink.Button--pseudoActive {
+  background-color: var(--pink);
+  box-shadow: inset 0 0 0 1px var(--pink_bright);
+  color: var(--white);
+}
+
+/* pink-outline */
+
+.Button--pink.Button--variant-outline {
+  background-color: var(--white);
+  color: var(--pink_bright);
+  box-shadow: inset 0 0 0 1px var(--pink_04_a30);
+}
+
+.Button--pink.Button--variant-outline:hover,
+.Button--pink.Button--variant-outline.Button--pseudoHover {
+  background-color: var(--pink_bg_a10);
+  color: var(--pink_bright);
+}
+
+.Button--pink.Button--variant-outline:focus-visible,
+.Button--pink.Button--variant-outline.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--pink.Button--variant-outline:active,
+.Button--pink.Button--variant-outline.Button--pseudoActive {
+  background-color: var(--pink_bg_a10);
+  box-shadow: inset 0 0 0 1px var(--pink_bright);
+  color: var(--pink_bright);
+}
+
+/* autoprefixer: ignore next */
+@supports not selector(:focus-visible) {
+  .Button--pink:focus {
+    box-shadow: 0 0 0 3px var(--pink_04_a30);
+  }
+}
+
+/* cherry */
+
+.Button--cherry {
+  background-color: var(--cherry);
+  color: var(--white);
+}
+
+.Button--cherry:hover,
+.Button--cherry.Button--pseudoHover {
+  background-color: var(--cherry_dark);
+}
+
+.Button--cherry:focus-visible,
+.Button--cherry.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--cherry:active,
+.Button--cherry.Button--pseudoActive {
+  background-color: var(--cherry);
+  box-shadow: inset 0 0 0 1px var(--cherry_dark);
+}
+
+/* cherry-outline */
+
+.Button--cherry.Button--variant-outline {
+  color: var(--cherry);
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px var(--pink_03_a60);
+}
+
+.Button--cherry.Button--variant-outline:hover,
+.Button--cherry.Button--variant-outline.Button--pseudoHover {
+  background-color: var(--pink_bg_a10);
+}
+
+.Button--cherry.Button--variant-outline:focus-visible,
+.Button--cherry.Button--variant-outline.Button--pseudoFocus {
+  box-shadow: 0 0 0 3px var(--pink_04_a30);
+}
+
+.Button--cherry.Button--variant-outline:active,
+.Button--cherry.Button--variant-outline.Button--pseudoActive {
+  background-color: var(--pink_bg_a10);
+  box-shadow: inset 0 0 0 1px var(--cherry);
+}
+
+/* cherry-outline dark */
+
+.Button--appearance-dark.Button--cherry.Button--variant-outline {
+  color: var(--white);
+}
+
+/* autoprefixer: ignore next */
+@supports not selector(:focus-visible) {
+  .Button--cherry:focus {
+    box-shadow: 0 0 0 3px var(--pink_04_a30);
+  }
+}
+
+/* sizes */
+
+.Button--size-s {
+  height: 40px;
+  padding: 0 16px;
+  font-size: 15px;
+  border-radius: 8px;
+}
+
+.Button--size-m {
+  height: 48px;
+  padding: 0 24px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+
+.Button--size-l {
+  height: 64px;
+  padding: 0 40px;
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 700;
+  border-radius: 8px;
+}
+
+.Button__prefix--loader {
+  animation-name: loader_appear;
+  animation-duration: var(--loader_time);
+  animation-fill-mode: forwards;
+
+  width: 16px;
+  margin-right: 8px;
+}
+
+.Button__prefix--removing {
+  animation-name: loader_disappear;
+}
+
+.Button__prefix--loader svg {
+  display: block;
+
+  animation-name: loader_rotation;
+  animation-duration: var(--loader_time);
+  animation-iteration-count: infinite;
+  animation-timing-function: linear;
+}
+
+@keyframes loader_appear {
+  0% {
+    width: 0;
+    margin-right: 0;
+    opacity: 0;
+  }
+  33% {
+    opacity: 0;
+  }
+  66% {
+    width: 16px;
+    margin-right: 8px;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes loader_disappear {
+  100% {
+    width: 0;
+    margin-right: 0;
+    opacity: 0;
+  }
+  66% {
+    opacity: 0;
+  }
+  33% {
+    width: 16px;
+    margin-right: 8px;
+  }
+  0% {
+    opacity: 1;
+  }
+}
+
+@keyframes loader_rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

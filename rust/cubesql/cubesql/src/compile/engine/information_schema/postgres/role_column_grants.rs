@@ -60,15 +60,16 @@ impl InfoSchemaRoleColumnGrantsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.grantor.finish()));
-        columns.push(Arc::new(self.grantee.finish()));
-        columns.push(Arc::new(self.table_catalog.finish()));
-        columns.push(Arc::new(self.table_schema.finish()));
-        columns.push(Arc::new(self.table_name.finish()));
-        columns.push(Arc::new(self.column_name.finish()));
-        columns.push(Arc::new(self.privilege_type.finish()));
-        columns.push(Arc::new(self.is_grantable.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.grantor.finish()),
+            Arc::new(self.grantee.finish()),
+            Arc::new(self.table_catalog.finish()),
+            Arc::new(self.table_schema.finish()),
+            Arc::new(self.table_name.finish()),
+            Arc::new(self.column_name.finish()),
+            Arc::new(self.privilege_type.finish()),
+            Arc::new(self.is_grantable.finish()),
+        ];
 
         columns
     }

@@ -1,12 +1,19 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubesql::compile::test::rewrite_engine::{
-    cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
+use cubesql::compile::test::{
+    get_test_tenant_ctx,
+    rewrite_engine::{
+        create_test_postgresql_cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner,
+    },
 };
+use itertools::Itertools;
 use std::sync::Arc;
 
 macro_rules! bench_func {
     ($NAME:expr, $QUERY:expr, $CRITERION:expr) => {{
-        let context = Arc::new(futures::executor::block_on(cube_context()));
+        let context = Arc::new(
+            futures::executor::block_on(create_test_postgresql_cube_context(get_test_tenant_ctx()))
+                .unwrap(),
+        );
         let plan = query_to_logical_plan($QUERY, &context);
         let rules = rewrite_rules(context.clone());
 
@@ -348,9 +355,392 @@ pub fn power_bi_sum_wrap(c: &mut Criterion) {
     bench_func!("power_bi_sum_wrap", get_power_bi_sum_wrap(), c);
 }
 
+fn get_simple_long_in_number_expr(set_size: usize) -> String {
+    let set = (1..=set_size).join(", ");
+
+    format!("SELECT * FROM NumberCube WHERE someNumber IN ({set})")
+}
+
+fn get_simple_long_in_str_expr(set_size: usize) -> String {
+    let mut set = Vec::with_capacity(set_size);
+
+    for i in 1..set_size {
+        set.push(format!(
+            "'SUPER LARGE RANDOM STRING TO TEST MEMORY CLONES ${i}'"
+        ))
+    }
+
+    let set = set.join(", ");
+
+    format!("SELECT * FROM KibanaSampleDataEcommerce WHERE customer_gender IN ({set})")
+}
+
+pub fn long_simple_in_number_expr_1k(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!(
+        "long_simple_in_number_expr_1k",
+        get_simple_long_in_number_expr(1000),
+        c
+    );
+}
+
+pub fn long_simple_in_str_expr_50(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!(
+        "long_simple_in_str_expr_50",
+        get_simple_long_in_str_expr(50),
+        c
+    );
+}
+
+pub fn long_simple_in_str_expr_1k(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!(
+        "long_simple_in_str_expr_1k",
+        get_simple_long_in_str_expr(1000),
+        c
+    );
+}
+
+fn get_long_in_expr() -> String {
+    r#"
+    SELECT 
+        "WideCube"."dim1" as "column1", 
+        "WideCube"."dim2" as "column2", 
+        "WideCube"."dim3" as "column3", 
+        "WideCube"."dim4" as "column4", 
+        "WideCube"."dim5" as "column5", 
+        "WideCube"."dim6" as "column6", 
+        "WideCube"."dim7" as "column7", 
+        "WideCube"."dim8" as "column8", 
+        "WideCube"."dim9" as "column9", 
+        "WideCube"."dim10" as "column10", 
+        "WideCube"."dim11" as "column11", 
+        "WideCube"."dim12" as "column12", 
+        "WideCube"."dim13" as "column13", 
+        "WideCube"."dim14" as "column14", 
+        "WideCube"."dim15" as "column15", 
+        SUM("WideCube"."dim16") as "some_sum" 
+    FROM 
+        "WideCube" 
+    WHERE 
+        "WideCube"."dim1" = 1 
+        AND "WideCube"."dim2" = 2 
+        AND "WideCube"."dim3" = 3 
+        AND "WideCube"."dim4" = 4 
+        AND "WideCube"."dim5" = 5 
+        AND "WideCube"."dim6" = 6 
+        AND "WideCube"."dim7" = 7 
+        AND "WideCube"."dim8" = 8 
+        AND "WideCube"."dim9" = 9 
+        AND "WideCube"."dim10" = 10 
+        AND ("WideCube"."dim11" = 42 OR "WideCube"."dim11" IS NULL) 
+        AND (
+            "WideCube"."dim12" IN (
+                1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 
+                27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50
+            ) OR "WideCube"."dim12" IS NULL
+        ) AND "WideCube"."dim20" = 55 
+    GROUP BY 
+        "WideCube"."dim1", 
+        "WideCube"."dim2", 
+        "WideCube"."dim3", 
+        "WideCube"."dim4", 
+        "WideCube"."dim5", 
+        "WideCube"."dim6", 
+        "WideCube"."dim7", 
+        "WideCube"."dim8", 
+        "WideCube"."dim9", 
+        "WideCube"."dim10", 
+        "WideCube"."dim11", 
+        "WideCube"."dim12", 
+        "WideCube"."dim13", 
+        "WideCube"."dim14", 
+        "WideCube"."dim15"
+  "#.into()
+}
+
+pub fn long_in_expr(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("long_in_expr", get_long_in_expr(), c);
+}
+
+fn get_tableau_logical_17_query() -> String {
+    r#"
+    SELECT LOWER(CAST("KibanaSampleDataEcommerce"."customer_gender" AS TEXT)) AS "TEMP(Test)(1234567890)(0)"
+    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    GROUP BY 1
+    "#
+    .into()
+}
+
+pub fn tableau_logical_17(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("tableau_logical_17", get_tableau_logical_17_query(), c);
+}
+
+fn get_ts_last_day_redshift_query() -> String {
+    r#"
+    WITH "qt_0" AS (
+        SELECT 
+            DATE_TRUNC('month', "ta_1"."order_date") "ca_1", 
+            CASE
+                WHEN sum("ta_1"."sumPrice") IS NOT NULL THEN sum("ta_1"."sumPrice")
+                ELSE 0
+            END "ca_2"
+        FROM "db"."public"."KibanaSampleDataEcommerce" "ta_1"
+        WHERE (
+            "ta_1"."order_date" >= DATE '1999-12-29'
+            AND "ta_1"."order_date" < DATE '1999-12-30'
+        )
+        GROUP BY "ca_1"
+    )
+    SELECT 
+        min("ta_2"."ca_1") "ca_3", 
+        max("ta_2"."ca_1") "ca_4"
+    FROM "qt_0" "ta_2"
+    "#
+    .into()
+}
+
+pub fn ts_last_day_redshift(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("ts_last_day_redshift", get_ts_last_day_redshift_query(), c);
+}
+
+fn get_tableau_bugs_b8888_query() -> String {
+    r#"
+    SELECT CAST(TRUNC((CASE WHEN 7 = 0 THEN NULL ELSE CAST(((6 + (1 + CAST(EXTRACT(DOW FROM (DATE_TRUNC( 'YEAR', CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) ) + (CASE WHEN (CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) < 3) THEN -10 ELSE 2 END) * INTERVAL '1 MONTH')) AS INTEGER))) + (EXTRACT(EPOCH FROM (CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) - (DATE_TRUNC( 'YEAR', CAST("KibanaSampleDataEcommerce"."order_date" AS TIMESTAMP) ) + (CASE WHEN (CAST(TRUNC(EXTRACT(MONTH FROM "KibanaSampleDataEcommerce"."order_date")) AS INTEGER) < 3) THEN -10 ELSE 2 END) * INTERVAL '1 MONTH'))) / (60.0 * 60 * 24))) AS DOUBLE PRECISION) / 7 END)) AS BIGINT) AS "Week #",
+        COUNT(DISTINCT "KibanaSampleDataEcommerce"."order_date") AS "ctd:order_date:ok",
+        CAST(TRUNC(EXTRACT(YEAR FROM ("KibanaSampleDataEcommerce"."order_date" + 10 * INTERVAL '1 MONTH'))) AS INTEGER) AS "yr:order_date:ok"
+    FROM "public"."KibanaSampleDataEcommerce" "KibanaSampleDataEcommerce"
+    GROUP BY 1,
+        3
+    "#.into()
+}
+
+pub fn tableau_bugs_b8888(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("tableau_bugs_b8888", get_tableau_bugs_b8888_query(), c);
+}
+
+fn get_quicksight_1_query() -> String {
+    r#"
+    SELECT
+    "LocalTemp.dim_date1_tg",
+    "LocalTemp.dim_str1",
+    "something_2",
+    "LocalTemp.measure_num1_sum",
+    "$otherbucket_group_count",
+    "count"
+    FROM
+    (
+        SELECT
+        "LocalTemp.dim_date1_tg",
+        "$VAL_1",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "LocalTemp.dim_str1"
+        END AS "LocalTemp.dim_str1",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END AS "$f7",
+        CASE
+            WHEN "$VAL_2" > 25 THEN 1
+            ELSE 0
+        END AS "something_2",
+        SUM(
+            "LocalTemp.measure_num1_sum"
+        ) AS "LocalTemp.measure_num1_sum",
+        COUNT(*) AS "$otherbucket_group_count",
+        SUM("count") AS "count"
+        FROM
+        (
+            SELECT
+            "dim_str1" AS "LocalTemp.dim_str1",
+            date_trunc('day', "dim_date1") AS "LocalTemp.dim_date1_tg",
+            COUNT(*) AS "count",
+            SUM("measure_num1") AS "LocalTemp.measure_num1_sum",
+            DENSE_RANK() OVER (
+                ORDER BY
+                date_trunc('day', "dim_date1") DESC NULLS LAST
+            ) AS "$VAL_1",
+            DENSE_RANK() OVER (
+                PARTITION BY date_trunc('day', "dim_date1")
+                ORDER BY
+                "dim_str1" NULLS FIRST
+            ) AS "$VAL_2"
+            FROM
+            "public"."MultiTypeCube"
+            WHERE
+            (
+                "dim_str2" NOT IN ('alpha', 'beta', 'gamma', 'delta')
+                OR "dim_str2" IS NULL
+                OR "dim_str2" IS NULL
+            )
+            AND "dim_str1" = 'Lima Lima Uniform'
+            AND "dim_date1" >= date_trunc(
+                'day',
+                TO_TIMESTAMP('2022-04-17 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+            )
+            AND "dim_date1" < date_trunc(
+                'day',
+                TO_TIMESTAMP('2022-06-05 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+            ) + 1 * interval '1 DAY'
+            GROUP BY
+            "dim_str1",
+            date_trunc('day', "dim_date1")
+        ) AS "t"
+        WHERE
+        "$VAL_1" <= 200
+        GROUP BY
+        "LocalTemp.dim_date1_tg",
+        "$VAL_1",
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "LocalTemp.dim_str1"
+        END,
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END,
+        CASE
+            WHEN "$VAL_2" > 25 THEN 1
+            ELSE 0
+        END
+        ORDER BY
+        "$VAL_1" NULLS FIRST,
+        CASE
+            WHEN "$VAL_2" > 25 THEN NULL
+            ELSE "$VAL_2"
+        END NULLS FIRST
+    ) AS "t0"
+   "#
+    .into()
+}
+
+fn quicksight_1(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("quicksight_1", get_quicksight_1_query(), c);
+}
+
+fn get_quicksight_2_query() -> String {
+    r#"
+SELECT
+  "Temp-A",
+  "Foo.dim_str5",
+  "something_2",
+  "sumof_sum_num2",
+  "$count_of_groups",
+  "count"
+FROM
+  (
+    SELECT
+      "Temp-A",
+      "$VAL_1",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "Foo.dim_str5"
+      END AS "Foo.dim_str5",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END AS "$f7",
+      CASE
+        WHEN "$VAL_2" > 25 THEN 1
+        ELSE 0
+      END AS "something_2",
+      SUM("sum_num2") AS "sumof_sum_num2",
+      COUNT(*) AS "$count_of_groups",
+      SUM("count") AS "count"
+    FROM
+      (
+        SELECT
+          "dim_str5" AS "Foo.dim_str5",
+          date_trunc('day', "dim_date1") AS "Temp-A",
+          COUNT(*) AS "count",
+          SUM("measure_num2") AS "sum_num2",
+          DENSE_RANK() OVER (
+            ORDER BY
+              date_trunc('day', "dim_date1") DESC NULLS LAST
+          ) AS "$VAL_1",
+          DENSE_RANK() OVER (
+            PARTITION BY date_trunc('day', "dim_date1")
+            ORDER BY
+              "dim_str5" NULLS FIRST
+          ) AS "$VAL_2"
+        FROM
+          "public"."MultiTypeCube"
+        WHERE
+          "dim_str1" IN (
+            '$0',
+            '$0 - $500',
+            '$1000 - $5K',
+            '$100K+',
+            '$10K - $25K',
+            '$25K - $50K',
+            '$500 - $1K',
+            '$50K - $100K',
+            '$5K - $10K',
+            'Credit'
+          )
+          AND "dim_str2" IN ('Open')
+          AND CAST(
+            "dim_num1" AS INTEGER
+          ) IN (0)
+          AND "dim_str3" <> '0002146'
+          AND "dim_str3" IS NOT NULL
+          AND "dim_str4" = 'Tango Golf Heaviside'
+          AND "dim_date1" >= date_trunc(
+            'day',
+            TO_TIMESTAMP('2024-01-01 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+          )
+          AND "dim_date1" < date_trunc(
+            'day',
+            TO_TIMESTAMP('2024-07-05 00:00:00', 'yyyy-MM-dd HH24:mi:ss')
+          ) + 1 * interval '1 DAY'
+        GROUP BY
+          "dim_str5",
+          date_trunc('day', "dim_date1")
+      ) AS "t"
+    WHERE
+      "$VAL_1" <= 200
+    GROUP BY
+      "Temp-A",
+      "$VAL_1",
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "Foo.dim_str5"
+      END,
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END,
+      CASE
+        WHEN "$VAL_2" > 25 THEN 1
+        ELSE 0
+      END
+    ORDER BY
+      "$VAL_1" NULLS FIRST,
+      CASE
+        WHEN "$VAL_2" > 25 THEN NULL
+        ELSE "$VAL_2"
+      END NULLS FIRST
+  ) AS "t0"
+   "#
+    .into()
+}
+
+fn quicksight_2(c: &mut Criterion) {
+    std::env::set_var("CUBESQL_SQL_PUSH_DOWN", "true");
+    bench_func!("quicksight_2", get_quicksight_2_query(), c);
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default().measurement_time(std::time::Duration::from_secs(15)).sample_size(10);
-    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap
+    targets = split_query, split_query_count_distinct, wrapped_query, power_bi_wrap, power_bi_sum_wrap, long_in_expr, long_simple_in_number_expr_1k, long_simple_in_str_expr_50, long_simple_in_str_expr_1k, tableau_logical_17,
+        tableau_bugs_b8888, ts_last_day_redshift, quicksight_1, quicksight_2
 }
 criterion_main!(benches);

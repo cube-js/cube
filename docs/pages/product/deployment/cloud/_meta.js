@@ -1,11 +1,8 @@
 module.exports = {
   "providers": "Cloud providers",
+  "infrastructure": "Infrastructure options",
   "vpc": "VPC",
-  "aws": {
-    title: "AWS",
-    display: "hidden",
-    hidden: true
-  },
+  "byoc": "BYOC",
   "deployments": "Deployments",
   "deployment-types": "Deployment types",
   "continuous-deployment": "Continuous deployment",

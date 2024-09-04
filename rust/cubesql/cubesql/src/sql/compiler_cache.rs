@@ -1,11 +1,12 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
+        engine::CubeContext,
         qtrace::Qtrace,
         rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
+        DatabaseProtocol,
     },
     config::ConfigObj,
-    sql::{session::DatabaseProtocol, AuthContextRef},
+    sql::AuthContextRef,
     transport::{MetaContext, TransportService},
     utils::egraph_hash,
     CubeError, MutexAsync, RWLockAsync,

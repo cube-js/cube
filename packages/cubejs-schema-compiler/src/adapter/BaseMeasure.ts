@@ -50,9 +50,20 @@ export class BaseMeasure {
 
   public measureSql() {
     if (this.expression) {
-      return this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure');
+      return this.convertTzForRawTimeDimensionIfNeeded(() => this.query.evaluateSymbolSql(this.expressionCubeName, this.expressionName, this.definition(), 'measure'));
     }
     return this.query.measureSql(this);
+  }
+
+  // We need this for measures however we don't for filters for performance reasons
+  public convertTzForRawTimeDimensionIfNeeded(sql) {
+    if (this.query.options.convertTzForRawTimeDimension) {
+      return this.query.evaluateSymbolSqlWithContext(sql, {
+        convertTzForRawTimeDimension: true
+      });
+    } else {
+      return sql();
+    }
   }
 
   public cube() {
@@ -107,6 +118,9 @@ export class BaseMeasure {
       return false;
     }
     const definition = this.measureDefinition();
+    if (definition.postAggregate) {
+      return false;
+    }
     return definition.type === 'sum' || definition.type === 'count' || definition.type === 'countDistinctApprox' ||
       definition.type === 'min' || definition.type === 'max';
   }
@@ -119,14 +133,26 @@ export class BaseMeasure {
     if (this.measureDefinition().type === 'runningTotal') {
       throw new UserError('runningTotal rollups aren\'t supported. Please consider replacing runningTotal measure with rollingWindow.');
     }
+    const { type } = this.measureDefinition().rollingWindow;
+    if (type && type !== 'fixed') {
+      throw new UserError(`Only fixed rolling windows are supported by Cube Store but got '${type}' rolling window`);
+    }
     return this.measureDefinition().rollingWindow;
   }
 
   public dateJoinCondition() {
-    if (this.measureDefinition().type === 'runningTotal') {
+    const definition = this.measureDefinition();
+    if (definition.type === 'runningTotal') {
       return this.query.runningTotalDateJoinCondition();
     }
-    const { rollingWindow } = this.measureDefinition();
+    const { rollingWindow } = definition;
+    if (rollingWindow.type === 'to_date') {
+      return this.query.rollingWindowToDateJoinCondition(rollingWindow.granularity);
+    }
+    // TODO deprecated
+    if (rollingWindow.type === 'year_to_date' || rollingWindow.type === 'quarter_to_date' || rollingWindow.type === 'month_to_date') {
+      return this.query.rollingWindowToDateJoinCondition(rollingWindow.type.replace('_to_date', ''));
+    }
     if (rollingWindow) {
       return this.query.rollingWindowDateJoinCondition(
         rollingWindow.trailing, rollingWindow.leading, rollingWindow.offset

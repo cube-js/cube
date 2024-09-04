@@ -25,6 +25,30 @@ export class DatabricksQuery extends BaseQuery {
     return new DatabricksFilter(this, filter);
   }
 
+  public castToString(sql: string): string {
+    return `CAST(${sql} as STRING)`;
+  }
+
+  public hllInit(sql: string) {
+    return `hll_sketch_agg(${sql})`;
+  }
+
+  public hllMerge(sql: string) {
+    return `hll_union_agg(${sql})`;
+  }
+
+  public hllCardinality(sql: string): string {
+    return `hll_sketch_estimate(${sql})`;
+  }
+
+  public hllCardinalityMerge(sql: string): string {
+    return `hll_sketch_estimate(hll_union_agg(${sql}))`;
+  }
+
+  public countDistinctApprox(sql: string) {
+    return `approx_count_distinct(${sql})`;
+  }
+
   public convertTz(field: string) {
     return `from_utc_timestamp(${field}, '${this.timezone}')`;
   }
@@ -104,7 +128,17 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
     templates.functions.DATEDIFF = 'DATEDIFF({{ date_part }}, DATE_TRUNC(\'{{ date_part }}\', {{ args[1] }}), DATE_TRUNC(\'{{ date_part }}\', {{ args[2] }}))';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.quotes.identifiers = '`';
+    templates.quotes.escape = '``';
+    // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
+    // but that requires Runtime 13.3+. Should this be enabled?
+    // templates.types.timestamp = 'TIMESTAMP_NTZ';
+    delete templates.types.time;
+    // Databricks intervals have a YearMonth or DayTime type variants, but no universal type
+    delete templates.types.interval;
     return templates;
   }
 }

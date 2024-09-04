@@ -122,8 +122,8 @@ impl Serialize for StartupMessage {
         buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
-            buffer::write_string(&mut buffer, &name);
-            buffer::write_string(&mut buffer, &value);
+            buffer::write_string(&mut buffer, name);
+            buffer::write_string(&mut buffer, value);
         }
 
         buffer.push(0);
@@ -215,6 +215,14 @@ impl ErrorResponse {
             severity: ErrorSeverity::Error,
             code: ErrorCode::QueryCanceled,
             message: "canceling statement due to user request".to_string(),
+        }
+    }
+
+    pub fn admin_shutdown() -> Self {
+        Self {
+            severity: ErrorSeverity::Fatal,
+            code: ErrorCode::AdminShutdown,
+            message: "terminating connection due to shutdown signal".to_string(),
         }
     }
 }
@@ -463,7 +471,7 @@ impl Serialize for CommandComplete {
             CommandComplete::Fetch(rows) => {
                 buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
-            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, tag),
         }
 
         Some(buffer)
@@ -953,11 +961,13 @@ pub enum ErrorCode {
     DuplicateCursor,
     SyntaxError,
     // Class 53 — Insufficient Resources
+    TooManyConnections,
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
     // Class 57 - Operator Intervention
     QueryCanceled,
+    AdminShutdown,
     // XX - Internal Error
     InternalError,
 }
@@ -976,9 +986,11 @@ impl Display for ErrorCode {
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
             Self::SyntaxError => "42601",
+            Self::TooManyConnections => "53300",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",
+            Self::AdminShutdown => "57P01",
             Self::InternalError => "XX000",
         };
         write!(f, "{}", string)
@@ -1123,7 +1135,12 @@ mod tests {
 
         // First step, We write struct to the buffer
         let mut cursor = Cursor::new(vec![]);
-        buffer::write_message(&mut cursor, expected_message.clone()).await?;
+        buffer::write_message(
+            &mut bytes::BytesMut::new(),
+            &mut cursor,
+            expected_message.clone(),
+        )
+        .await?;
 
         // Second step, We read form the buffer and output structure must be the same as original
         let buffer = cursor.get_ref()[..].to_vec();
@@ -1348,7 +1365,7 @@ mod tests {
     async fn test_frontend_message_write_complete_parse() -> Result<(), ProtocolError> {
         let mut cursor = Cursor::new(vec![]);
 
-        buffer::write_message(&mut cursor, ParseComplete {}).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, ParseComplete {}).await?;
 
         assert_eq!(cursor.get_ref()[0..], vec![49, 0, 0, 0, 4]);
 
@@ -1375,7 +1392,7 @@ mod tests {
                 Format::Text,
             ),
         ]);
-        buffer::write_message(&mut cursor, desc).await?;
+        buffer::write_message(&mut bytes::BytesMut::new(), &mut cursor, desc).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],

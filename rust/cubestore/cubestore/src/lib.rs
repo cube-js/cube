@@ -15,13 +15,13 @@ extern crate core;
 
 use crate::metastore::TableId;
 use crate::remotefs::queue::RemoteFsOpResult;
-use arrow::error::ArrowError;
 use cubehll::HllError;
 use cubezetasketch::ZetaError;
+use datafusion::arrow::error::ArrowError;
 use datafusion::cube_ext::catch_unwind::PanicError;
+use datafusion::parquet::errors::ParquetError;
 use flexbuffers::{DeserializationError, ReaderError};
 use log::SetLoggerError;
-use parquet::errors::ParquetError;
 use serde_derive::{Deserialize, Serialize};
 use sqlparser::parser::ParserError;
 use std::any::Any;
@@ -286,7 +286,7 @@ impl From<CubeError> for datafusion::error::DataFusionError {
     }
 }
 
-impl From<arrow::error::ArrowError> for CubeError {
+impl From<ArrowError> for CubeError {
     fn from(v: ArrowError) -> Self {
         CubeError::from_error(v)
     }
@@ -439,6 +439,12 @@ impl From<hex::FromHexError> for CubeError {
 
 impl From<HllError> for CubeError {
     fn from(v: HllError) -> Self {
+        return CubeError::from_error(v);
+    }
+}
+
+impl From<cubedatasketches::DataSketchesError> for CubeError {
+    fn from(v: cubedatasketches::DataSketchesError) -> Self {
         return CubeError::from_error(v);
     }
 }

@@ -54,8 +54,6 @@ use crate::table::{Row, TableValue};
 
 use crate::util::WorkerLoop;
 use crate::{meta_store_table_impl, CubeError};
-use arrow::datatypes::TimeUnit::Microsecond;
-use arrow::datatypes::{DataType, Field};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
@@ -63,14 +61,16 @@ use core::fmt;
 use cubehll::HllSketch;
 use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions};
 use cubezetasketch::HyperLogLogPlusPlus;
+use datafusion::arrow::datatypes::TimeUnit::Microsecond;
+use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::cube_ext;
+use datafusion::parquet::basic::{ConvertedType, Repetition};
+use datafusion::parquet::{basic::Type, schema::types};
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
 use multi_index::{MultiIndex, MultiIndexRocksIndex, MultiIndexRocksTable};
-use parquet::basic::{ConvertedType, Repetition};
-use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
 
@@ -88,6 +88,7 @@ use crate::cachestore::{
     CacheItem, QueueItem, QueueItemPayload, QueueItemStatus, QueueResult, QueueResultAckEvent,
 };
 use crate::remotefs::LocalDirRemoteFs;
+use cubedatasketches::HLLDataSketch;
 use deepsize::DeepSizeOf;
 use snapshot_info::SnapshotInfo;
 use std::time::{Duration, SystemTime};
@@ -342,10 +343,11 @@ impl DataFrameValue<String> for Option<Vec<AggregateFunction>> {
 
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, Eq, PartialEq, Hash, DeepSizeOf)]
 pub enum HllFlavour {
-    Airlift,    // Compatible with Presto, Athena, etc.
-    Snowflake,  // Same storage as Airlift, imports from Snowflake JSON.
-    Postgres,   // Same storage as Airlift, imports from HLL Storage Specification.
-    ZetaSketch, // Compatible with BigQuery.
+    Airlift,      // Compatible with Presto, Athena, etc.
+    Snowflake,    // Same storage as Airlift, imports from Snowflake JSON.
+    Postgres,     // Same storage as Airlift, imports from HLL Storage Specification.
+    ZetaSketch,   // Compatible with BigQuery.
+    DataSketches, // Compatible with DataBricks.
 }
 
 pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeError> {
@@ -359,6 +361,9 @@ pub fn is_valid_plain_binary_hll(data: &[u8], f: HllFlavour) -> Result<(), CubeE
         }
         HllFlavour::Postgres | HllFlavour::Snowflake => {
             panic!("string formats should be handled separately")
+        }
+        HllFlavour::DataSketches => {
+            HLLDataSketch::read(data)?;
         }
     }
     return Ok(());
@@ -391,6 +396,7 @@ impl Display for ColumnType {
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "hyperloglogpp",
             ColumnType::HyperLogLog(HllFlavour::Postgres) => "hll_postgres",
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => "hll_snowflake",
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => "hll_datasketches",
             ColumnType::Timestamp => "timestamp",
             ColumnType::Float => "float",
             ColumnType::Boolean => "boolean",
@@ -436,6 +442,7 @@ impl ColumnType {
                 "hyperloglogpp" => Ok(ColumnType::HyperLogLog(HllFlavour::ZetaSketch)),
                 "hll_postgres" => Ok(ColumnType::HyperLogLog(HllFlavour::Postgres)),
                 "hll_snowflake" => Ok(ColumnType::HyperLogLog(HllFlavour::Snowflake)),
+                "hll_datasketches" => Ok(ColumnType::HyperLogLog(HllFlavour::DataSketches)),
                 "timestamp" => Ok(ColumnType::Timestamp),
                 "float" => Ok(ColumnType::Float),
                 "boolean" => Ok(ColumnType::Boolean),
@@ -470,7 +477,7 @@ impl ColumnType {
     }
 }
 
-impl From<&Column> for parquet::schema::types::Type {
+impl From<&Column> for types::Type {
     fn from(column: &Column) -> Self {
         match column.get_column_type() {
             ColumnType::String => {
@@ -597,6 +604,7 @@ impl fmt::Display for Column {
             ColumnType::HyperLogLog(HllFlavour::ZetaSketch) => "HYPERLOGLOGPP".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Postgres) => "HLL_POSTGRES".to_string(),
             ColumnType::HyperLogLog(HllFlavour::Snowflake) => "HLL_SNOWFLAKE".to_string(),
+            ColumnType::HyperLogLog(HllFlavour::DataSketches) => "HLL_DATASKETCHES".to_string(),
             ColumnType::Float => "FLOAT".to_string(),
         };
         f.write_fmt(format_args!("{} {}", self.name, column_type))
