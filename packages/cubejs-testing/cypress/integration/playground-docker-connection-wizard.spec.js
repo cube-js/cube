@@ -102,7 +102,7 @@ context("Playground: Connection Wizard", () => {
       cy.wait(2000);
       cy.getByQa("ResultsTableContainer")
         .find(
-          '[data-row="0"][data-name="events.count"][data-element=SelectedNumberCell]'
+          '[data-row="0"][data-name="Events.count"][data-element=SelectedNumberCell]'
         )
         .contains("171,334");
     });
