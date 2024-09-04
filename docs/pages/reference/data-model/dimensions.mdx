@@ -363,12 +363,12 @@ cube(`products`, {
 
   dimensions: {
     comment: {
-      sql: `comments`,
+      sql: `comment`,
       type: `string`,
-      public: false,
-    },
-  },
-});
+      public: false
+    }
+  }
+})
 ```
 
 ```yaml
@@ -378,9 +378,9 @@ cubes:
 
     dimensions:
       - name: comment
-        sql: comments
+        sql: comment
+        type: string
         public: false
-        shown: false
 ```
 
 </CodeTabs>
