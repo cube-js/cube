@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+
+### Bug Fixes
+
+* **schema-compiler:** correct string casting for BigQuery ([#8651](https://github.com/cube-js/cube/issues/8651)) ([f6ac9c2](https://github.com/cube-js/cube/commit/f6ac9c2255091b27fc4ac5c2434bf7de7248afb2))
+* **schema-compiler:** correct string casting for MySQL ([#8650](https://github.com/cube-js/cube/issues/8650)) ([9408bb4](https://github.com/cube-js/cube/commit/9408bb43a7a63134894f0a7c4e1883e267b051a1))
+* **schema-compiler:** correct string concatenation and casting for MS SQL ([#8649](https://github.com/cube-js/cube/issues/8649)) ([0e9f9f1](https://github.com/cube-js/cube/commit/0e9f9f1f475245bd2c41fa05e6fd8a090b07bf99))
+* **schema-compiler:** Support `CURRENT_DATE` SQL push down for BigQuery ([9aebd6b](https://github.com/cube-js/cube/commit/9aebd6ba94bdc67c1b83e0b34d769db4088b41d2))
+
+
+
+
+
 ## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
 
 

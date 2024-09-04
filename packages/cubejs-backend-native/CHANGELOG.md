@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+
+### Features
+
+* **cubejs-api-gateway:** Support returning new security context from check_auth ([#8585](https://github.com/cube-js/cube/issues/8585)) ([704a96c](https://github.com/cube-js/cube/commit/704a96c4cdb4684459c37f5ed4a026f59b89e6f7))
+
+
+
+
+
 ## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
 
 
