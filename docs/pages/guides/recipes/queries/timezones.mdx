@@ -1,0 +1,130 @@
+# Using time zones
+
+In this recipe, you will learn how to use time zones in queries.
+
+## Use case
+
+We want users from different time zones to retrieve metrics that are relevant to
+their time zones. For example, online store managers from different locations
+all over the world might want to view sales stats in their own time zones.
+
+We would also like our queries to use pre-aggregations to get great performance.
+
+## Data modeling
+
+Consider the following `orders` cube that contains information about orders,
+including their transaction dates, modeled as the `created_at` time dimension:
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT 1 AS id, '2025-01-01T00:00:00.000Z'::TIMESTAMP AS created_at UNION ALL
+    SELECT 2 AS id, '2025-01-02T00:00:00.000Z'::TIMESTAMP AS created_at
+  `,
+  
+  dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
+    created_at: {
+      sql: `created_at`,
+      type: `time`
+    },
+
+    created_at_converted: {
+      sql: SQL_UTILS.convertTz(`created_at`),
+      type: `time`
+    }
+  }
+})
+```
+
+Note that the `created_at_converted` dimension is defined using the `convertTz`
+function of the [`SQL_UTILS` context variable][ref-sql-utils]. This dimension
+shall not be used as a time dimension in queries. However, unlike other
+dimensions, it will experience time zone conversion, as we'll see below.
+
+## Query
+
+To query the data with respect to a time zone, we need to use the [`timezone`
+property][ref-rest-api-time-zone] of the REST API. The sales stats will be
+translated to reflect the point of view of a person from a specific time zone.
+For instance, for an online store manager from New York, let's pass
+`America/New_York` as a time zone:
+
+```javascript
+{
+  "dimensions": [
+    "orders.created_at",
+    "orders.created_at_converted"
+  ],
+  "timeDimensions": [ {
+    "dimension": "orders.created_at",
+    "granularity": "day"
+  } ],
+  "order": {
+    "orders.created_at": "desc"
+  },
+  "timezone": "America/New_York"
+}
+```
+
+## Result
+
+Let's explore the retrieved data:
+
+```javascript
+[
+  {
+    "orders.created_at": "2023-11-05T00:00:00.000",
+    "orders.created_atConverted": "2023-11-04T20:00:00.000",
+    "orders.created_at.day": "2023-11-04T00:00:00.000"
+  },
+  {
+    "orders.created_at": "2023-11-04T00:00:00.000",
+    "orders.created_atConverted": "2023-11-03T20:00:00.000",
+    "orders.created_at.day": "2023-11-03T00:00:00.000"
+  },
+  {
+    "orders.created_at": "2023-11-04T00:00:00.000",
+    "orders.created_atConverted": "2023-11-03T20:00:00.000",
+    "orders.created_at.day": "2023-11-03T00:00:00.000"
+  }
+]
+```
+
+The `orders.created_at` time dimension was provided in the `dimensions` part of
+the query. So, its values were returned "as is", in the UTC timezone.
+(Apparently, all orders were made at midnight.)
+
+Also, check out the `orders.created_at.day` values in the result. They were
+returned because we've provided `orders.created_at` in the `timeDimensions` part
+of the query. So, they were translated to the New York timezone (shifted 4 hours
+back from UTC) and also truncated to the start of the day since we've specified
+the daily `granularity` in the query.
+
+We also added the `orders.created_atConverted` to `dimensions` in the query. The
+respective values were also translated to the New York timezone but not truncated
+with respect to the granularity. Please check that the `created_atConverted`
+dimension is defined using the [`SQL_UTILS.convertTz`
+method](https://cube.dev/docs/schema/reference/cube#convert-tz) that does the
+timezone translation.
+
+## Configuration
+
+To allow Cube to build pre-aggregations for timezones that can be specified in
+queries, we need to provide a list of such timezones via the
+`scheduledRefreshTimeZones` configuration option:
+
+```javascript
+module.exports = {
+  scheduledRefreshTimeZones: ['America/New_York'],
+};
+```
+
+
+[ref-sql-utils]: /reference/data-model/context-variables#sql_utils
+[ref-rest-api-time-zone]: /product/apis-integrations/rest-api/query-format#query-properties
