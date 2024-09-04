@@ -51,6 +51,8 @@ Cypress.Commands.add("setChartType", (chartType) => {
     if (expanded && expanded.includes("false")) {
       return cy.wrap($title).click();
     }
+
+    return cy.wrap($title);
   });
   cy.wait(500);
   cy.getByQa("ChartType")
@@ -75,9 +77,27 @@ Cypress.Commands.add("runQuery", () => {
 });
 
 Cypress.Commands.add("addMeasure", (name) => {
+  cy.get("[data-qa=ToggleMembersButton]").then(($button) => {
+    const expanded = $button.attr("data-qaval");
+
+    if (expanded && expanded.includes("used")) {
+      return cy.wrap($button).click();
+    }
+
+    return cy.wrap($button);
+  });
   cy.get(`[data-member="measure"][data-qaval="${name}"]`).click();
 });
 
 Cypress.Commands.add("addDimension", (name) => {
+  cy.get("[data-qa=ToggleMembersButton]").then(($button) => {
+    const expanded = $button.attr("data-qaval");
+
+    if (expanded && expanded.includes("used")) {
+      return cy.wrap($button).click();
+    }
+
+    return cy.wrap($button);
+  });
   cy.get(`[data-member="dimension"][data-qaval="${name}"]`).click();
 });

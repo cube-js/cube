@@ -166,11 +166,19 @@ export function SidePanelCubeItem({
     );
   const segments = (filterString ? shownSegments : cube?.segments || [])
     .map((s) => s.name)
-    .filter((s) => (mode === 'all' && isOpen) || showAllMembers || query?.segments?.includes(s));
+    .filter(
+      (s) =>
+        (mode === 'all' && isOpen) ||
+        showAllMembers ||
+        query?.segments?.includes(s)
+    );
 
   if (!filterString) {
     query?.dimensions?.forEach((dimension) => {
-      if (!dimensions?.includes(dimension) && dimension.startsWith(`${name}.`)) {
+      if (
+        !dimensions?.includes(dimension) &&
+        dimension.startsWith(`${name}.`)
+      ) {
         dimensions.push(dimension);
       }
     });
@@ -208,7 +216,8 @@ export function SidePanelCubeItem({
     dateRanges.remove(name);
   }
 
-  const showMembers = (isOpen || mode === 'query' || isUsed || !!filterString) && !isNonJoinable;
+  const showMembers =
+    (isOpen || mode === 'query' || isUsed || !!filterString) && !isNonJoinable;
 
   const dimensionsSection = useMemo(() => {
     return showMembers && dimensions.length ? (
@@ -233,7 +242,9 @@ export function SidePanelCubeItem({
                   if (granularity) {
                     return (
                       query?.timeDimensions?.some(
-                        (td) => td.dimension === item.name && td.granularity === granularity
+                        (td) =>
+                          td.dimension === item.name &&
+                          td.granularity === granularity
                       ) || false
                     );
                   }
@@ -241,8 +252,9 @@ export function SidePanelCubeItem({
                   return query?.dimensions?.includes(item.name) || false;
                 }}
                 isFiltered={
-                  query?.timeDimensions?.some((td) => td.dimension === item.name && td.dateRange) ||
-                  false
+                  query?.timeDimensions?.some(
+                    (td) => td.dimension === item.name && td.dateRange
+                  ) || false
                 }
                 onDimensionToggle={(dimension) => {
                   dimensionsUpdater?.toggle(dimension);
@@ -253,7 +265,9 @@ export function SidePanelCubeItem({
                   onMemberToggle?.(name);
                 }}
                 onToggleDataRange={
-                  !dateRanges.list.includes(item.name) ? addDateRange : removeDateRange
+                  !dateRanges.list.includes(item.name)
+                    ? addDateRange
+                    : removeDateRange
                 }
               />
             );
@@ -268,8 +282,9 @@ export function SidePanelCubeItem({
               filterString={filterString}
               isSelected={query?.dimensions?.includes(name) || false}
               isFiltered={
-                query?.filters?.some((filter) => 'member' in filter && filter.member === name) ||
-                false
+                query?.filters?.some(
+                  (filter) => 'member' in filter && filter.member === name
+                ) || false
               }
               onAddFilter={addFilter}
               onRemoveFilter={removeFilter}
@@ -314,8 +329,9 @@ export function SidePanelCubeItem({
               filterString={filterString}
               isSelected={query?.measures?.includes(name) || false}
               isFiltered={
-                query?.filters?.some((filter) => 'member' in filter && filter.member === name) ||
-                false
+                query?.filters?.some(
+                  (filter) => 'member' in filter && filter.member === name
+                ) || false
               }
               onAddFilter={addFilter}
               onRemoveFilter={removeFilter}
@@ -367,7 +383,8 @@ export function SidePanelCubeItem({
 
   const hasOverflow = useHasOverflow(textRef);
 
-  const noVisibleMembers = !dimensions.length && !measures.length && !segments.length;
+  const noVisibleMembers =
+    !dimensions.length && !measures.length && !segments.length;
 
   useEffect(() => {
     setShowAllMembers(false);
@@ -400,7 +417,11 @@ export function SidePanelCubeItem({
                 type="neutral"
                 size="small"
                 icon={
-                  !showAllMembers ? <ArrowIcon direction="bottom" /> : <ArrowIcon direction="top" />
+                  !showAllMembers ? (
+                    <ArrowIcon direction="bottom" />
+                  ) : (
+                    <ArrowIcon direction="top" />
+                  )
                 }
                 placeContent="start"
                 onPress={() => setShowAllMembers(!showAllMembers)}
@@ -414,7 +435,9 @@ export function SidePanelCubeItem({
         return null;
       } else if (isOpen || mode === 'query') {
         return (
-          <Block padding=".5x 0 .5x 4.5x">No members{mode === 'query' ? ' selected' : ''}</Block>
+          <Block padding=".5x 0 .5x 4.5x">
+            No members{mode === 'query' ? ' selected' : ''}
+          </Block>
         );
       }
     } else {
@@ -428,7 +451,9 @@ export function SidePanelCubeItem({
       qaVal={name}
       icon={
         isMissing ? (
-          <QuestionCircleOutlined style={{ color: 'var(--danger-text-color)' }} />
+          <QuestionCircleOutlined
+            style={{ color: 'var(--danger-text-color)' }}
+          />
         ) : type === 'cube' ? (
           <CubeIcon color="#purple" />
         ) : (
@@ -458,9 +483,15 @@ export function SidePanelCubeItem({
       onPress={() => !isMissing && !isNonJoinable && onToggle?.(!isOpen)}
     >
       <Text ref={textRef} ellipsis>
-        {filterString ? <FilteredLabel text={name} filter={filterString} /> : name}
+        {filterString ? (
+          <FilteredLabel text={name} filter={filterString} />
+        ) : (
+          name
+        )}
       </Text>
-      {description ? <ItemInfoIcon title={title} description={description} /> : undefined}
+      {description ? (
+        <ItemInfoIcon title={title} description={description} />
+      ) : undefined}
       {isPrivate ? <NonPublicIcon type="cube" /> : undefined}
     </CubeButton>
   );
