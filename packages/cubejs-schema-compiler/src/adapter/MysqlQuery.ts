@@ -28,6 +28,10 @@ export class MysqlQuery extends BaseQuery {
     return new MysqlFilter(this, filter);
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as CHAR)`;
+  }
+
   public convertTz(field) {
     return `CONVERT_TZ(${field}, @@session.time_zone, '${moment().tz(this.timezone).format('Z')}')`;
   }
@@ -91,6 +95,11 @@ export class MysqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    templates.types.string = 'VARCHAR';
+    templates.types.boolean = 'TINYINT';
+    templates.types.timestamp = 'DATETIME';
+    delete templates.types.interval;
+    templates.types.binary = 'BLOB';
     return templates;
   }
 }

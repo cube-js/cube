@@ -6,10 +6,12 @@ use crate::{
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
         rewriter::RewriteRules,
+        rules::utils::DeltaTimeUnitToken,
         to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
         transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
         LiteralExprValue, LogicalPlanLanguage,
     },
+    config::ConfigObj,
     var, var_iter,
 };
 use datafusion::{
@@ -18,9 +20,11 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{EGraph, Id, Rewrite, Subst};
-use std::convert::TryFrom;
+use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
-pub struct DateRules {}
+pub struct DateRules {
+    config_obj: Arc<dyn ConfigObj>,
+}
 
 impl RewriteRules for DateRules {
     fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
@@ -38,7 +42,7 @@ impl RewriteRules for DateRules {
                             ],
                         ),
                         "+",
-                        fun_expr(
+                        self.fun_expr(
                             "ToMonthInterval",
                             vec![
                                 udf_expr("quarter", vec![column_expr("?column")]),
@@ -49,7 +53,7 @@ impl RewriteRules for DateRules {
                     "-",
                     literal_expr("?interval"),
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("quarter"), column_expr("?column")],
                 ),
@@ -63,7 +67,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr(
                                         "dayofweek",
@@ -80,7 +84,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("week"), column_expr("?column")],
                 ),
@@ -93,7 +97,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr("dayofmonth", vec![column_expr("?column")]),
                                     "-",
@@ -104,7 +108,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("month"), column_expr("?column")],
                 ),
@@ -117,7 +121,7 @@ impl RewriteRules for DateRules {
                         "date_sub",
                         vec![
                             column_expr("?column"),
-                            to_day_interval_expr(
+                            self.to_day_interval_expr(
                                 binary_expr(
                                     udf_expr("dayofyear", vec![column_expr("?column")]),
                                     "-",
@@ -128,7 +132,7 @@ impl RewriteRules for DateRules {
                         ],
                     )],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("year"), column_expr("?column")],
                 ),
@@ -139,13 +143,13 @@ impl RewriteRules for DateRules {
                     "date_add",
                     vec![
                         udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
+                        self.to_day_interval_expr(
                             udf_expr("hour", vec![column_expr("?column")]),
                             literal_string("hour"),
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("hour"), column_expr("?column")],
                 ),
@@ -156,7 +160,7 @@ impl RewriteRules for DateRules {
                     "date_add",
                     vec![
                         udf_expr("date", vec![column_expr("?column")]),
-                        to_day_interval_expr(
+                        self.to_day_interval_expr(
                             binary_expr(
                                 binary_expr(
                                     udf_expr("hour", vec![column_expr("?column")]),
@@ -170,7 +174,7 @@ impl RewriteRules for DateRules {
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("minute"), column_expr("?column")],
                 ),
@@ -178,7 +182,7 @@ impl RewriteRules for DateRules {
             rewrite(
                 "date-to-date-trunc",
                 udf_expr("date", vec![column_expr("?column")]),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![literal_string("day"), column_expr("?column")],
                 ),
@@ -186,7 +190,7 @@ impl RewriteRules for DateRules {
             // TODO
             transforming_rewrite_with_root(
                 "cast-in-date-trunc",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         literal_expr("?granularity"),
@@ -194,7 +198,7 @@ impl RewriteRules for DateRules {
                     ],
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_expr("?granularity"), column_expr("?column")],
                     ),
@@ -204,12 +208,12 @@ impl RewriteRules for DateRules {
             ),
             transforming_rewrite_with_root(
                 "cast-in-date-trunc-double",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
                         literal_expr("?granularity"),
                         cast_expr(
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![
                                     literal_expr("?granularity"),
@@ -221,11 +225,11 @@ impl RewriteRules for DateRules {
                     ],
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![
                             literal_expr("?granularity"),
-                            fun_expr(
+                            self.fun_expr(
                                 "DateTrunc",
                                 vec![literal_expr("?granularity"), "?expr".to_string()],
                             ),
@@ -238,20 +242,26 @@ impl RewriteRules for DateRules {
             transforming_rewrite_with_root(
                 "current-timestamp-to-now",
                 udf_expr("current_timestamp", Vec::<String>::new()),
-                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                alias_expr(
+                    self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    "?alias",
+                ),
                 transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "localtimestamp-to-now",
                 udf_expr("localtimestamp", Vec::<String>::new()),
-                alias_expr(fun_expr("UtcTimestamp", Vec::<String>::new()), "?alias"),
+                alias_expr(
+                    self.fun_expr("UtcTimestamp", Vec::<String>::new()),
+                    "?alias",
+                ),
                 transform_original_expr_to_alias("?alias"),
             ),
             transforming_rewrite_with_root(
                 "tableau-week",
                 binary_expr(
                     alias_expr(
-                        fun_expr(
+                        self.fun_expr(
                             "DateTrunc",
                             vec!["?granularity".to_string(), column_expr("?column")],
                         ),
@@ -259,7 +269,7 @@ impl RewriteRules for DateRules {
                     ),
                     "+",
                     binary_expr(
-                        negative_expr(fun_expr(
+                        negative_expr(self.fun_expr(
                             "DatePart",
                             vec![literal_string("DOW"), column_expr("?column")],
                         )),
@@ -269,7 +279,7 @@ impl RewriteRules for DateRules {
                     ),
                 ),
                 alias_expr(
-                    fun_expr(
+                    self.fun_expr(
                         "DateTrunc",
                         vec![literal_string("week"), column_expr("?column")],
                     ),
@@ -280,14 +290,14 @@ impl RewriteRules for DateRules {
             rewrite(
                 "metabase-interval-date-range",
                 binary_expr(
-                    cast_expr(fun_expr("Now", Vec::<String>::new()), "?data_type"),
+                    cast_expr(self.fun_expr("Now", Vec::<String>::new()), "?data_type"),
                     "+",
                     literal_expr("?interval"),
                 ),
                 udf_expr(
                     "date_add",
                     vec![
-                        fun_expr("Now", Vec::<String>::new()),
+                        self.fun_expr("Now", Vec::<String>::new()),
                         literal_expr("?interval"),
                     ],
                 ),
@@ -376,21 +386,27 @@ impl RewriteRules for DateRules {
                 udf_expr("date_to_timestamp", vec![literal_expr("?date")]),
                 self.transform_to_date_to_timestamp("?format"),
             ),
-            rewrite(
+            // TODO turn this rule into generic DateTrunc merge
+            transforming_rewrite(
                 "datastudio-dates",
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
                     vec![
-                        "?granularity".to_string(),
-                        fun_expr(
+                        "?outer_granularity".to_string(),
+                        self.fun_expr(
                             "DateTrunc",
-                            vec![literal_string("SECOND"), column_expr("?column")],
+                            vec!["?inner_granularity".to_string(), column_expr("?column")],
                         ),
                     ],
                 ),
-                fun_expr(
+                self.fun_expr(
                     "DateTrunc",
-                    vec!["?granularity".to_string(), column_expr("?column")],
+                    vec![literal_expr("?new_granularity"), column_expr("?column")],
+                ),
+                self.transform_datastudio_date_trunc_merge(
+                    "?outer_granularity",
+                    "?inner_granularity",
+                    "?new_granularity",
                 ),
             ),
         ]
@@ -398,8 +414,16 @@ impl RewriteRules for DateRules {
 }
 
 impl DateRules {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(config_obj: Arc<dyn ConfigObj>) -> Self {
+        Self { config_obj }
+    }
+
+    fn fun_expr(&self, fun_name: impl Display, args: Vec<impl Display>) -> String {
+        fun_expr(fun_name, args, self.config_obj.push_down_pull_up_split())
+    }
+
+    fn to_day_interval_expr<D: Display>(&self, period: D, unit: D) -> String {
+        to_day_interval_expr(period, unit, self.config_obj.push_down_pull_up_split())
     }
 
     fn transform_interval_parts_to_interval(
@@ -490,6 +514,60 @@ impl DateRules {
                 }
             }
             false
+        }
+    }
+
+    // TODO turn this transform into generic DateTrunc merge
+    fn transform_datastudio_date_trunc_merge(
+        &self,
+        outer_granularity_var: &'static str,
+        inner_granularity_var: &'static str,
+        new_granularity_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let outer_granularity_var = var!(outer_granularity_var);
+        let inner_granularity_var = var!(inner_granularity_var);
+        let new_granularity_var = var!(new_granularity_var);
+        move |egraph, subst| match (
+            &egraph[subst[outer_granularity_var]].data.constant,
+            &egraph[subst[inner_granularity_var]].data.constant,
+        ) {
+            (
+                Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(outer_granularity)))),
+                Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(inner_granularity)))),
+            ) => {
+                let Ok(outer_granularity) = outer_granularity.parse::<DeltaTimeUnitToken>() else {
+                    return false;
+                };
+                let Ok(inner_granularity) = inner_granularity.parse::<DeltaTimeUnitToken>() else {
+                    return false;
+                };
+
+                use DeltaTimeUnitToken::*;
+
+                if !matches!(inner_granularity, Second) {
+                    return false;
+                }
+
+                let new_granularity = match outer_granularity {
+                    // Outer granularity is finer that inner seconds
+                    Microseconds | Milliseconds => Second,
+
+                    // Outer granularity is coarser, but aligned with inner seconds
+                    Second | Minute | Hour | Day | Week | Month | Quarter | Year | Decade
+                    | Century | Millennium => outer_granularity,
+
+                    // Invalid token for date_trunc
+                    Timezone | TimezoneHour | TimezoneMinute => return false,
+                };
+
+                let new_granularity =
+                    egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
+                        ScalarValue::Utf8(Some(new_granularity.as_str().to_string())),
+                    )));
+                subst.insert(new_granularity_var, new_granularity);
+                return true;
+            }
+            _ => false,
         }
     }
 

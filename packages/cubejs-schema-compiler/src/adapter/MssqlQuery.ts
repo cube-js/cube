@@ -58,6 +58,14 @@ export class MssqlQuery extends BaseQuery {
     return new MssqlFilter(this, filter);
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as VARCHAR)`;
+  }
+
+  public concatStringsSql(strings: string[]) {
+    return strings.join(' + ');
+  }
+
   public convertTz(field) {
     return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
@@ -78,6 +86,7 @@ export class MssqlQuery extends BaseQuery {
     return new MssqlParamAllocator(expressionParams);
   }
 
+  // TODO replace with limitOffsetClause override
   public groupByDimensionLimit() {
     if (this.rowLimit) {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';
@@ -127,15 +136,15 @@ export class MssqlQuery extends BaseQuery {
     const timeDimensionsColumns = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
-  
+
     // Group by regular dimensions
     const dimensionColumns = R.flatten(
       this.dimensions.map(s => s.selectColumns() && s.dimensionSql() && s.aliasName())
     ).filter(s => !!s);
-  
+
     // Combine time dimensions and regular dimensions for GROUP BY clause
     const allGroupByColumns = timeDimensionsColumns.concat(dimensionColumns);
-  
+
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return (
       `SELECT ${forSelect} FROM ${dateSeriesSql}` +
@@ -178,5 +187,20 @@ export class MssqlQuery extends BaseQuery {
   public addInterval(date, interval) {
     const amountInterval = interval.split(' ', 2);
     return `DATEADD(${amountInterval[1]}, ${amountInterval[0]}, ${date})`;
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.types.string = 'VARCHAR';
+    templates.types.boolean = 'BIT';
+    templates.types.integer = 'INT';
+    templates.types.float = 'FLOAT(24)';
+    templates.types.double = 'FLOAT(53)';
+    templates.types.timestamp = 'DATETIME2';
+    delete templates.types.interval;
+    templates.types.binary = 'VARBINARY';
+    return templates;
   }
 }

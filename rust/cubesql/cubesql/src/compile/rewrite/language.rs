@@ -469,6 +469,15 @@ macro_rules! variant_field_struct {
         );
     };
 
+    ($variant:ident, $var_field:ident, GroupingSetType) => {
+        $crate::variant_field_struct!(
+            @enum_struct $variant, $var_field, { GroupingSetType } -> {
+                GroupingSetType::Rollup => "Rollup",
+                GroupingSetType::Cube => "Cube",
+            }
+        );
+    };
+
     (@enum_struct $variant:ident, $var_field:ident, { $var_field_type:ty } -> {$($variant_type:ty => $name:literal,)*}) => {
         paste::item! {
             #[derive(Debug, Clone)]

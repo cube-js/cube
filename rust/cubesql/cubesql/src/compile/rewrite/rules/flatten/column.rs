@@ -59,6 +59,7 @@ impl FlattenRules {
         // let inner_alias_var = var!(inner_alias_var);
         let column_alias_var = var!(column_alias_var);
         let out_expr_var = var!(out_expr_var);
+        let flat_list = self.config_obj.push_down_pull_up_split();
         move |egraph, subst| {
             for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
                 for top_level in var_iter!(
@@ -76,15 +77,18 @@ impl FlattenRules {
                             .find(|(_, alias, _)| alias == &column.name)
                         {
                             // Currently there are no cases where it can fail when adding expression
-                            let output_expr =
-                                LogicalPlanToLanguageConverter::add_expr(egraph, &expr)
-                                    .map_err(|e| {
-                                        CubeError::internal(format!(
-                                "FlattenColumnPushdown: Can't add expression to egraph: {:?}: {}",
-                                expr, e
-                            ))
-                                    })
-                                    .unwrap();
+                            let output_expr = LogicalPlanToLanguageConverter::add_expr(
+                                egraph,
+                                &expr,
+                                flat_list,
+                            )
+                            .map_err(|e| {
+                                CubeError::internal(format!(
+                                    "FlattenColumnPushdown: Can't add expression to egraph: {:?}: {}",
+                                    expr, e
+                                ))
+                            })
+                            .unwrap();
                             let alias = egraph.add(LogicalPlanLanguage::AliasExprAlias(
                                 AliasExprAlias(if top_level {
                                     column.name.to_string()

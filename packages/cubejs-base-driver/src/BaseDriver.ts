@@ -154,7 +154,7 @@ export abstract class BaseDriver implements DriverInterface {
              columns.table_schema as ${this.quoteIdentifier('table_schema')},
              columns.data_type as ${this.quoteIdentifier('data_type')}
       FROM information_schema.columns
-      WHERE columns.table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE columns.table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
    `;
   }
 
@@ -162,7 +162,7 @@ export abstract class BaseDriver implements DriverInterface {
     return `
       SELECT table_schema as ${this.quoteIdentifier('schema_name')}
       FROM information_schema.tables
-      WHERE table_schema NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
+      WHERE table_schema NOT IN ('pg_catalog', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA')
       GROUP BY table_schema
     `;
   }
@@ -387,9 +387,7 @@ export abstract class BaseDriver implements DriverInterface {
 
   // Extended version of tablesSchema containing primary and foreign keys
   public async tablesSchemaV2() {
-    const query = this.informationSchemaQuery();
-
-    const tablesSchema = await this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    const tablesSchema = await this.tablesSchema();
     const [primaryKeys, foreignKeys] = await Promise.all([this.primaryKeys(), this.foreignKeys()]);
 
     for (const pk of primaryKeys) {
@@ -407,9 +405,9 @@ export abstract class BaseDriver implements DriverInterface {
       if (Array.isArray(tablesSchema?.[foreignKey.table_schema]?.[foreignKey.table_name])) {
         tablesSchema[foreignKey.table_schema][foreignKey.table_name] = tablesSchema[foreignKey.table_schema][foreignKey.table_name].map((it: any) => {
           if (it.name === foreignKey.column_name) {
-            it.foreignKeys = [...(it.foreignKeys || []), {
-              targetTable: foreignKey.target_table,
-              targetColumn: foreignKey.target_column
+            it.foreign_keys = [...(it.foreign_keys || []), {
+              target_table: foreignKey.target_table,
+              target_column: foreignKey.target_column
             }];
           }
           return it;

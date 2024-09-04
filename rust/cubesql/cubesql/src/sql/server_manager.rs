@@ -1,19 +1,15 @@
 use crate::{
+    compile::{DatabaseProtocol, DatabaseVariables, DatabaseVariablesToUpdate},
     config::ConfigObj,
     sql::{
         compiler_cache::CompilerCache,
-        database_variables::{
-            mysql_default_global_variables, postgres_default_global_variables,
-            DatabaseVariablesToUpdate,
-        },
+        database_variables::{mysql_default_global_variables, postgres_default_global_variables},
         SqlAuthService,
     },
     transport::TransportService,
     CubeError,
 };
 use std::sync::{Arc, RwLock as RwLockSync, RwLockReadGuard, RwLockWriteGuard};
-
-use super::{database_variables::DatabaseVariables, session::DatabaseProtocol};
 
 #[derive(Debug)]
 pub struct ServerConfiguration {
@@ -85,6 +81,10 @@ impl ServerManager {
                 .postgres_variables
                 .read()
                 .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::Extension(ext) => unimplemented!(
+                "read_variables is not implemented for custom protocol: {:?}",
+                ext
+            ),
         }
     }
 
@@ -101,6 +101,10 @@ impl ServerManager {
                 .postgres_variables
                 .write()
                 .expect("failed to unlock variables for reading"),
+            DatabaseProtocol::Extension(ext) => unimplemented!(
+                "write_variables is not implemented for custom protocol: {:?}",
+                ext
+            ),
         }
     }
 

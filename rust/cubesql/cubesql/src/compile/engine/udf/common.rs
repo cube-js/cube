@@ -5,17 +5,17 @@ use datafusion::{
     arrow::{
         array::{
             new_null_array, Array, ArrayBuilder, ArrayRef, BooleanArray, BooleanBuilder,
-            Float64Array, GenericStringArray, Int32Builder, Int64Array, Int64Builder,
-            IntervalDayTimeBuilder, ListArray, ListBuilder, PrimitiveArray, PrimitiveBuilder,
-            StringArray, StringBuilder, StructBuilder, TimestampMicrosecondArray,
-            TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray,
-            UInt32Builder,
+            Date32Array, Float64Array, Float64Builder, GenericStringArray, Int32Builder,
+            Int64Array, Int64Builder, IntervalDayTimeBuilder, IntervalMonthDayNanoArray, ListArray,
+            ListBuilder, PrimitiveArray, PrimitiveBuilder, StringArray, StringBuilder,
+            StructBuilder, TimestampMicrosecondArray, TimestampMillisecondArray,
+            TimestampNanosecondArray, TimestampSecondArray, UInt32Builder, UInt64Builder,
         },
         compute::{cast, concat},
         datatypes::{
-            DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type, IntervalDayTimeType,
-            IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType, TimeUnit,
-            TimestampNanosecondType, UInt32Type, UInt64Type,
+            ArrowPrimitiveType, DataType, Date32Type, Field, Float64Type, Int32Type, Int64Type,
+            IntervalDayTimeType, IntervalMonthDayNanoType, IntervalUnit, IntervalYearMonthType,
+            TimeUnit, TimestampNanosecondType, UInt32Type,
         },
     },
     error::{DataFusionError, Result},
@@ -40,14 +40,15 @@ use sha1_smol::Sha1;
 
 use crate::{
     compile::engine::{
-        df::{
-            coerce::{if_coercion, least_coercion},
-            columar::if_then_else,
-        },
+        df::{coerce::common_type_coercion, columar::if_then_else},
+        information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
         udf::utils::*,
     },
     sql::SessionState,
 };
+
+type IntervalDayTime = <IntervalDayTimeType as ArrowPrimitiveType>::Native;
+type IntervalMonthDayNano = <IntervalMonthDayNanoType as ArrowPrimitiveType>::Native;
 
 pub type ReturnTypeFunction = Arc<dyn Fn(&[DataType]) -> Result<Arc<DataType>> + Send + Sync>;
 pub type ScalarFunctionImplementation =
@@ -425,13 +426,14 @@ pub fn create_if_udf() -> ScalarUDF {
         let left = &args[1];
         let right = &args[2];
 
-        let return_type = if_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Positive and negative results must be the same type, actual: [{}, {}]",
-                left.data_type(),
-                right.data_type(),
-            ))
-        })?;
+        let return_type =
+            common_type_coercion(left.data_type(), right.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Positive and negative results must be the same type, actual: [{}, {}]",
+                    left.data_type(),
+                    right.data_type(),
+                ))
+            })?;
 
         let cond_array = match condition.data_type() {
             // // Arrow doesnt support UTF8 -> Boolean cast
@@ -468,7 +470,7 @@ pub fn create_if_udf() -> ScalarUDF {
     let return_type: ReturnTypeFunction = Arc::new(move |types| {
         assert!(types.len() == 3);
 
-        let base_type = if_coercion(&types[1], &types[2]).ok_or_else(|| {
+        let base_type = common_type_coercion(&types[1], &types[2]).ok_or_else(|| {
             DataFusionError::Execution(format!(
                 "Positive and negative results must be the same type, actual: [{}, {}]",
                 &types[1], &types[2],
@@ -486,81 +488,281 @@ pub fn create_if_udf() -> ScalarUDF {
     )
 }
 
-// LEAST() function in MySQL is used to find smallest values from given arguments respectively. If any given value is NULL, it return NULLs. Otherwise it returns the smallest value.
+/// The LEAST function selects the smallest value from a list of any number of expressions.
+/// The expressions must all be convertible to a common data type, which will be the type of
+/// the result. The SQL standard requires greatest and least to return null in case one argument
+/// is null. However, in Postgres NULL values in the list are ignored.
+/// We follow Postgres: The result will be NULL only if all the expressions evaluate to NULL.
 pub fn create_least_udf() -> ScalarUDF {
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
-        assert!(args.len() == 2);
+        assert!(args.len() > 0);
 
-        let left = &args[0];
-        let right = &args[1];
+        let mut base_type = DataType::Null;
+        let array_len = args[0].len();
 
-        let base_type = least_coercion(&left.data_type(), &right.data_type()).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Unable to coercion types, actual: [{}, {}]",
-                &left.data_type(),
-                &right.data_type(),
-            ))
-        })?;
+        for arg in args {
+            base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type,
+                    arg.data_type(),
+                ))
+            })?;
+        }
 
-        let result = if left.is_null(0) {
-            cast(&left, &base_type)?
-        } else if right.is_null(0) {
-            cast(&right, &base_type)?
-        } else {
-            let l = cast(&left, &base_type)?;
-            let r = cast(&right, &base_type)?;
-
-            let is_less = match &left.data_type() {
-                DataType::UInt64 => {
-                    let l = downcast_primitive_arg!(l, "left", UInt64Type);
-                    let r = downcast_primitive_arg!(r, "right", UInt64Type);
-
-                    l.value(0) < r.value(0)
-                }
-                DataType::Int64 => {
-                    let l = downcast_primitive_arg!(l, "left", Int64Type);
-                    let r = downcast_primitive_arg!(r, "right", Int64Type);
-
-                    l.value(0) < r.value(0)
-                }
-                _ => {
-                    return Err(DataFusionError::NotImplemented(format!(
-                        "unsupported type in least function, actual: {}",
-                        left.data_type()
-                    )));
-                }
-            };
-
-            if is_less {
-                l
-            } else {
-                r
+        // Creating a new builder with the base_type
+        let mut builder: Box<dyn ArrayBuilder> = match base_type {
+            DataType::UInt64 => Box::new(UInt64Builder::new(array_len)),
+            DataType::Int64 => Box::new(Int64Builder::new(array_len)),
+            DataType::Float64 => Box::new(Float64Builder::new(array_len)),
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "unsupported type in greatest function, actual: {}",
+                    base_type
+                )));
             }
         };
 
-        Ok(result)
+        // Iterating over strings
+        for i in 0..array_len {
+            let mut min_value: Option<ScalarValue> = None;
+
+            // Iterating over columns
+            for arg in args {
+                if arg.is_null(i) {
+                    continue;
+                }
+
+                let scalar_value = ScalarValue::try_from_array(arg, i)?;
+
+                min_value = match min_value {
+                    Some(current_min) => {
+                        if scalar_value < current_min {
+                            Some(scalar_value)
+                        } else {
+                            Some(current_min)
+                        }
+                    }
+                    None => Some(scalar_value),
+                };
+            }
+
+            match min_value {
+                Some(ScalarValue::UInt64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<UInt64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Int64(Some(v))) => {
+                    let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Float64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Float64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                _ => match base_type {
+                    DataType::UInt64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Int64 => {
+                        let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Float64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "unsupported type in greatest function, actual: {}",
+                            base_type
+                        )));
+                    }
+                },
+            }
+        }
+
+        let array = builder.finish();
+        Ok(Arc::new(array) as ArrayRef)
     });
 
     let return_type: ReturnTypeFunction = Arc::new(move |types| {
-        assert!(types.len() == 2);
+        assert!(types.len() > 0);
 
-        if types[0] == DataType::Null || types[1] == DataType::Null {
-            return Ok(Arc::new(DataType::Null));
+        let mut ti = types.iter();
+        let mut base_type = ti.next().unwrap().clone();
+
+        for t in ti {
+            base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type, t,
+                ))
+            })?;
         }
-
-        let base_type = least_coercion(&types[0], &types[1]).ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "Unable to coercion types, actual: [{}, {}]",
-                &types[0], &types[1],
-            ))
-        })?;
 
         Ok(Arc::new(base_type))
     });
 
     ScalarUDF::new(
         "least",
-        &Signature::any(2, Volatility::Immutable),
+        &Signature::variadic(
+            vec![DataType::Int64, DataType::UInt64, DataType::Float64],
+            Volatility::Immutable,
+        ),
+        &return_type,
+        &fun,
+    )
+}
+
+/// The GREATEST function selects the largest value from a list of any number of expressions.
+/// The expressions must all be convertible to a common data type, which will be the type of
+/// the result. The SQL standard requires greatest and least to return null in case one argument
+/// is null. However, in Postgres NULL values in the list are ignored.
+/// We follow Postgres: The result will be NULL only if all the expressions evaluate to NULL.
+pub fn create_greatest_udf() -> ScalarUDF {
+    let fun = make_scalar_function(move |args: &[ArrayRef]| {
+        assert!(args.len() > 0);
+
+        let mut base_type = DataType::Null;
+        let array_len = args[0].len();
+
+        for arg in args {
+            base_type = common_type_coercion(&base_type, arg.data_type()).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type,
+                    arg.data_type(),
+                ))
+            })?;
+        }
+
+        // Creating a new builder with the base_type
+        let mut builder: Box<dyn ArrayBuilder> = match base_type {
+            DataType::UInt64 => Box::new(UInt64Builder::new(array_len)),
+            DataType::Int64 => Box::new(Int64Builder::new(array_len)),
+            DataType::Float64 => Box::new(Float64Builder::new(array_len)),
+            _ => {
+                return Err(DataFusionError::NotImplemented(format!(
+                    "unsupported type in greatest function, actual: {}",
+                    base_type
+                )));
+            }
+        };
+
+        // Iterating over strings
+        for i in 0..array_len {
+            let mut max_value: Option<ScalarValue> = None;
+
+            // Iterating over columns
+            for arg in args {
+                if arg.is_null(i) {
+                    continue;
+                }
+
+                let scalar_value = ScalarValue::try_from_array(arg, i)?;
+
+                max_value = match max_value {
+                    Some(current_max) => {
+                        if scalar_value > current_max {
+                            Some(scalar_value)
+                        } else {
+                            Some(current_max)
+                        }
+                    }
+                    None => Some(scalar_value),
+                };
+            }
+
+            match max_value {
+                Some(ScalarValue::UInt64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<UInt64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Int64(Some(v))) => {
+                    let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                    builder.append_value(v)?;
+                }
+                Some(ScalarValue::Float64(Some(v))) => {
+                    let builder = builder
+                        .as_any_mut()
+                        .downcast_mut::<Float64Builder>()
+                        .unwrap();
+                    builder.append_value(v)?;
+                }
+                _ => match base_type {
+                    DataType::UInt64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<UInt64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Int64 => {
+                        let builder = builder.as_any_mut().downcast_mut::<Int64Builder>().unwrap();
+                        builder.append_null()?;
+                    }
+                    DataType::Float64 => {
+                        let builder = builder
+                            .as_any_mut()
+                            .downcast_mut::<Float64Builder>()
+                            .unwrap();
+                        builder.append_null()?;
+                    }
+                    _ => {
+                        return Err(DataFusionError::NotImplemented(format!(
+                            "unsupported type in greatest function, actual: {}",
+                            base_type
+                        )));
+                    }
+                },
+            }
+        }
+
+        let array = builder.finish();
+        Ok(Arc::new(array) as ArrayRef)
+    });
+
+    let return_type: ReturnTypeFunction = Arc::new(move |types| {
+        assert!(types.len() > 0);
+
+        let mut ti = types.iter();
+        let mut base_type = ti.next().unwrap().clone();
+
+        for t in ti {
+            base_type = common_type_coercion(&base_type, t).ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Unable to coercion types, actual: [{}, {}]",
+                    &base_type, t,
+                ))
+            })?;
+        }
+
+        Ok(Arc::new(base_type))
+    });
+
+    ScalarUDF::new(
+        "greatest",
+        &Signature::variadic(
+            vec![DataType::Int64, DataType::UInt64, DataType::Float64],
+            Volatility::Immutable,
+        ),
         &return_type,
         &fun,
     )
@@ -1226,10 +1428,12 @@ fn date_addsub_year_month(t: NaiveDateTime, i: i32, is_add: bool) -> Result<Naiv
     };
 }
 
-fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result<NaiveDateTime> {
-    let month = (i >> (64 + 32)) & 0xFFFFFFFF;
-    let day = (i >> 64) & 0xFFFFFFFF;
-    let nano = i & 0xFFFFFFFFFFFFFFFF;
+fn date_addsub_month_day_nano(
+    t: NaiveDateTime,
+    i: IntervalMonthDayNano,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (month, day, nano) = IntervalMonthDayNanoType::to_parts(i);
 
     let result = if month > 0 && is_add || month < 0 && !is_add {
         t.checked_add_months(Months::new(month as u32))
@@ -1244,9 +1448,7 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     };
 
     let result = result.and_then(|t| {
-        t.checked_add_signed(Duration::nanoseconds(
-            (nano as i64) * (if !is_add { -1 } else { 1 }),
-        ))
+        t.checked_add_signed(Duration::nanoseconds(nano * (if !is_add { -1 } else { 1 })))
     });
     result.ok_or_else(|| {
         DataFusionError::Execution(format!(
@@ -1256,15 +1458,30 @@ fn date_addsub_month_day_nano(t: NaiveDateTime, i: i128, is_add: bool) -> Result
     })
 }
 
-fn date_addsub_day_time(t: NaiveDateTime, interval: i64, is_add: bool) -> Result<NaiveDateTime> {
-    let i = match is_add {
-        true => interval,
-        false => -interval,
+fn date_addsub_day_time(
+    t: NaiveDateTime,
+    interval: IntervalDayTime,
+    is_add: bool,
+) -> Result<NaiveDateTime> {
+    let (days, millis) = IntervalDayTimeType::to_parts(interval);
+
+    let result = if days > 0 && is_add || days < 0 && !is_add {
+        t.checked_add_days(Days::new(days as u64))
+    } else {
+        t.checked_sub_days(Days::new(days.abs() as u64))
     };
 
-    let days: i64 = i.signum() * (i.abs() >> 32);
-    let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-    return Ok(t + chrono::Duration::days(days) + chrono::Duration::milliseconds(millis));
+    let result = result.and_then(|t| {
+        t.checked_add_signed(Duration::milliseconds(
+            millis as i64 * (if !is_add { -1 } else { 1 }),
+        ))
+    });
+    result.ok_or_else(|| {
+        DataFusionError::Execution(format!(
+            "Failed to add interval: {} day {} ms",
+            days, millis
+        ))
+    })
 }
 
 fn change_ym(t: NaiveDateTime, y: i32, m: u32) -> Option<NaiveDateTime> {
@@ -1990,7 +2207,7 @@ pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
                     }
 
                     match PgTypeId::from_oid(oid)?.to_type().typnamespace {
-                        11 | 2200 => Some(true),
+                        PG_NAMESPACE_CATALOG_OID | PG_NAMESPACE_PUBLIC_OID => Some(true),
                         _ => Some(false),
                     }
                 }
@@ -2097,6 +2314,86 @@ macro_rules! generate_series_udtf {
     }};
 }
 
+macro_rules! generate_series_helper_date32 {
+    ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
+        let current_dt = NaiveDateTime::from_timestamp_opt(($CURRENT as i64) * 86400, 0)
+            .ok_or_else(|| {
+                DataFusionError::Execution(format!(
+                    "Cannot convert date to NaiveDateTime: {}",
+                    $CURRENT
+                ))
+            })?;
+        let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
+        $CURRENT = (res.timestamp() / 86400) as $PRIMITIVE_TYPE;
+    };
+}
+
+macro_rules! generate_series_helper_timestamp {
+    ($CURRENT:ident, $STEP:ident, $PRIMITIVE_TYPE: ident) => {
+        let current_dt = NaiveDateTime::from_timestamp_opt(
+            ($CURRENT as i64) / 1_000_000_000,
+            ($CURRENT % 1_000_000_000) as u32,
+        )
+        .ok_or_else(|| {
+            DataFusionError::Execution(format!(
+                "Cannot convert timestamp to NaiveDateTime: {}",
+                $CURRENT
+            ))
+        })?;
+        let res = date_addsub_month_day_nano(current_dt, $STEP, true)?;
+        $CURRENT = res.timestamp_nanos_opt().unwrap() as $PRIMITIVE_TYPE;
+    };
+}
+
+macro_rules! generate_series_non_primitive_udtf {
+    ($ARGS:expr, $TYPE: ident, $PRIMITIVE_TYPE: ident, $HANDLE_MACRO:ident) => {{
+        let mut section_sizes: Vec<usize> = Vec::new();
+        let l_arr = &$ARGS[0].as_any().downcast_ref::<PrimitiveArray<$TYPE>>();
+
+        if l_arr.is_some() {
+            let l_arr = l_arr.unwrap();
+            let r_arr = downcast_primitive_arg!($ARGS[1], "right", $TYPE);
+            let step_arr = IntervalMonthDayNanoArray::from_value(
+                IntervalMonthDayNanoType::make_value(0, 1, 0), // 1 day as default
+                1,
+            );
+            let step_arr = if $ARGS.len() > 2 {
+                downcast_primitive_arg!($ARGS[2], "step", IntervalMonthDayNanoType)
+            } else {
+                &step_arr
+            };
+
+            let mut builder = PrimitiveBuilder::<$TYPE>::new(1);
+            for (i, (start, end)) in l_arr.iter().zip(r_arr.iter()).enumerate() {
+                let step = if step_arr.len() > i {
+                    step_arr.value(i)
+                } else {
+                    step_arr.value(0)
+                };
+
+                if let (Some(start), Some(end)) = (start, end) {
+                    let mut section_size: i64 = 0;
+                    if start <= end && step > 0 {
+                        let mut current = start;
+                        loop {
+                            if current > end {
+                                break;
+                            }
+                            builder.append_value(current).unwrap();
+
+                            section_size += 1;
+                            $HANDLE_MACRO!(current, step, $PRIMITIVE_TYPE);
+                        }
+                    }
+                    section_sizes.push(section_size as usize);
+                }
+            }
+
+            return Ok((Arc::new(builder.finish()) as ArrayRef, section_sizes));
+        }
+    }};
+}
+
 pub fn create_generate_series_udtf() -> TableUDF {
     let fun = make_table_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 2 || args.len() == 3);
@@ -2105,6 +2402,24 @@ pub fn create_generate_series_udtf() -> TableUDF {
             generate_series_udtf!(args, Int64Type, i64)
         } else if args[0].as_any().downcast_ref::<Float64Array>().is_some() {
             generate_series_udtf!(args, Float64Type, f64)
+        } else if args[0].as_any().downcast_ref::<Date32Array>().is_some() {
+            generate_series_non_primitive_udtf!(
+                args,
+                Date32Type,
+                i32,
+                generate_series_helper_date32
+            )
+        } else if args[0]
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .is_some()
+        {
+            generate_series_non_primitive_udtf!(
+                args,
+                TimestampNanosecondType,
+                i64,
+                generate_series_helper_timestamp
+            )
         }
 
         Err(DataFusionError::Execution(format!("Unsupported type")))
@@ -2129,6 +2444,41 @@ pub fn create_generate_series_udtf() -> TableUDF {
                     DataType::Float64,
                     DataType::Float64,
                     DataType::Float64,
+                ]),
+                TypeSignature::Exact(vec![DataType::Date32, DataType::Date32]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Date32,
+                    DataType::Date32,
+                    DataType::Interval(IntervalUnit::DayTime),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::MonthDayNano),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::YearMonth),
+                ]),
+                TypeSignature::Exact(vec![
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Timestamp(TimeUnit::Nanosecond, None),
+                    DataType::Interval(IntervalUnit::DayTime),
                 ]),
             ],
             Volatility::Immutable,
@@ -2461,6 +2811,13 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
 
         for i in 0..arr.len() {
             let values = arr.value(i);
+            let values = match values.data_type() {
+                DataType::Int64 => values,
+                DataType::Int16 => cast(&values, &DataType::Int64)?,
+                _ => {
+                    return Err(DataFusionError::Internal("information_schema._pg_expandarray only supports inputs of type List<Int16> or List<Int64>".to_string()))
+                }
+            };
             let values_arr = values.as_any().downcast_ref::<Int64Array>();
             if values_arr.is_none() {
                 return Err(DataFusionError::Execution(format!("Unsupported type")));
@@ -2490,16 +2847,25 @@ pub fn create_pg_expandarray_udtf() -> TableUDF {
     });
 
     let return_type: ReturnTypeFunction =
+        // FIXME: it is likely more correct to analyze List type and match type of `x`.
+        // For now, in order to avoid unexpected breakages, this is left as `Int64`.
         Arc::new(move |_| Ok(Arc::new(DataType::Struct(fields()))));
 
     TableUDF::new(
         "information_schema._pg_expandarray",
-        &Signature::exact(
-            vec![DataType::List(Box::new(Field::new(
-                "item",
-                DataType::Int64,
-                true,
-            )))],
+        &Signature::one_of(
+            vec![
+                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                    "item",
+                    DataType::Int64,
+                    true,
+                )))]),
+                TypeSignature::Exact(vec![DataType::List(Box::new(Field::new(
+                    "item",
+                    DataType::Int16,
+                    true,
+                )))]),
+            ],
             Volatility::Immutable,
         ),
         &return_type,
@@ -3463,7 +3829,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         rettyp = Int64,
         vol = Volatile
     );
-    register_fun_stub!(udf, "greatest", argc = 2);
     register_fun_stub!(
         udf,
         "has_column_privilege",

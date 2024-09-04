@@ -444,6 +444,41 @@ describe('Cube Validation', () => {
     expect(validationResult.error).toBeFalsy();
   });
 
+  it('Partition with multi time dimensions', async () => {
+    const cubeValidator = new CubeValidator(new CubeSymbols());
+    const cube = {
+      name: 'name',
+      sql: () => '',
+      fileName: 'fileName',
+      preAggregations: {
+        eventsByType: {
+          type: 'rollup',
+          timeDimensions: [
+            {
+              dimension: () => 'field1',
+              granularity: 'day'
+            },
+            {
+              dimension: () => 'field2',
+              granularity: 'day'
+            }
+          ],
+          partitionGranularity: 'day',
+        }
+      }
+    };
+
+    const validationResult = cubeValidator.validate(cube, {
+      error: (message, e) => {
+        console.log(message);
+        // this callback should not be invoked
+        expect(true).toBeFalsy();
+      }
+    } as any);
+
+    expect(validationResult.error).toBeFalsy();
+  });
+
   test('cube - aliases test', async () => {
     const cubeA = {
       name: 'CubeA',

@@ -138,7 +138,7 @@ const meta_fixture = require('./meta');
     console.log('SIGINT signal');
 
     try {
-      await native.shutdownInterface(server);
+      await native.shutdownInterface(server, 'fast');
     } catch (e) {
       console.log(e);
     } finally {

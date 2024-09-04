@@ -124,33 +124,34 @@ impl PgCatalogAttributeBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.attrelid.finish()));
-        columns.push(Arc::new(self.attname.finish()));
-        columns.push(Arc::new(self.atttypid.finish()));
-        columns.push(Arc::new(self.attstattarget.finish()));
-        columns.push(Arc::new(self.attlen.finish()));
-        columns.push(Arc::new(self.attnum.finish()));
-        columns.push(Arc::new(self.attndims.finish()));
-        columns.push(Arc::new(self.attcacheoff.finish()));
-        columns.push(Arc::new(self.atttypmod.finish()));
-        columns.push(Arc::new(self.attbyval.finish()));
-        columns.push(Arc::new(self.attalign.finish()));
-        columns.push(Arc::new(self.attstorage.finish()));
-        columns.push(Arc::new(self.attcompression.finish()));
-        columns.push(Arc::new(self.attnotnull.finish()));
-        columns.push(Arc::new(self.atthasdef.finish()));
-        columns.push(Arc::new(self.atthasmissing.finish()));
-        columns.push(Arc::new(self.attidentity.finish()));
-        columns.push(Arc::new(self.attgenerated.finish()));
-        columns.push(Arc::new(self.attisdropped.finish()));
-        columns.push(Arc::new(self.attislocal.finish()));
-        columns.push(Arc::new(self.attinhcount.finish()));
-        columns.push(Arc::new(self.attcollation.finish()));
-        columns.push(Arc::new(self.attacl.finish()));
-        columns.push(Arc::new(self.attoptions.finish()));
-        columns.push(Arc::new(self.attfdwoptions.finish()));
-        columns.push(Arc::new(self.attmissingval.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.attrelid.finish()),
+            Arc::new(self.attname.finish()),
+            Arc::new(self.atttypid.finish()),
+            Arc::new(self.attstattarget.finish()),
+            Arc::new(self.attlen.finish()),
+            Arc::new(self.attnum.finish()),
+            Arc::new(self.attndims.finish()),
+            Arc::new(self.attcacheoff.finish()),
+            Arc::new(self.atttypmod.finish()),
+            Arc::new(self.attbyval.finish()),
+            Arc::new(self.attalign.finish()),
+            Arc::new(self.attstorage.finish()),
+            Arc::new(self.attcompression.finish()),
+            Arc::new(self.attnotnull.finish()),
+            Arc::new(self.atthasdef.finish()),
+            Arc::new(self.atthasmissing.finish()),
+            Arc::new(self.attidentity.finish()),
+            Arc::new(self.attgenerated.finish()),
+            Arc::new(self.attisdropped.finish()),
+            Arc::new(self.attislocal.finish()),
+            Arc::new(self.attinhcount.finish()),
+            Arc::new(self.attcollation.finish()),
+            Arc::new(self.attacl.finish()),
+            Arc::new(self.attoptions.finish()),
+            Arc::new(self.attfdwoptions.finish()),
+            Arc::new(self.attmissingval.finish()),
+        ];
 
         columns
     }

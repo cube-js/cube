@@ -7,10 +7,7 @@ use sqlparser::{
     parser::Parser,
 };
 
-use crate::{
-    compile::{qtrace::Qtrace, CompilationError},
-    sql::session::DatabaseProtocol,
-};
+use super::{qtrace::Qtrace, CompilationError, DatabaseProtocol};
 
 use super::CompilationResult;
 
@@ -217,6 +214,7 @@ pub fn parse_sql_to_statements(
     let parse_result = match protocol {
         DatabaseProtocol::MySQL => Parser::parse_sql(&MySqlDialectWithBackTicks {}, query.as_str()),
         DatabaseProtocol::PostgreSQL => Parser::parse_sql(&PostgreSqlDialect {}, query.as_str()),
+        DatabaseProtocol::Extension(_) => unimplemented!(),
     };
 
     parse_result.map_err(|err| {

@@ -1,0 +1,139 @@
+# AI API
+
+The AI API provides a standard interface for interacting with large language models (LLMs) as a turnkey solution for text-to-semantic layer queries.
+
+Specifically, you can send the AI API a message (or conversation of messages) and it will return a Cube REST API query. Optionally, it will also run the query and return the results.
+
+<WarningBox>
+  The AI API is available on [Cube
+  Cloud](/getting-started#getting-started-with-cube-cloud) only. It is currently
+  in preview and should not be used for production workloads. Please contact
+  your Cube representative to have it enabled for your account.
+</WarningBox>
+
+## Configuration
+
+While the AI API is in preview, your Cube account team will enable and configure it for you.
+
+If you wish to enable or disable the AI API on a specific Cube deployment, you may do so by going to "Settings" in the Cube Cloud sidebar, then "Configuration", and then toggling the "AI API" configuration flag switch.
+
+To find your AI API base URL, go to "Settings" in the Cube Cloud sidebar, then "Connections and APIs"
+
+## Getting Started
+
+### Data modeling
+
+The AI API currently requires [views](/reference/data-model/view) in order to generate queries. This is because:
+
+1. Views let you create carefully-curated datasets, resulting in better outputs from LLMs. That is, you can choose exactly what is "ready" for the AI to see and what is not.
+2. Views define deterministic joins between Cubes, so the LLM does not have to "guess" at join ordering
+
+To use the AI API, set up one or more views before getting started.
+
+<InfoBox>
+  By default, the AI API syncs data model changes hourly. To manually trigger a
+  sync, go to "Settings" in the Cube Cloud sidebar, then "Data Catalog
+  Services", then hit "Sync" on the Cube connection.
+</InfoBox>
+
+### Authentication
+
+Authentication works the same as for the [REST API](/product/apis-integrations/rest-api#authentication).
+
+The API Token is passed via the Authorization Header. The token itself is a
+[JSON Web Token](https://jwt.io), the [Security section](/product/auth) describes
+how to generate it.
+
+### Example request
+
+Given the data model from the ["data modeling" section](#data-modeling) above, you could send a request with the following body:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where do we have the highest aov this year?"
+    }
+  ]
+}
+```
+
+Based on the view(s) provided, the AI API generates a Cube REST API request that could be used to answer the user's question. For example, you might receive the following response:
+
+```json
+{
+  "message": "To find where we have the highest Average Order Value (AOV) this year, we can analyze the data by comparing the AOV across different dimensions such as cities or states.",
+  "cube_query": {
+    "measures": ["orders_view.average_order_value"],
+    "dimensions": ["orders_view.users_city"],
+    "timeDimensions": [
+      {
+        "dimension": "orders_view.created_at",
+        "dateRange": "this year"
+      }
+    ],
+    "order": {
+      "orders_view.average_order_value": "desc"
+    },
+    "limit": 10
+  }
+}
+```
+
+See [running queries](#running-queries) for details on how to run the Cube query generated.
+
+### Running queries
+
+You have two possible ways to run the query:
+
+#### 1. `runQuery` parameter
+
+Use the `runQuery` request parameter to have the AI API run the query and report results back. When doing this, the request above would become:
+
+```json
+{
+  "messages": [
+    {
+      "role": "user",
+      "content": "Where do we have the highest aov this year?"
+    }
+  ],
+  "runQuery": true
+}
+```
+
+The response will be the same as above, followed by a second JSON object representing the response (see the [REST API reference](/reference/rest-api#v1load) for its format).
+
+<InfoBox>
+  Note that the response now contains two JSON objects separated by a newline
+  (`\n`). You are responsible for parsing these appropriately.
+</InfoBox>
+
+#### 2. `/load`
+
+Alternatively, you may take the generated `cube_query` from the response and then call the [REST API `/load` endpoint](/reference/rest-api#v1load) with it in the `/load` request body. This is recommended for advanced use-cases where you need more control over formatting, pagination, etc. or if you are adding the AI API to an existing Cube REST API implementation.
+
+### Error Handling
+
+Occasionally you may encounter errors. There are a few common categories of errors:
+
+#### 1. Cannot answer question
+
+If the AI API is unable to generate a query because the view(s) in your data model do not have the appropriate fields to answer the question, you will receive a message like the following, and no `cube_query` in the response:
+
+```
+{
+    "message": "I'm sorry, but the current data modeling doesn't cover stock prices or specific company data like NVDA. I will notify the data engineering team about this request."
+}
+```
+
+#### 2. Invalid query
+
+Occasionally, the AI API may generate a query that is invalid or cannot be run. When this happens, you will receive an error upon running the query.
+
+One way of handling this is to pass the error message back into the AI API; it may then self-correct and provide a new, valid query.
+
+#### 3. Continue wait
+
+When using `"runQuery": true`, you might sometimes receive a query result containing `{ "error": "Continue wait" }`. If this happens, you should use `/load` ([described above](#2-load)) instead of `runQuery` to run the query, and handle retries as described in the [REST API documentation](/product/apis-integrations/rest-api#continue-wait).

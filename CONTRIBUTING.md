@@ -53,7 +53,7 @@ For more information, take a look at [Docker Development Guide](./packages/cubej
 #### Development
 
 1. After cloning Cube repository run `yarn install` to install dependencies.
-2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` to build stable development image.
+2. Use `docker build -t cubejs/cube:dev -f dev.Dockerfile ../../` in `packages/cubejs-docker` to build stable development image.
 
 ### Cube Client
 
@@ -96,9 +96,18 @@ Cube.is written in a mixture of JavaScript, TypeScript, and Rust. TypeScript and
 7. Run `yarn install` in `packages/cubejs-<pkg>` to install dependencies for drivers and dependent packages.
 8. Run `yarn link @cubejs-backend/<pkg>` in `packages/cubejs-server-core` to link drivers and dependent packages.
 9. Run `yarn link` in `packages/cubejs-server-core`.
-10. Create or choose an existing project for testing.
+10. Create or choose an existing project for testing. You can generate a new one with 
+    [cubejs-cli](https://cube.dev/docs/reference/cli) tool.
 11. Run `yarn link @cubejs-backend/server-core` in your project directory. 
 12. Run `yarn dev` to start your testing project and verify changes.
+
+Instead of running all of the above commands manually you can use the `dev_env_setup.sh` script:
+
+1. Clone the Cube repository, `git clone https://github.com/cube-js/cube`.
+2. Navigate to your working projects directory and run `/path/to/cube/repo/dev_env_setup.sh`. The script will
+   ask you some questions and run all the required commands. In case you decide to create a new testing project,
+   it will be created in the current directory (that is why you probably don't want to run this script within 
+   cube repo directory).
 
 ### Debugging with WebStorm
 
@@ -205,6 +214,7 @@ Client packages has it's own `.eslintrc.js` files.
 2. Run `yarn test` before committing if package has tests.
 3. Please use [conventional commits name](https://www.conventionalcommits.org/) for your PR.
 It'll be used to build change logs.
-All PRs are merged using squash so only PR name matters.
-4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(@cubejs-backend/server-core):` or `fix(cubestore):`.
-5. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced.
+All PRs are merged using the squash strategy. PR title usually would be used as a name for commit. So please make sure it has a sensible name.  
+4. For the scope part of commit name please use package name if it's within one package or don't use it if change spans multiple packages. For example `feat(server-core):` or `fix(cubestore):`.
+5. Commit messages that are getting merged should contain mostly "Why" those changes are made as opposed to "What" changes are done. "Why" can be a feature, reference to issue or reasons to fix something like a chore.
+6. Do not reformat code you aren't really changing unless it's absolutely necessary (e.g. fixing linter). Such changes make it really hard to use git blame feature when we need to find a commit where line change of interest was introduced. Please do not include files that contain only reformatting changes in the commit.

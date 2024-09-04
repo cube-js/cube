@@ -94,6 +94,8 @@ components:
           type: "string"
         title:
           type: "string"
+        description:
+          type: "string"
         shortTitle:
           type: "string"
     V1CubeMetaDimension:
@@ -103,6 +105,8 @@ components:
         - type
       properties:
         name:
+          type: "string"
+        description:
           type: "string"
         type:
           type: "string"
@@ -115,6 +119,8 @@ components:
         name:
           type: "string"
         title:
+          type: "string"
+        description:
           type: "string"
         type:
           type: "string"
@@ -131,6 +137,8 @@ components:
         name:
           type: "string"
         title:
+          type: "string"
+        description:
           type: "string"
         measures:
           type: "array"
@@ -155,6 +163,8 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMeta"
+        compilerId:
+          type: "string"
     V1LoadResultAnnotation:
       type: "object"
       required:

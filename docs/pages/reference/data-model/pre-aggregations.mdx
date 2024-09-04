@@ -6,25 +6,16 @@ redirect_from:
 
 # Pre-aggregations
 
-Pre-aggregations are materialized query results persisted as tables. Cube has an
-ability to analyze queries against a defined set of pre-aggregation rules in
-order to choose the optimal one that will be used to create pre-aggregation
-table.
+[Pre-aggregations][ref-pre-aggs] can be defined using the `pre_aggregations`
+parameter of a [cube][ref-ref-cubes].
 
-If Cube finds a suitable pre-aggregation rule, database querying becomes a
-multi-stage process:
+Pre-aggregations must have, at minimum, a [name](#name) and a [type](#type).
+Pre-aggregations must include all dimensions and measures you will query with.
 
-1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
-
-2.  Cube will execute a query against the pre-aggregated tables instead of the
-    raw data.
-
-Pre-aggregations can be defined in the `pre_aggregations` available on each
-cube. A more in-depth diagram detailing how pre-aggregations are selected can be
-[found here][ref-caching-preaggs-selecting-preaggs].
-
-Pre-aggregations must have, at minimum, a name and a type. Pre-aggregations must
-include all dimensions, measures, and filters you will query with.
+A pre-aggregation is typically placed in a cube that defines most of dimensions
+and measures that this pre-aggregation includes. If a pre-aggregation doesn't
+include any dumensions or measures from a cube it's defined in, this
+pre-aggregation is be ignored.
 
 ## Parameters
 
@@ -160,14 +151,14 @@ cubes:
 
 #### `original_sql`
 
-As the name suggests, it persists the results of the `sql` property of the cube.
-Pre-aggregations of type `original_sql` should **only** be used when the cube's
-`sql` is a complex query (i.e. nested, window functions and/or multiple joins).
+As the name suggests, it persists the results of the `sql` property of the cube
+in the data source (rather than Cube Store). `original_sql` pre-aggregations should
+**only** be used when the cube's `sql` is a complex query (i.e., nested subqueries,
+window functions, and/or multiple joins).
 
 <WarningBox>
 
-`originalSql` pre-aggregations **must only** be used when [storing
-pre-aggregations in the source database][ref-caching-using-preaggs-internal].
+`originalSql` pre-aggregations **must only** be stored in the data source.
 While you can set `external: true` for `original_sql` pre-aggregation, this is
 not recommended or generally supported.
 
@@ -986,6 +977,13 @@ existing tables.
 
 </WarningBox>
 
+<WarningBox>
+
+Because incremental refreshes generate their own SQL, you **must not** use the
+[`sql`](#parameters-refresh-key-sql) property here.
+
+</WarningBox>
+
 <CodeTabs>
 
 ```javascript
@@ -1158,10 +1156,9 @@ underlying SQL calculations every time it builds new rollup tables.
 
 <WarningBox>
 
-`original_sql` pre-aggregations **must only** be used when [storing
-pre-aggregations in the source database][ref-caching-using-preaggs-internal].
-This also means that `original_sql` pre-aggregations require `readOnly: false`
-to be set on their respective database driver.
+`originalSql` pre-aggregations **must only** be stored in the data source.
+While you can set `external: true` for `original_sql` pre-aggregation, this is
+not recommended or generally supported.
 
 </WarningBox>
 
@@ -1716,10 +1713,6 @@ cubes:
 [ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
-[ref-caching-preaggs-selecting-preaggs]:
-  /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
-[ref-caching-using-preaggs-internal]:
-  /product/caching/using-pre-aggregations#pre-aggregations-storage
 [ref-config-downstream-superset]:
   /product/configuration/visualization-tools/superset
 [ref-config-driverfactory]: /config/#driver-factory
@@ -1753,3 +1746,5 @@ cubes:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
 [ref-indexes]: /product/caching/using-pre-aggregations#using-indexes
 [ref-aggregating-indexes]: /product/caching/using-pre-aggregations#aggregating-indexes
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-ref-cubes]: /reference/data-model/cube

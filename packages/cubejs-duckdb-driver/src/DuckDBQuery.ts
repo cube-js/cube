@@ -34,6 +34,8 @@ export class DuckDBQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     return templates;
   }
 }

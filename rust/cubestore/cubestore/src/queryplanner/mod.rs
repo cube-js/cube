@@ -40,7 +40,7 @@ use crate::queryplanner::info_schema::{
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{
-    batch_to_dataframe, ClusterSendExec, InlineTableProvider,
+    batches_to_dataframe, ClusterSendExec, InlineTableProvider,
 };
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopK;
@@ -51,12 +51,12 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
-use arrow::array::ArrayRef;
-use arrow::datatypes::Field;
-use arrow::record_batch::RecordBatch;
-use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::Field;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::{datatypes::Schema, datatypes::SchemaRef};
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
@@ -168,7 +168,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
-        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(&results)).await??;
+        let data_frame = cube_ext::spawn_blocking(move || batches_to_dataframe(results)).await??;
         Ok(data_frame)
     }
 }
@@ -480,15 +480,15 @@ macro_rules! base_info_schema_table_def {
     ($table: ty) => {
         #[async_trait]
         impl crate::queryplanner::BaseInfoSchemaTableDef for $table {
-            fn schema_ref(&self) -> arrow::datatypes::SchemaRef {
-                Arc::new(arrow::datatypes::Schema::new(self.schema()))
+            fn schema_ref(&self) -> datafusion::arrow::datatypes::SchemaRef {
+                Arc::new(datafusion::arrow::datatypes::Schema::new(self.schema()))
             }
 
             async fn scan(
                 &self,
                 ctx: crate::queryplanner::InfoSchemaTableDefContext,
                 limit: Option<usize>,
-            ) -> Result<arrow::record_batch::RecordBatch, crate::CubeError> {
+            ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
                 let columns = self.columns();
@@ -496,7 +496,9 @@ macro_rules! base_info_schema_table_def {
                     .into_iter()
                     .map(|c| c(rows.clone()))
                     .collect::<Vec<_>>();
-                Ok(arrow::record_batch::RecordBatch::try_new(schema, columns)?)
+                Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
+                    schema, columns,
+                )?)
             }
         }
     };
@@ -790,7 +792,7 @@ pub mod tests {
             Arc::new(test_utils::MetaStoreMock {}),
             Arc::new(test_utils::CacheStoreMock {}),
             &vec![],
-            Arc::new(SqlResultCache::new(1 << 20, None)),
+            Arc::new(SqlResultCache::new(1 << 20, None, 10000)),
         )
     }
 
