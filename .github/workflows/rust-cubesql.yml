@@ -211,7 +211,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
@@ -304,7 +304,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: [windows-2019]
         python-version: ["fallback"]
       fail-fast: false

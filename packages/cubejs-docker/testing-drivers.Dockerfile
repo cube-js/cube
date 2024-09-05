@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:18.20.3-bookworm-slim AS base
+FROM node:20.17.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -90,21 +90,21 @@ RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
 RUN yarn install --prod
 
-FROM prod_base_dependencies as prod_dependencies
+FROM prod_base_dependencies AS prod_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/bin packages/cubejs-databricks-jdbc-driver/bin
 RUN yarn install --prod --ignore-scripts
 
 ######################################################################
 # Build dependencies                                                 #
 ######################################################################
-FROM base as build_dependencies
+FROM base AS build_dependencies
 
 RUN yarn install
 
 ######################################################################
 # Build layer                                                        #
 ######################################################################
-FROM build_dependencies as build
+FROM build_dependencies AS build
 
 COPY rust/cubestore/ rust/cubestore/
 COPY rust/cubesql/ rust/cubesql/

@@ -40,7 +40,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        # Current docker version + next LTS
+        node-version: [20.x, 22.x]
       fail-fast: false
 
     steps:
@@ -94,7 +95,7 @@ jobs:
       - name: Lerna test
         run: yarn lerna run --concurrency 1 --stream --no-prefix unit
 #      - uses: codecov/codecov-action@v1
-#        if: (matrix.node-version == '18.x')
+#        if: (matrix.node-version == '20.x')
 #        with:
 #          files: ./packages/*/coverage/clover.xml
 #          flags: cube-backend
@@ -116,10 +117,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 18.x
+      - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -164,10 +165,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 18.x
+      - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -242,7 +243,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
       fail-fast: false
 
     steps:
@@ -315,7 +316,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
         db: [
             'clickhouse', 'druid', 'elasticsearch', 'mssql', 'mysql', 'postgres', 'prestodb',
             'mysql-aurora-serverless', 'crate', 'mongobi'
@@ -373,7 +374,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [ 18.x ]
+        node-version: [ 20.x ]
       fail-fast: false
 
     steps:
@@ -528,10 +529,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: localhost:5000/cubejs/cube:${{ matrix.tag }}
-      - name: Use Node.js 18.x
+      - name: Use Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"

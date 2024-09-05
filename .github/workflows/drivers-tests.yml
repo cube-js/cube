@@ -177,7 +177,7 @@ jobs:
     strategy:
       matrix:
         node:
-          - 18.x
+          - 20.x
         database:
           - athena
           - bigquery
@@ -194,10 +194,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js 18.x
+      - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
 
       - name: Configure `yarn`
         run: yarn policies set-version v1.22.19
