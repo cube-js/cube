@@ -47,6 +47,8 @@ ENV PYTHONUNBUFFERED=1
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
 
+RUN mkdir -p /cube/conf
+
 WORKDIR /cube/conf
 
 EXPOSE 4000
