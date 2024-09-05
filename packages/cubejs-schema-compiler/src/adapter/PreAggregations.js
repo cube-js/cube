@@ -162,6 +162,10 @@ export class PreAggregations {
 
     const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
       this.query.timeDimensions.find(td => {
+        if (!td.dateRange) {
+          return false;
+        }
+
         if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
           return true;
         }
