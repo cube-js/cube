@@ -10,7 +10,7 @@ describe('YAMLCompiler', () => {
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
-    
+
     measures:
       - name: weeklyActive
         sql: "{CUBE}.user_id"
@@ -62,7 +62,7 @@ cubes:
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
-    
+
     measures:
       - name: weeklyActive
         sql: "{CUBE}.user_id"
@@ -83,7 +83,7 @@ cubes:
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01'::timestamptz as timestamp"
-    
+
     measures:
       - name: withFilter
         sql: "{CUBE}.user_id"
@@ -126,7 +126,7 @@ cubes:
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
-    
+
     measures:
       - name: weeklyActive
         sql: "{user_id}"
@@ -181,7 +181,7 @@ cubes:
 cubes:
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
-    
+
     measures:
       - name: weeklyActive
         sql: "{CUBE.user_id}"
@@ -197,7 +197,7 @@ cubes:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-        
+
     preAggregations:
       - name: main
         measures:
@@ -248,7 +248,7 @@ cubes:
 cubes:
   - name: active_users
     sql: "SELECT * FROM (SELECT 1 as user_id, '2022-01-01'::timestamptz as \\"timestamp\\") t WHERE {FILTER_PARAMS.active_users.time.filter(\\"timestamp\\")} AND {FILTER_PARAMS.active_users.time.filter(lambda a,b : f'timestamp >= {a}::timestamptz AND timestamp <= {b}::timestamptz')}"
-    
+
     measures:
       - name: weekly_active
         sql: "{CUBE.user_id}"
@@ -303,13 +303,20 @@ cubes:
     const { compiler, joinGraph, cubeEvaluator } = prepareYamlCompiler(`
 cubes:
   - name: orders
-    sql: "SELECT 1 as id, 1 as customer_id, TO_TIMESTAMP('2022-01-01', 'YYYY-MM-DD') as timestamp WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
-    
+    sql: "SELECT *
+          FROM (
+            SELECT
+              1 as id,
+              1 as customer_id,
+              TO_TIMESTAMP('2022-01-01', 'YYYY-MM-DD') as timestamp
+          )
+          WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
+
     joins:
       - name: customers
         sql: "{CUBE}.customer_id = {customers}.id"
         relationship: many_to_one
-    
+
     measures:
       - name: count
         type: count
@@ -319,11 +326,11 @@ cubes:
         sql: "{CUBE}.id"
         type: string
         primary_key: true
-        
+
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-        
+
     preAggregations:
       - name: main
         measures: [orders.count]
@@ -356,11 +363,11 @@ cubes:
     measures:
       - name: count
         type: count
-  
-  
+
+
   - name: customers
     sql: "SELECT 1 as id, 'Foo' as name"
-    
+
     measures:
       - name: count
         type: count
@@ -370,11 +377,11 @@ cubes:
         sql: id
         type: string
         primary_key: true
-        
+
       - name: name
         sql: "{CUBE}.name"
         type: string
-        
+
 views:
   - name: line_items_view
 
@@ -385,13 +392,13 @@ views:
       - join_path: line_items.orders
         prefix: true
         includes: "*"
-        excludes: 
+        excludes:
           - count
-      
+
       - join_path: line_items.orders.customers
         alias: aliased_customers
         prefix: true
-        includes: 
+        includes:
           - name: name
             alias: full_name
     `);
@@ -425,12 +432,12 @@ views:
 cubes:
   - name: BaseUsers
     sql: "SELECT 1"
-    
+
     dimensions:
       - name: time
         sql: "{CUBE}.timestamp"
         type: time
-        
+
   - name: ActiveUsers
     sql: "SELECT 1 as user_id, '2022-01-01' as timestamp"
     extends: BaseUsers
@@ -527,9 +534,9 @@ cubes:
         type: string
         sql: w_id
         primary_key: true
- 
+
     joins:
-      
+
       - name: Z
         sql: "{CUBE}.z_id = {Z}.z_id"
         relationship: many_to_one
@@ -550,9 +557,9 @@ cubes:
         type: string
         sql: m_id
         primary_key: true
-    
+
     joins:
-      
+
       - name: V
         sql: "{CUBE}.v_id = {V}.v_id"
         relationship: many_to_one
@@ -560,11 +567,11 @@ cubes:
       - name: W
         sql: "{CUBE}.w_id = {W}.w_id"
         relationship: many_to_one
-        
+
   - name: Z
     sql: >
       SELECT 1 as z_id, 'US' as COUNTRY
-    
+
     dimensions:
       - name: country
         sql: "{CUBE}.COUNTRY"
@@ -574,7 +581,7 @@ cubes:
         sql: "{CUBE}.z_id"
         type: string
         primaryKey: true
-        
+
   - name: V
     sql: |
       SELECT 1 as v_id, 1 as z_id
@@ -595,7 +602,7 @@ cubes:
 
 views:
   - name: m_view
- 
+
     cubes:
 
       - join_path: M
