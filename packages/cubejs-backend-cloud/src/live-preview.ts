@@ -87,6 +87,8 @@ export class LivePreviewWatcher {
       lastHashTarget: this.lastHash,
       uploading: this.uploading,
       active: Boolean(this.watcher),
+      deploymentId: '' as any,
+      url: '' as any,
     };
 
     if (auth) {

@@ -1,6 +1,6 @@
 import type { CommanderStatic } from 'commander';
 import fs from 'fs-extra';
-import rp from 'request-promise';
+import fetch from 'node-fetch';
 
 import { displayError, event } from '../utils';
 
@@ -64,13 +64,11 @@ const generateQueryTypes = async (apiUrl, { token }) => {
   };
 
   try {
-    meta = await rp({
-      headers: {
-        authorization: token,
-      },
-      url: `${apiUrl}/meta`,
-      json: true,
-    });
+    const response = await fetch(
+      `${apiUrl}/meta`,
+      { headers: { authorization: token } }
+    );
+    meta = await response.json();
   } catch (e: any) {
     await displayError(e.error.error);
   }
