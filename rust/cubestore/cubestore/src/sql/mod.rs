@@ -82,7 +82,6 @@ use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
 pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
 
-
 #[automock]
 #[async_trait]
 pub trait SqlService: DIService + Send + Sync {
@@ -159,9 +158,6 @@ impl SqlQueryContext {
         res
     }
 }
-
-
-
 
 pub struct SqlServiceImpl {
     db: Arc<dyn MetaStore>,

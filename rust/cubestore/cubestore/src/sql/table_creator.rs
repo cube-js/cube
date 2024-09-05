@@ -30,7 +30,9 @@ pub trait TableExtensionService: DIService + Send + Sync {
 pub struct TableExtensionServiceImpl;
 
 impl TableExtensionServiceImpl {
-    pub fn new() -> Arc<Self> { Arc::new(Self{}) }
+    pub fn new() -> Arc<Self> {
+        Arc::new(Self {})
+    }
 }
 
 #[async_trait]
@@ -96,7 +98,8 @@ impl TableCreator {
         partitioned_index: Option<PartitionedIndexRef>,
         trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
-        let extension: Option<serde_json::Value> = self.table_extension_service.get_extension().await;
+        let extension: Option<serde_json::Value> =
+            self.table_extension_service.get_extension().await;
         if !if_not_exists {
             return self
                 .create_table_loop(

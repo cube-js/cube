@@ -44,7 +44,7 @@ use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::{
-    MetadataCacheFactory, NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache
+    MetadataCacheFactory, NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
 };
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{

@@ -127,7 +127,11 @@ impl KafkaPostProcessPlanner {
         }
     }
 
-    pub fn build(&self, select_statement: String, metadata_cache_factory: Arc<dyn MetadataCacheFactory>) -> Result<KafkaPostProcessPlan, CubeError> {
+    pub fn build(
+        &self,
+        select_statement: String,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    ) -> Result<KafkaPostProcessPlan, CubeError> {
         let target_schema = Arc::new(Schema::new(
             self.columns
                 .iter()
@@ -375,7 +379,10 @@ impl KafkaPostProcessPlanner {
                             schema.clone(),
                             projection_input.clone(),
                         )?;
-                        let plan_ctx = Arc::new(ExecutionContext::with_config(ExecutionConfig::new().with_metadata_cache_factory(metadata_cache_factory)));
+                        let plan_ctx = Arc::new(ExecutionContext::with_config(
+                            ExecutionConfig::new()
+                                .with_metadata_cache_factory(metadata_cache_factory),
+                        ));
 
                         let projection_phys_plan = plan_ctx
                             .create_physical_plan(&projection_plan)?
@@ -395,7 +402,9 @@ impl KafkaPostProcessPlanner {
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
-                    let plan_ctx = Arc::new(ExecutionContext::with_config(ExecutionConfig::new().with_metadata_cache_factory(metadata_cache_factory)));
+                    let plan_ctx = Arc::new(ExecutionContext::with_config(
+                        ExecutionConfig::new().with_metadata_cache_factory(metadata_cache_factory),
+                    ));
                     let projection_phys_plan = plan_ctx
                         .create_physical_plan(&projection_plan)?
                         .with_new_children(vec![empty_exec.clone()])?;

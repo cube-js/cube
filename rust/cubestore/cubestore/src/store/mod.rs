@@ -592,7 +592,8 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
-            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> = self.metadata_cache_factory.clone();
+            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> =
+                self.metadata_cache_factory.clone();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
                 let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, metadata_cache_factory);
                 Ok(parquet.read_columns(&local_file)?)
@@ -1383,9 +1384,14 @@ impl ChunkStore {
             let local_file = self.remote_fs.temp_upload_path(remote_path.clone()).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
-            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> = self.metadata_cache_factory.clone();
+            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> =
+                self.metadata_cache_factory.clone();
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, metadata_cache_factory);
+                let parquet = ParquetTableStore::new(
+                    index.get_row().clone(),
+                    ROW_GROUP_SIZE,
+                    metadata_cache_factory,
+                );
                 parquet.write_data(&local_file_copy, data)?;
                 Ok(())
             })

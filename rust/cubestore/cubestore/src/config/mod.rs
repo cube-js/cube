@@ -31,13 +31,16 @@ use crate::remotefs::s3::S3RemoteFs;
 use crate::remotefs::{LocalDirRemoteFs, RemoteFs};
 use crate::scheduler::SchedulerImpl;
 use crate::sql::cache::SqlResultCache;
-use crate::sql::{TableExtensionService, TableExtensionServiceImpl};
 use crate::sql::{SqlService, SqlServiceImpl};
+use crate::sql::{TableExtensionService, TableExtensionServiceImpl};
 use crate::store::compaction::{CompactionService, CompactionServiceImpl};
 use crate::store::{ChunkDataStore, ChunkStore, WALDataStore, WALStore};
 use crate::streaming::kafka::{KafkaClientService, KafkaClientServiceImpl};
 use crate::streaming::{KsqlClient, KsqlClientImpl, StreamingService, StreamingServiceImpl};
-use crate::table::parquet::{CubestoreMetadataCacheFactory, CubestoreMetadataCacheFactoryImpl, CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl};
+use crate::table::parquet::{
+    CubestoreMetadataCacheFactory, CubestoreMetadataCacheFactoryImpl,
+    CubestoreParquetMetadataCache, CubestoreParquetMetadataCacheImpl,
+};
 use crate::telemetry::tracing::{TracingHelper, TracingHelperImpl};
 use crate::telemetry::{
     start_agent_event_loop, start_track_event_loop, stop_agent_event_loop, stop_track_event_loop,
@@ -535,8 +538,7 @@ pub trait ConfigObj: DIService {
 
     fn remote_files_cleanup_interval_secs(&self) -> u64;
 
-    fn local_files_cleanup_size_threshold(&self) -> u64
-;
+    fn local_files_cleanup_size_threshold(&self) -> u64;
     fn local_files_cleanup_delay_secs(&self) -> u64;
 
     fn remote_files_cleanup_delay_secs(&self) -> u64;
@@ -2003,7 +2005,10 @@ impl Config {
 
         self.injector
             .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
-                let metadata_cache_factory = i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory();
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory();
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2020,11 +2025,17 @@ impl Config {
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
-                let metadata_cache_factory = i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory();
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory();
                 CubestoreParquetMetadataCacheImpl::new(
                     match c.metadata_cache_max_capacity_bytes() {
                         0 => metadata_cache_factory.make_noop_cache(),
-                        max_cached_metadata => metadata_cache_factory.make_lru_cache(max_cached_metadata, Duration::from_secs(c.metadata_cache_time_to_idle_secs())),
+                        max_cached_metadata => metadata_cache_factory.make_lru_cache(
+                            max_cached_metadata,
+                            Duration::from_secs(c.metadata_cache_time_to_idle_secs()),
+                        ),
                     },
                 )
             })
@@ -2032,7 +2043,10 @@ impl Config {
 
         self.injector
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
-                let metadata_cache_factory = i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory();
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory();
                 CompactionServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2077,7 +2091,9 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
-                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory(),
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory(),
                 )
             })
             .await;
@@ -2176,7 +2192,10 @@ impl Config {
         let query_cache_to_move = query_cache.clone();
         self.injector
             .register_typed::<dyn QueryPlanner, _, _, _>(async move |i| {
-                let metadata_cache_factory = i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory();
+                let metadata_cache_factory = i
+                    .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                    .await
+                    .cache_factory();
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2189,7 +2208,13 @@ impl Config {
 
         self.injector
             .register_typed_with_default::<dyn QueryExecutor, _, _, _>(async move |i| {
-                QueryExecutorImpl::new(i.get_service_typed::<dyn CubestoreMetadataCacheFactory>().await.cache_factory(), i.get_service_typed().await, i.get_service_typed().await)
+                QueryExecutorImpl::new(
+                    i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
+                        .await
+                        .cache_factory(),
+                    i.get_service_typed().await,
+                    i.get_service_typed().await,
+                )
             })
             .await;
 

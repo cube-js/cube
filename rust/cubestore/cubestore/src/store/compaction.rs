@@ -574,7 +574,11 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE, self.metadata_cache_factory.clone());
+        let store = ParquetTableStore::new(
+            index.get_row().clone(),
+            ROW_GROUP_SIZE,
+            self.metadata_cache_factory.clone(),
+        );
         let old_partition_remote = match &new_chunk {
             Some(_) => None,
             None => partition.get_row().get_full_name(partition.get_id()),
@@ -1024,7 +1028,13 @@ async fn keys_with_counts(
     key_len: usize,
 ) -> Result<HashAggregateExec, CubeError> {
     let projection = (0..key_len).collect_vec();
-    let plan = read_files(files, metadata_cache_factory, key_len, Some(projection.clone())).await?;
+    let plan = read_files(
+        files,
+        metadata_cache_factory,
+        key_len,
+        Some(projection.clone()),
+    )
+    .await?;
 
     let fields = plan.schema();
     let fields = fields.fields();
@@ -1972,8 +1982,16 @@ mod tests {
             .await
             .unwrap();
         let reader = Arc::new(
-            ParquetExec::try_from_path_with_cache(local.as_str(), None, None, ROW_GROUP_SIZE, 1, None, NoopParquetMetadataCache::new())
-                .unwrap(),
+            ParquetExec::try_from_path_with_cache(
+                local.as_str(),
+                None,
+                None,
+                ROW_GROUP_SIZE,
+                1,
+                None,
+                NoopParquetMetadataCache::new(),
+            )
+            .unwrap(),
         );
         let res_data = &collect(reader).await.unwrap()[0];
 
@@ -2251,7 +2269,11 @@ impl MultiSplit {
             }
         });
 
-        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE, self.metadata_cache_factory.clone());
+        let store = ParquetTableStore::new(
+            p.index.get_row().clone(),
+            ROW_GROUP_SIZE,
+            self.metadata_cache_factory.clone(),
+        );
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
