@@ -9,7 +9,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl3 curl \
-       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-11-jdk-headless \
+       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup

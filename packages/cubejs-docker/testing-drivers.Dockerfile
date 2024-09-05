@@ -13,12 +13,12 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl3 curl \
-       cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip mc \
+       cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
-ENV TERM rxvt-unicode
-ENV NODE_ENV development
+ENV TERM=rxvt-unicode
+ENV NODE_ENV=development
 
 WORKDIR /cubejs
 
@@ -84,7 +84,7 @@ RUN yarn config set network-timeout 120000 -g
 ######################################################################
 # Databricks driver dependencies                                     #
 ######################################################################
-FROM base as prod_base_dependencies
+FROM base AS prod_base_dependencies
 COPY packages/cubejs-databricks-jdbc-driver/package.json packages/cubejs-databricks-jdbc-driver/package.json
 RUN mkdir packages/cubejs-databricks-jdbc-driver/bin
 RUN echo '#!/usr/bin/env node' > packages/cubejs-databricks-jdbc-driver/bin/post-install
@@ -176,7 +176,7 @@ COPY --from=prod_dependencies /cubejs .
 COPY packages/cubejs-docker/bin/cubejs-dev /usr/local/bin/cubejs
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 RUN ln -s  /cubejs/packages/cubejs-docker /cube
 RUN ln -s  /cubejs/rust/cubestore/bin/cubestore-dev /usr/local/bin/cubestore-dev
 

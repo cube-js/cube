@@ -1,4 +1,4 @@
-FROM node:20.17.0-bookworm-slim as builder
+FROM node:20.17.0-bookworm-slim AS builder
 
 WORKDIR /cube
 COPY . .
@@ -34,15 +34,15 @@ RUN DEBIAN_FRONTEND=noninteractive \
 
 RUN yarn policies set-version v1.22.19
 
-ENV TERM rxvt-unicode
-ENV NODE_ENV production
+ENV TERM=rxvt-unicode
+ENV NODE_ENV=production
 
 WORKDIR /cube
 
 COPY --from=builder /cube .
 
 # By default Node dont search in parent directory from /cube/conf, @todo Reaserch a little bit more
-ENV NODE_PATH /cube/conf/node_modules:/cube/node_modules
+ENV NODE_PATH=/cube/conf/node_modules:/cube/node_modules
 ENV PYTHONUNBUFFERED=1
 RUN ln -s /cube/node_modules/.bin/cubejs /usr/local/bin/cubejs
 RUN ln -s /cube/node_modules/.bin/cubestore-dev /usr/local/bin/cubestore-dev
