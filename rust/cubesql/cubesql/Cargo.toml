@@ -67,7 +67,7 @@ portpicker = "0.1.1"
 tokio-postgres = { version = "0.7.7", features = ["with-chrono-0_4", "runtime"] }
 rust_decimal = { version = "1.23", features = ["db-tokio-postgres"] }
 pg_interval = "0.4.1"
-criterion = { version = "0.4.0", features = ["html_reports"] }
+criterion = { version = "0.4.0", features = ["html_reports", "async", "async_tokio"] }
 # Only for local debugging
 #console-subscriber = "0.3.0"
 
