@@ -1,7 +1,10 @@
 tags: ["cube"]
 timeout: "2400s"
+
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
+
 substitutions:
   _TAG: ""
 steps:
