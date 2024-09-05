@@ -162,7 +162,7 @@ export class MySqlDriver extends BaseDriver implements DriverInterface {
         }
         return true;
       },
-      destroy: (connection) => promisify(connection.end.bind(connection))(),
+      destroy: (connection) => promisify(connection.end.bind(connection)),
     }, {
       min: 0,
       max:
