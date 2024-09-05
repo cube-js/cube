@@ -12,7 +12,7 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl3 curl \
        cmake python3 gcc g++ make cmake openjdk-11-jdk-headless unzip mc \
     && rm -rf /var/lib/apt/lists/*
 

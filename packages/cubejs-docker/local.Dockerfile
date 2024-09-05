@@ -10,7 +10,7 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3.11 libpython3.11-dev \
+    && apt-get install -y --no-install-recommends rxvt-unicode libssl3 python3.11 libpython3.11-dev \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TERM rxvt-unicode
