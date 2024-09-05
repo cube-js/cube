@@ -30,6 +30,12 @@ describe('time', () => {
     ]);
   });
 
+  it('time series - reach limits', () => {
+    expect(() => {
+      timeSeries('second', ['1970-01-01', '2021-01-02']);
+    }).toThrowError(/The count of generated date ranges for the request.*reached the limits/);
+  });
+
   it('time series - custom: interval - 1 year, origin - 2021-01-01', () => {
     expect(timeSeriesFromCustomInterval('1 year', ['2021-01-01', '2023-12-31'], moment('2021-01-01'))).toEqual([
       ['2021-01-01T00:00:00.000', '2021-12-31T23:59:59.999'],
@@ -164,6 +170,12 @@ describe('time', () => {
       ['2021-02-01T11:42:15.000', '2021-02-01T11:52:29.999'],
       ['2021-02-01T11:52:30.000', '2021-02-01T12:02:44.999']
     ]);
+  });
+
+  it('time series - custom: interval - reach limits', () => {
+    expect(() => {
+      timeSeriesFromCustomInterval('10 minutes 15 seconds', ['1970-01-01', '2021-01-02'], moment('2021-02-01 09:59:45'));
+    }).toThrowError(/The count of generated date ranges for the request.*reached the limits/);
   });
 
   it('inDbTimeZone', () => {
