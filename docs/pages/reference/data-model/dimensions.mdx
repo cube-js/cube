@@ -525,6 +525,98 @@ cubes:
 
 </CodeTabs>
 
+### `granularities`
+
+By default, the following granularities are available for time dimensions:
+`year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
+`second`.
+
+You can use the `granularities` parameter with any dimension of the [type
+`time`][ref-time-dimensions] to define one or more custom granularities, such as
+a *week starting on Sunday* or a *fiscal year*.
+
+<ReferenceBox>
+
+See **this recipe** for more custom granularity examples.
+
+</ReferenceBox>
+
+For each custom granularity, the `interval` parameter is required. It specifies
+the duration of the time interval and has the following format:
+`quantity unit [quantity unit...]`, e.g., `5 days` or `1 year 6 months`.
+
+Optionally, a custom granularity might use the `offset` parameter to specify how
+the time interval is shifted forward or backward in time. It has the the same
+format as `interval`, however, you can also provide negative quantities, e.g.,
+`-1 day` or `1 month -10 days`.
+
+Alternatively, instead of `offset`, you can specify how the time interval is
+shifted forward or backward in time with the `origin` parameter. It accepts an
+ISO 8601-compliant [date time string][link-date-time-string], e.g., `2024-01-02`
+or `2024-01-02T12:00:00.000Z`. When `origin` is provided, time intervals will be
+shifted in a way that one of them will match the provided origin.
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: orders
+    sql: >
+      SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+      SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+
+    dimensions:
+      - name: time
+        sql: time
+        type: time
+
+        granularities:
+          - name: quarter_hour
+            interval: 15 minutes
+
+          - name: week_starting_on_sunday
+            interval: 1 week
+            offset: -1 day
+
+          - name: fiscal_year_starting_on_april_01
+            interval: 1 year
+            origin: "2025-04-01"
+            # You have to use quotes here to make `origin` a valid YAML string 
+```
+
+```javascript
+cube(`orders`, {
+  sql: `
+    SELECT '2025-01-01T00:12:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-02-01T00:15:00.000Z'::TIMESTAMP AS time UNION ALL
+    SELECT '2025-03-01T00:18:00.000Z'::TIMESTAMP AS time
+  `,
+
+  dimensions: {
+    time: {
+      sql: `time`,
+      type: `time`,
+      granularities: {
+        quarter_hour: {
+          interval: `15 minutes`
+        },
+        week_starting_on_sunday: {
+          interval: `1 week`,
+          offset: `-1 day`
+        },
+        fiscal_year_starting_on_april_01: {
+          interval: `1 year`,
+          origin: `2025-04-01`
+        }
+      }
+    }
+  }
+})
+```
+
+</CodeTabs>
+
 
 [ref-schema-ref-joins]: /reference/data-model/joins
 [ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
@@ -536,3 +628,5 @@ cubes:
   /reference/data-model/types-and-formats#dimension-formats
 [ref-playground]: /product/workspace/playground
 [ref-apis]: /product/apis-integrations
+[ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
+[link-date-time-string]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date#date_time_string_format

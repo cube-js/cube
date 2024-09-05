@@ -286,11 +286,26 @@ implicitly.
 Dimensions can be of different types. See the [dimension type
 reference][ref-schema-dimension-types] for details.
 
-Time-based properties should be modeled as dimensions of the `time` type.
-Time dimensions allow grouping the result set by a unit of time (e.g. hours,
-days, weeks, etc.). In analytics, this is also known as "granularity".
+### Time dimensions
 
-We can add the necessary time dimensions to both data models as follows:
+Time-based properties are modeled using dimensions of the [`time`
+type][ref-ref-time-dimensions]. They allow grouping the result set by a unit of
+time (e.g., days, weeks, month, etc.), also known as the *time dimension
+granularity*.
+
+The following granularities are available by default for any time dimension:
+`year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
+`second`. You can also define [custom granularities][ref-ref-dimension-granularities]
+and optionally expose them via **proxy dimensions** in case you need to use weeks
+starting on Sunday, fiscal years, etc.
+
+<ReferenceBox>
+
+See **this recipe** for more custom granularity examples.
+
+</ReferenceBox>
+
+Here's how we can add time dimensions to the data model:
 
 <CodeTabs>
 
@@ -301,15 +316,25 @@ cube(`orders`, {
   dimensions: {
     created_at: {
       sql: `created_at`,
-      type: `time`,
+      type: `time`
+      // You can use this time dimension with all default granularities:
+      // year, quarter, month, week, day, hour, minute, second
     },
 
     completed_at: {
       sql: `completed_at`,
       type: `time`,
-    },
-  },
-});
+      // You can use this time dimension with all default granularities
+      // and an additional custom granularity defined below
+      granularities: {
+        fiscal_year_starting_on_february_01: {
+          interval: `1 year`,
+          offset: `1 month`
+        }
+      }
+    }
+  }
+})
 ```
 
 ```yaml
@@ -321,38 +346,18 @@ cubes:
       - name: created_at
         sql: created_at
         type: time
+        # You can use this time dimension with all default granularities:
+        # year, quarter, month, week, day, hour, minute, second
 
       - name: completed_at
         sql: completed_at
         type: time
-```
-
-</CodeTabs>
-
-<CodeTabs>
-
-```javascript
-cube(`line_items`, {
-  // ...
-
-  dimensions: {
-    created_at: {
-      sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
-```
-
-```yaml
-cubes:
-  - name: line_items
-    # ...
-
-    dimensions:
-      - name: created_at
-        sql: created_at
-        type: time
+        # You can use this time dimension with all default granularities
+        # and an additional custom granularity defined below
+        granularities:
+          - name: fiscal_year_starting_on_february_01
+            interval: 1 year
+            offset: 1 month
 ```
 
 </CodeTabs>
@@ -693,7 +698,7 @@ Pre-Aggregations][ref-caching-preaggs-intro].
   /product/apis-integrations/rest-api/query-format#filters-format
 [ref-caching-preaggs-intro]: /product/caching/getting-started-pre-aggregations
 [ref-caching-use-preaggs-partition-time]:
-  /product/caching/using-pre-aggregations#time-partitioning
+  /product/caching/using-pre-aggregations#partitioning
 [ref-schema-dimension-types]:
   /reference/data-model/types-and-formats#dimension-types
 [ref-schema-measure-types]:
@@ -721,3 +726,5 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
 [ref-multitenancy]: /product/configuration/advanced/multitenancy
 [ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster
+[ref-ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
+[ref-ref-dimension-granularities]: /reference/data-model/dimensions#granularities
