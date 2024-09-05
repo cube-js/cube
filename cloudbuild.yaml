@@ -8,9 +8,13 @@ options:
 substitutions:
   _TAG: ""
 steps:
-  - name: "gcr.io/kaniko-project/executor:latest"
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: bash
     args:
-      - --dockerfile=packages/cubejs-docker/dev.Dockerfile
-      - --context=.
-      - --cache=true
-      - --destination=us-docker.pkg.dev/definite-371419/cube/cube:${_TAG}
+      - -c
+      - 'docker buildx build -t us-docker.pkg.dev/definite-371419/cube/cube:${_TAG} -f packages/cubejs-docker/dev.Dockerfile . --push'
+    id: Build
+
+
+images:
+  - 'us-docker.pkg.dev/definite-371419/cube/cube:${_TAG}'
