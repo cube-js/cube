@@ -38,7 +38,7 @@ export class OptsHandler {
   public constructor(
     private core: CubejsServerCore,
     private createOptions: CreateOptions,
-    private systemOptions?: SystemOptions,
+    private readonly systemOptions?: SystemOptions,
   ) {
     this.assertOptions(createOptions);
     const options = cloneDeep(this.createOptions);
@@ -233,17 +233,16 @@ export class OptsHandler {
    * Async driver type getter.
    */
   private getDbType(
-    opts: CreateOptions & {
-      driverFactory: DriverFactoryAsyncFn,
-    },
+    opts: CreateOptions,
   ): DbTypeAsyncFn {
-    const { dbType, driverFactory } = opts;
+    const { dbType } = opts;
+
     return async (ctx: DriverContext) => {
       if (!dbType) {
         let val: undefined | BaseDriver | DriverConfig;
         let type: DatabaseType;
         if (!this.driverFactoryType) {
-          val = await driverFactory(ctx);
+          val = await this.systemOptions.driverFactoryCache(ctx);
         }
         if (
           this.driverFactoryType === 'BaseDriver' &&
@@ -251,7 +250,7 @@ export class OptsHandler {
         ) {
           type = <DatabaseType>process.env.CUBEJS_DB_TYPE;
         } else if (this.driverFactoryType === 'DriverConfig') {
-          type = (<DriverConfig>(val || await driverFactory(ctx))).type;
+          type = (<DriverConfig>(val || await this.systemOptions.driverFactoryCache(ctx))).type;
         }
         return type;
       } else if (typeof dbType === 'function') {
