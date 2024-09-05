@@ -9,12 +9,3 @@ members = [
     "cuberpc",
     "cuberockstore",
 ]
-
-[patch.'https://github.com/cube-js/arrow-rs']
-# parquet = { path = "/Users/sam/arrow-rs", features = ["arrow"] }
-parquet = { path = "/Users/sam/arrow-rs/parquet" }
-arrow = { path = "/Users/sam/arrow-rs/arrow" }
-
-[patch.'https://github.com/cube-js/arrow-datafusion']
-# datafusion = { path = "/Users/sam/arrow-datafusion", features = ["default_nulls_last"] }
-datafusion = { path = "/Users/sam/arrow-datafusion/datafusion" }
