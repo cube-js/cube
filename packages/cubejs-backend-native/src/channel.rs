@@ -328,6 +328,10 @@ fn get_sql_templates(
         .get::<JsBoolean, _, _>(cx, "shouldReuseParams")
         .map_cube_err("Can't get shouldReuseParams")?
         .value(cx);
+    let cast_in_list_time_dimension = sql_generator
+        .get::<JsBoolean, _, _>(cx, "castInListTimeDimensionValues")
+        .map_cube_err("Can't get castInListTimeDimensionValues")?
+        .value(cx);
     let sql_templates = sql_generator
         .get::<JsFunction, _, _>(cx, "sqlTemplates")
         .map_cube_err("Can't get sqlTemplates")?;
@@ -369,7 +373,7 @@ fn get_sql_templates(
         }
     }
 
-    SqlTemplates::new(templates_map, reuse_params)
+    SqlTemplates::new(templates_map, reuse_params, cast_in_list_time_dimension)
 }
 
 // TODO impl drop for SqlGenerator

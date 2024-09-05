@@ -158,6 +158,10 @@ export class BigqueryQuery extends BaseQuery {
     };
   }
 
+  public get castInListTimeDimensionValues() {
+    return true;
+  }
+
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
