@@ -113,7 +113,33 @@ function alignToOrigin(startDate: moment.Moment, interval: ParsedInterval, origi
   return alignedDate;
 }
 
+function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Duration {
+  const duration = moment.duration();
+
+  Object.entries(parsedInterval).forEach(([key, value]) => {
+    duration.add(value, key as unitOfTime.DurationConstructor);
+  });
+
+  return duration;
+}
+
+function allowSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryDateRange): boolean {
+  const intervalParsed = parseSqlInterval(intervalStr);
+  const intervalAsSeconds = parsedSqlIntervalToDuration(intervalParsed).asSeconds();
+  const start = moment(startStr);
+  const end = moment(endStr);
+  const rangeSeconds = end.diff(start, 'seconds');
+
+  const limit = 50000; // TODO Make this as configurable soft limit
+
+  return rangeSeconds / intervalAsSeconds < limit;
+}
+
 export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, endStr]: QueryDateRange, origin: moment.Moment, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
+  if (!allowSeriesForDateRange(intervalStr, [startStr, endStr])) {
+    throw new Error(`The count of generated date ranges for the request from [${startStr}] to [${endStr}] by ${intervalStr} reached the limits. Please reduce the requested date interval or use bigger granularity.`);
+  }
+
   const intervalParsed = parseSqlInterval(intervalStr);
   const start = moment(startStr);
   const end = moment(endStr);
@@ -140,12 +166,15 @@ export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, end
  */
 export const timeSeries = (granularity: string, dateRange: QueryDateRange, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
   if (!TIME_SERIES[granularity]) {
-    // TODO error
     throw new Error(`Unsupported time granularity: ${granularity}`);
   }
 
   if (!options.timestampPrecision) {
     throw new Error(`options.timestampPrecision is required, actual: ${options.timestampPrecision}`);
+  }
+
+  if (!allowSeriesForDateRange(`1 ${granularity}`, dateRange)) {
+    throw new Error(`The count of generated date ranges for the request from [${dateRange[0]}] to [${dateRange[1]}] by ${granularity} reached the limits. Please reduce the requested date interval or use bigger granularity.`);
   }
 
   // moment.range works with strings
