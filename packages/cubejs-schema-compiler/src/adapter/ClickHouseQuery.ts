@@ -1,3 +1,5 @@
+import R from "ramda";
+
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -17,7 +19,7 @@ class ClickHouseFilter extends BaseFilter {
   public likeIgnoreCase(column, not, param, type) {
     const p = (!type || type === 'contains' || type === 'ends') ? '%' : '';
     const s = (!type || type === 'contains' || type === 'starts') ? '%' : '';
-    return `lower(${column}) ${not ? 'NOT' : ''} LIKE CONCAT('${p}', lower(${this.allocateParam(param)}), '${s}')`;
+    return `lowerUTF8(${column}) ${not ? 'NOT' : ''} LIKE lowerUTF8(${p}${this.allocateParam(param)}${s})`;
   }
 
   public castParameter() {
@@ -152,6 +154,27 @@ export class ClickHouseQuery extends BaseQuery {
     const direction = hash.desc ? 'DESC' : 'ASC';
     return `${fieldAlias} ${direction}`;
   }
+
+  public orderBy() {
+    //
+    // ClickHouse orders string by bytes, so we need to use COLLATE 'en' to order by string
+    //
+    if (R.isEmpty(this.order)) {
+        return "";
+    }
+
+    const orderByString = R.pipe(
+        R.map((order) => this.orderHashToString(order) + " COLLATE 'en'"),
+        R.reject(R.isNil),
+        R.join(", ")
+    )(this.order);
+
+    if (!orderByString) {
+        return "";
+    }
+
+    return ` ORDER BY ${orderByString}`;
+}
 
   public groupByClause() {
     if (this.ungrouped) {
