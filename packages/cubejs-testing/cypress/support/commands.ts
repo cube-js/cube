@@ -77,27 +77,55 @@ Cypress.Commands.add("runQuery", () => {
 });
 
 Cypress.Commands.add("addMeasure", (name) => {
-  cy.get("[data-qa=ToggleMembersButton]").then(($button) => {
-    const expanded = $button.attr("data-qaval");
+  cy.get("body").then(($body) => {
+    const $button = $body.find("[data-qa=ToggleMembersButton]");
 
-    if (expanded && expanded.includes("used")) {
-      return cy.wrap($button).click();
+    if ($button.length) {
+      const expanded = $button.attr("data-qaval");
+
+      if (expanded && expanded.includes("used")) {
+        cy.wrap($button).click();
+      }
     }
 
-    return cy.wrap($button);
+    const $cube = $body.find(
+      `[data-qa=CubeButton][data-qaval=${
+        name.split(".")[0]
+      }]:not([data-is-open])`
+    );
+
+    if ($cube.length > 0) {
+      cy.wrap($cube).click();
+    }
+
+    return cy.wrap($body);
   });
   cy.get(`[data-member="measure"][data-qaval="${name}"]`).click();
 });
 
 Cypress.Commands.add("addDimension", (name) => {
-  cy.get("[data-qa=ToggleMembersButton]").then(($button) => {
-    const expanded = $button.attr("data-qaval");
+  cy.get("body").then(($body) => {
+    const $button = $body.find("[data-qa=ToggleMembersButton]");
 
-    if (expanded && expanded.includes("used")) {
-      return cy.wrap($button).click();
+    if ($button.length) {
+      const expanded = $button.attr("data-qaval");
+
+      if (expanded && expanded.includes("used")) {
+        cy.wrap($button).click();
+      }
     }
 
-    return cy.wrap($button);
+    const $cube = $body.find(
+      `[data-qa=CubeButton][data-qaval=${
+        name.split(".")[0]
+      }]:not([data-is-open])`
+    );
+
+    if ($cube.length > 0) {
+      cy.wrap($cube).click();
+    }
+
+    return cy.wrap($body);
   });
   cy.get(`[data-member="dimension"][data-qaval="${name}"]`).click();
 });

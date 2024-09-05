@@ -95,6 +95,7 @@ context("Playground: Connection Wizard", () => {
     });
 
     it("executes a query after a successful connection", () => {
+      cy.visit("/");
       shouldStartConnectionWizardFlow = false;
       cy.setQuery(eventsCountQuery);
       cy.wait(300);

@@ -40,6 +40,7 @@ context("Playground: Explore Page", () => {
     });
   });
 
+  // @TODO: There is no heuristics anymore. We can probably remove this test.
   it("applies default heuristics", () => {
     cy.intercept("/playground/context").as("context");
     cy.intercept("/playground/files").as("files");
@@ -50,11 +51,11 @@ context("Playground: Explore Page", () => {
     cy.wait(500);
     cy.url().should("include", "/build");
 
-    cy.wait(20000);
+    cy.wait(5000);
 
     cy.addMeasure("Events.count");
-    cy.wait(300);
-    cy.getByTestId("TimeDimension").contains("Events Created at");
+    // cy.wait(300);
+    // cy.getByTestId("TimeDimension").contains("Events Created at");
   });
 
   describe("Live preview", () => {
