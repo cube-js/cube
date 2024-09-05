@@ -123,7 +123,7 @@ function parsedSqlIntervalToDuration(parsedInterval: ParsedInterval): moment.Dur
   return duration;
 }
 
-function allowSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryDateRange): boolean {
+function checkSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryDateRange): void {
   const intervalParsed = parseSqlInterval(intervalStr);
   const intervalAsSeconds = parsedSqlIntervalToDuration(intervalParsed).asSeconds();
   const start = moment(startStr);
@@ -131,14 +131,15 @@ function allowSeriesForDateRange(intervalStr: string, [startStr, endStr]: QueryD
   const rangeSeconds = end.diff(start, 'seconds');
 
   const limit = 50000; // TODO Make this as configurable soft limit
+  const count = rangeSeconds / intervalAsSeconds;
 
-  return rangeSeconds / intervalAsSeconds < limit;
+  if (count > limit) {
+    throw new Error(`The count of generated date ranges (${count}) for the request from [${startStr}] to [${endStr}] by ${intervalStr} is over limit (${limit}). Please reduce the requested date interval or use bigger granularity.`);
+  }
 }
 
 export const timeSeriesFromCustomInterval = (intervalStr: string, [startStr, endStr]: QueryDateRange, origin: moment.Moment, options: TimeSeriesOptions = { timestampPrecision: 3 }): QueryDateRange[] => {
-  if (!allowSeriesForDateRange(intervalStr, [startStr, endStr])) {
-    throw new Error(`The count of generated date ranges for the request from [${startStr}] to [${endStr}] by ${intervalStr} reached the limits. Please reduce the requested date interval or use bigger granularity.`);
-  }
+  checkSeriesForDateRange(intervalStr, [startStr, endStr]);
 
   const intervalParsed = parseSqlInterval(intervalStr);
   const start = moment(startStr);
@@ -173,9 +174,7 @@ export const timeSeries = (granularity: string, dateRange: QueryDateRange, optio
     throw new Error(`options.timestampPrecision is required, actual: ${options.timestampPrecision}`);
   }
 
-  if (!allowSeriesForDateRange(`1 ${granularity}`, dateRange)) {
-    throw new Error(`The count of generated date ranges for the request from [${dateRange[0]}] to [${dateRange[1]}] by ${granularity} reached the limits. Please reduce the requested date interval or use bigger granularity.`);
-  }
+  checkSeriesForDateRange(`1 ${granularity}`, dateRange);
 
   // moment.range works with strings
   const range = moment.range(<any>dateRange[0], <any>dateRange[1]);
