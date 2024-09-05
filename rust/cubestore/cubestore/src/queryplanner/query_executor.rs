@@ -371,7 +371,7 @@ pub struct CubeTable {
     worker_partition_ids: Vec<(u64, RowFilter)>,
     #[serde(skip, default)]
     chunk_id_to_record_batches: HashMap<u64, Vec<RecordBatch>>,
-    #[serde(skip, default = "NoopParquetMetadataCache::new")]  // TODO: Triple check the initialization of this field.
+    #[serde(skip, default = "NoopParquetMetadataCache::new")]
     parquet_metadata_cache: Arc<dyn ParquetMetadataCache>,
 }
 
