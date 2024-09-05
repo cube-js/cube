@@ -1,7 +1,7 @@
 ######################################################################
 # Base image                                                         #
 ######################################################################
-FROM node:18.20.3-bullseye-slim AS base
+FROM node:18.20.3-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
