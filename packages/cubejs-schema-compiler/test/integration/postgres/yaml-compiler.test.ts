@@ -309,7 +309,7 @@ cubes:
               1 as id,
               1 as customer_id,
               TO_TIMESTAMP('2022-01-01', 'YYYY-MM-DD') as timestamp
-          )
+          ) sq
           WHERE {FILTER_PARAMS.orders.time.filter(\\"timestamp\\")}"
 
     joins:
