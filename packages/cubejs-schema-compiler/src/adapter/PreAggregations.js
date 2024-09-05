@@ -118,11 +118,6 @@ export class PreAggregations {
   preAggregationDescriptionsForRecursive(cube, foundPreAggregation) {
     const query = this.query.preAggregationQueryForSqlEvaluation(cube, foundPreAggregation.preAggregation);
     const descriptions = query !== this.query ? query.preAggregations.preAggregationsDescription() : [];
-    
-    if (foundPreAggregation.preAggregation.lastRollupLambda && query !== this.query) {
-      return [query.preAggregations.preAggregationDescriptionFor(cube, foundPreAggregation)];
-    }
-
     return descriptions.concat(this.preAggregationDescriptionFor(cube, foundPreAggregation));
   }
 
@@ -167,10 +162,6 @@ export class PreAggregations {
 
     const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
       this.query.timeDimensions.find(td => {
-        if (!td.dateRange || (!td.boundaryDateRange && td.dateRange[0] === FROM_PARTITION_RANGE && td.dateRange[1] === TO_PARTITION_RANGE)) {
-          return false;
-        }
-
         if (td.dimension === foundPreAggregation.references.timeDimensions[0].dimension) {
           return true;
         }
@@ -226,7 +217,7 @@ export class PreAggregations {
         queryForSqlEvaluation.parseSecondDuration(preAggregation.refreshKey.updateWindow),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
-        this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
+        this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
         preAggregation.partitionGranularity && (
           matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
@@ -1085,12 +1076,15 @@ export class PreAggregations {
     return { preAggregations, result };
   }
 
-  refreshRangeQuery() {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      offset: null,
-      preAggregationQuery: true,
-    });
+  refreshRangeQuery(cube) {
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        offset: null,
+        preAggregationQuery: true,
+      }
+    );
   }
 
   originalSqlPreAggregationQuery(cube, aggregation) {
