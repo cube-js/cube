@@ -819,7 +819,7 @@ export class PreAggregationLoader {
       versionArray.push(this.preAggregation.streamOffset);
     }
     if (this.preAggregation.outputColumnTypes) {
-      versionArray.push(JSON.stringify(this.preAggregation.outputColumnTypes));
+      versionArray.push(this.preAggregation.outputColumnTypes);
     }
     versionArray.push(invalidationKeys);
     return version(versionArray);
