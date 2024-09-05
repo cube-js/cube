@@ -8,7 +8,6 @@ import jwt from 'jsonwebtoken';
 
 import * as console from 'console';
 import { ApiGateway, ApiGatewayOptions, Query, QueryRequest, Request } from '../src';
-import { ResponseResultFn } from '../src/types/request';
 import { generateAuthToken } from './utils';
 import {
   preAggregationsResultFactory,
@@ -237,6 +236,54 @@ describe('API Gateway', () => {
             jwt.verify(authorization, API_SECRET);
             req.authInfo = authorization;
           }
+        },
+        queryRewrite
+      }
+    );
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"filters":[{"dimension":"Foo.id","operator":"equals","values":[null]}]}'
+      )
+      // console.log(generateAuthToken({ uid: 5, }));
+      .set('Authorization', 'Authorization: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
+      .expect(200);
+
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+
+    expect(queryRewrite.mock.calls.length).toEqual(1);
+  });
+
+  test('query transform with checkAuth with return', async () => {
+    const queryRewrite = jest.fn(async (query: Query, context) => {
+      expect(context.securityContext).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      expect(context.authInfo).toEqual({
+        exp: 2475857705,
+        iat: 1611857705,
+        uid: 5
+      });
+
+      return query;
+    });
+
+    const { app } = await createApiGateway(
+      new AdapterApiMock(),
+      new DataSourceStorageMock(),
+      {
+        checkAuth: (req: Request, authorization) => {
+          if (authorization) {
+            return {
+              security_context: jwt.verify(authorization, API_SECRET),
+            };
+          }
+
+          return {};
         },
         queryRewrite
       }
@@ -579,7 +626,11 @@ describe('API Gateway', () => {
       .expect(200);
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(false);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   test('meta endpoint extended to get schema information with additional data', async () => {
@@ -592,7 +643,11 @@ describe('API Gateway', () => {
 
     expect(res.body).toHaveProperty('cubes');
     expect(res.body.cubes[0]?.name).toBe('Foo');
+    expect(res.body.cubes[0]?.description).toBe('cube from compilerApi mock');
     expect(res.body.cubes[0]?.hasOwnProperty('sql')).toBe(true);
+    expect(res.body.cubes[0]?.dimensions.find(dimension => dimension.name === 'Foo.id').description).toBe('id dimension from compilerApi mock');
+    expect(res.body.cubes[0]?.measures.find(measure => measure.name === 'Foo.bar').description).toBe('measure from compilerApi mock');
+    expect(res.body.cubes[0]?.segments.find(segment => segment.name === 'Foo.quux').description).toBe('segment from compilerApi mock');
   });
 
   describe('multi query support', () => {

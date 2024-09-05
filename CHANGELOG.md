@@ -3,6 +3,76 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+
+### Bug Fixes
+
+* **schema-compiler:** correct string casting for BigQuery ([#8651](https://github.com/cube-js/cube/issues/8651)) ([f6ac9c2](https://github.com/cube-js/cube/commit/f6ac9c2255091b27fc4ac5c2434bf7de7248afb2))
+* **schema-compiler:** correct string casting for Databricks ([#8652](https://github.com/cube-js/cube/issues/8652)) ([5cf71d9](https://github.com/cube-js/cube/commit/5cf71d91373899a1dfd8f3382ab59574bd9637a7))
+* **schema-compiler:** correct string casting for MySQL ([#8650](https://github.com/cube-js/cube/issues/8650)) ([9408bb4](https://github.com/cube-js/cube/commit/9408bb43a7a63134894f0a7c4e1883e267b051a1))
+* **schema-compiler:** correct string concatenation and casting for MS SQL ([#8649](https://github.com/cube-js/cube/issues/8649)) ([0e9f9f1](https://github.com/cube-js/cube/commit/0e9f9f1f475245bd2c41fa05e6fd8a090b07bf99))
+* **schema-compiler:** Support `CURRENT_DATE` SQL push down for BigQuery ([9aebd6b](https://github.com/cube-js/cube/commit/9aebd6ba94bdc67c1b83e0b34d769db4088b41d2))
+
+
+### Features
+
+* **cubejs-api-gateway:** Support returning new security context from check_auth ([#8585](https://github.com/cube-js/cube/issues/8585)) ([704a96c](https://github.com/cube-js/cube/commit/704a96c4cdb4684459c37f5ed4a026f59b89e6f7))
+
+
+
+
+
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+
+### Bug Fixes
+
+* **cubesql:** Don't clone AST on pre-planning step ([#8644](https://github.com/cube-js/cube/issues/8644)) ([03277b0](https://github.com/cube-js/cube/commit/03277b0e42afcc31fd7b1822aa9570a88f78e788))
+* **cubesql:** Don't clone response, improve performance ([#8638](https://github.com/cube-js/cube/issues/8638)) ([4366299](https://github.com/cube-js/cube/commit/436629901d1643193cd52c6af948112c7bc0c838))
+* **cubesql:** Fix non-injective functions split rules, make them variadic ([#8563](https://github.com/cube-js/cube/issues/8563)) ([ed33403](https://github.com/cube-js/cube/commit/ed33403eee334642f1ccaf2db075035e3b877368))
+* **cubesql:** Normalize incoming date_part and date_trunc tokens ([#8583](https://github.com/cube-js/cube/issues/8583)) ([f985265](https://github.com/cube-js/cube/commit/f9852650cb3b61dd52386f5cc6a1cec6a5752588))
+
+
+### Features
+
+* **cubejs-api-gateway:** Add description to V1CubeMeta, V1CubeMetaDimension and V1CubeMetaMeasure in OpenAPI ([#8597](https://github.com/cube-js/cube/issues/8597)) ([1afa934](https://github.com/cube-js/cube/commit/1afa934b1db7379a87ee913816e9ce855783d2bb))
+* **cubesql:** Introduce max sessions limit ([#8616](https://github.com/cube-js/cube/issues/8616)) ([dfcb596](https://github.com/cube-js/cube/commit/dfcb5966e76a27fd847e2457bf4af2e1c32b21ac))
+* **cubesql:** Upgrade serde, serde_json - performance boost ([#8636](https://github.com/cube-js/cube/issues/8636)) ([b4754db](https://github.com/cube-js/cube/commit/b4754dbd7898d928844558adece42668fe6e728f))
+* **schema-compiler:** detect boolean columns for schema generation ([#8637](https://github.com/cube-js/cube/issues/8637)) ([178d98f](https://github.com/cube-js/cube/commit/178d98fbc35b1744d0e83e0e4103ce0465ca2244))
+
+
+
+
+
+## [0.35.77](https://github.com/cube-js/cube/compare/v0.35.76...v0.35.77) (2024-08-26)
+
+
+### Bug Fixes
+
+* Row deduplication query isn't triggered in views if multiple entry join path is used ([#8631](https://github.com/cube-js/cube/issues/8631)) ([1668175](https://github.com/cube-js/cube/commit/16681754acfd23f1005838f83e8333ac1da1c6c3))
+* View builds incorrect join graph if join paths partially shared ([#8632](https://github.com/cube-js/cube/issues/8632)) Thanks [@barakcoh](https://github.com/barakcoh) for the fix hint! ([5ca76db](https://github.com/cube-js/cube/commit/5ca76dbd66c8b0227d3107a1b1c3f1f9316dbd86)), closes [#8499](https://github.com/cube-js/cube/issues/8499)
+
+
+### Features
+
+* **cubesql:** CubeScan - don't clone strings for non stream response ([#8633](https://github.com/cube-js/cube/issues/8633)) ([df364be](https://github.com/cube-js/cube/commit/df364beae38badbeeb27488a847a34c4431457e8))
+
+
+
+
+
+## [0.35.76](https://github.com/cube-js/cube/compare/v0.35.75...v0.35.76) (2024-08-24)
+
+
+### Bug Fixes
+
+* Invalid interval when querying multiple negative interval windows within Cube Store ([#8626](https://github.com/cube-js/cube/issues/8626)) ([716b26a](https://github.com/cube-js/cube/commit/716b26a7fa5c43d1b7970461c5007c872b0ca184))
+
+
+
+
+
 ## [0.35.75](https://github.com/cube-js/cube/compare/v0.35.74...v0.35.75) (2024-08-22)
 
 

@@ -137,6 +137,14 @@ cube(`orders`, {
 });
 ```
 
+<ReferenceBox>
+
+Currently, Cube does not wrap your SQL snippets in parentheses during SQL
+generation. In case of non-trivial snippets, this may lead to unexpected results.
+Please [track this issue](https://github.com/cube-js/cube/issues/6373).
+
+</ReferenceBox>
+
 </CodeTabs>
 
 ### User-defined functions

@@ -62,6 +62,8 @@ pub enum QueryState {
 pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
+    // Can be UUID or anything else. MDX uses UUID
+    pub extra_id: Option<SessionExtraId>,
     // secret for this session
     pub secret: u32,
     // client ip, immutable
@@ -95,6 +97,7 @@ pub struct SessionState {
 impl SessionState {
     pub fn new(
         connection_id: u32,
+        extra_id: Option<SessionExtraId>,
         client_ip: String,
         client_port: u16,
         protocol: DatabaseProtocol,
@@ -106,6 +109,7 @@ impl SessionState {
 
         Self {
             connection_id,
+            extra_id,
             secret: rng.gen(),
             client_ip,
             client_port,
@@ -390,6 +394,8 @@ impl SessionState {
     }
 }
 
+pub type SessionExtraId = [u8; 16];
+
 #[derive(Debug)]
 pub struct Session {
     // Backref
@@ -399,46 +405,7 @@ pub struct Session {
     pub state: Arc<SessionState>,
 }
 
-impl Session {
-    // For PostgreSQL
-    pub fn to_stat_activity(self: &Arc<Self>) -> SessionStatActivity {
-        let query = self.state.current_query();
-
-        let application_name = if let Some(v) = self.state.get_variable("application_name") {
-            match v.value {
-                ScalarValue::Utf8(r) => r,
-                _ => None,
-            }
-        } else {
-            None
-        };
-
-        SessionStatActivity {
-            oid: self.state.connection_id,
-            datname: self.state.database(),
-            pid: self.state.connection_id,
-            leader_pid: None,
-            usesysid: 0,
-            usename: self.state.user(),
-            application_name,
-            client_addr: self.state.client_ip.clone(),
-            client_hostname: None,
-            client_port: self.state.client_port.clone(),
-            query,
-        }
-    }
-
-    // For MySQL
-    pub fn to_process_list(self: &Arc<Self>) -> SessionProcessList {
-        SessionProcessList {
-            id: self.state.connection_id,
-            host: self.state.client_ip.clone(),
-            user: self.state.user(),
-            database: self.state.database(),
-        }
-    }
-}
-
+/// Specific representation of session for MySQL
 #[derive(Debug)]
 pub struct SessionProcessList {
     pub id: u32,
@@ -447,17 +414,58 @@ pub struct SessionProcessList {
     pub database: Option<String>,
 }
 
+impl From<&Session> for SessionProcessList {
+    fn from(session: &Session) -> Self {
+        Self {
+            id: session.state.connection_id,
+            host: session.state.client_ip.clone(),
+            user: session.state.user(),
+            database: session.state.database(),
+        }
+    }
+}
+
+/// Specific representation of session for PostgreSQL
 #[derive(Debug)]
 pub struct SessionStatActivity {
     pub oid: u32,
     pub datname: Option<String>,
     pub pid: u32,
     pub leader_pid: Option<u32>,
-    pub usesysid: u32,
+    pub usesysid: Option<u32>,
     pub usename: Option<String>,
     pub application_name: Option<String>,
     pub client_addr: String,
     pub client_hostname: Option<String>,
     pub client_port: u16,
     pub query: Option<String>,
+}
+
+impl From<&Session> for SessionStatActivity {
+    fn from(session: &Session) -> Self {
+        let query = session.state.current_query();
+
+        let application_name = if let Some(v) = session.state.get_variable("application_name") {
+            match v.value {
+                ScalarValue::Utf8(r) => r,
+                _ => None,
+            }
+        } else {
+            None
+        };
+
+        Self {
+            oid: session.state.connection_id,
+            datname: session.state.database(),
+            pid: session.state.connection_id,
+            leader_pid: None,
+            usesysid: None,
+            usename: session.state.user(),
+            application_name,
+            client_addr: session.state.client_ip.clone(),
+            client_hostname: None,
+            client_port: session.state.client_port.clone(),
+            query,
+        }
+    }
 }

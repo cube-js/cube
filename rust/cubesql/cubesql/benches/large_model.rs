@@ -70,17 +70,20 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
     let cube_name = format!("LargeCube_{}", dims);
     vec![V1CubeMeta {
         name: cube_name.clone(),
+        description: None,
         title: None,
         measures: vec![
             V1CubeMetaMeasure {
                 name: format!("{}.count", cube_name),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("count".to_string()),
             },
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
             },
@@ -88,6 +91,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
         dimensions: (1..=dims)
             .map(|n| V1CubeMetaDimension {
                 name: format!("{}.n{}", cube_name, n),
+                description: None,
                 _type: "number".to_string(),
             })
             .collect(),

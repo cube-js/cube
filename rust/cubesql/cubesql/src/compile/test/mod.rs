@@ -41,30 +41,37 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
     vec![
         CubeMeta {
             name: "KibanaSampleDataEcommerce".to_string(),
+            description: None,
             title: None,
             dimensions: vec![
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.order_date".to_string(),
+                    description: None,
                     _type: "time".to_string(),
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.last_mod".to_string(),
+                    description: None,
                     _type: "time".to_string(),
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
+                    description: None,
                     _type: "string".to_string(),
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.notes".to_string(),
+                    description: None,
                     _type: "string".to_string(),
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
+                    description: None,
                     _type: "number".to_string(),
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
+                    description: None,
                     _type: "boolean".to_string(),
                 },
             ],
@@ -72,36 +79,42 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.count".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("count".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("max".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.sumPrice".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("sum".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.minPrice".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("min".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("avg".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("countDistinct".to_string()),
                 },
@@ -110,11 +123,13 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 CubeMetaSegment {
                     name: "KibanaSampleDataEcommerce.is_male".to_string(),
                     title: "Ecommerce Male".to_string(),
+                    description: Some("Male users segment".to_string()),
                     short_title: "Male".to_string(),
                 },
                 CubeMetaSegment {
                     name: "KibanaSampleDataEcommerce.is_female".to_string(),
                     title: "Ecommerce Female".to_string(),
+                    description: None,
                     short_title: "Female".to_string(),
                 },
             ],
@@ -125,18 +140,22 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "Logs".to_string(),
+            description: None,
             title: None,
             dimensions: vec![
                 CubeMetaDimension {
                     name: "Logs.id".to_string(),
+                    description: None,
                     _type: "number".to_string(),
                 },
                 CubeMetaDimension {
                     name: "Logs.read".to_string(),
+                    description: None,
                     _type: "boolean".to_string(),
                 },
                 CubeMetaDimension {
                     name: "Logs.content".to_string(),
+                    description: None,
                     _type: "string".to_string(),
                 },
             ],
@@ -144,12 +163,14 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 CubeMetaMeasure {
                     name: "Logs.agentCount".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("countDistinct".to_string()),
                 },
                 CubeMetaMeasure {
                     name: "Logs.agentCountApprox".to_string(),
                     title: None,
+                    description: None,
                     _type: "number".to_string(),
                     agg_type: Some("countDistinctApprox".to_string()),
                 },
@@ -162,11 +183,13 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "NumberCube".to_string(),
+            description: None,
             title: None,
             dimensions: vec![],
             measures: vec![CubeMetaMeasure {
                 name: "NumberCube.someNumber".to_string(),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("number".to_string()),
             }],
@@ -175,10 +198,12 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "WideCube".to_string(),
+            description: None,
             title: None,
             dimensions: (0..100)
                 .map(|i| CubeMetaDimension {
                     name: format!("WideCube.dim{}", i),
+                    description: None,
                     _type: "number".to_string(),
                 })
                 .collect(),
@@ -188,36 +213,42 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     _type: "number".to_string(),
                     agg_type: Some("number".to_string()),
                     title: None,
+                    description: None,
                 })
                 .chain(
                     vec![
                         CubeMetaMeasure {
                             name: "KibanaSampleDataEcommerce.count".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "KibanaSampleDataEcommerce.minPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                         },
@@ -230,20 +261,24 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
+            description: None,
             title: None,
             dimensions: (0..10)
                 .flat_map(|i| {
                     [
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_num{}", i),
+                            description: None,
                             _type: "number".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
+                            description: None,
                             _type: "string".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
+                            description: None,
                             _type: "time".to_string(),
                         },
                     ]
@@ -257,18 +292,21 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             _type: "number".to_string(),
                             agg_type: Some("number".to_string()),
                             title: None,
+                            description: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
                             _type: "string".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
+                            description: None,
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
                             _type: "time".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
+                            description: None,
                         },
                     ]
                 })
@@ -277,30 +315,35 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                         CubeMetaMeasure {
                             name: "MultiTypeCube.count".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
                             title: None,
+                            description: None,
                             _type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                         },
@@ -317,11 +360,13 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
 pub fn get_string_cube_meta() -> Vec<CubeMeta> {
     vec![CubeMeta {
         name: "StringCube".to_string(),
+        description: None,
         title: None,
         dimensions: vec![],
         measures: vec![CubeMetaMeasure {
             name: "StringCube.someString".to_string(),
             title: None,
+            description: None,
             _type: "string".to_string(),
             agg_type: Some("string".to_string()),
         }],
@@ -333,24 +378,28 @@ pub fn get_string_cube_meta() -> Vec<CubeMeta> {
 pub fn get_sixteen_char_member_cube() -> Vec<CubeMeta> {
     vec![CubeMeta {
         name: "SixteenChar".to_string(),
+        description: None,
         title: None,
         dimensions: vec![],
         measures: vec![
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar".to_string(),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_foo".to_string(),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("avg".to_string()),
             },
             CubeMetaMeasure {
                 name: "SixteenChar.sixteen_charchar_bar".to_string(),
                 title: None,
+                description: None,
                 _type: "number".to_string(),
                 agg_type: Some("count".to_string()),
             },
@@ -442,8 +491,8 @@ pub fn sql_generator(
                     (
                         "statements/select".to_string(),
                         r#"SELECT {% if distinct %}DISTINCT {% endif %}
-  {{ select_concat | map(attribute='aliased') | join(', ') }} 
-  {% if from %} 
+  {{ select_concat | map(attribute='aliased') | join(', ') }}
+  {% if from %}
 FROM (
   {{ from | indent(2) }}
 ) AS {{ from_alias }} {% endif %} {% if filter %}
@@ -565,8 +614,9 @@ async fn get_test_session_with_config_and_transport(
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
-        .create_session(protocol, "127.0.0.1".to_string(), 1234)
-        .await;
+        .create_session(protocol, "127.0.0.1".to_string(), 1234, None)
+        .await
+        .unwrap();
 
     // Populate like shims
     session.state.set_database(Some(db_name.to_string()));

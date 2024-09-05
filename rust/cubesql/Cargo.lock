@@ -126,8 +126,8 @@ checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
 
 [[package]]
 name = "arrow"
-version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=8fd2aa80114d5c0d4e6a0c370729507a4424e7b3#8fd2aa80114d5c0d4e6a0c370729507a4424e7b3"
+version = "13.0.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=a03d4eef5640e05dddf99fc2357ad6d58b5337cb#a03d4eef5640e05dddf99fc2357ad6d58b5337cb"
 dependencies = [
  "bitflags 1.3.2",
  "chrono",
@@ -188,7 +188,7 @@ checksum = "531b97fb4cd3dfdce92c35dedbfdc1f0b9d8091c8ca943d6dae340ef5012d514"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -721,7 +721,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "arrow",
  "chrono",
@@ -790,7 +790,6 @@ dependencies = [
  "regex",
  "rust_decimal",
  "serde",
- "serde_derive",
  "serde_json",
  "sha1_smol",
  "sha2",
@@ -830,7 +829,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "scratch",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -847,13 +846,13 @@ checksum = "a26acccf6f445af85ea056362561a24ef56cdc15fcc685f03aec50b9c702cb6d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -886,7 +885,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "arrow",
  "ordered-float 2.10.0",
@@ -897,7 +896,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -910,7 +909,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -921,7 +920,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=bba28d60b4a048afb18944cc0ded1141437bd7c3#bba28d60b4a048afb18944cc0ded1141437bd7c3"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -1053,9 +1052,9 @@ dependencies = [
 
 [[package]]
 name = "flatbuffers"
-version = "2.1.1"
+version = "2.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ea97b4fe4b84e2f2765449bcea21cbdb3ee28cecb88afbf38a0c2e1639f5eb5"
+checksum = "86b428b715fdbdd1c364b84573b5fdc0f84f8e423661b9f398735278bc7f2b6a"
 dependencies = [
  "bitflags 1.3.2",
  "smallvec",
@@ -1160,7 +1159,7 @@ checksum = "87750cf4b7a4c0625b1529e4c543c2182106e4dedc60a2a6455e00d212c489ac"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -1265,7 +1264,7 @@ dependencies = [
  "futures-core",
  "futures-sink",
  "http",
- "indexmap 2.1.0",
+ "indexmap 2.4.0",
  "slab",
  "tokio",
  "tokio-util",
@@ -1511,9 +1510,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "2.1.0"
+version = "2.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d530e1a18b1cb4c484e6e34556a0d948706958449fca0cab753d649f2bce3d1f"
+checksum = "93ead53efc7ea8ed3cfb0c79fc8023fbb782a5432b52830b6518941cebe6505c"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.3",
@@ -2032,8 +2031,8 @@ dependencies = [
 
 [[package]]
 name = "parquet"
-version = "11.1.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?rev=8fd2aa80114d5c0d4e6a0c370729507a4424e7b3#8fd2aa80114d5c0d4e6a0c370729507a4424e7b3"
+version = "13.0.0"
+source = "git+https://github.com/cube-js/arrow-rs.git?rev=a03d4eef5640e05dddf99fc2357ad6d58b5337cb#a03d4eef5640e05dddf99fc2357ad6d58b5337cb"
 dependencies = [
  "arrow",
  "base64 0.13.0",
@@ -2224,7 +2223,7 @@ checksum = "4359fd9c9171ec6e8c62926d6faaf553a8dc3f64e1507e76da7911b4f6a04405"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -2369,9 +2368,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.70"
+version = "1.0.86"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39278fbbf5fb4f646ce651690877f89d1c5811a3d4acb27700c1cb3cdb78fd3b"
+checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
 dependencies = [
  "unicode-ident",
 ]
@@ -2425,9 +2424,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.33"
+version = "1.0.37"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5267fca4496028628a95160fc423a33e8b2e6af8a5302579e322e4b520293cae"
+checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
 dependencies = [
  "proc-macro2",
 ]
@@ -2715,32 +2714,33 @@ checksum = "58bf37232d3bb9a2c4e641ca2a11d83b5062066f88df7fed36c28772046d65ba"
 
 [[package]]
 name = "serde"
-version = "1.0.136"
+version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce31e24b01e1e524df96f1c2fdd054405f8d7376249a5110886fb4b658484789"
+checksum = "99fce0ffe7310761ca6bf9faf5115afbc19688edd00171d81b1bb1b116c63e09"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.136"
+version = "1.0.209"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
+checksum = "a5831b979fd7b5439637af1752d535ff49f4860c0f341d1baeb6faf0f4242170"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.90",
+ "syn 2.0.76",
 ]
 
 [[package]]
 name = "serde_json"
-version = "1.0.79"
+version = "1.0.127"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e8d9fa5c3b304765ce1fd9c4c8a3de2c8db365a5b91be52f186efc675681d95"
+checksum = "8043c06d9f82bd7271361ed64f415fe5e12a77fdb52e573e7f06a516dea329ad"
 dependencies = [
- "indexmap 1.8.1",
+ "indexmap 2.4.0",
  "itoa 1.0.10",
+ "memchr",
  "ryu",
  "serde",
 ]
@@ -2934,7 +2934,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -2972,9 +2972,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.41"
+version = "2.0.76"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44c8b28c477cc3bf0e7966561e3460130e1255f7a1cf71931075f1c5e7a7e269"
+checksum = "578e081a14e0cefc3279b0472138c513f37b41a08d5a3cca9b6e4e8ceb6cd525"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3065,7 +3065,7 @@ checksum = "266b2e40bc00e5a6c09c3584011e08b06f123c00362c92b975ba9843aaaa14b8"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -3152,7 +3152,7 @@ checksum = "5b8a1e28f2deaa14e508979454cb3a223b10b938b45af148bc0986de36f1923b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -3261,7 +3261,7 @@ checksum = "34704c8d6ebcbc939824180af020566b01a7c01f80641264eba0999f6c2b6be7"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]
@@ -3834,7 +3834,7 @@ checksum = "9ce1b18ccd8e73a9321186f97e46f9f04b778851177567b1975109d26a08d2a6"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.41",
+ "syn 2.0.76",
 ]
 
 [[package]]

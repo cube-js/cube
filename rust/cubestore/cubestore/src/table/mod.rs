@@ -1,14 +1,14 @@
 use crate::util::decimal::{Decimal, Decimal96};
 use crate::util::int96::Int96;
 
-use arrow::array::{
+use datafusion::arrow::array::{
     Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, Int64Decimal0Array,
     Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array, Int64Decimal3Array,
     Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array, Int96Decimal10Array,
     Int96Decimal1Array, Int96Decimal2Array, Int96Decimal3Array, Int96Decimal4Array,
     Int96Decimal5Array, StringArray, TimestampMicrosecondArray,
 };
-use arrow::datatypes::{DataType, TimeUnit};
+use datafusion::arrow::datatypes::{DataType, TimeUnit};
 
 use chrono::{SecondsFormat, TimeZone, Utc};
 use datafusion::cube_ext::ordfloat::OrdF64;

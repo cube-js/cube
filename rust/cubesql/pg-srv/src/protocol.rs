@@ -961,6 +961,7 @@ pub enum ErrorCode {
     DuplicateCursor,
     SyntaxError,
     // Class 53 — Insufficient Resources
+    TooManyConnections,
     ConfigurationLimitExceeded,
     // Class 55 — Object Not In Prerequisite State
     ObjectNotInPrerequisiteState,
@@ -985,6 +986,7 @@ impl Display for ErrorCode {
             Self::InvalidCursorName => "34000",
             Self::DuplicateCursor => "42P03",
             Self::SyntaxError => "42601",
+            Self::TooManyConnections => "53300",
             Self::ConfigurationLimitExceeded => "53400",
             Self::ObjectNotInPrerequisiteState => "55000",
             Self::QueryCanceled => "57014",

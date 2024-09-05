@@ -1100,7 +1100,6 @@ dependencies = [
  "actix-rt",
  "anyhow",
  "arc-swap",
- "arrow",
  "async-compression",
  "async-std",
  "async-trait",
@@ -1147,7 +1146,6 @@ dependencies = [
  "msql-srv",
  "nanoid",
  "num 0.3.1",
- "parquet",
  "parquet-format",
  "parse-size",
  "paste",
@@ -1271,7 +1269,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#823422f3b2bbdcbc0b18e1ee9bf30a377dde010a"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#11027d53f93c550d86e32ebf75e3a54cef6c8546"
 dependencies = [
  "ahash",
  "arrow",

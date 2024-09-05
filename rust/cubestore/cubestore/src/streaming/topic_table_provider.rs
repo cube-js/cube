@@ -1,11 +1,11 @@
 use crate::metastore::Column;
 use crate::CubeError;
-use arrow::array::{
-    Array, StringArray, StringBuilder, TimestampMicrosecondArray, TimestampMicrosecondBuilder,
-};
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use chrono::{TimeZone, Utc};
 use chrono_tz::Tz;
+use datafusion::arrow::array::{
+    Array, StringArray, StringBuilder, TimestampMicrosecondArray, TimestampMicrosecondBuilder,
+};
+use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;

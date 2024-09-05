@@ -1,7 +1,7 @@
 use cubesql::telemetry::LogReporter;
 use log::Level;
 use neon::prelude::*;
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::spawn;

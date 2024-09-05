@@ -1,9 +1,9 @@
 use crate::queryplanner::coalesce::{coalesce, SUPPORTED_COALESCE_TYPES};
 use crate::queryplanner::hll::{Hll, HllUnion};
 use crate::CubeError;
-use arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use chrono::{TimeZone, Utc};
+use datafusion::arrow::array::{Array, BinaryArray, TimestampNanosecondArray, UInt64Builder};
+use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::cube_ext::datetime::{date_addsub_array, date_addsub_scalar};
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::functions::Signature;

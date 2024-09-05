@@ -5,7 +5,7 @@ use crate::queryplanner::udfs::{
     aggregate_kind_by_name, scalar_kind_by_name, scalar_udf_by_kind, CubeAggregateUDFKind,
     CubeScalarUDFKind,
 };
-use arrow::datatypes::{DataType, Schema};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::error::DataFusionError;
 use datafusion::execution::context::ExecutionContextState;
 use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan};
