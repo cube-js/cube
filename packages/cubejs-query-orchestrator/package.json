@@ -47,7 +47,7 @@
     "@types/generic-pool": "^3.1.9",
     "@types/ioredis": "^4.19.3",
     "@types/jest": "^27",
-    "@types/node": "^16",
+    "@types/node": "^18",
     "@types/ramda": "^0.27.32",
     "@types/redis": "^2.8.28",
     "@types/uuid": "^8.3.0",

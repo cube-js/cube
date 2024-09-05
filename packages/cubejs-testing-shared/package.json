@@ -34,7 +34,7 @@
     "@jest/globals": "^27",
     "@types/dedent": "^0.7.0",
     "@types/jest": "^27",
-    "@types/node": "^16",
+    "@types/node": "^18",
     "jest": "^27",
     "typescript": "~5.2.2"
   },
