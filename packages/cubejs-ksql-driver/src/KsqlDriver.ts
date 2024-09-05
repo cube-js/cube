@@ -323,10 +323,10 @@ export class KsqlDriver extends BaseDriver implements DriverInterface {
       streamOffset,
       selectStatement,
       streamingSource,
-      sourceTable: {
+      sourceTable: outputColumnTypes ? {
         types: sourceTableTypes,
         tableName: streamingTable
-      }
+      } : null
     };
   }
 
