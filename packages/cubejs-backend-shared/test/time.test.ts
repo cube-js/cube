@@ -33,7 +33,7 @@ describe('time', () => {
   it('time series - reach limits', () => {
     expect(() => {
       timeSeries('second', ['1970-01-01', '2021-01-02']);
-    }).toThrowError(/The count of generated date ranges for the request.*reached the limits/);
+    }).toThrowError(/The count of generated date ranges.*for the request.*is over limit/);
   });
 
   it('time series - custom: interval - 1 year, origin - 2021-01-01', () => {
@@ -175,7 +175,7 @@ describe('time', () => {
   it('time series - custom: interval - reach limits', () => {
     expect(() => {
       timeSeriesFromCustomInterval('10 minutes 15 seconds', ['1970-01-01', '2021-01-02'], moment('2021-02-01 09:59:45'));
-    }).toThrowError(/The count of generated date ranges for the request.*reached the limits/);
+    }).toThrowError(/The count of generated date ranges.*for the request.*is over limit/);
   });
 
   it('inDbTimeZone', () => {
