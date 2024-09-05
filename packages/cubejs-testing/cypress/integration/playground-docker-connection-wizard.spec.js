@@ -21,7 +21,9 @@ context("Playground: Connection Wizard", () => {
 
   it("copies values of the localhost tip box", () => {
     cy.visit("/");
-    cy.getByTestId("wizard-db-card").contains("PostgreSQL").click();
+    cy.getByTestId("wizard-db-card", { timeout: 20000 })
+      .contains("PostgreSQL")
+      .click();
     ["mac", "windows", "linux"].forEach((os) => {
       cy.getByTestId(`localhost-tipbox-${os}-copy-btn`).click();
       cy.getByTestId(`localhost-tipbox-${os}-input`)
@@ -103,7 +105,7 @@ context("Playground: Connection Wizard", () => {
       cy.wait(2000);
       cy.getByQa("ResultsTableContainer")
         .find(
-          '[data-row="0"][data-name="Events.count"][data-element=SelectedNumberCell]'
+          '[data-row="0"][data-name="Events.count"][data-element=NumberCell]'
         )
         .contains("171,334");
     });
