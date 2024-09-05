@@ -2745,10 +2745,12 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    options.paramAllocator = null;
-    return this.options.queryFactory
-      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
-      : this.newSubQuery(options);
+    if (this.options.queryFactory) {
+      options.paramAllocator = null;
+      return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
+    }
+
+    return this.newSubQuery(options);
   }
 
   subQueryOptions(options) {
