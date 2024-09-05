@@ -105,7 +105,9 @@ export class KsqlQuery extends BaseQuery {
   }
 
   public preAggregationReadOnly(cube: string, preAggregation: any) {
-    return true;
+    const [sql] = this.preAggregationSql(cube, preAggregation);
+    return preAggregation.type === 'originalSql' && Boolean(KsqlQuery.extractTableFromSimpleSelectAsteriskQuery(sql)) ||
+      preAggregation.type === 'rollup' && !!this.dimensionsForSelect().find(d => d.definition().primaryKey);
   }
 
   public preAggregationAllowUngroupingWithPrimaryKey(_cube: any, _preAggregation: any) {
