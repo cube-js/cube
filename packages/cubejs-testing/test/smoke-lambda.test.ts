@@ -1,8 +1,8 @@
 import R from 'ramda';
-import { StartedTestContainer } from 'testcontainers';
+import { StartedTestContainer, Network, StartedNetwork } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
-import { PostgresDBRunner } from '@cubejs-backend/testing-shared';
+import { PostgresDBRunner, KafkaDBRunner, KsqlDBRunner } from '@cubejs-backend/testing-shared';
 import cubejs, { CubeApi, Query } from '@cubejs-client/core';
 // eslint-disable-next-line import/no-extraneous-dependencies
 import { afterAll, beforeAll, expect, jest } from '@jest/globals';
@@ -30,6 +30,9 @@ describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
 
   let db: StartedTestContainer;
+  let network: StartedNetwork;
+  let dbKafka: StartedTestContainer;
+  let dbKsql: StartedTestContainer;
   let birdbox: BirdBox;
   let client: CubeApi;
   let postgres: any;
@@ -38,6 +41,13 @@ describe('lambda', () => {
   beforeAll(async () => {
     db = await PostgresDBRunner.startContainer({});
     await PostgresDBRunner.loadEcom(db);
+
+    network = await new Network().start();
+    dbKafka = await KafkaDBRunner.startContainer({ network });
+    dbKsql = await KsqlDBRunner.startContainer({ network });
+
+    await KsqlDBRunner.loadData(dbKsql);
+
     birdbox = await getBirdbox(
       'postgres',
       {
@@ -50,6 +60,8 @@ describe('lambda', () => {
         CUBEJS_DB_PASS: 'test',
         CUBEJS_ROLLUP_ONLY: 'true',
         CUBEJS_REFRESH_WORKER: 'false',
+        KSQL_URL: `http://${dbKsql.getHost()}:${dbKsql.getMappedPort(8088)}`,
+        KSQL_KAFKA_HOST: `${dbKafka.getHost()}:${dbKafka.getMappedPort(9093)}`,
       },
       {
         schemaDir: 'lambda/schema',
@@ -79,8 +91,40 @@ describe('lambda', () => {
   afterAll(async () => {
     await birdbox.stop();
     await db.stop();
+    await dbKafka.stop();
+    await dbKsql.stop();
+    await network.stop();
     await cubestore.release();
   }, JEST_AFTER_ALL_DEFAULT_TIMEOUT);
+
+  test('Query lambda with ksql ', async () => {
+    const query: Query = {
+      measures: ['Requests.count'],
+      dimensions: ['Requests.tenant_id', 'Requests.request_id'],
+      timeDimensions: [
+        {
+          dimension: 'Requests.timestamp',
+          granularity: 'day'
+        }
+      ],
+    };
+    // First call to trigger the pre-aggregation build
+    await client.load(query);
+    // We have to wait for cubestore to consume the data from Kafka. There is no way to know when it's done right now.
+    await pausePromise(5000);
+
+    const response = await client.load(query);
+
+    // @ts-ignore
+    expect(response.loadResponse.results[0].data.map(i => i['Requests.request_id'])).toEqual([
+      'req-2',
+      'req-1',
+      'req-stream-2'
+    ]);
+    
+    // @ts-ignore
+    expect(response.loadResponse.results[0].data.length).toEqual(3);
+  });
 
   test('query', async () => {
     const query: Query = {
