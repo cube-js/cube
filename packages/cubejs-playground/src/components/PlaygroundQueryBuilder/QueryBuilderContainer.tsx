@@ -129,7 +129,7 @@ function QueryTabsRenderer({
   ...props
 }: QueryTabsRendererProps) {
   const { location } = useHistory();
-  const { setQuery, toggleModal } = useRollupDesignerContext();
+  const { setQuery, toggleModal, isLoading } = useRollupDesignerContext();
   const { isAddRollupButtonVisible } = useCloud();
 
   const params = new URLSearchParams(location.search);
@@ -142,6 +142,7 @@ function QueryTabsRenderer({
         <Space direction="horizontal">
           <Button
             data-testid="security-context-btn"
+            isLoading={isLoading}
             icon={<LockIcon />}
             size="small"
             type={securityContextToken ? 'primary' : 'secondary'}
@@ -153,6 +154,7 @@ function QueryTabsRenderer({
           {isAddRollupButtonVisible == null || isAddRollupButtonVisible ? (
             <Button
               data-testid="rd-btn"
+              isLoading={isLoading}
               icon={<ThunderboltIcon />}
               size="small"
               onPress={() => toggleModal()}

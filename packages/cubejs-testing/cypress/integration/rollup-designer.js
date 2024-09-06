@@ -14,6 +14,7 @@ context("Playground: Rollup Designer", () => {
     it("opens the Rollup Designer without running a query", () => {
       cy.setQuery(ordersCountQuery);
 
+      cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.getByTestId("rd-btn").click();
       cy.getByTestId("rd-modal").should("be.visible");
       cy.getByTestId("rd-query-tab").should("exist");
@@ -34,6 +35,7 @@ context("Playground: Rollup Designer", () => {
     it("opens the Rollup Designer with an empty query", () => {
       cy.setQuery({});
 
+      cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.getByTestId("rd-btn").click();
       cy.getByTestId("rd-modal").should("be.visible");
 
@@ -42,6 +44,7 @@ context("Playground: Rollup Designer", () => {
 
     it("opens the Rollup Designer after running a query", () => {
       cy.setQuery(ordersCountQuery);
+      cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.runQuery();
 
       cy.getByTestId("not-pre-agg-query-btn").click();
@@ -57,6 +60,7 @@ context("Playground: Rollup Designer", () => {
     it("applies settings", () => {
       cy.setQuery(ordersCountQuery);
 
+      cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.getByTestId("rd-btn").click();
       cy.wait(500);
       cy.getByTestId("rd-settings-tab").click();
