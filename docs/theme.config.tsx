@@ -106,6 +106,16 @@ const config: DocsThemeConfig = {
         </BlogButton>
       </div>
     )
+  },
+  toc: {
+    extraContent: (
+      <div>
+        <br/>
+        <a target="_blank" href="https://cube.dev/events/cube-rollup-london?ref=github-readme">
+          <img src="https://ucarecdn.com/f90c6d06-abac-45d5-92be-4217ee26f096/"/>
+        </a>
+      </div>
+    )
   }
 };
 
