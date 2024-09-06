@@ -11,7 +11,6 @@ import { RetryLink } from '@apollo/client/link/retry';
 import { Alert, Block, Button, Grid, tasty } from '@cube-dev/ui-kit';
 import { useEffect, useMemo, useState } from 'react';
 
-import { useDeepMemo } from './hooks';
 import { useQueryBuilderContext } from './context';
 import { convertJsonQueryToGraphQL } from './utils';
 import { CopyButton } from './components/CopyButton';
@@ -56,7 +55,6 @@ export function QueryBuilderGraphQL() {
   const {
     query,
     isQueryTouched,
-    joinedMembers,
     queryHash,
     isQueryEmpty,
     apiUrl,
@@ -65,7 +63,7 @@ export function QueryBuilderGraphQL() {
   } = useQueryBuilderContext();
   const [isFetching, setIsFetching] = useState(false);
 
-  const gqlQuery = useDeepMemo(() => {
+  const gqlQuery = useMemo(() => {
     if (isQueryEmpty || !meta) {
       return 'query { __typename }'; // Empty query
     }
@@ -152,7 +150,9 @@ export function QueryBuilderGraphQL() {
               <ScrollableCodeContainer
                 value={
                   queryError
-                    ? queryError.toString()
+                    ? // @ts-ignore
+                      queryError?.networkError?.result?.error ??
+                      queryError.toString()
                     : JSON.stringify(cleanedRawData, null, 2)
                 }
               />
@@ -161,5 +161,13 @@ export function QueryBuilderGraphQL() {
         </Grid>
       </TabPaneWithToolbar>
     );
-  }, [rawData, gqlQuery, isFetching, isQueryTouched]);
+  }, [
+    cleanedRawData,
+    gqlQuery,
+    isFetching,
+    query,
+    isQueryEmpty,
+    rawData,
+    isLoading,
+  ]);
 }
