@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use arrow::array::*;
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -13,6 +11,8 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, TimeZone, Utc};
+use datafusion::arrow::array::*;
+use datafusion::arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -4261,7 +4261,7 @@ mod tests {
                         sum(value) value
                         from (
                             select * from test.test
-                            union all 
+                            union all
                             select * from test.test1
                             )
                         group by 1, 2

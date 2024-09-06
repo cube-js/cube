@@ -2,7 +2,7 @@ use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
 use itertools::Itertools;
-use serde_derive::Serialize;
+use serde::Serialize;
 
 use crate::sql::ColumnType;
 

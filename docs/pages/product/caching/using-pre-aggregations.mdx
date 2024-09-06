@@ -5,10 +5,22 @@ redirect_from:
 
 # Using pre-aggregations
 
+Pre-aggregations is an implementation of aggregate awareness in Cube.
+Pre-aggregation tables are materialized query results. 
+Cube can analyze queries against a defined set of pre-aggregation rules to 
+choose the optimal one that will be used to serve a given Cube query instead of going to the data source.
+
+If Cube finds a suitable pre-aggregation rule, database querying becomes a
+multi-stage process:
+
+1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
+
+2.  Cube will execute a query against the pre-aggregated tables instead of the
+    raw data.
+
 Pre-aggregations is a powerful way to speed up your Cube queries. There are many
-configuration options to consider. Please make sure to also check [the
-Pre-Aggregations reference in the data modeling
-section][ref-schema-ref-preaggs].
+configuration options to consider. Please make sure to check the
+[configuration reference][ref-schema-ref-preaggs].
 
 ## Matching queries
 
@@ -981,6 +993,17 @@ access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
 ## Troubleshooting
+
+### Unused pre-aggregations
+
+You might find that a pre-aggregation is ignored by Cube. Possible reasons:
+
+* A pre-aggregation does not reference any dimensions or measures from a cube
+where this pre-aggreation is [defined][ref-schema-ref-preaggs]. To resolve,
+move it to another cube.
+* A pre-aggregation is defined similarly to another pre-aggregation that has
+more granular [partitions](#partitioning). To resolve, remove one of these
+pre-aggregations.
 
 ### Members with unknown types
 

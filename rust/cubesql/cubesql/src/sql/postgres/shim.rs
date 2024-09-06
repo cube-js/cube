@@ -1040,7 +1040,7 @@ impl AsyncPostgresShim {
                     .await?;
 
                 let plan = convert_statement_to_cube_query(
-                    &prepared_statement,
+                    prepared_statement,
                     meta,
                     self.session.clone(),
                     &mut None,
@@ -1132,10 +1132,10 @@ impl AsyncPostgresShim {
             .await?;
 
         let stmt_replacer = StatementPlaceholderReplacer::new();
-        let hacked_query = stmt_replacer.replace(&query)?;
+        let hacked_query = stmt_replacer.replace(query.clone())?;
 
         let plan = convert_statement_to_cube_query(
-            &hacked_query,
+            hacked_query,
             meta,
             self.session.clone(),
             qtrace,
@@ -1393,7 +1393,7 @@ impl AsyncPostgresShim {
                 })?;
 
                 let plan = convert_statement_to_cube_query(
-                    &cursor.query,
+                    cursor.query.clone(),
                     meta,
                     self.session.clone(),
                     qtrace,
@@ -1475,7 +1475,7 @@ impl AsyncPostgresShim {
                 let select_stmt = Statement::Query(query);
                 // It's just a verification that we can compile that query.
                 let _ = convert_statement_to_cube_query(
-                    &select_stmt,
+                    select_stmt.clone(),
                     meta.clone(),
                     self.session.clone(),
                     &mut None,
@@ -1648,7 +1648,7 @@ impl AsyncPostgresShim {
             }
             other => {
                 let plan = convert_statement_to_cube_query(
-                    &other,
+                    other,
                     meta.clone(),
                     self.session.clone(),
                     qtrace,

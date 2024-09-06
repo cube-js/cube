@@ -6,7 +6,7 @@ pub use plan::materialize_topk;
 pub use plan::plan_topk;
 
 use crate::queryplanner::planning::Snapshots;
-use arrow::compute::SortOptions;
+use datafusion::arrow::compute::SortOptions;
 use datafusion::logical_plan::{DFSchemaRef, Expr, LogicalPlan, UserDefinedLogicalNode};
 use itertools::Itertools;
 use serde::Deserialize;

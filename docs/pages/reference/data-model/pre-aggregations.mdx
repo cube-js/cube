@@ -6,25 +6,16 @@ redirect_from:
 
 # Pre-aggregations
 
-Pre-aggregations is an implementation of aggregate awareness in Cube.
-Pre-aggregation tables are materialized query results. 
-Cube can analyze queries against a defined set of pre-aggregation rules to 
-choose the optimal one that will be used to serve a given Cube query instead of going to the data source.
+[Pre-aggregations][ref-pre-aggs] can be defined using the `pre_aggregations`
+parameter of a [cube][ref-ref-cubes].
 
-If Cube finds a suitable pre-aggregation rule, database querying becomes a
-multi-stage process:
+Pre-aggregations must have, at minimum, a [name](#name) and a [type](#type).
+Pre-aggregations must include all dimensions and measures you will query with.
 
-1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
-
-2.  Cube will execute a query against the pre-aggregated tables instead of the
-    raw data.
-
-Pre-aggregations can be defined in the `pre_aggregations` available on each
-cube. A more in-depth diagram detailing how pre-aggregations are selected can be
-[found here][ref-caching-preaggs-selecting-preaggs].
-
-Pre-aggregations must have, at minimum, a name and a type. Pre-aggregations must
-include all dimensions, measures, and filters you will query with.
+A pre-aggregation is typically placed in a cube that defines most of dimensions
+and measures that this pre-aggregation includes. If a pre-aggregation doesn't
+include any dumensions or measures from a cube it's defined in, this
+pre-aggregation is be ignored.
 
 ## Parameters
 
@@ -1722,8 +1713,6 @@ cubes:
 [ref-caching-partitioning]: /product/caching/using-pre-aggregations#partitioning
 [ref-caching-preaggs-target]:
   /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries
-[ref-caching-preaggs-selecting-preaggs]:
-  /product/caching/getting-started-pre-aggregations#ensuring-pre-aggregations-are-targeted-by-queries-selecting-the-pre-aggregation
 [ref-config-downstream-superset]:
   /product/configuration/visualization-tools/superset
 [ref-config-driverfactory]: /config/#driver-factory
@@ -1757,3 +1746,5 @@ cubes:
   https://en.wikipedia.org/wiki/Aggregate_function#Decomposable_aggregate_functions
 [ref-indexes]: /product/caching/using-pre-aggregations#using-indexes
 [ref-aggregating-indexes]: /product/caching/using-pre-aggregations#aggregating-indexes
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
+[ref-ref-cubes]: /reference/data-model/cube
