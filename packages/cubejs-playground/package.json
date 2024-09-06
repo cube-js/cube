@@ -14,8 +14,9 @@
     "unit": "vitest run",
     "dev": "vite",
     "watch": "tsc --noEmit false --watch",
+    "build:lib": "yarn build:vizard && tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
+    "build:vizard": "cd ../vizard && yarn build",
     "build": "tsc && yarn build:playground && yarn build:lib",
-    "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },
   "browserslist": [

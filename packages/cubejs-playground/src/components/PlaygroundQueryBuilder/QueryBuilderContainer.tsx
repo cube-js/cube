@@ -20,6 +20,8 @@ import {
   QueryBuilderProps,
   RequestStatusProps,
 } from '../../QueryBuilderV2/index';
+import Vizard from '../Vizard/Vizard';
+
 import { PreAggregationStatus } from './components/index';
 
 const StyledCard = styled(Card)`
@@ -179,6 +181,7 @@ function QueryTabsRenderer({
             schemaVersion={props.schemaVersion}
             extra={props.extra ?? null}
             RequestStatusComponent={RequestStatusComponent}
+            VizardComponent={Vizard}
             onSchemaChange={props.onSchemaChange}
             onQueryChange={(data) => {
               saveTab(data);

@@ -1,0 +1,61 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgb(20, 20, 70);
+  background-color: white;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: stretch;
+  place-content: stretch;
+  width: 100vw;
+  height: 100vh;
+}
+
+iframe {
+  border: none;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Monaco Editor */
+.monaco-editor.monaco-editor {
+  position: absolute !important;
+
+  .view-overlays .current-line {
+    background-color: rgba(var(--purple-color-rgb), .08);
+    border: none;
+  }
+
+  .margin-view-overlays .line-numbers {
+    color: rgba(var(--dark-color-rgb), .50);
+  }
+
+  .margin-view-overlays .current-line + .line-numbers, .margin-view-overlays .current-line + .cldr + .line-numbers {
+    color: rgba(var(--dark-color-rgb), 1);
+  }
+
+  .margin-view-overlays .current-line {
+    background-color: rgba(var(--purple-color-rgb), .08);
+  }
+
+  .bracket-match {
+    border: none;
+    background: var(--pink-8-color);
+  }
+
+  .scroll-decoration {
+    box-shadow: #eee 0 6px 6px -6px inset;
+  }
+}

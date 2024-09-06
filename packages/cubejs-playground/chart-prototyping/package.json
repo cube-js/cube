@@ -1,0 +1,45 @@
+{
+  "name": "vizard-preview",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "yarn prepare && vite",
+    "build": "yarn prepare && tsc && vite build && mv ./build ../public/vizard",
+    "prepare": "node ./convert-apps.js && node ./build-apps.js",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "@ant-design/icons": "^5.3.6",
+    "@cube-dev/ui-kit": "^0.33.2",
+    "@cubejs-client/core": "^0.35.0",
+    "@cubejs-client/react": "^0.35.0",
+    "archiver": "^7.0.1",
+    "minimatch": "^9.0.3",
+    "monaco-editor": "^0.44.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-monaco-editor": "^0.55.0",
+    "react-router-dom": "^6.22.3",
+    "styled-components": "^6.1.8",
+    "toml": "^3.0.0",
+    "vite-plugin-environment": "^1.1.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.64",
+    "@types/react-dom": "^18.2.21",
+    "@typescript-eslint/eslint-plugin": "^7.1.1",
+    "@typescript-eslint/parser": "^7.1.1",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.57.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "prettier": "^3.2.5",
+    "typescript": "^5.2.2",
+    "vite": "^5.1.6"
+  }
+}
