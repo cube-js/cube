@@ -132,4 +132,10 @@ export class Granularity {
       return 'year';
     }
   }
+
+  public isNaturalAligned(): boolean {
+    const intParsed = this.granularityInterval.split(' ');
+
+    return !(intParsed.length !== 2 || intParsed[0] !== '1');
+  }
 }

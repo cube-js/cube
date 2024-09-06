@@ -123,7 +123,6 @@ const BaseDimensionWithoutSubQuery = {
         }),
         Joi.object().keys({
           interval: GranularityInterval.required().custom((value, helper) => {
-            // const isValid = isGranularityNaturalAligned(value);
             const intParsed = value.split(' ');
             const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
 

@@ -2766,7 +2766,7 @@ export class BaseQuery {
     let dtDate;
 
     // Interval is aligned with natural calendar, so we can use DATE_TRUNC
-    if (this.isGranularityNaturalAligned(granularity.granularityInterval)) {
+    if (granularity.isNaturalAligned()) {
       if (granularity.granularityOffset) {
         // Example: DATE_TRUNC(interval, dimension - INTERVAL 'offset') + INTERVAL 'offset'
         dtDate = this.subtractInterval(dimension, granularity.granularityOffset);
@@ -2780,17 +2780,6 @@ export class BaseQuery {
     }
 
     return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
-  }
-
-  /**
-   * @protected
-   * @param {string} interval
-   * @returns {boolean}
-   */
-  isGranularityNaturalAligned(interval) {
-    const intParsed = interval.split(' ');
-
-    return !(intParsed.length !== 2 || intParsed[0] !== '1');
   }
 
   /**
