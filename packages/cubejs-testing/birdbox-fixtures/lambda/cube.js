@@ -15,7 +15,7 @@ module.exports = {
       return 'postgres';
     }
 
-    return dataSource;
+    return dataSource || 'postgres';
   },
   driverFactory: async ({ dataSource }) => {
     if (dataSource === "ksql") {
