@@ -775,7 +775,6 @@ dependencies = [
  "hashbrown 0.14.3",
  "insta",
  "itertools",
- "lazy_static",
  "log",
  "lru",
  "minijinja",
