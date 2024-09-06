@@ -1,12 +1,14 @@
 use crate::{compile::DatabaseProtocolDetails, sql::SessionState, CubeError};
 use arc_swap::ArcSwap;
 use log::{Level, LevelFilter};
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    sync::{Arc, LazyLock},
+};
 
-lazy_static! {
-    static ref REPORTER: ArcSwap<Box<dyn LogReporter>> =
-        ArcSwap::from_pointee(Box::new(LocalReporter::new()));
-}
+static REPORTER: LazyLock<ArcSwap<Box<dyn LogReporter>>> =
+    LazyLock::new(|| ArcSwap::from_pointee(Box::new(LocalReporter::new())));
 
 pub trait LogReporter: Send + Sync + Debug {
     fn log(&self, event: String, properties: HashMap<String, String>, level: Level);
