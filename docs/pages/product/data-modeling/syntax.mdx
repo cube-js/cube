@@ -111,10 +111,6 @@ cubes:
       - name: status
         sql: "UPPER(status)"
         type: string
-
-
-
-
 ```
 
 ```javascript
@@ -176,7 +172,7 @@ cube(`orders`, {
 
 ## References
 
-To write reusable data models, it is important to be able to reference
+To write versatile data models, it is important to be able to reference
 members of cubes and views, such as measures or dimensions, as well as
 table columns. Cube supports the following syntax for references.
 
@@ -197,8 +193,6 @@ cubes:
       - name: name
         sql: name
         type: string
-
-
 ```
 
 ```javascript
@@ -246,10 +240,6 @@ cubes:
       - name: full_name
         sql: "CONCAT({name}, ' ', {surname})"
         type: string
-
-
-
-
 ```
 
 ```javascript
@@ -280,6 +270,71 @@ cube(`users`, {
 This syntax works great for simple use cases. However, there are cases
 (like [subquery][ref-subquery]) when you'd like to reference members of
 other cubes. See below how to do that.
+
+### `{time_dimension.granularity}`
+
+When referencing a [time dimension][ref-time-dimension], you can specificy a
+granularity to refer to a time value with that specific granularity. It can be
+one of the [default granularities][ref-default-granularities] (e.g., `year` or
+`week`) or a [custom granularity][ref-custom-granularities]:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+        granularities:
+          - name: sunday_week
+            interval: 1 week
+            offset: -1 day
+
+      - name: created_at__year
+        sql: "{created_at.year}"
+        type: time
+
+      - name: created_at__sunday_week
+        sql: "{created_at.sunday_week}"
+        type: time
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+
+      granularities: {
+        sunday_week: {
+          interval: `1 week`,
+          offset: `-1 day`
+        }
+      }
+    },
+
+    created_at__year: {
+      sql: `${created_at.year}`,
+      type: `time`
+    },
+
+    created_at__sunday_week: {
+      sql: `${created_at.sunday_week}`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeTabs>
 
 ### `{cube}.column`, `{cube.member}`
 
@@ -320,15 +375,6 @@ cubes:
       - name: name
         sql: "{contacts}.name"
         type: string
-
-
-
-
-
-
-
-
-
 ```
 
 ```javascript
@@ -465,15 +511,6 @@ cubes:
       - name: name
         sql: "{CUBE}.name"
         type: string
-
-
-
-
-
-
-
-
-
 ```
 
 </CodeTabs>
@@ -528,10 +565,6 @@ cubes:
           - CUBE.status
         measures:
           - CUBE.count
-
-
-
-
 ```
 
 ```javascript
@@ -587,3 +620,6 @@ defining dynamic data models.
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
 [link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
+[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
+[ref-custom-granularities]: /reference/data-model/dimensions#granularities

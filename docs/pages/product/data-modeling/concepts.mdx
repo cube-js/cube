@@ -296,12 +296,13 @@ granularity*.
 The following granularities are available by default for any time dimension:
 `year`, `quarter`, `month`, `week` (starting on Monday), `day`, `hour`, `minute`,
 `second`. You can also define [custom granularities][ref-ref-dimension-granularities]
-and optionally expose them via **proxy dimensions** in case you need to use weeks
-starting on Sunday, fiscal years, etc.
+and optionally expose them via [proxy dimensions][ref-proxy-granularity] in case
+you need to use weeks starting on Sunday, fiscal years, etc.
 
 <ReferenceBox>
 
-See **this recipe** for more custom granularity examples.
+See [this recipe][ref-custom-granularity-recipe] for more custom granularity
+examples.
 
 </ReferenceBox>
 
@@ -728,3 +729,5 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster
 [ref-ref-time-dimensions]: /reference/data-model/types-and-formats#time-1
 [ref-ref-dimension-granularities]: /reference/data-model/dimensions#granularities
+[ref-custom-granularity-recipe]: /guides/recipes/data-modeling/custom-granularity
+[ref-proxy-granularity]: /product/data-modeling/concepts/calculated-members#time-dimension-granularity

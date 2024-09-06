@@ -92,8 +92,76 @@ FROM (
 
 ## Proxy dimensions
 
-**Proxy dimensions reference dimensions from other cubes.** Proxy dimensions provide
-a way to reference some dimensions as if they were defined in multiple cubes.
+**Proxy dimensions reference dimensions from the same cube or other cubes.**
+Proxy dimensions are convenient for reusing existing dimensions when definiting
+new ones.
+
+### Members of the same cube
+
+If you have a dimension with a non-trivial definition, you can reference that
+dimension to reuse the existing definition and reduce code duplication.
+
+In the following example, the `full_name` dimension references `initials` and
+`last_name` dimensions of the same cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: initials
+        sql: "SUBSTR(first_name, 1, 1)"
+        type: string
+
+      - name: last_name
+        sql: "UPPER(last_name)"
+        type: string
+
+      - name: full_name
+        sql: "{initials} || '. ' || {last_name}"
+        type: string
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    initials: {
+      sql: `SUBSTR(first_name, 1, 1)`,
+      type: `string`
+    },
+
+    last_name: {
+      sql: `UPPER(last_name)`,
+      type: `string`
+    },
+
+    full_name: {
+      sql: `${initials} || '. ' || ${last_name}`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If you query for `users.full_name`, Cube will generate the following SQL:
+
+```sql
+SELECT
+  SUBSTR(first_name, 1, 1) || '. ' || UPPER(last_name) "users__full_name"
+FROM
+  users AS "users"
+GROUP BY
+  1
+```
+
+### Members of other cubes
 
 If you have `first_cube` that is [joined][ref-joins] to `second_cube`, you can use a
 proxy dimension to bring `second_cube.dimension` to `first_cube` as `dimension` (or
@@ -227,6 +295,71 @@ FROM (
 ) AS "users"
 GROUP BY 1
 ```
+
+### Time dimension granularity
+
+When referencing a [time dimension][ref-time-dimension] of the same or another
+cube, you can specificy a granularity to refer to a time value with that specific
+granularity. It can be one of the [default granularities][ref-default-granularities]
+(e.g., `year` or `week`) or a [custom granularity][ref-custom-granularities]:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: users
+    sql_table: users
+
+    dimensions:
+      - name: created_at
+        sql: created_at
+        type: time
+
+        granularities:
+          - name: sunday_week
+            interval: 1 week
+            offset: -1 day
+
+      - name: created_at__year
+        sql: "{created_at.year}"
+        type: time
+
+      - name: created_at__sunday_week
+        sql: "{created_at.sunday_week}"
+        type: time
+```
+
+```javascript
+cube(`users`, {
+  sql_table: `users`,
+
+  dimensions: {
+    created_at: {
+      sql: `created_at`,
+      type: `time`,
+
+      granularities: {
+        sunday_week: {
+          interval: `1 week`,
+          offset: `-1 day`
+        }
+      }
+    },
+
+    created_at__year: {
+      sql: `${created_at.year}`,
+      type: `time`
+    },
+
+    created_at__sunday_week: {
+      sql: `${created_at.sunday_week}`,
+      type: `time`
+    }
+  }
+})
+```
+
+</CodeTabs>
 
 ## Subquery dimensions
 
@@ -406,6 +539,8 @@ GROUP BY 1, 2
 [ref-decomposition-recipe]: /guides/recipes/query-acceleration/non-additivity#decomposing-into-a-formula-with-additive-measures
 [ref-nested-aggregates-recipe]: /guides/recipes/data-modeling/nested-aggregates
 [ref-non-additive]: /product/data-modeling/concepts#measure-additivity
-
 [link-postgres-division]: https://www.postgresql.org/docs/current/functions-math.html#FUNCTIONS-MATH
 [wiki-correlated-subquery]: https://en.wikipedia.org/wiki/Correlated_subquery
+[ref-time-dimension]: /reference/data-model/types-and-formats#time-1
+[ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
+[ref-custom-granularities]: /reference/data-model/dimensions#granularities
