@@ -32,8 +32,16 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use std::{
-    any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
-    pin::Pin, result, sync::Arc,
+    any::Any,
+    cmp::min,
+    collections::HashMap,
+    convert::TryInto,
+    fmt,
+    future::Future,
+    iter,
+    pin::Pin,
+    result,
+    sync::{Arc, LazyLock},
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -260,9 +268,7 @@ pub struct SqlGenerationResult {
     pub request: TransportLoadRequestQuery,
 }
 
-lazy_static! {
-    static ref DATE_PART_REGEX: Regex = Regex::new("^[A-Za-z_ ]+$").unwrap();
-}
+static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
 
 macro_rules! generate_sql_for_timestamp {
     (@generic $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
