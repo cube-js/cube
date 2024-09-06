@@ -97,9 +97,13 @@ export function QueryBuilderGraphQL() {
     fetchPolicy: 'network-only',
   });
 
-  if (rawData) {
-    cleanServiceKeys(rawData);
-  }
+  const cleanedRawData = useMemo(() => {
+    if (rawData) {
+      return cleanServiceKeys(JSON.parse(JSON.stringify(rawData)));
+    }
+
+    return rawData;
+  }, [rawData]);
 
   useEffect(() => {
     if (isQueryTouched) {
@@ -149,7 +153,7 @@ export function QueryBuilderGraphQL() {
                 value={
                   queryError
                     ? queryError.toString()
-                    : JSON.stringify(rawData, null, 2)
+                    : JSON.stringify(cleanedRawData, null, 2)
                 }
               />
             </Container>
