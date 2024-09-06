@@ -788,7 +788,6 @@ dependencies = [
  "futures-util",
  "hashbrown 0.14.3",
  "itertools",
- "lazy_static",
  "log",
  "lru",
  "minijinja",
