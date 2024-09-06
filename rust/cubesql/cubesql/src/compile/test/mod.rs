@@ -915,14 +915,10 @@ impl TestContext {
     }
 }
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: std::sync::RwLock<bool> =
-        std::sync::RwLock::new(false);
-}
+static TEST_LOGGING_INITIALIZED: std::sync::Once = std::sync::Once::new();
 
 pub fn init_testing_logger() {
-    let mut initialized = TEST_LOGGING_INITIALIZED.write().unwrap();
-    if !*initialized {
+    TEST_LOGGING_INITIALIZED.call_once(|| {
         let log_level = log::Level::Trace;
         let logger = simple_logger::SimpleLogger::new()
             .with_level(log::Level::Error.to_level_filter())
@@ -933,8 +929,7 @@ pub fn init_testing_logger() {
 
         log::set_boxed_logger(Box::new(logger)).unwrap();
         log::set_max_level(log_level.to_level_filter());
-        *initialized = true;
-    }
+    });
 }
 
 pub async fn convert_select_to_query_plan_customized(
