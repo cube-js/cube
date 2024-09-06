@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
+import { BaseQuery, PostgresQuery, MssqlQuery, UserError, CubeStoreQuery } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
 import {
   createCubeSchema,
@@ -432,7 +432,6 @@ describe('SQL Generation', () => {
           const query = new PostgresQuery(compilers, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
-          console.log('Generated query: ', queryString);
 
           expect(queryString.includes('undefined')).toBeFalsy();
           if (q.measures[0].includes('count')) {
@@ -450,7 +449,6 @@ describe('SQL Generation', () => {
           const query = new PostgresQuery(compilers, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
-          console.log('Generated query: ', queryString);
 
           expect(queryString.includes('undefined')).toBeFalsy();
           if (q.dimensions[0].includes('PredefinedYear')) {
@@ -459,6 +457,31 @@ describe('SQL Generation', () => {
             expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
           } else {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          }
+        });
+      });
+    });
+
+    describe('via CubeStoreQuery', () => {
+      beforeAll(async () => {
+        await compilers.compiler.compile();
+      });
+
+      granularityQueries.forEach(q => {
+        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
+          const query = new CubeStoreQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+
+          if (q.measures[0].includes('count')) {
+            expect(queryString.includes('DATE_BIN(INTERVAL')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'6 MONTH\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
+            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'2 DAY\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
+            expect(queryString.includes('date_trunc(\'day\'')).toBeTruthy();
+            expect(queryString.includes('INTERVAL \'3 DAY\'')).toBeTruthy();
           }
         });
       });
@@ -1297,7 +1320,6 @@ describe('SQL Generation', () => {
         ],
       });
       const cubeSQL = query.cubeSql('Order');
-      console.log('TEST: ', cubeSQL);
       expect(cubeSQL).toContain('select * from order where ((type = $0$))');
     });
   });
