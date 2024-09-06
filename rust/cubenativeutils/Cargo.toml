@@ -23,3 +23,16 @@ convert_case = "0.6.0"
 version = "=1"
 default-features = false
 features = ["napi-1", "napi-4", "napi-6", "futures"]
+
+# Code in cubenativeutils crate is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+clone_on_copy = "allow"
+len_without_is_empty = "allow"
+module_inception = "allow"
+multiple_bound_locations = "allow"
+result_large_err = "allow"
+unnecessary_cast = "allow"
+useless_format = "allow"

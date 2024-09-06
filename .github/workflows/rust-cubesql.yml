@@ -57,6 +57,10 @@ jobs:
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
+      - name: Clippy cubenativeutils
+        run: cd rust/cubenativeutils && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
+      - name: Clippy cubesqlplanner
+        run: cd rust/cubesqlplanner && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster
