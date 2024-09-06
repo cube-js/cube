@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
 use regex::Regex;
 use sqlparser::{
@@ -36,9 +36,9 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-lazy_static! {
-    static ref SIGMA_WORKAROUND: Regex = Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap();
-}
+static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
+});
 
 pub fn parse_sql_to_statements(
     query: &String,
