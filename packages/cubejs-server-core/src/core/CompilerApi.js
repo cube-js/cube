@@ -129,7 +129,7 @@ export class CompilerApi {
   async getSqlGenerator(query, dataSource) {
     const dbType = await this.getDbType(dataSource);
     const compilers = await this.getCompilers({ requestId: query.requestId });
-    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource);
+    let sqlGenerator = await this.createQueryByDataSource(compilers, query, dataSource, dbType);
 
     if (!sqlGenerator) {
       throw new Error(`Unknown dbType: ${dbType}`);
@@ -142,7 +142,8 @@ export class CompilerApi {
       sqlGenerator = await this.createQueryByDataSource(
         compilers,
         query,
-        dataSource
+        dataSource,
+        _dbType
       );
 
       if (!sqlGenerator) {
@@ -203,8 +204,10 @@ export class CompilerApi {
     return cubeEvaluator.scheduledPreAggregations();
   }
 
-  async createQueryByDataSource(compilers, query, dataSource) {
-    const dbType = await this.getDbType(dataSource);
+  async createQueryByDataSource(compilers, query, dataSource, dbType) {
+    if (!dbType) {
+      dbType = await this.getDbType(dataSource);
+    }
 
     return this.createQuery(compilers, dbType, this.getDialectClass(dataSource, dbType), query);
   }

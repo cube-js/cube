@@ -46,7 +46,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt::Display,
     ops::{Index, IndexMut},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 pub struct MemberRules {
@@ -2857,27 +2857,30 @@ pub fn add_member_error(
     ]))
 }
 
-lazy_static! {
-    static ref STANDARD_GRANULARITIES_PARENTS: HashMap<&'static str, Vec<&'static str>> = [
-        (
-            "year",
-            vec!["year", "quarter", "month", "day", "hour", "minute", "second"]
-        ),
-        (
-            "quarter",
-            vec!["quarter", "month", "day", "hour", "minute", "second"]
-        ),
-        ("month", vec!["month", "day", "hour", "minute", "second"]),
-        ("week", vec!["week", "day", "hour", "minute", "second"]),
-        ("day", vec!["day", "hour", "minute", "second"]),
-        ("hour", vec!["hour", "minute", "second"]),
-        ("minute", vec!["minute", "second"]),
-        ("second", vec!["second"]),
-    ]
-    .iter()
-    .cloned()
-    .collect();
-}
+static STANDARD_GRANULARITIES_PARENTS: LazyLock<HashMap<&'static str, Vec<&'static str>>> =
+    LazyLock::new(|| {
+        [
+            (
+                "year",
+                vec![
+                    "year", "quarter", "month", "day", "hour", "minute", "second",
+                ],
+            ),
+            (
+                "quarter",
+                vec!["quarter", "month", "day", "hour", "minute", "second"],
+            ),
+            ("month", vec!["month", "day", "hour", "minute", "second"]),
+            ("week", vec!["week", "day", "hour", "minute", "second"]),
+            ("day", vec!["day", "hour", "minute", "second"]),
+            ("hour", vec!["hour", "minute", "second"]),
+            ("minute", vec!["minute", "second"]),
+            ("second", vec!["second"]),
+        ]
+        .iter()
+        .cloned()
+        .collect()
+    });
 
 pub fn min_granularity(granularity_a: &String, granularity_b: &String) -> Option<String> {
     let granularity_a = granularity_a.to_lowercase();

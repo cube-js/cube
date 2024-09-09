@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.80](https://github.com/cube-js/cube/compare/v0.35.79...v0.35.80) (2024-09-09)
+
+
+### Bug Fixes
+
+* **schema-compiler:** propagate FILTER_PARAMS from view to inner cube's SELECT ([#8466](https://github.com/cube-js/cube/issues/8466)) ([c0466fd](https://github.com/cube-js/cube/commit/c0466fde9b7a3834159d7ec592362edcab6d9795))
+
+
+
+
+
 ## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
 
 **Note:** Version bump only for package @cubejs-backend/server-core

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/dremio-driver",
   "description": "Cube.js Dremio driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.79",
+  "version": "0.35.80",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.67",
-    "@cubejs-backend/schema-compiler": "^0.35.79",
+    "@cubejs-backend/schema-compiler": "^0.35.80",
     "@cubejs-backend/shared": "^0.35.67",
     "axios": "^0.21.1",
     "moment-timezone": "^0.5.31",

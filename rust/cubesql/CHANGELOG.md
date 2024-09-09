@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.80](https://github.com/cube-js/cube/compare/v0.35.79...v0.35.80) (2024-09-09)
+
+
+### Features
+
+* **cubesql:** Fill pg_description table with cube and members descriptions ([#8618](https://github.com/cube-js/cube/issues/8618)) ([2288c18](https://github.com/cube-js/cube/commit/2288c18bf30d1f3a3299b235fe9b4405d2cb7463))
+* **cubesql:** Support join with type coercion ([#8608](https://github.com/cube-js/cube/issues/8608)) ([46b3a36](https://github.com/cube-js/cube/commit/46b3a36936f0f00805144714f0dd87a3c50a5e0a))
+
+
+
+
+
 ## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
 
 **Note:** Version bump only for package @cubejs-backend/cubesql
