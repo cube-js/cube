@@ -571,8 +571,9 @@ export class CubeSymbols {
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          cube[refProperty].granularities &&
-          cube[refProperty].granularities[propertyName]) {
+          ((cube[refProperty].granularities && cube[refProperty].granularities[propertyName]) ||
+           (typeof propertyName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(propertyName))
+          )) {
           return {
             toString: () => this.withSymbolsCallContext(
               () => sqlResolveFn(cube[refProperty], cubeName, refProperty, propertyName),
