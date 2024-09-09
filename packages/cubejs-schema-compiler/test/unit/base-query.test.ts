@@ -313,6 +313,44 @@ describe('SQL Generation', () => {
         filters: [],
         timezone: 'Europe/Kyiv'
       },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtPredefinedYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.createdAtPredefinedQuarter'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
     ];
 
     it('Test time series with different granularities', async () => {
@@ -374,8 +412,14 @@ describe('SQL Generation', () => {
           const queryString = queryAndParams[0];
           console.log('Generated query: ', queryString);
 
-          expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
-          expect(queryString.includes('count("orders".id')).toBeTruthy();
+          if (q.dimensions[0].includes('PredefinedYear')) {
+            expect(queryString.includes('date_trunc(\'year\'')).toBeTruthy();
+          } else if (q.dimensions[0].includes('PredefinedQuarter')) {
+            expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+          } else {
+            expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+            expect(queryString.includes('count("orders".id')).toBeTruthy();
+          }
         });
       });
     });
