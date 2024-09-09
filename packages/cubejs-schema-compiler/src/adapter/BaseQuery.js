@@ -2197,7 +2197,7 @@ export class BaseQuery {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
     const memberPathArray = [cubeName, name];
-    if (internalPropertyName && symbol.type === 'time' && symbol.granularities[internalPropertyName]) {
+    if (internalPropertyName && symbol.type === 'time' && internalPropertyName) {
       memberPathArray.push('granularities', internalPropertyName);
     }
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
