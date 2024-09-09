@@ -48,26 +48,6 @@ export class DuckDBQuery extends BaseQuery {
       )::int`;
   }
 
-  private diffTimeUnitForInterval(interval: string): string {
-    if (/second/i.test(interval)) {
-      return 'second';
-    } else if (/minute/i.test(interval)) {
-      return 'minute';
-    } else if (/hour/i.test(interval)) {
-      return 'hour';
-    } else if (/day/i.test(interval)) {
-      return 'day';
-    } else if (/week/i.test(interval)) {
-      return 'day';
-    } else if (/month/i.test(interval)) {
-      return 'month';
-    } else if (/quarter/i.test(interval)) {
-      return 'month';
-    } else /* if (/year/i.test(interval)) */ {
-      return 'year';
-    }
-  }
-
   public countDistinctApprox(sql: string) {
     return `approx_count_distinct(${sql})`;
   }
