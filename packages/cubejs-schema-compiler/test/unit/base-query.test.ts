@@ -433,6 +433,7 @@ describe('SQL Generation', () => {
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
 
+          expect(queryString.includes('undefined')).toBeFalsy();
           if (q.measures[0].includes('count')) {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
           } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
@@ -450,6 +451,7 @@ describe('SQL Generation', () => {
           const queryString = queryAndParams[0];
           console.log('Generated query: ', queryString);
 
+          expect(queryString.includes('undefined')).toBeFalsy();
           if (q.dimensions[0].includes('PredefinedYear')) {
             expect(queryString.includes('date_trunc(\'year\'')).toBeTruthy();
           } else if (q.dimensions[0].includes('PredefinedQuarter')) {
