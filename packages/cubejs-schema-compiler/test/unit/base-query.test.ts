@@ -351,6 +351,44 @@ describe('SQL Generation', () => {
         filters: [],
         timezone: 'Europe/Kyiv'
       },
+      {
+        measures: [
+          'orders_users.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtPredefinedYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_users.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
     ];
 
     it('Test time series with different granularities', async () => {
@@ -418,7 +456,6 @@ describe('SQL Generation', () => {
             expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
           } else {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
-            expect(queryString.includes('count("orders".id')).toBeTruthy();
           }
         });
       });
