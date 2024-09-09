@@ -103,6 +103,16 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
               }
             }
           },
+          createdAtPredefinedYear: {
+            public: true,
+            sql: \`\${createdAt.year}\`,
+            type: 'string',
+          },
+          createdAtPredefinedQuarter: {
+            public: true,
+            sql: \`\${createdAt.quarter}\`,
+            type: 'string',
+          },
           createdAtHalfYear: {
             public: true,
             sql: \`\${createdAt.half_year}\`,
