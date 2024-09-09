@@ -1,0 +1,34 @@
+{
+  "tableName": "students",
+  "tableType": "OFFLINE",
+  "isDimTable": true,
+  "routing": {
+    "segmentPrunerTypes": ["partition"],
+    "instanceSelectorType": "replicaGroup"
+  },
+  "segmentsConfig": {
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "180",
+    "replication": "5",
+    "schemaName": "students"
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "tableIndexConfig": {
+  },
+  "metadata": {},
+  "quota": {
+    "storage": "20M"
+  },
+  "ingestionConfig": {
+    "batchIngestionConfig": {
+      "segmentIngestionType": "REFRESH",
+      "segmentIngestionFrequency": "DAILY"
+    }
+  },
+  "dimensionTableConfig": {
+    "disablePreload": false
+  }
+}

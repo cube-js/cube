@@ -63,6 +63,7 @@ COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/package.json packages/cubejs-materialize-driver/package.json
 COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
 COPY packages/cubejs-trino-driver/package.json packages/cubejs-trino-driver/package.json
+COPY packages/cubejs-pinot-driver/package.json packages/cubejs-pinot-driver/package.json
 COPY packages/cubejs-query-orchestrator/package.json packages/cubejs-query-orchestrator/package.json
 COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compiler/package.json
 COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
@@ -138,6 +139,7 @@ COPY packages/cubejs-questdb-driver/ packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/ packages/cubejs-materialize-driver/
 COPY packages/cubejs-prestodb-driver/ packages/cubejs-prestodb-driver/
 COPY packages/cubejs-trino-driver/ packages/cubejs-trino-driver/
+COPY packages/cubejs-pinot-driver/ packages/cubejs-pinot-driver/
 COPY packages/cubejs-query-orchestrator/ packages/cubejs-query-orchestrator/
 COPY packages/cubejs-schema-compiler/ packages/cubejs-schema-compiler/
 COPY packages/cubejs-server/ packages/cubejs-server/

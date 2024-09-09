@@ -117,7 +117,8 @@ export type DatabaseType =
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
-  | 'materialize';
+  | 'materialize'
+  | 'pinot';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
