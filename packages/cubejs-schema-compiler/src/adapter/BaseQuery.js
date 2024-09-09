@@ -2955,26 +2955,28 @@ export class BaseQuery {
         if (preAggregation.type === 'rollup') {
           const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
 
-          const findSchemaType = name => {
-            const outputSchemaType = preAggregation.outputColumnTypes.find(os => os.name === name);
+          const findSchemaType = member => {
+            const outputSchemaType = preAggregation.outputColumnTypes.find(os => this.cubeEvaluator.evaluateReferences(cube, os.member, { originalSorting: true }) === member);
             if (!outputSchemaType) {
-              throw new UserError(`Output schema type for ${name} not found in pre-aggregation ${preAggregation}`);
+              throw new UserError(`Output schema type for ${member} not found in pre-aggregation ${preAggregation}`);
             }
+
             return {
-              name: this.aliasName(`${cube}.${outputSchemaType.name}`),
+              name: this.aliasName(member),
               type: outputSchemaType.type,
             };
           };
-      
+
+          // The order of the output columns is important, it should match the order in the select statement
           const outputColumnTypes = [
-            ...(query.dimensions || []).map(d => findSchemaType(this.cubeEvaluator.parsePath('dimensions', d.dimension)[1])),
+            ...(query.dimensions || []).map(d => findSchemaType(d.dimension)),
             ...(query.timeDimensions || []).map(t => ({
               name: `${this.aliasName(t.dimension)}_${t.granularity}`,
               type: 'TIMESTAMP'
             })),
-            ...(query.measures || []).map(m => findSchemaType(this.cubeEvaluator.parsePath('measures', m.measure)[1]))
+            ...(query.measures || []).map(m => findSchemaType(m.measure)),
           ];
-      
+
           return outputColumnTypes;
         }
         throw new UserError('Output schema is only supported for rollup pre-aggregations');
