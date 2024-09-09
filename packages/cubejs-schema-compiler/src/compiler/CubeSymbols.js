@@ -552,7 +552,7 @@ export class CubeSymbols {
           if (refProperty) {
             return () => this.withSymbolsCallContext(
               () => sqlResolveFn(cube[refProperty], cubeName, refProperty),
-              { ...this.resolveSymbolsCallContext }
+              { ...this.resolveSymbolsCallContext, joinHints }
             );
           }
 
@@ -586,7 +586,7 @@ export class CubeSymbols {
           };
         }
         if (cube[propertyName]) {
-          return this.cubeReferenceProxy(cubeName, undefined, propertyName);
+          return this.cubeReferenceProxy(cubeName, joinHints, propertyName);
         }
         if (self.symbols[propertyName]) {
           return this.cubeReferenceProxy(propertyName, joinHints);
