@@ -50,26 +50,6 @@ views:
             - city
 ```
 
-### Measure groups
-
-MDX API supports organizing measures into groups (folders). You can define measure groups in the view's model file.
-
-```yaml
-views:
-  - name: orders_view
-    description: "Data about orders, amount, count and breakdown by status and geography."
-    meta:
-      folders:
-          - name: "Folder A"
-            members:
-              - total_amount
-              - average_order_value
-          - name: "Folder B"
-            members:
-              - completed_count
-              - completed_percentage
-```
-
 ### Dimension keys
 
 You can define a member that will be used as a key for a dimension in the cube's model file.
@@ -131,6 +111,26 @@ cubes:
               column: users_first_name
             - name: "Property B"
               value: users_city
+```
+
+### Measure groups
+
+MDX API supports organizing measures into groups (folders). You can define measure groups in the view's model file.
+
+```yaml
+views:
+  - name: orders_view
+    description: "Data about orders, amount, count and breakdown by status and geography."
+    meta:
+      folders:
+          - name: "Folder A"
+            members:
+              - total_amount
+              - average_order_value
+          - name: "Folder B"
+            members:
+              - completed_count
+              - completed_percentage
 ```
 
 ## Authentication and authorization
