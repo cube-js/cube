@@ -52,7 +52,7 @@ views:
 
 ### Measure groups
 
-MDX API supports organizing measures into groups (folders). You can define measure groups in the view's schema file.
+MDX API supports organizing measures into groups (folders). You can define measure groups in the view's model file.
 
 ```yaml
 views:
@@ -68,6 +68,69 @@ views:
             members:
               - completed_count
               - completed_percentage
+```
+
+### Dimension keys
+
+You can define a member that will be used as a key for a dimension in the cube's model file.
+
+```yaml
+cubes:
+  - name: users
+    sql_table: USERS
+    public: false
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.ID"
+        type: number
+        primary_key: true
+
+      - name: first_name
+        sql: FIRST_NAME
+        type: string
+        meta:
+          key_member: users_id
+```
+
+### Dimension labels
+
+You can define a member that will be used as a label for a dimension in the cube's model file.
+
+```yaml
+cubes:
+  - name: users
+    sql_table: USERS
+    public: false
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.ID"
+        type: number
+        meta:
+          label_member: users_first_name
+```
+
+### Custom properties
+
+You can define custom properties for dimensions in the cube's model file.
+
+```yaml
+cubes:
+  - name: users
+    sql_table: USERS
+    public: false
+
+    dimensions:
+      - name: id
+        sql: "{CUBE}.ID"
+        type: number
+        meta:
+          properties:
+            - name: "Property A"
+              column: users_first_name
+            - name: "Property B"
+              value: users_city
 ```
 
 ## Authentication and authorization
