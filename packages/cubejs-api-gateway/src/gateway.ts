@@ -423,18 +423,6 @@ class ApiGateway {
      * jobs scope                                                    *
      *************************************************************** */
 
-    app.get(
-      `${this.basePath}/v1/run-scheduled-refresh`,
-      userMiddlewares,
-      userAsyncHandler(async (req, res) => {
-        await this.runScheduledRefresh({
-          queryingOptions: req.query.queryingOptions,
-          context: req.context,
-          res: this.resToResultFn(res)
-        });
-      })
-    );
-
     app.post(
       `${this.basePath}/v1/pre-aggregations/jobs`,
       userMiddlewares,
@@ -539,26 +527,6 @@ class ApiGateway {
 
   protected duration(requestStarted) {
     return requestStarted && (new Date().getTime() - requestStarted.getTime());
-  }
-
-  public async runScheduledRefresh({ context, res, queryingOptions }: {
-    context: RequestContext,
-    res: ResponseResultFn,
-    queryingOptions: any
-  }) {
-    const requestStarted = new Date();
-    try {
-      await this.assertApiScope('jobs', context.securityContext);
-      const refreshScheduler = this.refreshScheduler();
-      res(await refreshScheduler.runScheduledRefresh(context, {
-        ...this.parseQueryParam(queryingOptions || {}),
-        throwErrors: true
-      }));
-    } catch (e: any) {
-      this.handleError({
-        e, context, res, requestStarted
-      });
-    }
   }
 
   private filterVisibleItemsInMeta(context: RequestContext, cubes: any[]) {
@@ -1552,7 +1520,7 @@ class ApiGateway {
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
       normalizedTotal.totalQuery = true;
-      
+
       delete normalizedTotal.order;
 
       normalizedTotal.limit = null;

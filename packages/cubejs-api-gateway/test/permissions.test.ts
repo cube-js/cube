@@ -225,14 +225,6 @@ describe('Gateway Api Scopes', () => {
     expect(res1.body && res1.body.error)
       .toStrictEqual('API scope is missing: jobs');
 
-    const res2 = await request(app)
-      .get('/cubejs-api/v1/run-scheduled-refresh')
-      .set('Authorization', AUTH_TOKEN)
-      .expect(403);
-
-    expect(res2.body && res2.body.error)
-      .toStrictEqual('API scope is missing: jobs');
-
     apiGateway.release();
   });
 });

@@ -1,4 +1,3 @@
-import R from 'ramda';
 import { StartedTestContainer, Network, StartedNetwork } from 'testcontainers';
 import { pausePromise } from '@cubejs-backend/shared';
 import fetch from 'node-fetch';
@@ -16,15 +15,6 @@ import {
 
 const CubeStoreDriver = require('@cubejs-backend/cubestore-driver');
 const PostgresDriver = require('@cubejs-backend/postgres-driver');
-
-async function runScheduledRefresh(client: any) {
-  return client.loadMethod(
-    () => client.request('run-scheduled-refresh'),
-    (response: any) => response,
-    {},
-    undefined
-  );
-}
 
 describe('lambda', () => {
   jest.setTimeout(60 * 5 * 1000);
@@ -121,7 +111,7 @@ describe('lambda', () => {
       'req-1',
       'req-stream-2'
     ]);
-    
+
     // @ts-ignore
     expect(response.loadResponse.results[0].data.length).toEqual(3);
   });
@@ -321,10 +311,6 @@ describe('lambda', () => {
         },
       ]
     );
-  });
-
-  test('refresh', async () => {
-    await runScheduledRefresh(client);
   });
 
   it('Pre-aggregations API', async () => {
