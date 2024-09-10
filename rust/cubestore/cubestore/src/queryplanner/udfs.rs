@@ -13,7 +13,6 @@ use datafusion::physical_plan::udaf::AggregateUDF;
 use datafusion::physical_plan::udf::ScalarUDF;
 use datafusion::physical_plan::{type_coercion, Accumulator, ColumnarValue};
 use datafusion::scalar::ScalarValue;
-use log::debug;
 use serde_derive::{Deserialize, Serialize};
 use smallvec::smallvec;
 use smallvec::SmallVec;
