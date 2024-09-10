@@ -200,36 +200,6 @@ impl CubeScalarUDF for UnixTimestamp {
     }
 }
 
-// fn interval_to_nanoseconds(interval: &ScalarValue) -> Result<Duration, DataFusionError> {
-//     match interval {
-//         ScalarValue::IntervalYearMonth(Some(i)) => {
-//             // since years and months do not have a fixed number of nanoseconds,
-//             // months can have different lengths, and leap years affect the length of a year,
-//             // converting an IntervalYearMonth to nanoseconds requires certain assumptions:
-//             // 1 month = 30 days
-//             // 1 year = 12 months = 365 days
-
-//             let years = i / 12;
-//             let months = i % 12;
-//             let duration = Duration::days(days) + Duration::milliseconds(millis);
-//             let total_nanoseconds =
-//                 (years as i64) * NANOS_IN_YEAR + (months as i64) * NANOS_IN_MONTH;
-
-//             Ok(total_nanoseconds)
-//         }
-//         ScalarValue::IntervalDayTime(Some(i)) => {
-//             let days: i64 = i.signum() * (i.abs() >> 32);
-//             let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
-//             let duration = Duration::days(days) + Duration::milliseconds(millis);
-
-//             Ok(duration)
-//         }
-//         _ => Err(DataFusionError::Execution(format!(
-//             "Unsupported interval type"
-//         ))),
-//     }
-// }
-
 fn interval_day_time_duration(i: &i64) -> Duration {
     let days: i64 = i.signum() * (i.abs() >> 32);
     let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
