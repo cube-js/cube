@@ -48,14 +48,14 @@ features:
 | Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
 | Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    |           |
 | Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
-| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    |           |
+| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    | v0.36.0   |
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
 | Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
 | Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
 | Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
 | Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
-| Deprecated | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
+| Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    |           |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
@@ -272,26 +272,7 @@ const server = new CubejsServer({
 
 ### Prefix Redis environment variables with `CUBEJS_`
 
-Redis-related environment variables are now prefixed with `CUBEJS_` for
-consistency with other environment variables.
-
-**Deprecated in Release: v0.27.0**
-
-Deprecated:
-
-```
-REDIS_URL=XXXX
-REDIS_PASSWORD=XXX
-REDIS_TLS=true
-```
-
-You should use:
-
-```
-CUBEJS_REDIS_URL=XXXX
-CUBEJS_REDIS_PASSWORD=XXX
-CUBEJS_REDIS_TLS=true
-```
+**Removed in Release: v0.36.0**
 
 ### Node.js 15
 
@@ -350,7 +331,7 @@ instead.
 
 ### Using Redis for in-memory cache and queue
 
-**Deprecated in release: v0.32.0**
+**Removed in Release: v0.36.0**
 
 Cube Store is now the default cache and queue engine, [replacing
 Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to

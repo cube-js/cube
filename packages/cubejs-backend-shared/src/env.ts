@@ -133,10 +133,6 @@ function asBoolOrTime(input: string, envName: string): number | boolean {
   );
 }
 
-let legacyRedisPasswordAlerted: boolean = false;
-let legacyRedisUrlAlerted: boolean = false;
-let legacyRedisTlsAlerted: boolean = false;
-
 const variables: Record<string, (...args: any) => any> = {
   devMode: () => get('CUBEJS_DEV_MODE')
     .default('false')
@@ -1571,85 +1567,9 @@ const variables: Record<string, (...args: any) => any> = {
     .default('30')
     .asInt(),
 
-  // Redis
-  redisPoolMin: () => get('CUBEJS_REDIS_POOL_MIN')
-    .default('2')
-    .asInt(),
-  redisPoolMax: () => get('CUBEJS_REDIS_POOL_MAX')
-    .default('1000')
-    .asInt(),
-  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
-    .default('false')
-    .asBoolStrict(),
-  redisAcquireTimeout: () => get('CUBEJS_REDIS_ACQUIRE_TIMEOUT')
-    .default('5000')
-    .asInt(),
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
     .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
     .asBoolStrict(),
-  redisPassword: () => {
-    const redisPassword = get('CUBEJS_REDIS_PASSWORD')
-      .asString();
-    if (redisPassword) {
-      return redisPassword;
-    }
-
-    const legacyRedisPassword = get('REDIS_PASSWORD')
-      .asString();
-    if (legacyRedisPassword) {
-      if (!legacyRedisPasswordAlerted) {
-        displayCLIWarning('REDIS_PASSWORD is deprecated and will be removed, please use CUBEJS_REDIS_PASSWORD.');
-
-        legacyRedisPasswordAlerted = true;
-      }
-
-      return legacyRedisPassword;
-    }
-
-    return undefined;
-  },
-  redisUrl: () => {
-    const redisUrl = get('CUBEJS_REDIS_URL')
-      .asString();
-    if (redisUrl) {
-      return redisUrl;
-    }
-
-    const legacyRedisUrl = get('REDIS_URL')
-      .asString();
-    if (legacyRedisUrl) {
-      if (!legacyRedisUrlAlerted) {
-        displayCLIWarning('REDIS_URL is deprecated and will be removed, please use CUBEJS_REDIS_URL.');
-
-        legacyRedisUrlAlerted = true;
-      }
-
-      return legacyRedisUrl;
-    }
-
-    return undefined;
-  },
-  redisTls: () => {
-    const redisTls = get('CUBEJS_REDIS_TLS')
-      .asBoolStrict();
-    if (redisTls) {
-      return redisTls;
-    }
-
-    const legacyRedisTls = get('REDIS_TLS')
-      .asBoolStrict();
-    if (legacyRedisTls) {
-      if (!legacyRedisTlsAlerted) {
-        displayCLIWarning('REDIS_TLS is deprecated and will be removed, please use CUBEJS_REDIS_TLS.');
-
-        legacyRedisTlsAlerted = true;
-      }
-
-      return legacyRedisTls;
-    }
-
-    return false;
-  },
   nodeEnv: () => get('NODE_ENV')
     .asString(),
   cacheAndQueueDriver: () => get('CUBEJS_CACHE_AND_QUEUE_DRIVER')
@@ -1766,6 +1686,30 @@ const variables: Record<string, (...args: any) => any> = {
     .default(200000)
     .asInt(),
   convertTzForRawTimeDimension: () => get('CUBESQL_SQL_PUSH_DOWN').default('false').asBoolStrict(),
+  // Deprecated section
+
+  // Support for Redis as queue & cache driver was removed in 0.36
+  // This code is used to detect Redis and throw an error
+  // TODO(ovr): Remove in after 1.0 + LTS
+  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
+    .default('false')
+    .asBoolStrict(),
+  // TODO(ovr): Remove in after 1.0 + LTS
+  redisUrl: () => {
+    const redisUrl = get('CUBEJS_REDIS_URL')
+      .asString();
+    if (redisUrl) {
+      return redisUrl;
+    }
+
+    const legacyRedisUrl = get('REDIS_URL')
+      .asString();
+    if (legacyRedisUrl) {
+      return legacyRedisUrl;
+    }
+
+    return undefined;
+  },
 };
 
 type Vars = typeof variables;

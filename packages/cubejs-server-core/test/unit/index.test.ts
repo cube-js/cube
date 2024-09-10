@@ -225,7 +225,7 @@ describe('index.test', () => {
         release: () => {}
       },
       externalDialectFactory: () => {},
-      cacheAndQueueDriver: 'redis',
+      cacheAndQueueDriver: 'cubestore',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
@@ -313,7 +313,7 @@ describe('index.test', () => {
     expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
       expect.any(Function),
       {
-        cacheAndQueueDriver: 'redis',
+        cacheAndQueueDriver: 'cubestore',
         contextToDbType: expect.any(Function),
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
@@ -424,7 +424,7 @@ describe('index.test', () => {
         dataSource: 'main',
         dbType: 'mysql',
       }]);
-      
+
       expect(dataSourcesSpy).toHaveBeenCalled();
       dataSourcesSpy.mockClear();
     });

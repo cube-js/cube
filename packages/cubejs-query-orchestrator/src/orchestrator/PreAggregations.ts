@@ -37,7 +37,6 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
-import { RedisPool } from './RedisPool';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
@@ -1981,7 +1980,6 @@ type PreAggregationsOptions = {
     orphanedTimeout?: number;
     heartBeatInterval?: number;
   }>;
-  redisPool?: RedisPool;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
@@ -2392,7 +2390,6 @@ export class PreAggregations {
             concurrency: 1,
             logger: this.logger,
             cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-            redisPool: this.options.redisPool,
             cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
@@ -2440,7 +2437,6 @@ export class PreAggregations {
           concurrency: 4,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
           cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           ...this.options.loadCacheQueueOptions
         }

@@ -70,7 +70,7 @@ const schemaOptions = Joi.object().keys({
   externalDialectFactory: Joi.func(),
   externalDriverFactory: Joi.func(),
   //
-  cacheAndQueueDriver: Joi.string().valid('cubestore', 'redis', 'memory'),
+  cacheAndQueueDriver: Joi.string().valid('cubestore', 'memory'),
   contextToAppId: Joi.func(),
   contextToOrchestratorId: Joi.func(),
   contextToDataSourceId: Joi.func(),
@@ -106,27 +106,6 @@ const schemaOptions = Joi.object().keys({
     Joi.func(),
     Joi.object().strict(true).keys({
       redisPrefix: Joi.string().allow(''),
-      redisPoolOptions: Joi.object().strict(true).keys({
-        poolMin: Joi.number().min(0),
-        poolMax: Joi.number().min(0),
-        idleTimeoutSeconds: Joi.number().min(0),
-        softIdleTimeoutSeconds: Joi.number().min(0),
-        createClient: Joi.func(),
-        destroyClient: Joi.func(),
-        poolOptions: Joi.object().keys({
-          maxWaitingClients: Joi.number(),
-          testOnBorrow: Joi.bool(),
-          testOnReturn: Joi.bool(),
-          acquireTimeoutMillis: Joi.number(),
-          fifo: Joi.bool(),
-          priorityRange: Joi.number(),
-          autostart: Joi.bool(),
-          evictionRunIntervalMillis: Joi.number().min(0),
-          numTestsPerEvictionRun: Joi.number().min(1),
-          softIdleTimeoutMillis: Joi.number().min(0),
-          idleTimeoutMillis: Joi.number().min(0),
-        })
-      }),
       continueWaitTimeout: Joi.number().min(0).max(90).integer(),
       skipExternalCacheAndQueue: Joi.boolean(),
       queryCacheOptions: Joi.object().keys({
