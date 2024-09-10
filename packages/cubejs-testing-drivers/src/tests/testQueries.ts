@@ -1816,7 +1816,7 @@ from
             ROLLUP(row, order)
             ORDER BY "rowId" ASC NULLS FIRST, "orderId" ASC NULLS FIRST OFFSET 0 ROWS FETCH FIRST 100 ROWS ONLY
         ) q1
-    ) q2 limit 100
+    ) q2 ORDER BY q2.order, q2.row DESC limit 100
 
   `);
       expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');

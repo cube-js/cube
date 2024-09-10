@@ -168,7 +168,7 @@ impl ConfigObjImpl {
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
-            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
         }
     }
 }
@@ -266,7 +266,7 @@ impl Config {
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
                 max_sessions: 1024,
-                no_implicit_order: false,
+                no_implicit_order: true,
             }),
         }
     }
