@@ -200,7 +200,7 @@ impl CubeScalarUDF for UnixTimestamp {
     }
 }
 
-fn interval_day_time_duration(i: &i64) -> Duration {
+fn interval_dt_duration(i: &i64) -> Duration {
     let days: i64 = i.signum() * (i.abs() >> 32);
     let millis: i64 = i.signum() * ((i.abs() << 32) >> 32);
     let duration = Duration::days(days) + Duration::milliseconds(millis);
@@ -223,11 +223,6 @@ fn calc_intervals(start: NaiveDateTime, end: NaiveDateTime, interval: i32) -> i3
     if num_intervals < 0 && rem == 0 && end.day() < start.day() {
         num_intervals -= 1;
     }
-
-    debug!(
-        "start: {}, end: {}, years_diff: {}, months_diff: {}, total_months: {}, num_intervals: {}",
-        start, end, years_diff, months_diff, total_months, num_intervals
-    );
 
     num_intervals
 }
@@ -257,7 +252,7 @@ fn calc_bin_timestamp_dt(origin: NaiveDateTime, source: &i64, interval: &i64) ->
     let timestamp =
         NaiveDateTime::from_timestamp(*source / 1_000_000_000, (*source % 1_000_000_000) as u32);
     let diff = timestamp - origin;
-    let interval_duration = interval_day_time_duration(&interval);
+    let interval_duration = interval_dt_duration(&interval);
     let num_intervals =
         diff.num_nanoseconds().unwrap_or(0) / interval_duration.num_nanoseconds().unwrap_or(1);
     let mut nearest_timestamp = origin
