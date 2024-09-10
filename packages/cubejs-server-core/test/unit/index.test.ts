@@ -230,7 +230,6 @@ describe('index.test', () => {
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
-      checkAuthMiddleware: () => {},
       queryTransformer: () => {},
       preAggregationsSchema: () => {},
       schemaVersion: () => {},

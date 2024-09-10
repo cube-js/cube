@@ -43,7 +43,7 @@ features:
 | Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
 | Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.32.0   |
 | Removed    | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
-| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    |           |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    | v0.36.0   |
 | Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
 | Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
 | Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    |           |
@@ -180,7 +180,7 @@ const { BaseQuery } = require("@cubejs-backend/schema-compiler");
 
 ### `checkAuthMiddleware`
 
-**Deprecated in Release: v0.26.0**
+**Removed in Release: v0.36.0**
 
 The `checkAuthMiddleware` option was tightly bound to Express,
 [which has been deprecated](#embedding-cubejs-within-express). Since Cube.js

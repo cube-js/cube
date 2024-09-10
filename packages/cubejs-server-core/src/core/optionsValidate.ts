@@ -77,7 +77,6 @@ const schemaOptions = Joi.object().keys({
   contextToApiScopes: Joi.func(),
   repositoryFactory: Joi.func(),
   checkAuth: Joi.func(),
-  checkAuthMiddleware: Joi.func(),
   jwt: jwtOptions,
   queryTransformer: Joi.func(),
   queryRewrite: Joi.func(),

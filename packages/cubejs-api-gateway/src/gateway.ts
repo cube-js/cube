@@ -60,7 +60,6 @@ import {
   ApiGatewayOptions,
 } from './types/gateway';
 import {
-  CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
@@ -146,8 +145,6 @@ class ApiGateway {
   protected readonly contextToApiScopesDefFn: ContextToApiScopesFn =
     async () => ['graphql', 'meta', 'data'];
 
-  protected readonly checkAuthMiddleware: CheckAuthMiddlewareFn;
-
   protected readonly requestLoggerMiddleware: RequestLoggerMiddlewareFn;
 
   protected readonly securityContextExtractor: SecurityContextExtractorFn;
@@ -188,9 +185,6 @@ class ApiGateway {
     this.checkAuthFn = this.createCheckAuthFn(options);
     this.checkAuthSystemFn = this.createCheckAuthSystemFn();
     this.contextToApiScopesFn = this.createContextToApiScopesFn(options);
-    this.checkAuthMiddleware = options.checkAuthMiddleware
-      ? this.wrapCheckAuthMiddleware(options.checkAuthMiddleware)
-      : this.checkAuth;
     this.securityContextExtractor = this.createSecurityContextExtractor(options.jwt);
     this.requestLoggerMiddleware = options.requestLoggerMiddleware || this.requestLogger;
     this.contextRejectionMiddleware = options.contextRejectionMiddleware || (async (req, res, next) => next());
@@ -214,7 +208,7 @@ class ApiGateway {
 
   public initApp(app: ExpressApplication) {
     const userMiddlewares: RequestHandler[] = [
-      this.checkAuthMiddleware,
+      this.checkAuth,
       this.requestContextMiddleware,
       this.contextRejectionMiddleware,
       this.logNetworkUsage,
@@ -2087,40 +2081,6 @@ class ApiGateway {
       }, context);
       res({ error: e.toString(), stack: e.stack, requestId, plainError, }, { status: 500 });
     }
-  }
-
-  protected wrapCheckAuthMiddleware(fn: CheckAuthMiddlewareFn): CheckAuthMiddlewareFn {
-    this.logger('CheckAuthMiddleware Middleware Deprecation', {
-      warning: (
-        'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: ' +
-        'https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware'
-      )
-    });
-
-    let showWarningAboutNotObject = false;
-
-    return (req, res, next) => {
-      fn(req, res, (e) => {
-        // We renamed authInfo to securityContext, but users can continue to use both ways
-        if (req.securityContext && !req.authInfo) {
-          req.authInfo = req.securityContext;
-        } else if (req.authInfo) {
-          req.securityContext = req.authInfo;
-        }
-
-        if ((typeof req.securityContext !== 'object' || req.securityContext === null) && !showWarningAboutNotObject) {
-          this.logger('Security Context Should Be Object', {
-            warning: (
-              `Value of securityContext (previously authInfo) expected to be object, actual: ${getRealType(req.securityContext)}`
-            )
-          });
-
-          showWarningAboutNotObject = true;
-        }
-
-        next(e);
-      });
-    };
   }
 
   protected wrapCheckAuth(fn: CheckAuthFn): PreparedCheckAuthFn {

@@ -14,7 +14,6 @@ import {
   CheckAuthFn,
 } from './auth';
 import {
-  CheckAuthMiddlewareFn,
   RequestLoggerMiddlewareFn,
   ContextRejectionMiddlewareFn,
   ContextAcceptorFn,
@@ -66,10 +65,6 @@ interface ApiGatewayOptions {
   contextRejectionMiddleware?: ContextRejectionMiddlewareFn;
   wsContextAcceptor?: ContextAcceptorFn;
   checkAuth?: CheckAuthFn;
-  /**
-   * @deprecated Use checkAuth property instead.
-   */
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   contextToApiScopes?: ContextToApiScopesFn;
   event?: (name: string, props?: object) => void;
 }

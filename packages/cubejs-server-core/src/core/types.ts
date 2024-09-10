@@ -1,7 +1,6 @@
 import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
   UserBackgroundContext,
@@ -180,7 +179,6 @@ export interface CreateOptions {
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
