@@ -2947,7 +2947,7 @@ export class BaseQuery {
 
   preAggregationOutputColumnTypes(cube, preAggregation) {
     return this.cacheValue(
-      ['preAggregationSqlOutputSchema', cube, JSON.stringify(preAggregation)],
+      ['preAggregationOutputColumnTypes', cube, JSON.stringify(preAggregation)],
       () => {
         if (!preAggregation.outputColumnTypes) {
           return null;
@@ -2956,8 +2956,13 @@ export class BaseQuery {
         if (preAggregation.type === 'rollup') {
           const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
 
+          const evaluatedMapOutputColumnTypes = preAggregation.outputColumnTypes.reduce((acc, outputColumnType) => {
+            acc.set(outputColumnType.name, outputColumnType);
+            return acc;
+          }, new Map());
+
           const findSchemaType = member => {
-            const outputSchemaType = preAggregation.outputColumnTypes.find(os => this.cubeEvaluator.evaluateReferences(cube, os.member, { originalSorting: true }) === member);
+            const outputSchemaType = evaluatedMapOutputColumnTypes.get(member);
             if (!outputSchemaType) {
               throw new UserError(`Output schema type for ${member} not found in pre-aggregation ${preAggregation}`);
             }

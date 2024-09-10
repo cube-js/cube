@@ -273,6 +273,12 @@ export class CubeEvaluator extends CubeSymbols {
           preAggregation.refreshRangeEnd = preAggregation.buildRangeEnd;
           delete preAggregation.buildRangeEnd;
         }
+
+        if (preAggregation.outputColumnTypes) {
+          preAggregation.outputColumnTypes.forEach(column => {
+            column.name = this.evaluateReferences(cube.name, column.member, { originalSorting: true });
+          });
+        }
       }
     }
   }
