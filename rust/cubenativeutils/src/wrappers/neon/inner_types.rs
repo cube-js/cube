@@ -1,6 +1,7 @@
 use super::context::ContextHolder;
 use super::object::base_types::*;
 use super::object::neon_array::NeonArray;
+use super::object::neon_function::NeonFunction;
 use super::object::neon_struct::NeonStruct;
 use super::object::NeonObject;
 use crate::wrappers::inner_types::InnerTypes;
@@ -26,5 +27,6 @@ impl<'cx: 'static, C: Context<'cx>> InnerTypes for NeonInnerTypes<'cx, C> {
     type Struct = NeonStruct<'cx, C>;
     type String = NeonString<'cx, C>;
     type Boolean = NeonBoolean<'cx, C>;
+    type Function = NeonFunction<'cx, C>;
     type Number = NeonNumber<'cx, C>;
 }

@@ -23,6 +23,7 @@
     "watch": "tsc -w",
     "test": "npm run unit && npm run integration",
     "unit": "TZ=UTC jest --coverage dist/test/unit",
+    "tst": "jest",
     "integration": "TZ=UTC jest dist/test/integration/*",
     "integration:mssql": "TZ=UTC jest dist/test/integration/mssql",
     "integration:mysql": "TZ=UTC jest dist/test/integration/mysql",

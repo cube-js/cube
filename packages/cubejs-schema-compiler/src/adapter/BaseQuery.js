@@ -577,6 +577,31 @@ export class BaseQuery {
     return false;
   }
 
+  buildSqlAndParamsTest(exportAnnotatedSql) {
+    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
+
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
+    }
+    const rr = this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildSqlAndParams', exportAnnotatedSql],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql,
+          this.shouldReuseParams
+        ),
+        { cache: this.queryCache }
+      )
+    );
+    console.log('!! rust result: ', r);
+    console.log('!! js result: ', rr);
+    return rr;
+  }
+
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
@@ -610,8 +635,11 @@ export class BaseQuery {
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
       joinRoot: this.join.root,
       cubeEvaluator: this.cubeEvaluator,
+      baseTools: this,
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
@@ -2121,7 +2149,9 @@ export class BaseQuery {
   }
 
   measureSql(measure) {
-    return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
+    const res = this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
+
+    return res;
   }
 
   autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
