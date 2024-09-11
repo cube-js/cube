@@ -44,7 +44,7 @@ export class Granularity {
       this.granularityInterval = customGranularity.interval;
 
       if (customGranularity.origin) {
-        this.origin = moment(new Date(customGranularity.origin));
+        this.origin = moment.tz(customGranularity.origin, 'UTC');
       } else if (customGranularity.offset) {
         this.granularityOffset = customGranularity.offset;
         this.origin = addInterval(this.origin, parseSqlInterval(customGranularity.offset));
@@ -59,6 +59,13 @@ export class Granularity {
   public minGranularity(): string {
     if (this.predefinedGranularity) {
       return this.granularity;
+    }
+
+    if (this.origin) {
+      return this.query.minGranularity(
+        this.granularityFromInterval(),
+        this.query.granularityFor(this.origin.utc())
+      );
     }
 
     if (this.granularityOffset) {
