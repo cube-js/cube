@@ -36,6 +36,8 @@ pub mod test_df_execution;
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
+#[cfg(test)]
+pub mod test_user_change;
 pub mod utils;
 pub use utils::*;
 
