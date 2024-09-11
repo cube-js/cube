@@ -69,9 +69,8 @@ export function QueryBuilderToolBar() {
           <TooltipProvider
             title={
               <>
-                <kbd>⌘</kbd> + <kbd>Enter</kbd>{' '}
-                <span style={{ padding: '0 16px' }}>OR</span> <kbd>Ctrl</kbd> +{' '}
-                <kbd>Enter</kbd>
+                <kbd>⌘</kbd> + <kbd>Enter</kbd> <span style={{ padding: '0 16px' }}>OR</span>{' '}
+                <kbd>Ctrl</kbd> + <kbd>Enter</kbd>
               </>
             }
           >
@@ -79,12 +78,7 @@ export function QueryBuilderToolBar() {
               qa="RunQueryButton"
               type="primary"
               size="small"
-              isDisabled={
-                isQueryEmpty ||
-                !!verificationError ||
-                isVerifying ||
-                isApiBlocked
-              }
+              isDisabled={isQueryEmpty || !!verificationError || isVerifying || isApiBlocked}
               isLoading={isLoading}
               icon={
                 !isQueryEmpty && (isLoading || !isQueryTouched) ? (

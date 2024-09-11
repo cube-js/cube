@@ -1,14 +1,7 @@
 import { PlayCircleOutlined } from '@ant-design/icons';
-import {
-  ApolloClient,
-  ApolloLink,
-  gql,
-  HttpLink,
-  InMemoryCache,
-  useQuery,
-} from '@apollo/client';
+import { ApolloClient, ApolloLink, gql, HttpLink, InMemoryCache, useQuery } from '@apollo/client';
 import { RetryLink } from '@apollo/client/link/retry';
-import { Alert, Block, Button, Grid, tasty } from '@cube-dev/ui-kit';
+import { Alert, Block, Button, Grid, LockIcon, tasty, TooltipProvider } from '@cube-dev/ui-kit';
 import { useEffect, useMemo, useState } from 'react';
 
 import { useQueryBuilderContext } from './context';
@@ -60,6 +53,7 @@ export function QueryBuilderGraphQL() {
     apiUrl,
     apiToken,
     meta,
+    hasPrivateMembers,
   } = useQueryBuilderContext();
   const [isFetching, setIsFetching] = useState(false);
 
@@ -110,6 +104,31 @@ export function QueryBuilderGraphQL() {
   }, [queryHash]);
 
   return useMemo(() => {
+    let fetchButton =
+      !rawData && !queryError ? (
+        <Button
+          isLoading={isLoading}
+          isDisabled={hasPrivateMembers}
+          icon={hasPrivateMembers ? <LockIcon /> : <PlayCircleOutlined />}
+          size="small"
+          onPress={() => setIsFetching(true)}
+        >
+          {isFetching && !rawData && !queryError ? 'Fetching...' : 'Fetch Raw Response'}
+        </Button>
+      ) : null;
+
+    if (hasPrivateMembers && fetchButton) {
+      fetchButton = (
+        <TooltipProvider
+          activeWrap
+          title="Unable to fetch the raw response because the query contains private members."
+          width={300}
+        >
+          {fetchButton}
+        </TooltipProvider>
+      );
+    }
+
     return !query || isQueryEmpty ? (
       <Block padding="1x">
         <Alert theme="note">Compose a query to see a GraphQL query.</Alert>
@@ -121,20 +140,7 @@ export function QueryBuilderGraphQL() {
             Copy
           </CopyButton>
         }
-        extraActions={
-          !rawData && !queryError ? (
-            <Button
-              isLoading={isLoading}
-              icon={<PlayCircleOutlined />}
-              size="small"
-              onPress={() => setIsFetching(true)}
-            >
-              {isFetching && !rawData && !queryError
-                ? 'Fetching...'
-                : 'Fetch Raw Response'}
-            </Button>
-          ) : null
-        }
+        extraActions={fetchButton}
       >
         <Grid
           columns={rawData ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr'}
@@ -151,8 +157,7 @@ export function QueryBuilderGraphQL() {
                 value={
                   queryError
                     ? // @ts-ignore
-                      queryError?.networkError?.result?.error ??
-                      queryError.toString()
+                      queryError?.networkError?.result?.error ?? queryError.toString()
                     : JSON.stringify(cleanedRawData, null, 2)
                 }
               />
@@ -164,6 +169,7 @@ export function QueryBuilderGraphQL() {
   }, [
     cleanedRawData,
     gqlQuery,
+    hasPrivateMembers,
     isFetching,
     query,
     isQueryEmpty,

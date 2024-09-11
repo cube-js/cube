@@ -12,28 +12,11 @@ import {
   CloseIcon,
   TooltipProvider,
 } from '@cube-dev/ui-kit';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import {
-  EditOutlined,
-  LoadingOutlined,
-  StarFilled,
-  StarOutlined,
-} from '@ant-design/icons';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { EditOutlined, LoadingOutlined, StarFilled, StarOutlined } from '@ant-design/icons';
 import { validateQuery } from '@cubejs-client/core';
 
-import {
-  useDebouncedValue,
-  useFilteredCubes,
-  useDeepMemo,
-  useEvent,
-} from './hooks';
+import { useDebouncedValue, useFilteredCubes, useDeepMemo, useEvent } from './hooks';
 import { useQueryBuilderContext } from './context';
 import { Panel } from './components/Panel';
 import { EditQueryDialogForm } from './components/EditQueryDialogForm';
@@ -76,7 +59,6 @@ export function QueryBuilderSidePanel({
     clearQuery,
     setQuery,
     usedCubes,
-    joinedCubes,
     usedMembers,
     apiVersion,
   } = useQueryBuilderContext();
@@ -85,18 +67,11 @@ export function QueryBuilderSidePanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const [scrollToCubeName, setScrollToCubeName] = useState<string | null>(null);
 
-  const [viewMode, setViewMode] = useState<'all' | 'query'>(
-    !joinedCubes.length ? 'all' : 'query'
-  );
-  const [openCubes, setOpenCubes] = useState<Set<string>>(
-    isQueryEmpty ? new Set() : new Set(usedCubes)
-  );
+  const [viewMode, setViewMode] = useState<'all' | 'query'>(!usedCubes.length ? 'all' : 'query');
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [filterString, setFilterString] = useState('');
 
-  const [selectedType, setSelectedType] = useState<'cubes' | 'views'>(
-    defaultSelectedType
-  );
+  const [selectedType, setSelectedType] = useState<'cubes' | 'views'>(defaultSelectedType);
 
   items.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -105,19 +80,19 @@ export function QueryBuilderSidePanel({
   // @ts-ignore
   const views = items.filter((item) => item.type === 'view');
 
-  const preparedFilterString = filterString
-    .trim()
-    .replaceAll('_', ' ')
-    .toLowerCase();
+  const preparedFilterString = filterString.trim().replaceAll('_', ' ').toLowerCase();
   const debouncedFilterString = useDebouncedValue(preparedFilterString, 500);
-  const appliedFilterString =
-    preparedFilterString.length < 2 ? '' : debouncedFilterString;
+  const appliedFilterString = preparedFilterString.length < 2 ? '' : debouncedFilterString;
 
   const allCubes = selectedType === 'cubes' ? cubes : views;
   const allJoinableCubes =
     selectedType === 'views' && usedCubes.length
       ? allCubes.filter((cube) => usedCubes[0] === cube.name)
       : allCubes.filter((cube) => joinableCubes.includes(cube));
+
+  const [openCubes, setOpenCubes] = useState<Set<string>>(
+    isQueryEmpty ? (allCubes.length ? new Set(allCubes[0].name) : new Set()) : new Set(usedCubes)
+  );
 
   const highlightedCubes = useMemo(() => {
     if (appliedFilterString) {
@@ -128,17 +103,11 @@ export function QueryBuilderSidePanel({
   }, [appliedFilterString]);
 
   allCubes.sort((a, b) => {
-    if (
-      highlightedCubes.includes(a.name) &&
-      !highlightedCubes.includes(b.name)
-    ) {
+    if (highlightedCubes.includes(a.name) && !highlightedCubes.includes(b.name)) {
       return -1;
     }
 
-    if (
-      !highlightedCubes.includes(a.name) &&
-      highlightedCubes.includes(b.name)
-    ) {
+    if (!highlightedCubes.includes(a.name) && highlightedCubes.includes(b.name)) {
       return 1;
     }
 
@@ -146,10 +115,7 @@ export function QueryBuilderSidePanel({
   });
 
   // Filtered cubes
-  const { cubes: filteredCubes } = useFilteredCubes(
-    appliedFilterString,
-    allJoinableCubes
-  );
+  const { cubes: filteredCubes } = useFilteredCubes(appliedFilterString, allJoinableCubes);
 
   const resetScrollAndContentSize = useCallback(() => {
     if (contentRef?.current) {
@@ -236,9 +202,7 @@ export function QueryBuilderSidePanel({
   }, [selectedType, meta, cubes.length, views.length]);
 
   const searchInput = useMemo(() => {
-    const description = `Search ${
-      selectedType === 'cubes' ? 'cubes' : 'views'
-    } and members`;
+    const description = `Search ${selectedType === 'cubes' ? 'cubes' : 'views'} and members`;
 
     return (
       <SearchInput
@@ -326,14 +290,7 @@ export function QueryBuilderSidePanel({
         ))}
       </Flex>
     );
-  }, [
-    allCubes,
-    viewMode,
-    meta,
-    openCubes.size,
-    appliedFilterString,
-    usedCubes.join(','),
-  ]);
+  }, [allCubes, viewMode, meta, openCubes.size, appliedFilterString, usedCubes.join(',')]);
 
   const onApplyQuery = useCallback(async (query) => {
     try {
@@ -368,9 +325,7 @@ export function QueryBuilderSidePanel({
             <Title preset="h6">All members</Title>
           ) : (
             <TooltipProvider
-              title={
-                'Toggle between all members and only those that are used in the query'
-              }
+              title={'Toggle between all members and only those that are used in the query'}
               placement="top"
             >
               <Button
@@ -379,9 +334,7 @@ export function QueryBuilderSidePanel({
                 type={viewMode === 'all' ? 'outline' : 'primary'}
                 size="small"
                 icon={viewMode === 'all' ? <StarOutlined /> : <StarFilled />}
-                onPress={() =>
-                  setViewMode(viewMode === 'all' ? 'query' : 'all')
-                }
+                onPress={() => setViewMode(viewMode === 'all' ? 'query' : 'all')}
               >
                 {viewMode === 'all' ? 'All' : 'Used'} members
               </Button>
@@ -411,13 +364,7 @@ export function QueryBuilderSidePanel({
         </Space>
       </Space>
     );
-  }, [
-    viewMode,
-    isQueryEmpty,
-    usedMembers.length,
-    appliedFilterString,
-    isVerifying,
-  ]);
+  }, [viewMode, isQueryEmpty, usedMembers.length, appliedFilterString, isVerifying]);
 
   return (
     <Panel
@@ -428,10 +375,7 @@ export function QueryBuilderSidePanel({
         appliedFilterString && !filteredCubes.length ? 'max-content ' : ' '
       } minmax(0, 1fr)`}
     >
-      <DialogContainer
-        isOpen={isPasteDialogOpen}
-        onDismiss={() => setIsPasteDialogOpen(false)}
-      >
+      <DialogContainer isOpen={isPasteDialogOpen} onDismiss={() => setIsPasteDialogOpen(false)}>
         <EditQueryDialogForm
           query={query}
           defaultType={'json'}

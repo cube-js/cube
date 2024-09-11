@@ -3,9 +3,9 @@ import { Alert } from '@cube-dev/ui-kit';
 import { useQueryBuilderContext } from './context';
 
 export function QueryBuilderError() {
-  const { verificationError, error, query, isVerifying, joinedCubes } = useQueryBuilderContext();
+  const { verificationError, error, isVerifying, usedCubes } = useQueryBuilderContext();
 
-  if (!joinedCubes?.length) {
+  if (!usedCubes?.length) {
     return null;
   }
 

@@ -5,7 +5,7 @@ export * from './use-is-first-render';
 export * from './get-query-hash';
 export * from './are-queries-equal';
 export * from './prepare-query';
-export * from './get-joined-cubes-and-members';
+export * from './get-used-cubes-and-members';
 export * from './move-pivot-config';
 export * from './use-commit-press';
 export * from './uncapitalize';

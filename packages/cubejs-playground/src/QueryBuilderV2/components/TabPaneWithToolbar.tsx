@@ -12,6 +12,7 @@ const ContainerElement = tasty({
       display: 'flex',
       flow: 'row',
       placeContent: 'space-between',
+      placeItems: 'center',
       gap: '1x',
       top: '0',
       padding: '1x',

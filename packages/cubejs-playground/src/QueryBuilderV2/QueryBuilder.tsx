@@ -9,9 +9,7 @@ import { useQueryBuilder } from './hooks/query-builder';
 import { QueryBuilderInternals } from './QueryBuilderInternals';
 import { useCommitPress } from './utils/use-commit-press';
 
-export function QueryBuilder(
-  props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl: string | null }
-) {
+export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl: string | null }) {
   const {
     apiUrl,
     apiToken,
@@ -37,19 +35,12 @@ export function QueryBuilder(
       : undefined;
   }, [apiUrl, apiToken]);
 
-  const [storedTimezones] = useLocalStorage<string[]>(
-    'QueryBuilder:timezones',
-    []
-  );
+  const [storedTimezones] = useLocalStorage<string[]>('QueryBuilder:timezones', []);
 
   function queryValidator(query: Query) {
     const queryCopy = JSON.parse(JSON.stringify(query));
 
-    if (
-      typeof queryCopy.limit !== 'number' ||
-      queryCopy.limit < 1 ||
-      queryCopy.limit > 50_000
-    ) {
+    if (typeof queryCopy.limit !== 'number' || queryCopy.limit < 1 || queryCopy.limit > 50_000) {
       queryCopy.limit = 5_000;
     }
 
@@ -69,7 +60,7 @@ export function QueryBuilder(
     runQuery,
     cubes,
     isCubeJoined,
-    joinedCubes,
+    usedCubes,
     getCubeByName,
     meta,
     loadMeta,
@@ -111,7 +102,7 @@ export function QueryBuilder(
         richMetaError,
         selectedCube,
         selectCube,
-        joinedCubes,
+        usedCubes,
         getCubeByName,
         tracking,
         isApiBlocked,

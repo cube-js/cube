@@ -23,7 +23,7 @@ import {
 
 import {
   extractMembersFromFilters,
-  getJoinedCubesAndMembers,
+  getUsedCubesAndMembers,
   getQueryHash,
   movePivotItem,
   prepareQuery,
@@ -72,11 +72,7 @@ type MemberUpdaterMap = {
   segments?: MemberUpdater;
 };
 
-const SIMPLE_MEMBERS: (keyof MemberUpdaterMap)[] = [
-  'dimensions',
-  'measures',
-  'segments',
-];
+const SIMPLE_MEMBERS: (keyof MemberUpdaterMap)[] = ['dimensions', 'measures', 'segments'];
 
 export function useQueryBuilder(props: QueryBuilderProps) {
   const mutexRef = useRef({});
@@ -139,16 +135,10 @@ export function useQueryBuilder(props: QueryBuilderProps) {
 
   const verificationRef = useRef(0);
   const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationError, setVerificationError] = useState<string | null>(
-    null
-  );
-  const [dryRunResponse, setDryRunResponse] = useState<DryRunResponse | null>(
-    null
-  );
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [dryRunResponse, setDryRunResponse] = useState<DryRunResponse | null>(null);
 
-  const [chartType, setChartType] = useState<ChartType>(
-    defaultChartType || ('line' as ChartType)
-  );
+  const [chartType, setChartType] = useState<ChartType>(defaultChartType || ('line' as ChartType));
 
   const [cubes, setCubes] = useState<Cube[]>([]);
   const [members, setMembers] = useState<CubeMembers>({
@@ -156,8 +146,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     measures: {},
     segments: {},
   });
-  const selectedCube =
-    cubes.find((cube) => cube.name === selectedCubeName) ?? null;
+  const selectedCube = cubes.find((cube) => cube.name === selectedCubeName) ?? null;
 
   const [dateRangesStore, setDateRangesStore] = useState<string[]>(
     (query?.timeDimensions || [])
@@ -178,13 +167,12 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     setProgress(progressResult);
   };
 
-  const { joinedCubes, joinedMembers, usedCubes, usedMembers } =
-    getJoinedCubesAndMembers(query);
+  const { usedCubes, usedMembers } = getUsedCubesAndMembers(query);
 
   // place joined cubes first
   cubes.sort((c1, c2) => {
-    const c1joined = isCubeJoined(c1.name);
-    const c2joined = isCubeJoined(c2.name);
+    const c1joined = isCubeUsed(c1.name);
+    const c2joined = isCubeUsed(c2.name);
 
     return c1joined > c2joined ? -1 : c1joined < c2joined ? 1 : 0;
   });
@@ -289,9 +277,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
 
         setMembers(memberData);
 
-        setCubes(
-          newMeta.meta.cubes.sort((a, b) => a.name.localeCompare(b.name))
-        );
+        setCubes(newMeta.meta.cubes.sort((a, b) => a.name.localeCompare(b.name)));
       })
       .catch((error) => {
         setIsMetaLoading(false);
@@ -321,12 +307,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
 
         setIsVerifying(false);
         setDryRunResponse(dryRunResponse);
-        setPivotConfig(
-          ResultSet.getNormalizedPivotConfig(
-            dryRunResponse.pivotQuery,
-            pivotConfig
-          )
-        );
+        setPivotConfig(ResultSet.getNormalizedPivotConfig(dryRunResponse.pivotQuery, pivotConfig));
       })
       .catch((error) => {
         if (currentRequest !== verificationRef.current) {
@@ -334,9 +315,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
         }
 
         setIsVerifying(false);
-        setVerificationError(
-          error.response?.plainError || error.message || String(error)
-        );
+        setVerificationError(error.response?.plainError || error.message || String(error));
       });
   }
 
@@ -347,9 +326,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
 
         let validatedQuery = queryValidation(query);
 
-        return originalHash !== getQueryHash(validatedQuery)
-          ? validatedQuery
-          : originalQuery;
+        return originalHash !== getQueryHash(validatedQuery) ? validatedQuery : originalQuery;
       } catch (e: any) {
         console.error('An invalid query has been set', query);
 
@@ -387,8 +364,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
           if (
             query[key] == null ||
             (Array.isArray(query[key]) && (query[key] as [])?.length === 0) ||
-            (typeof query[key] === 'object' &&
-              Object.keys(query[key] as {}).length === 0)
+            (typeof query[key] === 'object' && Object.keys(query[key] as {}).length === 0)
           ) {
             delete query[key];
           }
@@ -407,16 +383,12 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     return cubes.find((cube) => cube.name === name);
   }
 
-  function isCubeJoined(name: string) {
-    return joinedCubes.includes(name);
-  }
-
   function isCubeUsed(name: string) {
     return usedCubes.includes(name);
   }
 
-  function isMemberJoined(name: string) {
-    return joinedMembers.includes(name);
+  function isMemberUsed(name: string) {
+    return usedMembers.includes(name);
   }
 
   function getMemberFormat(name: string) {
@@ -432,85 +404,76 @@ export function useQueryBuilder(props: QueryBuilderProps) {
   }
 
   // Updaters with simple common logic for dimensions, measures and segments
-  const simpleUpdaters: MemberUpdaterMap = SIMPLE_MEMBERS.reduce(
-    (acc, type) => {
-      acc[type] = {
-        add(name: string) {
-          const member = members[type][name];
+  const simpleUpdaters: MemberUpdaterMap = SIMPLE_MEMBERS.reduce((acc, type) => {
+    acc[type] = {
+      add(name: string) {
+        const member = members[type][name];
 
-          if (!member) {
-            console.log(
-              `Unable to add ${type.slice(0, -1)}. Member is not found`,
-              name
-            );
+        if (!member) {
+          console.log(`Unable to add ${type.slice(0, -1)}. Member is not found`, name);
 
-            return false;
+          return false;
+        }
+
+        updateQuery((query) => {
+          const list = query[type] || [];
+
+          if (!list?.includes(name)) {
+            list.push(name);
           }
 
-          updateQuery((query) => {
-            const list = query[type] || [];
+          return { [type]: list };
+        });
 
-            if (!list?.includes(name)) {
-              list.push(name);
+        return true;
+      },
+      remove(name: string) {
+        updateQuery((query) => {
+          const list = query[type] || [];
+
+          const index = list?.indexOf(name);
+
+          if (index !== -1) {
+            list.splice(index, 1);
+          }
+
+          return { [type]: list };
+        });
+
+        return true;
+      },
+      toggle(name: string) {
+        updateQuery((query) => {
+          const list = query[type] || [];
+
+          const index = list?.indexOf(name);
+
+          if (index === -1) {
+            const member = members[type][name];
+
+            if (!member) {
+              console.log(`Unable to toggle ${type.slice(0, -1)}. Member is not found`, name);
+
+              return;
             }
 
-            return { [type]: list };
-          });
+            list.push(name);
+          } else {
+            list.splice(index, 1);
+          }
 
-          return true;
-        },
-        remove(name: string) {
-          updateQuery((query) => {
-            const list = query[type] || [];
+          return { [type]: list };
+        });
 
-            const index = list?.indexOf(name);
+        return true;
+      },
+      get list() {
+        return query[type] || [];
+      },
+    };
 
-            if (index !== -1) {
-              list.splice(index, 1);
-            }
-
-            return { [type]: list };
-          });
-
-          return true;
-        },
-        toggle(name: string) {
-          updateQuery((query) => {
-            const list = query[type] || [];
-
-            const index = list?.indexOf(name);
-
-            if (index === -1) {
-              const member = members[type][name];
-
-              if (!member) {
-                console.log(
-                  `Unable to toggle ${type.slice(0, -1)}. Member is not found`,
-                  name
-                );
-
-                return;
-              }
-
-              list.push(name);
-            } else {
-              list.splice(index, 1);
-            }
-
-            return { [type]: list };
-          });
-
-          return true;
-        },
-        get list() {
-          return query[type] || [];
-        },
-      };
-
-      return acc;
-    },
-    {} as MemberUpdaterMap
-  );
+    return acc;
+  }, {} as MemberUpdaterMap);
 
   const grouping = {
     add(name: string, granularity: TimeDimensionGranularity) {
@@ -600,9 +563,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
 
             // If component has no date range either we can remove it
             if (!component.dateRange) {
-              timeDimensions = timeDimensions.filter(
-                (d) => d.dimension !== name
-              );
+              timeDimensions = timeDimensions.filter((d) => d.dimension !== name);
             }
           } else {
             component.granularity = granularity;
@@ -617,16 +578,12 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     get(name: string) {
       const { timeDimensions = [] } = query;
 
-      return timeDimensions.find(
-        (timeDimension) => timeDimension.dimension === name
-      )?.granularity;
+      return timeDimensions.find((timeDimension) => timeDimension.dimension === name)?.granularity;
     },
     getAll() {
       const { timeDimensions = [] } = query;
 
-      return timeDimensions.filter(
-        (timeDimension) => timeDimension.granularity
-      );
+      return timeDimensions.filter((timeDimension) => timeDimension.granularity);
     },
     reorder(names: string[]) {
       updateQuery((query) => {
@@ -948,9 +905,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     ? [...cubes]
     : cubes.filter((cube) =>
         // @ts-ignore
-        connectionId != null
-          ? cube.connectedComponent === connectionId
-          : cube.name === usedCubes[0]
+        connectionId != null ? cube.connectedComponent === connectionId : cube.name === usedCubes[0]
       );
 
   const updatePivotConfig = {
@@ -1007,14 +962,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
       query?.timeDimensions
         ?.filter((timeDimension) => timeDimension.granularity)
         .map((timeDimension) => timeDimension.dimension) || [];
-    const all = [
-      ...measures,
-      ...dimensions,
-      ...segments,
-      ...filters,
-      ...dateRanges,
-      ...grouping,
-    ];
+    const all = [...measures, ...dimensions, ...segments, ...filters, ...dateRanges, ...grouping];
     const allCubeNames: string[] = [];
 
     all.forEach((member) => {
@@ -1025,70 +973,85 @@ export function useQueryBuilder(props: QueryBuilderProps) {
       }
     });
 
-    return allCubeNames.reduce((allStats, cubeName) => {
-      const cube = getCubeByName(cubeName);
-      const stats: CubeStats = {
-        measures: [],
-        dimensions: [],
-        segments: [],
-        filters: [],
-        dateRanges: [],
-        grouping: [],
-        timeDimensions: [],
-        instance: cube,
-      };
+    return allCubeNames.reduce(
+      (allStats, cubeName) => {
+        const cube = getCubeByName(cubeName);
+        const stats: CubeStats = {
+          measures: [],
+          dimensions: [],
+          segments: [],
+          filters: [],
+          dateRanges: [],
+          grouping: [],
+          timeDimensions: [],
+          instance: cube,
+        };
 
-      const cubePrefix = `${cubeName}.`;
+        const cubePrefix = `${cubeName}.`;
 
-      measures?.forEach((measure) => {
-        if (measure.includes(cubePrefix)) {
-          stats.measures.push(measure);
-        }
-      });
+        measures?.forEach((measure) => {
+          if (measure.includes(cubePrefix)) {
+            stats.measures.push(measure);
+          }
+        });
 
-      dimensions?.forEach((dimension) => {
-        if (dimension.includes(cubePrefix)) {
-          stats.dimensions.push(dimension);
-        }
-      });
+        dimensions?.forEach((dimension) => {
+          if (dimension.includes(cubePrefix)) {
+            stats.dimensions.push(dimension);
+          }
+        });
 
-      segments?.forEach((segment) => {
-        if (segment.includes(cubePrefix)) {
-          stats.segments.push(segment);
-        }
-      });
+        segments?.forEach((segment) => {
+          if (segment.includes(cubePrefix)) {
+            stats.segments.push(segment);
+          }
+        });
 
-      filters.forEach((member) => {
-        if (member.includes(cubePrefix)) {
-          stats.filters.push(member);
-        }
-      });
+        filters.forEach((member) => {
+          if (member.includes(cubePrefix)) {
+            stats.filters.push(member);
+          }
+        });
 
-      dateRanges.forEach((member) => {
-        if (member.includes(cubePrefix)) {
-          stats.dateRanges.push(member);
-        }
-      });
+        dateRanges.forEach((member) => {
+          if (member.includes(cubePrefix)) {
+            stats.dateRanges.push(member);
+          }
+        });
 
-      grouping.forEach((member) => {
-        if (member.includes(cubePrefix)) {
-          stats.grouping.push(member);
-        }
-      });
+        grouping.forEach((member) => {
+          if (member.includes(cubePrefix)) {
+            stats.grouping.push(member);
+          }
+        });
 
-      stats.timeDimensions = [...stats.dateRanges];
+        stats.timeDimensions = [...stats.dateRanges];
 
-      stats.grouping.forEach((member) => {
-        if (!stats.timeDimensions.includes(member)) {
-          stats.timeDimensions.push(member);
-        }
-      });
+        stats.grouping.forEach((member) => {
+          if (!stats.timeDimensions.includes(member)) {
+            stats.timeDimensions.push(member);
+          }
+        });
 
-      allStats[cubeName] = stats;
+        allStats[cubeName] = stats;
 
-      return allStats;
-    }, {} as Record<string, CubeStats>);
+        return allStats;
+      },
+      {} as Record<string, CubeStats>
+    );
   }, [queryHash, meta, cubes.length]);
+
+  const memberList = useMemo(() => {
+    return [...Object.values(members.dimensions), ...Object.values(members.measures)];
+  }, [members]);
+
+  const hasPrivateMembers = useMemo(() => {
+    return usedMembers.some((memberName) => {
+      const member = memberList.find((m) => m.name === memberName);
+
+      return !member?.public;
+    });
+  }, [usedCubes, usedMembers]);
 
   return {
     // query
@@ -1136,14 +1099,13 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     setChartType,
     usedCubes,
     usedMembers,
-    joinedCubes,
-    joinedMembers,
-    isCubeJoined,
-    isMemberJoined,
+    isCubeJoined: isCubeUsed,
+    isMemberJoined: isMemberUsed,
     isCubeUsed,
     isQueryEmpty,
     queryHash,
     cubeApi,
+    hasPrivateMembers,
     // ui
     selectedCube,
     selectCube: useEvent((name: string | null) => selectCubeName(name)),
