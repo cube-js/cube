@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 
@@ -189,7 +190,7 @@ export class PreAggregations {
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
-      rollup: () => queryForSqlEvaluation.dimensionColumns(),
+      rollup: () => queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation),
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
@@ -209,6 +210,7 @@ export class PreAggregations {
       preAggregationsSchema: queryForSqlEvaluation.preAggregationSchema(),
       loadSql: queryForSqlEvaluation.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: queryForSqlEvaluation.preAggregationSql(cube, preAggregation),
+      outputColumnTypes: queryForSqlEvaluation.preAggregationOutputColumnTypes(cube, preAggregation),
       uniqueKeyColumns,
       aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,
@@ -219,7 +221,7 @@ export class PreAggregations {
         queryForSqlEvaluation.parseSecondDuration(preAggregation.refreshKey.updateWindow),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
-        this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
+        this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
         preAggregation.partitionGranularity && (
           matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
@@ -1041,12 +1043,15 @@ export class PreAggregations {
     return { preAggregations, result };
   }
 
-  refreshRangeQuery() {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      offset: null,
-      preAggregationQuery: true,
-    });
+  refreshRangeQuery(cube) {
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        offset: null,
+        preAggregationQuery: true,
+      }
+    );
   }
 
   originalSqlPreAggregationQuery(cube, aggregation) {

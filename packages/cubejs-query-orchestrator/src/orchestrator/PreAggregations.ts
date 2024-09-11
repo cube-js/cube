@@ -104,6 +104,9 @@ function getStructureVersion(preAggregation) {
   if (preAggregation.streamOffset) {
     versionArray.push(preAggregation.streamOffset);
   }
+  if (preAggregation.outputColumnTypes) {
+    versionArray.push(preAggregation.outputColumnTypes);
+  }
 
   return version(versionArray.length === 1 ? versionArray[0] : versionArray);
 }
@@ -815,6 +818,9 @@ export class PreAggregationLoader {
     if (this.preAggregation.streamOffset) {
       versionArray.push(this.preAggregation.streamOffset);
     }
+    if (this.preAggregation.outputColumnTypes) {
+      versionArray.push(this.preAggregation.outputColumnTypes);
+    }
     versionArray.push(invalidationKeys);
     return version(versionArray);
   }
@@ -964,7 +970,11 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
+        {
+          streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
+          ...queryOptions
+        }
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
@@ -1107,7 +1117,11 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
+        {
+          streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
+          ...queryOptions
+        }
       ));
 
       return queryOptions;
@@ -1156,6 +1170,7 @@ export class PreAggregationLoader {
         sql,
         params, {
           streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
           ...queryOptions,
           ...capabilities,
           ...this.getStreamingOptions(),
@@ -1261,7 +1276,11 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = await saveCancelFn(client.downloadTable(table, { streamOffset: this.preAggregation.streamOffset, ...externalDriverCapabilities }));
+      tableData = await saveCancelFn(client.downloadTable(table, {
+        streamOffset: this.preAggregation.streamOffset,
+        outputColumnTypes: this.preAggregation.outputColumnTypes,
+        ...externalDriverCapabilities
+      }));
     }
 
     if (!tableData.types) {
