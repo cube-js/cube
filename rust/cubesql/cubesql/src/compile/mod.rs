@@ -370,11 +370,7 @@ mod tests {
         )
             .await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
         assert!(sql.contains(" IN ("));
@@ -385,11 +381,7 @@ mod tests {
         )
             .await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
         assert!(sql.contains(" IN ("));
@@ -408,11 +400,7 @@ mod tests {
             DatabaseProtocol::PostgreSQL,
         ).await.as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
     }
@@ -2992,17 +2980,15 @@ limit
 
         assert!(query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("sixteen_charchar_1"));
 
         assert!(query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("sixteen_charchar_2"));
     }
@@ -7226,11 +7212,7 @@ ORDER BY
                 DatabaseProtocol::PostgreSQL
             ).await.as_logical_plan();
 
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(
                 sql.contains(expected_search_expr),
                 "cast_expr is {}, expected_search_expr is {}",
@@ -7562,17 +7544,15 @@ ORDER BY
         );
         assert!(!query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("ungrouped"));
 
         assert!(query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("[\"dim2\",\"asc\"]"));
     }
@@ -7625,9 +7605,8 @@ ORDER BY "source"."str0" ASC
         );
         assert!(!query_plan
             .as_logical_plan()
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("ungrouped"));
     }
@@ -11433,11 +11412,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `LOWER(..) <> .. OR .. IS NULL`
         let re = Regex::new(r"LOWER ?\(.+\) != .+ OR .+ IS NULL").unwrap();
@@ -11470,11 +11445,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(LOWER(..) IN (..))`
         let re = Regex::new(r"NOT.+LOWER ?\(.+\).* IN ").unwrap();
@@ -11795,11 +11766,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(LOWER(..) IN (..)) OR NOT(.. IS NOT NULL)`
         let re = Regex::new(r"NOT.+LOWER ?\(.+\) IN .+\) OR NOT.+ IS NOT NULL").unwrap();
@@ -12144,11 +12111,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(sql.contains("LOWER("));
         assert!(sql.contains("GROUP BY "));
@@ -12729,11 +12692,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check wrapping for `NOT(.. IS NULL OR LOWER(..) IN)`
         let re = Regex::new(r"NOT \(.+ IS NULL OR .*LOWER\(.+ IN ").unwrap();
@@ -12780,11 +12739,7 @@ ORDER BY "source"."str0" ASC
         let re = Regex::new(r"\(LOWER ?\(.+\) = .+ OR .+LOWER ?\(.+\) = .+\) IN \(TRUE, FALSE\)")
             .unwrap();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         assert!(re.is_match(&sql));
     }
@@ -13407,9 +13362,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("LEFT"));
     }
@@ -13775,9 +13729,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -13859,9 +13812,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -13888,9 +13840,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -13917,9 +13868,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT"));
     }
@@ -13941,17 +13891,12 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("OVER"),
             "SQL should contain 'OVER': {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -13978,32 +13923,22 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("long_l_1"),
             "SQL should contain long_l_1: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         assert!(
             logical_plan
-                .find_cube_scan_wrapper()
+                .find_cube_scan_wrapped_sql()
                 .wrapped_sql
-                .unwrap()
                 .sql
                 .contains("long_l_1"),
             "SQL should contain long_l_2: {}",
-            logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql
+            logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
         );
 
         let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -14029,9 +13964,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("CURRENT_DATE()"));
 
@@ -14085,11 +14019,7 @@ ORDER BY "source"."str0" ASC
         .await
         .as_logical_plan();
 
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
 
         // check if contains `CAST(EXTRACT(YEAR FROM ..) || .. || .. || ..)`
         let re = Regex::new(r"CAST.+EXTRACT.+YEAR FROM(.+ \|\|){3}").unwrap();
@@ -14250,11 +14180,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
 
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(sql.contains("EXTRACT(YEAR"));
             assert!(sql.contains("EXTRACT(MONTH"));
 
@@ -14364,11 +14290,7 @@ ORDER BY "source"."str0" ASC
         // TODO: split on complex expressions?
         // CAST(CAST(ta_1.order_date AS Date32) - CAST(CAST(Utf8("1970-01-01") AS Date32) AS Date32) + Int64(3) AS Decimal(38, 10))
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(sql.contains("\"limit\":1000"));
             assert!(sql.contains("% 7"));
 
@@ -14751,11 +14673,7 @@ ORDER BY "source"."str0" ASC
         let logical_plan = query_plan.as_logical_plan();
 
         if Rewriter::sql_push_down_enabled() {
-            let sql = logical_plan
-                .find_cube_scan_wrapper()
-                .wrapped_sql
-                .unwrap()
-                .sql;
+            let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
             assert!(sql.contains("LIMIT 101"));
             assert!(sql.contains("ORDER BY"));
 
@@ -14869,9 +14787,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("NOT IN ("));
     }
@@ -14940,9 +14857,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("NOT ("));
     }
@@ -14974,9 +14890,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATEDIFF(day,"));
 
@@ -15003,11 +14918,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATETIME_DIFF(CAST("));
         assert!(sql.contains("day)"));
 
@@ -15034,11 +14945,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATEDIFF(day,"));
         assert!(sql.contains("DATE_TRUNC('day',"));
 
@@ -15065,11 +14972,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("CASE WHEN LOWER('day')"));
         assert!(sql.contains("WHEN 'year' THEN 12 WHEN 'quarter' THEN 3 WHEN 'month' THEN 1 END"));
         assert!(sql.contains("EXTRACT(EPOCH FROM"));
@@ -15104,9 +15007,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATEADD(day, 7,"));
 
@@ -15133,11 +15035,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("DATETIME_ADD(CAST("));
         assert!(sql.contains("INTERVAL 7 day)"));
 
@@ -15165,11 +15063,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("+ '7 day'::interval"));
     }
 
@@ -15245,9 +15139,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("DATE("));
     }
@@ -15284,9 +15177,8 @@ ORDER BY "source"."str0" ASC
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("EXTRACT(MONTH FROM "));
     }
@@ -15327,11 +15219,7 @@ ORDER BY "source"."str0" ASC
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("order_date"));
         assert!(sql.contains("EXTRACT(DAY FROM"))
     }
@@ -15450,11 +15338,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("OFFSET 1\nLIMIT 2"));
     }
 
@@ -15706,9 +15590,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("SELECT DISTINCT "));
 
@@ -15790,9 +15673,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW"));
 
@@ -16334,9 +16216,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         let logical_plan = query_plan.as_logical_plan();
         assert!(logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("LIMIT 250"));
 
@@ -16621,11 +16502,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS STRING)"));
         assert!(sql.contains(" AS FLOAT)"));
         assert!(sql.contains(" AS DOUBLE)"));
@@ -16653,11 +16530,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS STRING)"));
         assert!(sql.contains(" AS FLOAT64)"));
         assert!(sql.contains(" AS BIGDECIMAL(38,10))"));
@@ -16681,11 +16554,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains(" AS TEXT)"));
         assert!(sql.contains(" AS REAL)"));
         assert!(sql.contains(" AS DOUBLE PRECISION)"));
@@ -16805,11 +16674,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         .await;
 
         let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
+        let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
         assert!(sql.contains("LIKE "));
         assert!(sql.contains("ESCAPE "));
 
