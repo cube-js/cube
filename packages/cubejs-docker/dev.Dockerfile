@@ -9,7 +9,7 @@ ENV CI=0
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python3 libpython3-dev gcc g++ make cmake openjdk-11-jdk-headless \
+       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-11-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -171,7 +171,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3 libpython3-dev \
+    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .
