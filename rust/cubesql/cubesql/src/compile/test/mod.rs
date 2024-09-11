@@ -721,13 +721,17 @@ impl TransportService for TestConnectionTransport {
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
     ) -> Result<TransportLoadResponse, CubeError> {
-        if sql_query.is_some() {
-            unimplemented!("load with sql_query");
+        if let Some(sql_query) = sql_query {
+            return Err(CubeError::internal(format!(
+                "Test transport does not support load with SQL query: {sql_query:?}"
+            )));
         }
 
         let mocks = self.load_mocks.lock().await;
         let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
-            panic!("Unexpected query: {:?}", query);
+            return Err(CubeError::internal(format!(
+                "Unexpected query in test transport: {query:?}"
+            )));
         };
         Ok(res.clone())
     }
