@@ -30,7 +30,7 @@ use std::{
 
 use crate::{
     compile::{
-        engine::df::wrapper::{CubeScanWrapperNode, SqlQuery},
+        engine::df::wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode, SqlQuery},
         rewrite::WrappedSelectType,
         test::find_cube_scans_deep_search,
     },
@@ -386,35 +386,32 @@ impl ExtensionPlanner for CubeScanExtensionPlanner {
                     config_obj: self.config_obj.clone(),
                 }))
             } else if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                return Err(DataFusionError::Internal(format!(
+                    "CubeScanWrapperNode is not executable, SQL should be generated first with QueryEngine::evaluate_wrapped_sql: {:?}",
+                    wrapper_node
+                )));
+            } else if let Some(wrapped_sql_node) =
+                node.as_any().downcast_ref::<CubeScanWrappedSqlNode>()
+            {
                 // TODO
                 // assert_eq!(logical_inputs.len(), 0, "Inconsistent number of inputs");
                 // assert_eq!(physical_inputs.len(), 0, "Inconsistent number of inputs");
                 let scan_node =
-                    find_cube_scans_deep_search(wrapper_node.wrapped_plan.clone(), false)
+                    find_cube_scans_deep_search(wrapped_sql_node.wrapped_plan.clone(), false)
                         .into_iter()
                         .next()
                         .ok_or(DataFusionError::Internal(format!(
                             "No cube scans found in wrapper node: {:?}",
-                            wrapper_node
+                            wrapped_sql_node
                         )))?;
 
-                let schema = SchemaRef::new(wrapper_node.schema().as_ref().into());
+                let schema = SchemaRef::new(wrapped_sql_node.schema().as_ref().into());
                 Some(Arc::new(CubeScanExecutionPlan {
                     schema,
-                    member_fields: wrapper_node.member_fields.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Member fields are not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone(),
+                    member_fields: wrapped_sql_node.member_fields.clone(),
                     transport: self.transport.clone(),
-                    request: wrapper_node.request.clone().unwrap_or(scan_node.request.clone()),
-                    wrapped_sql: Some(wrapper_node.wrapped_sql.as_ref().ok_or_else(|| {
-                        DataFusionError::Internal(format!(
-                            "Wrapped SQL is not set for wrapper node. Optimization wasn't performed: {:?}",
-                            wrapper_node
-                        ))
-                    })?.clone()),
+                    request: wrapped_sql_node.request.clone(),
+                    wrapped_sql: Some(wrapped_sql_node.wrapped_sql.clone()),
                     auth_context: scan_node.auth_context.clone(),
                     options: scan_node.options.clone(),
                     meta: self.meta.clone(),
