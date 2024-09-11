@@ -28,3 +28,4 @@ dist-ssr
 build
 src/stats.json
 src/apps.json
+public/download

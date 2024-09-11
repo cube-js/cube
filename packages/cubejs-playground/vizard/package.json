@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "yarn prepare && vite",
-    "build": "yarn prepare && tsc && vite build && mv ./build ../public/vizard",
+    "build": "yarn prepare && tsc && vite build",
     "prepare": "node ./convert-apps.js && node ./build-apps.js",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
