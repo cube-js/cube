@@ -18601,4 +18601,23 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             }
         )
     }
+
+    #[tokio::test]
+    async fn test_quicksight_sql_implementation_info() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_sql_implementation_info",
+            execute_query(
+                r#"
+                SELECT character_value, version() 
+                FROM INFORMATION_SCHEMA.SQL_IMPLEMENTATION_INFO
+                WHERE implementation_info_id IN ('17','18')
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

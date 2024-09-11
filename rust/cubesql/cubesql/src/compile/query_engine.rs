@@ -366,7 +366,7 @@ impl QueryEngine for SqlQueryEngine {
             ctx.register_udf(create_user_udf(state.clone()));
         } else if state.protocol == DatabaseProtocol::PostgreSQL {
             ctx.register_udf(create_version_udf(
-                "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
+                "PostgreSQL 14.2 on x86_64-cubesql".to_string(),
             ));
             ctx.register_udf(create_db_udf("current_database".to_string(), state.clone()));
             ctx.register_udf(create_db_udf("current_schema".to_string(), state.clone()));
