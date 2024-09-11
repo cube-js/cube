@@ -26,6 +26,7 @@
   ],
   "dependencies": {
     "@cubejs-backend/base-driver": "^0.35.81",
+    "@cubejs-backend/shared": "^0.35.67",
     "generic-pool": "^3.1.7",
     "node-java-maven": "^0.1.2",
     "sqlstring": "^2.3.0"
