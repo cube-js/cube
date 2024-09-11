@@ -29,12 +29,11 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl3 python3.11 libpython3.11-dev \
+    && apt-get install -y --no-install-recommends libssl3 python3.11 libpython3.11-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN yarn policies set-version v1.22.22
 
-ENV TERM=rxvt-unicode
 ENV NODE_ENV=production
 
 WORKDIR /cube

@@ -12,12 +12,11 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl3 curl \
+    && apt-get install -y --no-install-recommends libssl3 curl \
        cmake python3 gcc g++ make cmake openjdk-17-jdk-headless unzip \
     && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
-ENV TERM=rxvt-unicode
 ENV NODE_ENV=development
 
 WORKDIR /cubejs
