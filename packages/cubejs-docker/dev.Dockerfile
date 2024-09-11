@@ -86,7 +86,7 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
 

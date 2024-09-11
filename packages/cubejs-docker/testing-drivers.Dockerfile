@@ -78,7 +78,7 @@ COPY packages/cubejs-jdbc-driver/package.json packages/cubejs-jdbc-driver/packag
 #COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 #COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 RUN yarn config set network-timeout 120000 -g
 
 ######################################################################

@@ -46,7 +46,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Yarn install
         uses: nick-fields/retry@v3
         env:
@@ -108,7 +108,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Yarn install
         uses: nick-fields/retry@v3
         env:
@@ -172,7 +172,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-workspace-main-20.x-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Yarn install
         uses: nick-fields/retry@v3
         env:

@@ -109,7 +109,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
       - uses: Swatinem/rust-cache@v2
@@ -200,7 +200,7 @@ jobs:
           node-version: 20.x
 
       - name: Configure `yarn`
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path

@@ -25,7 +25,7 @@ COPY --from=build /cubejs /cube-build
 RUN cd /cube-build && yarn run link:dev
 COPY package.json.local package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
 
