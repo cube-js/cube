@@ -1,7 +1,7 @@
 {
   "name": "@inthememory/pinot-driver",
   "description": "Cube.js Pinot database driver",
-  "author": "Cube Dev, Inc.",
+  "author": "Julian Ronsse, InTheMemory",
   "version": "0.35.80",
   "repository": {
     "type": "git",

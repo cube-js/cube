@@ -13,7 +13,7 @@ Cube.js Pinot driver.
 
 ### Project Status
 
-Project is WIP 
+In Review. [#8689](https://github.com/cube-js/cube/pull/8689)
 
 ### Installation
 
