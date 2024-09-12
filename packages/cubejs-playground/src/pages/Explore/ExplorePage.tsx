@@ -20,8 +20,7 @@ export function ExplorePage() {
   const { push } = useHistory();
   const livePreviewContext = useLivePreviewContext();
 
-  const { schemaVersion, setContext, playgroundContext } =
-    useAppContext();
+  const { schemaVersion, setContext, playgroundContext } = useAppContext();
   const { token: securityContextToken } = useSecurityContext();
 
   const { basePath, cubejsToken } = playgroundContext;
@@ -60,7 +59,7 @@ export function ExplorePage() {
   return (
     <QueryBuilderContainer
       schemaVersion={schemaVersion}
-      onVizStateChanged={setQueryParam}
+      onQueryChange={setQueryParam}
       onTabChange={setQueryParam}
     />
   );

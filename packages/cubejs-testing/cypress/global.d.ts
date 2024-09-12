@@ -3,11 +3,13 @@
 declare namespace Cypress {
   type MatchImageSnapshotOptions = {
     failureThreshold: number;
-    failureThresholdType: 'percent';
+    failureThresholdType: "percent";
   };
 
   interface Chainable {
     getByTestId(dataTestAttribute: string, args?: any): Chainable<Element>;
+
+    getByQa(dataTestAttribute: string, args?: any): Chainable<Element>;
 
     setQuery(query: Object, args?: any): void;
 
@@ -21,9 +23,15 @@ declare namespace Cypress {
 
     matchImageSnapshot(
       name?: string,
-      options?: Partial<MatchImageSnapshotOptions & Loggable & Timeoutable & ScreenshotOptions>
+      options?: Partial<
+        MatchImageSnapshotOptions & Loggable & Timeoutable & ScreenshotOptions
+      >
     ): void;
-    matchImageSnapshot(options: Partial<MatchImageSnapshotOptions & Loggable & Timeoutable & ScreenshotOptions>): void;
+    matchImageSnapshot(
+      options: Partial<
+        MatchImageSnapshotOptions & Loggable & Timeoutable & ScreenshotOptions
+      >
+    ): void;
 
     getLocalStorage(item: string): Chainable<string | null>;
   }

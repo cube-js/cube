@@ -83,7 +83,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
       this.setState({
         tablesSchema: result.tablesSchema,
       });
-    } catch (e) {
+    } catch (e: any) {
       this.setState({ schemaLoadingError: e });
     } finally {
       this.setState({ schemaLoading: false });
