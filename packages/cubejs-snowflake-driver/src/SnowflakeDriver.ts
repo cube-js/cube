@@ -8,7 +8,7 @@ import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import snowflake, { Column, Connection, Statement } from 'snowflake-sdk';
+import snowflake, { Column, Connection, RowStatement } from 'snowflake-sdk';
 import {
   BaseDriver,
   DownloadTableCSVData,
@@ -227,6 +227,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (privateKey && !privateKey.endsWith('\n')) {
       privateKey += '\n';
     }
+
+    snowflake.configure({
+      // TODO: Remove after release of https://github.com/snowflakedb/snowflake-connector-nodejs/pull/912
+      logLevel: 'OFF' as any
+    });
 
     this.config = {
       readOnly: false,
@@ -700,7 +705,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     _options: StreamOptions,
   ): Promise<StreamTableDataWithTypes> {
     const connection = await this.getConnection();
-    const stmt = await new Promise<Statement>((resolve, reject) => connection.execute({
+    const stmt = await new Promise<RowStatement>((resolve, reject) => connection.execute({
       sqlText: query,
       binds: <string[] | undefined>values,
       fetchAsString: [
@@ -742,7 +747,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     };
   }
 
-  private getTypes(stmt: Statement) {
+  private getTypes(stmt: RowStatement) {
     return stmt.getColumns().map((column) => {
       const type = {
         name: column.getName().toLowerCase(),
