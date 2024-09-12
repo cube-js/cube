@@ -742,11 +742,16 @@ export class PreAggregations {
    */
   findPreAggregationForQuery() {
     if (!this.preAggregationForQuery) {
-      this.preAggregationForQuery =
-        this
-          .rollupMatchResults()
-          // Refresh worker can access specific pre-aggregations even in case those hidden by others
-          .find(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      // Refresh worker can access specific pre-aggregations even in case those hidden by others
+      const matchedPreAggs = this.rollupMatchResults().filter(p => p.canUsePreAggregation && (!this.query.options.preAggregationId || p.preAggregationId === this.query.options.preAggregationId));
+      // Taking the first one from the request for the simplicity
+      // Trying to choose the preAggregation with the exact same granularity defined
+      // among the potentially applicable. This especially makes sense when using
+      // custom granularity in the query and if there is a related preAggregation
+      const reqGranularity = this.query.timeDimensions.length > 0 && this.query.timeDimensions[0].granularity;
+      const exactMatch = reqGranularity && matchedPreAggs.find(p => p.preAggregation.granularity === reqGranularity);
+
+      this.preAggregationForQuery = exactMatch || (matchedPreAggs.length > 0 ? matchedPreAggs[0] : undefined);
     }
     return this.preAggregationForQuery;
   }
