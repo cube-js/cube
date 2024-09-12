@@ -39,7 +39,7 @@ export class CubeToMetaTransformer {
    */
   transform(cube) {
     const cubeTitle = cube.title || this.titleize(cube.name);
-    
+
     const isCubeVisible = this.isVisible(cube, true);
 
     return {
@@ -80,6 +80,13 @@ export class CubeToMetaTransformer {
               ? this.isVisible(nameToDimension[1], !nameToDimension[1].primaryKey)
               : false,
             primaryKey: !!nameToDimension[1].primaryKey,
+            granularities:
+              nameToDimension[1].granularities
+                ? R.compose(R.map((g) => ({
+                  name: g[0],
+                  title: this.title(cubeTitle, g, true),
+                })), R.toPairs)(nameToDimension[1].granularities)
+                : undefined,
           })),
           R.toPairs
         )(cube.dimensions || {}),
