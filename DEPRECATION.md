@@ -188,7 +188,7 @@ supports HTTP **and** WebSockets as transports, we want our authentication API
 to not rely on transport-specific details. We now recommend using
 [`checkAuth`][ref-checkauth] as a transport-agnostic method of authentication.
 This means the same authentication logic can be reused for both HTTP and
-Websockets transports.
+WebSockets transports.
 
 If you are using custom authorization, please take a [look at the
 documentation][link-custom-auth]
