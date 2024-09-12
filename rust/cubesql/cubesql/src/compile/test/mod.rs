@@ -36,6 +36,8 @@ pub mod test_df_execution;
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
+#[cfg(test)]
+pub mod test_user_change;
 pub mod utils;
 pub use utils::*;
 
@@ -659,10 +661,19 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
+#[derive(Clone, Debug)]
+pub struct TestTransportLoadCall {
+    pub query: TransportLoadRequestQuery,
+    pub sql_query: Option<SqlQuery>,
+    pub ctx: AuthContextRef,
+    pub meta: LoadRequestMeta,
+}
+
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
     load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
 impl TestConnectionTransport {
@@ -670,7 +681,12 @@ impl TestConnectionTransport {
         Self {
             meta_context,
             load_mocks: tokio::sync::Mutex::new(vec![]),
+            load_calls: tokio::sync::Mutex::new(vec![]),
         }
+    }
+
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.load_calls.lock().await.clone()
     }
 
     pub async fn add_cube_load_mock(
@@ -694,13 +710,17 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
+        meta: LoadRequestMeta,
         _member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
+        let inputs = serde_json::json!({
+            "query": query,
+            "meta": meta,
+        });
         Ok(SqlResponse {
             sql: SqlQuery::new(
-                format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                format!("SELECT * FROM {}", serde_json::to_string(&inputs).unwrap()),
                 expression_params.unwrap_or(Vec::new()),
             ),
         })
@@ -712,16 +732,30 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
-        _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
     ) -> Result<TransportLoadResponse, CubeError> {
-        if sql_query.is_some() {
-            unimplemented!("load with sql_query");
+        {
+            let mut calls = self.load_calls.lock().await;
+            calls.push(TestTransportLoadCall {
+                query: query.clone(),
+                sql_query: sql_query.clone(),
+                ctx: ctx.clone(),
+                meta: meta.clone(),
+            });
+        }
+
+        if let Some(sql_query) = sql_query {
+            return Err(CubeError::internal(format!(
+                "Test transport does not support load with SQL query: {sql_query:?}"
+            )));
         }
 
         let mocks = self.load_mocks.lock().await;
         let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
-            panic!("Unexpected query: {:?}", query);
+            return Err(CubeError::internal(format!(
+                "Unexpected query in test transport: {query:?}"
+            )));
         };
         Ok(res.clone())
     }
@@ -861,6 +895,9 @@ impl TestContext {
             .map(|req_limit| req_limit.min(config_limit))
             .or(Some(config_limit));
         self.transport.add_cube_load_mock(req, res).await
+    }
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.transport.load_calls().await
     }
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {

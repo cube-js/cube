@@ -465,12 +465,14 @@ impl CubeScanWrapperNode {
                                 node
                             )));
                         }
+                        let mut meta_with_user = load_request_meta.as_ref().clone();
+                        meta_with_user.set_change_user(node.options.change_user.clone());
                         let sql = transport
                             .sql(
                                 node.span_id.clone(),
                                 node.request.clone(),
                                 node.auth_context,
-                                load_request_meta.as_ref().clone(),
+                                meta_with_user,
                                 Some(
                                     node.member_fields
                                         .iter()
@@ -843,12 +845,16 @@ impl CubeScanWrapperNode {
                                 }
                                 // TODO time dimensions, filters, segments
 
+                                let mut meta_with_user = load_request_meta.as_ref().clone();
+                                meta_with_user.set_change_user(
+                                    ungrouped_scan_node.options.change_user.clone(),
+                                );
                                 let sql_response = transport
                                     .sql(
                                         ungrouped_scan_node.span_id.clone(),
                                         load_request.clone(),
                                         ungrouped_scan_node.auth_context.clone(),
-                                        load_request_meta.as_ref().clone(),
+                                        meta_with_user,
                                         // TODO use aliases or push everything through names?
                                         None,
                                         Some(sql.values.clone()),
