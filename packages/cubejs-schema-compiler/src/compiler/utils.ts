@@ -1,5 +1,12 @@
 import { camelize } from 'inflection';
 
+// It's a map where key - is a level and value - is a map of properties on this level to ignore camelization
+const IGNORE_CAMELIZE = {
+  1: {
+    granularities: true,
+  }
+};
+
 function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unknown {
   if (!obj) {
     return obj;
@@ -12,7 +19,7 @@ function camelizeObjectPart(obj: unknown, camelizeKeys: boolean, level = 0): unk
   } else if (typeof obj === 'object') {
     for (const key of Object.keys(obj)) {
       if (!(level === 1 && key === 'meta')) {
-        obj[key] = camelizeObjectPart(obj[key], true, level + 1);
+        obj[key] = camelizeObjectPart(obj[key], !IGNORE_CAMELIZE[level]?.[key], level + 1);
       }
 
       if (camelizeKeys) {

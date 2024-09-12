@@ -2,7 +2,8 @@
 import { GenericContainer, Wait } from 'testcontainers';
 import sql from 'mssql';
 
-import { BaseDbRunner } from '../postgres/BaseDbRunner';
+import { BaseDbRunner } from '../utils/BaseDbRunner';
+import { MssqlQuery } from '../../../src';
 
 export class MSSqlDbRunner extends BaseDbRunner {
   async connectionLazyInit(port) {
@@ -83,6 +84,15 @@ export class MSSqlDbRunner extends BaseDbRunner {
     (2, 1, 2),
     (3, 3, 6)
     `);
+    await query(`CREATE TABLE ##numbers (num INT);`);
+    await query(`
+    INSERT INTO ##numbers (num) VALUES (0), (1), (2), (3), (4), (5), (6), (7), (8), (9),
+                                  (10), (11), (12), (13), (14), (15), (16), (17), (18), (19),
+                                  (20), (21), (22), (23), (24), (25), (26), (27), (28), (29),
+                                  (30), (31), (32), (33), (34), (35), (36), (37), (38), (39),
+                                  (40), (41), (42), (43), (44), (45), (46), (47), (48), (49),
+                                  (50), (51), (52), (53), (54), (55), (56), (57), (58), (59);
+    `);
   }
 
   password() {
@@ -127,5 +137,9 @@ export class MSSqlDbRunner extends BaseDbRunner {
 
   port() {
     return 1433;
+  }
+
+  newTestQuery(compilers, query) {
+    return new MssqlQuery(compilers, query);
   }
 }

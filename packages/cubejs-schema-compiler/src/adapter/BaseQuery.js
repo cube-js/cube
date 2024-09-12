@@ -16,7 +16,6 @@ import { FROM_PARTITION_RANGE, inDbTimeZone, MAX_SOURCE_ROW_LIMIT, QueryAlias, g
 import {
   buildSqlAndParams as nativeBuildSqlAndParams,
 } from '@cubejs-backend/native';
-import { eventNames } from 'process';
 import { UserError } from '../compiler/UserError';
 import { BaseMeasure } from './BaseMeasure';
 import { BaseDimension } from './BaseDimension';
@@ -31,7 +30,7 @@ import { SqlParser } from '../parser/SqlParser';
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
 const standardGranularitiesParents = {
-  year: ['year', 'quarter', 'month', 'month', 'day', 'hour', 'minute', 'second'],
+  year: ['year', 'quarter', 'month', 'day', 'hour', 'minute', 'second'],
   quarter: ['quarter', 'month', 'day', 'hour', 'minute', 'second'],
   month: ['month', 'day', 'hour', 'minute', 'second'],
   week: ['week', 'day', 'hour', 'minute', 'second'],
@@ -716,18 +715,38 @@ export class BaseQuery {
     );
   }
 
+  /**
+   * @param {string} date
+   * @param {string} interval
+   * @returns {string}
+   */
   subtractInterval(date, interval) {
     return `${date} - interval '${interval}'`;
   }
 
+  /**
+   * @param {string} date
+   * @param {string} interval
+   * @returns {string}
+   */
   addInterval(date, interval) {
     return `${date} + interval '${interval}'`;
   }
 
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
   addTimestampInterval(timestamp, interval) {
     return this.addInterval(timestamp, interval);
   }
 
+  /**
+   * @param {string} timestamp
+   * @param {string} interval
+   * @returns {string}
+   */
   subtractTimestampInterval(timestamp, interval) {
     return this.subtractInterval(timestamp, interval);
   }
@@ -1346,7 +1365,7 @@ export class BaseQuery {
       () => baseQueryFn(cumulativeMeasures, filters),
       cumulativeMeasure.shouldUngroupForCumulative(),
       !cumulativeMeasure.shouldUngroupForCumulative() && this.minGranularity(
-        cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).granularity
+        cumulativeMeasure.windowGranularity(), this.timeDimensions.find(d => d.granularity).resolvedGranularity()
       ) || undefined
     );
     const baseQueryAlias = this.cubeAlias('base');
@@ -2713,9 +2732,80 @@ export class BaseQuery {
     throw new Error('Not implemented');
   }
 
+  /**
+   * @param {string} granularity
+   * @param {string} dimension
+   * @return {string}
+   */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   timeGroupedColumn(granularity, dimension) {
     throw new Error('Not implemented');
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point
+   * @param {string} interval (a value expression of type interval)
+   * @param {string} source (a value expression of type timestamp/date)
+   * @param {string} origin (a value expression of type timestamp/date)
+   * @returns {string}
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dateBin(interval, source, origin) {
+    throw new Error('Date bin function is not implemented');
+    // Different syntax possible in different DBs
+  }
+
+  /**
+   * Returns the lowest time unit for the interval
+   * @protected
+   * @param {string} interval
+   * @returns {string}
+   */
+  diffTimeUnitForInterval(interval) {
+    if (/second/i.test(interval)) {
+      return 'second';
+    } else if (/minute/i.test(interval)) {
+      return 'minute';
+    } else if (/hour/i.test(interval)) {
+      return 'hour';
+    } else if (/day/i.test(interval)) {
+      return 'day';
+    } else if (/week/i.test(interval)) {
+      return 'day';
+    } else if (/month/i.test(interval)) {
+      return 'month';
+    } else if (/quarter/i.test(interval)) {
+      return 'month';
+    } else /* if (/year/i.test(interval)) */ {
+      return 'year';
+    }
+  }
+
+  /**
+   * @param {string} dimension
+   * @param {import('./Granularity').Granularity} granularity
+   * @return {string}
+   */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  dimensionTimeGroupedColumn(dimension, granularity) {
+    let dtDate;
+
+    // Interval is aligned with natural calendar, so we can use DATE_TRUNC
+    if (granularity.isNaturalAligned()) {
+      if (granularity.granularityOffset) {
+        // Example: DATE_TRUNC(interval, dimension - INTERVAL 'offset') + INTERVAL 'offset'
+        dtDate = this.subtractInterval(dimension, granularity.granularityOffset);
+        dtDate = this.timeGroupedColumn(granularity.granularityFromInterval(), dtDate);
+        dtDate = this.addInterval(dtDate, granularity.granularityOffset);
+
+        return dtDate;
+      }
+
+      return this.timeGroupedColumn(granularity.granularityFromInterval(), dimension);
+    }
+
+    return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
   }
 
   /**
