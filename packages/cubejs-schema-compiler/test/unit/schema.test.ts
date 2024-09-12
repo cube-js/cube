@@ -1,5 +1,5 @@
 import { prepareCompiler } from './PrepareCompiler';
-import { createCubeSchema } from './utils';
+import { createCubeSchema, createCubeSchemaWithCustomGranularities } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -292,6 +292,27 @@ describe('Schema Testing', () => {
     expect(segments).toBeDefined();
     expect(segments.length).toBeGreaterThan(0);
     expect(segments.find((segment) => segment.name === 'CubeA.sfUsers').description).toBe('SF users segment from createCubeSchema');
+  });
+
+  it('custom granularities in meta', async () => {
+    const { compiler, metaTransformer } = prepareCompiler([
+      createCubeSchemaWithCustomGranularities('orders')
+    ]);
+    await compiler.compile();
+
+    const { dimensions } = metaTransformer.cubes[0].config;
+
+    expect(dimensions).toBeDefined();
+    expect(dimensions.length).toBeGreaterThan(0);
+
+    const dg = dimensions.find((dimension) => dimension.name === 'orders.createdAt');
+    expect(dg).toBeDefined();
+    expect(dg.granularities).toBeDefined();
+    expect(dg.granularities.length).toBeGreaterThan(0);
+
+    const gr = dg.granularities.find(g => g.name === 'half_year');
+    expect(gr).toBeDefined();
+    expect(gr.title).toBe('Half Year');
   });
 
   it('join types', async () => {
