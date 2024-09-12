@@ -1,4 +1,5 @@
 {
+  "_version": "18.2.0",
   "exclude": [
     "node_modules",
     "dist",
@@ -6,8 +7,8 @@
   "files": [],
   "compilerOptions": {
     "incremental": true,
-    "lib": ["es2021"],
-    "target": "es2021",
+    "lib": ["es2023"],
+    "target": "es2022",
     "module": "commonjs",
     "baseUrl": ".",
     "paths": {
