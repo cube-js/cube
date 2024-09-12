@@ -1,38 +1,7 @@
-import { PivotConfig, ResultSet } from '@cubejs-client/core';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  Title,
-  Filler,
-  Tooltip,
-  Legend,
-  BarElement,
-  ArcElement,
-} from 'chart.js';
+import 'chart.js/auto';
 import { Line, Bar, Pie, Doughnut } from 'react-chartjs-2';
-import { CHART_COLORS, CHART_SOLID_COLORS } from './colors';
-import { ChartType } from './types';
-
-ChartJS.register(
-  ArcElement,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  Filler,
-  Title,
-  Tooltip,
-  Legend
-);
-
-const CHART_OPTIONS = {
-  responsive: true,
-  maintainAspectRatio: true,
-};
+import { PivotConfig, ResultSet } from '@cubejs-client/core';
+import { type ChartType } from './types';
 
 interface ChartViewerProps {
   resultSet: ResultSet;
@@ -43,33 +12,24 @@ interface ChartViewerProps {
 export function ChartViewer(props: ChartViewerProps) {
   const { resultSet, pivotConfig, chartType } = props;
 
-  if (chartType === 'table') {
-    return null;
-  }
-
-  const colors = chartType === 'line' ? CHART_COLORS : CHART_SOLID_COLORS;
-
   const data = {
     labels: resultSet.chartPivot(pivotConfig).map((row) => row.x),
-    datasets: resultSet.series(pivotConfig).map((item, i) => {
+    datasets: resultSet.series(pivotConfig).map((item) => {
       return {
         fill: chartType === 'area',
         label: item.title,
-        data: item.series.map(({ value }) => value),
-        backgroundColor: colors[i % colors.length],
+        data: item.series.map(({ value }) => value)
       };
     }),
   };
 
   const ChartElement = {
-    bar: Bar,
-    line: Line,
     area: Line,
-    pie: Pie,
+    bar: Bar,
     doughnut: Doughnut,
-  }[chartType];
+    line: Line,
+    pie: Pie
+  }[chartType as Exclude<ChartType, 'table'>];
 
-  if (!ChartElement) return;
-
-  return <ChartElement options={CHART_OPTIONS} data={data} />;
+  return <ChartElement data={data} />;
 }

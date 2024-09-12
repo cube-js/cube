@@ -19,4 +19,5 @@ body {
   padding: 16px;
   min-width: 320px;
   min-height: 100vh;
+  box-sizing: border-box;
 }

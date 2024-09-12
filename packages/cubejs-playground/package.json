@@ -11,11 +11,12 @@
   "module": "lib/playground/index.js",
   "types": "lib/playground/index.d.ts",
   "scripts": {
+    "postinstall": "yarn run build:vizard",
     "unit": "vitest run",
     "dev": "vite",
     "watch": "tsc --noEmit false --watch",
     "build:lib": "tsc --noEmit false && node postbuild.js && cp -R src/img/ lib/img/",
-    "build:vizard": "cd ./vizard && yarn build && mv ./build ../public/vizard",
+    "build:vizard": "cd ./vizard && yarn && yarn build && rsync -av ./build/ ../public/vizard/build/",
     "build": "tsc && yarn build:vizard && yarn build:playground && yarn build:lib",
     "build:playground": "SKIP_PREFLIGHT_CHECK=true vite build && rm -Rf ../cubejs-server-core/playground/** && cp -R build/ ../cubejs-server-core/playground/"
   },

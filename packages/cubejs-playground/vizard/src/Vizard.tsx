@@ -16,8 +16,8 @@ const DEFAULT_VALUES: AllParams = {
   ...validateVisualParams({
     visualization: 'line',
   }),
-  useWebSockets: true,
-  useSubscription: true,
+  useWebSockets: false,
+  useSubscription: false,
 };
 
 type Section = 'code' | 'preview';

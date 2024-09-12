@@ -1,12 +1,13 @@
-import { CubeProvider } from '@cubejs-client/react';
 import cube, { PivotConfig, Query } from '@cubejs-client/core';
+import { CubeProvider } from '@cubejs-client/react';
+import WebSocketTransport from '@cubejs-client/ws-transport';
 import { ChartViewer } from './ChartViewer.tsx';
 import { extractHashConfig } from './config';
 import { QueryRenderer } from './QueryRenderer.tsx';
 import { ChartType, Config } from './types';
 
 function App() {
-  const { apiUrl, apiToken, query, pivotConfig, chartType } = extractHashConfig(
+  const { apiUrl, apiToken, query, pivotConfig, chartType, useWebSockets, useSubscription } = extractHashConfig(
     {
       apiUrl: import.meta.env.VITE_CUBE_API_URL || '',
       apiToken: import.meta.env.VITE_CUBE_API_TOKEN || '',
@@ -20,25 +21,19 @@ function App() {
     } as Config
   );
 
-  const cubeApi = cube(apiToken, { apiUrl });
+  let transport = undefined;
+
+  if (useWebSockets) {
+    transport = new WebSocketTransport({ authorization: apiToken, apiUrl });
+  }
+
+  const cubeApi = cube(apiToken, { apiUrl, transport });
 
   return (
     <>
       <CubeProvider cubeApi={cubeApi}>
-        <QueryRenderer query={query}>
-          {({ resultSet, isLoading, error }) => {
-            if (isLoading) {
-              return <div>Loading...</div>;
-            }
-
-            if (error) {
-              return <div>{error.toString()}</div>;
-            }
-
-            if (!resultSet) {
-              return <div>NO RESULTS</div>;
-            }
-
+        <QueryRenderer query={query} subscribe={useSubscription}>
+          {({ resultSet }) => {
             return (
               <ChartViewer
                 chartType={chartType}

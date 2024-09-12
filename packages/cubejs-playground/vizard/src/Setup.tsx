@@ -6,7 +6,6 @@ import {
   Grid,
   Radio,
   Space,
-  Title,
   useForm,
 } from '@cube-dev/ui-kit';
 import { Query } from '@cubejs-client/core';
