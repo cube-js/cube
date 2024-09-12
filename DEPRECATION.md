@@ -33,7 +33,7 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                                                                                           | Deprecated | Remove    |
+| Status     | Feature                                                                                                                           | Deprecated | Removed   |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------|------------|-----------|
 | Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
 | Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
@@ -58,6 +58,7 @@ features:
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Deprecated | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   |           |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
@@ -353,6 +354,15 @@ instead.
 The `running_total` measure type is now deprecated, and we recommend using
 [`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
 to calculate running totals instead.
+
+### Top-level `includes` parameter in views
+
+**Deprecated in Release: v0.34.34**
+
+The top-level `includes` parameter is now deprecated. Please always use the
+`includes` parameter within [`cubes` and `join_path`
+parameters](https://cube.dev/docs/reference/data-model/view#cubes) so you can
+explicitly control the join path.
 
 ### Node.js 16
 
