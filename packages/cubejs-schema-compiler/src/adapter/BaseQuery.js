@@ -387,7 +387,7 @@ export class BaseQuery {
   }
 
   defaultOrder() {
-    if (this.options.preAggregationQuery) {
+    if (this.options.preAggregationQuery || this.options.totalQuery) {
       return [];
     }
 
@@ -2746,9 +2746,12 @@ export class BaseQuery {
   }
 
   newSubQueryForCube(cube, options) {
-    return this.options.queryFactory
-      ? this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options))
-      : this.newSubQuery(options);
+    if (this.options.queryFactory) {
+      options.paramAllocator = null;
+      return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
+    }
+
+    return this.newSubQuery(options);
   }
 
   subQueryOptions(options) {
@@ -2940,6 +2943,60 @@ export class BaseQuery {
       },
       { inputProps: { collectOriginalSqlPreAggregations: [] }, cache: this.queryCache }
     );
+  }
+
+  preAggregationOutputColumnTypes(cube, preAggregation) {
+    return this.cacheValue(
+      ['preAggregationOutputColumnTypes', cube, JSON.stringify(preAggregation)],
+      () => {
+        if (!preAggregation.outputColumnTypes) {
+          return null;
+        }
+
+        if (preAggregation.type === 'rollup') {
+          const query = this.preAggregations.rollupPreAggregationQuery(cube, preAggregation);
+
+          const evaluatedMapOutputColumnTypes = preAggregation.outputColumnTypes.reduce((acc, outputColumnType) => {
+            acc.set(outputColumnType.name, outputColumnType);
+            return acc;
+          }, new Map());
+
+          const findSchemaType = member => {
+            const outputSchemaType = evaluatedMapOutputColumnTypes.get(member);
+            if (!outputSchemaType) {
+              throw new UserError(`Output schema type for ${member} not found in pre-aggregation ${preAggregation}`);
+            }
+
+            return {
+              name: this.aliasName(member),
+              type: outputSchemaType.type,
+            };
+          };
+
+          // The order of the output columns is important, it should match the order in the select statement
+          const outputColumnTypes = [
+            ...(query.dimensions || []).map(d => findSchemaType(d.dimension)),
+            ...(query.timeDimensions || []).map(t => ({
+              name: `${this.aliasName(t.dimension)}_${t.granularity}`,
+              type: 'TIMESTAMP'
+            })),
+            ...(query.measures || []).map(m => findSchemaType(m.measure)),
+          ];
+
+          return outputColumnTypes;
+        }
+        throw new UserError('Output schema is only supported for rollup pre-aggregations');
+      },
+      { inputProps: { }, cache: this.queryCache }
+    );
+  }
+
+  preAggregationUniqueKeyColumns(cube, preAggregation) {
+    if (preAggregation.uniqueKeyColumns) {
+      return preAggregation.uniqueKeyColumns.map(key => this.aliasName(`${cube}.${key}`));
+    }
+
+    return this.dimensionColumns();
   }
 
   preAggregationReadOnly(_cube, _preAggregation) {

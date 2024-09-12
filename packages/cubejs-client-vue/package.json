@@ -33,6 +33,7 @@
     "ramda": "^0.27.2"
   },
   "devDependencies": {
+    "@babel/plugin-proposal-optional-chaining": "^7.21.0",
     "@vue/babel-preset-app": "^5",
     "@vue/cli-plugin-babel": "^5",
     "@vue/cli-plugin-eslint": "^5",

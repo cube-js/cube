@@ -237,11 +237,6 @@ impl ConfigObj for ConfigObjImpl {
     }
 }
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
-        tokio::sync::RwLock::new(false);
-}
-
 impl Config {
     pub fn default() -> Config {
         Config {

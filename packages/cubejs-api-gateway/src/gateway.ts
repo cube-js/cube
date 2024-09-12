@@ -1552,9 +1552,13 @@ class ApiGateway {
     if (normalizedQuery.total) {
       const normalizedTotal = structuredClone(normalizedQuery);
       normalizedTotal.totalQuery = true;
+      
+      delete normalizedTotal.order;
+
       normalizedTotal.limit = null;
       normalizedTotal.rowLimit = null;
       normalizedTotal.offset = null;
+
       const [totalQuery] = await this.getSqlQueriesInternal(
         context,
         [normalizedTotal],

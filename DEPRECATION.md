@@ -60,6 +60,7 @@ features:
 | Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
 | Removed | [MySQL-based SQL API](#mysql-based-sql-api) | v0.35.0 | v0.35.0 |
 | Removed | [`initApp` hook](#initapp-hook) | v0.35.0 | v0.35.0 |
+| Deprecated | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint) | v0.35.0 | |
 
 ### Node.js 8
 
@@ -393,3 +394,12 @@ Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-c
 **Removed in release: v0.35.0**
 
 The `initApp` hook is removed as it's not relevant anymore for Docker-based architecture.
+
+### `/v1/run-scheduled-refresh` REST API endpoint
+
+**Deprecated in release: v0.35.0**
+
+The `/v1/run-scheduled-refresh` REST API endpoint is deprecated as it's not
+relevant anymore for Docker-based architecture. Use the [Orchestration
+API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
+`/v1/pre-aggregations/jobs` endpoint instead.
