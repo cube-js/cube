@@ -415,6 +415,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
+            "date_bin" | "DATE_BIN" => CubeScalarUDFKind::DateBin,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
