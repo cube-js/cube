@@ -1750,6 +1750,39 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.productName'],
+        order: [
+          ['ECommerce.orderDate', 'asc'],
+          ['ECommerce.productName', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }

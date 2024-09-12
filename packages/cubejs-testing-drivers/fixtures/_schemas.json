@@ -88,7 +88,28 @@
         {
           "name": "orderDate",
           "sql": "order_date",
-          "type": "time"
+          "type": "time",
+          "granularities": [
+            {
+              "name": "half_year",
+              "interval": "6 months"
+            },
+            {
+              "name": "half_year_by_1st_april",
+              "interval": "6 months",
+              "offset": "3 months"
+            },
+            {
+              "name": "two_mo_by_feb",
+              "interval": "2 months",
+              "origin": "2020-02-01 00:00:00"
+            },
+            {
+              "name": "three_months_by_march",
+              "interval": "3 month 3 days 3 hours",
+              "origin": "2020-03-15"
+            }
+          ]
         },
         {
           "name": "customOrderDateNoPreAgg",
