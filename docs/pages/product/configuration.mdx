@@ -122,8 +122,10 @@ and navigating to the <Btn>Data Model</Btn> page.
 
 ## Runtimes and dependencies
 
-As of v0.34, Cube uses Python v3.9 and Node.js v16.20 as runtime environments
-for the code of configuration and [dynamic data models][ref-dynamic-data-models].
+Cube uses Python and Node.js as runtime environments for the code of
+configuration and [dynamic data models][ref-dynamic-data-models]. You can look
+current versions up on GitHub: [Python][link-current-python-version],
+[Node.js][link-current-nodejs-version]. 
 
 It's recommended to use `requirements.txt` and `package.json` files to
 specify dependencies for your Python and JavaScript code, respectively.
@@ -171,7 +173,6 @@ of data model entities.
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-gql-api]: /product/apis-integrations/graphql-api
 [ref-sql-api]: /product/apis-integrations/sql-api
-
 [ref-folder-structure]:
   /product/data-modeling/syntax#folder-structure
 [link-config]: /reference/configuration/config
@@ -181,6 +182,7 @@ of data model entities.
   /reference/data-model/pre-aggregations#scheduled_refresh
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
-
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
 [ref-data-model-publicity]: /product/data-modeling/concepts/publicity
+[link-current-python-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L13
+[link-current-nodejs-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L1

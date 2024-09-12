@@ -57,7 +57,7 @@ features:
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
-| Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    |           |
+| Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
 | Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
 | Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
