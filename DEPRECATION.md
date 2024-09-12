@@ -365,7 +365,6 @@ Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-c
 
 The `initApp` hook is removed as it's not relevant anymore for Docker-based architecture.
 
-
 ### `/v1/run-scheduled-refresh` REST API endpoint
 
 **Removed in release: v0.36.0**
