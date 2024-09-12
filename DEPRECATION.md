@@ -46,7 +46,7 @@ features:
 | Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    | v0.36.0   |
 | Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
 | Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    |           |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    | v0.36.0   |
 | Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
 | Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    | v0.36.0   |
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
@@ -56,6 +56,7 @@ features:
 | Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
 | Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
 | Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
+| Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
 | Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
 | Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
 | Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
@@ -205,7 +206,7 @@ no more updates. Please upgrade to Node.js 12 or higher.
 
 ### `USER_CONTEXT`
 
-**Deprecated in Release: v0.26.0**
+**Removed in Release: v0.36.0**
 
 `USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
 
@@ -336,6 +337,14 @@ instead.
 Cube Store is now the default cache and queue engine, [replacing
 Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
 [Cube Store](https://cube.dev/blog/how-you-win-by-using-cube-store-part-1).
+
+### `SECURITY_CONTEXT`
+
+**Deprecated in Release: v0.33.0**
+
+The `SECURITY_CONTEXT` context variable is deprecated. Use
+[`query_rewrite`](https://cube.dev/docs/reference/configuration/config#query_rewrite)
+instead.
 
 ### `running_total` measure type
 
