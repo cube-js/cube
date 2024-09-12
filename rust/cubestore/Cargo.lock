@@ -160,7 +160,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 [[package]]
 name = "arrow"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube#9d6173caa1756600981f245c43197bb4d52dcac7"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube#1963799bd9fd1de3948eba3fce11ddb9c1392d7c"
 dependencies = [
  "bitflags 1.3.2",
  "chrono",
@@ -3321,7 +3321,7 @@ dependencies = [
 [[package]]
 name = "parquet"
 version = "5.0.0"
-source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube#9d6173caa1756600981f245c43197bb4d52dcac7"
+source = "git+https://github.com/cube-js/arrow-rs.git?branch=cube#1963799bd9fd1de3948eba3fce11ddb9c1392d7c"
 dependencies = [
  "aes-gcm",
  "arrow",
