@@ -82,9 +82,9 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
   }
 });
 
-const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|year)s?(\s\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity interval');
+const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|quarter|year)s?(\s\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity interval');
 // Do not allow negative intervals for granularities, while offsets could be negative
-const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|year)s?){0,7}$/, 'granularity offset');
+const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
 
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
