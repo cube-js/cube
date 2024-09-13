@@ -130,8 +130,8 @@ async function main() {
       console.log(`Processing ${appName}...`);
 
       // Run npm install and npm run build
-      execSync('npm install', { cwd: appDir, stdio: 'inherit' });
-      execSync('npm run build', { cwd: appDir, stdio: 'inherit' });
+      execSync('yarn install', { cwd: appDir, stdio: 'inherit' });
+      execSync('yarn run build', { cwd: appDir, stdio: 'inherit' });
 
       // Move dist content
       const distDir = path.join(appDir, 'dist');
