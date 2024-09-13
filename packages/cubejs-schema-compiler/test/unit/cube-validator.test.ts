@@ -770,6 +770,24 @@ describe('Cube Validation', () => {
         expect(validationResult.error).toBeTruthy();
       }
 
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '3 weeks',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
       // Offset doesn't matter in this case
       {
         const cube = newCube({
