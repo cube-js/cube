@@ -310,9 +310,15 @@ describe('Schema Testing', () => {
     expect(dg.granularities).toBeDefined();
     expect(dg.granularities.length).toBeGreaterThan(0);
 
-    const gr = dg.granularities.find(g => g.name === 'half_year');
+    // Granularity defined with title
+    let gr = dg.granularities.find(g => g.name === 'half_year');
     expect(gr).toBeDefined();
-    expect(gr.title).toBe('Half Year');
+    expect(gr.title).toBe('6 month intervals');
+
+    // // Granularity defined without title -> titlize()
+    gr = dg.granularities.find(g => g.name === 'half_year_by_1st_june');
+    expect(gr).toBeDefined();
+    expect(gr.title).toBe('Half Year By1 St June');
   });
 
   it('join types', async () => {

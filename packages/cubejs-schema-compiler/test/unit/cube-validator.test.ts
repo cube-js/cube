@@ -603,7 +603,8 @@ describe('Cube Validation', () => {
       {
         const cube = newCube({
           half_year: {
-            interval: '6 months'
+            interval: '6 months',
+            title: 'Half year intervals'
           }
         });
 
@@ -675,6 +676,7 @@ describe('Cube Validation', () => {
           half_year: {
             interval: '6 months',
             offset: '4 weeks 5 days 6 hours',
+            title: 'Half year intervals title'
           }
         });
 
@@ -757,6 +759,7 @@ describe('Cube Validation', () => {
           half_year: {
             interval: '15 days',
             offset: '1 hours 7 minutes 8 seconds',
+            title: 'Just title'
           }
         });
 
@@ -847,6 +850,7 @@ describe('Cube Validation', () => {
           half_year: {
             interval: '10 months',
             origin: '2024-04',
+            title: 'Someone loves number 10'
           }
         });
 
