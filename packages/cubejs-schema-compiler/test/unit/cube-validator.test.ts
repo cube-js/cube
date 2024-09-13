@@ -745,6 +745,43 @@ describe('Cube Validation', () => {
           error: (message: any, _e: any) => {
             console.log(message);
             expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '3 quarters',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
+          }
+        } as any);
+
+        expect(validationResult.error).toBeTruthy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '3 weeks',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, {
+          error: (message: any, _e: any) => {
+            console.log(message);
+            expect(message).toContain('"dimensions.createdAt" does not match any of the allowed types');
+            expect(message).toContain('Arbitrary intervals cannot be used without origin point specified');
           }
         } as any);
 
@@ -846,6 +883,18 @@ describe('Cube Validation', () => {
         const cube = newCube({
           half_year: {
             interval: '10 months',
+            origin: '2024-04',
+          }
+        });
+
+        const validationResult = cubeValidator.validate(cube, new ConsoleErrorReporter());
+        expect(validationResult.error).toBeFalsy();
+      }
+
+      {
+        const cube = newCube({
+          half_year: {
+            interval: '2 quarters',
             origin: '2024-04',
           }
         });
