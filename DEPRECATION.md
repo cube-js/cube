@@ -46,7 +46,7 @@ features:
 | Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    | v0.36.0   |
 | Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
 | Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    | v0.36.0   |
+| Removed    | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    | v0.36.0   |
 | Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
 | Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    | v0.36.0   |
 | Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
@@ -210,14 +210,6 @@ no more updates. Please upgrade to Node.js 12 or higher.
 **Removed in Release: v0.36.0**
 
 `USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
-
-Deprecated:
-
-```js
-cube(`visitors`, {
-  sql: `select * from visitors WHERE ${USER_CONTEXT.source.filter("source")}`,
-});
-```
 
 You should use:
 

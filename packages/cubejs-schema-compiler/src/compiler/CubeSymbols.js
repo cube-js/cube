@@ -9,7 +9,6 @@ import { BaseQuery } from '../adapter';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
-  USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
@@ -495,6 +494,11 @@ export class CubeSymbols {
 
   resolveSymbol(cubeName, name) {
     const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
+
+    if (name === 'USER_CONTEXT') {
+      throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
+    }
+
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
