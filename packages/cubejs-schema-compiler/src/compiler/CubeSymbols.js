@@ -575,7 +575,7 @@ export class CubeSymbols {
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          ((cube[refProperty].granularities && cube[refProperty].granularities[propertyName]) ||
+          (self.resolveSubProperty([cubeName, refProperty, 'granularities', propertyName], cube) ||
            (typeof propertyName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(propertyName))
           )) {
           return {
@@ -597,6 +597,21 @@ export class CubeSymbols {
         return undefined;
       }
     });
+  }
+
+  /**
+   * Tries to resolve subProperty object.
+   *
+   * For now, it only resolves custom granularities in time dimensions.
+   * In the future, it possibly will be extended to support globally defined granularities
+   * or even other subProperties.
+   * @param {string|string[]} path
+   * @param [refCube] Optional cube object to operate on
+   */
+  resolveSubProperty(path, refCube) {
+    const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
+    const cube = refCube || this.symbols[cubeName];
+    return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
   }
 
   isCurrentCube(name) {
