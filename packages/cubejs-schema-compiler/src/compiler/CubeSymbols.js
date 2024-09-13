@@ -507,6 +507,12 @@ export class CubeSymbols {
       return symbol;
     }
 
+    // In proxied subProperty flow `name` will be set to parent dimension|measure name,
+    // so there will be no cube = this.symbols[cubeName : name] found, but potentially
+    // during cube definition evaluation some other deeper subProperty may be requested.
+    // To distinguish such cases we pass the right now requested property name to
+    // cubeReferenceProxy, so later if subProperty is requested we'll have all the required
+    // information to construct the response.
     let cube = this.symbols[this.isCurrentCube(name) ? cubeName : name];
     if (sqlResolveFn) {
       if (cube) {
