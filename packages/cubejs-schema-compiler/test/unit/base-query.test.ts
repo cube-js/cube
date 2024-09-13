@@ -295,7 +295,6 @@ describe('SQL Generation', () => {
           const query = new PostgresQuery(compilers, q);
           const queryAndParams = query.buildSqlAndParams();
           const queryString = queryAndParams[0];
-          console.log('Generated query: ', queryString);
 
           if (q.measures[0].includes('count')) {
             expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
@@ -1166,7 +1165,6 @@ describe('SQL Generation', () => {
         ],
       });
       const cubeSQL = query.cubeSql('Order');
-      console.log('TEST: ', cubeSQL);
       expect(cubeSQL).toContain('select * from order where ((type = $0$))');
     });
   });
