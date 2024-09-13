@@ -468,7 +468,7 @@ describe('SQL Generation', () => {
         await compilers.compiler.compile();
       });
 
-      queries.forEach(q => {
+      granularityQueries.forEach(q => {
         it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
           const query = new CubeStoreQuery(compilers, q);
           const queryAndParams = query.buildSqlAndParams();
