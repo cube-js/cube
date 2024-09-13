@@ -6,7 +6,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   hour: 'h',
   day: 'd',
   month: 'M',
-  year: 'Y'
+  year: 'y'
 };
 
 class QuestParamAllocator extends ParamAllocator {
