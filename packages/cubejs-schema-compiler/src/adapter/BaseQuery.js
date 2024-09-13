@@ -2199,7 +2199,7 @@ export class BaseQuery {
     const memberPathArray = [cubeName, name];
     // Member path needs to be expanded to granularity if subPropertyName is provided.
     // Without this: failures with Maximum call stack size exceeded.
-    // During resolving and members collection safeEvaluateSymbolContext().memberChildren is set,
+    // During resolving within dimensionSql() and members collection safeEvaluateSymbolContext().memberChildren is set,
     // so path is recursively pushed to memberChildren.
     if (subPropertyName && symbol.type === 'time') {
       memberPathArray.push('granularities', subPropertyName);
