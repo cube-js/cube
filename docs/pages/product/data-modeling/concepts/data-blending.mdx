@@ -10,14 +10,20 @@ redirect_from:
 In case you want to plot two measures from different cubes on a single chart, or
 create a calculated measure based on it, you need to create a join between these
 two cubes. If there's no way to join two cubes other than by time dimension, you
-need to use the data blending approach.
+can consider using the data blending approach.
 
 Data blending is a pattern that allows creating a cube based on two or more
 existing cubes, and contains a union of the underlying cubes' date to query it
 together.
 
-For an example omnichannel store which has both online and offline sales, let's
-calculate summary metrics for revenue, customer count, etc. We have
+Data blending could be faster than joining on date when the record count is very large, 
+because with this pattern, aggregation happens before joining, which can be more 
+efficient for large volumes of data.
+The other situation in which data blending could be a better approach than joining 
+on date is when the two tables have mostly the same columns, such as in the example below.
+
+For an example, consider an omnichannel store which has both online and offline sales. Let's
+calculate summary metrics for revenue, customer count, etc. We have a
 `retail_orders` cube for offline sales:
 
 <CodeTabs>

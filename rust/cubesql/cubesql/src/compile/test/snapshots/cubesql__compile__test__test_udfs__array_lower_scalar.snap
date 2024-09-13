@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_udfs.rs
+expression: "execute_query(\"\n                SELECT\n                    array_lower(ARRAY[1,2,3,4,5]) v1,\n                    array_lower(ARRAY[5,4,3,2,1]) v2,\n                    array_lower(ARRAY[5,4,3,2,1], 1) v3\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----+----+----+
+| v1 | v2 | v3 |
++----+----+----+
+| 1  | 1  | 1  |
++----+----+----+

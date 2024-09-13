@@ -1,7 +1,6 @@
 import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
   UserBackgroundContext,
@@ -10,7 +9,7 @@ import {
   CanSwitchSQLUserFn,
   ContextToApiScopesFn,
 } from '@cubejs-backend/api-gateway';
-import { BaseDriver, RedisPoolOptions, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
+import { BaseDriver, CacheAndQueryDriverType } from '@cubejs-backend/query-orchestrator';
 import { BaseQuery } from '@cubejs-backend/schema-compiler';
 
 export interface QueueOptions {
@@ -45,7 +44,6 @@ export interface PreAggregationsOptions {
 
 export interface OrchestratorOptions {
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   queryCacheOptions?: QueryCacheOptions;
   preAggregationsOptions?: PreAggregationsOptions;
   rollupOnlyMode?: boolean;
@@ -76,7 +74,6 @@ export interface OrchestratorInitedOptions {
   queryCacheOptions: QueryInitedOptions;
   preAggregationsOptions: AggsInitedOptions;
   redisPrefix?: string;
-  redisPoolOptions?: RedisPoolOptions;
   rollupOnlyMode?: boolean;
   testConnectionTimeout?: number;
 }
@@ -182,11 +179,11 @@ export interface CreateOptions {
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;
   jwt?: JWTOptions;
+  gatewayPort?: number;
   // @deprecated Please use queryRewrite
   queryTransformer?: QueryRewriteFn;
   queryRewrite?: QueryRewriteFn;

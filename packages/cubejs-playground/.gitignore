@@ -11,6 +11,7 @@
 # production
 /build
 /dist
+/public/vizard
 
 # misc
 .DS_Store

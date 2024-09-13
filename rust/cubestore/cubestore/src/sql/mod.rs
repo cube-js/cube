@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use arrow::array::*;
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -13,6 +11,8 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, TimeZone, Utc};
+use datafusion::arrow::array::*;
+use datafusion::arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -49,7 +49,7 @@ use crate::metastore::{
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor};
+use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
 use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -80,6 +80,7 @@ use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
+pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
 
 #[automock]
 #[async_trait]
@@ -187,6 +188,7 @@ impl SqlServiceImpl {
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
         import_service: Arc<dyn ImportService>,
+        table_extension_service: Arc<dyn TableExtensionService>,
         config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
@@ -205,6 +207,7 @@ impl SqlServiceImpl {
                 db.clone(),
                 cluster.clone(),
                 import_service,
+                table_extension_service,
                 config_obj.clone(),
                 create_table_timeout,
                 cache.clone(),
@@ -1072,7 +1075,7 @@ impl SqlService for SqlServiceImpl {
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
+                                            let df = batches_to_dataframe(records)?;
                                             Ok(df)
                                         },
                                     )
@@ -1659,11 +1662,13 @@ mod tests {
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
     use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
+    use table_creator::TableExtensionServiceImpl;
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
@@ -1723,6 +1728,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1735,6 +1741,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1800,6 +1807,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1812,6 +1820,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1861,6 +1870,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
 
@@ -1907,6 +1917,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1919,6 +1930,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1965,6 +1977,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -4261,7 +4274,7 @@ mod tests {
                         sum(value) value
                         from (
                             select * from test.test
-                            union all 
+                            union all
                             select * from test.test1
                             )
                         group by 1, 2

@@ -54,8 +54,6 @@ use crate::table::{Row, TableValue};
 
 use crate::util::WorkerLoop;
 use crate::{meta_store_table_impl, CubeError};
-use arrow::datatypes::TimeUnit::Microsecond;
-use arrow::datatypes::{DataType, Field};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use chrono::{DateTime, Utc};
 use chunks::ChunkRocksTable;
@@ -63,14 +61,16 @@ use core::fmt;
 use cubehll::HllSketch;
 use cuberockstore::rocksdb::backup::{BackupEngine, BackupEngineOptions};
 use cubezetasketch::HyperLogLogPlusPlus;
+use datafusion::arrow::datatypes::TimeUnit::Microsecond;
+use datafusion::arrow::datatypes::{DataType, Field};
 use datafusion::cube_ext;
+use datafusion::parquet::basic::{ConvertedType, Repetition};
+use datafusion::parquet::{basic::Type, schema::types};
 use futures_timer::Delay;
 use index::{IndexRocksIndex, IndexRocksTable};
 use itertools::Itertools;
 use log::trace;
 use multi_index::{MultiIndex, MultiIndexRocksIndex, MultiIndexRocksTable};
-use parquet::basic::{ConvertedType, Repetition};
-use parquet::{basic::Type, schema::types};
 use partition::{PartitionRocksIndex, PartitionRocksTable};
 use regex::Regex;
 
@@ -477,7 +477,7 @@ impl ColumnType {
     }
 }
 
-impl From<&Column> for parquet::schema::types::Type {
+impl From<&Column> for types::Type {
     fn from(column: &Column) -> Self {
         match column.get_column_type() {
             ColumnType::String => {
@@ -856,6 +856,7 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
         drop_if_exists: bool,
+        extension: Option<String>,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
@@ -2087,6 +2088,7 @@ impl MetaStore for RocksMetaStore {
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
         drop_if_exists: bool,
+        extension: Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
@@ -2189,6 +2191,7 @@ impl MetaStore for RocksMetaStore {
                 aggregate_column_indices,
                 seq_column_index,
                 partition_split_threshold,
+                extension,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
 
@@ -5143,6 +5146,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -5166,6 +5170,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -5290,6 +5295,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5315,6 +5321,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5406,6 +5413,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5498,6 +5506,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5571,6 +5580,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5594,6 +5604,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5620,6 +5631,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -6104,6 +6116,7 @@ mod tests {
                         None,
                         None,
                         false,
+                        None,
                     )
                     .await
                     .unwrap();
@@ -6326,6 +6339,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -6467,6 +6481,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();

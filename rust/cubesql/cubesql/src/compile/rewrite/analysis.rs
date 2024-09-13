@@ -1,6 +1,5 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
@@ -10,6 +9,7 @@ use crate::{
             TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
             TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
+        CubeContext,
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var_iter, var_list_iter, CubeError,
@@ -29,6 +29,7 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{Analysis, DidMerge, EGraph, Id};
+use hashbrown;
 use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
@@ -37,7 +38,7 @@ pub type MemberNameToExpr = (Option<String>, Member, Expr);
 pub struct LogicalPlanData {
     pub iteration_timestamp: usize,
     pub original_expr: Option<OriginalExpr>,
-    pub member_name_to_expr: Option<Vec<MemberNameToExpr>>,
+    pub member_name_to_expr: Option<MemberNamesToExpr>,
     pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
@@ -53,6 +54,18 @@ pub struct LogicalPlanData {
 pub enum OriginalExpr {
     Expr(Expr),
     List(Vec<Expr>),
+}
+
+#[derive(Clone, Debug)]
+pub struct MemberNamesToExpr {
+    /// List of MemberNameToExpr.
+    pub list: Vec<MemberNameToExpr>,
+    /// Results of lookup_member_by_column_name represented as indexes into `list`.
+    // Note that using Vec<(String, usize)> had nearly identical performance the last time that was
+    // benchmarked.
+    pub cached_lookups: hashbrown::HashMap<String, usize>,
+    /// The lookups in [uncached_lookups_offset, list.len()) are not completely cached.
+    pub uncached_lookups_offset: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -400,9 +413,19 @@ impl LogicalPlanAnalysis {
     fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(Option<String>, Member, Expr)>> {
+    ) -> Option<MemberNamesToExpr> {
         let column_name = |id| egraph.index(id).data.column.clone();
-        let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
+        let id_to_column_name_to_expr = |id| {
+            Some(
+                egraph
+                    .index(id)
+                    .data
+                    .member_name_to_expr
+                    .as_ref()?
+                    .list
+                    .clone(),
+            )
+        };
         let original_expr = |id| {
             egraph
                 .index(id)
@@ -433,7 +456,7 @@ impl LogicalPlanAnalysis {
                 })
         };
         let mut map = Vec::new();
-        match enode {
+        let list = match enode {
             LogicalPlanLanguage::Measure(params) => {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
@@ -685,7 +708,12 @@ impl LogicalPlanAnalysis {
                 Some(map)
             }
             _ => None,
-        }
+        };
+        list.map(|x| MemberNamesToExpr {
+            list: x,
+            cached_lookups: hashbrown::HashMap::new(),
+            uncached_lookups_offset: 0,
+        })
     }
 
     fn make_filter_operators(

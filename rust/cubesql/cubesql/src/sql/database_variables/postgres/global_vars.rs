@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use datafusion::scalar::ScalarValue;
 
-use crate::sql::database_variables::{DatabaseVariable, DatabaseVariables};
+use crate::compile::{DatabaseVariable, DatabaseVariables};
 
 pub fn defaults() -> DatabaseVariables {
     let mut variables: DatabaseVariables = HashMap::new();

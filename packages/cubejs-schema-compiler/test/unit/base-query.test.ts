@@ -1,7 +1,13 @@
 import moment from 'moment-timezone';
 import { BaseQuery, PostgresQuery, MssqlQuery, UserError } from '../../src';
 import { prepareCompiler, prepareYamlCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaYaml, createJoinedCubesSchema, createSchemaYaml } from './utils';
+import {
+  createCubeSchema,
+  createCubeSchemaWithCustomGranularities,
+  createCubeSchemaYaml,
+  createJoinedCubesSchema,
+  createSchemaYaml
+} from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
 describe('SQL Generation', () => {
@@ -48,6 +54,261 @@ describe('SQL Generation', () => {
     });
   });
 
+  describe('Custom granularities', () => {
+    const compilers = /** @type Compilers */ prepareCompiler(
+      createCubeSchemaWithCustomGranularities('orders')
+    );
+
+    const queries = [
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_march',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByTrailing2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders.rollingCountByLeading2Day'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders.createdAt',
+            granularity: 'half_year_by_1st_april',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      }
+    ];
+
+    it('Test time series with different granularities', async () => {
+      await compilers.compiler.compile();
+
+      const query = new BaseQuery(compilers, queries[0]);
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2021-01-01T00:00:00.000', '2021-06-30T23:59:59.999'],
+          ['2021-07-01T00:00:00.000', '2021-12-31T23:59:59.999']
+        ]);
+      }
+
+      {
+        const timeDimension = query.newTimeDimension({
+          dimension: 'orders.createdAt',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2021-01-01', '2021-12-31']
+        });
+        expect(timeDimension.timeSeries()).toEqual([
+          ['2020-10-01T00:00:00.000', '2021-03-31T23:59:59.999'],
+          ['2021-04-01T00:00:00.000', '2021-09-30T23:59:59.999'],
+          ['2021-10-01T00:00:00.000', '2022-03-31T23:59:59.999']
+        ]);
+      }
+    });
+
+    describe('via PostgresQuery', () => {
+      beforeAll(async () => {
+        await compilers.compiler.compile();
+      });
+
+      queries.forEach(q => {
+        it(`measure "${q.measures[0]}" + granularity "${q.timeDimensions[0].granularity}"`, () => {
+          const query = new PostgresQuery(compilers, q);
+          const queryAndParams = query.buildSqlAndParams();
+          const queryString = queryAndParams[0];
+          console.log('Generated query: ', queryString);
+
+          if (q.measures[0].includes('count')) {
+            expect(queryString.includes('INTERVAL \'6 months\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByTrailing2Day')) {
+            expect(queryString.includes('- interval \'2 day\'')).toBeTruthy();
+          } else if (q.measures[0].includes('rollingCountByLeading2Day')) {
+            expect(queryString.includes('+ interval \'3 day\'')).toBeTruthy();
+          }
+        });
+      });
+    });
+  });
+
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
@@ -60,7 +321,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Test time series with 6 digits timestamp presicion - bigquery', async () => {
+    it('Test time series with 6 digits timestamp precision - bigquery', async () => {
       await compilers.compiler.compile();
 
       const query = new BigqueryQuery(compilers, {
@@ -185,6 +446,34 @@ describe('SQL Generation', () => {
           ])
         );
       }
+    });
+
+    it('Test same dimension with different granularities - postgres', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'quarter',
+          },
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'month',
+          }
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString.includes('date_trunc(\'quarter\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_quarter')).toBeTruthy();
+      expect(queryString.includes('date_trunc(\'month\'')).toBeTruthy();
+      expect(queryString.includes('cards__created_at_month')).toBeTruthy();
     });
 
     it('Test for everyRefreshKeySql', async () => {
@@ -660,21 +949,30 @@ describe('SQL Generation', () => {
     /** @type {Compilers} */
     const compilers = prepareYamlCompiler(
       createSchemaYaml({
-        cubes: [
-          {
-            name: 'Order',
-            sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
-            measures: [{
-              name: 'count',
-              type: 'count',
-            }],
-            dimensions: [{
-              name: 'type',
-              sql: 'type',
-              type: 'string'
-            }]
-          },
-        ]
+        cubes: [{
+          name: 'Order',
+          sql: 'select * from order where {FILTER_PARAMS.Order.type.filter(\'type\')}',
+          measures: [{
+            name: 'count',
+            type: 'count',
+          }],
+          dimensions: [{
+            name: 'type',
+            sql: 'type',
+            type: 'string'
+          }]
+        }],
+        views: [{
+          name: 'orders_view',
+          cubes: [{
+            join_path: 'Order',
+            prefix: true,
+            includes: [
+              'type',
+              'count',
+            ]
+          }]
+        }]
       })
     );
 
@@ -829,6 +1127,149 @@ describe('SQL Generation', () => {
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toMatch(/\(\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*AND\s*\(.*type\s*=\s*\$\d\$.*OR.*type\s*=\s*\$\d\$.*\)\s*\)/);
     });
+
+    it('propagate filter params from view into cube\'s query', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      console.log('TEST: ', cubeSQL);
+      expect(cubeSQL).toContain('select * from order where ((type = $0$))');
+    });
+  });
+
+  describe('FILTER_GROUP', () => {
+    /** @type {Compilers} */
+    const compilers = prepareYamlCompiler(
+      createSchemaYaml({
+        cubes: [
+          {
+            name: 'Order',
+            sql: `select * from order where {FILTER_GROUP(
+              FILTER_PARAMS.Order.dim0.filter('dim0'),
+              FILTER_PARAMS.Order.dim1.filter('dim1')
+            )}`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [
+              {
+                name: 'dim0',
+                sql: 'dim0',
+                type: 'string'
+              },
+              {
+                name: 'dim1',
+                sql: 'dim1',
+                type: 'string'
+              }
+            ]
+          },
+        ]
+      })
+    );
+
+    it('inserts "or" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) OR (dim1 = $1$)))');
+    });
+
+    it('inserts "and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            and: [
+              {
+                member: 'Order.dim0',
+                operator: 'equals',
+                values: ['val0'],
+              },
+              {
+                member: 'Order.dim1',
+                operator: 'equals',
+                values: ['val1'],
+              },
+            ]
+          }
+        ],
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where (((dim0 = $0$) AND (dim1 = $1$)))');
+    });
+
+    it('inserts "or + and" filter', async () => {
+      await compilers.compiler.compile();
+      const query = new BaseQuery(compilers, {
+        measures: ['Order.count'],
+        filters: [
+          {
+            or: [
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['val1'],
+                  }
+                ]
+              },
+              {
+                and: [
+                  {
+                    member: 'Order.dim0',
+                    operator: 'equals',
+                    values: ['another_val0'],
+                  },
+                  {
+                    member: 'Order.dim1',
+                    operator: 'equals',
+                    values: ['another_val1'],
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      });
+      const cubeSQL = query.cubeSql('Order');
+      expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
   });
 });
 
@@ -866,19 +1307,20 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('camel_case_cube__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('camel_case_cube__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('camel_case_cube__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('camel_case_cube');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('camel_case_cube_id');
     expect(baseQuery.aliasName('CamelCaseCube.description', true)).toEqual('camel_case_cube_description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', true)).toEqual('camel_case_cube_grant_total');
-    
+
     // cubeAlias
     expect(baseQuery.cubeAlias('CamelCaseCube')).toEqual('"camel_case_cube"');
     expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"camel_case_cube__id"');
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
   });
+
   it('Test BaseQuery with aliased cube', async () => {
     const set = /** @type Compilers */ prepareCompiler(`
       cube('CamelCaseCube', {
@@ -914,7 +1356,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.aliasName('CamelCaseCube.id', false)).toEqual('t1__id');
     expect(baseQuery.aliasName('CamelCaseCube.description', false)).toEqual('t1__description');
     expect(baseQuery.aliasName('CamelCaseCube.grant_total', false)).toEqual('t1__grant_total');
-    
+
     // aliasName for pre-agg
     expect(baseQuery.aliasName('CamelCaseCube', true)).toEqual('t1');
     expect(baseQuery.aliasName('CamelCaseCube.id', true)).toEqual('t1_id');
@@ -927,6 +1369,7 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
   });
+
   it('Test BaseQuery columns order for the query with the sub-query', async () => {
     const joinedSchemaCompilers = prepareCompiler(createJoinedCubesSchema());
     await joinedSchemaCompilers.compiler.compile();

@@ -1,16 +1,18 @@
 use async_trait::async_trait;
-use cubeclient::{
-    apis::{configuration::Configuration as ClientConfiguration, default_api as cube_api},
-    models::{V1LoadRequest, V1LoadRequestQuery, V1LoadResponse},
+use cubeclient::apis::{
+    configuration::Configuration as ClientConfiguration, default_api as cube_api,
 };
 
 use datafusion::{
-    arrow::{datatypes::SchemaRef, record_batch::RecordBatch},
+    arrow::{
+        datatypes::{DataType, SchemaRef},
+        record_batch::RecordBatch,
+    },
     logical_plan::window_frames::{WindowFrame, WindowFrameBound, WindowFrameUnits},
     physical_plan::{aggregates::AggregateFunction, windows::WindowFunction},
 };
 use minijinja::{context, value::Value, Environment};
-use serde_derive::*;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fmt::Debug,
@@ -24,14 +26,14 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    compile::{
-        engine::df::{
-            scan::MemberField,
-            wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
-        },
-        MetaContext,
+    compile::engine::df::{
+        scan::MemberField,
+        wrapper::{GroupingSetDesc, GroupingSetType, SqlQuery},
     },
     sql::{AuthContextRef, HttpAuthContext},
+    transport::{
+        MetaContext, TransportLoadRequest, TransportLoadRequestQuery, TransportLoadResponse,
+    },
     CubeError, RWLockAsync,
 };
 
@@ -122,7 +124,7 @@ pub trait TransportService: Send + Sync + Debug {
     async fn sql(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
@@ -133,16 +135,16 @@ pub trait TransportService: Send + Sync + Debug {
     async fn load(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError>;
+    ) -> Result<TransportLoadResponse, CubeError>;
 
     async fn load_stream(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta_fields: LoadRequestMeta,
@@ -259,7 +261,7 @@ impl TransportService for HttpTransport {
     async fn sql(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        _query: V1LoadRequestQuery,
+        _query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
         _member_to_alias: Option<HashMap<String, String>>,
@@ -271,11 +273,11 @@ impl TransportService for HttpTransport {
     async fn load(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError> {
+    ) -> Result<TransportLoadResponse, CubeError> {
         if meta.change_user().is_some() {
             return Err(CubeError::internal(
                 "Changing security context (__user) is not supported in the standalone mode"
@@ -284,7 +286,7 @@ impl TransportService for HttpTransport {
         }
 
         // TODO: support meta_fields for HTTP
-        let request = V1LoadRequest {
+        let request = TransportLoadRequest {
             query: Some(query),
             query_type: Some("multi".to_string()),
         };
@@ -297,7 +299,7 @@ impl TransportService for HttpTransport {
     async fn load_stream(
         &self,
         _span_id: Option<Arc<SpanId>>,
-        _query: V1LoadRequestQuery,
+        _query: TransportLoadRequestQuery,
         _sql_query: Option<SqlQuery>,
         _ctx: AuthContextRef,
         _meta_fields: LoadRequestMeta,
@@ -371,6 +373,10 @@ impl SqlTemplates {
             jinja,
             reuse_params,
         })
+    }
+
+    pub fn contains_template(&self, template_name: &str) -> bool {
+        self.templates.contains_key(template_name)
     }
 
     pub fn aggregate_function_name(
@@ -711,15 +717,37 @@ impl SqlTemplates {
         )
     }
 
-    pub fn interval_expr(
+    pub fn interval_any_expr(
         &self,
         interval: String,
         num: i64,
-        date_part: String,
+        date_part: &'static str,
+    ) -> Result<String, CubeError> {
+        const INTERVAL_TEMPLATE: &str = "expressions/interval";
+        const INTERVAL_SINGLE_TEMPLATE: &str = "expressions/interval_single_date_part";
+        if self.contains_template(INTERVAL_TEMPLATE) {
+            self.interval_expr(interval)
+        } else if self.contains_template(INTERVAL_SINGLE_TEMPLATE) {
+            self.interval_single_expr(num, date_part)
+        } else {
+            Err(CubeError::internal(
+                "Interval template generation is not supported".to_string(),
+            ))
+        }
+    }
+
+    pub fn interval_expr(&self, interval: String) -> Result<String, CubeError> {
+        self.render_template("expressions/interval", context! { interval => interval })
+    }
+
+    pub fn interval_single_expr(
+        &self,
+        num: i64,
+        date_part: &'static str,
     ) -> Result<String, CubeError> {
         self.render_template(
-            "expressions/interval",
-            context! { interval => interval, num => num, date_part => date_part },
+            "expressions/interval_single_date_part",
+            context! { num => num, date_part => date_part },
         )
     }
 
@@ -806,5 +834,40 @@ impl SqlTemplates {
 
     pub fn param(&self, param_index: usize) -> Result<String, CubeError> {
         self.render_template("params/param", context! { param_index => param_index })
+    }
+
+    pub fn sql_type(&self, data_type: DataType) -> Result<String, CubeError> {
+        let data_type = match data_type {
+            DataType::Decimal(precision, scale) => {
+                return self.render_template(
+                    "types/decimal",
+                    context! {
+                        precision => precision,
+                        scale => scale,
+                    },
+                )
+            }
+            // NULL is not a type in databases. In PostgreSQL, untyped NULL is TEXT
+            DataType::Utf8 | DataType::LargeUtf8 | DataType::Null => "string",
+            DataType::Boolean => "boolean",
+            DataType::Int8 | DataType::UInt8 => "tinyint",
+            DataType::Int16 | DataType::UInt16 => "smallint",
+            DataType::Int32 | DataType::UInt32 => "integer",
+            DataType::Int64 | DataType::UInt64 => "bigint",
+            DataType::Float16 | DataType::Float32 => "float",
+            DataType::Float64 => "double",
+            DataType::Timestamp(_, _) => "timestamp",
+            DataType::Date32 | DataType::Date64 => "date",
+            DataType::Time32(_) | DataType::Time64(_) => "time",
+            DataType::Duration(_) | DataType::Interval(_) => "interval",
+            DataType::Binary | DataType::FixedSizeBinary(_) | DataType::LargeBinary => "binary",
+            dt => {
+                return Err(CubeError::internal(format!(
+                    "Can't generate SQL for type {:?}: not supported",
+                    dt
+                )))
+            }
+        };
+        self.render_template(&format!("types/{}", data_type), context! {})
     }
 }

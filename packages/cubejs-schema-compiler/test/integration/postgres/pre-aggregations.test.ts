@@ -13,13 +13,13 @@ describe('PreAggregations', () => {
       select * from visitors WHERE \${FILTER_PARAMS.visitors.createdAt.filter('created_at')}
       AND \${FILTER_PARAMS.ReferenceOriginalSql.createdAt.filter('created_at')}
       \`,
-      
+
       joins: {
         visitor_checkins: {
           relationship: 'hasMany',
           sql: \`\${CUBE.id} = \${visitor_checkins.visitor_id}\`
         },
-        
+
         cards: {
           relationship: 'hasMany',
           sql: \`\${visitors.id} = \${cards.visitorId}\`
@@ -30,12 +30,12 @@ describe('PreAggregations', () => {
         count: {
           type: 'count'
         },
-        
+
         checkinsTotal: {
           sql: \`\${checkinsCount}\`,
           type: 'sum'
         },
-        
+
         checkinsRollingTotal: {
           sql: \`\${checkinsCount}\`,
           type: 'sum',
@@ -43,7 +43,7 @@ describe('PreAggregations', () => {
             trailing: 'unbounded'
           }
         },
-        
+
         checkinsRolling2day: {
           sql: \`\${checkinsCount}\`,
           type: 'sum',
@@ -51,22 +51,22 @@ describe('PreAggregations', () => {
             trailing: '2 day'
           }
         },
-        
+
         uniqueSourceCount: {
           sql: 'source',
           type: 'countDistinct'
         },
-        
+
         countDistinctApprox: {
           sql: 'id',
           type: 'countDistinctApprox'
         },
-        
+
         ratio: {
           sql: \`\${uniqueSourceCount} / nullif(\${checkinsTotal}, 0)\`,
           type: 'number'
         },
-        
+
         googleUniqueSourceCount: {
           sql: \`\${CUBE.source}\`,
           filters: [{
@@ -74,8 +74,8 @@ describe('PreAggregations', () => {
           }],
           type: 'countDistinct'
         },
-        
-        
+
+
       },
 
       dimensions: {
@@ -107,13 +107,13 @@ describe('PreAggregations', () => {
           propagateFiltersToSubQuery: true
         }
       },
-      
+
       segments: {
         google: {
           sql: \`source = 'google'\`
         }
       },
-      
+
       preAggregations: {
         default: {
           type: 'originalSql',
@@ -238,13 +238,13 @@ describe('PreAggregations', () => {
         }
       }
     })
-    
-    
+
+
     cube('visitor_checkins', {
       sql: \`
       select * from visitor_checkins
       \`,
-      
+
       sqlAlias: 'vc',
 
       measures: {
@@ -272,7 +272,7 @@ describe('PreAggregations', () => {
           sql: 'created_at'
         }
       },
-      
+
       preAggregations: {
         main: {
           type: 'originalSql'
@@ -333,7 +333,7 @@ describe('PreAggregations', () => {
         }
       }
     });
-    
+
     cube('cards', {
       sql: \`
       select * from cards
@@ -351,13 +351,13 @@ describe('PreAggregations', () => {
           sql: 'id',
           primaryKey: true
         },
-        
+
         visitorId: {
           type: 'number',
           sql: 'visitor_id'
         }
       },
-      
+
       preAggregations: {
         forJoin: {
           type: 'rollup',
@@ -366,7 +366,7 @@ describe('PreAggregations', () => {
         },
       }
     });
-    
+
     cube('GoogleVisitors', {
       refreshKey: {
         immutable: true,
@@ -374,14 +374,14 @@ describe('PreAggregations', () => {
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`
     })
-    
+
     cube('EveryHourVisitors', {
       refreshKey: {
         immutable: true,
       },
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
-      
+
       preAggregations: {
         default: {
           type: 'originalSql',
@@ -404,16 +404,16 @@ describe('PreAggregations', () => {
         }
       }
     })
-    
+
     cube('EmptyHourVisitors', {
       extends: EveryHourVisitors,
       sql: \`select v.* from \${visitors.sql()} v where created_at < '2000-01-01'\`
     })
-    
+
     cube('ReferenceOriginalSql', {
       extends: visitors,
       sql: \`select v.* from \${visitors.sql()} v where v.source = 'google'\`,
-      
+
       preAggregations: {
         partitioned: {
           type: 'rollup',
@@ -431,33 +431,33 @@ describe('PreAggregations', () => {
         }
       }
     })
-    
+
     cube('VisitorView', {
       sql: \`SELECT 1\`,
-      
+
       measures: {
         checkinsTotal: {
           sql: \`\${visitors.checkinsTotal}\`,
           type: 'number',
         }
       },
-      
+
       dimensions: {
         source: {
           sql: \`\${visitors.source}\`,
           type: 'string',
         },
-        
+
         createdAt: {
           sql: \`\${visitors.createdAt}\`,
           type: 'time'
         }
       },
     });
-    
+
     cube('LambdaVisitors', {
       extends: visitors,
-      
+
       preAggregations: {
         partitionedLambda: {
           type: 'rollupLambda',
@@ -478,11 +478,11 @@ describe('PreAggregations', () => {
         }
       }
     });
-    
+
     cube('RealTimeLambdaVisitors', {
       dataSource: 'ksql',
       extends: visitors,
-      
+
       preAggregations: {
         partitioned: {
           type: 'rollup',
@@ -490,11 +490,13 @@ describe('PreAggregations', () => {
           dimensions: [id, source],
           timeDimension: createdAt,
           granularity: 'day',
+          build_range_start: { sql: "SELECT DATE_SUB(NOW(), interval '96 hour')" },
+          build_range_end: { sql: "SELECT NOW()" },
           partitionGranularity: 'day'
         }
       }
     });
-    
+
     view('visitors_view', {
       cubes: [{
         join_path: visitors,
@@ -1894,7 +1896,6 @@ describe('PreAggregations', () => {
       timezone: 'America/Los_Angeles',
       preAggregationsSchema: '',
       timeDimensions: [],
-      order: [],
     });
 
     const queryAndParams = query.buildSqlAndParams();

@@ -18,13 +18,14 @@ use crate::table::redistribute::redistribute;
 use crate::table::{Row, TableValue};
 use crate::util::batch_memory::record_batch_buffer_size;
 use crate::CubeError;
-use arrow::array::{ArrayRef, UInt64Array};
-use arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
-use arrow::datatypes::DataType;
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use chrono::Utc;
+use datafusion::arrow::array::{ArrayRef, UInt64Array};
+use datafusion::arrow::compute::{lexsort_to_indices, SortColumn, SortOptions};
+use datafusion::arrow::datatypes::DataType;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::cube_ext;
+use datafusion::parquet::arrow::ArrowWriter;
 use datafusion::physical_plan::common::collect;
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::expressions::{Column, Count, Literal};
@@ -33,7 +34,7 @@ use datafusion::physical_plan::hash_aggregate::{
 };
 use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
-use datafusion::physical_plan::parquet::ParquetExec;
+use datafusion::physical_plan::parquet::{MetadataCacheFactory, ParquetExec};
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::{
     AggregateExpr, ExecutionPlan, PhysicalExpr, SendableRecordBatchStream,
@@ -43,7 +44,6 @@ use futures::StreamExt;
 use futures_util::future::join_all;
 use itertools::{EitherOrBoth, Itertools};
 use num::integer::div_ceil;
-use parquet::arrow::ArrowWriter;
 use std::cmp::Ordering;
 use std::fs::File;
 use std::mem::take;
@@ -75,6 +75,7 @@ pub struct CompactionServiceImpl {
     chunk_store: Arc<dyn ChunkDataStore>,
     remote_fs: Arc<dyn RemoteFs>,
     config: Arc<dyn ConfigObj>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 crate::di_service!(CompactionServiceImpl, [CompactionService]);
@@ -85,12 +86,14 @@ impl CompactionServiceImpl {
         chunk_store: Arc<dyn ChunkDataStore>,
         remote_fs: Arc<dyn RemoteFs>,
         config: Arc<dyn ConfigObj>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<CompactionServiceImpl> {
         Arc::new(CompactionServiceImpl {
             meta_store,
             chunk_store,
             remote_fs,
             config,
+            metadata_cache_factory,
         })
     }
 
@@ -571,7 +574,11 @@ impl CompactionService for CompactionServiceImpl {
             }
         }
 
-        let store = ParquetTableStore::new(index.get_row().clone(), ROW_GROUP_SIZE);
+        let store = ParquetTableStore::new(
+            index.get_row().clone(),
+            ROW_GROUP_SIZE,
+            self.metadata_cache_factory.clone(),
+        );
         let old_partition_remote = match &new_chunk {
             Some(_) => None,
             None => partition.get_row().get_full_name(partition.get_id()),
@@ -611,7 +618,7 @@ impl CompactionService for CompactionServiceImpl {
             // Concat rows from all chunks.
             let mut columns = Vec::with_capacity(num_columns);
             for i in 0..num_columns {
-                let v = arrow::compute::concat(
+                let v = datafusion::arrow::compute::concat(
                     &data.iter().map(|a| a.column(i).as_ref()).collect_vec(),
                 )?;
                 columns.push(v);
@@ -630,7 +637,11 @@ impl CompactionService for CompactionServiceImpl {
             let indices = lexsort_to_indices(&sort_key, None)?;
             let mut new = Vec::with_capacity(num_columns);
             for c in columns {
-                new.push(arrow::compute::take(c.as_ref(), &indices, None)?)
+                new.push(datafusion::arrow::compute::take(
+                    c.as_ref(),
+                    &indices,
+                    None,
+                )?)
             }
             Ok((store, new))
         })
@@ -640,13 +651,14 @@ impl CompactionService for CompactionServiceImpl {
         let schema = Arc::new(arrow_schema(index.get_row()));
         let main_table: Arc<dyn ExecutionPlan> = match old_partition_local {
             Some(file) => {
-                let parquet_exec = Arc::new(ParquetExec::try_from_path(
+                let parquet_exec = Arc::new(ParquetExec::try_from_path_with_cache(
                     file.as_str(),
                     None,
                     None,
                     ROW_GROUP_SIZE,
                     1,
                     None,
+                    self.metadata_cache_factory.make_noop_cache(),
                 )?);
 
                 Arc::new(TraceDataLoadedExec::new(
@@ -850,7 +862,7 @@ impl CompactionService for CompactionServiceImpl {
         // TODO deactivate corrupt tables
         let files = download_files(&partitions, self.remote_fs.clone()).await?;
         let keys = find_partition_keys(
-            keys_with_counts(&files, key_len).await?,
+            keys_with_counts(&files, self.metadata_cache_factory.as_ref(), key_len).await?,
             key_len,
             // TODO should it respect table partition_split_threshold?
             self.config.partition_split_threshold() as usize,
@@ -893,6 +905,7 @@ impl CompactionService for CompactionServiceImpl {
         let mut s = MultiSplit::new(
             self.meta_store.clone(),
             self.remote_fs.clone(),
+            self.metadata_cache_factory.clone(),
             keys,
             key_len,
             multi_partition_id,
@@ -935,6 +948,7 @@ impl CompactionService for CompactionServiceImpl {
         let mut s = MultiSplit::new(
             self.meta_store.clone(),
             self.remote_fs.clone(),
+            self.metadata_cache_factory.clone(),
             keys,
             key_len,
             multi_partition_id,
@@ -979,19 +993,21 @@ async fn find_partition_keys(
 
 async fn read_files(
     files: &[String],
+    metadata_cache_factory: &dyn MetadataCacheFactory,
     key_len: usize,
     projection: Option<Vec<usize>>,
 ) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
     assert!(!files.is_empty());
     let mut inputs = Vec::<Arc<dyn ExecutionPlan>>::with_capacity(files.len());
     for f in files {
-        inputs.push(Arc::new(ParquetExec::try_from_files(
+        inputs.push(Arc::new(ParquetExec::try_from_files_with_cache(
             &[f.as_str()],
             projection.clone(),
             None,
             ROW_GROUP_SIZE,
             1,
             None,
+            metadata_cache_factory.make_noop_cache(),
         )?));
     }
     let plan = Arc::new(UnionExec::new(inputs));
@@ -1008,10 +1024,17 @@ async fn read_files(
 /// this key in the input files.
 async fn keys_with_counts(
     files: &[String],
+    metadata_cache_factory: &dyn MetadataCacheFactory,
     key_len: usize,
 ) -> Result<HashAggregateExec, CubeError> {
     let projection = (0..key_len).collect_vec();
-    let plan = read_files(files, key_len, Some(projection.clone())).await?;
+    let plan = read_files(
+        files,
+        metadata_cache_factory,
+        key_len,
+        Some(projection.clone()),
+    )
+    .await?;
 
     let fields = plan.schema();
     let fields = fields.fields();
@@ -1395,11 +1418,13 @@ mod tests {
     use crate::store::MockChunkDataStore;
     use crate::table::data::rows_to_columns;
     use crate::table::{cmp_same_types, Row, TableValue};
-    use arrow::array::{Int64Array, StringArray};
-    use arrow::datatypes::Schema;
-    use arrow::record_batch::RecordBatch;
     use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::arrow::array::{Int64Array, StringArray};
+    use datafusion::arrow::datatypes::Schema;
+    use datafusion::arrow::record_batch::RecordBatch;
     use datafusion::physical_plan::collect;
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
+    use datafusion::physical_plan::parquet::NoopParquetMetadataCache;
     use std::fs;
     use std::path::{Path, PathBuf};
 
@@ -1432,6 +1457,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -1513,6 +1539,7 @@ mod tests {
             Arc::new(chunk_store),
             remote_fs,
             Arc::new(config),
+            Arc::new(BasicMetadataCacheFactory::new()),
         );
         compaction_service
             .compact(1, DataLoadedSize::new())
@@ -1652,6 +1679,7 @@ mod tests {
             remote_fs.clone(),
             Arc::new(cluster),
             config.config_obj(),
+            Arc::new(BasicMetadataCacheFactory::new()),
             10,
         );
         metastore
@@ -1678,6 +1706,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -1738,6 +1767,7 @@ mod tests {
             chunk_store.clone(),
             remote_fs,
             config.config_obj(),
+            Arc::new(BasicMetadataCacheFactory::new()),
         );
         compaction_service
             .compact_in_memory_chunks(partition.get_id())
@@ -1825,6 +1855,7 @@ mod tests {
             remote_fs.clone(),
             Arc::new(MockCluster::new()),
             config.config_obj(),
+            Arc::new(BasicMetadataCacheFactory::new()),
             50,
         );
 
@@ -1863,6 +1894,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -1926,6 +1958,7 @@ mod tests {
             chunk_store.clone(),
             remote_fs.clone(),
             config.config_obj(),
+            Arc::new(BasicMetadataCacheFactory::new()),
         );
         compaction_service
             .compact(partition.get_id(), DataLoadedSize::new())
@@ -1949,8 +1982,16 @@ mod tests {
             .await
             .unwrap();
         let reader = Arc::new(
-            ParquetExec::try_from_path(local.as_str(), None, None, ROW_GROUP_SIZE, 1, None)
-                .unwrap(),
+            ParquetExec::try_from_path_with_cache(
+                local.as_str(),
+                None,
+                None,
+                ROW_GROUP_SIZE,
+                1,
+                None,
+                NoopParquetMetadataCache::new(),
+            )
+            .unwrap(),
         );
         let res_data = &collect(reader).await.unwrap()[0];
 
@@ -2148,6 +2189,7 @@ mod tests {
 struct MultiSplit {
     meta: Arc<dyn MetaStore>,
     fs: Arc<dyn RemoteFs>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     keys: Vec<Row>,
     key_len: usize,
     multi_partition_id: u64,
@@ -2163,6 +2205,7 @@ impl MultiSplit {
     fn new(
         meta: Arc<dyn MetaStore>,
         fs: Arc<dyn RemoteFs>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         keys: Vec<Row>,
         key_len: usize,
         multi_partition_id: u64,
@@ -2172,6 +2215,7 @@ impl MultiSplit {
         MultiSplit {
             meta,
             fs,
+            metadata_cache_factory,
             keys,
             key_len,
             multi_partition_id,
@@ -2225,10 +2269,15 @@ impl MultiSplit {
             }
         });
 
-        let store = ParquetTableStore::new(p.index.get_row().clone(), ROW_GROUP_SIZE);
+        let store = ParquetTableStore::new(
+            p.index.get_row().clone(),
+            ROW_GROUP_SIZE,
+            self.metadata_cache_factory.clone(),
+        );
         let records = if !in_files.is_empty() {
             read_files(
                 &in_files.into_iter().map(|(f, _)| f).collect::<Vec<_>>(),
+                self.metadata_cache_factory.as_ref(),
                 self.key_len,
                 None,
             )

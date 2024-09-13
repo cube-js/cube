@@ -2,14 +2,14 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, LogicalPlanAnalysis, Member, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
         filter_op_filters_empty_tail, filter_replacer, filter_simplify_replacer, fun_expr,
-        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, is_not_null_expr, is_null_expr,
-        like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int, literal_string,
-        measure_expr, member_name_by_alias, negative_expr, not_expr, projection, rewrite,
+        fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
+        is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
+        literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
         rewriter::RewriteRules,
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
@@ -40,18 +40,29 @@ use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Date32Array, Date64Array, TimestampNanosecondArray},
-        datatypes::DataType,
+        datatypes::{DataType, IntervalDayTimeType},
     },
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
 };
 use egg::{EGraph, Rewrite, Subst, Var};
-use std::{collections::HashSet, fmt::Display, ops::Index, sync::Arc};
+use std::{
+    collections::HashSet,
+    fmt::Display,
+    ops::{Index, IndexMut},
+    sync::Arc,
+};
 
 pub struct FilterRules {
     meta_context: Arc<MetaContext>,
     config_obj: Arc<dyn ConfigObj>,
     eval_stable_functions: bool,
+}
+
+impl FilterRules {
+    fn inlist_expr_list(&self, exprs: Vec<impl Display>) -> String {
+        inlist_expr_list(exprs, self.config_obj.push_down_pull_up_split())
+    }
 }
 
 impl RewriteRules for FilterRules {
@@ -394,18 +405,18 @@ impl RewriteRules for FilterRules {
             transforming_rewrite(
                 "in-filter-equal",
                 filter_replacer(
-                    inlist_expr("?expr", "?list", "?negated"),
+                    inlist_expr("?expr", self.inlist_expr_list(vec!["?elem"]), "?negated"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
                 filter_replacer(
-                    "?binary_expr",
+                    binary_expr("?expr", "?op", "?elem"),
                     "?alias_to_cube",
                     "?members",
                     "?filter_aliases",
                 ),
-                self.transform_filter_in_to_equal("?expr", "?list", "?negated", "?binary_expr"),
+                self.transform_filter_in_to_equal("?negated", "?op"),
             ),
             transforming_rewrite(
                 "filter-in-list-datetrunc",
@@ -2617,22 +2628,29 @@ impl FilterRules {
         let filter_aliases_var = filter_aliases_var.parse().unwrap();
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
+            let expr_ops: Vec<_> = var_iter!(egraph[subst[op_var]], BinaryExprOp)
+                .cloned()
+                .collect();
+            for expr_op in expr_ops {
                 if let Some(ConstantFolding::Scalar(literal)) =
-                    &egraph[subst[constant_var]].data.constant
+                    &egraph[subst[constant_var]].data.constant.clone()
                 {
-                    for aliases in
+                    let aliases_es: Vec<_> =
                         var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
-                    {
-                        if let Some((member_name, cube)) = Self::filter_member_name(
-                            egraph,
-                            subst,
-                            &meta_context,
-                            alias_to_cube_var,
-                            column_var,
-                            members_var,
-                            &aliases,
-                        ) {
+                            .cloned()
+                            .collect();
+                    for aliases in aliases_es {
+                        if let Some((member_name, granularity, cube)) =
+                            Self::filter_member_name_with_granularity(
+                                egraph,
+                                subst,
+                                &meta_context,
+                                alias_to_cube_var,
+                                column_var,
+                                members_var,
+                                &aliases,
+                            )
+                        {
                             if let Some(member_type) = cube.member_type(&member_name) {
                                 // Segments + __user are handled by separate rule
                                 if cube.lookup_measure_by_member_name(&member_name).is_some()
@@ -2759,11 +2777,23 @@ impl FilterRules {
                                                 let value = format_iso_timestamp(timestamp);
 
                                                 match expr_op {
+                                                    // TODO: all other operators need special granularity handlers like Eq
                                                     Operator::Lt => vec![value],
                                                     Operator::LtEq => vec![value],
                                                     Operator::Gt => vec![value],
                                                     Operator::GtEq => vec![value],
-                                                    Operator::Eq => vec![value.to_string(), value],
+                                                    Operator::Eq => {
+                                                        if let Some(granularity) = granularity {
+                                                            if let Some((_, end)) = Self::naive_datetime_to_range_by_granularity(timestamp, &granularity) {
+                                                                let end = format_iso_timestamp(end.checked_sub_signed(Duration::milliseconds(1)).unwrap());
+                                                                vec![value, end]
+                                                            } else {
+                                                                continue;
+                                                            }
+                                                        } else {
+                                                            vec![value.to_string(), value]
+                                                        }
+                                                    }
                                                     _ => {
                                                         continue;
                                                     }
@@ -2836,9 +2866,13 @@ impl FilterRules {
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
             if let Some(ConstantFolding::Scalar(literal)) =
-                &egraph[subst[literal_var]].data.constant
+                &egraph[subst[literal_var]].data.constant.clone()
             {
-                for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+                let aliases_es: Vec<Vec<(String, String)>> =
+                    var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                        .cloned()
+                        .collect();
+                for aliases in aliases_es {
                     let literal_value = match literal {
                         ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
                         _ => continue,
@@ -2988,7 +3022,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some((left_member_name, _)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -3033,7 +3071,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some((left_member_name, _)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -3127,8 +3169,18 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for year in var_iter!(egraph[subst[year_var]], LiteralExprValue) {
-                for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let years: Vec<ScalarValue> = var_iter!(egraph[subst[year_var]], LiteralExprValue)
+                .cloned()
+                .collect();
+            if years.is_empty() {
+                return false;
+            }
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for year in years {
+                for aliases in aliases_es.iter() {
                     if let ScalarValue::Int64(Some(year)) = year {
                         let year = year.clone();
                         if year < 1000 || year > 9999 {
@@ -3194,12 +3246,27 @@ impl FilterRules {
         let filter_aliases_var = filter_aliases_var.parse().unwrap();
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for expr_op in var_iter!(egraph[subst[op_var]], BinaryExprOp) {
-                for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                    for aliases in
-                        var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
-                    {
-                        if expr_op == &Operator::Eq {
+            let expr_ops: Vec<Operator> = var_iter!(egraph[subst[op_var]], BinaryExprOp)
+                .cloned()
+                .collect();
+            if expr_ops.is_empty() {
+                return false;
+            }
+            let literals: Vec<ScalarValue> =
+                var_iter!(egraph[subst[literal_var]], LiteralExprValue)
+                    .cloned()
+                    .collect();
+            if literals.is_empty() {
+                return false;
+            }
+            let aliases_es: Vec<Vec<(String, String)>> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for expr_op in expr_ops {
+                for literal in literals.iter() {
+                    for aliases in aliases_es.iter() {
+                        if expr_op == Operator::Eq {
                             if literal == &ScalarValue::Boolean(Some(true))
                                 || literal == &ScalarValue::Utf8(Some("true".to_string()))
                             {
@@ -3274,45 +3341,24 @@ impl FilterRules {
     // Transform ?expr IN (?literal) to ?expr = ?literal
     fn transform_filter_in_to_equal(
         &self,
-        expr_val: &'static str,
-        list_var: &'static str,
         negated_var: &'static str,
-        return_binary_expr_var: &'static str,
+        op_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let expr_val = var!(expr_val);
-        let list_var = var!(list_var);
         let negated_var = var!(negated_var);
-        let return_binary_expr_var = var!(return_binary_expr_var);
+        let op_var = var!(op_var);
 
         move |egraph, subst| {
-            let expr_id = subst[expr_val];
-            let scalar = match &egraph[subst[list_var]].data.constant_in_list {
-                Some(list) if list.len() == 1 => list[0].clone(),
-                _ => return false,
-            };
-
             for negated in var_iter!(egraph[subst[negated_var]], InListExprNegated) {
                 let operator = if *negated {
                     Operator::NotEq
                 } else {
                     Operator::Eq
                 };
-                let operator =
-                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator)));
 
-                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExprValue(
-                    LiteralExprValue(scalar),
-                ));
-                let literal_expr = egraph.add(LogicalPlanLanguage::LiteralExpr([literal_expr]));
-
-                let return_binary_expr = egraph.add(LogicalPlanLanguage::BinaryExpr([
-                    expr_id,
-                    operator,
-                    literal_expr,
-                ]));
-
-                subst.insert(return_binary_expr_var, return_binary_expr);
-
+                subst.insert(
+                    op_var,
+                    egraph.add(LogicalPlanLanguage::BinaryExprOp(BinaryExprOp(operator))),
+                );
                 return true;
             }
 
@@ -3343,7 +3389,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<_> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some(list) = &egraph[subst[list_var]].data.constant_in_list {
                     let values = list
                         .into_iter()
@@ -3465,7 +3515,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<_> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some((member_name, cube)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -3557,7 +3611,7 @@ impl FilterRules {
     }
 
     fn filter_member_name(
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
         subst: &Subst,
         meta_context: &Arc<MetaContext>,
         alias_to_cube_var: Var,
@@ -3565,33 +3619,75 @@ impl FilterRules {
         members_var: Var,
         aliases: &Vec<(String, String)>,
     ) -> Option<(String, V1CubeMeta)> {
-        for alias_to_cube in var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
-        {
-            for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+        Self::filter_member_name_with_granularity(
+            egraph,
+            subst,
+            meta_context,
+            alias_to_cube_var,
+            column_var,
+            members_var,
+            aliases,
+        )
+        .map(|(name, _, meta)| (name, meta))
+    }
+
+    fn filter_member_name_with_granularity(
+        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        subst: &Subst,
+        meta_context: &Arc<MetaContext>,
+        alias_to_cube_var: Var,
+        column_var: Var,
+        members_var: Var,
+        aliases: &Vec<(String, String)>,
+    ) -> Option<(String, Option<String>, V1CubeMeta)> {
+        let alias_to_cubes: Vec<_> =
+            var_iter!(egraph[subst[alias_to_cube_var]], FilterReplacerAliasToCube)
+                .cloned()
+                .collect();
+        if alias_to_cubes.is_empty() {
+            return None;
+        }
+        let columns: Vec<_> = var_iter!(egraph[subst[column_var]], ColumnExprColumn)
+            .cloned()
+            .collect();
+        for alias_to_cube in alias_to_cubes {
+            for column in columns.iter() {
                 let alias_name = expr_column_name(&Expr::Column(column.clone()), &None);
 
                 let member_name = aliases
                     .iter()
                     .find(|(a, _)| a == &alias_name)
                     .map(|(_, name)| name.to_string());
-                let member_name = if member_name.is_some() {
-                    member_name
+                let (member_name, granularity) = if member_name.is_some() {
+                    (member_name, None)
                 } else {
                     // TODO: aliases are not enough?
-                    member_name_by_alias(egraph, subst[members_var], &alias_name)
+                    egraph
+                        .index_mut(subst[members_var])
+                        .data
+                        .find_member_by_alias(&alias_name)
+                        .map(|((member_name, member, _), _)| {
+                            let member_name: Option<String> = member_name.clone();
+                            if let Member::TimeDimension { granularity, .. } = member {
+                                (member_name, granularity.clone())
+                            } else {
+                                (member_name, None)
+                            }
+                        })
+                        .unwrap_or((None, None))
                 };
 
                 if let Some(member_name) = member_name {
                     if let Some(cube) =
                         meta_context.find_cube_with_name(&member_name.split(".").next().unwrap())
                     {
-                        return Some((member_name, cube));
+                        return Some((member_name, granularity, cube));
                     }
                 } else if let Some((_, cube)) =
-                    meta_context.find_cube_by_column(alias_to_cube, &column)
+                    meta_context.find_cube_by_column(&alias_to_cube, &column)
                 {
                     if let Some(original_name) = Self::original_member_name(&cube, &column.name) {
-                        return Some((original_name, cube));
+                        return Some((original_name, granularity, cube));
                     }
                 }
             }
@@ -3637,7 +3733,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<_> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some((member_name, cube)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -3720,7 +3820,11 @@ impl FilterRules {
         let filter_aliases_var = var!(filter_aliases_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<_> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 if let Some((member_name, cube)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -4077,8 +4181,12 @@ impl FilterRules {
                 TimeDimensionDateRangeReplacerMember
             ) {
                 let member = member.to_string();
-                if let Some(member_name_to_expr) =
-                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                if let Some(member_name_to_expr) = &egraph
+                    .index(subst[members_var])
+                    .data
+                    .member_name_to_expr
+                    .as_ref()
+                    .map(|x| &x.list)
                 {
                     if member_name_to_expr
                         .iter()
@@ -4143,8 +4251,12 @@ impl FilterRules {
                 egraph[subst[time_dimension_member_var]],
                 TimeDimensionDateRangeReplacerMember
             ) {
-                if let Some(member_name_to_expr) =
-                    &egraph.index(subst[members_var]).data.member_name_to_expr
+                if let Some(member_name_to_expr) = &egraph
+                    .index(subst[members_var])
+                    .data
+                    .member_name_to_expr
+                    .as_ref()
+                    .map(|x| &x.list)
                 {
                     if member_name_to_expr
                         .iter()
@@ -4256,17 +4368,33 @@ impl FilterRules {
         let filter_values_var = var!(filter_values_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for escape_char in var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar) {
+            let escape_chars: Vec<Option<char>> =
+                var_iter!(egraph[subst[escape_char_var]], LikeExprEscapeChar)
+                    .cloned()
+                    .collect();
+            if escape_chars.is_empty() {
+                return false;
+            }
+            let literals: Vec<ScalarValue> =
+                var_iter!(egraph[subst[literal_var]], LiteralExprValue)
+                    .cloned()
+                    .collect();
+            if literals.is_empty() {
+                return false;
+            }
+            for escape_char in escape_chars {
                 if let Some('!') = escape_char {
-                    for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
+                    for literal in literals.iter() {
                         let literal_value = match &literal {
                             ScalarValue::Utf8(Some(literal_value)) => literal_value.to_string(),
                             _ => continue,
                         };
 
-                        for aliases in
+                        let aliases_es: Vec<_> =
                             var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
-                        {
+                                .cloned()
+                                .collect();
+                        for aliases in aliases_es {
                             if let Some((member_name, cube)) = Self::filter_member_name(
                                 egraph,
                                 subst,
@@ -4398,7 +4526,9 @@ impl FilterRules {
                     subst.insert(
                         one_day_var,
                         egraph.add(LogicalPlanLanguage::LiteralExprValue(LiteralExprValue(
-                            ScalarValue::IntervalDayTime(Some(1 << 32)),
+                            ScalarValue::IntervalDayTime(Some(IntervalDayTimeType::make_value(
+                                1, 0,
+                            ))),
                         ))),
                     );
                     return true;
@@ -4430,16 +4560,20 @@ impl FilterRules {
         let new_filter_var = var!(new_filter_var);
         let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            let Some(list) = &egraph[subst[list_var]].data.constant_in_list else {
+            let Some(list) = &egraph[subst[list_var]].data.constant_in_list.clone() else {
                 return false;
             };
             let Some(ConstantFolding::Scalar(ScalarValue::Utf8(Some(granularity)))) =
-                &egraph[subst[granularity_var]].data.constant
+                &egraph[subst[granularity_var]].data.constant.clone()
             else {
                 return false;
             };
 
-            for aliases in var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases) {
+            let aliases_es: Vec<_> =
+                var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                    .cloned()
+                    .collect();
+            for aliases in aliases_es {
                 let Some((member_name, cube)) = Self::filter_member_name(
                     egraph,
                     subst,
@@ -4818,7 +4952,7 @@ impl Decimal {
     pub fn to_string(&self, scale: usize) -> String {
         let big_decimal = BigDecimal::new(BigInt::from(self.raw_value), scale as i64);
         let mut res = big_decimal.to_string();
-        if res.contains(".") {
+        if res.contains('.') {
             let mut truncate_len = res.len();
             for (i, c) in res.char_indices().rev() {
                 if c == '0' {
@@ -4833,5 +4967,9 @@ impl Decimal {
             res.truncate(truncate_len);
         }
         res
+    }
+
+    pub fn format_string(raw_value: i128, scale: usize) -> String {
+        Decimal::new(raw_value).to_string(scale)
     }
 }

@@ -1,3 +1,5 @@
+import { StartedNetwork } from 'testcontainers';
+
 export interface ContainerVolumeDefinition {
   source: string,
   target: string,
@@ -5,6 +7,7 @@ export interface ContainerVolumeDefinition {
 }
 
 export interface DBRunnerContainerOptions {
+  network?: StartedNetwork,
   volumes?: ContainerVolumeDefinition[],
   version?: string,
 }

@@ -40,16 +40,16 @@ impl PgCatalogPartitionedTableBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.partrelid.finish()));
-        columns.push(Arc::new(self.partstrat.finish()));
-        columns.push(Arc::new(self.partnatts.finish()));
-        columns.push(Arc::new(self.partdefid.finish()));
-        columns.push(Arc::new(self.partattrs.finish()));
-        columns.push(Arc::new(self.partclass.finish()));
-        columns.push(Arc::new(self.partcollation.finish()));
-        columns.push(Arc::new(self.partexprs.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.partrelid.finish()),
+            Arc::new(self.partstrat.finish()),
+            Arc::new(self.partnatts.finish()),
+            Arc::new(self.partdefid.finish()),
+            Arc::new(self.partattrs.finish()),
+            Arc::new(self.partclass.finish()),
+            Arc::new(self.partcollation.finish()),
+            Arc::new(self.partexprs.finish()),
+        ];
 
         columns
     }

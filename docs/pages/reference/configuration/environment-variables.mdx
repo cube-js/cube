@@ -662,7 +662,7 @@ indefinitely][snowflake-docs-connection-options].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | N/A                    | N/A                   |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`
 
@@ -735,6 +735,15 @@ The username used to connect to the database.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
+
+## `CUBEJS_DB_QUERY_DEFAULT_LIMIT`
+
+The default [row limit][ref-row-limit] in the result set if it's not explicitly
+specified in an API query.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `10000`                | `10000`               |
 
 ## `CUBEJS_DB_QUERY_LIMIT`
 
@@ -926,101 +935,6 @@ to use for storing pre-aggregations.
 | --------------- | ---------------------- | ----------------------- |
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
 
-## `CUBEJS_REDIS_PASSWORD`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The password used to connect to the Redis server.
-
-| Possible Values        | Default in Development | Default in Production |
-| ---------------------- | ---------------------- | --------------------- |
-| A valid Redis password | N/A                    | N/A                   |
-
-## `CUBEJS_REDIS_POOL_MAX`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The maximum number of connections to keep active in the Redis connection pool
-for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be higher
-than [`CUBEJS_REDIS_POOL_MIN`](#cubejs-redis-pool-min).
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid number of connections | `1000`                 | `1000`                |
-
-## `CUBEJS_REDIS_POOL_MIN`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The minimum number of connections to keep active in the Redis connection pool
-for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be lower
-than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid number of connections | `2`                    | `2`                   |
-
-## `CUBEJS_REDIS_TLS`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-If `true`, then the connection to the Redis server is protected by TLS
-authentication.
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
-
-## `CUBEJS_REDIS_URL`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The host URL for a Redis server.
-
-| Possible Values        | Default in Development | Default in Production |
-| ---------------------- | ---------------------- | --------------------- |
-| A valid Redis host URL | N/A                    | N/A                   |
-
-## `CUBEJS_REDIS_USE_IOREDIS`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-Use [`ioredis`][gh-ioredis] instead of [`redis`][gh-node-redis].
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
-
 ## `CUBEJS_REFRESH_WORKER`
 
 If `true`, this instance of Cube will **only** refresh pre-aggregations.
@@ -1131,6 +1045,15 @@ Query pushdown in the SQL API is available in public preview.
 [Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
 </InfoBox>
+
+## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
+
+If `true`, prevents adding implicit [default `ORDER BY`
+clause](/product/apis-integrations/queries#order) for [SQL API][ref-sql-api] queries.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                | `true`               |
 
 ## `CUBESQL_REWRITE_MAX_NODES`
 
@@ -1333,7 +1256,7 @@ The logging level for Cube Store.
 
 ## `CUBESTORE_META_ADDR`
 
-The address/port pair for the **router** node in the cluster.
+The address/port pair for the Cube Store **router** node in the cluster.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1341,8 +1264,8 @@ The address/port pair for the **router** node in the cluster.
 
 ## `CUBESTORE_META_PORT`
 
-The port for the **router** node to listen for connections on. Ignored when
-`CUBESTORE_META_ADDR` is set.
+The port for the Cube Store **router** node to listen for connections on.
+Ignored when `CUBESTORE_META_ADDR` is set.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1469,8 +1392,10 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 
 ## `CUBESTORE_SERVER_NAME`
 
-The full name and port number of the Cube Store server. Must be unique for each
-instance in cluster mode.
+The full name and port number of the Cube Store node (either the router
+or a worker). Must be unique for each instance in the Cube Store cluster.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1496,7 +1421,7 @@ insertion.
 ## `CUBESTORE_WORKER_PORT`
 
 The port for Cube Store workers to listen to connections on. When set, the node
-will start as a **worker** in the cluster
+will start as a Cube Store **worker** in the cluster
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1504,7 +1429,9 @@ will start as a **worker** in the cluster
 
 ## `CUBESTORE_WORKERS`
 
-A comma-separated list of address/port pairs for Cube Store workers.
+A comma-separated list of address/port pairs of Cube Store workers.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values                              | Default in Development | Default in Production |
 | -------------------------------------------- | ---------------------- | --------------------- |
@@ -1513,6 +1440,12 @@ A comma-separated list of address/port pairs for Cube Store workers.
 ```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
+
+Used to implement stateless addressing within a Cube Store cluster.
+By analyzing `CUBESTORE_WORKERS` and `CUBESTORE_SERVER_NAME`, each node
+is able to determine its position within a Cube Store cluster.
+This allows each worker to know which pre-aggregation partitions it owns
+and how the load is distributed across all workers.
 
 ## `DEBUG_LOG`
 
@@ -1557,10 +1490,8 @@ The port for a Cube deployment to listen to API connections on.
   https://cloud.google.com/iam/docs/creating-managing-service-account-keys
 [gh-docs-pat]:
   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
-[gh-ioredis]: https://github.com/luin/ioredis
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
-[gh-node-redis]: https://github.com/NodeRedis/node-redis
 [ietf-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
 [ietf-jwt-ref-iss]: https://tools.ietf.org/html/rfc7519#section-4.1.1
 [ietf-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2

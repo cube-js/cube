@@ -2,9 +2,9 @@ use crate::metastore::table::TablePath;
 use crate::metastore::Column;
 use crate::queryplanner::{InfoSchemaTableDef, InfoSchemaTableDefContext};
 use crate::CubeError;
-use arrow::array::{ArrayRef, StringArray};
-use arrow::datatypes::{DataType, Field};
 use async_trait::async_trait;
+use datafusion::arrow::array::{ArrayRef, StringArray};
+use datafusion::arrow::datatypes::{DataType, Field};
 use std::sync::Arc;
 
 pub struct ColumnsInfoSchemaTableDef;

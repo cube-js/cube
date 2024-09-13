@@ -32,9 +32,7 @@ same condensed dataset if any matching attributes are found.
 
 [Pre-aggregations are defined within each cube's data
 schema][ref-schema-preaggs], and cubes can have as many pre-aggregations as they
-require. The pre-aggregated data [can be stored either alongside the source data
-in the same database, in an external database][ref-caching-preaggs-storage] that
-is supported by Cube, [or in Cube Store, a dedicated pre-aggregation storage
+require. The pre-aggregated data is stored in [Cube Store, a dedicated pre-aggregation storage
 layer][ref-caching-preaggs-cubestore].
 
 ## Pre-Aggregations without Time Dimension
@@ -223,6 +221,4 @@ background as a scheduled process, unless configured otherwise.
   /product/caching/using-pre-aggregations#pre-aggregations-storage
 [ref-caching-preaggs-refresh]:
   /product/caching/using-pre-aggregations#refresh-strategy
-[ref-caching-preaggs-storage]:
-  /product/caching/using-pre-aggregations#pre-aggregations-storage
 [ref-schema-preaggs]: /reference/data-model/pre-aggregations

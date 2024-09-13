@@ -21,8 +21,10 @@ describe('AuroraServerlessMySqlDriver', () => {
     );
 
     env = await dc
-      .withEnv('TEST_MYSQL_VERSION', process.env.TEST_MYSQL_VERSION || '5.6.50')
-      .withEnv('TEST_LOCAL_DATA_API_VERSION', process.env.TEST_LOCAL_DATA_API_VERSION || '0.6.4')
+      .withEnvironment({
+        TEST_MYSQL_VERSION: process.env.TEST_MYSQL_VERSION || '5.6.50',
+        TEST_LOCAL_DATA_API_VERSION: process.env.TEST_LOCAL_DATA_API_VERSION || '0.6.4',
+      })
       .withWaitStrategy('mysql', Wait.forHealthCheck())
       .up();
 

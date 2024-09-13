@@ -6,7 +6,6 @@ import { CubeStoreQueueDriver } from '@cubejs-backend/cubestore-driver';
 
 import { TimeoutError } from './TimeoutError';
 import { ContinueWaitError } from './ContinueWaitError';
-import { RedisQueueDriver } from './RedisQueueDriver';
 import { LocalQueueDriver } from './LocalQueueDriver';
 import { QueryStream } from './QueryStream';
 
@@ -17,8 +16,6 @@ import { QueryStream } from './QueryStream';
  */
 function factoryQueueDriver(cacheAndQueueDriver, queueDriverOptions) {
   switch (cacheAndQueueDriver || 'memory') {
-    case 'redis':
-      return new RedisQueueDriver(queueDriverOptions);
     case 'memory':
       return new LocalQueueDriver(queueDriverOptions);
     case 'cubestore':

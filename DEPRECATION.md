@@ -33,33 +33,37 @@ features:
   migrate to alternatives. In such cases, a warning may be printed, and users
   should not rely on this feature.
 
-| Status     | Feature                                                                                                                                 | Deprecated | Remove    |
-|------------|-----------------------------------------------------------------------------------------------------------------------------------------|------------|-----------|
-| Removed    | [Node.js 8](#nodejs-8)                                                                                                                  | v0.22.4    | v0.26.0   |
-| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                                 | v0.23.8    | June 2021 |
-| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                               | v0.23.11   | v0.26.0   |
-| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                                    | v0.24.0    | June 2021 |
-| Removed    | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                      | v0.24.2    | v0.32.0   |
-| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                       | v0.25.0    | v0.25.0   |
-| Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                                    | v0.25.4    | v0.32.0   |
-| Removed    | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                            | v0.25.21   | v0.32.0   |
-| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                           | v0.26.0    |           |
-| Removed    | [Node.js 10](#nodejs-10)                                                                                                                | v0.26.0    | v0.29.0   |
-| Removed    | [Node.js 15](#nodejs-15)                                                                                                                | v0.26.0    | v0.32.0   |
-| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                         | v0.26.0    |           |
-| Deprecated | [`authInfo`](#authinfo)                                                                                                                 | v0.26.0    |           |
-| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                                   | v0.27.0    |           |
-| Removed    | [Node.js 12](#nodejs-12)                                                                                                                | v0.29.0    | v0.32.0   |
-| Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default)       | v0.30.0    |           |
-| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                         | v0.30.0    |           |
-| Deprecated | [`dbType`](#dbtype)                                                                                                                     | v0.30.30   |           |
-| Removed | [Serverless Deployments](#serverless-deployments)                                                                                       | v0.31.64   | v0.35.0   |
-| Removed    | [Node.js 14](#nodejs-14)                                                                                                                | v0.32.0    | v0.35.0   |
-| Deprecated | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue) | v0.32.0 |   |
-| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                             | v0.33.39   |           |
-| Deprecated | [Node.js 16](#nodejs-16)                                                                                                                | v0.35.0    |           |
-| Removed | [MySQL-based SQL API](#mysql-based-sql-api) | v0.35.0 | v0.35.0 |
-| Removed | [`initApp` hook](#initapp-hook) | v0.35.0 | v0.35.0 |
+| Status     | Feature                                                                                                                           | Deprecated | Removed   |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------|------------|-----------|
+| Removed    | [Node.js 8](#nodejs-8)                                                                                                            | v0.22.4    | v0.26.0   |
+| Deprecated | [`hearBeatInterval`](#hearbeatinterval)                                                                                           | v0.23.8    | June 2021 |
+| Removed    | [`CUBEJS_ENABLE_TLS`](#cubejs_enable_tls)                                                                                         | v0.23.11   | v0.26.0   |
+| Deprecated | [Embedding Cube.js within Express](#embedding-cubejs-within-express)                                                              | v0.24.0    | June 2021 |
+| Removed    | [Absolute import for `@cubejs-backend/query-orchestrator`](#absolute-import-for-@cubejs-backendquery-orchestrator)                | v0.24.2    | v0.32.0   |
+| Removed    | [`contextToDataSourceId`](#contexttodatasourceid)                                                                                 | v0.25.0    | v0.25.0   |
+| Removed    | [Absolute import for `@cubejs-backend/server-core`](#absolute-import-for-@cubejs-backendserver-core)                              | v0.25.4    | v0.32.0   |
+| Removed    | [Absolute import for `@cubejs-backend/schema-compiler`](#absolute-import-for-@cubejs-backendschema-compiler)                      | v0.25.21   | v0.32.0   |
+| Deprecated | [`checkAuthMiddleware`](#checkauthmiddleware)                                                                                     | v0.26.0    | v0.36.0   |
+| Removed    | [Node.js 10](#nodejs-10)                                                                                                          | v0.26.0    | v0.29.0   |
+| Removed    | [Node.js 15](#nodejs-15)                                                                                                          | v0.26.0    | v0.32.0   |
+| Deprecated | [`USER_CONTEXT`](#user_context)                                                                                                   | v0.26.0    | v0.36.0   |
+| Deprecated | [`authInfo`](#authinfo)                                                                                                           | v0.26.0    |           |
+| Deprecated | [Prefix Redis environment variables with `CUBEJS_`](#prefix-redis-environment-variables-with-cubejs_)                             | v0.27.0    | v0.36.0   |
+| Removed    | [Node.js 12](#nodejs-12)                                                                                                          | v0.29.0    | v0.32.0   |
+| Deprecated | [`CUBEJS_EXTERNAL_DEFAULT` and `CUBEJS_SCHEDULED_REFRESH_DEFAULT`](#cubejs_external_default-and-cubejs_scheduled_refresh_default) | v0.30.0    |           |
+| Deprecated | [Using external databases for pre-aggregations](#using-external-databases-for-pre-aggregations)                                   | v0.30.0    |           |
+| Deprecated | [`dbType`](#dbtype)                                                                                                               | v0.30.30   |           |
+| Removed    | [Serverless Deployments](#serverless-deployments)                                                                                 | v0.31.64   | v0.35.0   |
+| Removed    | [Node.js 14](#nodejs-14)                                                                                                          | v0.32.0    | v0.35.0   |
+| Removed    | [Using Redis for in-memory cache and queue](#using-redis-for-in-memory-cache-and-queue)                                           | v0.32.0    | v0.36.0   |
+| Deprecated | [`SECURITY_CONTEXT`](#security_context)                                                                                           | v0.33.0    |           |
+| Deprecated | [`running_total` measure type](#running_total-measure-type)                                                                       | v0.33.39   |           |
+| Deprecated | [Top-level `includes` parameter in views](#top-level-includes-parameter-in-views)                                                 | v0.34.34   |           |
+| Removed    | [Node.js 16](#nodejs-16)                                                                                                          | v0.35.0    | v0.36.0   |
+| Removed    | [MySQL-based SQL API](#mysql-based-sql-api)                                                                                       | v0.35.0    | v0.35.0   |
+| Removed    | [`initApp` hook](#initapp-hook)                                                                                                   | v0.35.0    | v0.35.0   |
+| Removed    | [`/v1/run-scheduled-refresh` REST API endpoint](#v1run-scheduled-refresh-rest-api-endpoint)                                       | v0.35.0    | v0.36.0   |
+| Deprecated | [Node.js 18](#nodejs-18)                                                                                                          | v0.36.0    |           |
 
 ### Node.js 8
 
@@ -178,7 +182,7 @@ const { BaseQuery } = require("@cubejs-backend/schema-compiler");
 
 ### `checkAuthMiddleware`
 
-**Deprecated in Release: v0.26.0**
+**Removed in Release: v0.36.0**
 
 The `checkAuthMiddleware` option was tightly bound to Express,
 [which has been deprecated](#embedding-cubejs-within-express). Since Cube.js
@@ -186,7 +190,7 @@ supports HTTP **and** WebSockets as transports, we want our authentication API
 to not rely on transport-specific details. We now recommend using
 [`checkAuth`][ref-checkauth] as a transport-agnostic method of authentication.
 This means the same authentication logic can be reused for both HTTP and
-Websockets transports.
+WebSockets transports.
 
 If you are using custom authorization, please take a [look at the
 documentation][link-custom-auth]
@@ -203,7 +207,7 @@ no more updates. Please upgrade to Node.js 12 or higher.
 
 ### `USER_CONTEXT`
 
-**Deprecated in Release: v0.26.0**
+**Removed in Release: v0.36.0**
 
 `USER_CONTEXT` has been renamed to `SECURITY_CONTEXT`.
 
@@ -270,40 +274,15 @@ const server = new CubejsServer({
 
 ### Prefix Redis environment variables with `CUBEJS_`
 
-Redis-related environment variables are now prefixed with `CUBEJS_` for
-consistency with other environment variables.
-
-**Deprecated in Release: v0.27.0**
-
-Deprecated:
-
-```
-REDIS_URL=XXXX
-REDIS_PASSWORD=XXX
-REDIS_TLS=true
-```
-
-You should use:
-
-```
-CUBEJS_REDIS_URL=XXXX
-CUBEJS_REDIS_PASSWORD=XXX
-CUBEJS_REDIS_TLS=true
-```
+**Removed in Release: v0.36.0**
 
 ### Node.js 15
 
 **Removed in Release: v0.29.0**
 
-Node.js 15 reached [End of Life on June 1, 2021][link-nodejs-eol]. This means no
-more updates. Please upgrade to Node.js 14 or higher.
-
 ### Node.js 12
 
 **Removed in Release: v0.32.0**
-
-Node.js 12 reached [End of Life on May 19, 2021][link-nodejs-eol]. This means no
-more updates. Please upgrade to Node.js 14 or higher.
 
 ### Using non-Cube Store databases as external database
 
@@ -352,16 +331,21 @@ instead.
 
 **Removed in Release: v0.35.0**
 
-Node.js 14 reached [End of Life on April 30, 2023][link-nodejs-eol]. This means
-no more updates. Please upgrade to Node.js 16 or higher.
-
 ### Using Redis for in-memory cache and queue
 
-**Deprecated in release: v0.32.0**
+**Removed in Release: v0.36.0**
 
 Cube Store is now the default cache and queue engine, [replacing
 Redis](https://cube.dev/blog/replacing-redis-with-cube-store). Please migrate to
 [Cube Store](https://cube.dev/blog/how-you-win-by-using-cube-store-part-1).
+
+### `SECURITY_CONTEXT`
+
+**Deprecated in Release: v0.33.0**
+
+The `SECURITY_CONTEXT` context variable is deprecated. Use
+[`query_rewrite`](https://cube.dev/docs/reference/configuration/config#query_rewrite)
+instead.
 
 ### `running_total` measure type
 
@@ -371,12 +355,18 @@ The `running_total` measure type is now deprecated, and we recommend using
 [`rolling_window`](https://cube.dev/docs/product/data-modeling/reference/measures#rolling_window)
 to calculate running totals instead.
 
+### Top-level `includes` parameter in views
+
+**Deprecated in Release: v0.34.34**
+
+The top-level `includes` parameter is now deprecated. Please always use the
+`includes` parameter within [`cubes` and `join_path`
+parameters](https://cube.dev/docs/reference/data-model/view#cubes) so you can
+explicitly control the join path.
+
 ### Node.js 16
 
-**Deprecated in Release: v0.35.0**
-
-Node.js 16 reached [End of Life on September 11, 2023][link-nodejs-eol]. This means
-no more updates. Please upgrade to Node.js 18 or higher.
+**Removed in Release: v0.36.0**
 
 [link-nodejs-eol]: https://github.com/nodejs/Release#end-of-life-releases
 
@@ -393,3 +383,19 @@ Early prototype of the MySQL-based SQL API is removed in favor of the Postgres-c
 **Removed in release: v0.35.0**
 
 The `initApp` hook is removed as it's not relevant anymore for Docker-based architecture.
+
+### `/v1/run-scheduled-refresh` REST API endpoint
+
+**Removed in release: v0.36.0**
+
+The `/v1/run-scheduled-refresh` REST API endpoint is deprecated as it's not
+relevant anymore for Docker-based architecture. Use the [Orchestration
+API](https://cube.dev/docs/product/apis-integrations/orchestration-api) and
+`/v1/pre-aggregations/jobs` endpoint instead.
+
+### Node.js 18
+
+**Deprecated in Release: v0.36.0**
+
+Node.js 18 reaches [End of Life on April 30, 2025][link-nodejs-eol]. This means
+no more updates. Please upgrade to Node.js 20 or higher.

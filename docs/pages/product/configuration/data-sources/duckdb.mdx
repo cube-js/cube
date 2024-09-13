@@ -4,6 +4,8 @@
 support for querying data in CSV, JSON and Parquet formats from an AWS
 S3-compatible blob storage. This means you can [query data stored in AWS S3,
 Google Cloud Storage, or Cloudflare R2][duckdb-docs-s3-import].
+You can also use the `CUBEJS_DB_DUCKDB_DATABASE_PATH` environment variable to
+connect to a local DuckDB database.
 
 <Diagram src="https://ucarecdn.com/d3e42677-83ce-4ad8-8ac9-c39d3b74e252/" />
 
@@ -65,12 +67,12 @@ deployment][ref-demo-deployment] in Cube Cloud.
 | `CUBEJS_DB_DUCKDB_DATABASE_PATH`        | The database filepath to use for connection to a local database.                                                      | A valid duckdb database file path                             |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_ACCESS_KEY_ID`     | The Access Key ID to use for database connections                                                                     | A valid Access Key ID                                         |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_SECRET_ACCESS_KEY` | The Secret Access Key to use for database connections                                                                 | A valid Secret Access Key                                     |    ❌    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ✅    |                                    ✅                                     |
-| `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ✅    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_ENDPOINT`          | The S3 endpoint                                                                                                       | A valid [S3 endpoint][duckdb-docs-s3-import]                  |    ❌    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_REGION`            | The [region of the bucket][duckdb-docs-s3-import]                                                                     | A valid AWS region                                            |    ❌    |                                    ✅                                     |
 | `CUBEJS_CONCURRENCY`                    | The number of concurrent connections each queue has to the database. Default is `2`                                   | A valid number                                                |    ❌    |                                    ✅                                     |
 | `CUBEJS_DB_DUCKDB_S3_USE_SSL`           | Use SSL for connection                                                                                                | A boolean                                                     |    ❌    |                                    ❌                                     |
 | `CUBEJS_DB_DUCKDB_S3_URL_STYLE`         | To choose the S3 URL style(vhost or path)                                                                             | 'vhost' or 'path'                                             |    ❌    |                                    ❌                                     |
-| `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`     | The token for the S3 session                                                                                          | A valid Session Token                                         |    ✅    |                                    ✅                                     |
+| `CUBEJS_DB_DUCKDB_S3_SESSION_TOKEN`     | The token for the S3 session                                                                                          | A valid Session Token                                         |    ❌    |                                    ✅                                     |
 
 ## Pre-Aggregation Feature Support
 
@@ -112,13 +114,6 @@ DuckDB does not support export buckets.
 Cube does not require any additional configuration to enable SSL as DuckDB
 connections are made over HTTPS.
 
-[aws-s3]: https://aws.amazon.com/s3/
-[aws-docs-access-keys]:
-  https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html#sec-access-keys-and-secret-access-keys
-[aws-docs-regions]:
-  https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-regions-availability-zones.html#concepts-available-regions
-[aws-docs-vpc-endpoints]:
-  https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html
 [duckdb]: https://duckdb.org/
 [duckdb-docs-approx-agg-fns]:
   https://duckdb.org/docs/sql/aggregates.html#approximate-aggregates

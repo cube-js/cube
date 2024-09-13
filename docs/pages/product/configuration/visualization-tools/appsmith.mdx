@@ -6,24 +6,21 @@ redirect_from:
 # Appsmith
 
 [Appsmith](https://www.appsmith.com) is an open-source framework for building
-internal tools. You can connect a Cube deployment to Appsmith using Cube’s
-[REST API](/reference/rest-api).
+internal tools.
 
 Here's a short video guide on how to connect Appsmith to Cube.
 
 <LoomVideo url="https://www.loom.com/embed/8898c6394cac46568c2be6ae526b1fd5" />
 
-## Use REST API in Cube
+## Connect from Cube Cloud
 
-### Cube Cloud
+Navigate to the [Integrations](/product/workspace/integrations#connect-specific-tools)
+page, click <Btn>Connect to Cube</Btn>, and choose <Btn>Appsmith</Btn> to get
+detailed instructions.
 
-Click the “How to connect” link on the Overview page, navigate to the REST API
-tab. You should see the screen below with your connection credentials (the REST
-API URL and the authorization token):
+## Connect from Cube Core
 
-<Screenshot src="https://ucarecdn.com/5e861647-21df-407d-951d-6a88d5ed9f97/" />
-
-### Self-hosted Cube
+You can connect a Cube deployment to Appsmith using the [REST API](/reference/rest-api).
 
 For a Cube instance publicly available at a specific `HOST`, the REST API URL
 would be `HOST/cubejs-api/v1`. Please refer to the
@@ -36,14 +33,16 @@ Please check the [Security page](/product/auth#generating-json-web-tokens-jwt)
 to learn how to generate a token. We suggest generating a long-lived JWT that
 won't expire soon.
 
-## Create a new Data Source in Appsmith
+## Connecting from Appsmith
+
+### Create a new data source
 
 Copy and paste the REST API URL and the Authorization token to create a new data
 source in Appsmith.
 
 <Screenshot src="https://ucarecdn.com/bbdc1318-55aa-4b18-8358-d0ca1869c907/" />
 
-## Create a POST request in Appsmith
+### Create a POST request
 
 Get your Cube query in the JSON
 [query format](/product/apis-integrations/rest-api/query-format) ready. You can
@@ -61,7 +60,7 @@ Next, hit Run.
 
 <Screenshot src="https://ucarecdn.com/bee6da36-805e-4a78-97cb-4641046710cb/" />
 
-## Display the Data in Appsmith
+### Display the data
 
 You have many options to display the data in Appsmith. For instance, you can
 display the data in a table widget. Also, you can create a chart widget and map

@@ -11,8 +11,10 @@ interface CreateCubeSchemaOptions {
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cube('${name}', {
+        description: 'test cube from createCubeSchema',
+
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
         ${publicly !== undefined ? `public: ${publicly},` : ''}
@@ -22,6 +24,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         measures: {
           count: {
+            description: 'count measure from createCubeSchema',
             type: 'count'
           },
           sum: {
@@ -41,6 +44,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         dimensions: {
           id: {
             type: 'number',
+            description: 'id dimension from createCubeSchema',
             sql: 'id',
             primaryKey: true
           },
@@ -60,6 +64,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         segments: {
           sfUsers: {
+            description: 'SF users segment from createCubeSchema',
             sql: \`\${CUBE}.location = 'San Francisco'\`
           }
         },
@@ -67,8 +72,67 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         preAggregations: {
             ${preAggregations}
         }
-      }) 
+      })
   `;
+}
+
+export function createCubeSchemaWithCustomGranularities(name: string): string {
+  return `cube('${name}', {
+        sql: 'select * from orders',
+        public: true,
+        dimensions: {
+          createdAt: {
+            public: true,
+            sql: 'created_at',
+            type: 'time',
+            granularities: {
+              half_year: {
+                interval: '6 months',
+              },
+              half_year_by_1st_april: {
+                interval: '6 months',
+                offset: '3 months'
+              },
+              half_year_by_1st_march: {
+                interval: '6 months',
+                origin: '2020-03-01'
+              },
+              half_year_by_1st_june: {
+                interval: '6 months',
+                origin: '2020-06-01 10:00:00'
+              }
+            }
+          },
+          status: {
+            type: 'string',
+            sql: 'status',
+          }
+        },
+        measures: {
+          count: {
+            sql: 'count',
+            type: 'count'
+          },
+          rollingCountByTrailing2Day: {
+            type: 'count',
+            rollingWindow: {
+              trailing: '2 day'
+            }
+          },
+          rollingCountByLeading2Day: {
+            type: 'count',
+            rollingWindow: {
+              leading: '3 day'
+            }
+          },
+          rollingCountByUnbounded: {
+            type: 'count',
+            rollingWindow: {
+              trailing: 'unbounded'
+            }
+          }
+        }
+      })`;
 }
 
 export type CreateSchemaOptions = {
@@ -81,11 +145,11 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
 }
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}
-    
+
         measures:
           - name: count
             type: count

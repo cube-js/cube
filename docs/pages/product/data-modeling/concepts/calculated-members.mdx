@@ -310,11 +310,6 @@ cube(`orders`, {
       sql: `id`,
       type: `number`,
       primary_key: true
-    },
-
-    user_name: {
-      sql: `${users.name}`,
-      type: `string`
     }
   },
 
@@ -339,16 +334,29 @@ cube(`users`, {
   `,
 
   dimensions: {
+    id: {
+      sql: `id`,
+      type: `number`,
+      primary_key: true
+    },
+
     name: {
       sql: `name`,
       type: `string`
+    },
+
+    order_count: {
+      sql: `${orders.count}`,
+      type: `number`,
+      sub_query: true
     }
   },
 
   measures: {
-    name: `avg_order_count`,
-    sql: `${order_count}`,
-    type: `avg`
+    avg_order_count: {
+      sql: `${order_count}`,
+      type: `avg`
+    }
   }
 })
 ```

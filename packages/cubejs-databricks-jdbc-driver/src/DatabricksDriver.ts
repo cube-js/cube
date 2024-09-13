@@ -73,7 +73,7 @@ export type DatabricksDriverConfiguration = JDBCDriverConfiguration &
      * Export bucket AWS account region.
      */
     awsRegion?: string,
-    
+
     /**
      * Export bucket Azure account key.
      */
@@ -136,7 +136,7 @@ export class DatabricksDriver extends JDBCDriver {
   private showSparkProtocolWarn: boolean;
 
   /**
-   * Read-only mode flag.
+   * Driver Configuration.
    */
   protected readonly config: DatabricksDriverConfiguration;
 
@@ -248,6 +248,11 @@ export class DatabricksDriver extends JDBCDriver {
         conf?.azureClientSecret ||
         getEnv('dbExportBucketAzureClientSecret', { dataSource }),
     };
+    if (config.readOnly === undefined) {
+      // we can set readonly to true if there is no bucket config provided
+      config.readOnly = !config.exportBucket;
+    }
+
     super(config);
     this.config = config;
     this.showSparkProtocolWarn = showSparkProtocolWarn;
@@ -316,10 +321,11 @@ export class DatabricksDriver extends JDBCDriver {
     values: unknown[],
   ): Promise<R[]> {
     if (this.config.catalog) {
+      const preAggSchemaName = this.getPreAggrSchemaName();
       return super.query(
         query.replace(
-          new RegExp(`(?<=\\s)${this.getPreaggsSchemaName()}\\.(?=[^\\s]+)`, 'g'),
-          `${this.config.catalog}.${this.getPreaggsSchemaName()}.`
+          new RegExp(`(?<=\\s)${preAggSchemaName}\\.(?=[^\\s]+)`, 'g'),
+          `${this.config.catalog}.${preAggSchemaName}.`
         ),
         values,
       );
@@ -331,7 +337,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns pre-aggregation schema name.
    */
-  public getPreaggsSchemaName(): string {
+  protected getPreAggrSchemaName(): string {
     const schema = getEnv('preAggregationsSchema');
     if (schema) {
       return schema;
@@ -354,7 +360,7 @@ export class DatabricksDriver extends JDBCDriver {
     return super.dropTable(tableFullName, options);
   }
 
-  public showDeprecations() {
+  private showDeprecations() {
     if (this.config.url) {
       const result = this.config.url
         .split(';')
@@ -414,7 +420,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns tables meta data object.
    */
-  public async tablesSchema(): Promise<Record<string, Record<string, object>>> {
+  public override async tablesSchema(): Promise<Record<string, Record<string, object>>> {
     const tables = await this.getTables();
 
     const metadata: Record<string, Record<string, object>> = {};
@@ -434,7 +440,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns list of accessible tables.
    */
-  public async getTables(): Promise<ShowTableRow[]> {
+  private async getTables(): Promise<ShowTableRow[]> {
     if (this.config.database) {
       return <any> this.query<ShowTableRow>(
         `SHOW TABLES IN ${
@@ -519,7 +525,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns table columns types.
    */
-  public async tableColumnTypes(table: string): Promise<{ name: any; type: string; }[]> {
+  public override async tableColumnTypes(table: string): Promise<{ name: any; type: string; }[]> {
     let tableFullName = '';
     const tableArray = table.split('.');
 
@@ -594,7 +600,7 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns schema full name.
    */
-  public getSchemaFullName(schema: string): string {
+  private getSchemaFullName(schema: string): string {
     if (this.config?.catalog) {
       return `${
         this.quoteIdentifier(this.config.catalog)
@@ -609,14 +615,17 @@ export class DatabricksDriver extends JDBCDriver {
   /**
    * Returns quoted string.
    */
-  public quoteIdentifier(identifier: string): string {
+  protected quoteIdentifier(identifier: string): string {
+    if (identifier.startsWith('`') && identifier.endsWith('`')) {
+      return identifier;
+    }
     return `\`${identifier}\``;
   }
 
   /**
    * Returns the JS type by the Databricks type.
    */
-  public toGenericType(columnType: string): string {
+  protected toGenericType(columnType: string): string {
     return DatabricksToGenericType[columnType.toLowerCase()] || super.toGenericType(columnType);
   }
 
@@ -666,7 +675,7 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.queryColumnTypes(sql, params);
 
     await this.createExternalTableFromSql(tableFullName, sql, params, types);
-    
+
     return types;
   }
 
@@ -677,7 +686,7 @@ export class DatabricksDriver extends JDBCDriver {
     const types = await this.tableColumnTypes(tableFullName);
 
     await this.createExternalTableFromTable(tableFullName, types);
-    
+
     return types;
   }
 

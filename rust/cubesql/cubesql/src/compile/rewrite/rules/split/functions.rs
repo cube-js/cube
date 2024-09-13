@@ -1,6 +1,6 @@
 use crate::compile::rewrite::{
     analysis::LogicalPlanAnalysis, is_not_null_expr, is_null_expr, literal_expr, negative_expr,
-    rules::split::SplitRules, udf_expr, LogicalPlanLanguage,
+    rules::split::SplitRules, udf_expr, ListType, LogicalPlanLanguage,
 };
 use egg::Rewrite;
 
@@ -9,78 +9,43 @@ impl SplitRules {
         &self,
         rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
     ) {
-        self.single_arg_pass_through_rules(
-            "trunc",
-            |expr| self.fun_expr("Trunc", vec![expr]),
-            false,
+        // Universal rule to traverse any number of function arguments
+        // PushDown(ScalarFunctionExprArgs(..., arg, ...)) => ScalarFunctionExprArgs(..., PushDown(arg), ...)
+        // ScalarFunctionExprArgs(..., PullUp(arg), ...) => PullUp(ScalarFunctionExprArgs(..., arg, ...))
+        // If your function arguments requires special treatment, avoid generic rewrite like this
+        // PushDown(ScalarFunctionExpr ?fun ?args) => ScalarFunctionExpr ?fun PushDown(?args)
+        // Instead, use direct rewrite like this
+        // PushDown(ScalarFunctionExpr ?fun ScalarFunctionExprArgs(arg1 arg2)) => ScalarFunctionExpr ?fun ScalarFunctionExprArgs(PushDown(arg1) arg2)
+        Self::flat_list_pushdown_pullup_rules(
+            "scalar-fun-var-args",
+            ListType::ScalarFunctionExprArgs,
             rules,
         );
-        self.single_arg_pass_through_rules(
-            "lower",
-            |expr| self.fun_expr("Lower", vec![expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "upper",
-            |expr| self.fun_expr("Upper", vec![expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "ceil",
-            |expr| self.fun_expr("Ceil", vec![expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "floor",
-            |expr| self.fun_expr("Floor", vec![expr]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "char-length",
-            |expr| self.fun_expr("CharacterLength", vec![expr]),
-            false,
-            rules,
-        );
+
+        let fns = [
+            ("Trunc", false),
+            ("Lower", false),
+            ("Upper", false),
+            ("Ceil", false),
+            ("Floor", false),
+            ("CharacterLength", false),
+            ("Substr", false),
+            ("Lpad", false),
+            ("Rpad", false),
+            ("Coalesce", false),
+            ("NullIf", false),
+            ("Left", false),
+            ("Right", false),
+        ];
+
+        for (fn_name, with_projection) in fns {
+            self.scalar_fn_args_pass_through_rules(fn_name, with_projection, rules);
+        }
+
+        // TODO udf function have different list type for args, accomodate it
         self.single_arg_pass_through_rules(
             "to-char",
             |expr| udf_expr("to_char", vec![expr, "?format".to_string()]),
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "substring",
-            |expr| {
-                self.fun_expr(
-                    "Substr",
-                    vec![expr, "?from".to_string(), "?for".to_string()],
-                )
-            },
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "lpad",
-            |expr| {
-                self.fun_expr(
-                    "Lpad",
-                    vec![expr, "?length".to_string(), "?char".to_string()],
-                )
-            },
-            false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "rpad",
-            |expr| {
-                self.fun_expr(
-                    "Rpad",
-                    vec![expr, "?length".to_string(), "?char".to_string()],
-                )
-            },
             false,
             rules,
         );
@@ -89,30 +54,6 @@ impl SplitRules {
             "is-not-null",
             |expr| is_not_null_expr(expr),
             false,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "coalesce-constant",
-            |expr| self.fun_expr("Coalesce", vec![expr, literal_expr("?literal")]),
-            true,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "nullif-constant",
-            |expr| self.fun_expr("NullIf", vec![expr, literal_expr("?literal")]),
-            true,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "left-constant",
-            |expr| self.fun_expr("Left", vec![expr, literal_expr("?literal")]),
-            true,
-            rules,
-        );
-        self.single_arg_pass_through_rules(
-            "right-constant",
-            |expr| self.fun_expr("Right", vec![expr, literal_expr("?literal")]),
-            true,
             rules,
         );
         self.single_arg_pass_through_rules("negative", |expr| negative_expr(expr), true, rules);

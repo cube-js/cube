@@ -3,6 +3,247 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.81](https://github.com/cube-js/cube/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+
+### Bug Fixes
+
+* Updated jsonwebtoken in all packages ([#8282](https://github.com/cube-js/cube/issues/8282)) Thanks  [@jlloyd-widen](https://github.com/jlloyd-widen) ! ([ca7c292](https://github.com/cube-js/cube/commit/ca7c292e0122be50ac7adc9b9d4910623d19f840))
+
+
+
+
+
+## [0.35.80](https://github.com/cube-js/cube/compare/v0.35.79...v0.35.80) (2024-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.77](https://github.com/cube-js/cube/compare/v0.35.76...v0.35.77) (2024-08-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.76](https://github.com/cube-js/cube/compare/v0.35.75...v0.35.76) (2024-08-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.75](https://github.com/cube-js/cube/compare/v0.35.74...v0.35.75) (2024-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.74](https://github.com/cube-js/cube.js/compare/v0.35.73...v0.35.74) (2024-08-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.72](https://github.com/cube-js/cube/compare/v0.35.71...v0.35.72) (2024-08-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.71](https://github.com/cube-js/cube/compare/v0.35.70...v0.35.71) (2024-08-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.70](https://github.com/cube-js/cube/compare/v0.35.69...v0.35.70) (2024-08-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.69](https://github.com/cube-js/cube/compare/v0.35.68...v0.35.69) (2024-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.68](https://github.com/cube-js/cube/compare/v0.35.67...v0.35.68) (2024-08-12)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.66](https://github.com/cube-js/cube/compare/v0.35.65...v0.35.66) (2024-08-06)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.65](https://github.com/cube-js/cube/compare/v0.35.64...v0.35.65) (2024-07-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.64](https://github.com/cube-js/cube/compare/v0.35.63...v0.35.64) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.63](https://github.com/cube-js/cube/compare/v0.35.62...v0.35.63) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.61](https://github.com/cube-js/cube/compare/v0.35.60...v0.35.61) (2024-07-19)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.60](https://github.com/cube-js/cube/compare/v0.35.59...v0.35.60) (2024-07-17)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.59](https://github.com/cube-js/cube/compare/v0.35.58...v0.35.59) (2024-07-13)
+
+
+### Bug Fixes
+
+* Compile data model only once per each version ([#8452](https://github.com/cube-js/cube/issues/8452)) ([2b3bdcd](https://github.com/cube-js/cube/commit/2b3bdcdf451029d056c05c60c57e1c3ec9aca1be))
+
+
+
+
+
+## [0.35.58](https://github.com/cube-js/cube/compare/v0.35.57...v0.35.58) (2024-07-10)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.57](https://github.com/cube-js/cube.js/compare/v0.35.56...v0.35.57) (2024-07-05)
+
+
+### Bug Fixes
+
+* **cubesql:** Make CAST(COUNT(*) as float) work properly in some situations ([#8423](https://github.com/cube-js/cube.js/issues/8423)) ([3ff5c9f](https://github.com/cube-js/cube.js/commit/3ff5c9fc2349fa35644040787173a6c97d93341f))
+
+
+
+
+
+## [0.35.56](https://github.com/cube-js/cube/compare/v0.35.55...v0.35.56) (2024-07-03)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.55](https://github.com/cube-js/cube/compare/v0.35.54...v0.35.55) (2024-06-28)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.54](https://github.com/cube-js/cube.js/compare/v0.35.53...v0.35.54) (2024-06-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
+## [0.35.53](https://github.com/cube-js/cube/compare/v0.35.52...v0.35.53) (2024-06-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing-drivers
+
+
+
+
+
 ## [0.35.52](https://github.com/cube-js/cube/compare/v0.35.51...v0.35.52) (2024-06-20)
 
 **Note:** Version bump only for package @cubejs-backend/testing-drivers

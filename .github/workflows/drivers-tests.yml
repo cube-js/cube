@@ -66,11 +66,11 @@ jobs:
       - id: git-log
         run: git log HEAD~30..HEAD
       - id: get-tag-test
-        run: echo "$SHA $(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "$SHA $(git rev-list -n 1 "$(git tag --contains "$SHA")")"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag
-        run: echo "::set-output name=sha::$(git rev-list -n 1 $(git tag --contains $SHA))"
+        run: echo "sha=$(git rev-list -n 1 "$(git tag --contains "$SHA")")" >> "$GITHUB_OUTPUT"
         env:
           SHA: ${{ github.sha }}
       - id: get-tag-out
@@ -84,31 +84,32 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 18 ]
+        node-version: [ 20 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
     container:
-      image: cubejs/rust-cross:${{ matrix.target }}-02042024
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: nightly-2023-12-13
-          override: true
+          toolchain: nightly-2024-07-15
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
           target: ${{ matrix.target }}
       - name: Install Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
       - uses: Swatinem/rust-cache@v2
@@ -123,7 +124,7 @@ jobs:
         run: cd packages/cubejs-backend-native && npm run native:build-release
       - name: Setup cross compilation
         if: (matrix.target == 'aarch64-unknown-linux-gnu')
-        uses: allenevans/set-env@v3.0.0
+        uses: allenevans/set-env@v4.0.0
         with:
           PYO3_CROSS_PYTHON_VERSION: ${{ matrix.python-version }}
       - name: Build native (with Python)
@@ -153,23 +154,15 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-
+        uses: docker/setup-qemu-action@v3
       - name: Download native build
         uses: actions/download-artifact@v4
         with:
           name: backend-native
           path: packages/cubejs-backend-native/
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          version: v0.10.3
-
       - name: Build and push
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
@@ -183,8 +176,8 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     strategy:
       matrix:
-        node: 
-          - 18.x
+        node:
+          - 20.x
         database:
           - athena
           - bigquery
@@ -201,21 +194,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js 18.x
-        uses: actions/setup-node@v3
+      - name: Install Node.js 20.x
+        uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
 
       - name: Configure `yarn`
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
-        run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
         shell: bash
       - name: Restore yarn cache
         # We don't want to save it on finish, restore only!
-        uses: actions/cache/restore@v3
+        uses: actions/cache/restore@v4
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('**/yarn.lock') }}
@@ -223,7 +216,7 @@ jobs:
             ${{ runner.os }}-yarn-
 
       - name: Install dependencies
-        uses: nick-invision/retry@v2
+        uses: nick-fields/retry@v3
         env:
           CUBESTORE_SKIP_POST_INSTALL: true
         with:

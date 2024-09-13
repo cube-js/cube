@@ -23,12 +23,26 @@ export class PostgresQuery extends BaseQuery {
     return new PostgresParamAllocator(expressionParams);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string): string {
     return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * Postgres operates with whole intervals as is without measuring them in plain seconds.
+   * This implementation should also work for AWS RedShift.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    return `('${origin}'::timestamp + INTERVAL '${interval}' *
+      FLOOR(
+        EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
+        EXTRACT(EPOCH FROM INTERVAL '${interval}')
+      ))`;
   }
 
   public hllInit(sql) {
@@ -62,7 +76,11 @@ export class PostgresQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'timestamptz \'{{ value }}\'';
     templates.window_frame_types.groups = 'GROUPS';
-
+    templates.types.string = 'TEXT';
+    templates.types.tinyint = 'SMALLINT';
+    templates.types.float = 'REAL';
+    templates.types.double = 'DOUBLE PRECISION';
+    templates.types.binary = 'BYTEA';
     return templates;
   }
 

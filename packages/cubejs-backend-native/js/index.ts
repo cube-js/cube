@@ -84,9 +84,7 @@ export interface CanSwitchUserPayload {
 }
 
 export type SQLInterfaceOptions = {
-  port?: number,
   pgPort?: number,
-  nonce?: string,
   checkAuth: (payload: CheckAuthPayload) => CheckAuthResponse | Promise<CheckAuthResponse>,
   load: (payload: LoadPayload) => unknown | Promise<unknown>,
   sql: (payload: SqlPayload) => unknown | Promise<unknown>,
@@ -96,6 +94,8 @@ export type SQLInterfaceOptions = {
   logLoadEvent: (payload: LogLoadEventPayload) => unknown | Promise<unknown>,
   sqlGenerators: (paramsJson: string) => unknown | Promise<unknown>,
   canSwitchUserForSession: (payload: CanSwitchUserPayload) => unknown | Promise<unknown>,
+  // gateway options
+  gatewayPort?: number,
 };
 
 export function loadNative() {
@@ -328,12 +328,12 @@ export const registerInterface = async (options: SQLInterfaceOptions): Promise<S
   });
 };
 
-export const shutdownInterface = async (instance: SqlInterfaceInstance): Promise<void> => {
+export type ShutdownMode = 'fast' | 'semifast' | 'smart';
+
+export const shutdownInterface = async (instance: SqlInterfaceInstance, shutdownMode: ShutdownMode): Promise<void> => {
   const native = loadNative();
 
-  await native.shutdownInterface(instance);
-
-  await new Promise((resolve) => setTimeout(resolve, 2000));
+  await native.shutdownInterface(instance, shutdownMode);
 };
 
 export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, stream: any, securityContext?: any): Promise<void> => {
@@ -342,10 +342,16 @@ export const execSql = async (instance: SqlInterfaceInstance, sqlQuery: string, 
   await native.execSql(instance, sqlQuery, stream, securityContext ? JSON.stringify(securityContext) : null);
 };
 
+export const buildSqlAndParams = (cubeEvaluator: any): String => {
+  const native = loadNative();
+
+  return native.buildSqlAndParams(cubeEvaluator);
+};
+
 export interface PyConfiguration {
   repositoryFactory?: (ctx: unknown) => Promise<unknown>,
   logger?: (msg: string, params: Record<string, any>) => void,
-  checkAuth?: (req: unknown, authorization: string) => Promise<void>
+  checkAuth?: (req: unknown, authorization: string) => Promise<{ 'security_context'?: unknown }>
   queryRewrite?: (query: unknown, ctx: unknown) => Promise<unknown>
   contextToApiScopes?: () => Promise<string[]>
 }
@@ -371,10 +377,16 @@ export const pythonLoadConfig = async (content: string, options: { fileName: str
 
   if (config.checkAuth) {
     const nativeCheckAuth = config.checkAuth;
-    config.checkAuth = async (req: ExpressRequest, authorization: string) => nativeCheckAuth(
-      simplifyExpressRequest(req),
-      authorization,
-    );
+    config.checkAuth = async (req: ExpressRequest, authorization: string) => {
+      const nativeResult = await nativeCheckAuth(
+        simplifyExpressRequest(req),
+        authorization,
+      );
+      const securityContext = nativeResult?.security_context;
+      return {
+        ...(securityContext ? { security_context: securityContext } : {})
+      };
+    };
   }
 
   if (config.extendContext) {

@@ -105,7 +105,7 @@ practices._
 ### Usage
 
 ```bash{promptUser: user}
-npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
+npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR
 ```
 
 ### Flags
@@ -115,7 +115,6 @@ npx cubejs-cli token -e TOKEN-EXPIRY -s SECRET -p FOO=BAR -u BAZ=QUX
 | -e, --expiry           | Token expiry. Set to 0 for no expiry (default: "30 days")                     | `1 day`, `30 days`         |
 | -s, --secret           | Cube app secret. Also can be set via environment variable `CUBEJS_API_SECRET` | -                          |
 | -p, --payload          | Token Payload                                                                 | `foo=bar`, `userId=2`      |
-| -u, --user-context     | Token USER_CONTEXT Payload                                                    | `baz=qux`, `companyId=5`   |
 
 ### Example
 

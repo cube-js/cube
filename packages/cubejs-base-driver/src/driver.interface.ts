@@ -90,6 +90,7 @@ export interface StreamTableData extends DownloadTableBase {
 export interface StreamingSourceTableData extends DownloadTableBase {
   streamingTable: string;
   selectStatement?: string;
+  sourceTable?: any,
   partitions?: number;
   streamOffset?: string;
   streamingSource: {
@@ -130,6 +131,7 @@ export type StreamOptions = {
 
 export type StreamingSourceOptions = {
   streamOffset?: boolean;
+  outputColumnTypes?: TableColumn[]
 };
 
 export interface DownloadQueryResultsBase {
@@ -230,6 +232,7 @@ export interface DriverInterface {
   queryColumnTypes: (sql: string, params: unknown[]) => Promise<{ name: any; type: string; }[]>;
   //
   getSchemas: () => Promise<QuerySchemasResult[]>;
+  tablesSchema: () => Promise<any>;
   getTablesForSpecificSchemas: (schemas: QuerySchemasResult[]) => Promise<QueryTablesResult[]>;
   getColumnsForSpecificTables: (tables: QueryTablesResult[]) => Promise<QueryColumnsResult[]>;
   // eslint-disable-next-line camelcase
@@ -246,7 +249,7 @@ export interface DriverInterface {
    * queried fields types.
    */
   stream?: (table: string, values: unknown[], options: StreamOptions) => Promise<StreamTableData>;
-  
+
   /**
    * Returns to the Cubestore an object with links to unloaded to an
    * export bucket data.
@@ -258,7 +261,7 @@ export interface DriverInterface {
    * Determines whether export bucket feature is configured or not.
    */
   isUnloadSupported?: (options: UnloadOptions) => Promise<boolean>;
-  
+
   // Current timestamp, defaults to new Date().getTime()
   nowTimestamp(): number;
   // Shutdown the driver

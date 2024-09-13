@@ -44,21 +44,27 @@ An example stack using BigQuery as a data source is provided below:
 
 <InfoBox>
 
-Using macOS or Windows? Use `CUBEJS_DB_HOST=host.docker.internal` instead of
+**Using macOS or Windows?** Use `CUBEJS_DB_HOST=host.docker.internal` instead of
 `localhost` if your database is on the same machine.
 
 </InfoBox>
 
 <InfoBox>
 
+**Using macOS on Apple Silicon (arm64)?** Use the `arm64v8` tag for Cube Store
+[Docker images](https://hub.docker.com/r/cubejs/cubestore/tags?page=&page_size=&ordering=&name=arm64v8),
+e.g., `cubejs/cubestore:arm64v8`. 
+
+</InfoBox>
+
+<InfoBox>
+
 Note that it's a best practice to use specific locked versions, e.g.,
-`cubejs/cube:v0.34.56`, instead of `cubejs/cube:latest` in production.
+`cubejs/cube:v0.36.0`, instead of `cubejs/cube:latest` in production.
 
 </InfoBox>
 
 ```yaml
-version: "2.2"
-
 services:
   cube_api:
     restart: always
@@ -276,11 +282,9 @@ Docker Hub][link-cubejs-docker]. Then update your `docker-compose.yml` to use
 a specific tag instead of `latest`:
 
 ```yaml
-version: "2.2"
-
 services:
   cube_api:
-    image: cubejs/cube:v0.34.56
+    image: cubejs/cube:v0.36.0
     ports:
       - 4000:4000
     environment:
@@ -342,8 +346,6 @@ docker build -t <YOUR-USERNAME>/cube-custom-image .
 Finally, update your `docker-compose.yml` to use your newly-built image:
 
 ```yaml
-version: "2.2"
-
 services:
   cube_api:
     image: <YOUR-USERNAME>/cube-custom-image

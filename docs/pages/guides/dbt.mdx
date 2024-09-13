@@ -263,6 +263,7 @@ cubes:
       - name: "{{ column.name }}"
         sql: "{{ column.sql }}"
         type: "{{ column.type }}"
+        description: "{{ column.description }}"
         meta:
           source: dbt
       {% endfor %}

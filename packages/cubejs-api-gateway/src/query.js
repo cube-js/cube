@@ -41,8 +41,8 @@ const getPivotQuery = (queryType, queries) => {
 const id = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$/);
 const idOrMemberExpressionName = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+$|^[a-zA-Z0-9_]+$/);
 const dimensionWithTime = Joi.string().regex(/^[a-zA-Z0-9_]+\.[a-zA-Z0-9_]+(\.(second|minute|hour|day|week|month|year))?$/);
-const memberExpression = Joi.object().keys({
-  expression: Joi.func().required(),
+const parsedMemberExpression = Joi.object().keys({
+  expression: Joi.array().items(Joi.string()).min(1).required(),
   cubeName: Joi.string().required(),
   name: Joi.string().required(),
   expressionName: Joi.string(),
@@ -52,6 +52,9 @@ const memberExpression = Joi.object().keys({
     id: Joi.number().required(),
     subId: Joi.number()
   })
+});
+const memberExpression = parsedMemberExpression.keys({
+  expression: Joi.func().required(),
 });
 
 const operators = [
@@ -95,12 +98,12 @@ const oneCondition = Joi.object().keys({
 
 const querySchema = Joi.object().keys({
   // TODO add member expression alternatives only for SQL API queries?
-  measures: Joi.array().items(Joi.alternatives(id, memberExpression)),
-  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression)),
+  measures: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
+  dimensions: Joi.array().items(Joi.alternatives(dimensionWithTime, memberExpression, parsedMemberExpression)),
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
-    granularity: Joi.valid('quarter', 'day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
+    granularity: Joi.string().max(128, 'utf8'), // Custom granularities may have arbitrary names
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
@@ -111,7 +114,7 @@ const querySchema = Joi.object().keys({
     Joi.object().pattern(idOrMemberExpressionName, Joi.valid('asc', 'desc')),
     Joi.array().items(Joi.array().min(2).ordered(idOrMemberExpressionName, Joi.valid('asc', 'desc')))
   ),
-  segments: Joi.array().items(Joi.alternatives(id, memberExpression)),
+  segments: Joi.array().items(Joi.alternatives(id, memberExpression, parsedMemberExpression)),
   timezone: Joi.string(),
   limit: Joi.number().integer().min(0),
   offset: Joi.number().integer().min(0),
@@ -219,9 +222,9 @@ const normalizeQuery = (query, persistent) => {
 
   return {
     ...query,
+    ...(query.order ? { order: normalizeQueryOrder(query.order) } : {}),
     limit: newLimit,
     timezone,
-    order: normalizeQueryOrder(query.order),
     filters: normalizeQueryFilters(query.filters || []),
     dimensions: (query.dimensions || []).filter(d => typeof d !== 'string' || d.split('.').length !== 3),
     timeDimensions: (query.timeDimensions || []).map(td => {
@@ -266,7 +269,7 @@ const remapQueryOrder = order => {
 const remapToQueryAdapterFormat = (query) => (query ? {
   ...query,
   rowLimit: query.limit,
-  order: remapQueryOrder(query.order),
+  ...(query.order ? { order: remapQueryOrder(query.order) } : {}),
 } : query);
 
 const queryPreAggregationsSchema = Joi.object().keys({
