@@ -198,8 +198,8 @@ jobs:
           - os: macos-12
             target: x86_64-apple-darwin
             executable_name: cubestored
-            strip: true
-            compress: true
+            strip: false
+            compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v4
