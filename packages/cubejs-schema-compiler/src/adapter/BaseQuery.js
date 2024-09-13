@@ -2191,14 +2191,14 @@ export class BaseQuery {
     return this.evaluateSymbolContext || {};
   }
 
-  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, internalPropertyName) {
+  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName) {
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
     const memberPathArray = [cubeName, name];
-    if (internalPropertyName && symbol.type === 'time' && internalPropertyName) {
-      memberPathArray.push('granularities', internalPropertyName);
+    if (subPropertyName && symbol.type === 'time') {
+      memberPathArray.push('granularities', subPropertyName);
     }
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
@@ -2305,31 +2305,29 @@ export class BaseQuery {
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
-        }
-
-        let res;
-
-        if (symbol.type === 'time' && internalPropertyName) {
+        } else if (symbol.type === 'time' && subPropertyName) {
+          // TODO: Beware! memberExpression && shiftInterval are not supported with the current implementation.
+          // Ideally this should be implemented (at least partially) inside cube symbol evaluation logic.
+          // As now `dimensionSql()` is recursively calling `evaluateSymbolSql()` which is not good.
           const td = this.newTimeDimension({
             dimension: this.cubeEvaluator.pathFromArray([cubeName, name]),
-            granularity: internalPropertyName
+            granularity: subPropertyName
           });
-          res = td.dimensionSql();
+          return td.dimensionSql();
         } else {
-          res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+          if (symbol.shiftInterval) {
+            res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
+          }
+          if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
+            !memberExpressionType &&
+            symbol.type === 'time' &&
+            this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
+          ) {
+            res = this.convertTz(res);
+          }
+          return res;
         }
-
-        if (symbol.shiftInterval) {
-          res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
-        }
-        if (this.safeEvaluateSymbolContext().convertTzForRawTimeDimension &&
-          !memberExpressionType &&
-          symbol.type === 'time' &&
-          this.cubeEvaluator.byPathAnyType(memberPathArray).ownedByCube
-        ) {
-          res = this.convertTz(res);
-        }
-        return res;
       } else if (type === 'segment') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {
           return this.evaluateSymbolContext.renderedReference[memberPath];
