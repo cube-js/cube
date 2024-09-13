@@ -2381,7 +2381,7 @@ export class BaseQuery {
       }
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
     }, {
-      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, pn, ppn) => self.evaluateSymbolSql(cube, pn, symbol, false, ppn)),
+      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, propName, subPropName) => self.evaluateSymbolSql(cube, propName, symbol, false, subPropName)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
       query: this,
