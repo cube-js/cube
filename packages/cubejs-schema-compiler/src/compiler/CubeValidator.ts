@@ -140,6 +140,8 @@ const BaseDimensionWithoutSubQuery = {
               month: () => 12 % v === 0,
               // Only quarters divisible by a year with no remainder are valid
               quarter: () => 4 % v === 0,
+              // Only 1 week is valid
+              week: () => v === 1,
               // Only 1 day is valid
               day: () => v === 1,
               // Only hours divisible by a day with no remainder are valid
