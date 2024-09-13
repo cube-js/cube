@@ -26,6 +26,7 @@ import { BaseTimeDimension } from './BaseTimeDimension';
 import { ParamAllocator } from './ParamAllocator';
 import { PreAggregations } from './PreAggregations';
 import { SqlParser } from '../parser/SqlParser';
+import {Granularity} from "./Granularity";
 
 const DEFAULT_PREAGGREGATIONS_SCHEMA = 'stb_pre_aggregations';
 
@@ -2197,13 +2198,6 @@ export class BaseQuery {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
     const memberPathArray = [cubeName, name];
-    // Member path needs to be expanded to granularity if subPropertyName is provided.
-    // Without this: failures with Maximum call stack size exceeded.
-    // During resolving within dimensionSql() and members collection safeEvaluateSymbolContext().memberChildren is set,
-    // so path is recursively pushed to memberChildren.
-    if (subPropertyName && symbol.type === 'time') {
-      memberPathArray.push('granularities', subPropertyName);
-    }
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
     if (!type) {
@@ -2302,24 +2296,15 @@ export class BaseQuery {
         }
         if (symbol.case) {
           return this.renderDimensionCase(symbol, cubeName);
-        }
-        if (symbol.type === 'geo') {
+        } else if (symbol.type === 'geo') {
           return this.concatStringsSql([
             this.autoPrefixAndEvaluateSql(cubeName, symbol.latitude.sql, isMemberExpr),
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
-        } else if (symbol.type === 'time' && subPropertyName) {
-          // TODO: Beware! memberExpression && shiftInterval are not supported with the current implementation.
-          // Ideally this should be implemented (at least partially) inside cube symbol evaluation logic.
-          // As now `dimensionSql()` is recursively calling `evaluateSymbolSql()` which is not good.
-          const td = this.newTimeDimension({
-            dimension: this.cubeEvaluator.pathFromArray([cubeName, name]),
-            granularity: subPropertyName
-          });
-          return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+
           if (symbol.shiftInterval) {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
@@ -2330,6 +2315,17 @@ export class BaseQuery {
           ) {
             res = this.convertTz(res);
           }
+
+          if (symbol.type === 'time' && subPropertyName) {
+            // Custom granularity
+            const granularity = new Granularity(this, {
+              dimension: memberPath,
+              granularity: subPropertyName
+            });
+
+            res = this.dimensionTimeGroupedColumn(res, granularity);
+          }
+
           return res;
         }
       } else if (type === 'segment') {
