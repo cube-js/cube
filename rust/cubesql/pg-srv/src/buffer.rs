@@ -1,10 +1,13 @@
 //! Helpers for reading/writing from/to the connection's socket
 
+use async_trait::async_trait;
 use bytes::{BufMut, BytesMut};
 use std::{
     convert::TryFrom,
+    fmt::Debug,
     io::{Cursor, Error, ErrorKind},
     marker::Send,
+    sync::Arc,
 };
 
 use crate::{
@@ -16,34 +19,68 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use super::protocol::{self, Deserialize, FrontendMessage, Serialize};
 
+#[async_trait]
+pub trait MessageTagParser: Sync + Send + Debug {
+    async fn parse(
+        &self,
+        tag: u8,
+        cursor: Cursor<Vec<u8>>,
+    ) -> Result<FrontendMessage, ProtocolError>;
+}
+
+#[derive(Default, Debug)]
+pub struct MessageTagParserDefaultImpl {}
+
+impl MessageTagParserDefaultImpl {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn with_arc() -> Arc<dyn MessageTagParser> {
+        Arc::new(Self::new())
+    }
+}
+
+#[async_trait]
+impl MessageTagParser for MessageTagParserDefaultImpl {
+    async fn parse(
+        &self,
+        tag: u8,
+        cursor: Cursor<Vec<u8>>,
+    ) -> Result<FrontendMessage, ProtocolError> {
+        let message = match tag {
+            b'Q' => FrontendMessage::Query(protocol::Query::deserialize(cursor).await?),
+            b'P' => FrontendMessage::Parse(protocol::Parse::deserialize(cursor).await?),
+            b'B' => FrontendMessage::Bind(protocol::Bind::deserialize(cursor).await?),
+            b'D' => FrontendMessage::Describe(protocol::Describe::deserialize(cursor).await?),
+            b'E' => FrontendMessage::Execute(protocol::Execute::deserialize(cursor).await?),
+            b'C' => FrontendMessage::Close(protocol::Close::deserialize(cursor).await?),
+            b'p' => FrontendMessage::PasswordMessage(
+                protocol::PasswordMessage::deserialize(cursor).await?,
+            ),
+            b'X' => FrontendMessage::Terminate,
+            b'H' => FrontendMessage::Flush,
+            b'S' => FrontendMessage::Sync,
+            identifier => {
+                return Err(ErrorResponse::error(
+                    ErrorCode::DataException,
+                    format!("Unknown message identifier: {:X?}", identifier),
+                )
+                .into())
+            }
+        };
+        Ok(message)
+    }
+}
+
 pub async fn read_message<Reader: AsyncReadExt + Unpin + Send>(
     reader: &mut Reader,
+    parser: Arc<dyn MessageTagParser>,
 ) -> Result<FrontendMessage, ProtocolError> {
     // https://www.postgresql.org/docs/14/protocol-message-formats.html
     let message_tag = reader.read_u8().await?;
     let cursor = read_contents(reader, message_tag).await?;
-
-    let message = match message_tag {
-        b'Q' => FrontendMessage::Query(protocol::Query::deserialize(cursor).await?),
-        b'P' => FrontendMessage::Parse(protocol::Parse::deserialize(cursor).await?),
-        b'B' => FrontendMessage::Bind(protocol::Bind::deserialize(cursor).await?),
-        b'D' => FrontendMessage::Describe(protocol::Describe::deserialize(cursor).await?),
-        b'E' => FrontendMessage::Execute(protocol::Execute::deserialize(cursor).await?),
-        b'C' => FrontendMessage::Close(protocol::Close::deserialize(cursor).await?),
-        b'p' => {
-            FrontendMessage::PasswordMessage(protocol::PasswordMessage::deserialize(cursor).await?)
-        }
-        b'X' => FrontendMessage::Terminate,
-        b'H' => FrontendMessage::Flush,
-        b'S' => FrontendMessage::Sync,
-        identifier => {
-            return Err(ErrorResponse::error(
-                ErrorCode::DataException,
-                format!("Unknown message identifier: {:X?}", identifier),
-            )
-            .into())
-        }
-    };
+    let message = parser.parse(message_tag, cursor).await?;
 
     trace!("[pg] Decoded {:X?}", message,);
 

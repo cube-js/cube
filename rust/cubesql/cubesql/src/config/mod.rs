@@ -6,7 +6,10 @@ use crate::{
         injection::{DIService, Injector},
         processing_loop::{ProcessingLoop, ShutdownMode},
     },
-    sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
+    sql::{
+        pg_auth_service::{PostgresAuthService, PostgresAuthServiceDefaultImpl},
+        PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+    },
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -303,6 +306,12 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn PostgresAuthService, _, _, _>(|_| async move {
+                Arc::new(PostgresAuthServiceDefaultImpl::new())
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn CompilerCache, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(CompilerCacheImpl::new(
@@ -316,6 +325,7 @@ impl Config {
             .register_typed::<ServerManager, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
