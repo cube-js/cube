@@ -581,9 +581,8 @@ export class CubeSymbols {
         }
         if (refProperty &&
           cube[refProperty].type === 'time' &&
-          (self.resolveSubProperty([cubeName, refProperty, 'granularities', propertyName], cube) ||
-           (typeof propertyName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(propertyName))
-          )) {
+          self.resolveGranularity([cubeName, refProperty, 'granularities', propertyName], cube)
+        ) {
           return {
             toString: () => this.withSymbolsCallContext(
               () => sqlResolveFn(cube[refProperty], cubeName, refProperty, propertyName),
@@ -606,17 +605,20 @@ export class CubeSymbols {
   }
 
   /**
-   * Tries to resolve subProperty object.
-   *
-   * For now, it only resolves custom granularities in time dimensions.
-   * In the future, it possibly will be extended to support globally defined granularities
-   * or even other subProperties.
+   * Tries to resolve Granularity object.
+   * For predefined granularity it constructs it on the fly.
    * @param {string|string[]} path
    * @param [refCube] Optional cube object to operate on
    */
-  resolveSubProperty(path, refCube) {
+  resolveGranularity(path, refCube) {
     const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
     const cube = refCube || this.symbols[cubeName];
+
+    // Predefined granularity
+    if (typeof granName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(granName)) {
+      return { interval: `1 ${granName}` };
+    }
+
     return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
   }
 
