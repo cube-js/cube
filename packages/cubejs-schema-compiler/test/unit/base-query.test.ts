@@ -251,7 +251,46 @@ describe('SQL Generation', () => {
         ],
         filters: [],
         timezone: 'Europe/Kyiv'
-      }
+      },
+      // requesting via view
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            granularity: 'half_year_by_1st_june',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_view.rollingCountByUnbounded'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            granularity: 'half_year',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_view.status'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
     ];
 
     const proxiedGranularitiesQueries = [
@@ -377,6 +416,45 @@ describe('SQL Generation', () => {
         timeDimensions: [
           {
             dimension: 'orders.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_users.proxyCreatedAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      // requesting via views
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
+            dateRange: [
+              '2020-01-01',
+              '2021-12-31'
+            ]
+          }
+        ],
+        dimensions: [
+          'orders_view.createdAtHalfYear'
+        ],
+        filters: [],
+        timezone: 'Europe/Kyiv'
+      },
+      {
+        measures: [
+          'orders_view.count'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'orders_view.createdAt',
             dateRange: [
               '2020-01-01',
               '2021-12-31'

@@ -205,6 +205,13 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
             type: 'count_distinct'
           }
         }
+      })
+
+      view(\`orders_view\`, {
+        cubes: [{
+          join_path: orders,
+          includes: '*'
+        }]
       })`;
 }
 
