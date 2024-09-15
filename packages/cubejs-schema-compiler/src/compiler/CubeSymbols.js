@@ -385,6 +385,7 @@ export class CubeSymbols {
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
+          ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
