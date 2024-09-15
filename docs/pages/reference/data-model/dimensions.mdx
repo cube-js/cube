@@ -551,11 +551,10 @@ the time interval is shifted forward or backward in time. It has the the same
 format as `interval`, however, you can also provide negative quantities, e.g.,
 `-1 day` or `1 month -10 days`.
 
-Alternatively, instead of `offset`, you can specify how the time interval is
-shifted forward or backward in time with the `origin` parameter. It accepts an
-ISO 8601-compliant [date time string][link-date-time-string], e.g., `2024-01-02`
-or `2024-01-02T12:00:00.000Z`. When `origin` is provided, time intervals will be
-shifted in a way that one of them will match the provided origin.
+Alternatively, instead of `offset`, you can provide the `origin` parameter.
+When `origin` is provided, time intervals will be shifted in a way that one of
+them will match the provided origin. It accepts an ISO 8601-compliant [date time
+string][link-date-time-string], e.g., `2024-01-02` or `2024-01-02T12:00:00.000Z`.
 
 Optionally, a custom granularity might have the `title` parameter with a
 human-friendly description.
