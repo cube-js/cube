@@ -103,14 +103,44 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
               }
             }
           },
+          createdAtPredefinedYear: {
+            public: true,
+            sql: \`\${createdAt.year}\`,
+            type: 'string',
+          },
+          createdAtPredefinedQuarter: {
+            public: true,
+            sql: \`\${createdAt.quarter}\`,
+            type: 'string',
+          },
+          createdAtHalfYear: {
+            public: true,
+            sql: \`\${createdAt.half_year}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stJune: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_june}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stMarch: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_march}\`,
+            type: 'string',
+          },
           status: {
             type: 'string',
             sql: 'status',
+          },
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
           }
         },
         measures: {
           count: {
-            sql: 'count',
             type: 'count'
           },
           rollingCountByTrailing2Day: {
@@ -131,7 +161,57 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
               trailing: 'unbounded'
             }
           }
+        },
+
+        joins: {
+          ${name}_users: {
+            sql: \`\${${name}_users}.id = \${${name}}.user_id\`,
+            relationship: \`one_to_many\`
+          }
         }
+
+      })
+
+      cube(\`${name}_users\`, {
+        sql: \`SELECT * FROM users\`,
+
+        dimensions: {
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
+          },
+          name: {
+            sql: 'name',
+            type: 'string',
+            public: true,
+          },
+          proxyCreatedAtPredefinedYear: {
+            sql: \`\${${name}.createdAt.year}\`,
+            type: \`string\`,
+            public: true,
+          },
+          proxyCreatedAtHalfYear: {
+            sql: \`\${${name}.createdAt.half_year}\`,
+            type: 'string',
+            public: true,
+          }
+        },
+
+        measures: {
+          count: {
+            sql: 'user_id',
+            type: 'count_distinct'
+          }
+        }
+      })
+
+      view(\`orders_view\`, {
+        cubes: [{
+          join_path: orders,
+          includes: '*'
+        }]
       })`;
 }
 

@@ -2191,12 +2191,20 @@ export class BaseQuery {
     return this.evaluateSymbolContext || {};
   }
 
-  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType) {
+  evaluateSymbolSql(cubeName, name, symbol, memberExpressionType, subPropertyName) {
     const isMemberExpr = !!memberExpressionType;
     if (!memberExpressionType) {
       this.pushMemberNameForCollectionIfNecessary(cubeName, name);
     }
     const memberPathArray = [cubeName, name];
+    // Member path needs to be expanded to granularity if subPropertyName is provided.
+    // Without this: infinite recursion with maximum call stack size exceeded.
+    // During resolving within dimensionSql() the same symbol is pushed into the stack.
+    // This would not be needed when the subProperty evaluation will be here and no
+    // call to dimensionSql().
+    if (subPropertyName && symbol.type === 'time') {
+      memberPathArray.push('granularities', subPropertyName);
+    }
     const memberPath = this.cubeEvaluator.pathFromArray(memberPathArray);
     let type = memberExpressionType;
     if (!type) {
@@ -2301,8 +2309,18 @@ export class BaseQuery {
             '\',\'',
             this.autoPrefixAndEvaluateSql(cubeName, symbol.longitude.sql, isMemberExpr)
           ]);
+        } else if (symbol.type === 'time' && subPropertyName) {
+          // TODO: Beware! memberExpression && shiftInterval are not supported with the current implementation.
+          // Ideally this should be implemented (at least partially) here + inside cube symbol evaluation logic.
+          // As now `dimensionSql()` is recursively calling `evaluateSymbolSql()` which is not good.
+          const td = this.newTimeDimension({
+            dimension: this.cubeEvaluator.pathFromArray([cubeName, name]),
+            granularity: subPropertyName
+          });
+          return td.dimensionSql();
         } else {
           let res = this.autoPrefixAndEvaluateSql(cubeName, symbol.sql, isMemberExpr);
+
           if (symbol.shiftInterval) {
             res = `(${this.addTimestampInterval(res, symbol.shiftInterval)})`;
           }
@@ -2364,7 +2382,7 @@ export class BaseQuery {
       }
       return self.evaluateSymbolSql(nextCubeName, name, resolvedSymbol);
     }, {
-      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, n) => self.evaluateSymbolSql(cube, n, symbol)),
+      sqlResolveFn: options.sqlResolveFn || ((symbol, cube, propName, subPropName) => self.evaluateSymbolSql(cube, propName, symbol, false, subPropName)),
       cubeAliasFn: self.cubeAlias.bind(self),
       contextSymbols: this.parametrizedContextSymbols(),
       query: this,

@@ -29,6 +29,10 @@ describe('Custom Granularities', () => {
           sql: status
           type: string
 
+        - name: createdAtHalfYear
+          sql: "{createdAt.half_year}"
+          type: string
+
         - name: createdAt
           sql: created_at
           type: time
@@ -72,6 +76,12 @@ describe('Custom Granularities', () => {
           type: count
           rolling_window:
             trailing: unbounded
+
+  views:
+    - name: orders_view
+      cubes:
+        - join_path: orders
+          includes: "*"
   `);
 
   it('works with half_year custom granularity w/o dimensions query', async () => dbRunner.runQueryTest(
@@ -106,6 +116,115 @@ describe('Custom Granularities', () => {
       {
         orders__count: '1',
         orders__created_at_half_year: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with proxied createdAtHalfYear custom granularity as dimension query', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders.count'],
+      timeDimensions: [{
+        dimension: 'orders.createdAt',
+        dateRange: ['2024-01-01', '2025-12-31']
+      }],
+      dimensions: ['orders.createdAtHalfYear'],
+      filters: [],
+      timezone: 'Europe/London'
+    },
+    [
+      {
+        orders__count: '13',
+        orders__created_at_half_year: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        orders__count: '13',
+        orders__created_at_half_year: '2024-07-01T00:00:00.000Z',
+      },
+      {
+        orders__count: '13',
+        orders__created_at_half_year: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        orders__count: '13',
+        orders__created_at_half_year: '2025-07-01T00:00:00.000Z',
+      },
+      {
+        orders__count: '1',
+        orders__created_at_half_year: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with half_year custom granularity w/o dimensions querying view', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders_view.count'],
+      timeDimensions: [{
+        dimension: 'orders_view.createdAt',
+        granularity: 'half_year',
+        dateRange: ['2024-01-01', '2025-12-31']
+      }],
+      dimensions: [],
+      filters: [],
+      timezone: 'Europe/London'
+    },
+    [
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2024-07-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2025-07-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '1',
+        orders_view__created_at_half_year: '2026-01-01T00:00:00.000Z',
+      },
+    ],
+    { joinGraph, cubeEvaluator, compiler }
+  ));
+
+  it('works with proxied createdAtHalfYear custom granularity as dimension querying view', async () => dbRunner.runQueryTest(
+    {
+      measures: ['orders_view.count'],
+      timeDimensions: [{
+        dimension: 'orders_view.createdAt',
+        dateRange: ['2024-01-01', '2025-12-31']
+      }],
+      dimensions: ['orders_view.createdAtHalfYear'],
+      filters: [],
+      timezone: 'Europe/London'
+    },
+    [
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2024-01-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2024-07-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2025-01-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '13',
+        orders_view__created_at_half_year: '2025-07-01T00:00:00.000Z',
+      },
+      {
+        orders_view__count: '1',
+        orders_view__created_at_half_year: '2026-01-01T00:00:00.000Z',
       },
     ],
     { joinGraph, cubeEvaluator, compiler }
