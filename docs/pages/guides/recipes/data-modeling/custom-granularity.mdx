@@ -54,12 +54,14 @@ cubes:
             offset: -1 day
 
           - name: fiscal_year
+            title: Federal fiscal year in the United States
             interval: 1 year
-            offset: -6 months
+            offset: -3 months
 
           - name: fiscal_quarter
+            title: Federal fiscal quarter in the United States
             interval: 1 quarter
-            offset: -6 months
+            offset: -3 months
       
       - name: sunday_week
         sql: "{time.sunday_week}"
@@ -109,13 +111,15 @@ cube(`custom_granularities`, {
         },
 
         fiscal_year: {
+          title: `Federal fiscal year in the United States`,
           interval: `1 year`,
-          offset: `-6 months`
+          offset: `-3 months`
         },
 
         fiscal_quarter: {
+          title: `Federal fiscal quarter in the United States`,
           interval: `1 quarter`,
-          offset: `-6 months`
+          offset: `-3 months`
         }
       }
     },

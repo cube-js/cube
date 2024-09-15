@@ -557,6 +557,9 @@ ISO 8601-compliant [date time string][link-date-time-string], e.g., `2024-01-02`
 or `2024-01-02T12:00:00.000Z`. When `origin` is provided, time intervals will be
 shifted in a way that one of them will match the provided origin.
 
+Optionally, a custom granularity might have the `title` parameter with a
+human-friendly description.
+
 <CodeTabs>
 
 ```yaml
@@ -581,6 +584,7 @@ cubes:
             offset: -1 day
 
           - name: fiscal_year_starting_on_april_01
+            title: Corporate and government fiscal year in the United Kingdom
             interval: 1 year
             origin: "2025-04-01"
             # You have to use quotes here to make `origin` a valid YAML string 
@@ -607,6 +611,7 @@ cube(`orders`, {
           offset: `-1 day`
         },
         fiscal_year_starting_on_april_01: {
+          title: `Corporate and government fiscal year in the United Kingdom`,
           interval: `1 year`,
           origin: `2025-04-01`
         }
