@@ -1,0 +1,119 @@
+# Cube Cloud for Sheets
+
+Cube Cloud for Sheets is a native [Google Sheets][link-google-sheets] add-on for
+Cube Cloud.
+
+<SuccessBox>
+
+Cube Cloud for Sheets is available in Cube Cloud on [Premium and
+above](https://cube.dev/pricing) plans.
+
+</SuccessBox>
+
+After [installing](#installation) and [authenticating](#authentication) this
+add-on, you will be able to [create reports via pivot
+table](#create-reports-via-pivot-table) and work with [saved
+reports](#work-with-saved-reports).
+
+<YouTubeVideo url="https://www.youtube.com/embed/qPp9hroqd4g"/>
+
+## Installation
+
+You have to install Cube Cloud for Sheets into your Google Workspace organization.
+To do so, navigate to its [page in the Google Workspace
+Marketplace][link-marketplace-listing] and click <Btn>Install</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/79a183d2-5c18-4adb-93f8-886ec513920f/"
+  highlight="inset(15% 7.5% 52.5% 30% round 10px)"
+/>
+
+To verify that the add-on is successfully installed, go to any Google Sheets
+document, open the <Btn>Extensions</Btn> menu, and check that there is the
+<Btn>Cube Cloud for Sheets</Btn> menu item:
+
+<Screenshot
+  src="https://ucarecdn.com/90f3a9d0-abde-4eb4-9222-27e4ebc46c6c/"
+  highlight="inset(4% 23% 43% 30% round 10px)"
+/>
+
+## Authentication
+
+You need to authenticate Cube Cloud for Sheets to retrieve data from your
+semantic layer in Cube Cloud. To do so, open the sidebar by going to the
+<Btn>Extensions</Btn> menu and choosing <Btn>Cube Cloud for Sheets → Open
+Sidebar</Btn>. Then, click <Btn>Sign in</Btn>.
+
+<Screenshot
+  src="https://ucarecdn.com/d47c8faa-97ed-4ce1-ba0e-99b7add1ab61/"
+  highlight="inset(15% 0 55% 76.5% round 10px)"
+/>
+
+A modal window with an authentication prompt will open. Choose the deployments
+within your Cube Cloud account that you want to work with in Google Sheets and
+click <Btn>Authorize</Btn>. Once you see the `Access Granted` message, close the
+modal window.
+
+If you want to revoke the authentication, open the add-on menu and click
+<Btn>Sign out</Btn>.
+
+## Create reports via pivot table
+
+To create a report, go to the add-on menu and click <Btn>Create report via pivot
+table</Btn>. Then, select a Cube Cloud deployment from the drop-down. Finally,
+you can start building a query by selecting a view and its members in the UI that
+looks and feel exactly like [Playground][ref-playground].
+
+<InfoBox>
+
+Google Cloud for Sheets only works with [views][ref-views] rather than cubes.
+
+</InfoBox>
+
+Click on members to add them to <Btn>Rows</Btn> and <Btn>Measures</Btn>.
+If needed, drag dimensions from <Btn>Rows</Btn> to <Btn>Columns</Btn>. Click on
+the funnel buttons to add members to <Btn>Filters</Btn>. Click on <Btn>×</Btn> to
+remove members from a query.
+
+<Screenshot
+  src="https://ucarecdn.com/acc8e133-f237-4aa7-a725-f32dd4a2ebdb/"
+  highlight="inset(10% 0 5% 76.5% round 10px)"
+/>
+
+Use <Btn>Order</Btn> and <Btn>Filters</Btn> panes below to sort and filter the
+data in the report.
+
+If you'd like to move the report to a new location, click on the desired top-left
+cell and then confirm with the target button under <Btn>Result location</Btn>.
+
+<Screenshot
+  src="https://ucarecdn.com/5a8d2b6a-b415-46ee-9e03-57ea5eeb693a/"
+  highlight="inset(52.5% 0 5% 76.5% round 10px)"
+/>
+
+With every change to your query, Cube Cloud for Sheets will update the report on
+the sheet after a slight delay. If you'd like to minimize it, consider
+implementing [pre-aggregations][ref-pre-aggs].
+
+When your report is ready, you can optionally move it to [saved reports](#work-with-saved-reports)
+by clicking <Btn>Save</Btn>.
+
+## Work with saved reports
+
+Go to the add-on menu and click <Btn>View saved reports</Btn> to see a list of
+reports.
+
+Click <Btn>Refresh</Btn> to manually refresh the data in the report's location.
+Click <Btn>Edit</Btn> to chnage the query or the location.
+
+<Screenshot
+  src="https://ucarecdn.com/c8d490c6-80bf-44fe-9233-45121a7c4088/"
+  highlight="inset(15% 0 25% 76.5% round 10px)"
+/>
+
+
+[link-google-sheets]: https://workspace.google.com/products/sheets/
+[link-marketplace-listing]: https://workspace.google.com/u/0/marketplace/app/cube_cloud_for_sheets/641460343379
+[ref-playground]: /product/workspace/playground
+[ref-views]: /product/data-modeling/concepts#views
+[ref-pre-aggs]: /product/caching/using-pre-aggregations
