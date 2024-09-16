@@ -2,11 +2,11 @@ use crate::{
     compile::rewrite::{
         aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-        analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr,
-        projection_expr_empty_tail, projection_split_pullup_replacer,
-        projection_split_pushdown_replacer, rewrite, rules::split::SplitRules,
-        transforming_rewrite, AggregateSplitPushDownReplacerAliasToCube, CubeScanAliasToCube,
-        LogicalPlanLanguage, ProjectionAlias, ProjectionSplitPushDownReplacerAliasToCube,
+        analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr_empty_tail,
+        projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
+        rules::split::SplitRules, transforming_rewrite, AggregateSplitPushDownReplacerAliasToCube,
+        CubeScanAliasToCube, ListType, LogicalPlanLanguage, ProjectionAlias,
+        ProjectionSplitPushDownReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -100,7 +100,7 @@ impl SplitRules {
                 "AggregateSplit:true",
             ),
             projection(
-                projection_expr("?outer_group_expr", "?outer_aggr_expr"),
+                "?projection_expr",
                 aggregate(
                     cube_scan(
                         "?alias_to_cube",
@@ -121,7 +121,12 @@ impl SplitRules {
                 "?projection_alias",
                 "ProjectionSplit:true",
             ),
-            self.transform_projection_aggregate_pull_up("?projection_alias"),
+            self.transform_projection_aggregate_pull_up(
+                "?projection_alias",
+                "?outer_group_expr",
+                "?outer_aggr_expr",
+                "?projection_expr",
+            ),
         ));
 
         rules.push(transforming_rewrite(
@@ -324,12 +329,16 @@ impl SplitRules {
                 "?top_alias",
                 "ProjectionSplit:true",
             ),
-            self.transform_projection_aggregate_pull_up("?projection_alias"),
+            self.transform_projection_projection_ungrouped_pull_up("?projection_alias"),
         ));
 
-        Self::list_pushdown_pullup_rules("aggr-group-expr", "AggregateGroupExpr", rules);
-        Self::list_pushdown_pullup_rules("aggr-aggr-expr", "AggregateAggrExpr", rules);
-        Self::list_pushdown_pullup_rules("projection-expr", "ProjectionExpr", rules);
+        Self::flat_list_pushdown_pullup_rules(
+            "aggr-group-expr",
+            ListType::AggregateGroupExpr,
+            rules,
+        );
+        Self::flat_list_pushdown_pullup_rules("aggr-aggr-expr", ListType::AggregateAggrExpr, rules);
+        Self::flat_list_pushdown_pullup_rules("projection-expr", ListType::ProjectionExpr, rules);
     }
 
     fn transform_projection_aggregate(
@@ -360,6 +369,25 @@ impl SplitRules {
                 Some(0) | Some(1)
             ) {
                 return false;
+            }
+            if let Some(projection_expr_var) = projection_expr_var {
+                if egraph[subst[projection_expr_var]]
+                    .data
+                    .referenced_expr
+                    .is_none()
+                {
+                    return false;
+                }
+            }
+            if let Some(group_expr_var) = group_expr_var {
+                if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
+                    return false;
+                }
+            }
+            if let Some(aggr_expr_var) = aggr_expr_var {
+                if egraph[subst[aggr_expr_var]].data.referenced_expr.is_none() {
+                    return false;
+                }
             }
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
@@ -399,6 +427,12 @@ impl SplitRules {
             ) {
                 return false;
             }
+            if egraph[subst[aggr_expr_var]].data.referenced_expr.is_none() {
+                return false;
+            }
+            if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
+                return false;
+            }
             for alias_to_cube in
                 var_iter!(egraph[subst[alias_to_cube_var]], CubeScanAliasToCube).cloned()
             {
@@ -415,12 +449,56 @@ impl SplitRules {
         }
     }
 
-    fn transform_projection_aggregate_pull_up(
+    fn transform_projection_projection_ungrouped_pull_up(
         &self,
         projection_alias_var: &str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
         let projection_alias_var = var!(projection_alias_var);
         move |egraph, subst| {
+            subst.insert(
+                projection_alias_var,
+                // Do not put alias on inner projection so table name from cube scan can be reused
+                egraph.add(LogicalPlanLanguage::ProjectionAlias(ProjectionAlias(None))),
+            );
+            return true;
+        }
+    }
+
+    fn transform_projection_aggregate_pull_up(
+        &self,
+        projection_alias_var: &str,
+        outer_group_expr_var: &str,
+        outer_aggr_expr_var: &str,
+        projection_expr_var: &str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let projection_alias_var = var!(projection_alias_var);
+        let outer_group_expr_var = var!(outer_group_expr_var);
+        let outer_aggr_expr_var = var!(outer_aggr_expr_var);
+        let projection_expr_var = var!(projection_expr_var);
+        move |egraph, subst| {
+            let group_expr_node = egraph[subst[outer_group_expr_var]]
+                .nodes
+                .iter()
+                .find(|n| matches!(n, LogicalPlanLanguage::ProjectionExpr(_)));
+            let Some(LogicalPlanLanguage::ProjectionExpr(group_expr_node)) = group_expr_node else {
+                return false;
+            };
+            let aggr_expr_node = egraph[subst[outer_aggr_expr_var]]
+                .nodes
+                .iter()
+                .find(|n| matches!(n, LogicalPlanLanguage::ProjectionExpr(_)));
+            let Some(LogicalPlanLanguage::ProjectionExpr(aggr_expr_node)) = aggr_expr_node else {
+                return false;
+            };
+            let projection_expr = group_expr_node
+                .iter()
+                .chain(aggr_expr_node.iter())
+                .map(|id| *id)
+                .collect::<Vec<_>>();
+            subst.insert(
+                projection_expr_var,
+                egraph.add(LogicalPlanLanguage::ProjectionExpr(projection_expr)),
+            );
             subst.insert(
                 projection_alias_var,
                 // Do not put alias on inner projection so table name from cube scan can be reused

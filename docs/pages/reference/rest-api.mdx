@@ -147,18 +147,19 @@ Example response:
 
 ## `/v1/meta`
 
-Get meta-information for cubes defined in the data model.
+Get meta-information for cubes and views defined in the data model. Information about cubes and views with `public: false` will not be returned.
 
 Response
 
-- `cubes` - Array of cubes
-  - `name` - Codename of the cube
-  - `title` - Human-readable cube name
+- `cubes` - Array of cubes and views
+  - `name` - Codename of the cube/view
+  - `type` - Type can be "cube" or "view"
+  - `title` - Human-readable cube/view name
   - `meta` - Custom metadata
-  - `measures` - Array of measures defined within this cube
-  - `dimensions` - Array of dimensions defined within this cube
-  - `segments` - Array of segments defined within this cube
-  - `connectedComponent` - if it has the same value for two cubes, then there is
+  - `measures` - Array of measures in this cube/view
+  - `dimensions` - Array of dimensions in this cube/view
+  - `segments` - Array of segments in this cube/view
+  - `connectedComponent` - An integer representing a join relationship. If the same value is returned for two cubes, then there is
     at least one join path between them.
 
 Example request:
@@ -210,45 +211,6 @@ Example response:
     }
   ]
 }
-```
-
-## `/v1/run-scheduled-refresh`
-
-Trigger a scheduled refresh run to refresh pre-aggregations.
-
-<WarningBox>
-
-This API endpoint is deprecated and will be removed from Cube in the future.
-Use the [`/v1/pre-aggregations/jobs`](#v1pre-aggregationsjobs) endpoint instead.
-
-</WarningBox>
-
-<WarningBox>
-
-Single call to this API may be not enough to refresh everything is pending. This
-call just populates queue with refresh workload and should be continuously
-called until refresh jobs have completed; otherwise refresh jobs will be marked
-as orphaned, and they will be removed from the queue.
-
-</WarningBox>
-
-Learn more about
-[scheduled refresh here](/product/caching/getting-started-pre-aggregations#keeping-pre-aggregations-up-to-date).
-
-| Parameter       | Description                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------ |
-| queryingOptions | Optional URL encoded Cube [Query](/product/apis-integrations/rest-api/query-format) options such as timezone |
-
-Empty object response if scheduled successfully.
-
-Example request:
-
-```bash{outputLines: 2-5}
-curl \
-  -H "Authorization: EXAMPLE-API-TOKEN" \
-  -G \
-  --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
-  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
 ```
 
 ## `/v1/pre-aggregations/jobs`

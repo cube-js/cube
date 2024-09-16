@@ -37,7 +37,8 @@ model
 
 Cube supports two ways to define data model files: with [YAML][wiki-yaml] or
 JavaScript syntax. YAML data model files should have the `.yml` extension,
-whereas JavaScript data model files should end with `.js`.
+whereas JavaScript data model files should end with `.js`. You can mix YAML and
+JavaScript files within a single data model. 
 
 <CodeTabs>
 
@@ -63,10 +64,14 @@ cubes:
 
 </CodeTabs>
 
-You define the data model statically or build [dynamic data
+You can define the data model statically or build [dynamic data
 models][ref-dynamic-data-models] programmatically. YAML data models use
 [Jinja and Python][ref-dynamic-data-models-jinja] whereas JavaScript data
 models use [JavaScript][ref-dynamic-data-models-js].
+
+It is [recommended][ref-style-guide] to default to YAML syntax because of its
+simplicity and readability. However, JavaScript might provide more flexibility
+for dynamic data modeling.
 
 ## Naming
 
@@ -137,7 +142,22 @@ cube(`orders`, {
 });
 ```
 
+<ReferenceBox>
+
+Currently, Cube does not wrap your SQL snippets in parentheses during SQL
+generation. In case of non-trivial snippets, this may lead to unexpected results.
+Please [track this issue](https://github.com/cube-js/cube/issues/6373).
+
+</ReferenceBox>
+
 </CodeTabs>
+
+### User-defined functions
+
+If you have created a [user-defined function][link-sql-udf] (UDF) in your data
+source, you can use it in the `sql` parameter as well.
+
+### Case sensitivity
 
 If your database uses case-sensitive identifiers, make sure to properly
 quote table and column names. For example, here's how you can reference
@@ -566,8 +586,10 @@ defining dynamic data models.
 [ref-config-model-path]: /reference/configuration/config#schemapath
 [ref-config-repository-factory]:
   /reference/configuration/config#repositoryfactory
-[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [wiki-snake-case]: https://en.wikipedia.org/wiki/Snake_case
 [wiki-yaml]: https://en.wikipedia.org/wiki/YAML
 [link-snowflake-listagg]: https://docs.snowflake.com/en/sql-reference/functions/listagg
 [link-bigquery-stringagg]: https://cloud.google.com/bigquery/docs/reference/standard-sql/functions-and-operators#string_agg
+[link-sql-udf]: https://en.wikipedia.org/wiki/User-defined_function#Databases
+[ref-style-guide]: /guides/style-guide

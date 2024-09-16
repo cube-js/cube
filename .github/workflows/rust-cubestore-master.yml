@@ -7,6 +7,11 @@ on:
     branches:
       - master
 
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
 jobs:
   debian:
     name: Debian Rust ${{ matrix.rust }}
@@ -16,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        rust: [nightly-2022-06-22]
+        rust: [nightly-2024-01-29]
     env:
       RUST: ${{ matrix.rust }}
     steps:
@@ -39,10 +44,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          override: true
+          # override: true # this is by default on
+          rustflags: ""
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
@@ -50,22 +56,15 @@ jobs:
           shared-key: cubestore
           key: ubuntu-22.04
       - name: Run cargo fmt cubestore
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
+        run: |
+          cargo fmt --manifest-path rust/cubestore/cubestore/Cargo.toml -- --check
       - name: Run cargo fmt cubehll
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
+        run: |
+          cargo fmt --manifest-path rust/cubestore/cubehll/Cargo.toml -- --check
       - name: Run cargo build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --manifest-path rust/cubestore/Cargo.toml -j 4
+        run:
+          cargo build --manifest-path rust/cubestore/Cargo.toml -j 4
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
         env:
           CUBESTORE_AWS_ACCESS_KEY_ID: ${{ secrets.CUBESTORE_AWS_ACCESS_KEY_ID }}
           CUBESTORE_AWS_SECRET_ACCESS_KEY: ${{ secrets.CUBESTORE_AWS_SECRET_ACCESS_KEY }}
@@ -73,9 +72,8 @@ jobs:
           TEST_KSQL_USER: ${{ secrets.TEST_KSQL_USER }}
           TEST_KSQL_PASS: ${{ secrets.TEST_KSQL_PASS }}
           TEST_KSQL_URL: ${{ secrets.TEST_KSQL_URL }}
-        with:
-          command: test
-          args: --manifest-path rust/cubestore/Cargo.toml -j 1
+        run: |
+          cargo test --manifest-path rust/cubestore/Cargo.toml -j 1
 
   cubestore-docker-image-dev:
     name: Release Cube Store :dev image
@@ -102,10 +100,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Repo metadata
         id: repo
-        uses: actions/github-script@v3
+        uses: actions/github-script@v7
         with:
           script: |
-            const repo = await github.repos.get(context.repo)
+            const repo = await github.rest.repos.get(context.repo)
             return repo.data
       - name: Prepare
         id: prep
@@ -113,50 +111,43 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: |
           DOCKER_IMAGE=cubejs/cubestore
-          VERSION=dev${{ matrix.postfix }}
+          VERSION="dev${{ matrix.postfix }}"
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
-            VERSION=nightly
-          elif [[ $GITHUB_REF == refs/tags/* ]]; then
-            VERSION=${GITHUB_REF#refs/tags/}
-          elif [[ $GITHUB_REF == refs/heads/* ]]; then
-            VERSION=$(echo ${GITHUB_REF#refs/heads/} | sed -r 's#/+#-#g')
+            VERSION="nightly"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          elif [[ "$GITHUB_REF" == refs/heads/* ]]; then
+            VERSION=$(echo "${GITHUB_REF#refs/heads/}" | sed -r 's#/+#-#g')
             if [ "${{ github.event.repository.default_branch }}" = "$VERSION" ]; then
-              VERSION=edge
+              VERSION="edge"
             fi
-          elif [[ $GITHUB_REF == refs/pull/* ]]; then
-            VERSION=pr-${{ github.event.number }}
+          elif [[ "$GITHUB_REF" == refs/pull/* ]]; then
+            VERSION="pr-${{ github.event.number }}"
           fi
 
           TAGS="${DOCKER_IMAGE}:${VERSION}"
 
-          if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
-            MINOR=${VERSION%.*}
-            MAJOR=${MINOR%.*}
+          if [[ "$VERSION" =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            MINOR="${VERSION%.*}"
+            MAJOR="${MINOR%.*}"
             TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR}"
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:build-1${GITHUB_RUN_NUMBER}${{ matrix.postfix }}"
           fi
 
-          echo ::set-output name=version::${VERSION}
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          {
+            echo "version=${VERSION}"
+            echo "tags=${TAGS}"
+            echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } >> "$GITHUB_OUTPUT"
       - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
-        with:
-          version: v0.9.1
-      - name: Cache Docker layers
-        uses: actions/cache@v3
-        with:
-          path: /tmp/.buildx-cache
-          key: ${{ runner.os }}-${{ matrix.target }}-buildx-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-buildx-
+        uses: docker/setup-buildx-action@v3
       - name: Push to Docker Hub
         uses: docker/build-push-action@v3
         with:
@@ -166,8 +157,8 @@ jobs:
           build-args: ${{ matrix.build-args }}
           push: true
           tags: ${{ steps.prep.outputs.tags }}
-          cache-from: type=local,src=/tmp/.buildx-cache
-          cache-to: type=local,dest=/tmp/.buildx-cache
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           labels: |
             org.opencontainers.image.title=${{ fromJson(steps.repo.outputs.result).name }}
             org.opencontainers.image.description=${{ fromJson(steps.repo.outputs.result).description }}
@@ -185,7 +176,7 @@ jobs:
           repository: cubejs/cubestore
           readme-filepath: ./rust/cubestore/README.md
 
-  cross:
+  cubestore:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -194,38 +185,21 @@ jobs:
     strategy:
       matrix:
         target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
+          - x86_64-pc-windows-msvc
           - x86_64-apple-darwin
-          - aarch64-unknown-linux-gnu
         include:
-          - os: ubuntu-20.04
-            target: x86_64-unknown-linux-gnu
-            executable_name: cubestored
-            cross: true
+          - os: windows-2019
+            target: x86_64-pc-windows-msvc
+            executable_name: cubestored.exe
             strip: true
-            compress: false
-          - os: ubuntu-20.04
-            target: x86_64-unknown-linux-musl
-            executable_name: cubestored
-            cross: true
-            strip: true
-            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
+            # cubestored.exe: CantPackException: superfluous data between sections
             compress: false
             # Please use minimal possible version of macOS, because it produces constraint on libstdc++
-          - os: macos-11
+          - os: macos-12
             target: x86_64-apple-darwin
             executable_name: cubestored
-            cross: false
-            strip: true
-            compress: true
-          - os: ubuntu-20.04
-            target: aarch64-unknown-linux-gnu
-            executable_name: cubestored
-            cross: true
-            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
-            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
             compress: false
       fail-fast: false
     steps:
@@ -234,42 +208,31 @@ jobs:
         run: rustup set auto-self-update disable
         if: contains(runner.os, 'windows')
         shell: bash
-      - name: Setup Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly-2022-06-22
-          target: ${{ matrix.target }}
-          override: true
-          components: rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: ./rust/cubestore -> target
           prefix-key: v0-rust-cubestore-cross
           key: target-${{ matrix.target }}
-      - run: source .github/actions/${{ matrix.before_script }}.sh
-        if: ${{ matrix.before_script }}
-        shell: bash
-      #- name: Install dependencies Windows
-      #  run: vcpkg integrate install; vcpkg install openssl:x64-windows
-      #  if: matrix.os == 'windows-2019'
-      #  env:
-      #    VCPKG_ROOT: 'C:\vcpkg'
-      - name: Set Env Variables for Darwin
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: ${{ startsWith(matrix.os, 'windows') }}
+      - name: Install OpenSSL for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: vcpkg integrate install; vcpkg install openssl:x64-windows
+      - name: Instal LLVM for Windows
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: choco install -y --force llvm --version 18.1.6
+      - name: Set Env Variables for Windows
         uses: allenevans/set-env@v3.0.0
-        if: ${{ matrix.target == 'x86_64-apple-darwin' }}
+        if: ${{ startsWith(matrix.os, 'windows') }}
         with:
-          OPENSSL_STATIC: "true"
-      - name: Build with Cross
-        if: ${{ matrix.cross }}
-        run: |
-          wget -c https://github.com/rust-embedded/cross/releases/download/v0.2.1/cross-v0.2.1-x86_64-unknown-linux-gnu.tar.gz -O - | tar -xz
-          chmod +x cross && sudo mv cross /usr/local/bin/cross
-          cd rust/cubestore
-          cross build --release --target=${{ matrix.target }}
+          OPENSSL_DIR: 'C:/vcpkg/packages/openssl_x64-windows'
+          # This paths are required to work with static linking
+          OPENSSL_LIB_DIR: 'C:/vcpkg/packages/openssl_x64-windows/lib'
+          OPENSSL_INCLUDE_DIR: 'C:/vcpkg/packages/openssl_x64-windows/include'
+          LIBCLANG_PATH: 'C:\Program Files\LLVM\bin'
       - name: Build with Cargo
-        if: ${{ !matrix.cross }}
         run: |
-          cd rust/cubestore && cargo build --release --target=${{ matrix.target }}
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
       - name: Compress binaries
         uses: svenstaro/upx-action@v2
         if: ${{ matrix.compress }}
@@ -277,10 +240,93 @@ jobs:
           file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
           args: --lzma
           strip: ${{ matrix.strip }}
-      - name: Create archive for release
+      - name: Create folder for archive
         run: |
           mkdir cubestore-archive
           mkdir cubestore-archive/bin
+      - name: Copy/paste OpenSSL to Archive (hotfix for Windows)
+        if: ${{ startsWith(matrix.os, 'windows') }}
+        run: cp C:/vcpkg/packages/openssl_x64-windows/bin/*.dll cubestore-archive/bin
+      - name: Create archive for release
+        run: |
           mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
           cd cubestore-archive
-          tar cv * | gzip --best  > cubestored-${{ matrix.target }}.tar.gz
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
+      - uses: actions/upload-artifact@v4
+        with:
+          path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1
+
+  cubestore_linux:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      OPENSSL_STATIC: 1
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-gnu
+        include:
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            executable_name: cubestored
+            strip: true
+            compress: false
+          - os: ubuntu-20.04
+            target: x86_64-unknown-linux-musl
+            executable_name: cubestored
+            strip: true
+            # cubestored: CantPackException: bad DT_HASH nbucket=0x344  len=0x1890
+            compress: false
+          - os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            executable_name: cubestored
+            # Unable to recognise the format of the input file `rust/cubestore/target/aarch64-unknown-linux-gnu/release/cubestored'
+            strip: false
+            # UPX is broken, issue https://github.com/cube-js/cube/issues/4474
+            compress: false
+      fail-fast: false
+    container:
+      image: cubejs/rust-cross:${{ matrix.target }}-15082024
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: nightly-2024-01-29
+          target: ${{ matrix.target }}
+          # override: true # this is by default on
+          rustflags: ""
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ./rust/cubestore -> target
+          prefix-key: v0-rust-cubestore-cross
+          key: target-${{ matrix.target }}
+      - name: Build with Cargo
+        run: |
+          cd rust/cubestore && cargo build --release --target=${{ matrix.target }} -p cubestore
+      - name: Compress binaries
+        uses: svenstaro/upx-action@v2
+        if: ${{ matrix.compress }}
+        with:
+          file: rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }}
+          args: --lzma
+          strip: ${{ matrix.strip }}
+      - name: Create folder for archive
+        run: |
+          mkdir cubestore-archive
+          mkdir cubestore-archive/bin
+      - name: Create archive for release
+        run: |
+          mv rust/cubestore/target/${{ matrix.target }}/release/${{ matrix.executable_name }} cubestore-archive/bin/${{ matrix.executable_name }}
+          cd cubestore-archive
+          tar -cvzf cubestored-${{ matrix.target }}.tar.gz ./*
+      - uses: actions/upload-artifact@v4
+        with:
+          path: cubestore-archive/cubestored-${{ matrix.target }}.tar.gz
+          name: cubestored-${{ matrix.target }}.tar.gz
+          retention-days: 1

@@ -1,9 +1,9 @@
 use crate::queryplanner::project_schema;
 use crate::sql::cache::{sql_result_cache_sizeof, SqlResultCache};
-use arrow::array::{Array, Int64Builder, StringBuilder};
-use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
+use datafusion::arrow::array::{Array, Int64Builder, StringBuilder};
+use datafusion::arrow::datatypes::{DataType, Field, Schema, SchemaRef};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::datasource::Statistics;
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;

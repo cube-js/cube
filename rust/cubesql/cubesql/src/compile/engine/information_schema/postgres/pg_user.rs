@@ -56,16 +56,17 @@ impl PgCatalogUserBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.usenames.finish()));
-        columns.push(Arc::new(self.usesysids.finish()));
-        columns.push(Arc::new(self.usecreatedbs.finish()));
-        columns.push(Arc::new(self.usesupers.finish()));
-        columns.push(Arc::new(self.userepls.finish()));
-        columns.push(Arc::new(self.usebypassrlss.finish()));
-        columns.push(Arc::new(self.passwds.finish()));
-        columns.push(Arc::new(self.valuntils.finish()));
-        columns.push(Arc::new(self.useconfigs.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.usenames.finish()),
+            Arc::new(self.usesysids.finish()),
+            Arc::new(self.usecreatedbs.finish()),
+            Arc::new(self.usesupers.finish()),
+            Arc::new(self.userepls.finish()),
+            Arc::new(self.usebypassrlss.finish()),
+            Arc::new(self.passwds.finish()),
+            Arc::new(self.valuntils.finish()),
+            Arc::new(self.useconfigs.finish()),
+        ];
 
         columns
     }

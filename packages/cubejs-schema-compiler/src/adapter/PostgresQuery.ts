@@ -23,12 +23,26 @@ export class PostgresQuery extends BaseQuery {
     return new PostgresParamAllocator(expressionParams);
   }
 
-  public convertTz(field) {
+  public convertTz(field: string): string {
     return `(${field}::timestamptz AT TIME ZONE '${this.timezone}')`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * Postgres operates with whole intervals as is without measuring them in plain seconds.
+   * This implementation should also work for AWS RedShift.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    return `('${origin}'::timestamp + INTERVAL '${interval}' *
+      FLOOR(
+        EXTRACT(EPOCH FROM (${source} - '${origin}'::timestamp)) /
+        EXTRACT(EPOCH FROM INTERVAL '${interval}')
+      ))`;
   }
 
   public hllInit(sql) {
@@ -51,6 +65,8 @@ export class PostgresQuery extends BaseQuery {
     templates.functions.CONCAT = 'CONCAT({% for arg in args %}CAST({{arg}} AS TEXT){% if not loop.last %},{% endif %}{% endfor %})';
     templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.CURRENTDATE = 'CURRENT_DATE';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.functions.NOW = 'NOW({{ args_concat }})';
     // DATEADD is being rewritten to DATE_ADD
     // templates.functions.DATEADD = '({{ args[2] }} + \'{{ interval }} {{ date_part }}\'::interval)';
@@ -59,7 +75,16 @@ export class PostgresQuery extends BaseQuery {
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.timestamp_literal = 'timestamptz \'{{ value }}\'';
-
+    templates.window_frame_types.groups = 'GROUPS';
+    templates.types.string = 'TEXT';
+    templates.types.tinyint = 'SMALLINT';
+    templates.types.float = 'REAL';
+    templates.types.double = 'DOUBLE PRECISION';
+    templates.types.binary = 'BYTEA';
     return templates;
+  }
+
+  public get shouldReuseParams() {
+    return true;
   }
 }

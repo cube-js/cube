@@ -32,12 +32,12 @@ impl PgCatalogViewsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.viewname.finish()));
-        columns.push(Arc::new(self.viewowner.finish()));
-        columns.push(Arc::new(self.definition.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.viewname.finish()),
+            Arc::new(self.viewowner.finish()),
+            Arc::new(self.definition.finish()),
+        ];
 
         columns
     }

@@ -73,7 +73,7 @@ export function CodeSnippet({
 
         <ButtonWrapper>
           <Button
-            icon={<CopyOutlined />}
+            icon={<CopyOutlined  />}
             onClick={() => copyToClipboard(code, copyMessage || 'Copied')}
           />
         </ButtonWrapper>

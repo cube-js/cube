@@ -4,8 +4,6 @@
  * @fileoverview The `JDBCDriver` and related types declaration.
  */
 
-/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
-import { Readable } from 'stream';
 import {
   getEnv,
   assertDataSource,
@@ -25,8 +23,9 @@ import path from 'path';
 import { DriverOptionsInterface, SupportedDrivers } from './supported-drivers';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { JDBCDriverConfiguration } from './types';
-import { QueryStream, nextFn, Row } from './QueryStream';
+import { QueryStream, nextFn, Row, transformRow } from './QueryStream';
 
+/* eslint-disable no-restricted-syntax,import/no-extraneous-dependencies */
 const DriverManager = require('@cubejs-backend/jdbc/lib/drivermanager');
 const Connection = require('@cubejs-backend/jdbc/lib/connection');
 const DatabaseMetaData = require('@cubejs-backend/jdbc/lib/databasemetadata');
@@ -34,11 +33,6 @@ const jinst = require('@cubejs-backend/jdbc/lib/jinst');
 const mvn = require('node-java-maven');
 
 let mvnPromise: Promise<void> | null = null;
-
-type JdbcStatement = {
-  setQueryTimeout: (t: number) => any,
-  execute: (q: string) => any,
-};
 
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
@@ -53,6 +47,11 @@ const initMvn = (customClassPath: any) => {
           if (!jinst.isJvmCreated()) {
             jinst.addOption('-Xrs');
             jinst.addOption('-Dfile.encoding=UTF8');
+
+            // Workaround for Databricks JDBC driver
+            // Issue when deserializing Apache Arrow data with Java JVMs version 11 or higher, due to compatibility issues.
+            jinst.addOption('--add-opens=java.base/java.nio=ALL-UNNAMED');
+
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
             jinst.setupClasspath(classPath);
           }
@@ -78,7 +77,7 @@ interface ExtendedPool extends Pool<any> {
 
 export class JDBCDriver extends BaseDriver {
   protected readonly config: JDBCDriverConfiguration;
-  
+
   protected pool: ExtendedPool;
 
   protected jdbcProps: any;
@@ -246,6 +245,7 @@ export class JDBCDriver extends BaseDriver {
 
   protected async queryPromised(query: string, cancelObj: any, options: any) {
     options = options || {};
+
     try {
       const conn = await this.pool.acquire();
       try {
@@ -294,6 +294,7 @@ export class JDBCDriver extends BaseDriver {
               reject(err);
               return;
             }
+
             const rowStream = new QueryStream(res.rows.next, highWaterMark);
             resolve({
               rowStream,
@@ -322,6 +323,7 @@ export class JDBCDriver extends BaseDriver {
     if (options.streamImport) {
       return this.stream(query, values, options);
     }
+
     return super.downloadQueryResults(query, values, options);
   }
 
@@ -335,11 +337,18 @@ export class JDBCDriver extends BaseDriver {
     await setQueryTimeout(600);
     const executeQueryAsync = promisify(statement.execute.bind(statement));
     const resultSet = await executeQueryAsync(query);
-    const toObjArrayAsync =
-      resultSet.toObjArray && promisify(resultSet.toObjArray.bind(resultSet)) ||
-      (() => Promise.resolve(resultSet));
 
-    return toObjArrayAsync();
+    if (resultSet.toObjArray) {
+      const result: any = await (promisify(resultSet.toObjArray.bind(resultSet)))();
+
+      for (const [key, row] of Object.entries(result)) {
+        result[key] = transformRow(row);
+      }
+
+      return result;
+    }
+
+    return resultSet;
   }
 
   public async release() {
@@ -350,7 +359,7 @@ export class JDBCDriver extends BaseDriver {
   public static getSupportedDrivers(): string[] {
     return Object.keys(SupportedDrivers);
   }
-  
+
   public static dbTypeDescription(dbType: string): DriverOptionsInterface {
     return SupportedDrivers[dbType];
   }

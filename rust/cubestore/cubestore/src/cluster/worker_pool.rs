@@ -450,8 +450,8 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
 
-    use arrow::datatypes::{DataType, Field, Schema};
     use async_trait::async_trait;
+    use datafusion::arrow::datatypes::{DataType, Field, Schema};
     use datafusion::logical_plan::ToDFSchema;
     use futures_timer::Delay;
     use serde::{Deserialize, Serialize};

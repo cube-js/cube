@@ -40,15 +40,15 @@ impl PgCatalogMatviewsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.matviewname.finish()));
-        columns.push(Arc::new(self.matviewowner.finish()));
-        columns.push(Arc::new(self.tablespace.finish()));
-        columns.push(Arc::new(self.hasindexes.finish()));
-        columns.push(Arc::new(self.ispopulated.finish()));
-        columns.push(Arc::new(self.definition.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.matviewname.finish()),
+            Arc::new(self.matviewowner.finish()),
+            Arc::new(self.tablespace.finish()),
+            Arc::new(self.hasindexes.finish()),
+            Arc::new(self.ispopulated.finish()),
+            Arc::new(self.definition.finish()),
+        ];
 
         columns
     }

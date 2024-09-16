@@ -35,9 +35,8 @@ We'll use a sample e-commerce database with two tables, `orders` and
 ## Cubes
 
 A [cube][ref-cubes] represents a dataset in Cube, and is conceptually similar to a [view in
-SQL][wiki-view-sql]. Cubes are typically declared in separate files with one
-cube per file. Within each cube are definitions of [dimensions][self-dimensions]
-and [measures][self-measures]. Typically, a cube points to a single table in
+SQL][wiki-view-sql]. Cubes are usually declared in separate files with one
+cube per file. Typically, a cube points to a single table in
 your database using the [`sql_table` property][ref-schema-ref-sql-table]:
 
 <CodeTabs>
@@ -67,23 +66,39 @@ cube(`orders`, {
     SELECT *
     FROM orders, line_items
     WHERE orders.id = line_items.order_id
-  `,
-});
+  `
+})
 ```
 
 ```yaml
 cubes:
   - name: orders
     sql: >
-      SELECT * FROM orders, line_items WHERE orders.id = line_items.order_id
+      SELECT *
+      FROM orders, line_items
+      WHERE orders.id = line_items.order_id
+
 ```
 
 </CodeTabs>
 
+Within each cube are definitions of [dimensions][self-dimensions],
+[measures][self-measures], and [segments](#segments). [Joins](#joins) are used
+to define relations between cubes; [pre-aggregations](#pre-aggregations) are
+designed to accelerate queries to cubes.
+
 Note that cubes support [extension][ref-extending-cubes],
 [polymorphism][ref-polymorphic-cubes], and [data blending][ref-data-blending].
-Also, cubes may not only be defined statically; you can actually build
+Also, cubes should not necessarily be defined statically; you can actually build
 [dynamic data models][ref-dynamic-data-models].
+
+<InfoBox>
+
+Cube supports data models that consist of thousands of cubes and views.
+For massive [multi-tenancy][ref-multitenancy] configurations, e.g., with more than
+1,000 tenants, consider using a [multi-cluster deployment][ref-pmc].
+
+</InfoBox>
 
 ## Views
 
@@ -92,10 +107,12 @@ data model with which data consumers can interact. They are useful for defining
 metrics, managing governance and data access, and controlling ambiguous join
 paths.
 
-Views **can not** have their own members. Instead, use the `cubes` or `includes`
-parameters to include measures and dimensions from other cubes into the view. In
-the example below, we create a new view `active_users` which is made up of
-properties from the `users` cube:
+<Diagram src="https://ucarecdn.com/bfc3e04a-b690-40bc-a6f8-14a9175fb4fd/" />
+
+Views can **not** have their own members. Instead, use the `cubes` or `includes`
+parameters to include measures and dimensions from other cubes into the view.
+In the example below, we create the `orders` view which includes select members
+from `base_orders`, `products`, and `users` cubes:
 
 <CodeTabs>
 
@@ -159,6 +176,9 @@ views:
 ```
 
 </CodeTabs>
+
+Views do **not** define any [pre-aggregations](#pre-aggregations). Instead,
+they reuse pre-aggregations from underlying cubes.
 
 View may not only be defined statically; you can actually build
 [dynamic data models][ref-dynamic-data-models].
@@ -258,9 +278,13 @@ cubes:
 
 </CodeTabs>
 
-Dimensions can have [different types][ref-schema-dimension-types]. Also,
-[subquery dimensions][ref-subquery-dimensions] can be used to join cubes
+Also, [subquery dimensions][ref-subquery-dimensions] can be used to join cubes
 implicitly.
+
+### Dimension types
+
+Dimensions can be of different types. See the [dimension type
+reference][ref-schema-dimension-types] for details.
 
 Time-based properties should be modeled as dimensions of the `time` type.
 Time dimensions allow grouping the result set by a unit of time (e.g. hours,
@@ -402,8 +426,8 @@ cubes:
 
 ### Measure types
 
-Measures can be of different types, and you can find them all
-[here][ref-schema-measure-types].
+Measures can be of different types. See the [measure type
+reference][ref-schema-measure-types] for details.
 
 Often, aggregate functions in SQL are mapped to measure types in the following way:
 
@@ -420,6 +444,120 @@ Often, aggregate functions in SQL are mapped to measure types in the following w
 | `STRING_AGG`, `LISTAGG` | [`string`](/reference/data-model/types-and-formats#string) |
 | `SUM` | [`sum`](/reference/data-model/types-and-formats#sum) |
 | Any function returning a timestamp, e.g., `MAX(time)` | [`time`](/reference/data-model/types-and-formats#time) |
+
+### Measure additivity
+
+Additivity is a property of measures that detemines whether measure values,
+once calculated for a set of dimensions, can be further aggregated to calculate
+measure values for a subset of these dimensions.
+
+Measure additivity has an impact on [pre-aggregation
+matching][ref-matching-preaggs].
+
+Additivity of a measure depends on its [type](#measure-types). Only measures
+with the following types are considered *additive*:
+[`count`](/reference/data-model/types-and-formats#count),
+[`count_distinct_approx`](/reference/data-model/types-and-formats#count_distinct_approx),
+[`min`](/reference/data-model/types-and-formats#min),
+[`max`](/reference/data-model/types-and-formats#max),
+[`sum`](/reference/data-model/types-and-formats#sum).
+Measures with all other types are considered *non-additive*.
+
+#### Example
+
+Consider the following cube:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: employees
+    sql: >
+      SELECT 1 AS id, 'Ali' AS first_name, 20 AS age, 'Los Gatos' AS city UNION ALL
+      SELECT 2 AS id, 'Bob' AS first_name, 30 AS age, 'San Diego' AS city UNION ALL
+      SELECT 3 AS id, 'Eve' AS first_name, 40 AS age, 'San Diego' AS city
+
+    measures:
+      - name: count
+        type: count
+
+      - name: avg_age
+        sql: age
+        type: avg
+
+    dimensions:
+      - name: city
+        sql: city
+        type: string
+```
+
+```javascript
+cube(`employees`, {
+  sql: `
+    SELECT 1 AS id, 'Ali' AS first_name, 20 AS age, 'Los Gatos' AS city UNION ALL
+    SELECT 2 AS id, 'Bob' AS first_name, 30 AS age, 'San Diego' AS city UNION ALL
+    SELECT 3 AS id, 'Eve' AS first_name, 40 AS age, 'San Diego' AS city
+  `,
+
+  measures: {
+    count: {
+      type: `count`
+    },
+
+    avg_age: {
+      sql: `age`,
+      type: `avg`
+    }
+  },
+
+  dimensions: {
+    city: {
+      sql: `city`,
+      type: `string`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+If we run a query that includes `city` as a dimension and `count` and `avg_age`
+as measures, we'll get the following results:
+
+| city      | count | avg_age |    
+| --------- | ----- | ------- |
+| Los Gatos | 1     | 20      |
+| San Diego | 2     | 35      |
+
+Then, if we remove the `city` dimension from the query, we'll get the following
+results:
+
+| count | avg_age |    
+| ----- | ------- |
+| 3     | 30      |
+
+As you can see, the value of the `count` measure that we've got for the second
+query could have been calculated based on the results of the first one:
+`1 + 2 = 3`. It explains why the `count` measure, having the `count` type, is
+considered *additive*.
+
+However, the value of the `avg_age` measure that we've got for the second query
+can't be calculated based on the results  of the first one: there's no way to
+derive `30` from `20` and `35`. This is why the `avg_age` measure, having the
+`avg` type, is considered *non-additive*.
+
+### Leaf measures
+
+Measures that do not [reference][ref-syntax-references] other measures are
+considered *leaf measures*.
+
+By definition, all measures that only reference SQL
+[columns][ref-syntax-references-column] and expressions are *leaf measures*.
+On the other hand, [calculated measures][ref-calculated-measures] might not
+necessarily be *leaf measures* because they can reference other measures.
+
+Whether a query contains only [additive](#measure-additivity) leaf measures has
+an impact on [pre-aggregation matching][ref-matching-preaggs].
 
 ## Joins
 
@@ -512,7 +650,7 @@ cubes:
 
 Pre-aggregations are a powerful way of caching frequently-used, expensive
 queries and keeping the cache up-to-date on a periodic basis. Within a data
-schema, they are defined under the `pre_aggregations` property:
+model, they are defined under the `pre_aggregations` property:
 
 <CodeTabs>
 
@@ -571,9 +709,15 @@ Pre-Aggregations][ref-caching-preaggs-intro].
 [ref-polymorphic-cubes]: /product/data-modeling/concepts/polymorphic-cubes
 [ref-data-blending]: /product/data-modeling/concepts/data-blending
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
-[ref-subquery-dimensions]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery-dimensions]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [ref-working-with-joins]: /product/data-modeling/concepts/working-with-joins
 [self-dimensions]: #dimensions
 [self-measures]: #measures
 [wiki-olap]: https://en.wikipedia.org/wiki/Online_analytical_processing
 [wiki-view-sql]: https://en.wikipedia.org/wiki/View_(SQL)
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations
+[ref-syntax-references]: /product/data-modeling/syntax#references
+[ref-syntax-references-column]: /product/data-modeling/syntax#column
+[ref-calculated-measures]: /product/data-modeling/overview#4-using-calculated-measures
+[ref-multitenancy]: /product/configuration/advanced/multitenancy
+[ref-pmc]: /product/deployment/cloud/deployment-types#production-multi-cluster

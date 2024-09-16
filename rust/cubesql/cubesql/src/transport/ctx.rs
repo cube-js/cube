@@ -3,15 +3,13 @@ use itertools::Itertools;
 use std::{collections::HashMap, ops::RangeFrom, sync::Arc};
 use uuid::Uuid;
 
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
-
 use crate::{sql::ColumnType, transport::SqlGenerator};
 
-use super::V1CubeMetaExt;
+use super::{CubeMeta, CubeMetaDimension, CubeMetaMeasure, V1CubeMetaExt};
 
 #[derive(Debug)]
 pub struct MetaContext {
-    pub cubes: Vec<V1CubeMeta>,
+    pub cubes: Vec<CubeMeta>,
     pub tables: Vec<CubeMetaTable>,
     pub cube_to_data_source: HashMap<String, String>,
     pub data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
@@ -24,6 +22,7 @@ pub struct CubeMetaTable {
     pub record_oid: u32,
     pub array_handler_oid: u32,
     pub name: String,
+    pub description: Option<String>,
     pub columns: Vec<CubeMetaColumn>,
 }
 
@@ -31,13 +30,14 @@ pub struct CubeMetaTable {
 pub struct CubeMetaColumn {
     pub oid: u32,
     pub name: String,
+    pub description: Option<String>,
     pub column_type: ColumnType,
     pub can_be_null: bool,
 }
 
 impl MetaContext {
     pub fn new(
-        cubes: Vec<V1CubeMeta>,
+        cubes: Vec<CubeMeta>,
         cube_to_data_source: HashMap<String, String>,
         data_source_to_sql_generator: HashMap<String, Arc<dyn SqlGenerator + Send + Sync>>,
         compiler_id: Uuid,
@@ -51,12 +51,14 @@ impl MetaContext {
                 record_oid: oid_iter.next().unwrap_or(0),
                 array_handler_oid: oid_iter.next().unwrap_or(0),
                 name: cube.name.clone(),
+                description: cube.description.clone(),
                 columns: cube
                     .get_columns()
                     .iter()
                     .map(|column| CubeMetaColumn {
                         oid: oid_iter.next().unwrap_or(0),
                         name: column.get_name().clone(),
+                        description: column.get_description().clone(),
                         column_type: column.get_column_type().clone(),
                         can_be_null: column.sql_can_be_null(),
                     })
@@ -90,7 +92,7 @@ impl MetaContext {
             .cloned()
     }
 
-    pub fn find_cube_with_name(&self, name: &str) -> Option<V1CubeMeta> {
+    pub fn find_cube_with_name(&self, name: &str) -> Option<CubeMeta> {
         for cube in self.cubes.iter() {
             if cube.name.eq(&name) {
                 return Some(cube.clone());
@@ -104,7 +106,7 @@ impl MetaContext {
         &self,
         alias_to_cube: &Vec<(String, String)>,
         column: &Column,
-    ) -> Option<(String, V1CubeMeta)> {
+    ) -> Option<(String, CubeMeta)> {
         (if let Some(rel) = column.relation.as_ref() {
             alias_to_cube.iter().find(|(a, _)| a == rel)
         } else {
@@ -126,7 +128,7 @@ impl MetaContext {
         &self,
         alias_to_cube: &Vec<((String, String), String)>,
         column: &Column,
-    ) -> Vec<((String, String), V1CubeMeta)> {
+    ) -> Vec<((String, String), CubeMeta)> {
         if let Some(rel) = column.relation.as_ref() {
             alias_to_cube
                 .iter()
@@ -155,7 +157,7 @@ impl MetaContext {
         }
     }
 
-    pub fn find_measure_with_name(&self, name: String) -> Option<V1CubeMetaMeasure> {
+    pub fn find_measure_with_name(&self, name: String) -> Option<CubeMetaMeasure> {
         let cube_and_member_name = name.split(".").collect::<Vec<_>>();
         if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
             cube.lookup_measure(cube_and_member_name[1]).cloned()
@@ -164,7 +166,7 @@ impl MetaContext {
         }
     }
 
-    pub fn find_dimension_with_name(&self, name: String) -> Option<V1CubeMetaDimension> {
+    pub fn find_dimension_with_name(&self, name: String) -> Option<CubeMetaDimension> {
         let cube_and_member_name = name.split(".").collect::<Vec<_>>();
         if let Some(cube) = self.find_cube_with_name(cube_and_member_name[0]) {
             cube.lookup_dimension(cube_and_member_name[1]).cloned()
@@ -222,16 +224,18 @@ mod tests {
     #[test]
     fn test_find_tables() {
         let test_cubes = vec![
-            V1CubeMeta {
+            CubeMeta {
                 name: "test1".to_string(),
+                description: None,
                 title: None,
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
                 joins: None,
             },
-            V1CubeMeta {
+            CubeMeta {
                 name: "test2".to_string(),
+                description: None,
                 title: None,
                 dimensions: vec![],
                 measures: vec![],

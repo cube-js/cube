@@ -185,6 +185,16 @@ To accept the license terms for the Databricks JDBC driver, this must be set to
 | --------------- | ---------------------- | --------------------- |
 | `true`, `false` | N/A                    | N/A                   |
 
+## `CUBEJS_DB_DATABRICKS_CATALOG`
+
+The name of the [Databricks catalog][databricks-catalog] to connect to.
+
+| Possible Values                 | Default in Development | Default in Production |
+| ------------------------------- | ---------------------- | --------------------- |
+| A valid Databricks catalog name | N/A                    | N/A                   |
+
+[databricks-catalog]: (https://docs.databricks.com/en/data-governance/unity-catalog/create-catalogs.html)
+
 ## `CUBEJS_DB_DATABRICKS_TOKEN`
 
 The [personal access token][databricks-docs-pat] used to authenticate the
@@ -592,7 +602,7 @@ indefinitely][snowflake-docs-connection-options].
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | N/A                    | N/A                   |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS`
 
@@ -665,6 +675,31 @@ The username used to connect to the database.
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
 | A valid database username | N/A                    | N/A                   |
+
+## `CUBEJS_DB_QUERY_DEFAULT_LIMIT`
+
+The default [row limit][ref-row-limit] in the result set if it's not explicitly
+specified in an API query.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `10000`                | `10000`               |
+
+## `CUBEJS_DB_QUERY_LIMIT`
+
+The maximum [row limit][ref-row-limit] in the result set.
+
+| Possible Values           | Default in Development | Default in Production |
+| ------------------------- | ---------------------- | --------------------- |
+| A positive integer number | `50000`                | `50000`               |
+
+<WarningBox>
+
+Increasing the maximum row limit may cause out-of-memory (OOM) crashes and make
+Cube susceptible to denial-of-service (DoS) attacks if it's exposed to
+untrusted environments.
+
+</WarningBox>
 
 ## `CUBEJS_DEFAULT_API_SCOPES`
 
@@ -833,107 +868,12 @@ If Cube is configured to act as a refresh worker instance using
 
 ## `CUBEJS_PRE_AGGREGATIONS_SCHEMA`
 
-The [schema name][ref-config-preagg-schema-name] to use for storing
-pre-aggregations.
+The [database schema name](/reference/configuration/config#pre_aggregations_schema)
+to use for storing pre-aggregations.
 
 | Possible Values | Default in Development | Default in Production   |
 | --------------- | ---------------------- | ----------------------- |
 | A valid string  | `dev_pre_aggregations` | `prod_pre_aggregations` |
-
-## `CUBEJS_REDIS_PASSWORD`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The password used to connect to the Redis server.
-
-| Possible Values        | Default in Development | Default in Production |
-| ---------------------- | ---------------------- | --------------------- |
-| A valid Redis password | N/A                    | N/A                   |
-
-## `CUBEJS_REDIS_POOL_MAX`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The maximum number of connections to keep active in the Redis connection pool
-for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be higher
-than [`CUBEJS_REDIS_POOL_MIN`](#cubejs-redis-pool-min).
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid number of connections | `1000`                 | `1000`                |
-
-## `CUBEJS_REDIS_POOL_MIN`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The minimum number of connections to keep active in the Redis connection pool
-for a single [`appId`][ref-config-conf-ctx-to-appid] (tenant). Must be lower
-than [`CUBEJS_REDIS_POOL_MAX`](#cubejs-redis-pool-max).
-
-| Possible Values               | Default in Development | Default in Production |
-| ----------------------------- | ---------------------- | --------------------- |
-| A valid number of connections | `2`                    | `2`                   |
-
-## `CUBEJS_REDIS_TLS`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-If `true`, then the connection to the Redis server is protected by TLS
-authentication.
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
-
-## `CUBEJS_REDIS_URL`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-The host URL for a Redis server.
-
-| Possible Values        | Default in Development | Default in Production |
-| ---------------------- | ---------------------- | --------------------- |
-| A valid Redis host URL | N/A                    | N/A                   |
-
-## `CUBEJS_REDIS_USE_IOREDIS`
-
-<WarningBox>
-
-This environment variable is deprecated. Update to v0.32.0 or later to use Cube
-Store instead of Redis.
-
-</WarningBox>
-
-Use [`ioredis`][gh-ioredis] instead of [`redis`][gh-node-redis].
-
-| Possible Values | Default in Development | Default in Production |
-| --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `false`                | `false`               |
 
 ## `CUBEJS_REFRESH_WORKER`
 
@@ -945,7 +885,9 @@ If `true`, this instance of Cube will **only** refresh pre-aggregations.
 
 ## `CUBEJS_ROLLUP_ONLY`
 
-If `true`, this instance of Cube will **only** query rollup pre-aggregations.
+If `true`, the API instance of Cube will **only** fulfill queries from
+pre-aggregations. See [rollup-only
+mode](/product/caching/using-pre-aggregations#rollup-only-mode) for details.
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
@@ -959,13 +901,12 @@ accordingly
 
 | Possible Values                                | Default in Development | Default in Production |
 | ---------------------------------------------- | ---------------------- | --------------------- |
-| A valid number of concurrent refresh processes | N/A                    | N/A                   |
+| A valid number of concurrent refresh processes | 10                     | 10                    |
 
 ## `CUBEJS_SCHEDULED_REFRESH_TIMEZONES`
 
 A comma-separated [list of timezones to schedule refreshes
-for][ref-config-sched-refresh-timer]. Used in conjunction with
-[`CUBEJS_SCHEDULED_REFRESH_CONCURRENCY`](#cubejs-scheduled-refresh-concurrency).
+for][ref-config-sched-refresh-timer].
 
 | Possible Values                                           | Default in Development | Default in Production |
 | --------------------------------------------------------- | ---------------------- | --------------------- |
@@ -1011,14 +952,78 @@ A username required to access the [SQL API][ref-sql-api].
 | --------------- | ---------------------- | --------------------- |
 | A valid string  | N/A                    | N/A                   |
 
-## `CUBEJS_TELEMETRY`
+## `CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY`
 
-If `true`, then send telemetry to Cube.
+If `true`, disables the primary key inclusion check for
+[ungrouped queries](/product/apis-integrations/queries#ungrouped-query).
 
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
-| `true`, `false` | `true`                 | `true`                |
+| `true`, `false` | `false`                | `false`               |
 
+It can be also set using the [`allow_ungrouped_without_primary_key` configuration
+option](/reference/configuration/config#allow_ungrouped_without_primary_key).
+
+<InfoBox>
+
+When query push-own in the SQL API is enabled via the `CUBESQL_SQL_PUSH_DOWN`
+environment variable, this option is enabled as well for the best user experience.
+
+</InfoBox>
+
+## `CUBESQL_SQL_PUSH_DOWN`
+
+If `true`, enables query pushdown in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `false`                | `false`               |
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+## `CUBESQL_SQL_NO_IMPLICIT_ORDER`
+
+If `true`, prevents adding implicit [default `ORDER BY`
+clause](/product/apis-integrations/queries#order) for [SQL API][ref-sql-api] queries.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                | `true`               |
+
+## `CUBESQL_REWRITE_MAX_NODES`
+
+Specifies the maximum number of e-graph nodes that are allocated during
+the creation of a query plan in the [SQL API][ref-sql-api].
+
+Should be increased if you get the following error:
+`Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 10000                  | 10000                 |
+
+## `CUBESQL_REWRITE_MAX_ITERATIONS`
+
+Specifies the maximum number of e-graph term rewriting iterations that are performed
+during the creation of a query plan in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 300                    | 300                   |
+
+## `CUBESQL_REWRITE_TIMEOUT`
+
+Specifies the maximum time, in seconds, that is allocated for
+the creation of a query plan in the [SQL API][ref-sql-api].
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| A valid number  | 30                     | 30                    |
 
 ## `CUBESQL_AUTH_EXPIRE_SECS`
 
@@ -1027,6 +1032,14 @@ Number of seconds before session's SQL API security context will be invalidated.
 | Possible Values | Default in Development | Default in Production |
 | --------------- | ---------------------- | --------------------- |
 | A valid integer number | `300`                 | `300`                |
+
+## `CUBEJS_TELEMETRY`
+
+If `true`, then send telemetry to Cube.
+
+| Possible Values | Default in Development | Default in Production |
+| --------------- | ---------------------- | --------------------- |
+| `true`, `false` | `true`                 | `true`                |
 
 ## `CUBESTORE_METRICS_FORMAT`
 
@@ -1183,7 +1196,7 @@ The logging level for Cube Store.
 
 ## `CUBESTORE_META_ADDR`
 
-The address/port pair for the **router** node in the cluster.
+The address/port pair for the Cube Store **router** node in the cluster.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1191,8 +1204,8 @@ The address/port pair for the **router** node in the cluster.
 
 ## `CUBESTORE_META_PORT`
 
-The port for the **router** node to listen for connections on. Ignored when
-`CUBESTORE_META_ADDR` is set.
+The port for the Cube Store **router** node to listen for connections on.
+Ignored when `CUBESTORE_META_ADDR` is set.
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1319,8 +1332,10 @@ The number of Cube Store sub-processes that handle `SELECT` queries.
 
 ## `CUBESTORE_SERVER_NAME`
 
-The full name and port number of the Cube Store server. Must be unique for each
-instance in cluster mode.
+The full name and port number of the Cube Store node (either the router
+or a worker). Must be unique for each instance in the Cube Store cluster.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values           | Default in Development | Default in Production |
 | ------------------------- | ---------------------- | --------------------- |
@@ -1346,7 +1361,7 @@ insertion.
 ## `CUBESTORE_WORKER_PORT`
 
 The port for Cube Store workers to listen to connections on. When set, the node
-will start as a **worker** in the cluster
+will start as a Cube Store **worker** in the cluster
 
 | Possible Values     | Default in Development | Default in Production |
 | ------------------- | ---------------------- | --------------------- |
@@ -1354,7 +1369,9 @@ will start as a **worker** in the cluster
 
 ## `CUBESTORE_WORKERS`
 
-A comma-separated list of address/port pairs for Cube Store workers.
+A comma-separated list of address/port pairs of Cube Store workers.
+
+Should be passed to the Cube Store router and to each Cube Store worker.
 
 | Possible Values                              | Default in Development | Default in Production |
 | -------------------------------------------- | ---------------------- | --------------------- |
@@ -1363,6 +1380,12 @@ A comma-separated list of address/port pairs for Cube Store workers.
 ```dotenv
 CUBESTORE_WORKERS=worker-1:3123,localhost:3124,123.124.125.128:3123
 ```
+
+Used to implement stateless addressing within a Cube Store cluster.
+By analyzing `CUBESTORE_WORKERS` and `CUBESTORE_SERVER_NAME`, each node
+is able to determine its position within a Cube Store cluster.
+This allows each worker to know which pre-aggregation partitions it owns
+and how the load is distributed across all workers.
 
 ## `DEBUG_LOG`
 
@@ -1407,10 +1430,8 @@ The port for a Cube deployment to listen to API connections on.
   https://cloud.google.com/iam/docs/creating-managing-service-account-keys
 [gh-docs-pat]:
   https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token
-[gh-ioredis]: https://github.com/luin/ioredis
 [gh-jsonwebtoken-algs]:
   https://github.com/auth0/node-jsonwebtoken#algorithms-supported
-[gh-node-redis]: https://github.com/NodeRedis/node-redis
 [ietf-jwk-ref]: https://tools.ietf.org/html/rfc7517#section-4
 [ietf-jwt-ref-iss]: https://tools.ietf.org/html/rfc7519#section-4.1.1
 [ietf-jwt-ref-sub]: https://tools.ietf.org/html/rfc7519#section-4.1.2
@@ -1422,8 +1443,6 @@ The port for a Cube deployment to listen to API connections on.
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-multiple-ds-decorating-env]:
   /product/configuration/advanced/multiple-data-sources#configuring-data-sources-with-environment-variables-decorated-environment-variables
-[ref-config-preagg-schema-name]:
-  /reference/configuration/config#pre_aggregations_schema
 [ref-config-sched-refresh-timer]:
   /reference/configuration/config#scheduled_refresh_timer
 [ref-rest-scopes]: /product/apis-integrations/rest-api#configuration-api-scopes
@@ -1439,3 +1458,4 @@ The port for a Cube deployment to listen to API connections on.
   https://docs.snowflake.com/en/user-guide/warehouses.html
 [wiki-tz-database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 [ref-sql-api]: /product/apis-integrations/sql-api
+[ref-row-limit]: /product/apis-integrations/queries#row-limit

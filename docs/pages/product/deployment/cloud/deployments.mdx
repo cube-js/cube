@@ -24,6 +24,8 @@ guidance on the rest of the steps:
 
 <YouTubeVideo url="https://www.youtube.com/embed/HVZ4ytDEjqc" />
 
+All deployments within a Cube Cloud account should have uniqie names.
+
 ## Demo deployments
 
 After you've created your [Cube Cloud account][cube-cloud-signup] and
@@ -70,6 +72,41 @@ user-specific state of the deployment:
   selected and being viewed by the user.
 * <Btn>Enter Development Mode</Btn> button indicates whether a user has
   entered the [development mode][ref-dev-mode].
+
+## Cube version
+
+Each deployment in Cube Cloud runs a specific version of Cube, depending on the
+branch of the source code and the selected [update channel](#update-channels).
+
+### Current version
+
+You can check the current version of Cube that your deployment runs by
+navigating to <Btn>Overview → Resources & Logs → Cube API</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/83a5010a-3c02-4ce1-8e4f-fdbb2efc6a90/"
+  highlight="inset(42.5% 42.5% 32.5% 4% round 10px)"
+/>
+
+Non-main branches and [development mode][ref-dev-mode] branches always run
+the most up-to-date version of Cube.
+
+### Update channels
+
+Cube Cloud provides two update channels:
+
+* **Stable channel.** You should manually update the deployment to one of
+available stable versions.
+* **Latest channel.** On each build, the deployment is automatically updated
+to the most up-to-date version of Cube.
+
+You can view or change the update channel by navigating to <Btn>Settings →
+General → Cube version</Btn>:
+
+<Screenshot
+  src="https://ucarecdn.com/b6ddfc8f-ee37-4b75-8108-ba12c020a9f6/"
+  highlight="inset(53.75% 42.5% 11.25% 20% round 10px)"
+/>
 
 ## Resource consumption
 

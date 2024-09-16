@@ -206,4 +206,30 @@ describe('pre-aggregations', () => {
       '2023-01-10T23:59:59.999'
     ]);
   });
+
+  it('pre-aggregation with indexes descriptions', async () => {
+    const { compiler, cubeEvaluator, joinGraph } = prepareYamlCompiler(
+      createSchemaYaml(createECommerceSchema())
+    );
+
+    await compiler.compile();
+
+    const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, {
+      measures: [
+        'orders_indexes.count'
+      ],
+      timeDimensions: [{
+        dimension: 'orders_indexes.created_at',
+        granularity: 'day',
+        dateRange: ['2023-01-01', '2023-01-10']
+      }],
+      dimensions: ['orders_indexes.status']
+    });
+
+    const preAggregationsDescription: any = query.preAggregations?.preAggregationsDescription();
+    const { indexesSql } = preAggregationsDescription[0];
+    expect(indexesSql.length).toEqual(2);
+    expect(indexesSql[0].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_regular_index');
+    expect(indexesSql[1].indexName).toEqual('orders_indexes_orders_by_day_with_day_by_status_agg_index');
+  });
 });

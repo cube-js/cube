@@ -8,6 +8,7 @@ description = "Tests for CubeStore that can run in multiple configurations."
 documentation = "https://cube.dev/docs"
 homepage = "https://cube.dev"
 repository = "https://github.com/cube-js/cube.js"
+resolver = "2"
 
 [lib]
 test = false
@@ -28,7 +29,7 @@ path = "tests/cluster.rs"
 harness = false
 
 [target.'cfg(not(target_os = "windows"))'.dependencies]
-ipc-channel = { version = "0.14.1" }
+ipc-channel = { version = "0.18.0" }
 
 [dependencies]
 base64 = "0.13.0"
@@ -41,11 +42,11 @@ itertools = "0.9.0"
 lazy_static = "1.4.0"
 log = "0.4.11"
 pretty_assertions = "0.7.1"
-reqwest = "0.11.10"
+reqwest = { version = "0.12.5", features = ["json", "rustls-tls", "stream", "http2"], default-features = false }
 scopeguard = "1.1.0"
 serde = "1.0.115"
 serde_derive = "1.0.115"
-tokio = { version = "1.0", features = ["full", "rt"] }
+tokio = { version = "1", features = ["full", "rt"] }
 futures-timer = "3.0.2"
 indoc = "1.0"
 tempfile = "3.2.0"
@@ -53,7 +54,7 @@ tar = "0.4.38"
 
 [dev-dependencies]
 criterion = { version = "0.4.0", features = ["async_tokio", "html_reports"] }
-rocksdb = { git = "https://github.com/cube-js/rust-rocksdb", branch = "cubestore", default-features = false, features = ["zstd", "snappy"] }
+cuberockstore = { path = "../cuberockstore" }
 
 [[bench]]
 name = "in_process"

@@ -45,17 +45,18 @@ impl InformationSchemaViewsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.table_catalog.finish()));
-        columns.push(Arc::new(self.table_schema.finish()));
-        columns.push(Arc::new(self.table_name.finish()));
-        columns.push(Arc::new(self.view_definition.finish()));
-        columns.push(Arc::new(self.check_option.finish()));
-        columns.push(Arc::new(self.is_updatable.finish()));
-        columns.push(Arc::new(self.is_insertable_into.finish()));
-        columns.push(Arc::new(self.is_trigger_updatable.finish()));
-        columns.push(Arc::new(self.is_trigger_deletable.finish()));
-        columns.push(Arc::new(self.is_trigger_insertable_into.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.table_catalog.finish()),
+            Arc::new(self.table_schema.finish()),
+            Arc::new(self.table_name.finish()),
+            Arc::new(self.view_definition.finish()),
+            Arc::new(self.check_option.finish()),
+            Arc::new(self.is_updatable.finish()),
+            Arc::new(self.is_insertable_into.finish()),
+            Arc::new(self.is_trigger_updatable.finish()),
+            Arc::new(self.is_trigger_deletable.finish()),
+            Arc::new(self.is_trigger_insertable_into.finish()),
+        ];
 
         columns
     }

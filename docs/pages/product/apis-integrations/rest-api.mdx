@@ -10,7 +10,6 @@ data applications, including but not limited to the following ones:
 
 - Most commonly, front-end applications
 - Some [data notebooks][ref-notebooks], e.g., [Observable][ref-observable]
-- Some AI-based applications, e.g., [Delphi][ref-delphi]
 - [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
 - Automated jobs
 
@@ -30,7 +29,64 @@ API][ref-graphql-api] and [Orchestration API][ref-orchestration-api]. However,
 they target specific use cases and are not usually considered part of the REST
 API.
 
-See [REST API reference][ref-ref-rest-api] for the list of supported endpoints.
+## Example request
+
+You can use the `curl` utility to execute requests to the REST API:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  -G \
+  --data-urlencode 'query={
+    "dimensions": [
+      "users.state",
+      "users.city",
+      "orders.status"
+    ],
+    "measures": [
+      "orders.count"
+    ],
+    "filters": [
+      {
+        "member": "users.state",
+        "operator": "notEquals",
+        "values": ["us-wa"]
+      }
+    ],
+    "timeDimensions": [
+      {
+        "dimension": "orders.created_at",
+        "dateRange": ["2020-01-01", "2021-01-01"]
+      }
+    ],
+    "limit": 10
+  }' \
+  http://localhost:4000/cubejs-api/v1/load
+```
+
+You can also use the [`jq` utility][link-jq-utility] to format responses
+from the REST API in your terminal:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  -G \
+  --data-urlencode 'query={"measures": ["orders.count"]}' \
+  http://localhost:4000/cubejs-api/v1/load | jq .data
+```
+
+You can also introspect the data model by querying the [`/v1/meta`
+endpoint][ref-ref-meta-endpoint]:
+
+```bash
+curl \
+  -H "Authorization: JSON.WEB.TOKEN" \
+  http://localhost:4000/cubejs-api/v1/meta | jq
+```
+
+Check [query format][ref-rest-query-format] for details about supported queries.
+Also, check [REST API reference][ref-ref-rest-api] for the list of supported API
+endpoints.
 
 ## Configuration
 
@@ -65,7 +121,7 @@ accessible for everyone.
 | `meta`    | [`/v1/meta`][ref-ref-meta]                                                                | ✅ Yes                 |
 | `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
 | `graphql` | `/graphql`                                                                                | ✅ Yes                 |
-| `jobs`    | [`/v1/run-scheduled-refresh`][ref-ref-rsr]<br/>[`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No                  |
+| `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj]                                                | ❌ No                  |
 
 <InfoBox>
 
@@ -134,12 +190,6 @@ how to generate it.
 In the development environment the token is not required for authorization, but
 you can still use it to pass a security context.
 
-### Example request
-
-```bash{promptUser: user}
-curl -H "Authorization: EXAMPLE-API-TOKEN" https://example.com/cubejs-api/v1/sql
-```
-
 ### Continue wait
 
 If the request takes too long to be processed, Cube Backend responds with
@@ -187,7 +237,7 @@ change during one single interaction.
 ### Pagination
 
 Cube supports paginated requests for the `/v1/load` endpoint by including
-[`limit` and `offset` parameters][ref-api-ref-query-format] in the query. For
+[`limit` and `offset` parameters][ref-rest-query-format] in the query. For
 example, the following query will retrieve rows 101-200 from the `Orders` cube:
 
 ```json
@@ -210,15 +260,14 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-config-js]: /reference/configuration/config
 [ref-config-queryrewrite]: /reference/configuration/config#queryrewrite
 [ref-conf-queue-opts]: /reference/configuration/config#queueoptions
-[ref-api-ref-query-format]:
-  /product/apis-integrations/rest-api/query-format#query-properties
+[ref-rest-query-format]: /product/apis-integrations/rest-api/query-format#query-properties
+[ref-ref-meta-endpoint]: /reference/rest-api#v1meta
 [ref-config-cors]: /reference/configuration/config#http
 [ref-schema-ref-cube-refresh-key]:
   /reference/data-model/cube#refresh_key
 [ref-security]: /product/auth
 [ref-notebooks]: /product/configuration/visualization-tools#notebooks
 [ref-observable]: /product/configuration/visualization-tools/observable
-[ref-delphi]: /product/configuration/visualization-tools/delphi
 [ref-low-code]:
   /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
 [ref-retool]: /product/configuration/visualization-tools/retool
@@ -228,7 +277,6 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-load]: /reference/rest-api#v1load
 [ref-ref-meta]: /reference/rest-api#v1meta
 [ref-ref-sql]: /reference/rest-api#v1sql
-[ref-ref-rsr]: /reference/rest-api#v1run-scheduled-refresh
 [ref-ref-paj]: /reference/rest-api#v1pre-aggregationsjobs
 [ref-security-context]: /product/auth/context
 [ref-graphql-api]: /product/apis-integrations/graphql-api
@@ -239,3 +287,4 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [self-api-scopes]: #configuration-api-scopes
 [self-cors]: #configuration-cors
 [ref-ref-rest-api]: /reference/rest-api
+[link-jq-utility]: https://jqlang.github.io/jq/

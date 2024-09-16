@@ -1,6 +1,7 @@
 /// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import environmentPlugin from 'vite-plugin-environment';
 
 export default defineConfig(({ mode }) => ({
   build: {
@@ -14,7 +15,15 @@ export default defineConfig(({ mode }) => ({
       '^/cubejs-api/*': 'http://localhost:4000',
     },
   },
-  plugins: [react()],
+  plugins: [
+    environmentPlugin(
+      {
+        SC_DISABLE_SPEEDY: 'false',
+      },
+      { loadEnvFiles: true }
+    ),
+    react(),
+  ],
   css: {
     preprocessorOptions: {
       less: {
