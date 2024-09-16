@@ -25,7 +25,7 @@ export class Granularity {
   ) {
     this.granularity = timeDimension.granularity;
     this.predefinedGranularity = isPredefinedGranularity(this.granularity);
-    this.origin = moment().startOf('year'); // Defaults to current year start
+    this.origin = moment.tz('UTC').startOf('year'); // Defaults to current year start
 
     if (this.predefinedGranularity) {
       this.granularityInterval = `1 ${this.granularity}`;
@@ -60,17 +60,17 @@ export class Granularity {
       return this.granularity;
     }
 
-    if (this.origin) {
-      return this.query.minGranularity(
-        this.granularityFromInterval(),
-        this.query.granularityFor(this.origin.utc())
-      );
-    }
-
     if (this.granularityOffset) {
       return this.query.minGranularity(
         this.granularityFromInterval(),
         this.granularityFromOffset()
+      );
+    }
+
+    if (this.origin) {
+      return this.query.minGranularity(
+        this.granularityFromInterval(),
+        this.query.granularityFor(this.origin.utc())
       );
     }
 
