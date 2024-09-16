@@ -431,7 +431,11 @@ export class PreAggregations {
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.expressionPath(), d.rollupGranularity()])
+      timeDimensions.map(d => (d.isPredefinedGranularity() ?
+        [d.expressionPath(), d.rollupGranularity()] :
+        // For custom granularities we need to add its name to the list (for exact matches)
+        [d.expressionPath(), d.rollupGranularity(), d.granularity]
+      ))
     ) || [];
   }
 
@@ -615,9 +619,16 @@ export class PreAggregations {
      * @returns {Array<Array<string>>}
      */
     const expandTimeDimension = (timeDimension) => {
-      const [dimension, granularity] = timeDimension;
-      return expandGranularity(granularity)
+      const [dimension, granularity, customGranularity] = timeDimension;
+      const res = expandGranularity(granularity)
         .map((newGranularity) => [dimension, newGranularity]);
+
+      if (customGranularity) {
+        // For custom granularities we add it upfront to the list (for exact matches)
+        res.unshift([dimension, customGranularity]);
+      }
+
+      return res;
     };
 
     /**

@@ -261,6 +261,10 @@ export class BaseTimeDimension extends BaseFilter {
     return this.granularityObj?.resolvedGranularity();
   }
 
+  public isPredefinedGranularity(): boolean {
+    return this.granularityObj?.isPredefined() || false;
+  }
+
   public wildcardRange() {
     return [FROM_PARTITION_RANGE, TO_PARTITION_RANGE];
   }
