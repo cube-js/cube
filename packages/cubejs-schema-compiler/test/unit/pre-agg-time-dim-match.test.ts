@@ -9,7 +9,24 @@ describe('Pre Aggregation by filter match tests', () => {
 
     cube.dimensions.created = {
       sql: 'created',
-      type: 'time'
+      type: 'time',
+      granularities: {
+        one_week: {
+          interval: '1 week',
+        },
+        one_week_by_sunday: {
+          interval: '1 week',
+          offset: '-1 day'
+        },
+        two_weeks_by_1st_feb_00am: {
+          interval: '2 weeks',
+          origin: '2024-02-01 00:00:00'
+        },
+        two_weeks_by_1st_feb_10am: {
+          interval: '2 weeks',
+          origin: '2024-02-01 10:00:00'
+        }
+      }
     };
 
     return prepareCube('cube', cube);
@@ -20,6 +37,7 @@ describe('Pre Aggregation by filter match tests', () => {
     measures: Array<String>,
     preAggTimeGranularity: string,
     queryAggTimeGranularity: string,
+    queryTimeZone: string = 'America/Los_Angeles',
   ) {
     const aaa: any = {
       type: 'rollup',
@@ -28,6 +46,8 @@ describe('Pre Aggregation by filter match tests', () => {
       timeDimension: 'cube.created',
       granularity: preAggTimeGranularity,
       partitionGranularity: 'year',
+      // Enabling only for custom granularities
+      allowNonStrictDateRangeMatch: !/^(minute|hour|day|week|month|quarter|year)$/.test(preAggTimeGranularity)
     };
 
     const cube: any = {
@@ -55,7 +75,7 @@ describe('Pre Aggregation by filter match tests', () => {
           granularity: queryAggTimeGranularity,
           dateRange: { from: '2017-01-01', to: '2017-03-31' }
         }],
-        timezone: 'America/Los_Angeles',
+        timezone: queryTimeZone,
       });
 
       const usePreAggregation = PreAggregations.canUsePreAggregationForTransformedQueryFn(
@@ -69,6 +89,26 @@ describe('Pre Aggregation by filter match tests', () => {
 
   it('1 count measure, day, day', () => testPreAggregationMatch(
     true, ['count'], 'day', 'day'
+  ));
+
+  it('1 count measure, one_week_by_sunday, one_week_by_sunday', () => testPreAggregationMatch(
+    true, ['count'], 'one_week_by_sunday', 'one_week_by_sunday'
+  ));
+
+  it('1 count measure, two_weeks_by_1st_feb_00am, two_weeks_by_1st_feb_00am', () => testPreAggregationMatch(
+    true, ['count'], 'two_weeks_by_1st_feb_00am', 'two_weeks_by_1st_feb_00am'
+  ));
+
+  it('1 count measure, day, one_week_by_sunday', () => testPreAggregationMatch(
+    true, ['count'], 'day', 'one_week_by_sunday'
+  ));
+
+  it('1 count measure, day, two_weeks_by_1st_feb_00am', () => testPreAggregationMatch(
+    true, ['count'], 'day', 'two_weeks_by_1st_feb_00am'
+  ));
+
+  it('1 count measure, day, two_weeks_by_1st_feb_10am', () => testPreAggregationMatch(
+    false, ['count'], 'day', 'two_weeks_by_1st_feb_10am'
   ));
 
   it('1 count measure, week, day', () => testPreAggregationMatch(
