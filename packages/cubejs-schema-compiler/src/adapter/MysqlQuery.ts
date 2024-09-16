@@ -158,6 +158,7 @@ export class MysqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'TINYINT';
     templates.types.timestamp = 'DATETIME';
