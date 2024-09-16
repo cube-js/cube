@@ -314,7 +314,7 @@ export class PreAggregations {
         dateRange: td.dateRange,
         granularity: td.granularity,
       });
-    }).map(d => query.newTimeDimension(d));
+    });
 
     let sortedAllCubeNames;
     let sortedUsedCubePrimaryKeys;
