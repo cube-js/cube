@@ -7,7 +7,7 @@ use crate::{
                 filters::Decimal,
                 utils::{DecomposedDayTime, DecomposedMonthDayNano},
             },
-            WrappedSelectType,
+            LikeType, WrappedSelectType,
         },
     },
     config::ConfigObj,
@@ -1285,8 +1285,96 @@ impl CubeScanWrapperNode {
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::AnyExpr { .. } => {}
-                // Expr::Like(_) => {}-=
-                // Expr::ILike(_) => {}
+                Expr::Like(like) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *like.expr,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (pattern, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *like.pattern,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (escape_char, sql_query) = match like.escape_char {
+                        Some(escape_char) => {
+                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            (Some(escape_char), sql_query)
+                        }
+                        None => (None, sql_query),
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .like_expr(LikeType::Like, expr, like.negated, pattern, escape_char)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for like expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
+                Expr::ILike(ilike) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *ilike.expr,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (pattern, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *ilike.pattern,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (escape_char, sql_query) = match ilike.escape_char {
+                        Some(escape_char) => {
+                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            (Some(escape_char), sql_query)
+                        }
+                        None => (None, sql_query),
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .like_expr(LikeType::ILike, expr, ilike.negated, pattern, escape_char)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for ilike expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::SimilarTo(_) => {}
                 Expr::Not(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
