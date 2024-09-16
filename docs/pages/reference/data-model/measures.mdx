@@ -58,7 +58,9 @@ cubes:
 
 ### `description`
 
-You can add details to a measure’s definition via the `description` parameter:
+This parameter provides a human-readable description of a measure.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
 
 <CodeTabs>
 
@@ -70,7 +72,7 @@ cube(`orders`, {
     orders_count: {
       sql: `id`,
       type: `count`,
-      description: `count of all orders`,
+      description: `Count of all orders`,
     },
   },
 });
@@ -83,7 +85,7 @@ cubes:
 
     measures:
       - name: orders_count
-        description: count of all orders
+        description: Count of all orders
         sql: id
         type: count
 ```
@@ -530,9 +532,12 @@ cubes:
 You can create calculated measures from several joined cubes. In this case, a
 join will be created automatically.
 
+
 [ref-schema-ref-types-formats-measures-types]:
   /reference/data-model/types-and-formats#measure-types
 [ref-schema-ref-types-formats-measures-formats]:
   /reference/data-model/types-and-formats#measure-formats
 [ref-drilldowns]: /guides/recipes/data-exploration/drilldowns
 [ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations

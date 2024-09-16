@@ -1,0 +1,66 @@
+# Chart Prototyping
+
+Chart Prototyping generates code of a front-end application that works with
+the [REST API][ref-rest-api] and visualizes data on charts. It's convenient
+for boostrapping a new embedded analytics application or copying and pasting
+code to an existing one.
+
+<SuccessBox>
+
+Chart Prototyping is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+To access Chart Prototyping, go to [Playground][ref-playground], compose and
+run a query, expand the <Btn>Chart</Btn> pane, and click <Btn>Code</Btn> on
+the right:
+
+<YouTubeVideo url="https://www.youtube.com/embed/OFiJ8AVNHQw" />
+
+## Preview the chart
+
+Chart Prototyping shows you a preview of the chart on the <Btn>Preview</Btn>
+tab:
+
+<Screenshot src="https://ucarecdn.com/c9511662-9673-43ef-a496-33d7cf30d5ab/" />
+
+You can also customize the chart by choosing a visualization type,
+a framework, a charting library, or one of other options in the sidebar.
+
+<InfoBox>
+
+If you'd like to request the support for a specific charting library or
+framework, please [contact us](http://cube.dev/contact).
+
+</InfoBox>
+
+## Browse the code
+
+You can also browse the generated code of this application on the
+<Btn>Code</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/b86c7ef5-afc2-4ccb-b529-4b98dea98772/" />
+
+## Download the application
+
+Finally, you can download a ZIP archive with the code and the file with your
+Cube Cloud credentials using the buttons on the bottom of the <Btn>Code</Btn>
+tab:
+
+<Screenshot
+  src="https://ucarecdn.com/b86c7ef5-afc2-4ccb-b529-4b98dea98772/"
+  highlight="inset(87.5% 78.5% 2.5% 2.5% round 10px)"  
+/>
+
+First, unarchive the code. Then, rename the credentials file to `.env.local`
+(so that it starts with a dot) and place it into the folder with unarchived code.
+You can now run the application with the following commands:
+
+```bash
+npm install
+npm run dev
+```
+
+
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-playground]: /product/workspace/playground

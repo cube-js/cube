@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/test/test_introspection.rs
+expression: "execute_query(\"\n                SELECT n.nspname AS schema_name\n                FROM pg_namespace n\n                WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname <> 'information_schema' AND has_schema_privilege(n.nspname, 'USAGE'::text);\n                \".to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++-------------+
+| schema_name |
++-------------+
+| public      |
++-------------+

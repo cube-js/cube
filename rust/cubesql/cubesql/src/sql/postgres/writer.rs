@@ -394,7 +394,7 @@ mod tests {
         writer.write_value(true)?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -422,7 +422,7 @@ mod tests {
         writer.write_value(true)?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -450,7 +450,7 @@ mod tests {
         writer.write_value(Decimal128Value::new(2, 15))?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],
@@ -488,7 +488,7 @@ mod tests {
         writer.write_value(ListValue::new(Arc::new(col.finish()) as ArrayRef))?;
         writer.end_row()?;
 
-        buffer::write_direct(&mut cursor, writer).await?;
+        buffer::write_direct(&mut BytesMut::new(), &mut cursor, writer).await?;
 
         assert_eq!(
             cursor.get_ref()[0..],

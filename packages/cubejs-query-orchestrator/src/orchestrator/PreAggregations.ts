@@ -37,7 +37,6 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { QueryQueue } from './QueryQueue';
 import { LargeStreamWarning } from './StreamObjectsCounter';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
-import { RedisPool } from './RedisPool';
 
 /// Name of the inline table containing the lambda rows.
 export const LAMBDA_TABLE_PREFIX = 'lambda';
@@ -103,6 +102,9 @@ function getStructureVersion(preAggregation) {
   }
   if (preAggregation.streamOffset) {
     versionArray.push(preAggregation.streamOffset);
+  }
+  if (preAggregation.outputColumnTypes) {
+    versionArray.push(preAggregation.outputColumnTypes);
   }
 
   return version(versionArray.length === 1 ? versionArray[0] : versionArray);
@@ -196,8 +198,10 @@ export type PreAggregationDescription = {
   partitionGranularity: string;
   preAggregationStartEndQueries: [QueryWithParams, QueryWithParams];
   timestampFormat: string;
+  timestampPrecision: number;
   expandedPartition: boolean;
   unionWithSourceData: LambdaOptions;
+  buildRangeStart?: string;
   buildRangeEnd?: string;
   updateWindowSeconds?: number;
   sealAt?: string;
@@ -813,6 +817,9 @@ export class PreAggregationLoader {
     if (this.preAggregation.streamOffset) {
       versionArray.push(this.preAggregation.streamOffset);
     }
+    if (this.preAggregation.outputColumnTypes) {
+      versionArray.push(this.preAggregation.outputColumnTypes);
+    }
     versionArray.push(invalidationKeys);
     return version(versionArray);
   }
@@ -962,7 +969,11 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
+        {
+          streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
+          ...queryOptions
+        }
       ));
 
       await this.createIndexes(client, newVersionEntry, saveCancelFn, queryOptions);
@@ -1105,7 +1116,11 @@ export class PreAggregationLoader {
         targetTableName,
         query,
         params,
-        { streamOffset: this.preAggregation.streamOffset, ...queryOptions }
+        {
+          streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
+          ...queryOptions
+        }
       ));
 
       return queryOptions;
@@ -1154,6 +1169,7 @@ export class PreAggregationLoader {
         sql,
         params, {
           streamOffset: this.preAggregation.streamOffset,
+          outputColumnTypes: this.preAggregation.outputColumnTypes,
           ...queryOptions,
           ...capabilities,
           ...this.getStreamingOptions(),
@@ -1259,7 +1275,11 @@ export class PreAggregationLoader {
         tableData.rowStream = stream;
       }
     } else {
-      tableData = await saveCancelFn(client.downloadTable(table, { streamOffset: this.preAggregation.streamOffset, ...externalDriverCapabilities }));
+      tableData = await saveCancelFn(client.downloadTable(table, {
+        streamOffset: this.preAggregation.streamOffset,
+        outputColumnTypes: this.preAggregation.outputColumnTypes,
+        ...externalDriverCapabilities
+      }));
     }
 
     if (!tableData.types) {
@@ -1656,6 +1676,7 @@ export class PreAggregationPartitionRangeLoader {
         .map(q => ({ ...q, sql: this.replacePartitionSqlAndParams(q.sql, range, partitionTableName) })),
       previewSql: this.preAggregation.previewSql &&
         this.replacePartitionSqlAndParams(this.preAggregation.previewSql, range, partitionTableName),
+      buildRangeStart: loadRange[0],
       buildRangeEnd: loadRange[1],
       sealAt, // Used only for kSql pre aggregations
     };
@@ -1824,9 +1845,10 @@ export class PreAggregationPartitionRangeLoader {
       // use last partition so outer query can receive expected table structure.
       dateRange = [buildRange[1], buildRange[1]];
     }
-    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange)], () => PreAggregationPartitionRangeLoader.timeSeries(
+    const partitionRanges = this.compilerCacheFn(['timeSeries', this.preAggregation.partitionGranularity, JSON.stringify(dateRange), `${this.preAggregation.timestampPrecision}`], () => PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       dateRange,
+      this.preAggregation.timestampPrecision
     ));
     if (partitionRanges.length > this.options.maxPartitions) {
       throw new Error(
@@ -1849,6 +1871,7 @@ export class PreAggregationPartitionRangeLoader {
     const wholeSeriesRanges = PreAggregationPartitionRangeLoader.timeSeries(
       this.preAggregation.partitionGranularity,
       this.orNowIfEmpty([startDate, endDate]),
+      this.preAggregation.timestampPrecision,
     );
     const [rangeStart, rangeEnd] = await Promise.all(
       preAggregationStartEndQueries.map(
@@ -1893,7 +1916,7 @@ export class PreAggregationPartitionRangeLoader {
       throw new Error(`Date range expected to be a string array but ${range} found`);
     }
 
-    if (range[0].length !== 23 || range[1].length !== 23) {
+    if ((range[0].length !== 23 && range[0].length !== 26) || (range[1].length !== 23 && range[0].length !== 26)) {
       throw new Error(`Date range expected to be in YYYY-MM-DDTHH:mm:ss.SSS format but ${range} found`);
     }
   }
@@ -1918,8 +1941,10 @@ export class PreAggregationPartitionRangeLoader {
     ];
   }
 
-  public static timeSeries(granularity: string, dateRange: QueryDateRange): QueryDateRange[] {
-    return timeSeries(granularity, dateRange);
+  public static timeSeries(granularity: string, dateRange: QueryDateRange, timestampPrecision: number): QueryDateRange[] {
+    return timeSeries(granularity, dateRange, {
+      timestampPrecision
+    });
   }
 
   public static partitionTableName(tableName: string, partitionGranularity: string, dateRange: string[]) {
@@ -1955,7 +1980,6 @@ type PreAggregationsOptions = {
     orphanedTimeout?: number;
     heartBeatInterval?: number;
   }>;
-  redisPool?: RedisPool;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>;
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
@@ -2366,7 +2390,6 @@ export class PreAggregations {
             concurrency: 1,
             logger: this.logger,
             cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-            redisPool: this.options.redisPool,
             cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
@@ -2414,7 +2437,6 @@ export class PreAggregations {
           concurrency: 4,
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
           cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           ...this.options.loadCacheQueueOptions
         }

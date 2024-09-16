@@ -1,4 +1,5 @@
 import { BaseQuery } from './BaseQuery';
+import { BaseFilter } from './BaseFilter';
 
 const GRANULARITY_TO_INTERVAL = {
   day: 'DAY',
@@ -11,13 +12,64 @@ const GRANULARITY_TO_INTERVAL = {
   year: 'YEAR'
 };
 
+class SnowflakeFilter extends BaseFilter {
+  public likeIgnoreCase(column: string, not: boolean, param: any, type: string) {
+    const p = (!type || type === 'contains' || type === 'ends') ? '\'%\' || ' : '';
+    const s = (!type || type === 'contains' || type === 'starts') ? ' || \'%\'' : '';
+    // From Snowflake docs:
+    // If you use the backslash as an escape character, then you must escape the backslash in both the expression
+    // and the ESCAPE clause. For example, the following command specifies that the escape character is the backslash,
+    // and then uses that escape character to search for % as a literal (without the escape character, the % would be
+    // treated as a wildcard): `'SOMETHING%' ILIKE '%\\%%' ESCAPE '\\';`
+    //
+    // Special chars in bind vars are escaped with backslash which in turn is also escaped by backslash.
+    // To get double backslashes passed inside generated SQL string we need to escape each one.
+    // That is why here are FOUR backslashes.
+    return `${column}${not ? ' NOT' : ''} ILIKE ${p}${this.allocateParam(param)}${s} ESCAPE '\\\\'`;
+  }
+}
+
 export class SnowflakeQuery extends BaseQuery {
+  public newFilter(filter) {
+    return new SnowflakeFilter(this, filter);
+  }
+
   public convertTz(field) {
     return `CONVERT_TIMEZONE('${this.timezone}', ${field}::timestamp_tz)::timestamp_ntz`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = 'TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0)';
+
+    return `DATEADD(${timeUnit},
+        FLOOR(
+          DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}'))
+        ) * DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}')),
+        ${this.timeStampCast(`'${origin}'`)})`;
+  }
+
+  /**
+   * The input interval in format "2 years 3 months 4 weeks 5 days...."
+   * will be converted to Snowflake dialect "2 years, 3 months, 4 weeks, 5 days...."
+   */
+  private formatInterval(interval: string): string {
+    return interval.split(' ').map((word, index, arr) => {
+      if (index % 2 !== 0 && index < arr.length - 1) {
+        return `${word},`;
+      }
+      return word;
+    }).join(' ');
   }
 
   public timeStampCast(value) {
@@ -63,6 +115,7 @@ export class SnowflakeQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval = 'INTERVAL \'{{ interval }}\'';
     templates.expressions.timestamp_literal = '\'{{ value }}\'::timestamp_tz';
+    delete templates.types.interval;
     return templates;
   }
 }

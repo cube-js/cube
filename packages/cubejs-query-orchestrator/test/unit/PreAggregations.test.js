@@ -1,6 +1,7 @@
 /* eslint-disable global-require */
 /* globals describe, jest, beforeEach, test, expect */
 import R from 'ramda';
+import { PreAggregationPartitionRangeLoader } from '../../src';
 
 class MockDriver {
   constructor() {
@@ -367,6 +368,33 @@ describe('PreAggregations', () => {
       const { preAggregationsTablesToTempTables: result } = await preAggregations.loadAllPreAggregationsIfNeeded(basicQueryExternal);
       expect(result[0][1].targetTableName).toMatch(/stb_pre_aggregations.orders_number_and_count20191101_kjypcoio_5yftl5il_1893709044209/);
       expect(result[0][1].lastUpdatedAt).toEqual(1893709044209);
+    });
+  });
+
+  describe('intersectDateRanges', () => {
+    test('6 timestamps - valid intersection', () => {
+      expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-05T00:00:00.000000', '2024-01-05T23:59:59.999999'],
+        ['2024-01-01T00:00:00.000000', '2024-01-31T23:59:59.999999'],
+      )).toEqual(
+        ['2024-01-05T00:00:00.000000', '2024-01-05T23:59:59.999999']
+      );
+
+      expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-20T00:00:00.000000', '2024-02-05T23:59:59.999999'],
+        ['2024-01-01T00:00:00.000000', '2024-01-31T23:59:59.999999'],
+      )).toEqual(
+        ['2024-01-20T00:00:00.000000', '2024-01-31T23:59:59.999999']
+      );
+    });
+
+    test('3 timestamps - valid intersection', () => {
+      expect(PreAggregationPartitionRangeLoader.intersectDateRanges(
+        ['2024-01-05T00:00:00.000', '2024-01-05T23:59:59.999'],
+        ['2024-01-01T00:00:00.000', '2024-01-31T23:59:59.999'],
+      )).toEqual(
+        ['2024-01-05T00:00:00.000', '2024-01-05T23:59:59.999']
+      );
     });
   });
 });

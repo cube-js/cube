@@ -1,4 +1,5 @@
 module.exports = {
-  "security": "Authentication and Authorization",
-  "joins": "Joins"
+  "query-format": "Query format",
+  "joins": "Joins",
+  "security": "Authentication and Authorization"
 }

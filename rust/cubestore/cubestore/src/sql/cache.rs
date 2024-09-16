@@ -81,7 +81,11 @@ pub fn sql_result_cache_sizeof(key: &SqlResultCacheKey, df: &Arc<DataFrame>) -> 
 }
 
 impl SqlResultCache {
-    pub fn new(capacity_bytes: u64, time_to_idle_secs: Option<u64>) -> Self {
+    pub fn new(
+        capacity_bytes: u64,
+        time_to_idle_secs: Option<u64>,
+        queue_cache_max_capacity: u64,
+    ) -> Self {
         let cache_builder = if let Some(time_to_idle_secs) = time_to_idle_secs {
             Cache::builder().time_to_idle(Duration::from_secs(time_to_idle_secs))
         } else {
@@ -89,7 +93,7 @@ impl SqlResultCache {
         };
 
         Self {
-            queue_cache: Mutex::new(lru::LruCache::new(1000)),
+            queue_cache: Mutex::new(lru::LruCache::new(queue_cache_max_capacity as usize)),
             result_cache: cache_builder
                 .max_capacity(capacity_bytes)
                 .weigher(sql_result_cache_sizeof)
@@ -139,6 +143,19 @@ impl SqlResultCache {
         let (sender, receiver) = {
             let key = queue_key.clone();
             let mut cache = self.queue_cache.lock().await;
+
+            if cache.contains(&key) {
+                if let Some(receiver) = cache.get(&key) {
+                    if receiver.has_changed().is_err() {
+                        log::error!("Queue cache contains closed channel");
+                        cache.pop(&key);
+                    }
+                } else {
+                    log::error!("Queue cache doesn't contains channel");
+                    cache.pop(&key);
+                }
+            }
+
             if !cache.contains(&key) {
                 let (tx, rx) = watch::channel(None);
                 cache.put(key, rx);
@@ -290,7 +307,7 @@ mod tests {
 
     #[tokio::test]
     async fn simple() -> Result<(), CubeError> {
-        let cache = SqlResultCache::new(1 << 20, Some(120));
+        let cache = SqlResultCache::new(1 << 20, Some(120), 1000);
         let schema = Arc::new(DFSchema::new(Vec::new())?);
         let plan = SerializedPlan::try_new(
             LogicalPlan::EmptyRelation {

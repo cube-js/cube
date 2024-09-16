@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use arrow::array::*;
-use arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use async_trait::async_trait;
 use chrono::format::Fixed::Nanosecond3;
 use chrono::format::Item::{Fixed, Literal, Numeric, Space};
@@ -13,6 +11,8 @@ use chrono::format::Numeric::{Day, Hour, Minute, Month, Second, Year};
 use chrono::format::Pad::Zero;
 use chrono::format::Parsed;
 use chrono::{ParseResult, TimeZone, Utc};
+use datafusion::arrow::array::*;
+use datafusion::arrow::compute::kernels::cast_utils::string_to_timestamp_nanos;
 use datafusion::cube_ext;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::sql::parser::Statement as DFStatement;
@@ -49,7 +49,7 @@ use crate::metastore::{
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor};
+use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
 use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -80,6 +80,7 @@ use crate::sql::cachestore::CacheStoreSqlService;
 use crate::util::metrics;
 use mockall::automock;
 use table_creator::{convert_columns_type, TableCreator};
+pub use table_creator::{TableExtensionService, TableExtensionServiceImpl};
 
 #[automock]
 #[async_trait]
@@ -187,6 +188,7 @@ impl SqlServiceImpl {
         query_executor: Arc<dyn QueryExecutor>,
         cluster: Arc<dyn Cluster>,
         import_service: Arc<dyn ImportService>,
+        table_extension_service: Arc<dyn TableExtensionService>,
         config_obj: Arc<dyn ConfigObj>,
         remote_fs: Arc<dyn RemoteFs>,
         rows_per_chunk: usize,
@@ -205,6 +207,7 @@ impl SqlServiceImpl {
                 db.clone(),
                 cluster.clone(),
                 import_service,
+                table_extension_service,
                 config_obj.clone(),
                 create_table_timeout,
                 cache.clone(),
@@ -1072,7 +1075,7 @@ impl SqlService for SqlServiceImpl {
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
+                                            let df = batches_to_dataframe(records)?;
                                             Ok(df)
                                         },
                                     )
@@ -1259,6 +1262,11 @@ fn parse_hyper_log_log<'a>(
             Ok(buffer)
         }
         HllFlavour::Airlift | HllFlavour::ZetaSketch => {
+            let bytes = parse_binary_string(buffer, v)?;
+            is_valid_plain_binary_hll(bytes, f)?;
+            Ok(bytes)
+        }
+        HllFlavour::DataSketches => {
             let bytes = parse_binary_string(buffer, v)?;
             is_valid_plain_binary_hll(bytes, f)?;
             Ok(bytes)
@@ -1653,12 +1661,14 @@ mod tests {
     use crate::metastore::job::JobType;
     use crate::store::compaction::CompactionService;
     use async_compression::tokio::write::GzipEncoder;
+    use cuberockstore::rocksdb::{Options, DB};
+    use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
     use futures_timer::Delay;
     use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use rocksdb::{Options, DB};
+    use table_creator::TableExtensionServiceImpl;
     use tokio::io::{AsyncWriteExt, BufWriter};
     use uuid::Uuid;
 
@@ -1690,7 +1700,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1718,6 +1728,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1730,6 +1741,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1738,6 +1750,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -1766,7 +1779,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1794,6 +1807,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1806,6 +1820,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1814,6 +1829,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -1854,6 +1870,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
+                TableValue::String("NULL".to_string()),
             ]));
         }
 
@@ -1872,7 +1889,7 @@ mod tests {
         let store_path = path.to_string() + &"_store".to_string();
         let remote_store_path = path.to_string() + &"remote_store".to_string();
 
-        let _ = fs::remove_dir_all(path.clone());
+        let _ = fs::remove_dir_all(path);
         let _ = fs::remove_dir_all(store_path.clone());
         let _ = fs::remove_dir_all(remote_store_path.clone());
 
@@ -1900,6 +1917,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
+                Arc::new(BasicMetadataCacheFactory::new()),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1912,6 +1930,7 @@ mod tests {
                 Arc::new(MockQueryExecutor::new()),
                 Arc::new(MockCluster::new()),
                 Arc::new(MockImportService::new()),
+                TableExtensionServiceImpl::new(),
                 config.config_obj(),
                 remote_fs.clone(),
                 rows_per_chunk,
@@ -1920,6 +1939,7 @@ mod tests {
                 Arc::new(SqlResultCache::new(
                     config.config_obj().query_cache_max_capacity_bytes(),
                     config.config_obj().query_cache_time_to_idle_secs(),
+                    1000,
                 )),
                 BasicProcessRateLimiter::new(),
             );
@@ -1957,6 +1977,7 @@ mod tests {
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("".to_string()),
+                TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
                 TableValue::String("NULL".to_string()),
@@ -4253,7 +4274,7 @@ mod tests {
                         sum(value) value
                         from (
                             select * from test.test
-                            union all 
+                            union all
                             select * from test.test1
                             )
                         group by 1, 2
@@ -4280,6 +4301,45 @@ mod tests {
                     .await
                     .unwrap();
                 assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(4)])]);
+            })
+            .await;
+
+        //assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(2)])]);
+    }
+
+    #[tokio::test]
+    async fn total_count_over_single_row() {
+        Config::test("total_count_over_single_row")
+            .start_test(async move |services| {
+                let service = services.sql_service;
+
+                let _ = service.exec_query("CREATE SCHEMA test").await.unwrap();
+
+                service
+                    .exec_query("CREATE TABLE test.test (idd int, value int)")
+                    .await
+                    .unwrap();
+
+                service
+                    .exec_query(
+                        "INSERT INTO test.test (idd, value) values \
+                            (1, 10)\
+                            ",
+                    )
+                    .await
+                    .unwrap();
+                let res = service
+                    .exec_query(
+                        "SELECT count(*) cnt FROM \
+                                (\
+                                 SELECT \
+                                 sum(value) as s
+                                 from test.test
+                                 ) tmp",
+                    )
+                    .await
+                    .unwrap();
+                assert_eq!(res.get_rows(), &vec![Row::new(vec![TableValue::Int(1)])]);
             })
             .await;
 

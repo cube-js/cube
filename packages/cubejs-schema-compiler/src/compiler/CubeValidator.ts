@@ -43,10 +43,10 @@ function formatStatePath(state: Joi.State): string {
 }
 
 const regexTimeInterval = Joi.string().custom((value, helper) => {
-  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/)) {
+  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)s?$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)s?$/` });
   }
 });
 
@@ -82,6 +82,10 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
   }
 });
 
+const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|quarter|year)s?(\s\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity interval');
+// Do not allow negative intervals for granularities, while offsets could be negative
+const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -101,13 +105,94 @@ const BaseDimensionWithoutSubQuery = {
       label: Joi.string().required()
     })
   ]),
-  meta: Joi.any()
+  meta: Joi.any(),
+  granularities: Joi.when('type', {
+    is: 'time',
+    then: Joi.object().pattern(identifierRegex,
+      Joi.alternatives([
+        Joi.object().keys({
+          interval: GranularityInterval.required(),
+          origin: Joi.string().required().custom((value, helpers) => {
+            const date = new Date(value);
+
+            if (Number.isNaN(date.getTime())) {
+              return helpers.message({ custom: 'Origin should be valid date-only form: YYYY[-MM[-DD]] or date-time form: YYYY-MM-DD[T]HH:mm[:ss[.sss[Z]]]' });
+            }
+            return value;
+          }),
+        }),
+        Joi.object().keys({
+          interval: GranularityInterval.required().custom((value, helper) => {
+            const intParsed = value.split(' ');
+            const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
+
+            if (intParsed.length !== 2) {
+              return helper.message(msg);
+            }
+
+            const v = parseInt(intParsed[0], 10);
+            const unit = intParsed[1];
+
+            const validIntervals = {
+              // Any number of years is valid
+              year: () => true,
+              // Only months divisible by a year with no remainder are valid
+              month: () => 12 % v === 0,
+              // Only quarters divisible by a year with no remainder are valid
+              quarter: () => 4 % v === 0,
+              // Only 1 week is valid
+              week: () => v === 1,
+              // Only 1 day is valid
+              day: () => v === 1,
+              // Only hours divisible by a day with no remainder are valid
+              hour: () => 24 % v === 0,
+              // Only minutes divisible by an hour with no remainder are valid
+              minute: () => 60 % v === 0,
+              // Only seconds divisible by a minute with no remainder are valid
+              second: () => 60 % v === 0,
+            };
+
+            const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
+
+            return isValid ? value : helper.message(msg);
+          }),
+          offset: GranularityOffset.optional(),
+        })
+      ])).optional(),
+    otherwise: Joi.forbidden()
+  })
 };
 
 const BaseDimension = Object.assign({
   subQuery: Joi.boolean().strict(),
   propagateFiltersToSubQuery: Joi.boolean().strict()
 }, BaseDimensionWithoutSubQuery);
+
+const FixedRollingWindow = {
+  type: Joi.string().valid('fixed'),
+  trailing: timeInterval,
+  leading: timeInterval,
+  offset: Joi.any().valid('start', 'end')
+};
+
+const GranularitySchema = Joi.string().required(); // To support custom granularities
+
+const YearToDate = {
+  type: Joi.string().valid('year_to_date'),
+};
+
+const QuarterToDate = {
+  type: Joi.string().valid('quarter_to_date'),
+};
+
+const MonthToDate = {
+  type: Joi.string().valid('month_to_date'),
+};
+
+const ToDate = {
+  type: Joi.string().valid('to_date'),
+  granularity: GranularitySchema,
+};
 
 const BaseMeasure = {
   aliases: Joi.array().items(Joi.string()),
@@ -125,11 +210,18 @@ const BaseMeasure = {
   ),
   title: Joi.string(),
   description: Joi.string(),
-  rollingWindow: Joi.object().keys({
-    trailing: timeInterval,
-    leading: timeInterval,
-    offset: Joi.any().valid('start', 'end')
-  }),
+  rollingWindow: Joi.alternatives().conditional(
+    Joi.ref('.type'), [
+      { is: 'year_to_date', then: YearToDate },
+      { is: 'quarter_to_date', then: QuarterToDate },
+      { is: 'month_to_date', then: MonthToDate },
+      { is: 'to_date', then: ToDate },
+      { is: 'fixed',
+        then: FixedRollingWindow,
+        otherwise: FixedRollingWindow
+      }
+    ]
+  ),
   drillMemberReferences: Joi.func(),
   drillMembers: Joi.func(),
   drillFilters: Joi.array().items(
@@ -168,7 +260,7 @@ const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
   Joi.object().keys({
     sql: Joi.func().required(),
-    // We dont support timezone for this, because it's useless
+    // We don't support timezone for this, because it's useless
     // We cannot support cron interval
     every: everyInterval,
   }),
@@ -215,6 +307,10 @@ const BasePreAggregationWithoutPartitionGranularity = {
   },
   readOnly: Joi.boolean().strict(),
   streamOffset: Joi.any().valid('earliest', 'latest'),
+  outputColumnTypes: Joi.array().items(Joi.object().keys({
+    member: Joi.func().required(),
+    type: Joi.string().required()
+  })),
 };
 
 const BasePreAggregation = {
@@ -252,10 +348,8 @@ const OriginalSqlSchema = condition(
   }),
 );
 
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
-
 const ReferencesFields = ['timeDimensionReference', 'rollupReferences', 'measureReferences', 'dimensionReferences', 'segmentReferences'];
-const NonReferencesFields = ['timeDimension', 'rollups', 'measures', 'dimensions', 'segments'];
+const NonReferencesFields = ['timeDimension', 'timeDimensions', 'rollups', 'measures', 'dimensions', 'segments'];
 
 function hasAnyField(fields, s) {
   return !fields.every((f) => !defined(s[f]));
@@ -348,7 +442,7 @@ const RollupLambdaSchema = condition(
 );
 
 const RollUpSchema = condition(
-  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensionReference),
+  (s) => defined(s.granularity) || defined(s.timeDimension) || defined(s.timeDimensions) || defined(s.timeDimensionReference),
   condition(
     (s) => defined(s.timeDimensionReference),
     inherit(BasePreAggregation, {
@@ -359,31 +453,51 @@ const RollUpSchema = condition(
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
-    // Rollup without References postfix
-    inherit(BasePreAggregation, {
-      type: Joi.any().valid('rollup').required(),
-      timeDimension: Joi.func().required(),
-      allowNonStrictDateRangeMatch: Joi.bool(),
-      granularity: GranularitySchema,
-      measures: Joi.func(),
-      dimensions: Joi.func(),
-      segments: Joi.func(),
-    })
+    condition(
+      (s) => defined(s.timeDimension),
+      // Rollup without References postfix
+      inherit(BasePreAggregation, {
+        type: Joi.any().valid('rollup').required(),
+        timeDimension: Joi.func().required(),
+        allowNonStrictDateRangeMatch: Joi.bool(),
+        granularity: GranularitySchema,
+        measures: Joi.func(),
+        dimensions: Joi.func(),
+        segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
+      }),
+      // Rollup with multiple time dimensions
+      inherit(BasePreAggregation, {
+        type: Joi.any().valid('rollup').required(),
+        timeDimensions: Joi.array().items(Joi.object().keys({
+          dimension: Joi.func(),
+          granularity: GranularitySchema,
+        })),
+        allowNonStrictDateRangeMatch: Joi.bool(),
+        measures: Joi.func(),
+        dimensions: Joi.func(),
+        segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
+      })
+    )
   ),
   Joi.alternatives().try(
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func()
+      segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
-      segments: Joi.func()
+      segments: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     })
   )
 );
@@ -440,7 +554,34 @@ const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
 );
 
-const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(
+const postAggregateMeasureType = Joi.string().valid(
+  'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
+  'rank'
+);
+
+const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.postAggregate'), [
+  {
+    is: true,
+    then: inherit(BaseMeasure, {
+      postAggregate: Joi.boolean().strict(),
+      type: postAggregateMeasureType.required(),
+      sql: Joi.func(), // TODO .required(),
+      groupBy: Joi.func(),
+      reduceBy: Joi.func(),
+      addGroupBy: Joi.func(),
+      timeShift: Joi.array().items(Joi.object().keys({
+        timeDimension: Joi.func().required(),
+        interval: regexTimeInterval.required(),
+        type: Joi.string().valid('next', 'prior').required(),
+      })),
+      // TODO validate for order window functions
+      orderBy: Joi.array().items(Joi.object().keys({
+        sql: Joi.func().required(),
+        dir: Joi.string().valid('asc', 'desc')
+      })),
+    })
+  }
+]).conditional(
   Joi.ref('.type'), [
     {
       is: 'count',
@@ -534,10 +675,21 @@ const baseSchema = {
     }),
     inherit(BaseDimension, {
       sql: Joi.func().required()
+    }),
+    inherit(BaseDimension, {
+      postAggregate: Joi.boolean().valid(true),
+      type: Joi.any().valid('number').required(),
+      sql: Joi.func().required(),
+      addGroupBy: Joi.func(),
     })
   )),
   segments: SegmentsSchema,
   preAggregations: PreAggregationsAlternatives,
+  hierarchies: Joi.array().items(Joi.object().keys({
+    name: Joi.string().required(),
+    title: Joi.string(),
+    levels: Joi.func()
+  })),
 };
 
 const cubeSchema = inherit(baseSchema, {

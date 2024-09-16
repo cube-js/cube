@@ -103,73 +103,23 @@ which is located in a parent directory.
 ├── README.md
 ├── cube.js
 ├── package.json
-└── model
-    ├── utils.js
-    └── sales
+└── model/
+    ├── shared_utils/
+    │   └── utils.js
+    └── sales/
         └── orders.js
 ```
 
 ```javascript
 // in model/sales/orders.js
-import { capitalize } from "./schema_utils";
+import { capitalize } from "./shared_utils/utils";
 ```
 
 ```javascript
-// in model/utils.js
+// in model/shared_utils/utils.js
 export const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 ```
 
-### Expose environment variables to data model files
-
-A common use-case is to disable pre-aggregations unless running in "production"
-or "staging" environments. The best approach is to add an environment variable
-and make it available in data model files.
-
-In the example below we have the following file structure:
-
-```tree
-.
-├── README.md
-├── cube.js
-├── package.json
-├── utils.js
-└── model
-    └── sales
-        └── orders.js
-```
-
-In the `utils.js` file we read the environment variable and expose it. We will
-default the environment variable to the value `dev`.
-
-```javascript
-// in utils.js
-const environment =
-  typeof process.env.ENVIRONMENT === "undefined"
-    ? "dev"
-    : process.env.ENVIRONMENT.toLowerCase();
-exports.environment = () => environment;
-```
-
-In the data model file, the definition will change depending on the value of the
-environment value.
-
-```javascript
-// in model/sales/orders.js
-import { environment } from "../utils";
-const isProdOrStaging = ["prod", "staging"].includes(environment());
-
-cube(`orders`, {
-  // ...
-
-  pre_aggregations: isProdOrStaging
-    ? {
-        main: {
-          // ...
-        },
-      }
-    : {}, // No pre-aggregations unless environment is prod or stagging
-});
-```
 
 [mdn-js-es6-export]:
   https://developer.mozilla.org/en-US/docs/web/javascript/reference/statements/export

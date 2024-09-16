@@ -1,6 +1,5 @@
 use crate::{
     compile::{
-        engine::provider::CubeContext,
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
             expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
@@ -10,6 +9,7 @@ use crate::{
             TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
             TimeDimensionName, VirtualFieldCube, VirtualFieldName,
         },
+        CubeContext,
     },
     transport::ext::{V1CubeMetaDimensionExt, V1CubeMetaMeasureExt, V1CubeMetaSegmentExt},
     var_iter, var_list_iter, CubeError,
@@ -29,12 +29,16 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{Analysis, DidMerge, EGraph, Id};
-use std::{fmt::Debug, ops::Index, sync::Arc};
+use hashbrown;
+use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
+
+pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
+    pub iteration_timestamp: usize,
     pub original_expr: Option<OriginalExpr>,
-    pub member_name_to_expr: Option<Vec<(Option<String>, Member, Expr)>>,
+    pub member_name_to_expr: Option<MemberNamesToExpr>,
     pub trivial_push_down: Option<usize>,
     pub column: Option<Column>,
     pub expr_to_alias: Option<Vec<(Expr, String, Option<bool>)>>,
@@ -50,6 +54,18 @@ pub struct LogicalPlanData {
 pub enum OriginalExpr {
     Expr(Expr),
     List(Vec<Expr>),
+}
+
+#[derive(Clone, Debug)]
+pub struct MemberNamesToExpr {
+    /// List of MemberNameToExpr.
+    pub list: Vec<MemberNameToExpr>,
+    /// Results of lookup_member_by_column_name represented as indexes into `list`.
+    // Note that using Vec<(String, usize)> had nearly identical performance the last time that was
+    // benchmarked.
+    pub cached_lookups: hashbrown::HashMap<String, usize>,
+    /// The lookups in [uncached_lookups_offset, list.len()) are not completely cached.
+    pub uncached_lookups_offset: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -98,27 +114,28 @@ impl Member {
     pub fn add_to_egraph(
         &self,
         egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        flat_list: bool,
     ) -> Result<Id, CubeError> {
         match self {
             Member::Dimension { name, expr } => {
                 let dimension_name = egraph.add(LogicalPlanLanguage::DimensionName(DimensionName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Dimension([dimension_name, expr])))
             }
             Member::Measure { name, expr } => {
                 let measure_name = egraph.add(LogicalPlanLanguage::MeasureName(MeasureName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Measure([measure_name, expr])))
             }
             Member::Segment { name, expr } => {
                 let segment_name = egraph.add(LogicalPlanLanguage::SegmentName(SegmentName(
                     name.to_string(),
                 )));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::Segment([segment_name, expr])))
             }
             Member::TimeDimension {
@@ -138,7 +155,7 @@ impl Member {
                     egraph.add(LogicalPlanLanguage::TimeDimensionDateRange(
                         TimeDimensionDateRange(date_range.clone()),
                     ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::TimeDimension([
                     time_dimension_name,
                     time_dimension_granularity,
@@ -150,7 +167,7 @@ impl Member {
                 let change_user_cube = egraph.add(LogicalPlanLanguage::ChangeUserCube(
                     ChangeUserCube(cube.to_string()),
                 ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::ChangeUser([change_user_cube, expr])))
             }
             Member::LiteralMember {
@@ -165,7 +182,7 @@ impl Member {
                     egraph.add(LogicalPlanLanguage::LiteralMemberRelation(
                         LiteralMemberRelation(relation.clone()),
                     ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::LiteralMember([
                     literal_member_value,
                     expr,
@@ -179,7 +196,7 @@ impl Member {
                 let virtual_field_cube = egraph.add(LogicalPlanLanguage::VirtualFieldCube(
                     VirtualFieldCube(cube.to_string()),
                 ));
-                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr)?;
+                let expr = LogicalPlanToLanguageConverter::add_expr(egraph, &expr, flat_list)?;
                 Ok(egraph.add(LogicalPlanLanguage::VirtualField([
                     virtual_field_name,
                     virtual_field_cube,
@@ -218,6 +235,9 @@ impl Member {
 
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
+    /* This is 0, when creating the EGraph.  It's set to 1 before iteration 0,
+    2 before the iteration 1, etc. */
+    pub iteration_timestamp: usize,
     cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
@@ -249,6 +269,7 @@ impl<'a> Index<Id> for SingleNodeIndex<'a> {
 impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
+            iteration_timestamp: 0,
             cube_context,
             planner,
         }
@@ -392,9 +413,19 @@ impl LogicalPlanAnalysis {
     fn make_member_name_to_expr(
         egraph: &EGraph<LogicalPlanLanguage, Self>,
         enode: &LogicalPlanLanguage,
-    ) -> Option<Vec<(Option<String>, Member, Expr)>> {
+    ) -> Option<MemberNamesToExpr> {
         let column_name = |id| egraph.index(id).data.column.clone();
-        let id_to_column_name_to_expr = |id| egraph.index(id).data.member_name_to_expr.clone();
+        let id_to_column_name_to_expr = |id| {
+            Some(
+                egraph
+                    .index(id)
+                    .data
+                    .member_name_to_expr
+                    .as_ref()?
+                    .list
+                    .clone(),
+            )
+        };
         let original_expr = |id| {
             egraph
                 .index(id)
@@ -425,7 +456,7 @@ impl LogicalPlanAnalysis {
                 })
         };
         let mut map = Vec::new();
-        match enode {
+        let list = match enode {
             LogicalPlanLanguage::Measure(params) => {
                 if let Some(_) = column_name(params[1]) {
                     let expr = original_expr(params[1])?;
@@ -647,7 +678,7 @@ impl LogicalPlanAnalysis {
                         .next()
                         .unwrap();
                     let expr = original_expr(params[1])?;
-                    let name = expr_column_name(expr, &None);
+                    let name = expr_column_name(&expr, &None);
                     let column_expr = Expr::Column(Column {
                         relation: relation.clone(),
                         name,
@@ -677,7 +708,12 @@ impl LogicalPlanAnalysis {
                 Some(map)
             }
             _ => None,
-        }
+        };
+        list.map(|x| MemberNamesToExpr {
+            list: x,
+            cached_lookups: hashbrown::HashMap::new(),
+            uncached_lookups_offset: 0,
+        })
     }
 
     fn make_filter_operators(
@@ -845,6 +881,10 @@ impl LogicalPlanAnalysis {
                 push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
+            LogicalPlanLanguage::NegativeExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
+                Some(vec)
+            }
             LogicalPlanLanguage::CaseExpr(params) => {
                 push_referenced_columns(params[0], &mut vec)?;
                 push_referenced_columns(params[1], &mut vec)?;
@@ -865,6 +905,10 @@ impl LogicalPlanAnalysis {
             }
             LogicalPlanLanguage::AggregateFunctionExpr(params) => {
                 push_referenced_columns(params[1], &mut vec)?;
+                Some(vec)
+            }
+            LogicalPlanLanguage::GroupingSetExpr(params) => {
+                push_referenced_columns(params[0], &mut vec)?;
                 Some(vec)
             }
             LogicalPlanLanguage::LiteralExpr(_) => Some(vec),
@@ -889,6 +933,14 @@ impl LogicalPlanAnalysis {
             | LogicalPlanLanguage::AggregateUDFExprArgs(params)
             | LogicalPlanLanguage::ScalarFunctionExprArgs(params)
             | LogicalPlanLanguage::ScalarUDFExprArgs(params) => {
+                for p in params.iter() {
+                    vec.extend(referenced_columns(*p)?.into_iter());
+                }
+
+                Some(vec)
+            }
+
+            LogicalPlanLanguage::GroupingSetExprMembers(params) => {
                 for p in params.iter() {
                     vec.extend(referenced_columns(*p)?.into_iter());
                 }
@@ -972,7 +1024,6 @@ impl LogicalPlanAnalysis {
                         || &fun.name == "date_sub"
                         || &fun.name == "date"
                         || &fun.name == "date_to_timestamp"
-                        || &fun.name == "interval_mul"
                     {
                         Self::eval_constant_expr(&egraph, &expr)
                     } else {
@@ -1062,22 +1113,6 @@ impl LogicalPlanAnalysis {
                     &SingleNodeIndex { egraph },
                 )
                 .ok()?;
-
-                match &expr {
-                    Expr::BinaryExpr { left, right, .. } => match (&**left, &**right) {
-                        (Expr::Literal(ScalarValue::IntervalYearMonth(_)), Expr::Literal(_))
-                        | (Expr::Literal(ScalarValue::IntervalDayTime(_)), Expr::Literal(_))
-                        | (Expr::Literal(ScalarValue::IntervalMonthDayNano(_)), Expr::Literal(_))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalYearMonth(_)))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalDayTime(_)))
-                        | (Expr::Literal(_), Expr::Literal(ScalarValue::IntervalMonthDayNano(_))) => {
-                            return None
-                        }
-                        _ => (),
-                    },
-                    _ => (),
-                }
-
                 Self::eval_constant_expr(&egraph, &expr)
             }
             _ => None,
@@ -1218,29 +1253,41 @@ impl LogicalPlanAnalysis {
         }
     }
 
-    fn merge_option_field<T: Clone + Debug>(
-        &mut self,
-        a: &mut LogicalPlanData,
-        mut b: LogicalPlanData,
-        field: fn(&mut LogicalPlanData) -> &mut Option<T>,
-    ) -> (DidMerge, LogicalPlanData) {
-        let res = if field(a).is_none() && field(&mut b).is_some() {
-            *field(a) = field(&mut b).clone();
+    #[inline]
+    fn merge_option_field<T>(&mut self, field_a: &mut Option<T>, field_b: Option<T>) -> DidMerge {
+        let res = if field_a.is_none() && field_b.is_some() {
+            *field_a = field_b;
             DidMerge(true, false)
-        } else if field(a).is_some() {
+        } else if field_a.is_some() {
             DidMerge(false, true)
         } else {
             DidMerge(false, false)
         };
-        (res, b)
+
+        res
+    }
+
+    fn merge_max_field<T: Ord>(&mut self, a: &mut T, mut b: T) -> DidMerge {
+        match Ord::cmp(a, &mut b) {
+            Ordering::Less => {
+                *a = b;
+                DidMerge(true, false)
+            }
+            Ordering::Equal => DidMerge(false, false),
+            Ordering::Greater => DidMerge(false, true),
+        }
     }
 }
 
 impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
     type Data = LogicalPlanData;
 
-    fn make(egraph: &EGraph<LogicalPlanLanguage, Self>, enode: &LogicalPlanLanguage) -> Self::Data {
+    fn make(
+        egraph: &mut EGraph<LogicalPlanLanguage, Self>,
+        enode: &LogicalPlanLanguage,
+    ) -> Self::Data {
         LogicalPlanData {
+            iteration_timestamp: egraph.analysis.iteration_timestamp,
             original_expr: Self::make_original_expr(egraph, enode),
             member_name_to_expr: Self::make_member_name_to_expr(egraph, enode),
             trivial_push_down: Self::make_trivial_push_down(egraph, enode),
@@ -1256,18 +1303,19 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
     }
 
     fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        let (original_expr, b) = self.merge_option_field(a, b, |d| &mut d.original_expr);
-        let (member_name_to_expr, b) =
-            self.merge_option_field(a, b, |d| &mut d.member_name_to_expr);
-        let (trivial_push_down, b) = self.merge_option_field(a, b, |d| &mut d.trivial_push_down);
-        let (column_name_to_alias, b) = self.merge_option_field(a, b, |d| &mut d.expr_to_alias);
-        let (referenced_columns, b) = self.merge_option_field(a, b, |d| &mut d.referenced_expr);
-        let (constant_in_list, b) = self.merge_option_field(a, b, |d| &mut d.constant_in_list);
-        let (constant, b) = self.merge_option_field(a, b, |d| &mut d.constant);
-        let (cube_reference, b) = self.merge_option_field(a, b, |d| &mut d.cube_reference);
-        let (is_empty_list, b) = self.merge_option_field(a, b, |d| &mut d.is_empty_list);
-        let (filter_operators, b) = self.merge_option_field(a, b, |d| &mut d.filter_operators);
-        let (column_name, _) = self.merge_option_field(a, b, |d| &mut d.column);
+        let original_expr = self.merge_option_field(&mut a.original_expr, b.original_expr);
+        let member_name_to_expr =
+            self.merge_option_field(&mut a.member_name_to_expr, b.member_name_to_expr);
+        let trivial_push_down =
+            self.merge_option_field(&mut a.trivial_push_down, b.trivial_push_down);
+        let column_name_to_alias = self.merge_option_field(&mut a.expr_to_alias, b.expr_to_alias);
+        let referenced_columns = self.merge_option_field(&mut a.referenced_expr, b.referenced_expr);
+        let constant_in_list = self.merge_option_field(&mut a.constant_in_list, b.constant_in_list);
+        let constant = self.merge_option_field(&mut a.constant, b.constant);
+        let cube_reference = self.merge_option_field(&mut a.cube_reference, b.cube_reference);
+        let is_empty_list = self.merge_option_field(&mut a.is_empty_list, b.is_empty_list);
+        let filter_operators = self.merge_option_field(&mut a.filter_operators, b.filter_operators);
+        let column_name = self.merge_option_field(&mut a.column, b.column);
         original_expr
             | member_name_to_expr
             | trivial_push_down
@@ -1279,6 +1327,7 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
             | column_name
             | filter_operators
             | is_empty_list
+            | self.merge_max_field(&mut a.iteration_timestamp, b.iteration_timestamp)
     }
 
     fn modify(egraph: &mut EGraph<LogicalPlanLanguage, Self>, id: Id) {
@@ -1308,7 +1357,14 @@ impl Analysis<LogicalPlanLanguage> for LogicalPlanAnalysis {
                 )));
                 let alias_expr = egraph.add(LogicalPlanLanguage::AliasExpr([literal_expr, alias]));
                 egraph.union(id, alias_expr);
+                // egraph[id]
+                //     .nodes
+                //     .retain(|n| matches!(n, LogicalPlanLanguage::AliasExpr(_)));
             }
         }
+    }
+
+    fn allow_ematching_cycles(&self) -> bool {
+        false
     }
 }

@@ -55,7 +55,7 @@ cubes:
 
     joins:
       - name: users
-        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        sql: "{CUBE}.USER_ID = {users}.ID"
         relationship: many_to_one
 
     dimensions:
@@ -112,7 +112,7 @@ within the `measures` block.
 ```yaml
 - name: completed_percentage
   type: number
-  sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+  sql: "(100.0 * {CUBE.completed_count} / NULLIF({CUBE.count}, 0))"
   format: percent
 ```
 
@@ -127,7 +127,7 @@ cubes:
 
     joins:
       - name: users
-        sql: "{CUBE}.USER_ID = {users}.USER_ID"
+        sql: "{CUBE}.USER_ID = {users}.ID"
         relationship: many_to_one
 
     dimensions:
@@ -159,7 +159,7 @@ cubes:
 
       - name: completed_percentage
         type: number
-        sql: "({completed_count} / NULLIF({count}, 0)) * 100.0"
+        sql: "(100.0 * {CUBE.completed_count} / NULLIF({CUBE.count}, 0))"
         format: percent
 ```
 

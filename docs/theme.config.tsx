@@ -6,9 +6,31 @@ import { SearchIcon, SearchTrigger } from '@cube-dev/marketing-ui';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { LogoWithVersion } from '@/components/common/LogoWithVersion/LogoWithVersion';
 
+// Copied from https://cube.dev/blog source code to match its style.
+// For .Button--size-s class, font-size was reduced from 16px to 15px because,
+// unlike in the docs, Cera Pro font is used in https://cube.dev/blog
+import { Button as BlogButton } from '@/components/common/BlogButton/Button';
+
 const repo = "https://github.com/cube-js/cube";
 const branch = "master";
 const path = "/docs/";
+
+const GoogleTagManager = () => (
+  <>
+    <script dangerouslySetInnerHTML={{ __html: `
+      (function(w,d,s,l,i){
+        w[l]=w[l]||[];
+        w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});
+        var f=d.getElementsByTagName(s)[0],
+            j=d.createElement(s),
+            dl=l!='dataLayer'?'&l='+l:'';
+        j.async=true;
+        j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;
+        f.parentNode.insertBefore(j,f);
+      })(window,document,'script','dataLayer','GTM-52W7VM2');
+    `}} ></script>
+  </>
+)
 
 const config: DocsThemeConfig = {
   logo: LogoWithVersion,
@@ -24,6 +46,7 @@ const config: DocsThemeConfig = {
   head: (
     <>
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <GoogleTagManager />
     </>
   ),
   useNextSeoProps: () => {
@@ -71,6 +94,29 @@ const config: DocsThemeConfig = {
     defaultTheme: "light",
     forcedTheme: "light",
   },
+  navbar: {
+    extraContent: (
+      <div style={{ marginLeft: '24px' }}>
+        <BlogButton
+          color="pink"
+          size="s"
+          href="https://cubecloud.dev/auth/signup?utm_source=docs&utm_medium=site&UTM_Publisher=Cube"
+        >
+          Try Cube for Free
+        </BlogButton>
+      </div>
+    )
+  },
+  toc: {
+    extraContent: (
+      <div>
+        <br/>
+        <a target="_blank" href="https://cube.dev/events/cube-rollup-london?ref=github-readme">
+          <img src="https://ucarecdn.com/f90c6d06-abac-45d5-92be-4217ee26f096/"/>
+        </a>
+      </div>
+    )
+  }
 };
 
 export default config;

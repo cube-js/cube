@@ -131,12 +131,18 @@ pub async fn read_format<Reader: AsyncReadExt + Unpin>(
 
 /// Same as the write_message function, but it doesn’t append header for frame (code + size).
 pub async fn write_direct<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    partial_write: &mut BytesMut,
     writer: &mut Writer,
     message: Message,
 ) -> Result<(), ProtocolError> {
+    let mut bytes_mut = BytesMut::new();
     match message.serialize() {
         Some(buffer) => {
-            writer.write_all(&buffer).await?;
+            // TODO: Yet another memory copy.
+            bytes_mut.extend_from_slice(&buffer);
+            *partial_write = bytes_mut;
+            writer.write_all_buf(partial_write).await?;
+            *partial_write = BytesMut::new();
             writer.flush().await?;
         }
         _ => {}
@@ -170,8 +176,11 @@ fn message_serialize<Message: Serialize>(
     Ok(())
 }
 
-/// Write multiple F messages with frame's headers to the writer.
+/// Write multiple F messages with frame's headers to the writer.  The variable
+/// `*partial_write` is set for graceful shutdown attempts with partial writes.
+/// Upon a successful write, it is left empty.
 pub async fn write_messages<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    partial_write: &mut BytesMut,
     writer: &mut Writer,
     messages: Vec<Message>,
 ) -> Result<(), ProtocolError> {
@@ -181,20 +190,34 @@ pub async fn write_messages<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
         message_serialize(message, &mut buffer)?;
     }
 
-    writer.write_all(&buffer).await?;
+    // For simplicity we obviously don't save message boundary data with
+    // `*partial_write`, which means that a AdminShutdown fatal error message
+    // would have to be written after _all_ these messages.
+    *partial_write = buffer;
+    writer.write_all_buf(partial_write).await?;
+    *partial_write = BytesMut::new();
+
+    // (We _could_ reuse the buffer in *partial_write, doing fewer allocations -- after
+    // making other serialization logic allocate less and thinking about memory usage.)
+
     writer.flush().await?;
     Ok(())
 }
 
-/// Write single F message with frame's headers to the writer.
+/// Write single F message with frame's headers to the writer.  As with the
+/// function `write_messages`, `*partial_write` is set for graceful shutdown
+/// attempts with partial writes.  Upon a successful write, it is left empty.
 pub async fn write_message<Writer: AsyncWriteExt + Unpin, Message: Serialize>(
+    partial_write: &mut BytesMut,
     writer: &mut Writer,
     message: Message,
 ) -> Result<(), ProtocolError> {
     let mut buffer = BytesMut::with_capacity(64);
     message_serialize(message, &mut buffer)?;
 
-    writer.write_all(&buffer).await?;
+    *partial_write = buffer;
+    writer.write_all_buf(partial_write).await?;
+    *partial_write = BytesMut::new();
     writer.flush().await?;
     Ok(())
 }

@@ -31,6 +31,7 @@ class OracleFilter extends BaseFilter {
 export class OracleQuery extends BaseQuery {
   /**
    * "LIMIT" on Oracle it's illegal
+   * TODO replace with limitOffsetClause override
    */
   public groupByDimensionLimit() {
     const limitClause = this.rowLimit === null ? '' : ` FETCH NEXT ${this.rowLimit && parseInt(this.rowLimit, 10) || 10000} ROWS ONLY`;

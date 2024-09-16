@@ -13,6 +13,8 @@ export type SegmentDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
+  // TODO should we have it here?
+  postAggregate?: boolean,
 };
 
 export type DimensionDefinition = {
@@ -21,6 +23,20 @@ export type DimensionDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
+  postAggregate?: boolean,
+  shiftInterval?: string,
+};
+
+export type TimeShiftDefinition = {
+  timeDimension: Function,
+  interval: string,
+  type: 'next' | 'prior',
+};
+
+export type TimeShiftDefinitionReference = {
+  timeDimension: string,
+  interval: string,
+  type: 'next' | 'prior',
 };
 
 export type MeasureDefinition = {
@@ -30,7 +46,16 @@ export type MeasureDefinition = {
   rollingWindow?: any
   filters?: any
   primaryKey?: true,
-  drillFilters?: any
+  drillFilters?: any,
+  postAggregate?: boolean,
+  groupBy?: Function,
+  reduceBy?: Function,
+  addGroupBy?: Function,
+  timeShift?: TimeShiftDefinition[],
+  groupByReferences?: string[],
+  reduceByReferences?: string[],
+  addGroupByReferences?: string[],
+  timeShiftReferences?: TimeShiftDefinitionReference[],
 };
 
 export class CubeEvaluator extends CubeSymbols {
@@ -46,13 +71,22 @@ export class CubeEvaluator extends CubeSymbols {
     super(true);
   }
 
-  public compile(cubes: any, errorReporter: ErrorReporter) {
+  public compile(cubes: any[], errorReporter: ErrorReporter) {
     super.compile(cubes, errorReporter);
-    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube));
+    const validCubes = this.cubeList.filter(cube => this.cubeValidator.isCubeValid(cube)).sort((a, b) => {
+      if (a.isView) {
+        return 1;
+      } else if (!a.isView && !b.isView) {
+        return 0;
+      } else {
+        return -1;
+      }
+    });
 
-    Object.values(validCubes).map((cube) => this.prepareCube(cube, errorReporter));
+    for (const cube of validCubes) {
+      this.evaluatedCubes[cube.name] = this.prepareCube(cube, errorReporter);
+    }
 
-    this.evaluatedCubes = R.fromPairs(validCubes.map(v => [v.name, v]));
     this.byFileName = R.groupBy(v => v.fileName, validCubes);
     this.primaryKeys = R.fromPairs(
       validCubes.map((v) => {
@@ -72,6 +106,88 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareMembers(cube.measures, cube, errorReporter);
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
+
+    this.evaluatePostAggregateReferences(cube.name, cube.measures);
+    this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+
+    this.prepareHierarchies(cube);
+
+    return cube;
+  }
+
+  private prepareHierarchies(cube: any) {
+    if (Array.isArray(cube.hierarchies)) {
+      cube.hierarchies = cube.hierarchies.map(hierarchy => ({
+        ...hierarchy,
+        levels: this.evaluateReferences(
+          cube.name, hierarchy.levels, { originalSorting: true }
+        )
+      }));
+    }
+
+    if (cube.isView && (cube.includedMembers || []).length) {
+      const includedCubeNames: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath.split('.')[0]));
+      const includedMemberPaths: string[] = R.uniq(cube.includedMembers.map(it => it.memberPath));
+
+      if (!cube.hierarchies) {
+        for (const cubeName of includedCubeNames) {
+          const { hierarchies } = this.evaluatedCubes[cubeName] || {};
+
+          if (Array.isArray(hierarchies) && hierarchies.length) {
+            const filteredHierarchies = hierarchies.map(it => {
+              const levels = it.levels.filter(level => includedMemberPaths.includes(level));
+
+              return {
+                ...it,
+                levels
+              };
+            }).filter(it => it.levels.length);
+
+            cube.hierarchies = [...(cube.hierarchies || []), ...filteredHierarchies];
+          }
+        }
+      }
+
+      cube.hierarchies = (cube.hierarchies || []).map((hierarchy) => ({
+        ...hierarchy,
+        levels: hierarchy.levels.map((level) => {
+          const member = cube.includedMembers.find(m => m.memberPath === level);
+
+          if (!member) {
+            return null;
+          }
+
+          return [cube.name, member.name].join('.');
+        }).filter(Boolean)
+      }));
+    }
+
+    return [];
+  }
+
+  private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
+    if (!obj) {
+      return;
+    }
+
+    // eslint-disable-next-line no-restricted-syntax
+    for (const member of Object.values(obj)) {
+      if (member.postAggregate) {
+        if (member.groupBy) {
+          member.groupByReferences = this.evaluateReferences(cubeName, member.groupBy);
+        }
+        if (member.reduceBy) {
+          member.reduceByReferences = this.evaluateReferences(cubeName, member.reduceBy);
+        }
+        if (member.addGroupBy) {
+          member.addGroupByReferences = this.evaluateReferences(cubeName, member.addGroupBy);
+        }
+        if (member.timeShift) {
+          member.timeShiftReferences = member.timeShift
+            .map(s => ({ ...s, timeDimension: this.evaluateReferences(cubeName, s.timeDimension) }));
+        }
+      }
+    }
   }
 
   protected prepareJoins(cube: any, _errorReporter: ErrorReporter) {
@@ -107,6 +223,11 @@ export class CubeEvaluator extends CubeSymbols {
         if (preAggregation.timeDimension) {
           preAggregation.timeDimensionReference = preAggregation.timeDimension;
           delete preAggregation.timeDimension;
+        }
+
+        if (preAggregation.timeDimensions) {
+          preAggregation.timeDimensionReferences = preAggregation.timeDimensions;
+          delete preAggregation.timeDimensions;
         }
 
         if (preAggregation.dimensions) {
@@ -151,6 +272,12 @@ export class CubeEvaluator extends CubeSymbols {
 
           preAggregation.refreshRangeEnd = preAggregation.buildRangeEnd;
           delete preAggregation.buildRangeEnd;
+        }
+
+        if (preAggregation.outputColumnTypes) {
+          preAggregation.outputColumnTypes.forEach(column => {
+            column.name = this.evaluateReferences(cube.name, column.member, { originalSorting: true });
+          });
         }
       }
     }
@@ -293,15 +420,15 @@ export class CubeEvaluator extends CubeSymbols {
     return Object.keys(this.evaluatedCubes);
   }
 
-  public isMeasure(measurePath: string): boolean {
+  public isMeasure(measurePath: string | string[]): boolean {
     return this.isInstanceOfType('measures', measurePath);
   }
 
-  public isDimension(path: string): boolean {
+  public isDimension(path: string | string[]): boolean {
     return this.isInstanceOfType('dimensions', path);
   }
 
-  public isSegment(path: string): boolean {
+  public isSegment(path: string | string[]): boolean {
     return this.isInstanceOfType('segments', path);
   }
 
@@ -427,10 +554,23 @@ export class CubeEvaluator extends CubeSymbols {
   }
 
   protected evaluatePreAggregationReferences(cube, aggregation) {
-    const timeDimensions = aggregation.timeDimensionReference ? [{
-      dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
-      granularity: aggregation.granularity
-    }] : [];
+    const timeDimensions: any = [];
+
+    if (aggregation.timeDimensionReference) {
+      timeDimensions.push({
+        dimension: this.evaluateReferences(cube, aggregation.timeDimensionReference),
+        granularity: aggregation.granularity
+      });
+    } else if (aggregation.timeDimensionReferences) {
+      // eslint-disable-next-line guard-for-in
+      for (const timeDimensionReference of aggregation.timeDimensionReferences) {
+        timeDimensions.push({
+          dimension: this.evaluateReferences(cube, timeDimensionReference.dimension),
+          granularity: timeDimensionReference.granularity
+        });
+      }
+    }
+
     return {
       allowNonStrictDateRangeMatch: aggregation.allowNonStrictDateRangeMatch,
       dimensions:

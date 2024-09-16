@@ -32,7 +32,7 @@ services:
 
   db:
     container_name: birdbox-db
-    image: postgres:13
+    image: hbontempo/postgres-hll:16-v2.18
     environment:
       - POSTGRES_PASSWORD=test
       - POSTGRES_USER=test

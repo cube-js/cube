@@ -274,7 +274,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -303,7 +303,7 @@ impl PostgresIntegrationTestSuite {
 
         let cancel_token = client.cancel_token();
         let cancel = async move {
-            sleep(Duration::from_millis(1000)).await;
+            sleep(Duration::from_millis(10000)).await;
 
             cancel_token.cancel_query(NoTls).await
         };
@@ -1167,7 +1167,8 @@ impl AsyncTestSuite for PostgresIntegrationTestSuite {
         self.test_simple_cursors_close_all().await?;
         self.test_simple_query_prepare().await?;
         self.test_snapshot_execute_query(
-            "SELECT COUNT(*) count, status FROM Orders GROUP BY status".to_string(),
+            "SELECT COUNT(*) count, status FROM Orders GROUP BY status ORDER BY count DESC"
+                .to_string(),
             None,
             false,
         )

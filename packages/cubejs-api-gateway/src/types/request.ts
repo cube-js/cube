@@ -52,6 +52,8 @@ interface Request extends ExpressRequest {
    */
   securityContext?: any,
 
+  requestStarted?: Date,
+
   /**
    * @deprecated
    */
@@ -59,9 +61,9 @@ interface Request extends ExpressRequest {
 }
 
 /**
- * Function that should provides basic query conversion mechanic.
+ * Function that should provide basic query conversion mechanic.
  * Used as a part of a main configuration object of the server-core
- * to provide extendabillity to a query processing logic.
+ * to provide extendability to a query processing logic.
  */
 type QueryRewriteFn =
   (query: Query, context: RequestContext) => Promise<Query>;
@@ -69,7 +71,7 @@ type QueryRewriteFn =
 /**
  * Function that should provides a logic for extracting security
  * context from the request. Used as a part of a main configuration
- * object of the server-core to provide extendabillity to a query
+ * object of the server-core to provide extendability to a query
  * security processing logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
@@ -78,31 +80,33 @@ type SecurityContextExtractorFn =
   (ctx: Readonly<RequestContext>) => any;
 
 /**
- * Function that should provides a logic for extracting request
- * extesion context from the request. Used as a part of a main
- * configuration object of the server-core to provide extendabillity
+ * Function that should provide a logic for extracting request
+ * extension context from the request. Used as a part of a main
+ * configuration object of the server-core to provide extendability
  * to a query processing logic.
  */
 type ExtendContextFn =
   (req: ExpressRequest) =>
     Promise<RequestExtension> | RequestExtension;
 
+type ErrorResponse = {
+  error: string,
+};
+
+type MetaResponse = { cubes: any[], compilerId?: string };
+type MetaResponseResultFn = (message: MetaResponse | ErrorResponse) => void;
+
 /**
  * Function that should provides a logic for the response result
  * processing. Used as a part of a main configuration object of the
- * server-core to provide extendabillity for this logic.
+ * server-core to provide extendability for this logic.
  * @todo any could be changed to unknown?
  * @todo Maybe we can add type limitations?
  */
 type ResponseResultFn =
   (
-    message: Record<string, any> | Record<string, any>[],
+    message: (Record<string, any> | Record<string, any>[]) | ErrorResponse,
     extra?: { status: number }
-  ) => void;
-
-type MetaResponseResultFn =
-  (
-    message: { cubes: any[], compilerId?: string }
   ) => void;
 
 /**
@@ -136,6 +140,7 @@ type SqlApiRequest = BaseRequest & {
   apiType?: ApiType;
   queryKey: any;
   streaming?: boolean;
+  memberExpressions?: boolean;
 };
 
 /**

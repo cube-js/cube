@@ -80,6 +80,7 @@ declare module '@cubejs-client/core' {
     credentials?: 'omit' | 'same-origin' | 'include';
     parseDateMeasures?: boolean;
     resType?: 'default' | 'compact';
+    castNumerics?: boolean;
   };
 
   export type LoadMethodOptions = {
@@ -786,7 +787,9 @@ declare module '@cubejs-client/core' {
     | 'afterDate'
     | 'afterOrOnDate';
 
-  export type TimeDimensionGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+  export type TimeDimensionPredefinedGranularity = 'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
+
+  export type TimeDimensionGranularity = TimeDimensionPredefinedGranularity | string;
 
   export type DateRange = string | [string, string];
 
