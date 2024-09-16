@@ -4,18 +4,19 @@ use std::collections::HashMap;
 use std::fmt::Display;
 
 use async_trait::async_trait;
-use cubeclient::models::{V1Error, V1LoadRequestQuery, V1LoadResponse, V1MetaResponse};
 use cubesql::compile::engine::df::scan::{MemberField, SchemaRef};
 use cubesql::compile::engine::df::wrapper::SqlQuery;
-use cubesql::transport::{SpanId, SqlGenerator, SqlResponse};
+use cubesql::transport::{
+    SpanId, SqlGenerator, SqlResponse, TransportLoadRequestQuery, TransportLoadResponse,
+    TransportMetaResponse,
+};
 use cubesql::{
     di_service,
     sql::AuthContextRef,
     transport::{CubeStreamReceiver, LoadRequestMeta, MetaContext, TransportService},
     CubeError,
 };
-use serde_derive::Deserialize;
-use serde_derive::Serialize;
+use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -77,7 +78,7 @@ struct CanSwitchUserForSessionRequest {
 #[derive(Debug, Serialize)]
 struct LoadRequest {
     request: TransportRequest,
-    query: V1LoadRequestQuery,
+    query: TransportLoadRequestQuery,
     #[serde(rename = "sqlQuery", skip_serializing_if = "Option::is_none")]
     sql_query: Option<(String, Vec<Option<String>>)>,
     session: SessionContext,
@@ -106,11 +107,6 @@ struct MetaRequest {
     only_compiler_id: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct SqlResponseSerialized {
-    sql: (String, Vec<String>),
-}
-
 #[async_trait]
 impl TransportService for NodeBridgeTransport {
     async fn meta(&self, ctx: AuthContextRef) -> Result<Arc<MetaContext>, CubeError> {
@@ -134,7 +130,8 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: false,
         })?;
-        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+
+        let response = call_js_with_channel_as_callback::<TransportMetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
             Some(extra.clone()),
@@ -234,7 +231,7 @@ impl TransportService for NodeBridgeTransport {
             },
             only_compiler_id: true,
         })?;
-        let response = call_js_with_channel_as_callback::<V1MetaResponse>(
+        let response = call_js_with_channel_as_callback::<TransportMetaResponse>(
             self.channel.clone(),
             self.on_meta.clone(),
             Some(extra.clone()),
@@ -256,7 +253,7 @@ impl TransportService for NodeBridgeTransport {
     async fn sql(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
         member_to_alias: Option<HashMap<String, String>>,
@@ -297,19 +294,6 @@ impl TransportService for NodeBridgeTransport {
         )
         .await?;
 
-        if let Some(error) = response.get("error").and_then(|e| e.as_str()) {
-            if let Some(stack) = response.get("stack").and_then(|e| e.as_str()) {
-                return Err(CubeError::user(format!(
-                    "Error during SQL generation: {}\n{}",
-                    error, stack
-                )));
-            }
-            return Err(CubeError::user(format!(
-                "Error during SQL generation: {}",
-                error
-            )));
-        }
-
         let sql = response
             .get("sql")
             .ok_or_else(|| CubeError::user(format!("No sql in response: {}", response)))?
@@ -346,11 +330,11 @@ impl TransportService for NodeBridgeTransport {
     async fn load(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,
-    ) -> Result<V1LoadResponse, CubeError> {
+    ) -> Result<TransportLoadResponse, CubeError> {
         trace!("[transport] Request ->");
 
         let native_auth = ctx
@@ -393,45 +377,50 @@ impl TransportService for NodeBridgeTransport {
                     continue;
                 }
             }
+
             let response: serde_json::Value = result?;
+
             #[cfg(debug_assertions)]
             trace!("[transport] Request <- {:?}", response);
             #[cfg(not(debug_assertions))]
             trace!("[transport] Request <- <hidden>");
 
-            let load_err = match serde_json::from_value::<V1LoadResponse>(response.clone()) {
-                Ok(r) => {
-                    return Ok(r);
+            if let Some(error_value) = response.get("error") {
+                match error_value {
+                    serde_json::Value::String(error) => {
+                        if error.to_lowercase() == *"continue wait" {
+                            debug!(
+                                "[transport] load - retrying request (continue wait) requestId: {}",
+                                request_id
+                            );
+
+                            continue;
+                        } else {
+                            return Err(CubeError::user(error.clone()));
+                        }
+                    }
+                    other => {
+                        error!(
+                            "[transport] load - strange response, success which contains error: {:?}",
+                            other
+                        );
+
+                        return Err(CubeError::internal(
+                            "Error response with broken data inside".to_string(),
+                        ));
+                    }
                 }
-                Err(err) => err,
             };
 
-            if let Ok(res) = serde_json::from_value::<V1Error>(response) {
-                if res.error.to_lowercase() == *"continue wait" {
-                    debug!(
-                        "[transport] load - retrying request (continue wait) requestId: {}",
-                        request_id
-                    );
-
-                    continue;
-                } else {
-                    error!(
-                        "[transport] load - strange response, success which contains error: {:?}",
-                        res
-                    );
-
-                    return Err(CubeError::internal(res.error));
-                }
-            };
-
-            return Err(CubeError::user(load_err.to_string()));
+            break serde_json::from_value::<TransportLoadResponse>(response)
+                .map_err(|err| CubeError::user(err.to_string()));
         }
     }
 
     async fn load_stream(
         &self,
         span_id: Option<Arc<SpanId>>,
-        query: V1LoadRequestQuery,
+        query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
         ctx: AuthContextRef,
         meta: LoadRequestMeta,

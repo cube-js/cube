@@ -21,7 +21,7 @@ function createApiGateway(handler: RequestHandler, logger: () => any, options: P
 
     public initApp(app: ExpressApplication) {
       const userMiddlewares: RequestHandler[] = [
-        this.checkAuthMiddleware,
+        this.checkAuth,
         this.requestContextMiddleware,
       ];
 
@@ -128,7 +128,7 @@ describe('test authorization', () => {
       .get('/test-auth-fake')
       .set('Authorization', `Authorization: ${badToken}`)
       .expect(403);
-      
+
     expect(loggerMock.mock.calls.length).toEqual(1);
     expect(handlerMock.mock.calls.length).toEqual(2);
 
@@ -247,6 +247,58 @@ describe('test authorization', () => {
     });
   });
 
+  test('custom checkAuth with async flow and return', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.securityContext);
+      expectSecurityContext(req.context.authInfo);
+
+      res.status(200).end();
+    });
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      checkAuth: async (req: Request, auth?: string) => {
+        if (auth) {
+          await pausePromise(500);
+
+          const securityContext = jwt.verify(auth, 'secret');
+
+          req.securityContext = {
+            uid: 'should not be visible',
+          };
+
+          return {
+            security_context: securityContext,
+          };
+        }
+
+        return {};
+      }
+    });
+
+    const token = generateAuthToken({ uid: 5, });
+
+    await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(200);
+
+    expect(handlerMock.mock.calls.length).toEqual(1);
+
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
+    // authInfo was deprecated, but should exist as computability
+    expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
+  });
+
   test('custom checkAuth with deprecated authInfo', async () => {
     const loggerMock = jest.fn(() => {
       //
@@ -331,110 +383,6 @@ describe('test authorization', () => {
 
     expect(handlerMock.mock.calls.length).toEqual(1);
 
-    expect(handlerMock.mock.calls[0][0].context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
-    // authInfo was deprecated, but should exists as computability
-    expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
-  });
-
-  test('custom checkAuthMiddleware with deprecated authInfo', async () => {
-    const loggerMock = jest.fn(() => {
-      //
-    });
-
-    const expectSecurityContext = (securityContext) => {
-      expect(securityContext.uid).toEqual(5);
-      expect(securityContext.iat).toBeDefined();
-      expect(securityContext.exp).toBeDefined();
-    };
-
-    const handlerMock = jest.fn((req, res) => {
-      expectSecurityContext(req.context.securityContext);
-      expectSecurityContext(req.context.authInfo);
-
-      res.status(200).end();
-    });
-
-    const { app } = createApiGateway(handlerMock, loggerMock, {
-      checkAuthMiddleware: (req: Request, res, next) => {
-        try {
-          if (req.headers.authorization) {
-            req.authInfo = jwt.verify(req.headers.authorization, 'secret');
-          }
-
-          next();
-        } catch (e) {
-          next(e);
-        }
-      }
-    });
-
-    const token = generateAuthToken({ uid: 5, });
-
-    await request(app)
-      .get('/test-auth-fake')
-      .set('Authorization', token)
-      .expect(200);
-
-    expect(loggerMock.mock.calls.length).toEqual(1);
-    expect(loggerMock.mock.calls[0]).toEqual([
-      'CheckAuthMiddleware Middleware Deprecation',
-      {
-        warning: 'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
-      }
-    ]);
-    expect(handlerMock.mock.calls.length).toEqual(1);
-
-    expectSecurityContext(handlerMock.mock.calls[0][0].context.securityContext);
-    // authInfo was deprecated, but should exists as computability
-    expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
-  });
-
-  test('custom checkAuthMiddleware with securityInfo (not object)', async () => {
-    const loggerMock = jest.fn();
-
-    const EXPECTED_SECURITY_CONTEXT = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g';
-
-    const handlerMock = jest.fn((req, res) => {
-      expect(req.context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
-      expect(req.context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);
-
-      res.status(200).end();
-    });
-
-    const { app } = createApiGateway(handlerMock, loggerMock, {
-      checkAuthMiddleware: (req: Request, res, next) => {
-        if (req.headers.authorization) {
-          // It must be object, but some users are using string for securityContext
-          req.authInfo = req.headers.authorization;
-        }
-
-        if (next) {
-          next();
-        }
-      }
-    });
-
-    await request(app)
-      .get('/test-auth-fake')
-      // console.log(generateAuthToken({ uid: 5, }));
-      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1aWQiOjUsImlhdCI6MTYxMTg1NzcwNSwiZXhwIjoyNDc1ODU3NzA1fQ.tTieqdIcxDLG8fHv8YWwfvg_rPVe1XpZKUvrCdzVn3g')
-      .expect(200);
-
-    expect(loggerMock.mock.calls.length).toEqual(2);
-    expect(loggerMock.mock.calls[0]).toEqual([
-      'CheckAuthMiddleware Middleware Deprecation',
-      {
-        warning: 'Option checkAuthMiddleware is now deprecated in favor of checkAuth, please migrate: https://github.com/cube-js/cube.js/blob/master/DEPRECATION.md#checkauthmiddleware',
-      }
-    ]);
-    expect(loggerMock.mock.calls[1]).toEqual([
-      'Security Context Should Be Object',
-      {
-        warning: 'Value of securityContext (previously authInfo) expected to be object, actual: string',
-      }
-    ]);
-
-    expect(handlerMock.mock.calls.length).toEqual(1);
     expect(handlerMock.mock.calls[0][0].context.securityContext).toEqual(EXPECTED_SECURITY_CONTEXT);
     // authInfo was deprecated, but should exists as computability
     expect(handlerMock.mock.calls[0][0].context.authInfo).toEqual(EXPECTED_SECURITY_CONTEXT);

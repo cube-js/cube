@@ -18,6 +18,12 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct CLReprObject(pub(crate) HashMap<String, CLRepr>);
 
+impl Default for CLReprObject {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CLReprObject {
     pub fn new() -> Self {
         Self(HashMap::new())
@@ -31,16 +37,21 @@ impl CLReprObject {
         self.0.insert(key, value)
     }
 
-    pub fn into_iter(self) -> IntoIter<String, CLRepr> {
-        self.0.into_iter()
-    }
-
     pub fn iter(&self) -> Iter<String, CLRepr> {
         self.0.iter()
     }
 
     pub fn keys(&self) -> Keys<'_, String, CLRepr> {
         self.0.keys()
+    }
+}
+
+impl IntoIterator for CLReprObject {
+    type Item = (String, CLRepr);
+    type IntoIter = IntoIter<String, CLRepr>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
     }
 }
 
@@ -149,11 +160,20 @@ impl CLRepr {
             Ok(CLRepr::String(v.value(cx), StringType::Normal))
         } else if from.is_a::<JsArray, _>(cx) {
             let v = from.downcast_or_throw::<JsArray, _>(cx)?;
-            let el = v.to_vec(cx)?;
 
-            let mut r = Vec::with_capacity(el.len());
+            let mut r = Vec::with_capacity(v.len(cx) as usize);
 
-            for el in el {
+            for i in 0..v.len(cx) {
+                let el = v.get(cx, i)?;
+
+                let circular_reference = from.strict_equals(cx, el);
+                if circular_reference {
+                    #[cfg(debug_assertions)]
+                    log::warn!("Circular referenced array detected");
+
+                    continue;
+                }
+
                 r.push(Self::from_js_ref(el, cx)?)
             }
 
@@ -166,6 +186,14 @@ impl CLRepr {
             for i in 0..properties.len(cx) {
                 let property: Handle<JsString> = properties.get(cx, i)?;
                 let property_val = v.get_value(cx, property)?;
+
+                let circular_reference = from.strict_equals(cx, property_val);
+                if circular_reference {
+                    #[cfg(debug_assertions)]
+                    log::warn!("Circular referenced object detected");
+
+                    continue;
+                }
 
                 obj.insert(property.value(cx), Self::from_js_ref(property_val, cx)?);
             }

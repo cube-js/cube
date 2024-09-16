@@ -234,7 +234,7 @@ impl CacheEvictionManager {
                     raw_size,
                 }) => {
                     let mut ttl_buffer = ttl_buffer_to_move.blocking_write();
-                    if let Some(mut cache_data) = ttl_buffer.get_mut(&row_id) {
+                    if let Some(cache_data) = ttl_buffer.get_mut(&row_id) {
                         let expired_lfu = if let Some(previous_lru) =
                             cache_data.lru.decode_value_as_opt_datetime().unwrap()
                         {

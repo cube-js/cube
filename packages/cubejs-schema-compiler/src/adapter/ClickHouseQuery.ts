@@ -1,3 +1,4 @@
+import { parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -40,56 +41,73 @@ export class ClickHouseQuery extends BaseQuery {
 
   public convertTz(field) {
     //
-    // field yields a Date or a DateTime so add in the extra toDateTime to support the Date case
+    // field yields a Date or a DateTime so add in the extra toDateTime64 to support the Date case
     //
     // https://clickhouse.yandex/docs/en/data_types/datetime/
     // https://clickhouse.yandex/docs/en/query_language/functions/date_time_functions/
     //
     //
-    return `toTimeZone(toDateTime(${field}), '${this.timezone}')`;
+    return `toTimeZone(toDateTime64(${field}, 0), '${this.timezone}')`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
     if (granularity === 'week') {
-      return `toDateTime(toMonday(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      return `toDateTime64(toMonday(${dimension}, '${this.timezone}'), 0, '${this.timezone}')`;
     } else {
       const interval = GRANULARITY_TO_INTERVAL[granularity];
-      return `toDateTime(${granularity === 'second' ? 'toDateTime' : `toStartOf${interval}`}(${dimension}, '${this.timezone}'), '${this.timezone}')`;
+      const toDateTime64 = `toDateTime64(${dimension}, 0, '${this.timezone}')`;
+      const toStartOfInterval = `toStartOf${interval}(${dimension}, '${this.timezone}')`;
+      const internalConversion = granularity === 'second' ? toDateTime64 : toStartOfInterval;
+      return `toDateTime64(${internalConversion}, 0, '${this.timezone}')`;
     }
   }
 
-  public calcInterval(operation, date, interval) {
-    const [intervalValue, intervalUnit] = interval.split(' ');
-    // eslint-disable-next-line prefer-template
-    const fn = operation + intervalUnit[0].toUpperCase() + intervalUnit.substring(1) + 's';
-    return `${fn}(${date}, ${intervalValue})`;
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = 'fromUnixTimestamp(0)';
+
+    return `date_add(${timeUnit},
+        FLOOR(
+          date_diff(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted})
+        ) * date_diff(${timeUnit}, ${beginOfTime}, ${beginOfTime} + ${intervalFormatted}),
+        ${this.timeStampCast(`'${origin}'`)}
+    )`;
   }
 
-  public subtractInterval(date, interval) {
-    return this.calcInterval('subtract', date, interval);
+  public subtractInterval(date: string, interval: string): string {
+    return `subDate(${date}, ${this.formatInterval(interval)})`;
   }
 
-  public addInterval(date, interval) {
-    return this.calcInterval('add', date, interval);
+  public addInterval(date: string, interval: string): string {
+    return `addDate(${date}, ${this.formatInterval(interval)})`;
   }
 
-  public timeStampCast(value) {
+  /**
+   * The input interval with (possible) plural units, like "2 years", "3 months", "4 weeks", "5 days"...
+   * will be converted to ClickHouse form of sum of single intervals.
+   * @see https://clickhouse.com/docs/en/sql-reference/data-types/special-data-types/interval
+   */
+  private formatInterval(interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+
+    return Object.entries(intervalParsed)
+      .map(([key, value]) => `INTERVAL ${value} ${key.toUpperCase()}`)
+      .join(' + ');
+  }
+
+  public timeStampCast(value: string): string {
+    return this.dateTimeCast(value);
+  }
+
+  public dateTimeCast(value: string): string {
     // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-
-    //
     // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    //
-    // However parseDateTimeBestEffort works with ISO8601
-    //
-    return `parseDateTimeBestEffort(${value})`;
-  }
-
-  public dateTimeCast(value) {
-    // value yields a string formatted in ISO8601, so this function returns a expression to parse a string to a DateTime
-
-    //
-    // ClickHouse provides toDateTime which expects dates in UTC in format YYYY-MM-DD HH:MM:SS
-    //
     // However parseDateTimeBestEffort works with ISO8601
     //
     return `parseDateTimeBestEffort(${value})`;
@@ -240,14 +258,28 @@ export class ClickHouseQuery extends BaseQuery {
     return [`CREATE TABLE ${tableName} ENGINE = MergeTree() ORDER BY (${indexColumns.join(', ')}) ${this.asSyntaxTable} ${sqlAndParams[0]}`, sqlAndParams[1]];
   }
 
+  public countDistinctApprox(sql: string): string {
+    return `uniq(${sql})`;
+  }
+
   public createIndexSql(indexName, tableName, escapedColumns) {
     return `ALTER TABLE ${tableName} ADD INDEX ${indexName} (${escapedColumns.join(', ')}) TYPE minmax GRANULARITY 1`;
   }
 
   public sqlTemplates() {
     const templates = super.sqlTemplates();
+    templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
+    // https://github.com/ClickHouse/ClickHouse/issues/19351
+    templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    templates.types.boolean = 'BOOL';
+    templates.types.timestamp = 'DATETIME';
+    delete templates.types.time;
+    // ClickHouse intervals have a distinct type for each granularity
+    delete templates.types.interval;
+    delete templates.types.binary;
     return templates;
   }
 }

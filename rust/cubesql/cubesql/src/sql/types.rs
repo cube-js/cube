@@ -1,8 +1,10 @@
+use crate::compile::CommandCompletion;
 use bitflags::bitflags;
 use datafusion::arrow::datatypes::{DataType, Field, IntervalUnit, TimeUnit};
 use pg_srv::{protocol::CommandComplete, PgTypeId};
+use serde::Serialize;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Serialize)]
 pub enum ColumnType {
     String,
     VarStr,
@@ -97,31 +99,6 @@ bitflags! {
         const NOT_NULL  = 0b00000001;
         const UNSIGNED  = 0b00000010;
     }
-}
-
-bitflags! {
-    pub struct StatusFlags: u8 {
-        const SERVER_STATE_CHANGED = 0b00000001;
-        const AUTOCOMMIT           = 0b00000010;
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum CommandCompletion {
-    Begin,
-    Prepare,
-    Commit,
-    Use,
-    Rollback,
-    Set,
-    Select(u32),
-    DeclareCursor,
-    CloseCursor,
-    CloseCursorAll,
-    Deallocate,
-    DeallocateAll,
-    Discard(String),
-    DropTable,
 }
 
 impl CommandCompletion {

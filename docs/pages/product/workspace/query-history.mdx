@@ -13,8 +13,8 @@ took to execute, and if they failed.
 
 <SuccessBox>
 
-Query History is available in Cube Cloud on
-[all tiers](https://cube.dev/pricing).
+Query History is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+Enterprise users can choose a [Query History tier](/product/deployment/cloud/pricing#query-history-tiers).
 
 </SuccessBox>
 
@@ -28,9 +28,10 @@ Query History is available in Cube Cloud on
 ## Setting the time range
 
 By default, Cube Cloud shows you a live feed of queries made to the API and
-connected [data sources][ref-conf-db]. You can see query history for the last 72
-hours by using the date picker in the top right corner of the page and selecting
-a time period:
+connected [data sources][ref-conf-db].
+
+You can navigate throughout the query history by using the date picker in the
+top right corner of the page and selecting a time period:
 
 <Screenshot
   highlight="inset(15% 1% 60% 21% round 10px)"
@@ -149,6 +150,15 @@ screen:
 Clicking <Btn>Accelerate</Btn> takes you to the Rollup Designer, where you can
 add a pre-aggregation to accelerate similar queries in the future.
 
+### Security context
+
+The <Btn>Security Context</Btn> tab shows the [security context][ref-security-context]
+that was used to process this query:
+
+<Screenshot src="https://ucarecdn.com/4ea5f5b6-f5a0-4d62-93f9-b9adfe5a2a07/" />
+
+This is helpful in case [multitenancy][ref-multitenancy] is configured.
+
 ### Queue graph
 
 The <Btn>Queue Graph</Btn> tab details any activity in the query queue while
@@ -208,3 +218,5 @@ while the query is in the query execution queue:
 [ref-workspace-sqlrunner]: /product/workspace/sql-runner
 [ref-query-format]: /product/apis-integrations/rest-api/query-format
 [ref-cache-types]: /product/caching#cache-type
+[ref-security-context]: /product/auth/context
+[ref-multitenancy]: /product/configuration/advanced/multitenancy

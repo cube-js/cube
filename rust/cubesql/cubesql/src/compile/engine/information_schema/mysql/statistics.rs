@@ -15,7 +15,7 @@ use datafusion::{
 };
 
 use super::utils::{new_string_array_with_placeholder, new_uint32_array_with_placeholder};
-use crate::compile::engine::provider::TableName;
+use crate::compile::engine::context::TableName;
 
 struct InformationSchemaStatisticsBuilder {
     catalog_names: StringBuilder,

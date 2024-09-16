@@ -5,6 +5,8 @@ redirect_from:
 
 # QuestDB
 
+[QuestDB][questdb] is a high-performance [time-series database][time-series-database-glossary] which helps you overcome ingestion bottlenecks.
+
 <WarningBox>
 
 The driver for QuestDB is supported by its vendor. Please report any issues to
@@ -14,13 +16,36 @@ their [Slack][questdb-slack].
 
 ## Prerequisites
 
-- The hostname for the [QuestDB][questdb] database server
+- The hostname for the QuestDB database server
+  - If QuestDB is not running, checkout the QuestDB [quick start][questdb-quick-start]
+- [Docker][docker] (optional)
 
 ## Setup
 
-### Manual
+### Docker
 
-Add the following to a `.env` file in your Cube project:
+Create a dockerfile within the project directory:
+
+```yaml title=docker-compose.yml
+services:
+  cube:
+    environment:
+      - CUBEJS_DEV_MODE=true
+    image: "cubejs/cube:latest"
+    ports:
+      - "4000:4000"
+    volumes:
+      - ".:/cube/conf"
+  questdb:
+    container_name: questdb
+    hostname: questdb
+    image: "questdb/questdb:latest"
+    ports:
+      - "9000:9000"
+      - "8812:8812"
+```
+
+Within your project directory, create an `.env` file:
 
 ```dotenv
 CUBEJS_DB_TYPE=questdb
@@ -30,6 +55,14 @@ CUBEJS_DB_NAME=qdb
 CUBEJS_DB_USER=admin
 CUBEJS_DB_PASS=quest
 ```
+
+Finally, bring it all up with Docker:
+
+```bash title=shell
+docker-compose up -d
+```
+
+Access Cube at http://localhost:4000 & QuestDB at http://localhost:9000
 
 ## Environment Variables
 
@@ -46,3 +79,6 @@ CUBEJS_DB_PASS=quest
 
 [questdb]: https://questdb.io/
 [questdb-slack]: https://slack.questdb.io/
+[time-series-database-glossary]: https://questdb.io/glossary/time-series/database/
+[questdb-quick-start]: https://questdb.io/docs/quick-start/
+[docker]: https://docs.docker.com/get-docker/

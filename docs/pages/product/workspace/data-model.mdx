@@ -32,22 +32,27 @@ specific to this branch. This development API hot-reloads your data model
 changes, allowing you to quickly test API changes from your applications.
 
 To enter development mode, navigate to the <Btn>Data Model</Btn> screen and
-click <Btn>Enter Development Mode</Btn>.
+click <Btn>Dev Mode</Btn>.
 
-<Screenshot src="https://ucarecdn.com/f96a2b0e-a413-4126-84ef-45e73acbb5e0/" />
+<Screenshot
+  src="https://ucarecdn.com/a35aefc4-8065-4641-a79d-d441d2789c55/"
+  alt="Entering dev mode"
+/>
 
-When development mode is active, a grey bar will be visible at the top of the
-screen. It provides several useful controls and indicators:
+If you are entering development mode from the main branch, you will be asked to
+choose an existing branch or create a new one. You can configure whether it's possible
+to commit directly to the main branch in the deployment settings.
 
-- The name of the current development Git branch
-- The status of the development API. After any changes to the project, the API
-  will hot-reload, and the API status will indicate when it's ready.
-- 'Copy API URL' will copy the API URL to the clipboard for the current
-  development branch.
+<Screenshot
+  src="https://ucarecdn.com/68ed5627-ab7f-4d16-8dc4-90e48c0e6216/"
+  alt="Entering dev mode modal"
+/>
 
-<Screenshot src="https://ucarecdn.com/915e829d-39a7-4d65-b5d4-678bc7545a6f/" />
+When development mode is active, the status of the development API will be shown
+at the top of the screen. After any changes to the project, the API
+will hot-reload, and the API status will indicate when it's ready.
 
-You can exit development mode by clicking <Btn>Exit</Btn> in the grey banner. If
+You can exit development mode by clicking <Btn>Dev Mode X</Btn> in the purple banner. If
 you've been editing a data model and navigate away, Cube Cloud will warn you if
 there are any unsaved changes:
 
@@ -120,16 +125,34 @@ want to delete, then open the switcher and click <Btn>Remove Branch</Btn>:
   alt="Delete a branch"
 />
 
-## Generating models
+## Generating data model files
 
-Cube Cloud supports generating models from a data source after the initial
-deployment creation. The <Btn>Generate Data Model</Btn> on the <Btn>Data
-Model</Btn> page will let you re-generate models from your source database, or
-alternatively add rollups to existing data models:
+You can generate data model files when [creating a new
+deployment][ref-creating-deployment] or at later moment. To open the data model
+wizard, click on the <Btn>...</Btn> button on the right and select <Btn>Generate
+data model</Btn>:
 
 <Screenshot
-  src="https://ucarecdn.com/b83b8b21-7894-4363-9b0e-5f390b50cd6f/"
-  alt="Generate rollups or data model modal"
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
+/>
+
+It is safe to generate data model files for tables that already have matching cubes.
+In that case, existing files will be renamed by appending `.backup` to their names.
+You would also be able to review changes to files on the <Btn>Changes</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/a8d53348-8441-41f3-969c-df46d41d78b6/" />
+
+
+## Creating pre-aggregations
+
+If you'd like to use the UI to create a pre-aggregation, you can click on the
+<Btn>...</Btn> button on the right and select <Btn>Add rollup</Btn> to open
+[Rollup Designer][ref-rollup-designer]:
+
+<Screenshot
+  highlight="inset(17.5% 0 50% 80% round 10px)"
+  src="https://ucarecdn.com/0f9684c2-a7f5-48a2-9fac-32e050beba5d/"
 />
 
 [ref-data-modeling]: /product/data-modeling/overview
@@ -137,3 +160,5 @@ alternatively add rollups to existing data models:
 [ref-joins]: /reference/data-model/joins
 [ref-join-types]: /reference/data-model/joins#relationship
 [wiki-erd]: https://en.wikipedia.org/wiki/Entity–relationship_model
+[ref-rollup-designer]: /product/workspace/rollup-designer
+[ref-creating-deployment]: /product/deployment/cloud/deployments#creating-a-new-deployment

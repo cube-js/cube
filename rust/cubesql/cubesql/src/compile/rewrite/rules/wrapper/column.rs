@@ -1,8 +1,10 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, column_expr, column_name_to_member_vec, rewrite,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, ColumnExprColumn, LogicalPlanLanguage,
+        analysis::{LogicalPlanAnalysis, Member},
+        column_expr, rewrite,
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ColumnExprColumn,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
@@ -65,33 +67,37 @@ impl WrapperRules {
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.pushdown_dimension("?name", "?cube_members", "?dimension"),
+                self.pushdown_dimension("?alias_to_cube", "?name", "?cube_members", "?dimension"),
             ),
         ]);
     }
 
     fn pushdown_dimension(
         &self,
+        alias_to_cube_var: &'static str,
         column_name_var: &'static str,
         members_var: &'static str,
         dimension_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let alias_to_cube_var = var!(alias_to_cube_var);
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let dimension_var = var!(dimension_var);
-        let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
-                if let Some(member_name_to_expr) =
-                    egraph[subst[members_var]].data.member_name_to_expr.clone()
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns.iter() {
+                for alias_to_cube in var_iter!(
+                    egraph[subst[alias_to_cube_var]],
+                    WrapperPullupReplacerAliasToCube
+                )
+                .cloned()
                 {
-                    let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
-                    if let Some((_, Some(member))) = column_name_to_member_name
-                        .iter()
-                        .find(|(cn, _)| cn == &column.name)
-                    {
-                        if meta.find_dimension_with_name(member.to_string()).is_some()
-                            || meta.is_synthetic_field(member.to_string())
+                    //FIXME We always add subquery column as dimension. I'm not 100% sure that this is the correct solution
+                    if let Some(col_relation) = &column.relation {
+                        if &alias_to_cube[0].0 != col_relation
+                            && col_relation.starts_with("__subquery")
                         {
                             let column_expr_column =
                                 egraph.add(LogicalPlanLanguage::ColumnExprColumn(
@@ -103,6 +109,29 @@ impl WrapperRules {
                             subst.insert(dimension_var, column_expr);
                             return true;
                         }
+                    }
+                }
+                if let Some((member, _)) = &egraph[subst[members_var]]
+                    .data
+                    .find_member_by_alias(&column.name)
+                {
+                    if matches!(
+                        member.1,
+                        Member::Dimension { .. }
+                            | Member::TimeDimension { .. }
+                            | Member::Segment { .. }
+                            | Member::ChangeUser { .. }
+                            | Member::VirtualField { .. }
+                            | Member::LiteralMember { .. }
+                    ) {
+                        let column_expr_column = egraph.add(LogicalPlanLanguage::ColumnExprColumn(
+                            ColumnExprColumn(column.clone()),
+                        ));
+
+                        let column_expr =
+                            egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+                        subst.insert(dimension_var, column_expr);
+                        return true;
                     }
                 }
             }
@@ -119,19 +148,17 @@ impl WrapperRules {
         let members_var = var!(members_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
-            for column in var_iter!(egraph[subst[column_name_var]], ColumnExprColumn).cloned() {
-                if let Some(member_name_to_expr) =
-                    egraph[subst[members_var]].data.member_name_to_expr.clone()
+            let columns: Vec<_> = var_iter!(egraph[subst[column_name_var]], ColumnExprColumn)
+                .cloned()
+                .collect();
+            for column in columns {
+                if let Some(((Some(member), _, _), _)) = egraph[subst[members_var]]
+                    .data
+                    .find_member_by_alias(&column.name)
                 {
-                    let column_name_to_member_name = column_name_to_member_vec(member_name_to_expr);
-                    if let Some((_, Some(member))) = column_name_to_member_name
-                        .iter()
-                        .find(|(cn, _)| cn == &column.name)
-                    {
-                        if let Some(measure) = meta.find_measure_with_name(member.to_string()) {
-                            if measure.agg_type != Some("number".to_string()) {
-                                return true;
-                            }
+                    if let Some(measure) = meta.find_measure_with_name(member.to_string()) {
+                        if measure.agg_type != Some("number".to_string()) {
+                            return true;
                         }
                     }
                 }

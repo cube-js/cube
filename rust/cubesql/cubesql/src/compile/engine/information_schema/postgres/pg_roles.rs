@@ -68,20 +68,21 @@ impl PgCatalogRolesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.rolname.finish()));
-        columns.push(Arc::new(self.rolsuper.finish()));
-        columns.push(Arc::new(self.rolinherit.finish()));
-        columns.push(Arc::new(self.rolcreaterole.finish()));
-        columns.push(Arc::new(self.rolcreatedb.finish()));
-        columns.push(Arc::new(self.rolcanlogin.finish()));
-        columns.push(Arc::new(self.rolreplication.finish()));
-        columns.push(Arc::new(self.rolconnlimit.finish()));
-        columns.push(Arc::new(self.rolpassword.finish()));
-        columns.push(Arc::new(self.rolvaliduntil.finish()));
-        columns.push(Arc::new(self.rolbypassrls.finish()));
-        columns.push(Arc::new(self.rolconfig.finish()));
-        columns.push(Arc::new(self.oid.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.rolname.finish()),
+            Arc::new(self.rolsuper.finish()),
+            Arc::new(self.rolinherit.finish()),
+            Arc::new(self.rolcreaterole.finish()),
+            Arc::new(self.rolcreatedb.finish()),
+            Arc::new(self.rolcanlogin.finish()),
+            Arc::new(self.rolreplication.finish()),
+            Arc::new(self.rolconnlimit.finish()),
+            Arc::new(self.rolpassword.finish()),
+            Arc::new(self.rolvaliduntil.finish()),
+            Arc::new(self.rolbypassrls.finish()),
+            Arc::new(self.rolconfig.finish()),
+            Arc::new(self.oid.finish()),
+        ];
 
         columns
     }
@@ -94,7 +95,7 @@ pub struct PgCatalogRolesProvider {
 impl PgCatalogRolesProvider {
     pub fn new(role: &str) -> Self {
         let mut builder = PgCatalogRolesBuilder::new(1);
-        builder.add_role(&role);
+        builder.add_role(role);
 
         Self {
             data: Arc::new(builder.finish()),

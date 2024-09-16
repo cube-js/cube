@@ -11,9 +11,13 @@
       "CUBEJS_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
       "CUBEJS_AWS_REGION": "us-east-1",
       "CUBEJS_AWS_ATHENA_WORKGROUP": "primary",
-      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://athena-drivers-tests-preaggs/output"
+      "CUBEJS_AWS_S3_OUTPUT_LOCATION": "s3://athena-drivers-tests-preaggs/output",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "cast": {
     "SELECT_PREFIX": "",
@@ -62,6 +66,16 @@
           "CUBE.totalSales",
           "CUBE.totalProfit"
         ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
+        ]
       }
     ],
     "BigECommerce": [
@@ -76,6 +90,33 @@
           "CUBE.avgDiscount",
           "CUBE.totalSales",
           "CUBE.totalProfit"
+        ]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ]
+      },
+      {
+        "name": "CountByProduct",
+        "time_dimension": "CUBE.orderDate",
+        "granularity": "month",
+        "partition_granularity": "month",
+        "dimensions": ["CUBE.productName"],
+        "measures": [
+          "CUBE.countApproxByCustomer"
         ]
       }
     ]
@@ -92,7 +133,7 @@
     "---------------------------------------",
 
     "---------------------------------------",
-    "SKIPED FOR ALL                         ",
+    "SKIPPED FOR ALL                         ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -102,8 +143,33 @@
     "querying BigECommerce: null sum",
     "querying BigECommerce: null boolean",
     "--------------------",
+
     "week granularity is not supported for intervals",
     "--------------------",
-    "querying BigECommerce: rolling window by 2 week"
+    "querying BigECommerce: rolling window by 2 week",
+
+    "---------------------------------------",
+    "Custom Granularities                   ",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by half_year + no dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by half_year + dimension",
+    "querying custom granularities ECommerce: count by half_year_by_1st_april + dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading",
+
+    "SKIPPED SQL API (Need work)",
+    "---------------------------------------",
+    "SQL API: Simple Rollup",
+    "SQL API: Complex Rollup",
+    "SQL API: Nested Rollup",
+    "SQL API: Rollup with aliases",
+    "SQL API: Rollup over exprs",
+    "SQL API: Nested Rollup with aliases",
+    "SQL API: Nested Rollup over asterisk",
+    "SQL API: Extended nested Rollup over asterisk"
   ]
 }

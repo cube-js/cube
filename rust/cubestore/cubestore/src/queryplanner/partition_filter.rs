@@ -1,6 +1,6 @@
 use crate::table::{cmp_same_types, TableValue};
 use crate::util::decimal::Decimal;
-use arrow::datatypes::{DataType, Schema};
+use datafusion::arrow::datatypes::{DataType, Schema};
 use datafusion::logical_plan::{Column, Expr, Operator};
 use datafusion::scalar::ScalarValue;
 use std::cmp::Ordering;
@@ -561,7 +561,7 @@ impl Builder<'_> {
 mod tests {
     use super::*;
     use crate::sql::parser::{CubeStoreParser, Statement as CubeStatement};
-    use arrow::datatypes::Field;
+    use datafusion::arrow::datatypes::Field;
     use datafusion::catalog::TableReference;
     use datafusion::datasource::TableProvider;
     use datafusion::logical_plan::ToDFSchema;
