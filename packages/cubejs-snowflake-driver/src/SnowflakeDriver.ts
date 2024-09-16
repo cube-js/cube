@@ -22,7 +22,6 @@ import {
   DownloadQueryResultsResult,
   DownloadQueryResultsOptions,
   DriverCapabilities,
-  QueryTablesResult,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { Storage } from '@google-cloud/storage';
