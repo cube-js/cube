@@ -89,7 +89,10 @@
     "testMatch": [
       "<rootDir>/dist/test/**/*.(test|spec).(ts|js)"
     ],
-    "snapshotResolver": "<rootDir>/test/snapshotResolver.js"
+    "snapshotResolver": "<rootDir>/test/snapshotResolver.js",
+    "moduleNameMapper": {
+      "^axios$": "axios/dist/node/axios.cjs"
+    }
   },
   "eslintConfig": {
     "extends": "../cubejs-linter"
