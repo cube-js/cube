@@ -112,7 +112,7 @@ const config: DocsThemeConfig = {
       <div>
         <br/>
         <a target="_blank" href="https://cube.dev/events/cube-rollup-san-francisco?ref=github-readme">
-          <img src="https://ucarecdn.com/459df450-5984-42da-9211-a1d70a96e6a5/"/>
+          <img src="https://ucarecdn.com/79c21019-78d0-4d33-a380-f04409cb807b/"/>
         </a>
       </div>
     )
