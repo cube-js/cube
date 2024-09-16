@@ -99,12 +99,6 @@ sequenceDiagram
     participant CubeStore
 
     loop processQuery: Background execution
-        BackgroundQueryQueue->>QueueDriverInterface: getNextProcessingId
-        activate CubeStore
-        QueueDriverInterface->>CubeStore: CACHE INCR ?
-        CubeStore-->>+BackgroundQueryQueue: number
-        deactivate CubeStore
-
         BackgroundQueryQueue->>QueueDriverInterface: retrieveForProcessing
         activate CubeStore
         QueueDriverInterface->>CubeStore: QUEUE RETRIEVE CONCURRENCY ?number ?path

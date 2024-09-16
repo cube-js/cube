@@ -6,17 +6,23 @@
         {
           "name": "category",
           "type": "string",
-          "sql": "category"
+          "sql": "category",
+          "primary_key": true,
+          "shown": true
         },
         {
           "name": "subCategory",
           "type": "string",
-          "sql": "sub_category"
+          "sql": "sub_category",
+          "primary_key": true,
+          "shown": true
         },
         {
           "name": "productName",
           "type": "string",
-          "sql": "product_name"
+          "sql": "product_name",
+          "primary_key": true,
+          "shown": true
         }
       ]
     },
@@ -40,6 +46,11 @@
         {
           "name": "count",
           "type": "count",
+          "sql": "customer_id"
+        },
+        {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
           "sql": "customer_id"
         },
         {
@@ -77,6 +88,58 @@
         {
           "name": "orderDate",
           "sql": "order_date",
+          "type": "time",
+          "granularities": [
+            {
+              "name": "half_year",
+              "interval": "6 months"
+            },
+            {
+              "name": "half_year_by_1st_april",
+              "interval": "6 months",
+              "offset": "3 months"
+            },
+            {
+              "name": "two_mo_by_feb",
+              "interval": "2 months",
+              "origin": "2020-02-01 00:00:00"
+            },
+            {
+              "name": "three_months_by_march",
+              "interval": "3 month 3 days 3 hours",
+              "origin": "2020-03-15"
+            }
+          ]
+        },
+        {
+          "name": "customOrderDateNoPreAgg",
+          "sql": "order_date",
+          "type": "time",
+          "granularities": [
+            {
+              "name": "half_year",
+              "interval": "6 months"
+            },
+            {
+              "name": "half_year_by_1st_april",
+              "interval": "6 months",
+              "offset": "3 months"
+            },
+            {
+              "name": "two_mo_by_feb",
+              "interval": "2 months",
+              "origin": "2020-02-01 10:00:00"
+            },
+            {
+              "name": "three_months_by_march",
+              "interval": "3 month 3 days 3 hours",
+              "origin": "2020-03-15"
+            }
+          ]
+        },
+        {
+          "name": "completedDate",
+          "sql": "completed_date",
           "type": "time"
         },
         {
@@ -122,6 +185,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "totalQuantity",
           "sql": "quantity",
           "type": "sum"
@@ -146,12 +214,32 @@
           "sql": "profit",
           "type": "sum",
           "shown": false
+        },
+        {
+          "name": "rollingCountByTrailing",
+          "type": "count",
+          "rollingWindow": {
+            "trailing": "2 month"
+          }
+        },
+        {
+          "name": "rollingCountByLeading",
+          "type": "count",
+          "rollingWindow": {
+            "leading": "3 month"
+          }
+        },
+        {
+          "name": "rollingCountByUnbounded",
+          "type": "count",
+          "rollingWindow": {
+            "trailing": "unbounded"
+          }
         }
       ]
     },
     {
       "name": "BigECommerce",
-      "extends": "Products",
       "joins": [
         {
           "name": "Customers",
@@ -168,6 +256,21 @@
           "shown": true
         },
         {
+          "name": "category",
+          "type": "string",
+          "sql": "category"
+        },
+        {
+          "name": "subCategory",
+          "type": "string",
+          "sql": "sub_category"
+        },
+        {
+          "name": "productName",
+          "type": "string",
+          "sql": "product_name"
+        },
+        {
           "name": "orderId",
           "sql": "order_id",
           "type": "string"
@@ -175,6 +278,11 @@
         {
           "name": "orderDate",
           "sql": "order_date",
+          "type": "time"
+        },
+        {
+          "name": "completedDate",
+          "sql": "completed_date",
           "type": "time"
         },
         {
@@ -225,6 +333,11 @@
           "sql": "customer_id"
         },
         {
+          "name": "countApproxByCustomer",
+          "type": "count_distinct_approx",
+          "sql": "customer_id"
+        },
+        {
           "name": "totalQuantity",
           "sql": "quantity",
           "type": "sum"
@@ -243,6 +356,30 @@
           "name": "totalProfit",
           "sql": "profit",
           "type": "sum"
+        },
+        {
+          "name": "totalProfitYearAgo",
+          "type": "number",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "time_shift": [{
+            "time_dimension": "orderDate",
+            "interval": "366 day",
+            "type": "prior"
+          }]
+        },
+        {
+          "name": "totalProfitForStatus",
+          "type": "sum",
+          "sql": "{totalProfit}",
+          "post_aggregate": true,
+          "reduce_by": ["category"]
+        },
+        {
+          "name": "percentageOfTotalForStatus",
+          "type": "number",
+          "sql": "ROUND(100 * {totalProfit} / NULLIF({totalProfitForStatus}, 0))",
+          "post_aggregate": true
         },
         {
           "name": "hiddenSum",
@@ -267,6 +404,30 @@
         {
           "name": "rollingCountBy2Month",
           "type": "count",
+          "rolling_window": {
+            "trailing": "2 month"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Day",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 day"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Week",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
+          "rolling_window": {
+            "trailing": "2 week"
+          }
+        },
+        {
+          "name": "rollingCountApproxBy2Month",
+          "type": "count_distinct_approx",
+          "sql": "order_id",
           "rolling_window": {
             "trailing": "2 month"
           }

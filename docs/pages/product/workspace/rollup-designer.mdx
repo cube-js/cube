@@ -1,0 +1,65 @@
+# Rollup Designer
+
+Rollup Designer provides an easy way to create and edit
+[pre-aggregations][ref-caching-preaggs-gs].
+
+<SuccessBox>
+
+Rollup Designer is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
+
+</SuccessBox>
+
+## Identifying slow queries
+
+You can identify queries that might be accelerated with pre-aggregations in
+[Playground][ref-playground] and [Query History][ref-query-history].
+
+You can also access Rollup Designer from [Data Model][ref-data-model].
+
+### Playground
+
+When you execute a query in [Playground][ref-playground] that has no matching
+pre-aggregations, you would see this notificaton. Clicking on it will open
+Rollup Designer with a suggested pre-aggregation:
+
+<Screenshot
+  highlight="inset(22.5% 0 65% 72.5% round 10px)"
+  src="https://ucarecdn.com/582acb98-373b-4617-9aa8-263b0653cd00/"
+/>
+
+### Query History
+
+When you browse a query in [Query History][ref-query-history] that has no matching
+pre-aggregations, you would see this notificaton. Clicking on <Btn>Accelerate</Btn>
+will open Rollup Designer with a suggested pre-aggregation:
+
+<Screenshot
+  highlight="inset(37.5% 0 37.5% 5% round 10px)"
+  src="https://ucarecdn.com/1105e459-66b5-440e-8ca1-53e93c912cb5/"
+/>
+
+## Creating pre-aggregations
+
+When you open Rollup Designer from Playground or Query History, it will suggest
+a pre-aggregation accelerating the query in question:
+
+<Screenshot src="https://ucarecdn.com/d860dd55-4f94-46a1-ba64-53452ec267ba/" />
+
+If desired, you can also modify settings such as the [refresh
+key][ref-preaggs-ref-refreshkey], the [partition
+granularity][ref-preaggs-ref-partitiongranularity], and
+[indexes][ref-preaggs-ref-indexes] to further optimize the pre-aggregation by
+clicking the ​<Btn>Settings</Btn> tab:
+
+<Screenshot src="https://ucarecdn.com/27afed37-10ae-4948-bf3f-4261f6e0663c/" />
+
+Click <Btn>Add to the Data Schema</Btn> to add the pre-aggregation to the data
+model.
+
+[ref-caching-preaggs-gs]: /product/caching/getting-started-pre-aggregations
+[ref-preaggs-ref-refreshkey]: /reference/data-model/pre-aggregations#refresh_key
+[ref-preaggs-ref-partitiongranularity]: /reference/data-model/pre-aggregations#partition_granularity
+[ref-preaggs-ref-indexes]: /reference/data-model/pre-aggregations#indexes
+[ref-playground]: /product/workspace/playground
+[ref-query-history]: /product/workspace/query-history
+[ref-data-model]: /product/workspace/data-model

@@ -1,7 +1,7 @@
 use std::{any::Any, sync::Arc};
 
+use crate::transport::CubeMeta;
 use async_trait::async_trait;
-use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
         array::{Array, ArrayRef, StringBuilder},
@@ -52,12 +52,13 @@ impl RedshiftSvvTablesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.catalog_names.finish()));
-        columns.push(Arc::new(self.schema_names.finish()));
-        columns.push(Arc::new(self.table_names.finish()));
-        columns.push(Arc::new(self.table_types.finish()));
-        columns.push(Arc::new(self.remarks.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.catalog_names.finish()),
+            Arc::new(self.schema_names.finish()),
+            Arc::new(self.table_names.finish()),
+            Arc::new(self.table_types.finish()),
+            Arc::new(self.remarks.finish()),
+        ];
 
         columns
     }
@@ -68,7 +69,7 @@ pub struct RedshiftSvvTablesTableProvider {
 }
 
 impl RedshiftSvvTablesTableProvider {
-    pub fn new(db_name: &str, cubes: &Vec<V1CubeMeta>) -> Self {
+    pub fn new(db_name: &str, cubes: &Vec<CubeMeta>) -> Self {
         let mut builder = RedshiftSvvTablesBuilder::new(cubes.len());
 
         for cube in cubes {

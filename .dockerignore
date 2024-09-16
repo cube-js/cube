@@ -11,10 +11,13 @@
 !rust/cubestore/bin
 !rust/cubesql/package.json
 
+# Ignoring builds for native from local machime to protect a problem with different architecture
+packages/cubejs-backend-native/index.node
+packages/cubejs-backend-native/native/
+# Caches
+packages/cubejs-backend-native/target
 packages/*/node_modules/
 packages/*/dist/
 packages/*/coverage/
+# Other
 packages/cubejs-server-core/playground/
-packages/cubejs-serverless
-packages/cubejs-serverless-aws
-packages/cubejs-serverless-google

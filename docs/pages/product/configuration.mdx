@@ -103,12 +103,6 @@ module.exports = {
 
 Both ways are equivalent; when in doubt, use Python.
 
-<InfoBox>
-
-Support for Python and the `cube.py` file was introduced in v0.34.
-
-</InfoBox>
-
 ### Cube Core
 
 When using Docker, ensure that the configuration file and your [data model
@@ -122,8 +116,10 @@ and navigating to the <Btn>Data Model</Btn> page.
 
 ## Runtimes and dependencies
 
-As of v0.34, Cube uses Python v3.9 and Node.js v16.20 as runtime environments
-for the code of configuration and [dynamic data models][ref-dynamic-data-models].
+Cube uses Python and Node.js as runtime environments for the code of
+configuration and [dynamic data models][ref-dynamic-data-models]. You can look
+current versions up on GitHub: [Python][link-current-python-version],
+[Node.js][link-current-nodejs-version]. 
 
 It's recommended to use `requirements.txt` and `package.json` files to
 specify dependencies for your Python and JavaScript code, respectively.
@@ -155,24 +151,22 @@ Cube can be run in an insecure, development mode by setting the
 `CUBEJS_DEV_MODE` environment variable to `true`. Putting Cube in development
 mode does the following:
 
-- Disables authentication checks
-- Enables Cube Store in single instance mode
+- Disables authentication checks.
+- Disables access control checks based on the [publicity][ref-data-model-publicity]
+of data model entities.
+- Enables Cube Store in single instance mode.
 - Enables background refresh for in-memory cache and [scheduled
-  pre-aggregations][link-scheduled-refresh]
-- Allows another log level to be set (`trace`)
-- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`
-- Uses `memory` instead of `cubestore` as the default cache/queue engine
+  pre-aggregations][link-scheduled-refresh].
+- Allows another log level to be set (`trace`).
+- Enables [Developer Playground][link-dev-playground] on `http://localhost:4000`.
+- Uses `memory` instead of `cubestore` as the default cache/queue engine.
 - Logs incorrect/invalid configuration for `externalRefresh` /`waitForRenew`
-  instead of throwing errors
-- Allows access to non-public cubes and members through the [`/meta`
-  endpoint][ref-ref-meta] and for querying through the [REST][ref-rest-api],
-  [GraphQL][ref-gql-api] or [SQL][ref-sql-api] APIs.
+  instead of throwing errors.
 
 [ref-ref-meta]: /reference/rest-api#v1meta
 [ref-rest-api]: /product/apis-integrations/rest-api
 [ref-gql-api]: /product/apis-integrations/graphql-api
 [ref-sql-api]: /product/apis-integrations/sql-api
-
 [ref-folder-structure]:
   /product/data-modeling/syntax#folder-structure
 [link-config]: /reference/configuration/config
@@ -182,5 +176,7 @@ mode does the following:
   /reference/data-model/pre-aggregations#scheduled_refresh
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-custom-docker-image]: /product/deployment/core#extend-the-docker-image
-
 [link-docker-env-vars]: https://docs.docker.com/compose/environment-variables/set-environment-variables/
+[ref-data-model-publicity]: /product/data-modeling/concepts/publicity
+[link-current-python-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L13
+[link-current-nodejs-version]: https://github.com/cube-js/cube/blob/master/packages/cubejs-docker/latest.Dockerfile#L1

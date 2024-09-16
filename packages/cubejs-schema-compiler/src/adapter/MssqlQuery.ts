@@ -1,7 +1,7 @@
 import R from 'ramda';
 import moment from 'moment-timezone';
 
-import { QueryAlias } from '@cubejs-backend/shared';
+import { QueryAlias, parseSqlInterval } from '@cubejs-backend/shared';
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { ParamAllocator } from './ParamAllocator';
@@ -58,26 +58,54 @@ export class MssqlQuery extends BaseQuery {
     return new MssqlFilter(this, filter);
   }
 
+  public castToString(sql) {
+    return `CAST(${sql} as VARCHAR)`;
+  }
+
+  public concatStringsSql(strings: string[]) {
+    return strings.join(' + ');
+  }
+
   public convertTz(field) {
     return `TODATETIMEOFFSET(${field}, '${moment().tz(this.timezone).format('Z')}')`;
   }
 
-  public timeStampCast(value) {
-    return `CAST(${value} AS DATETIME2)`; // TODO
+  public timeStampCast(value: string) {
+    return this.dateTimeCast(value);
   }
 
-  public dateTimeCast(value) {
+  public dateTimeCast(value: string) {
     return `CAST(${value} AS DATETIME2)`;
   }
 
-  public timeGroupedColumn(granularity, dimension) {
+  public timeGroupedColumn(granularity: string, dimension: string): string {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * The formula operates with seconds diffs so it won't produce human-expected dates aligned with offset date parts.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const beginOfTime = this.timeStampCast('DATEFROMPARTS(1970, 1, 1)');
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+
+    // Need to explicitly cast one argument of floor to float to trigger correct sign logic
+    return `DATEADD(${timeUnit},
+        FLOOR(
+          CAST(DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) AS FLOAT) /
+          DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)})
+        ) * DATEDIFF(${timeUnit}, ${beginOfTime}, ${this.addInterval(beginOfTime, interval)}),
+        ${this.timeStampCast(`'${origin}'`)}
+    )`;
   }
 
   public newParamAllocator(expressionParams) {
     return new MssqlParamAllocator(expressionParams);
   }
 
+  // TODO replace with limitOffsetClause override
   public groupByDimensionLimit() {
     if (this.rowLimit) {
       return this.offset ? ` OFFSET ${parseInt(this.offset, 10)} ROWS FETCH NEXT ${parseInt(this.rowLimit, 10)} ROWS ONLY` : '';
@@ -101,6 +129,9 @@ export class MssqlQuery extends BaseQuery {
    * @override
    */
   public groupByClause() {
+    if (this.ungrouped) {
+      return '';
+    }
     const dimensionsForSelect = this.dimensionsForSelect();
     const dimensionColumns = R.flatten(
       dimensionsForSelect.map(s => s.selectColumns() && s.dimensionSql())
@@ -124,15 +155,15 @@ export class MssqlQuery extends BaseQuery {
     const timeDimensionsColumns = this.timeDimensions.map(
       (t) => `${t.dateSeriesAliasName()}.${this.escapeColumnName('date_from')}`
     );
-  
+
     // Group by regular dimensions
     const dimensionColumns = R.flatten(
       this.dimensions.map(s => s.selectColumns() && s.dimensionSql() && s.aliasName())
     ).filter(s => !!s);
-  
+
     // Combine time dimensions and regular dimensions for GROUP BY clause
     const allGroupByColumns = timeDimensionsColumns.concat(dimensionColumns);
-  
+
     const forSelect = this.overTimeSeriesForSelect(cumulativeMeasures);
     return (
       `SELECT ${forSelect} FROM ${dateSeriesSql}` +
@@ -166,14 +197,40 @@ export class MssqlQuery extends BaseQuery {
     )} date_to FROM (VALUES ${values}) ${this.asSyntaxTable} dates (date_from, date_to)`;
   }
 
-  public subtractInterval(date, interval) {
-    const amountInterval = interval.split(' ', 2);
-    const negativeInterval = (amountInterval[0]) * -1;
-    return `DATEADD(${amountInterval[1]}, ${negativeInterval}, ${date})`;
+  public subtractInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    for (const [key, value] of Object.entries(intervalParsed)) {
+      res = `DATEADD(${key}, ${value * -1}, ${res})`;
+    }
+
+    return res;
   }
 
-  public addInterval(date, interval) {
-    const amountInterval = interval.split(' ', 2);
-    return `DATEADD(${amountInterval[1]}, ${amountInterval[0]}, ${date})`;
+  public addInterval(date: string, interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    let res = date;
+
+    for (const [key, value] of Object.entries(intervalParsed)) {
+      res = `DATEADD(${key}, ${value}, ${res})`;
+    }
+
+    return res;
+  }
+
+  public sqlTemplates() {
+    const templates = super.sqlTemplates();
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
+    templates.types.string = 'VARCHAR';
+    templates.types.boolean = 'BIT';
+    templates.types.integer = 'INT';
+    templates.types.float = 'FLOAT(24)';
+    templates.types.double = 'FLOAT(53)';
+    templates.types.timestamp = 'DATETIME2';
+    delete templates.types.interval;
+    templates.types.binary = 'VARBINARY';
+    return templates;
   }
 }

@@ -14,7 +14,7 @@ Any dimension should have the following properties: `name`, `sql` and `type`.
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a dimension. It must be unique
 among all dimensions, measures, and segments within a cube and follow the
@@ -56,7 +56,7 @@ cubes:
 
 </CodeTabs>
 
-### case
+### `case`
 
 The `case` statement is used to define dimensions based on SQL conditions.
 
@@ -152,9 +152,11 @@ cube(`products`, {
 });
 ```
 
-### description
+### `description`
 
-You can add details to a dimension's definition via the `description` property:
+This parameter provides a human-readable description of a dimension.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
 
 <CodeTabs>
 
@@ -186,7 +188,7 @@ cubes:
 
 </CodeTabs>
 
-### format
+### `format`
 
 `format` is an optional parameter. It is used to format the output of dimensions
 in different ways, for example, a link for `external_url`. Please refer to the
@@ -223,7 +225,7 @@ cubes:
 
 </CodeTabs>
 
-### meta
+### `meta`
 
 Custom metadata. Can be used to pass any information to the frontend.
 
@@ -260,7 +262,7 @@ cubes:
 
 </CodeTabs>
 
-### primary_key
+### `primary_key`
 
 Specify which dimension is a primary key for a cube. The default value is
 `false`.
@@ -304,7 +306,7 @@ cubes:
 
 </CodeTabs>
 
-### propagate_filters_to_sub_query
+### `propagate_filters_to_sub_query`
 
 When this statement is set to `true`, the filters applied to the query will be
 passed to the [subquery][self-subquery].
@@ -341,7 +343,7 @@ cubes:
 
 </CodeTabs>
 
-### public
+### `public`
 
 <InfoBox>
 
@@ -383,7 +385,7 @@ cubes:
 
 </CodeTabs>
 
-### sql
+### `sql`
 
 `sql` is a required parameter. It can take any valid SQL expression depending on
 the `type` of the dimension. Please refer to the [Dimension
@@ -418,7 +420,7 @@ cube(`orders`, {
 
 </CodeTabs>
 
-### sub_query
+### `sub_query`
 
 The `sub_query` statement allows you to reference a measure in a dimension. It's
 an advanced concept and you can learn more about it [here][ref-subquery].
@@ -453,7 +455,7 @@ cubes:
 
 </CodeTabs>
 
-### title
+### `title`
 
 You can use the `title` parameter to change a dimension's displayed name. By
 default, Cube will humanize your dimension key to create a display name. In
@@ -489,7 +491,7 @@ cubes:
 
 </CodeTabs>
 
-### type
+### `type`
 
 `type` is a required parameter. There are various types that can be assigned to
 a dimension. Please refer to the [Dimension Types][ref-schema-ref-dims-types]
@@ -523,11 +525,14 @@ cubes:
 
 </CodeTabs>
 
+
 [ref-schema-ref-joins]: /reference/data-model/joins
-[ref-subquery]: /product/data-modeling/concepts/subquery-dimensions
+[ref-subquery]: /product/data-modeling/concepts/calculated-members#subquery-dimensions
 [self-subquery]: #sub-query
 [ref-naming]: /product/data-modeling/syntax#naming
 [ref-schema-ref-dims-types]:
   /reference/data-model/types-and-formats#dimension-types
 [ref-schema-ref-dims-formats]:
   /reference/data-model/types-and-formats#dimension-formats
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations

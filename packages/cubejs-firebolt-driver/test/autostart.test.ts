@@ -16,7 +16,8 @@ describe('FireboltDriver autostart', () => {
     driver.connection = {
       execute: jest.fn().mockRejectedValue({
         status: 404
-      })
+      }),
+      destroy: jest.fn(),
     };
     driver.ensureEngineRunning = jest.fn();
     tests = new DriverTests(driver, { expectStringFields: true });

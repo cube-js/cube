@@ -20,6 +20,7 @@ impl WrapperRules {
                         wrapped_select(
                             "?select_type",
                             "?projection_expr",
+                            "?subqueries",
                             "?group_expr",
                             "?aggr_expr",
                             "?window_expr",
@@ -31,6 +32,7 @@ impl WrapperRules {
                             "WrappedSelectOffset:None",
                             "?order_expr",
                             "?select_alias",
+                            "?select_distinct",
                             "?select_ungrouped",
                             "?select_ungrouped_scan",
                         ),
@@ -47,6 +49,7 @@ impl WrapperRules {
                     wrapped_select(
                         "?select_type",
                         "?projection_expr",
+                        "?subqueries",
                         "?group_expr",
                         "?aggr_expr",
                         "?window_expr",
@@ -58,6 +61,7 @@ impl WrapperRules {
                         "?wrapped_select_offset",
                         "?order_expr",
                         "?select_alias",
+                        "?select_distinct",
                         "?select_ungrouped",
                         "?select_ungrouped_scan",
                     ),

@@ -1,6 +1,6 @@
 ---
 source: cubesql/src/compile/mod.rs
-assertion_line: 5755
+assertion_line: 6570
 expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants\".to_string(),\n            DatabaseProtocol::PostgreSQL).await?"
 ---
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+
@@ -239,4 +239,71 @@ expression: "execute_query(\"SELECT * FROM information_schema.role_column_grants
 | ovr     | ovr     | cubedb        | public       | WideCube                  | dim99              | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | WideCube                  | __user             | SELECT         | YES          |
 | ovr     | ovr     | cubedb        | public       | WideCube                  | __cubeJoinField    | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num0       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str0       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date0      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num1       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str1       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date1      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num2       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str2       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date2      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num3       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str3       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date3      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num4       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str4       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date4      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num5       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str5       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date5      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num6       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str6       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date6      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num7       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str7       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date7      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num8       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str8       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date8      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_num9       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_str9       | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | measure_date9      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | count              | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | maxPrice           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | minPrice           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | avgPrice           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | countDistinct      | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num0           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str0           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date0          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num1           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str1           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date1          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num2           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str2           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date2          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num3           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str3           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date3          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num4           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str4           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date4          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num5           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str5           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date5          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num6           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str6           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date6          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num7           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str7           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date7          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num8           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str8           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date8          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_num9           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_str9           | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | dim_date9          | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | __user             | SELECT         | YES          |
+| ovr     | ovr     | cubedb        | public       | MultiTypeCube             | __cubeJoinField    | SELECT         | YES          |
 +---------+---------+---------------+--------------+---------------------------+--------------------+----------------+--------------+

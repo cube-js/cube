@@ -3,6 +3,92 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+
+* chore!: Remove cache & queue driver for Redis ([eac704e](https://github.com/cube-js/cube/commit/eac704ecc54c2a02ba83475973b66efa0be6b389))
+* chore!: Support for Node.js 16 was removed ([8b83021](https://github.com/cube-js/cube/commit/8b830214ab3d16ebfadc65cb9587a08b0496fb93))
+
+
+### Features
+
+* **schema-compiler:** custom granularity support ([#8537](https://github.com/cube-js/cube/issues/8537)) ([2109849](https://github.com/cube-js/cube/commit/21098494353b9b6274b534b6c656154cb8451c7b))
+
+
+### BREAKING CHANGES
+
+* Starting from v0.32, Cube Store is used as default cache and queue engine.
+
+Article: https://cube.dev/blog/replacing-redis-with-cube-store
+* Node.js is EOL, it was deprecated in v0.35.0
+
+
+
+
+
+## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
+
+
+### Features
+
+* **cubesqlplanner:** Native SQL planner implementation first steps ([#8506](https://github.com/cube-js/cube/issues/8506)) ([fab9c48](https://github.com/cube-js/cube/commit/fab9c4801de41a0d3d05331c5ca85c3e0cdd6266))
+
+
+
+
+
+## [0.35.63](https://github.com/cube-js/cube/compare/v0.35.62...v0.35.63) (2024-07-24)
+
+**Note:** Version bump only for package @cubejs-backend/shared
+
+
+
+
+
+## [0.35.62](https://github.com/cube-js/cube/compare/v0.35.61...v0.35.62) (2024-07-22)
+
+
+### Features
+
+* **native:** Initial support for native api-gateway ([#8472](https://github.com/cube-js/cube/issues/8472)) ([d917d6f](https://github.com/cube-js/cube/commit/d917d6fd422090cc78fc30125731d147a091de6c))
+
+
+
+
+
+## [0.35.43](https://github.com/cube-js/cube/compare/v0.35.42...v0.35.43) (2024-05-31)
+
+
+### Features
+
+* **bigquery-driver:** Use 6 digits precision for timestamps ([#8308](https://github.com/cube-js/cube/issues/8308)) ([568bfe3](https://github.com/cube-js/cube/commit/568bfe34bc6aca136b580acb8873d208b522a2f3))
+
+
+
+
+
+## [0.35.33](https://github.com/cube-js/cube.js/compare/v0.35.32...v0.35.33) (2024-05-15)
+
+
+### Features
+
+* **firebolt:** Switch to the new auth method ([#8182](https://github.com/cube-js/cube.js/issues/8182)) ([e559114](https://github.com/cube-js/cube.js/commit/e55911478d0b3ba916d44f1fa4c04697d7ca7dfb))
+
+
+
+
+
+## [0.35.2](https://github.com/cube-js/cube/compare/v0.35.1...v0.35.2) (2024-03-22)
+
+
+### Features
+
+* **query-orchestrator:** Queue - improve performance ([#7983](https://github.com/cube-js/cube/issues/7983)) ([56d48fb](https://github.com/cube-js/cube/commit/56d48fb2bad6210f38cfcc6189b683dd2ead62c2))
+
+
+
+
+
 # [0.35.0](https://github.com/cube-js/cube/compare/v0.34.62...v0.35.0) (2024-03-14)
 
 **Note:** Version bump only for package @cubejs-backend/shared

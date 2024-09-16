@@ -16,8 +16,24 @@ export class ParamAllocator {
     return sql.match(PARAMS_MATCH_REGEXP) !== null;
   }
 
-  public buildSqlAndParams(annotatedSql: string, exportAnnotatedSql?: boolean): [string, unknown[]] {
+  public buildSqlAndParams(annotatedSql: string, exportAnnotatedSql?: boolean, shouldReuseParams?: boolean): [string, unknown[]] {
     const paramsInSqlOrder: unknown[] = [];
+    const paramIndexMap: Record<string, number> = {};
+
+    if (shouldReuseParams) {
+      return [
+        annotatedSql.replace(PARAMS_MATCH_REGEXP, (match, paramIndex) => {
+          let newIndex = paramIndexMap[paramIndex];
+          if (newIndex == null) {
+            newIndex = paramsInSqlOrder.length;
+            paramIndexMap[paramIndex] = newIndex;
+            paramsInSqlOrder.push(this.params[paramIndex]);
+          }
+          return exportAnnotatedSql ? `$${newIndex}$` : this.paramPlaceHolder(newIndex);
+        }),
+        paramsInSqlOrder
+      ];
+    }
 
     return [
       annotatedSql.replace(PARAMS_MATCH_REGEXP, (match, paramIndex) => {

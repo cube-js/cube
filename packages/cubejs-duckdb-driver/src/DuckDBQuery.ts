@@ -23,8 +23,29 @@ export class DuckDBQuery extends BaseQuery {
     return `timezone('${this.timezone}', ${field}::timestamptz)`;
   }
 
+  public timeStampCast(value: string) {
+    return `'${value}'::TIMESTAMPTZ`;
+  }
+
   public timeGroupedColumn(granularity: string, dimension: string) {
     return GRANULARITY_TO_INTERVAL[granularity](dimension);
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   * DuckDB operates with whole intervals as is without measuring them in plain seconds,
+   * so the resulting date will be human-expected aligned with intervals.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = this.timeStampCast('1970-01-01 00:00:00.000');
+
+    return `${this.timeStampCast(origin)}' + INTERVAL '${interval}' *
+      floor(
+        date_diff('${timeUnit}', ${this.timeStampCast(origin)}, ${source}) /
+        date_diff('${timeUnit}', ${beginOfTime}, ${beginOfTime} + INTERVAL '${interval}')
+      )::int`;
   }
 
   public countDistinctApprox(sql: string) {
@@ -34,6 +55,8 @@ export class DuckDBQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.LEAST = 'LEAST({{ args_concat }})';
+    templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     return templates;
   }
 }

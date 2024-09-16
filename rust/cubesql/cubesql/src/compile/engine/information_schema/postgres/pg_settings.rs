@@ -1,5 +1,6 @@
 use std::{any::Any, sync::Arc};
 
+use crate::compile::DatabaseVariables;
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
@@ -12,8 +13,6 @@ use datafusion::{
     logical_plan::Expr,
     physical_plan::{memory::MemoryExec, ExecutionPlan},
 };
-
-use crate::sql::database_variables::DatabaseVariables;
 
 pub struct PgCatalogSettingsProvider {
     vars: DatabaseVariables,
@@ -102,24 +101,25 @@ impl TableProvider for PgCatalogSettingsProvider {
             pending_restarts.append_null().unwrap();
         }
 
-        let mut data: Vec<Arc<dyn Array>> = vec![];
-        data.push(Arc::new(names.finish()));
-        data.push(Arc::new(settings.finish()));
-        data.push(Arc::new(units.finish()));
-        data.push(Arc::new(categories.finish()));
-        data.push(Arc::new(short_descs.finish()));
-        data.push(Arc::new(extra_descs.finish()));
-        data.push(Arc::new(contexts.finish()));
-        data.push(Arc::new(vartypes.finish()));
-        data.push(Arc::new(sources.finish()));
-        data.push(Arc::new(min_vals.finish()));
-        data.push(Arc::new(max_vals.finish()));
-        data.push(Arc::new(enumvals.finish()));
-        data.push(Arc::new(boot_vals.finish()));
-        data.push(Arc::new(reset_vals.finish()));
-        data.push(Arc::new(sourcefiles.finish()));
-        data.push(Arc::new(sourceline.finish()));
-        data.push(Arc::new(pending_restarts.finish()));
+        let data: Vec<Arc<dyn Array>> = vec![
+            Arc::new(names.finish()),
+            Arc::new(settings.finish()),
+            Arc::new(units.finish()),
+            Arc::new(categories.finish()),
+            Arc::new(short_descs.finish()),
+            Arc::new(extra_descs.finish()),
+            Arc::new(contexts.finish()),
+            Arc::new(vartypes.finish()),
+            Arc::new(sources.finish()),
+            Arc::new(min_vals.finish()),
+            Arc::new(max_vals.finish()),
+            Arc::new(enumvals.finish()),
+            Arc::new(boot_vals.finish()),
+            Arc::new(reset_vals.finish()),
+            Arc::new(sourcefiles.finish()),
+            Arc::new(sourceline.finish()),
+            Arc::new(pending_restarts.finish()),
+        ];
 
         let batch = RecordBatch::try_new(self.schema(), data)?;
 

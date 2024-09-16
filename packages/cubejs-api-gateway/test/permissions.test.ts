@@ -1,6 +1,6 @@
 import express from 'express';
 import request from 'supertest';
-import { ApiGateway, ApiGatewayOptions, Query, Request } from '../src';
+import { ApiGateway, ApiGatewayOptions } from '../src';
 import {
   compilerApi,
   DataSourceStorageMock,
@@ -37,7 +37,7 @@ function createApiGateway(
 describe('Gateway Api Scopes', () => {
   test('CUBEJS_DEFAULT_API_SCOPES', async () => {
     process.env.CUBEJS_DEFAULT_API_SCOPES = '';
-    
+
     let res: request.Response;
     const { app, apiGateway } = createApiGateway();
 
@@ -77,17 +77,17 @@ describe('Gateway Api Scopes', () => {
     const { app, apiGateway } = createApiGateway({
       contextToApiScopes: async () => ['graphql', 'meta', 'data', 'jobs'],
     });
-  
+
     await request(app)
       .get('/readyz')
       .set('Authorization', AUTH_TOKEN)
       .expect(200);
-  
+
     await request(app)
       .get('/livez')
       .set('Authorization', AUTH_TOKEN)
       .expect(200);
-  
+
     apiGateway.release();
   });
 
@@ -223,14 +223,6 @@ describe('Gateway Api Scopes', () => {
       .expect(403);
 
     expect(res1.body && res1.body.error)
-      .toStrictEqual('API scope is missing: jobs');
-
-    const res2 = await request(app)
-      .get('/cubejs-api/v1/run-scheduled-refresh')
-      .set('Authorization', AUTH_TOKEN)
-      .expect(403);
-
-    expect(res2.body && res2.body.error)
       .toStrictEqual('API scope is missing: jobs');
 
     apiGateway.release();

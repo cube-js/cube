@@ -16,11 +16,10 @@ const Badge = styled.div`
   background: var(--warning-bg-color);
 `;
 
-type PreAggregationStatusProps = QueryStatus & {
-  apiUrl: string;
-  availableMembers: AvailableMembers;
-  query: Query;
-};
+type PreAggregationStatusProps = Pick<
+  QueryStatus,
+  'preAggregationType' | 'isAggregated' | 'external' | 'extDbType'
+>;
 
 export function PreAggregationStatus({
   isAggregated,

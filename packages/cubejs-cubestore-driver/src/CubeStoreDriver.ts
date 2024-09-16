@@ -46,6 +46,7 @@ type CreateTableOptions = {
   files?: string[]
   aggregations?: string
   selectStatement?: string
+  sourceTable?: any
   sealAt?: string
   delimiter?: string
 };
@@ -117,6 +118,9 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
     }
     if (options.selectStatement) {
       withEntries.push(`select_statement = ${escape(options.selectStatement)}`);
+    }
+    if (options.sourceTable) {
+      withEntries.push(`source_table = ${escape(`CREATE TABLE ${options.sourceTable.tableName} (${options.sourceTable.types.map(t => `${t.name} ${this.fromGenericType(t.type)}`).join(', ')})`)}`);
     }
     if (options.streamOffset) {
       withEntries.push(`stream_offset = '${options.streamOffset}'`);
@@ -431,6 +435,7 @@ export class CubeStoreDriver extends BaseDriver implements DriverInterface {
       indexes,
       files: locations,
       selectStatement: tableData.selectStatement,
+      sourceTable: tableData.sourceTable,
       streamOffset: tableData.streamOffset,
       sealAt
     };

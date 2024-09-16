@@ -97,9 +97,19 @@ Upload a service account JSON keyfile to connect to BigQuery.<br/>Alternatively,
     ],
   },
   {
-    databases: [{ title: 'Firebolt', driver: 'firebolt', logo: logoFirebolt }],
+    databases: [
+      {
+        title: 'Firebolt',
+        driver: 'firebolt',
+        logo: logoFirebolt,
+        instructions: `
+Specify the Firebolt Service Account <a href="https://docs.firebolt.io/godocs/Guides/managing-your-organization/service-accounts.html" target="_blank">client ID and secret.</a>
+    `,
+      },
+    ],
     settings: [
-      ...BASE_CRED,
+      { env: 'CUBEJS_DB_USER', title: 'Client ID' },
+      { env: 'CUBEJS_DB_PASS', title: 'Client Secret' },
       DB_NAME,
       { env: 'CUBEJS_FIREBOLT_ACCOUNT', title: 'Account' },
       { env: 'CUBEJS_FIREBOLT_ENGINE_NAME', title: 'Engine name' },

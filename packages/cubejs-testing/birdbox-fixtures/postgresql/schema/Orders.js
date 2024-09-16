@@ -21,12 +21,67 @@ cube(`Orders`, {
     toRemove: {
       type: `count`,
     },
+    numberTotal: {
+      sql: `${totalAmount}`,
+      type: `number`
+    },
+    amountRank: {
+      post_aggregate: true,
+      type: `rank`,
+      order_by: [{
+        sql: `${totalAmount}`,
+        dir: 'asc'
+      }],
+      reduce_by: [status],
+    },
+    amountReducedByStatus: {
+      post_aggregate: true,
+      type: `sum`,
+      sql: `${totalAmount}`,
+      reduce_by: [status],
+    },
+    statusPercentageOfTotal: {
+      post_aggregate: true,
+      sql: `${totalAmount} / NULLIF(${amountReducedByStatus}, 0)`,
+      type: `number`,
+    },
+    amountRankView: {
+      post_aggregate: true,
+      type: `number`,
+      sql: `${amountRank}`,
+    },
+    amountRankDateMax: {
+      post_aggregate: true,
+      sql: `${createdAt}`,
+      type: `max`,
+      filters: [{
+        sql: `${amountRank} = 1`
+      }]
+    },
+    amountRankDate: {
+      post_aggregate: true,
+      sql: `${amountRankDateMax}`,
+      type: `time`,
+    },
+    countAndTotalAmount: {
+      type: "string",
+      sql: `CONCAT(${count}, ' / ', ${totalAmount})`,
+    },
+    createdAtMax: {
+      type: `max`,
+      sql: `created_at`,
+    },
+    createdAtMaxProxy: {
+      type: "time",
+      sql: `${createdAtMax}`,
+    },
   },
   dimensions: {
     id: {
       sql: `id`,
       type: `number`,
       primaryKey: true,
+      public: true,
     },
 
     status: {
@@ -39,4 +94,12 @@ cube(`Orders`, {
       type: `time`
     }
   },
+});
+
+view(`OrdersView`, {
+  cubes: [{
+    joinPath: Orders,
+    includes: `*`,
+    excludes: [`toRemove`]
+  }]
 });

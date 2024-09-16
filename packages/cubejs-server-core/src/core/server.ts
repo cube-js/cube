@@ -426,7 +426,7 @@ export class CubejsServerCore {
 
   public initSQLServer() {
     const apiGateway = this.apiGateway();
-    return apiGateway.initSQLServer();
+    return apiGateway.getSQLServer();
   }
 
   protected apiGateway(): ApiGateway {
@@ -443,7 +443,6 @@ export class CubejsServerCore {
         standalone: this.standalone,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
-        checkAuthMiddleware: this.options.checkAuthMiddleware,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
         wsContextAcceptor: this.contextAcceptor.shouldAcceptWs.bind(this.contextAcceptor),
         checkAuth: this.options.checkAuth,
@@ -457,6 +456,7 @@ export class CubejsServerCore {
         scheduledRefreshTimeZones: this.options.scheduledRefreshTimeZones,
         serverCoreVersion: this.coreServerVersion,
         contextToApiScopes: this.options.contextToApiScopes,
+        gatewayPort: this.options.gatewayPort,
         event: this.event,
       }
     ));
@@ -530,7 +530,7 @@ export class CubejsServerCore {
 
     this.repository = new FileRepository(this.options.schemaPath);
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
-    
+
     this.startScheduledRefreshTimer();
   }
 

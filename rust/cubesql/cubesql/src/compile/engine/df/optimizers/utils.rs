@@ -316,6 +316,7 @@ pub fn rewrite(expr: &Expr, map: &HashMap<Column, Option<Expr>>) -> Result<Optio
         // As rewrites are used to push things down or up the plan, wildcards
         // might change the selection and should be marked as non-rewrittable
         Expr::Wildcard | Expr::QualifiedWildcard { .. } => None,
+        Expr::GroupingSet(..) => None,
         Expr::InSubquery {
             expr,
             subquery,

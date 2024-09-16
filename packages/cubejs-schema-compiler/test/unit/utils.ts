@@ -11,8 +11,10 @@ interface CreateCubeSchemaOptions {
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cube('${name}', {
+        description: 'test cube from createCubeSchema',
+
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
         ${publicly !== undefined ? `public: ${publicly},` : ''}
@@ -22,6 +24,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         measures: {
           count: {
+            description: 'count measure from createCubeSchema',
             type: 'count'
           },
           sum: {
@@ -41,6 +44,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         dimensions: {
           id: {
             type: 'number',
+            description: 'id dimension from createCubeSchema',
             sql: 'id',
             primaryKey: true
           },
@@ -60,6 +64,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         segments: {
           sfUsers: {
+            description: 'SF users segment from createCubeSchema',
             sql: \`\${CUBE}.location = 'San Francisco'\`
           }
         },
@@ -67,8 +72,147 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         preAggregations: {
             ${preAggregations}
         }
-      }) 
+      })
   `;
+}
+
+export function createCubeSchemaWithCustomGranularities(name: string): string {
+  return `cube('${name}', {
+        sql: 'select * from orders',
+        public: true,
+        dimensions: {
+          createdAt: {
+            public: true,
+            sql: 'created_at',
+            type: 'time',
+            granularities: {
+              half_year: {
+                interval: '6 months',
+              },
+              half_year_by_1st_april: {
+                interval: '6 months',
+                offset: '3 months'
+              },
+              half_year_by_1st_march: {
+                interval: '6 months',
+                origin: '2020-03-01'
+              },
+              half_year_by_1st_june: {
+                interval: '6 months',
+                origin: '2020-06-01 10:00:00'
+              }
+            }
+          },
+          createdAtPredefinedYear: {
+            public: true,
+            sql: \`\${createdAt.year}\`,
+            type: 'string',
+          },
+          createdAtPredefinedQuarter: {
+            public: true,
+            sql: \`\${createdAt.quarter}\`,
+            type: 'string',
+          },
+          createdAtHalfYear: {
+            public: true,
+            sql: \`\${createdAt.half_year}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stJune: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_june}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stMarch: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_march}\`,
+            type: 'string',
+          },
+          status: {
+            type: 'string',
+            sql: 'status',
+          },
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
+          }
+        },
+        measures: {
+          count: {
+            type: 'count'
+          },
+          rollingCountByTrailing2Day: {
+            type: 'count',
+            rollingWindow: {
+              trailing: '2 day'
+            }
+          },
+          rollingCountByLeading2Day: {
+            type: 'count',
+            rollingWindow: {
+              leading: '3 day'
+            }
+          },
+          rollingCountByUnbounded: {
+            type: 'count',
+            rollingWindow: {
+              trailing: 'unbounded'
+            }
+          }
+        },
+
+        joins: {
+          ${name}_users: {
+            sql: \`\${${name}_users}.id = \${${name}}.user_id\`,
+            relationship: \`one_to_many\`
+          }
+        }
+
+      })
+
+      cube(\`${name}_users\`, {
+        sql: \`SELECT * FROM users\`,
+
+        dimensions: {
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
+          },
+          name: {
+            sql: 'name',
+            type: 'string',
+            public: true,
+          },
+          proxyCreatedAtPredefinedYear: {
+            sql: \`\${${name}.createdAt.year}\`,
+            type: \`string\`,
+            public: true,
+          },
+          proxyCreatedAtHalfYear: {
+            sql: \`\${${name}.createdAt.half_year}\`,
+            type: 'string',
+            public: true,
+          }
+        },
+
+        measures: {
+          count: {
+            sql: 'user_id',
+            type: 'count_distinct'
+          }
+        }
+      })
+
+      view(\`orders_view\`, {
+        cubes: [{
+          join_path: orders,
+          includes: '*'
+        }]
+      })`;
 }
 
 export type CreateSchemaOptions = {
@@ -81,11 +225,11 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
 }
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}
-    
+
         measures:
           - name: count
             type: count
@@ -164,7 +308,56 @@ export function createECommerceSchema() {
           },
         }
       ]
-    }],
+    },
+    {
+      name: 'orders_indexes',
+      sql_table: 'orders',
+      measures: [{
+        name: 'count',
+        type: 'count',
+      }],
+      dimensions: [
+        {
+          name: 'created_at',
+          sql: 'created_at',
+          type: 'time',
+        },
+        {
+          name: 'status',
+          sql: 'status',
+          type: 'string',
+        }
+      ],
+      preAggregations: [
+        {
+          name: 'orders_by_day_with_day_by_status',
+          measures: ['count'],
+          dimensions: ['status'],
+          timeDimension: 'created_at',
+          granularity: 'day',
+          partition_granularity: 'day',
+          build_range_start: {
+            sql: 'SELECT NOW() - INTERVAL \'1000 day\'',
+          },
+          build_range_end: {
+            sql: 'SELECT NOW()'
+          },
+          indexes: [
+            {
+              name: 'regular_index',
+              columns: ['created_at', 'status']
+            },
+            {
+              name: 'agg_index',
+              columns: ['status'],
+              type: 'aggregate'
+            }
+
+          ]
+        }
+      ]
+    },
+    ],
     views: [{
       name: 'orders_view',
       cubes: [{

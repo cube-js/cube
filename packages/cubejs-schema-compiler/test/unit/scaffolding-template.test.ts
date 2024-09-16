@@ -1,4 +1,3 @@
-import { MemberType } from '../../src';
 import {
   ScaffoldingTemplate,
   SchemaFormat,
@@ -6,12 +5,10 @@ import {
 
 const driver = {
   quoteIdentifier: (name) => `"${name}"`,
-  concatStringsSql: (strings: string[]) => strings.join(' || '),
 };
 
 const mySqlDriver = {
   quoteIdentifier: (name) => `\`${name}\``,
-  concatStringsSql: (strings: string[]) => `CONCAT(${strings.join(', ')})`
 };
 
 const bigQueryDriver = {
@@ -64,7 +61,7 @@ const dbSchema = {
         attributes: [],
       },
       {
-        name: 'accountId',
+        name: 'account_id',
         type: 'integer',
         attributes: [],
       },
@@ -86,7 +83,7 @@ const dbSchema = {
         attributes: [],
       },
       {
-        name: 'failureCount',
+        name: 'failure_count',
         type: 'integer',
         attributes: [],
       },
@@ -113,7 +110,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Customers: {
-      sql: \`\${CUBE}.customerId = \${Customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${Customers}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -151,7 +148,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     Accounts: {
-      sql: \`\${CUBE}.accountId = \${Accounts}.id\`,
+      sql: \`\${CUBE}.account_id = \${Accounts}.id\`,
       relationship: \`belongsTo\`
     }
   },
@@ -219,8 +216,8 @@ describe('ScaffoldingTemplate', () => {
       type: \`count\`
     },
     
-    failurecount: {
-      sql: \`failureCount\`,
+    failureCount: {
+      sql: \`failure_count\`,
       type: \`sum\`
     }
   },
@@ -254,7 +251,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     customers: {
-      sql: \`\${CUBE}.customerId = \${customers}.id\`,
+      sql: \`\${CUBE}."customerId" = \${customers}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -292,7 +289,7 @@ describe('ScaffoldingTemplate', () => {
   
   joins: {
     accounts: {
-      sql: \`\${CUBE}.accountId = \${accounts}.id\`,
+      sql: \`\${CUBE}.account_id = \${accounts}.id\`,
       relationship: \`many_to_one\`
     }
   },
@@ -360,8 +357,8 @@ describe('ScaffoldingTemplate', () => {
       type: \`count\`
     },
     
-    failurecount: {
-      sql: \`failureCount\`,
+    failure_count: {
+      sql: \`failure_count\`,
       type: \`sum\`
     }
   },
@@ -410,7 +407,7 @@ describe('ScaffoldingTemplate', () => {
           {
             fileName: 'some_orders.js',
             content: `cube(\`some_orders\`, {
-  sql_table: \`public.someOrders\`,
+  sql_table: \`public.\\\`someOrders\\\`\`,
   
   joins: {
     
@@ -424,7 +421,7 @@ describe('ScaffoldingTemplate', () => {
     },
     
     somedimension: {
-      sql: \`someDimension\`,
+      sql: \`\${CUBE}.\\\`someDimension\\\`\`,
       type: \`string\`
     }
   },
@@ -463,7 +460,6 @@ describe('ScaffoldingTemplate', () => {
               },
               {
                 name: 'some.dimension.inside',
-                nestedName: ['some', 'dimension', 'inside'],
                 type: 'string',
                 attributes: [],
               },
@@ -531,7 +527,6 @@ describe('ScaffoldingTemplate', () => {
               },
               {
                 name: 'some.dimension.inside',
-                nestedName: ['some', 'dimension', 'inside'],
                 type: 'string',
                 attributes: [],
               },
@@ -590,119 +585,6 @@ describe('ScaffoldingTemplate', () => {
   });
 
   describe('Yaml formatter', () => {
-    it('generates composite primary key for YAML model', () => {
-      const template = new ScaffoldingTemplate(dbSchema, driver, {
-        format: SchemaFormat.Yaml,
-        snakeCase: true
-      });
-
-      const files = template.generateFilesByCubeDescriptors([
-        {
-          cube: 'orders',
-          tableName: 'public.orders',
-          table: 'orders',
-          schema: 'public',
-          joins: [],
-          shouldGeneratePrimaryKey: true,
-          members: [
-            {
-              memberType: MemberType.Dimension,
-              name: 'number',
-              title: 'Number',
-              types: [
-                'sum',
-                'avg',
-                'min',
-                'max'
-              ],
-              included: true,
-              type: 'number'
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'status',
-              title: 'Status',
-              types: [
-                'string'
-              ],
-              isPrimaryKey: false,
-              type: 'string',
-              included: true
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'created_at',
-              title: 'Created At',
-              types: [
-                'number'
-              ],
-              type: 'time',
-              included: true
-            },
-          ],
-        },
-      ]);
-
-      expect(files[0].content).toContain('sql: "{CUBE}.number || \'-\' || {CUBE}.status"');
-    });
-
-    it('generates composite primary key for JS model', () => {
-      const template = new ScaffoldingTemplate(dbSchema, driver, {
-        format: SchemaFormat.JavaScript,
-        snakeCase: true
-      });
-
-      const files = template.generateFilesByCubeDescriptors([
-        {
-          cube: 'orders',
-          tableName: 'public.orders',
-          table: 'orders',
-          schema: 'public',
-          joins: [],
-          shouldGeneratePrimaryKey: true,
-          members: [
-            {
-              memberType: MemberType.Dimension,
-              name: 'number',
-              title: 'Number',
-              types: [
-                'sum',
-                'avg',
-                'min',
-                'max'
-              ],
-              included: true,
-              type: 'number'
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'status',
-              title: 'Status',
-              types: [
-                'string'
-              ],
-              isPrimaryKey: false,
-              type: 'string',
-              included: true
-            },
-            {
-              memberType: MemberType.Dimension,
-              name: 'created_at',
-              title: 'Created At',
-              types: [
-                'number'
-              ],
-              type: 'time',
-              included: true
-            },
-          ],
-        },
-      ]);
-
-      // eslint-disable-next-line
-      expect(files[0].content).toContain('sql: `${CUBE}.number || \'-\' || ${CUBE}.status`');
-    });
-
     it('generates schema for base driver', () => {
       const template = new ScaffoldingTemplate(dbSchema, driver, {
         format: SchemaFormat.Yaml,
@@ -724,7 +606,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: customers
-        sql: "{CUBE}.customerId = {customers}.id"
+        sql: "{CUBE}.\\"customerId\\" = {customers}.id"
         relationship: many_to_one
 
     dimensions:
@@ -755,7 +637,7 @@ describe('ScaffoldingTemplate', () => {
 
     joins:
       - name: accounts
-        sql: "{CUBE}.accountId = {accounts}.id"
+        sql: "{CUBE}.account_id = {accounts}.id"
         relationship: many_to_one
 
     dimensions:
@@ -808,8 +690,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:
@@ -862,8 +744,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:
@@ -917,8 +799,8 @@ describe('ScaffoldingTemplate', () => {
       - name: count
         type: count
 
-      - name: failurecount
-        sql: failureCount
+      - name: failure_count
+        sql: failure_count
         type: sum
 
     pre_aggregations:

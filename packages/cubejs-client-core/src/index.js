@@ -56,6 +56,7 @@ class CubeApi {
     });
     this.pollInterval = options.pollInterval || 5;
     this.parseDateMeasures = options.parseDateMeasures;
+    this.castNumerics = typeof options.castNumerics === 'boolean' ? options.castNumerics : false;
 
     this.updateAuthorizationPromise = null;
   }
@@ -308,6 +309,11 @@ class CubeApi {
   }
 
   load(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));
@@ -327,6 +333,11 @@ class CubeApi {
   }
 
   subscribe(query, options, callback, responseFormat = ResultType.DEFAULT) {
+    options = {
+      castNumerics: this.castNumerics,
+      ...options
+    };
+
     if (responseFormat === ResultType.COMPACT) {
       if (Array.isArray(query)) {
         query = query.map((q) => this.patchQueryInternal(q, ResultType.COMPACT));

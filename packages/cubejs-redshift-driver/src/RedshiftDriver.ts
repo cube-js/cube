@@ -72,6 +72,14 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     super(options);
   }
 
+  protected primaryKeysQuery() {
+    return null;
+  }
+
+  protected foreignKeysQuery() {
+    return null;
+  }
+
   /**
    * @override
    */

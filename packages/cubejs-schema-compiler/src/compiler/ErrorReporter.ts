@@ -14,7 +14,7 @@ export interface CompilerErrorInterface {
 export interface SyntaxErrorInterface {
   message: string;
   plainMessage?: string
-  loc: SourceLocation | null,
+  loc: SourceLocation | null | undefined,
 }
 
 interface File {

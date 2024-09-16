@@ -1,0 +1,156 @@
+# Implementing custom sorting
+
+In this recipe, you will learn how to sort the result set of a [query][ref-queries]
+by your custom criteria.
+
+## Use case
+
+While [data APIs][ref-data-apis] provide built-in ways to sort the result set by
+dimensions and measures in ascending or descending order, sometimes you may need
+more flexibility.
+
+For example, if a measure or a dimension contains `NULL` values, they will always
+appear last last when sorting in the ascending order. This recipe shows how to
+work around this behavior for all data APIs.
+
+<ReferenceBox>
+
+Currently, the SQL API does not support `ORDER BY ... NULLS FIRST/LAST`.
+Please [track this issue](https://github.com/cube-js/cube/issues/8464).
+
+</ReferenceBox>
+
+## Data modeling
+
+Consider the following data model:
+
+<CodeTabs>
+
+```yaml
+cubes:
+  - name: sort_nulls
+    sql: >
+      SELECT 1234 AS value UNION ALL
+      SELECT 5678 AS value UNION ALL
+      SELECT NULL AS value
+
+    dimensions:
+      - name: value
+        sql: value
+        type: number
+
+      - name: value_for_sorting
+        sql: "COALESCE({value}, 0)"
+        type: number
+```
+
+```javascript
+cube(`sort_nulls`, {
+  sql: `
+    SELECT 1234 AS value UNION ALL
+    SELECT 5678 AS value UNION ALL
+    SELECT NULL AS value
+  `,
+
+  dimensions: {
+    value: {
+      sql: `value`,
+      type: `number`
+    },
+
+    value_for_sorting: {
+      sql: `COALESCE(${value}, 0)`,
+      type: `number`
+    }
+  }
+})
+```
+
+</CodeTabs>
+
+You can see that the `value` dimension contains `NULL` values while the
+`value_for_sorting` dimension never has `NULL` values. It means that sorting by
+the latter dimension will always strictly follow the ascending or descending
+order.
+
+Moreover, note that this additional dimension that acts as a *sorting key* may
+reference more than one other dimension, allowing to move your complex sorting
+logic from the querying layer to your data model. 
+
+
+## Query
+
+Let's query the `value` dimension and sort the result set by that dimension in
+the ascending order:
+
+<CodeTabs>
+
+```sql
+SELECT value
+FROM sort_nulls
+GROUP BY 1
+ORDER BY 1 ASC;
+```
+
+```json
+{
+  "dimensions": [
+    "sort_nulls.value"
+  ],
+  "order": {
+    "sort_nulls.value": "asc"
+  }
+}
+```
+
+</CodeTabs>
+
+We'll get the following result set:
+
+| value  | 
+| ------ |
+| 1234   |
+| 5678   |
+| `NULL` |
+
+
+Now, let's query the `value` dimension but sort the result set by the
+`value_for_sorting` dimension in the ascending order:
+
+<CodeTabs>
+
+```sql
+SELECT value, value_for_sorting
+FROM sort_nulls
+GROUP BY 1, 2
+ORDER BY 2 ASC;
+```
+
+```json
+{
+  "dimensions": [
+    "sort_nulls.value",
+    "sort_nulls.value_for_sorting"
+  ],
+  "order": {
+    "sort_nulls.value_for_sorting": "asc"
+  }
+}
+```
+
+</CodeTabs>
+
+We'll get the following result set:
+
+| value  | value_for_sorting | 
+| ------ | ----------------- |
+| `NULL` |                 0 |
+| 1234   |              1234 |
+| 5678   |              5678 |
+
+As you can see, now `NULL` values of the `value` dimension appear first in the
+result set.
+
+
+[ref-queries]: /product/apis-integrations/queries
+[ref-data-apis]: /product/apis-integrations#data-apis

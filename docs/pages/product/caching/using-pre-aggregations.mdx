@@ -5,10 +5,49 @@ redirect_from:
 
 # Using pre-aggregations
 
+Pre-aggregations is an implementation of aggregate awareness in Cube.
+Pre-aggregation tables are materialized query results. 
+Cube can analyze queries against a defined set of pre-aggregation rules to 
+choose the optimal one that will be used to serve a given Cube query instead of going to the data source.
+
+If Cube finds a suitable pre-aggregation rule, database querying becomes a
+multi-stage process:
+
+1.  Cube checks if an up-to-date copy of the pre-aggregation exists.
+
+2.  Cube will execute a query against the pre-aggregated tables instead of the
+    raw data.
+
 Pre-aggregations is a powerful way to speed up your Cube queries. There are many
-configuration options to consider. Please make sure to also check [the
-Pre-Aggregations reference in the data modeling
-section][ref-schema-ref-preaggs].
+configuration options to consider. Please make sure to check the
+[configuration reference][ref-schema-ref-preaggs].
+
+## Matching queries
+
+When executing a query, Cube will try to [match and fulfill it with a
+pre-aggregation][ref-matching-preaggs] in the first place.
+
+If there's no matching pre-aggregation, Cube will query the upstream data
+source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
+
+## Rollup-only mode
+
+In the rollup-only mode, Cube will **only** fulfill queries using
+pre-aggregations. To enable the rollup-only mode, use the
+`CUBEJS_ROLLUP_ONLY` environment variable.
+
+It can be useful to prevent queries from your end users from ever hitting the
+upstream data source, e.g., if you prefer to use your data warehouse only to
+build and refresh pre-aggregations and keep it suspended the rest of the time.
+
+<WarningBox>
+
+When the rollup-only mode is used with a single-node deployment (where the API
+instance also serves as a [refresh worker][ref-deploy-refresh-wrkr]), queries
+that can't be fulfilled with pre-aggregations will result in an error.
+Scheduled refreshes will continue to work in the background.
+
+</WarningBox>
 
 ## Refresh strategy
 
@@ -144,22 +183,6 @@ When `every` and `sql` are used together, Cube will run the query from the `sql`
 property on an interval defined by the `every` property. If the query returns
 new results, then the pre-aggregation will be refreshed.
 
-## Rollup-only mode
-
-To make Cube _only_ serve requests from pre-aggregations, the
-[`CUBEJS_ROLLUP_ONLY`][ref-config-env-rolluponly] environment variable can be
-set to `true` on an API instance. This will prevent serving data on API requests
-from the source database.
-
-<WarningBox>
-
-When using this configuration in a single node deployment (where the API
-instance and [Refresh Worker][ref-deploy-refresh-wrkr] are configured on the
-same host), requests made to the API that cannot be satisfied by a rollup throw
-an error. Scheduled refreshes will continue to work in the background.
-
-</WarningBox>
-
 ## Partitioning
 
 [Partitioning][wiki-partitioning] is an extremely effective optimization for
@@ -239,6 +262,23 @@ This issue can be addressed by lambda pre-aggregations.
 Alternatively, if you want to explicitly introduce key partitioning, you can use multi-tenancy to introduce multiple orchestrator IDs.
 Each orchestrator ID can use a different pre-aggregation schema, so you may define those based on the partitioning key you want to introduce.
 This technique, together with multi-router Cube Store approach, allows you to achieve linear scaling on the partitioning key of your choice.
+
+### Best practices
+
+In general, it's better to lean towards less partitions, as long as you are satisfied with query speed.
+
+For optimal _querying performance_, partitions should be small enough so that the Cube Store workers can process them in less than 100 milliseconds. 
+The best way to optimize this is to start from a relatively large partition (e.g., yearly or no partition at all if data permits), 
+check what the [flame graph][ref-flame-graph] in Query History shows, then iterate as needed.
+
+For optimal pre-aggregation _build performance_, you would optimize partition size together with pre-aggregation build concurrency and build time. Smaller 
+partitions with high concurrency would incur significant overhead. For optimal build performance, having 1 Cube Store worker per partition is ideal. 
+However, Cube Store workers can handle up to 4 partitions per worker conucrrently. Since Cube Store workers often max out at 16, this means you should avoid having more than 64 partitions. 
+Any additional partitions would be queued. Keep in mind that indexes essentially multiply the number of partitions that are created, 
+so for example, if you have two indexes, you would want to avoid having more than 32 partitions to avoid queueing. 
+The best way to optimize this is to make refresh keys as infrequent as possible 
+and then use the [Build History][ref-build-history] tab to check build times, along with the [Performance Insights][ref-perf-insights] page to 
+monitor Cube Store workers load, and iterate as needed.
 
 ## Using indexes
 
@@ -650,16 +690,14 @@ This query would be optimal as well.
 
 ## Pre-aggregations storage
 
-The default pre-aggregations storage in Cube is its own purpose-built storage
-layer: Cube Store.
+Cube uses its own purpose-built pre-aggregations engine: [Cube Store][ref-cube-store].
 
-Alternatively, you can store pre-aggregations **internally** in the source
-database. To store a pre-aggregation internally, set `external: false` in
-pre-aggregation definition.
+When using Cube Store, pre-aggregation data will be ingested and stored as Parquet files
+on a [blob storage][ref-cube-store-storage]. Then, Cube Store would load that data to
+execute queries using pre-aggregations.
 
-Please note, that [original_sql][ref-original-sql] pre-aggregations are stored
-**internally** by default. It is not recommended to store `original_sql`
-pre-aggregations in Cube Store.
+However, [`original_sql`][ref-original-sql] pre-aggregations are stored in the data source
+by default. It is not recommended to store `original_sql` pre-aggregations in Cube Store.
 
 ## Joins between pre-aggregations
 
@@ -954,6 +992,36 @@ please [let us know](https://cube.dev/contact) if you are interested in early
 access to any of these drivers or would like Cube to support any other SQL
 streaming engine.
 
+## Troubleshooting
+
+### Unused pre-aggregations
+
+You might find that a pre-aggregation is ignored by Cube. Possible reasons:
+
+* A pre-aggregation does not reference any dimensions or measures from a cube
+where this pre-aggreation is [defined][ref-schema-ref-preaggs]. To resolve,
+move it to another cube.
+* A pre-aggregation is defined similarly to another pre-aggregation that has
+more granular [partitions](#partitioning). To resolve, remove one of these
+pre-aggregations.
+
+### Members with unknown types
+
+When building pre-aggregations, you might get an error similar to the this one:
+
+```
+Error during create table: CREATE TABLE <REDACTED>:
+Custom type 'fixed' is not supported
+```
+
+It means that a member of a pre-aggregation has a type in the upstream data
+source that Cube Store can not recognize (e.g., `fixed` in this case).
+
+To resolve, please add a cast to a known type in the [`sql` parameter][ref-member-sql]
+of this member. For numeric types, it will most likely be an integer, a float,
+or a decimal type, depending on the nature of your data.
+
+
 [ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
 [ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
 [ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
@@ -961,8 +1029,6 @@ streaming engine.
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory
-[ref-config-env-rolluponly]:
-  /reference/configuration/environment-variables#cubejs-rollup-only
 [ref-config-extdriverfactory]:
   /reference/configuration/config#externaldriverfactory
 [ref-connect-db-athena]: /product/configuration/data-sources/aws-athena
@@ -994,3 +1060,10 @@ streaming engine.
 [ref-ref-indexes]: /reference/data-model/pre-aggregations#indexes
 [ref-additivity]: /product/caching/getting-started-pre-aggregations#additivity
 [ref-ref-index-type]: /reference/data-model/pre-aggregations#type-1
+[ref-flame-graph]: /product/workspace/query-history#flame-graph
+[ref-perf-insights]: /product/workspace/performance
+[ref-build-history]: /product/workspace/pre-aggregations#build-history
+[ref-matching-preaggs]: /product/caching/matching-pre-aggregations
+[ref-cube-store]: /product/caching/running-in-production#architecture
+[ref-cube-store-storage]: /product/caching/running-in-production#storage
+[ref-member-sql]: /reference/data-model/dimensions#sql

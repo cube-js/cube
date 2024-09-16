@@ -83,17 +83,19 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
       config.dataSource ||
       assertDataSource('default');
 
+    const username = getEnv('dbUser', { dataSource });
+    const auth = username.includes('@')
+      ? { username, password: getEnv('dbPass', { dataSource }) }
+      : { client_id: username, client_secret: getEnv('dbPass', { dataSource }) };
+
     this.config = {
       readOnly: true,
       apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
       ...config,
       connection: {
-        username: getEnv('dbUser', { dataSource }),
-        password: getEnv('dbPass', { dataSource }),
+        auth,
         database: getEnv('dbName', { dataSource }),
-        // The propery `account` is deprecated according to Firebolt SDK docs
-        // and will be removed in the future.
-        // account: <string>process.env.CUBEJS_FIREBOLT_ACCOUNT,
+        account: getEnv('fireboltAccount', { dataSource }),
         engineName: getEnv('fireboltEngineName', { dataSource }),
         // engineEndpoint was deprecated in favor of engineName + account
         engineEndpoint: getEnv('fireboltEngineEndpoint', { dataSource }),
@@ -349,7 +351,7 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
   public async release() {
     if (this.connection) {
       const connection = await this.connection;
-      connection.destroy();
+      await connection.destroy();
       this.connection = null;
     }
   }

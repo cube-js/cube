@@ -8,11 +8,15 @@
       "CUBEJS_DB_HOST": "data",
       "CUBEJS_DB_NAME": "test",
       "CUBEJS_DB_USER": "test",
-      "CUBEJS_DB_PASS": "test"
+      "CUBEJS_DB_PASS": "test",
+      "CUBEJS_PG_SQL_PORT": "5656",
+      "CUBEJS_SQL_USER": "admin",
+      "CUBEJS_SQL_PASSWORD": "admin_password",
+      "CUBESQL_SQL_PUSH_DOWN": "true"
     },
     "depends_on": ["data"],
     "links": ["data"],
-    "ports" : ["4000"]
+    "ports" : ["4000", "5656"]
   },
   "data": {
     "image": "clickhouse/clickhouse-server:23.10",
@@ -112,11 +116,33 @@
           "name": "category_index",
           "columns": ["CUBE.productName"]
         }]
+      },
+      {
+        "name": "MultiTimeDimForCount",
+        "time_dimensions": [
+          {
+            "dimension": "CUBE.completedDate",
+            "granularity": "day"
+          },
+          {
+            "dimension": "CUBE.orderDate",
+            "granularity": "day"
+          }
+        ],
+        "dimensions": ["CUBE.productName"],
+        "partition_granularity": "month",
+        "measures": [
+          "CUBE.count"
+        ],
+        "indexes": [{
+          "name": "category_index",
+          "columns": ["CUBE.productName"]
+        }]
       }
     ]
   },
   "skip": [
-    "SKIPED FOR ALL",
+    "SKIPPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -131,6 +157,13 @@
     "--------------------",
     "querying BigECommerce: rolling window by 2 day",
     "querying BigECommerce: rolling window by 2 week",
-    "querying BigECommerce: rolling window by 2 month"
+    "querying BigECommerce: rolling window by 2 month",
+
+    "---------------------------------------",
+    "Custom Granularities                   ",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing",
+    "querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading"
   ]
 }

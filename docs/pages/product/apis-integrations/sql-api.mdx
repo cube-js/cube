@@ -9,33 +9,16 @@ SQL API enables Cube to deliver data over the [Postgres-compatible
 protocol][postgres-protocol] to certain kinds of data applications, including
 but not limited to the following ones:
 
-- [Business intelligence (BI) and data exploration][ref-bi] tools, e.g.,
-  [Superset][ref-superset] or [Tableau][ref-tableau]
-- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter] or
-  [Hex][ref-hex]
+- Most commonly, [business intelligence tools][ref-bi], e.g.,
+  [Tableau][ref-tableau], [Power BI][ref-powerbi], [ThoughtSpot][ref-thoughtspot],
+  [Sigma][ref-sigma], [Looker Studio][ref-looker-studio], [Superset /
+  Preset][ref-superset], and [Metabase][ref-metabase]
+- [Data notebooks][ref-notebooks], e.g., [Jupyter][ref-jupyter], [Hex][ref-hex],
+  or [Deepnote][ref-deepnote]
 - Reverse ETL tools, e.g., Census or Hightouch
-- [Low-code tools][ref-low-code], e.g., [Retool][ref-retool]
-- Automated jobs
 
 Often, the SQL API is used to enable internal or self-serve [business
-intelligence][cube-issbi] use cases.
-
-SQL API has been tested with the following tools:
-
-- psql CLI
-- Apache Superset
-- Tableau Cloud
-- Tableau Desktop with JDBC driver
-- Power BI
-- Metabase
-- Google Looker Studio
-- Excel through Devart plugin
-- Deepnote
-- Hex
-- Observable
-- Streamlit
-- Jupyter notebook
-- Hightouch
+intelligence][cube-bi-use-case] use cases.
 
 <InfoBox>
 
@@ -44,8 +27,104 @@ suggest tools of your interest and vote for already proposed ones.
 
 </InfoBox>
 
-See [SQL API reference][ref-ref-sql-api] for the list of supported commands,
-functions, and operators.
+## Example request
+
+You can use the [`psql` utility][link-psql] to connect to the SQL API:
+
+```bash
+# Cube Core
+PGPASSWORD=password \
+  psql -h localhost \
+  -p 15432 \
+  -U user cube
+```
+
+```bash
+# Cube Cloud
+PGPASSWORD=password \
+  psql -h awesome-ecom.sql.gcp-us-central1.cubecloudapp.dev \
+  -p 5432 \
+  -U cube awesome-ecom
+```
+
+Then, you can run queries in the Postgres dialect, just like the following one:
+
+```sql
+SELECT
+  users.state,
+  users.city,
+  orders.status,
+  MEASURE(orders.count)
+FROM orders
+CROSS JOIN users
+WHERE
+  users.state != 'us-wa'
+  AND orders.created_at BETWEEN '2020-01-01' AND '2021-01-01'
+GROUP BY 1, 2, 3
+LIMIT 10;
+```
+
+You can also introspect the data model in a Postgres-native way by querying [tables
+in `information_schema`][link-postgres-information-schema] or using [backslash
+commands][link-postgres-backslash-commands]:
+
+```sql
+SELECT *
+FROM information_schema.tables
+WHERE table_schema = 'public';
+```
+
+```sql
+\d
+```
+
+Check [query format][ref-sql-query-format] for details about supported queries.
+Also, check [SQL API reference][ref-ref-sql-api] for the list of supported SQL
+commands, functions, and operators.
+
+## Fundamentals
+
+In the SQL API, each cube or view from the [data model][ref-data-model-concepts]
+is represented as a table. Measures, dimensions, and segments are represented as
+columns in these tables. SQL API can execute [regular queries][ref-regular-queries],
+[queries with post-processing][ref-queries-wpp], and [queries with
+pushdown][ref-queries-wpd] that can reference these tables and columns.
+
+Under the hood, the SQL API uses [Apache DataFusion][link-datafusion] as
+its query engine. It's responsible for query planning and execution.
+As part of query planning, the SQL API also uses [egg][link-egg] (an [e-graph term
+rewriting][link-egraphs] library) to analyze incoming SQL queries and find the best
+query plan out of a wide variety of possible plans to execute.
+
+<Diagram src="https://ucarecdn.com/70646e5a-12bd-45a3-84ad-004de11ed536/"/>
+
+Overall, query planning is a seamless process. 
+SQL API does its best to execute a query as a [regular query][ref-regular-queries]
+or a [query with post-processing][ref-queries-wpp]. If that is not possible,
+then the query would be executed as a [query with pushdown][ref-queries-wpd].
+There are trade-offs associated with each query type:
+
+| Query type | In-memory cache | Pre-aggregations | SQL support |
+| ---- | ---- | ---- | ---- |
+| [Regular queries][ref-regular-queries] | ✅ Used | ✅ Used | 🟡 Very limited |
+| [Queries with post-processing][ref-queries-wpp] | ✅ Used | ✅ Used | 🟡 Limited |
+| [Queries with pushdown][ref-queries-wpd] | ✅ Used | ❌ Not used | ✅ Extensive |
+
+<InfoBox>
+
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
+
+</InfoBox>
+
+<WarningBox>
+
+**Query pushdown is disabled by default.** You should explicitly [enable
+it](#query-planning). In future versions, it will be enabled by default. Also,
+enabling query pushdown would affect how [ungrouped queries][ref-ungrouped-queries]
+are executed; check [query format][ref-sql-query-format] for details.
+
+</WarningBox>
 
 ## Configuration
 
@@ -67,493 +146,112 @@ You can also use
 [`canSwitchSqlUser`][ref-config-canswitchsqluser], and `CUBEJS_SQL_SUPER_USER`
 to configure [custom authentication][ref-sql-api-auth].
 
+#### Example
+
+The following Docker Compose file will run Cube with the SQL API enabled on
+port 15432, accessible using `user` as the user name, `password` as the password,
+and any string as the database name:
+
+```yaml filename="docker-compose.yml"
+services:
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - 4000:4000
+      - 15432:15432
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_API_SECRET=SECRET
+
+      - CUBEJS_DB_USER=cube
+      - CUBEJS_DB_PASS=12345
+      - CUBEJS_DB_HOST=demo-db-examples.cube.dev
+      - CUBEJS_DB_NAME=ecom
+      - CUBEJS_DB_TYPE=postgres
+
+      - CUBEJS_PG_SQL_PORT=15432      # SQL API credential
+      - CUBEJS_SQL_USER=user          # SQL API credential
+      - CUBEJS_SQL_PASSWORD=password  # SQL API credential
+    volumes:
+      - .:/cube/conf
+```
+
+After running it with `docker compose up`, you can finally connect and execute
+an [example request](#example-request).
+
 ### Cube Cloud
 
 **SQL API is enabled by default.** You can find credentials for the SQL API on
 the <Btn>Overview</Btn> page by clicking <Btn>Connect to SQL API</Btn>.
 
-You can also customize `CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and
-`CUBEJS_SQL_PASSWORD` environment variables by navigating to <Btn>Settings →
-Configration</Btn>.
+By default, the SQL API is enabled on port 5432, the user name is `cube`, and
+a random  string is generated for the password. You can customize these with
+`CUBEJS_PG_SQL_PORT`, `CUBEJS_SQL_USER`, and `CUBEJS_SQL_PASSWORD` environment
+variables by navigating to <Btn>Settings → Configration</Btn>.
 
-## Querying Fundamentals
+### Query planning
 
-Under the hood, SQL API uses
-[Apache Datafusion](https://arrow.apache.org/datafusion/) as its SQL execution
-engine. It's responsible for query planning and execution. As the conversion
-process from SQL to Cube Query can be ambiguous, an additional step of query
-rewriting is done before the query is executed. During this step, the query plan
-is rewritten such that the maximum number of Cube Queries can be detected within
-the given query plan. Overall, rewriting is a seamless process. There are some
-practical considerations that you should keep in mind while querying, though.
+**By default, the SQL API executes queries as [regular queries][ref-regular-queries]
+or [queries with post-processing][ref-queries-wpp].** Such queries support only a limited
+set of SQL functions and operators, and sometimes you can get the following error:
+`Error during rewrite: Can't detect Cube query and it may be not supported yet.`
 
-In the SQL API, each cube is represented as a table. Measures, dimensions, and
-segments in this table are columns. We call these tables **cube tables**.
+You can use the `CUBESQL_SQL_PUSH_DOWN` environment variable to instruct the SQL API
+to execute such queries as [queries with pushdown][ref-queries-wpd].
 
-Consider the `orders` cube in your data model, the following query is performing
-a `SELECT` from the `orders` **cube**.
+<InfoBox>
 
-```sql
-SELECt
-  city,
-  SUM(amount)
-FROM orders
-WHERE status = 'shipped'
-GROUP BY 1
-```
+Query pushdown in the SQL API is available in public preview.
+[Read more](https://cube.dev/blog/query-push-down-in-cubes-semantic-layer) in the blog.
 
-The SQL API transforms `SELECT` query fragments from **cube tables** into
-[Cube's internal query format](/product/apis-integrations/rest-api/query-format).
-This process is called **Cube query rewrite**.
+</InfoBox>
 
-The SQL query above would be rewritten into the following Cube query:
+Query planning is a resource-intensive task, and sometimes you can get the following
+error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit reached.`
+Use the following environment variables to allocate more resources for query planning:
+`CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
-```json
-{
-  "measures": ["Orders.amount"],
-  "dimensions": ["Orders.city"],
-  "filters": [
-    {
-      "member": "Orders.status",
-      "operator": "equals",
-      "values": ["shipped"]
-    }
-  ]
-}
-```
+## Streaming
 
-Because of this transformation, not all functions and expressions are supported
-in query fragments performing `SELECT` from cube tables. Please refer to the
-reference to see whether a specific expression or function is supported. For
-example, the following query won't work because the SQL API can't push down the
-`case` expression to Cube for processing. It is not possible to translate `case`
-expression in measure.
+By default, query results are loaded in a single batch. However, a more effective
+*streaming mode* can be used for large result sets. To enable it, set the
+`CUBESQL_STREAM_MODE` environment variable to `true`.
 
-```sql
--- This query won't work because of the Cube query rewrite
-SELECT
-  city,
-  CASE
-    WHEN status = 'shipped' THEN 'done'
-    ELSE 'in-progress'
-  END real_status,
-  SUM(number)
-FROM orders
-  CROSS JOIN Users
-GROUP BY 1;
-```
+<InfoBox>
 
-You can leverage nested queries in cases like this. You can wrap your `SELECT`
-statement from a cube table into another `SELECT` statement to perform
-calculations with expressions like `CASE`. This outer select is **not** part of
-the SQL query that being rewritten and thus allows you to use more SQL
-functions, operators and expressions. You can rewrite the above query as
-follows, making sure to wrap the original `SELECT` statement:
+When the streaming mode is enabled, the maximum [row limit][ref-queries-row-limit]
+does not apply to SQL API queries. They can return an unlimited number of rows.
 
-```sql
---- You can also use CTEs to achieve the same result
-SELECT
-  city,
-  CASE
-    WHEN status = 'shipped' THEN 'done'
-    ELSE 'in-progress'
-  END real_status,
-  SUM(amount) AS total
-FROM (
-  SELECT
-    Users.city AS city,
-    SUM(number) AS amount,
-    orders.status
-  FROM orders
-    CROSS JOIN Users
-  GROUP BY 1, 3
-) AS inner
-GROUP BY 1, 2
-ORDER BY 1;
-```
+</InfoBox>
 
-The above query works because the `CASE` expression is supported in `SELECT`
-queries **not** querying cube tables.
-
-When querying cube tables, it is important to understand fundamentals of Cube
-query rewrite as well as the **pushdown** process. **Pushdown** is a process of
-pushing the processing of a particular part of the query down to the inner
-`SELECT` from the cube table. The following sections provide an overview of Cube
-query rewrite and pushdown. Please refer to the reference to see whether
-specific functions, operators or expressions are supported in Cube query
-rewrite.
-
-### Aggregated vs Non-aggregated queries
-
-There are two types of queries supported against **cube tables**: aggregated and
-non-aggregated. Aggregated are those with `GROUP BY` statement, and
-non-aggregated are those without. Cube queries issued to your database will
-always be aggregated, and it doesn't matter if you provide `GROUP BY` in a query
-or not.
-
-Whenever you use a non-aggregated query you need to provide only column names in
-SQL:
-
-```sql
-SELECT status, count FROM orders
-```
-
-The same aggregated query should always aggregate measure columns using a
-corresponding aggregating function or special `MEASURE()` function:
-
-<WarningBox>
-
-In cases where measure columns are not aggregated or dimensions columns aren't included in `GROUP BY`,
-`Projection references non-aggregate values` error will be thrown. This error means
-there are columns that are neither in `GROUP BY` nor aggregated. This is a
-standard SQL `GROUP BY` operation consistency check enforced by SQL API as well.
-This error can be also thrown if you forget to `GROUP BY` all dimensions included in the query as well.
-
-</WarningBox>
-
-```sql
-SELECT status, SUM(count) FROM orders GROUP BY 1
-SELECT status, MEASURE(count) FROM orders GROUP BY 1
-```
-
-### Filtering
-
-Cube supports most simple equality operators like `=`, `<>`, `<`, `<=`, `>`,
-`>=` as well as `IN` and `LIKE` operators. Cube tries to push down all filters
-into Cube query. In some cases, SQL filters aren't available in Cube and can be
-done in a post-processing phase. Time dimension filters will be converted to
-time dimension date ranges whenever it's possible.
-
-### Ordering
-
-Cube tries to push down all `ORDER BY` statements into Cube Query.
-
-If it can't be done ordering part would be done in a post-processing phase. In
-case there are more than 50,000 rows in the result set, incorrect results can be
-received in this case. Please use `EXPLAIN` in order to check if it's the case.
-
-Consider the following query.
-
-```sql
-SELECT
-  status,
-  SUM(total_value) + 2 as transformed_amount
-FROM (
-  SELECT * FROM orders
-) orders
-GROUP BY status
-ORDER BY status DESC
-LIMIT 100
-```
-
-Because of the expression `SUM(total_value) + 2` in the projection of outer
-query, Cube can't push down `ORDER`.
-
-You can run `EXPLAIN` against the above query to look at the plan. As you can
-see below, the sorting operation is done after Cube query and projection.
-
-```bash
-+ GlobalLimitExec: skip=None, fetch=100
-+- SortExec: [transformed_amount@1 DESC]
-+-- ProjectionExec: expr=[status@0 as status, SUM(orders.total_value)@1 + CAST(2 AS Float64) as transformed_amount]
-+--- CubeScanExecutionPlan
-```
-
-Because of the default limit in Cube queries (50,000 rows), there is a
-possibility of a wrong result if there are more than 50,000 rows. Given that
-queries to Cube are usually aggregated, it is rare that they may return more
-than 50,000 rows, but keep that limitation in mind when designing your queries.
-
-### Limit
-
-Limit push down is supported by Cube however, a limit over 50,000 can't be
-overridden. In future versions, paging and streaming would be used to avoid this
-limitation.
-
-## Examples
-
-Consider the following data model:
-
-<CodeTabs>
-
-```yaml
-cubes:
-  - name: orders
-    sql_table: orders
-
-    measures:
-      - name: count
-        type: count
-
-    dimensions:
-      - name: status
-        type: string
-        sql: status
-
-      - name: created_at
-        type: time
-        sql: created_at
-```
-
-```javascript
-cube(`orders`, {
-  sql_table: `orders`,
-
-  measures: {
-    count: {
-      type: `count`,
-    },
-  },
-
-  dimensions: {
-    status: {
-      sql: `status`,
-      type: `string`,
-    },
-
-    created_at: {
-      sql: `created_at`,
-      type: `time`,
-    },
-  },
-});
-```
-
-</CodeTabs>
-
-It would be represented as table in SQL API with `count`, `status`, `created`
-columns.
-
-To get the count of orders grouped by status we can run the following query.
-
-```sql
-cube=> SELECT count, status FROM orders;
- count |   status
--------+------------
- 15513 | completed
- 14652 | processing
- 13829 | shipped
-(3 rows)
-```
-
-Cube will automatically apply the `GROUP BY` clause in case it is missing in the
-query. We can also provide the `GROUP BY` statement to control how results are
-grouped. In the following example, we group orders by created month and also by
-status within every month.
-
-```sql
-cube=> SELECT MEASURE(count), status, DATE_TRUNC('month', created_at) date FROM orders GROUP BY date, status ORDER BY date asc;
- measure(orders.count) |   status   |            date
------------------------+------------+----------------------------
-                    31 | shipped    | 2016-01-01 00:00:00.000000
-                    28 | completed  | 2016-01-01 00:00:00.000000
-                    28 | processing | 2016-01-01 00:00:00.000000
-                    28 | shipped    | 2016-02-01 00:00:00.000000
-                    18 | processing | 2016-02-01 00:00:00.000000
-                    28 | completed  | 2016-02-01 00:00:00.000000
-                    54 | processing | 2016-03-01 00:00:00.000000
-                    57 | completed  | 2016-03-01 00:00:00.000000
-                    56 | shipped    | 2016-03-01 00:00:00.000000
-                    54 | shipped    | 2016-04-01 00:00:00.000000
-                    60 | completed  | 2016-04-01 00:00:00.000000
-                    43 | processing | 2016-04-01 00:00:00.000000
-                    55 | shipped    | 2016-05-01 00:00:00.000000
-```
-
-### Querying Dimensions
-
-Querying dimensions is straightforward, simply add any required fields to the
-`SELECT` clause.
-
-```sql
-cube=> SELECT status FROM orders;
-   status
-------------
- completed
- processing
- shipped
-(3 rows)
-```
-
-### Querying Measures
-
-Measures can similarly be queried through Cube SQL.
-
-Because measures are already aggregated in Cube there is no need to apply
-aggregate functions to them in SQL API if you don't have a `GROUP BY` statement
-in query.
-
-```sql
-cube=> SELECT count FROM orders;
- count
--------
- 43994
-(1 row)
-```
-
-Some BI systems or SQL constraints may require you to apply aggregate functions.
-To support this, Cube allows aggregate functions on measures as long as they
-match the type of the measure.
-
-`count` measure in our example is of type `count`, It means we can apply
-`COUNT()` aggregate function to it. The below query is similar to the above one.
-
-```sql
-cube=> SELECT COUNT(count) FROM orders;
- COUNT(orders.count)
----------------------
-               43994
-(1 row)
-```
-
-There's also universal aggregate function `MEASURE()` that matches any measure
-type.
-
-```sql
-cube=> SELECT MEASURE(count) FROM orders;
- measure(orders.count)
------------------------
-                 43994
-(1 row)
-```
-
-Let's look at more measures types:
-
-<CodeTabs>
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-
-    measures:
-      - name: count
-        type: count
-
-      - name: distinct_count
-        type: count_distinct
-        sql: id
-
-      - name: approx_distinct_count
-        type: count_distinct_approx
-        sql: id
-
-      - name: min_value
-        type: min
-        sql: min_value
-
-      - name: max_value
-        type: max
-        sql: max_value
-```
-
-```javascript
-cube(`orders`, {
-  // ...,
-
-  measures: {
-    count: {
-      type: `count`,
-    },
-    distinct_count: {
-      sql: `id`,
-      type: `count_distinct`,
-    },
-    approx_distinct_count: {
-      sql: `id`,
-      type: `count_distinct_approx`,
-    },
-    min_value: {
-      sql: `min_value`,
-      type: `min`,
-    },
-    max_value: {
-      sql: `max_value`,
-      type: `max`,
-    },
-  },
-});
-```
-
-</CodeTabs>
-
-As we can see, we have a mix of measure types in the above data model. To query
-them, we could use the following SQL statements:
-
-```sql
---- Both the following statements are equivalent
-SELECT count FROM orders
-SELECT COUNT(*) FROM orders
-
---- Count distinct, and count distinct approx
---- Both the following statements are equivalent
-SELECT distinct_count FROM orders
-SELECT COUNT(DISTINCT distinct_count) FROM orders
-
---- Both the following statements are equivalent
-SELECT approx_distinct_count FROM orders
-SELECT COUNT(DISTINCT approx_distinct_count) FROM orders
-
---- Both the following statements are equivalent
-SELECT min_value FROM orders
-SELECT MIN(min_value) FROM orders
-
---- Both the following statements are equivalent
-SELECT max_value FROM orders
-SELECT MAX(max_value) FROM orders
-```
-
-### Querying Segments
-
-Any segments defined in a data model can also be used in Cube SQL queries.
-Looking at the data model below, we have one segment `is_completed`:
-
-<CodeTabs>
-
-```yaml
-cubes:
-  - name: orders
-    # ...
-    segments:
-      - name: is_completed
-        sql: status = 'completed'
-```
-
-```javascript
-cube("orders", {
-  // ...,
-
-  segments: {
-    is_completed: {
-      sql: `${CUBE}.status = 'completed'`,
-    },
-  },
-});
-```
-
-</CodeTabs>
-
-Segments must be used as `boolean` types in Cube SQL queries:
-
-```sql
-WHERE is_completed = true
-```
-
-[ref-config-js]: /reference/configuration/config
-[ref-dynamic-schemas]: /schema/dynamic-schema-creation
-[ref-config-env]: /reference/configuration/environment-variables
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth
 [ref-config-canswitchsqluser]: /reference/configuration/config#canswitchsqluser
 [ref-bi]: /product/configuration/visualization-tools#bi-data-exploration-tools
 [ref-superset]: /product/configuration/visualization-tools/superset
 [ref-tableau]: /product/configuration/visualization-tools/tableau
+[ref-powerbi]: /product/configuration/visualization-tools/powerbi
+[ref-thoughtspot]: /product/configuration/visualization-tools/thoughtspot
+[ref-sigma]: /product/configuration/visualization-tools/sigma
+[ref-looker-studio]: /product/configuration/visualization-tools/looker-studio
+[ref-metabase]: /product/configuration/visualization-tools/metabase
 [ref-notebooks]: /product/configuration/visualization-tools#notebooks
 [ref-jupyter]: /product/configuration/visualization-tools/jupyter
 [ref-hex]: /product/configuration/visualization-tools/hex
-[ref-low-code]:
-  /product/configuration/visualization-tools#low-code-tools-internal-tool-builders
-[ref-retool]: /product/configuration/visualization-tools/retool
-[postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
-[cube-issbi]: https://cube.dev/use-cases/semantic-layer
+[ref-deepnote]: /product/configuration/visualization-tools/deepnote
+[ref-sql-query-format]: /product/apis-integrations/sql-api/query-format
 [ref-ref-sql-api]: /reference/sql-api
+[ref-data-model-concepts]: /product/data-modeling/concepts
+[ref-regular-queries]: /product/apis-integrations/queries#regular-query
+[ref-queries-wpp]: /product/apis-integrations/queries#query-with-post-processing
+[ref-queries-wpd]: /product/apis-integrations/queries#query-with-pushdown
+[ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
+[link-datafusion]: https://arrow.apache.org/datafusion/
+[link-egg]: https://github.com/egraphs-good/egg
+[link-egraphs]: https://docs.rs/egg/latest/egg/tutorials/_01_background/index.html
+[link-psql]: https://www.postgresql.org/docs/current/app-psql.html
+[link-postgres-information-schema]: https://www.postgresql.org/docs/16/information-schema.html
+[link-postgres-backslash-commands]: https://www.postgresql.org/docs/current/app-psql.html#APP-PSQL-META-COMMANDS
+[postgres-protocol]: https://www.postgresql.org/docs/current/protocol.html
+[cube-bi-use-case]: https://cube.dev/use-cases/connected-bi
+[ref-queries-row-limit]: /product/apis-integrations/queries#row-limit

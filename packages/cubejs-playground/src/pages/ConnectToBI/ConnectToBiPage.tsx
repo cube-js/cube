@@ -222,10 +222,9 @@ function Field({ label, children }: FieldItemProps) {
 
 function getFields(fields: FieldProps[], credentials: CubeSqlCredentials) {
   return fields.map((field) => {
-    const value =
-      typeof field.value === 'function'
-        ? field.value(credentials)
-        : field.value;
+    const value = (
+      typeof field.value === 'function' ? field.value(credentials) : field.value
+    ) as string;
 
     switch (field.type) {
       case 'checkbox':
@@ -252,11 +251,11 @@ function getFields(fields: FieldProps[], credentials: CubeSqlCredentials) {
           </Typography.Paragraph>
         );
       case 'alert':
-        return <Alert message={field.value} />;
+        return <Alert message={value} />;
       case 'heading':
-        return <Typography.Title>{field.value}</Typography.Title>;
+        return <Typography.Title>{value}</Typography.Title>;
       case 'custom':
-        return field.value;
+        return value;
       case 'snippet':
         return <CodeSnippet theme="light" code={value} />;
       default:

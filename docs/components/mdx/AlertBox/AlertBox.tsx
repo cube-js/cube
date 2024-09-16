@@ -8,6 +8,7 @@ export enum AlertBoxTypes {
   INFO = "info",
   SUCCESS = "success",
   WARNING = "warning",
+  REFERENCE = "reference"
 }
 
 declare const TypeToEmoji: {
@@ -15,6 +16,7 @@ declare const TypeToEmoji: {
   error: string;
   info: JSX.Element;
   warning: string;
+  neutral: string;
 };
 type CalloutType = keyof typeof TypeToEmoji;
 
@@ -29,6 +31,7 @@ const typeMapping: Record<AlertBoxTypes, CalloutType> = {
   info: "info",
   warning: "warning",
   success: "default",
+  reference: "neutral"
 };
 
 const iconMapping: Record<string, any> = {
@@ -79,4 +82,9 @@ export const SuccessBox = (props: SuccessBoxProps) => (
 export type WarningBoxProps = AlertBoxSubclass;
 export const WarningBox = (props: WarningBoxProps) => (
   <AlertBox type={AlertBoxTypes.WARNING} {...props} />
+);
+
+export type ReferenceBoxProps = AlertBoxSubclass;
+export const ReferenceBox = (props: ReferenceBoxProps) => (
+  <AlertBox type={AlertBoxTypes.REFERENCE} {...props} />
 );
