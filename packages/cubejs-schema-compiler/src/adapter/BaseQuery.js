@@ -3716,6 +3716,9 @@ export class BaseQuery {
       return null;
     }
     const filterMembers = BaseQuery.extractFilterMembers(filter);
+    console.log('filterMembers:', filterMembers, '\ngroupMembers:', groupMembers, '\naliases:', aliases);
+    console.log('filterMembers.every(m => (groupMembers.indexOf(m) !== -1)):', Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1)));
+    console.log('filterMembers.every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1)):', Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1)));
     if (filterMembers && Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1))) {
       return filter;
     }
@@ -3758,7 +3761,7 @@ export class BaseQuery {
       return newGroupFilter({ operator: filter.operator, values }).filterToWhere();
     }
 
-    const filterParams = filter.filterParams();
+    const filterParams = filter && filter.filterParams();
     const filterParamArg = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
@@ -3806,11 +3809,15 @@ export class BaseQuery {
           .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
           .reduce((a, b) => ({ ...a, ...b }), {})
         : {};
+      // Filtering aliases that somehow relate to this group members
+      const aliasesForGroupMembers = Object.entries(aliases)
+        .filter(([key, value]) => groupMembers.includes(key))
+        .map(([_key, value]) => value);
       const filter = BaseQuery.findAndSubTreeForFilterGroup(
         newGroupFilter({ operator: 'and', values: allFilters }),
         groupMembers,
         newGroupFilter,
-        Object.values(aliases)
+        aliasesForGroupMembers
       );
 
       return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases)})`;
@@ -3846,15 +3853,16 @@ export class BaseQuery {
                     .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
-                // Filtering aliases that somehow relate to this cube
-                const filteredAliases = Object.entries(aliases)
-                  .filter(([key, value]) => key.startsWith(cubeNameObj.cube) || value.startsWith(cubeNameObj.cube))
-                  .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+                // Filtering aliases that somehow relate to this group member
+                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
+                const aliasesForGroupMembers = Object.entries(aliases)
+                  .filter(([key, _value]) => key === groupMember)
+                  .map(([_key, value]) => value);
                 const filter = BaseQuery.findAndSubTreeForFilterGroup(
                   newGroupFilter({ operator: 'and', values: allFilters }),
-                  [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
+                  [groupMember],
                   newGroupFilter,
-                  Object.values(filteredAliases)
+                  aliasesForGroupMembers
                 );
 
                 return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;
