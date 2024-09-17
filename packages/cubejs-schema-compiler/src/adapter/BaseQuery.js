@@ -3716,9 +3716,6 @@ export class BaseQuery {
       return null;
     }
     const filterMembers = BaseQuery.extractFilterMembers(filter);
-    console.log('filterMembers:', filterMembers, '\ngroupMembers:', groupMembers, '\naliases:', aliases);
-    console.log('filterMembers.every(m => (groupMembers.indexOf(m) !== -1)):', Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1)));
-    console.log('filterMembers.every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1)):', Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1)));
     if (filterMembers && Object.keys(filterMembers).every(m => (groupMembers.indexOf(m) !== -1 || aliases.indexOf(m) !== -1))) {
       return filter;
     }
