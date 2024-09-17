@@ -1,0 +1,8 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                select nspname\n                from pg_external_schema pe\n                join pg_namespace pn on pe.esoid = pn.oid \n                where\n                    nspowner != 1\n                    and nspname = 'public'\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| nspname |
++---------+
++---------+

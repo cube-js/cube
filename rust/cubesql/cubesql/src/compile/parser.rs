@@ -212,6 +212,30 @@ pub fn parse_sql_to_statements(
         "p.proname AS PROCEDURE_NAME, NULL AS NULL, NULL AS NULL2, NULL AS NULL3, ",
     );
 
+    // Quicksight workarounds
+    // subquery must have an alias
+    let query = query.replace(
+        "ORDER BY nspname,c.relname,attnum  ) UNION ALL",
+        "ORDER BY nspname,c.relname,attnum  ) _internal_unaliased_1 UNION ALL",
+    );
+    // SELECT expression referencing column aliased above
+    let query = query.replace(
+        "AS IS_AUTOINCREMENT, IS_AUTOINCREMENT AS IS_GENERATEDCOLUMN",
+        "AS IS_AUTOINCREMENT, 'NO' AS IS_GENERATEDCOLUMN",
+    );
+    // WHERE expressions referencing SELECT aliases
+    let query = {
+        static WHERE_TABLE_SCHEMA_NAME_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"\slbv_columns\s+WHERE\s+table_schema\sLIKE\s(?P<tableschema>[^\s]+)\s+AND\stable_name\sLIKE\s(?P<tablename>[^\s]+)\s*$"#).unwrap()
+        });
+        WHERE_TABLE_SCHEMA_NAME_RE
+            .replace(
+                &query,
+                " lbv_columns WHERE schemaname LIKE $tableschema AND tablename LIKE $tablename",
+            )
+            .to_string()
+    };
+
     if let Some(qtrace) = qtrace {
         qtrace.set_replaced_query(&query)
     }

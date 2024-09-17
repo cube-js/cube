@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"\n                with nodes as (\n                    select count(distinct node) as node_count\n                    from STV_SLICES\n                )\n                select\n                    case\n                        when diststyle = 'ALL' then size/cast(nodes.node_count as float) \n                        else size\n                    end as sizeMBs\n                from SVV_TABLE_INFO\n                join nodes on 1=1\n                where\n                    \"table\" = 'KibanaSampleDataEcommerce'\n                    and \"schema\" = 'public';\n                \"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++---------+
+| sizeMBs |
++---------+
+| 5       |
++---------+
