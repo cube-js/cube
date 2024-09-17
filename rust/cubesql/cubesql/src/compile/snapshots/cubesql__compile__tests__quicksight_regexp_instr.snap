@@ -1,0 +1,9 @@
+---
+source: cubesql/src/compile/mod.rs
+expression: "execute_query(r#\"SELECT regexp_instr('abcdefg', 'd.f', 3)\"#.to_string(),\nDatabaseProtocol::PostgreSQL).await?"
+---
++----------------------------------------------------+
+| regexp_instr(Utf8("abcdefg"),Utf8("d.f"),Int64(3)) |
++----------------------------------------------------+
+| 4                                                  |
++----------------------------------------------------+
