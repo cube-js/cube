@@ -98,6 +98,16 @@ components:
           type: "string"
         shortTitle:
           type: "string"
+    V1CubeMetaDimensionGranularity:
+      type: "object"
+      required:
+        - name
+        - title
+      properties:
+        name:
+          type: "string"
+        title:
+          type: "string"
     V1CubeMetaDimension:
       type: "object"
       required:
@@ -110,6 +120,10 @@ components:
           type: "string"
         type:
           type: "string"
+        granularities:
+          type: array
+          items:
+            $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
     V1CubeMetaMeasure:
       type: "object"
       required:

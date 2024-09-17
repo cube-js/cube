@@ -88,8 +88,10 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
             granularities: {
               half_year: {
                 interval: '6 months',
+                title: '6 month intervals'
               },
               half_year_by_1st_april: {
+                title: 'Half year from Apr to Oct',
                 interval: '6 months',
                 offset: '3 months'
               },
