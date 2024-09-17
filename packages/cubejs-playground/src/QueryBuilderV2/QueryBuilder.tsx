@@ -40,17 +40,13 @@ export function QueryBuilder(props: Omit<QueryBuilderProps, 'apiUrl'> & { apiUrl
   function queryValidator(query: Query) {
     const queryCopy = JSON.parse(JSON.stringify(query));
 
-    if (typeof queryCopy.limit !== 'number' || queryCopy.limit < 1 || queryCopy.limit > 50_000) {
-      queryCopy.limit = 5_000;
+    // add the last stored timezone if the query is empty
+    if (JSON.stringify(queryCopy) === '{}' && storedTimezones[0]) {
+      queryCopy.timezone = storedTimezones[0];
     }
 
-    /**
-     * @TODO: Add support for offset
-     */
-    delete queryCopy.offset;
-
-    if (!queryCopy.timezone && storedTimezones[0]) {
-      queryCopy.timezone = storedTimezones[0];
+    if (typeof queryCopy.limit !== 'number' || queryCopy.limit < 1 || queryCopy.limit > 50_000) {
+      queryCopy.limit = 5_000;
     }
 
     return queryCopy;

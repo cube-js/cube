@@ -29,7 +29,7 @@ import {
   prepareQuery,
   useIsFirstRender,
 } from '../utils';
-import { CubeStats } from '../types';
+import { CubeStats, QueryOptions } from '../types';
 
 import { useEvent } from './event';
 
@@ -117,6 +117,10 @@ export function useQueryBuilder(props: QueryBuilderProps) {
   const [query, setQueryInstance] = useState<Query>(defaultQuery || {});
   const [executedQuery, setExecutedQuery] = useState<Query | null>(null);
 
+  // Invalidation markers
+  const [isDataModelChanged, setIsDataModelChanged] = useState(false);
+  const [isApiTokenChanged, setIsApiTokenChanged] = useState(false);
+
   // Calculate hash to invalidate query
   const queryHash = getQueryHash(query);
 
@@ -203,6 +207,8 @@ export function useQueryBuilder(props: QueryBuilderProps) {
           return;
         }
 
+        setIsApiTokenChanged(false);
+        setIsDataModelChanged(false);
         setIsLoading(false);
         setExecutedQuery(queryCopy);
         setResultSet(resultSet);
@@ -352,7 +358,7 @@ export function useQueryBuilder(props: QueryBuilderProps) {
             return originalQuery;
           }
 
-          query = { ...copiedQuery, ...newQuery };
+          query = queryValidation({ ...copiedQuery, ...newQuery });
         } else {
           query = queryValidation({
             ...copiedQuery,
@@ -854,6 +860,19 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     onQueryChange?.({ query, chartType, pivotConfig });
   }, [queryHash, chartType, pivotConfig]);
 
+  // Update invalidation markers
+  useEffect(() => {
+    if (executedQuery) {
+      setIsApiTokenChanged(true);
+    }
+  }, [cubeApi]);
+
+  useEffect(() => {
+    if (executedQuery) {
+      setIsDataModelChanged(true);
+    }
+  }, [schemaVersion]);
+
   // After time dimensions updated...
   useEffect(() => {
     let updateDateRanges = false;
@@ -1103,6 +1122,11 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     isMemberJoined: isMemberUsed,
     isCubeUsed,
     isQueryEmpty,
+    isApiTokenChanged,
+    isDataModelChanged,
+    isResultOutdated:
+      executedQuery &&
+      (queryHash !== getQueryHash(executedQuery) || isApiTokenChanged || isDataModelChanged),
     queryHash,
     cubeApi,
     hasPrivateMembers,

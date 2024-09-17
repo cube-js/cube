@@ -1,7 +1,7 @@
 import { Block, Flow, tasty } from '@cube-dev/ui-kit';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { QUERY_BUILDER_COLOR_TOKENS } from './color-tokens';
 
+import { QUERY_BUILDER_COLOR_TOKENS } from './color-tokens';
 import { useAutoSize, useEvent, useListMode, useLocalStorage } from './hooks';
 import { useQueryBuilderContext } from './context';
 import { Panel } from './components/Panel';
@@ -73,9 +73,7 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
           <Tab id="json" title="REST API" />
           <Tab id="graphql" title="GraphQL API" />
         </Tabs>
-        {tab === 'results' && (
-          <QueryBuilderResults forceMinHeight={!isChartExpanded} />
-        )}
+        {tab === 'results' && <QueryBuilderResults forceMinHeight={!isChartExpanded} />}
         {tab === 'generated-sql' && <QueryBuilderGeneratedSQL />}
         {tab === 'json' && <QueryBuilderRest />}
         {tab === 'sql' && <QueryBuilderSQL />}
@@ -99,22 +97,13 @@ const QueryBuilderInternals = memo(function QueryBuilderInternals() {
   return (
     <QueryBuilderPanel>
       {useMemo(
-        () =>
-          listMode === 'bi' ? (
-            <QueryBuilderSidePanel />
-          ) : (
-            <QueryBuilderDevSidePanel />
-          ),
+        () => (listMode === 'bi' ? <QueryBuilderSidePanel /> : <QueryBuilderDevSidePanel />),
         [listMode]
       )}
 
       <Block fill="#border" />
 
-      <Panel
-        ref={ref}
-        gridRows="min-content min-content minmax(0, 1fr)"
-        border="right 1ow"
-      >
+      <Panel ref={ref} gridRows="min-content min-content minmax(0, 1fr)" border="right 1ow">
         {useMemo(
           () => (
             <>
