@@ -5,19 +5,17 @@ redirect_from:
 
 # Query format in the REST API
 
-Cube Queries are plain JavaScript objects, describing an analytics query. The
-basic elements of a query (query members) are `measures`, `dimensions`, and
-`segments`.
+Queries to the REST API are plain JavaScript objects, describing an analytics
+query. The basic elements of a query (query members) are `measures`, `dimensions`,
+and `segments`.
 
-The query member format name is `CUBE_NAME.MEMBER_NAME`, for example the
-dimension `email` in the Cube `Users` would have the name `Users.email`.
+The query member format name is `cube_name.member_name`, for example the `email`
+dimension in the `users` cube would have the `users.email` name.
 
-In the case of dimension of type `time` granularity could be optionally added to
-the name, in the following format `CUBE_NAME.TIME_DIMENSION_NAME.GRANULARITY`,
-ex: `stories.time.month`.
-
-Supported granularities: `second`, `minute`, `hour`, `day`, `week`, `month`,
-`quarter` and `year`.
+In the case of a dimension of the `time` type, a granularity could be optionally
+added to the name, in the following format: `cube_name.time_dimension_name.granularity_name`,
+e.g., `stories.time.week`. It can be one of the [default granularities][ref-default-granularities]
+(e.g., `year` or `week`) or a [custom granularity][ref-custom-granularities].
 
 The Cube client also accepts an array of queries. By default, it will be treated
 as a Data Blending query type.
@@ -95,8 +93,8 @@ query][ref-ungrouped-query].
 If the `order` property is not specified in the query, Cube sorts results by
 default using the following rules:
 
-- The first time dimension with granularity, ascending. If no time dimension
-  with granularity exists...
+- The first time dimension with a granularity, ascending. If no time dimension
+  with a granularity exists...
 - The first measure, descending. If no measure exists...
 - The first dimension, ascending.
 
@@ -530,9 +528,10 @@ provides a convenient shortcut to pass a dimension and a filter as a
   range][ref-relative-date-range], for example, `last quarter`.
 - `compareDateRange`: An array of date ranges to compare measure values. See
 [compare date range queries][ref-compare-date-range] for details.
-- `granularity`: A granularity for a time dimension. It supports the following
-  values `second`, `minute`, `hour`, `day`, `week`, `month`, `quarter`, `year`.
-  If you pass `null` to the granularity, Cube will only perform filtering by a
+- `granularity`: A granularity for a time dimension. It can be one of the [default
+granularities][ref-default-granularities] (e.g., `year` or `week`) or a [custom
+granularity][ref-custom-granularities].
+  If you don't provide a granularity, Cube will only perform filtering by a
   specified time dimension, without grouping.
 
 ```json
@@ -618,3 +617,5 @@ refer to its documentation for more examples.
 [ref-total-query]: /product/apis-integrations/queries#total-query
 [ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query
 [ref-default-order]: /product/apis-integrations/queries#order
+[ref-default-granularities]: /product/data-modeling/concepts#time-dimensions
+[ref-custom-granularities]: /reference/data-model/dimensions#granularities
