@@ -552,7 +552,8 @@ export class PreAggregations {
         backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
-        : transformedQuery.sortedTimeDimensions;
+        : transformedQuery.sortedTimeDimensions.map(t => t.slice(0, 2));
+      // slice above is used to exclude possible custom granularity returned from sortTimeDimensionsWithRollupGranularity()
 
       const backAliasMeasures = backAlias(references.measures);
       const backAliasSortedDimensions = backAlias(references.sortedDimensions || references.dimensions);
@@ -793,7 +794,7 @@ export class PreAggregations {
   }
 
   /**
-   * Returns an array of potencially applicable for the query preaggs in the
+   * Returns an array of potentially applicable for the query preaggs in the
    * same order they appear in the schema file.
    * @returns {Array<Object>}
    */
