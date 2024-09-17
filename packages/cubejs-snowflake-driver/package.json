@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/snowflake-driver",
   "description": "Cube.js Snowflake database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.36.0",
+  "version": "0.36.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -29,7 +29,7 @@
     "@cubejs-backend/shared": "^0.36.0",
     "@google-cloud/storage": "^5.8.5",
     "date-fns-timezone": "^0.1.4",
-    "snowflake-sdk": "^1.8.0"
+    "snowflake-sdk": "^1.13.1"
   },
   "license": "Apache-2.0",
   "publishConfig": {
@@ -40,7 +40,6 @@
   },
   "devDependencies": {
     "@cubejs-backend/linter": "^0.36.0",
-    "@types/snowflake-sdk": "^1.6.8",
     "typescript": "~5.2.2"
   }
 }

@@ -3225,6 +3225,9 @@ export class BaseQuery {
         not: 'NOT ({{ expr }})',
         true: 'TRUE',
         false: 'FALSE',
+        like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
+        ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
+        like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
       },
       quotes: {
         identifiers: '"',

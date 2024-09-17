@@ -111,8 +111,8 @@ const config: DocsThemeConfig = {
     extraContent: (
       <div>
         <br/>
-        <a target="_blank" href="https://cube.dev/events/cube-rollup-london?ref=github-readme">
-          <img src="https://ucarecdn.com/f90c6d06-abac-45d5-92be-4217ee26f096/"/>
+        <a target="_blank" href="https://cube.dev/events/cube-rollup-san-francisco?ref=github-readme">
+          <img src="https://ucarecdn.com/79c21019-78d0-4d33-a380-f04409cb807b/"/>
         </a>
       </div>
     )

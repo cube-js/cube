@@ -12,6 +12,7 @@ mod filter;
 mod in_list_expr;
 mod in_subquery_expr;
 mod is_null_expr;
+mod like_expr;
 mod limit;
 mod literal;
 mod negative_expr;
@@ -82,6 +83,7 @@ impl RewriteRules for WrapperRules {
         self.negative_expr_rules(&mut rules);
         self.not_expr_rules(&mut rules);
         self.distinct_rules(&mut rules);
+        self.like_expr_rules(&mut rules);
 
         rules
     }

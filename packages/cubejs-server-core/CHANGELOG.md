@@ -3,6 +3,14 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.36.1](https://github.com/cube-js/cube/compare/v0.36.0...v0.36.1) (2024-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/server-core
+
+
+
+
+
 # [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
 
 
