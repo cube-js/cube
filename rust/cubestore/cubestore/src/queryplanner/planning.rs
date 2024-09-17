@@ -2142,6 +2142,7 @@ pub mod tests {
             Vec::new(),
             None,
             None,
+            None,
         ));
         i.indices.push(
             Index::try_new(
@@ -2191,6 +2192,7 @@ pub mod tests {
             None,
             None,
             Vec::new(),
+            None,
             None,
             None,
         ));
@@ -2248,6 +2250,7 @@ pub mod tests {
             None,
             None,
             Vec::new(),
+            None,
             None,
             None,
         ));

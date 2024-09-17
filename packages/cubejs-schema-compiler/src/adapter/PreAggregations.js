@@ -1,4 +1,5 @@
 import R from 'ramda';
+import { FROM_PARTITION_RANGE, TO_PARTITION_RANGE } from '@cubejs-backend/shared';
 
 import { UserError } from '../compiler/UserError';
 
@@ -157,7 +158,7 @@ export class PreAggregations {
     const queryForSqlEvaluation = this.query.preAggregationQueryForSqlEvaluation(cube, preAggregation);
     const partitionInvalidateKeyQueries = queryForSqlEvaluation.partitionInvalidateKeyQueries && queryForSqlEvaluation.partitionInvalidateKeyQueries(cube, preAggregation);
 
-    const allBackAliasMembers = PreAggregations.allBackAliasMembers(this.query);
+    const allBackAliasMembers = this.query.allBackAliasMembers();
 
     const matchedTimeDimension = preAggregation.partitionGranularity && !this.hasCumulativeMeasures &&
       this.query.timeDimensions.find(td => {
@@ -189,7 +190,7 @@ export class PreAggregations {
 
     const uniqueKeyColumnsDefault = () => null;
     const uniqueKeyColumns = ({
-      rollup: () => queryForSqlEvaluation.dimensionColumns(),
+      rollup: () => queryForSqlEvaluation.preAggregationUniqueKeyColumns(cube, preAggregation),
       originalSql: () => preAggregation.uniqueKeyColumns || null
     }[preAggregation.type] || uniqueKeyColumnsDefault)();
 
@@ -209,6 +210,7 @@ export class PreAggregations {
       preAggregationsSchema: queryForSqlEvaluation.preAggregationSchema(),
       loadSql: queryForSqlEvaluation.preAggregationLoadSql(cube, preAggregation, tableName),
       sql: queryForSqlEvaluation.preAggregationSql(cube, preAggregation),
+      outputColumnTypes: queryForSqlEvaluation.preAggregationOutputColumnTypes(cube, preAggregation),
       uniqueKeyColumns,
       aggregationsColumns,
       dataSource: queryForSqlEvaluation.dataSource,
@@ -219,7 +221,7 @@ export class PreAggregations {
         queryForSqlEvaluation.parseSecondDuration(preAggregation.refreshKey.updateWindow),
       preAggregationStartEndQueries:
         (preAggregation.partitionGranularity || references.timeDimensions[0]?.granularity) &&
-        this.refreshRangeQuery().preAggregationStartEndQueries(cube, preAggregation),
+        this.refreshRangeQuery(cube).preAggregationStartEndQueries(cube, preAggregation),
       matchedTimeDimensionDateRange:
         preAggregation.partitionGranularity && (
           matchedTimeDimension && matchedTimeDimension.boundaryDateRangeFormatted() ||
@@ -292,7 +294,7 @@ export class PreAggregations {
   static transformQueryToCanUseForm(query) {
     const flattenDimensionMembers = this.flattenDimensionMembers(query);
     const sortedDimensions = this.squashDimensions(query, flattenDimensionMembers);
-    const allBackAliasMembers = this.allBackAliasMembers(query);
+    const allBackAliasMembers = query.allBackAliasMembers();
     const measures = query.measures.concat(query.measureFilters);
     const measurePaths = R.uniq(this.flattenMembers(measures).map(m => m.expressionPath()));
     const collectLeafMeasures = query.collectLeafMeasures.bind(query);
@@ -312,7 +314,7 @@ export class PreAggregations {
         dateRange: td.dateRange,
         granularity: td.granularity,
       });
-    }).map(d => query.newTimeDimension(d));
+    });
 
     let sortedAllCubeNames;
     let sortedUsedCubePrimaryKeys;
@@ -424,31 +426,6 @@ export class PreAggregations {
         .collectFrom(members, query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor')
         .filter(d => query.cubeEvaluator.byPathAnyType(d).ownedByCube)
     );
-  }
-
-  static backAliasMembers(query, members) {
-    return members.map(
-      member => {
-        const collectedMembers = query
-          .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
-        const memberPath = member.expressionPath();
-        let nonAliasSeen = false;
-        return collectedMembers
-          .filter(d => {
-            if (!query.cubeEvaluator.byPathAnyType(d).aliasMember) {
-              nonAliasSeen = true;
-            }
-            return !nonAliasSeen;
-          })
-          .map(d => (
-            { [query.cubeEvaluator.byPathAnyType(d).aliasMember]: memberPath }
-          )).reduce((a, b) => ({ ...a, ...b }), {});
-      }
-    ).reduce((a, b) => ({ ...a, ...b }), {});
-  }
-
-  static allBackAliasMembers(query) {
-    return this.backAliasMembers(query, this.flattenAllMembers(query));
   }
 
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
@@ -747,18 +724,6 @@ export class PreAggregations {
       query.dimensions
         .concat(query.filters)
         .concat(query.segments)
-    );
-  }
-
-  static flattenAllMembers(query) {
-    return R.flatten(
-      query.measures
-        .concat(query.dimensions)
-        .concat(query.segments)
-        .concat(query.filters)
-        .concat(query.measureFilters)
-        .concat(query.timeDimensions)
-        .map(m => m.getMembers()),
     );
   }
 
@@ -1078,12 +1043,15 @@ export class PreAggregations {
     return { preAggregations, result };
   }
 
-  refreshRangeQuery() {
-    return this.query.newSubQuery({
-      rowLimit: null,
-      offset: null,
-      preAggregationQuery: true,
-    });
+  refreshRangeQuery(cube) {
+    return this.query.newSubQueryForCube(
+      cube,
+      {
+        rowLimit: null,
+        offset: null,
+        preAggregationQuery: true,
+      }
+    );
   }
 
   originalSqlPreAggregationQuery(cube, aggregation) {

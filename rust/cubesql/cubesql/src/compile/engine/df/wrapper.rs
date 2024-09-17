@@ -7,7 +7,7 @@ use crate::{
                 filters::Decimal,
                 utils::{DecomposedDayTime, DecomposedMonthDayNano},
             },
-            WrappedSelectType,
+            LikeType, WrappedSelectType,
         },
     },
     config::ConfigObj,
@@ -32,8 +32,16 @@ use itertools::Itertools;
 use regex::{Captures, Regex};
 use serde::{Deserialize, Serialize};
 use std::{
-    any::Any, cmp::min, collections::HashMap, convert::TryInto, fmt, future::Future, iter,
-    pin::Pin, result, sync::Arc,
+    any::Any,
+    cmp::min,
+    collections::HashMap,
+    convert::TryInto,
+    fmt,
+    future::Future,
+    iter,
+    pin::Pin,
+    result,
+    sync::{Arc, LazyLock},
 };
 
 #[derive(Debug, Clone, Deserialize)]
@@ -160,12 +168,12 @@ impl SqlQuery {
     }
 
     pub fn finalize_query(&mut self, sql_templates: Arc<SqlTemplates>) -> Result<()> {
+        static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\$(\d+)\$").unwrap());
+
         let mut params = Vec::new();
         let mut rendered_params = HashMap::new();
-        let regex = Regex::new(r"\$(\d+)\$")
-            .map_err(|e| DataFusionError::Execution(format!("Can't parse regex: {}", e)))?;
         let mut res = Ok(());
-        let replaced_sql = regex.replace_all(self.sql.as_str(), |c: &Captures<'_>| {
+        let replaced_sql = REGEX.replace_all(self.sql.as_str(), |c: &Captures<'_>| {
             let param = c.get(1).map(|x| x.as_str());
             match self.render_param(sql_templates.clone(), param, &rendered_params, params.len()) {
                 Ok((param_index, param, push_param)) => {
@@ -260,9 +268,7 @@ pub struct SqlGenerationResult {
     pub request: TransportLoadRequestQuery,
 }
 
-lazy_static! {
-    static ref DATE_PART_REGEX: Regex = Regex::new("^[A-Za-z_ ]+$").unwrap();
-}
+static DATE_PART_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("^[A-Za-z_ ]+$").unwrap());
 
 macro_rules! generate_sql_for_timestamp {
     (@generic $value:ident, $value_block:expr, $sql_generator:expr, $sql_query:expr) => {
@@ -459,12 +465,14 @@ impl CubeScanWrapperNode {
                                 node
                             )));
                         }
+                        let mut meta_with_user = load_request_meta.as_ref().clone();
+                        meta_with_user.set_change_user(node.options.change_user.clone());
                         let sql = transport
                             .sql(
                                 node.span_id.clone(),
                                 node.request.clone(),
                                 node.auth_context,
-                                load_request_meta.as_ref().clone(),
+                                meta_with_user,
                                 Some(
                                     node.member_fields
                                         .iter()
@@ -837,12 +845,16 @@ impl CubeScanWrapperNode {
                                 }
                                 // TODO time dimensions, filters, segments
 
+                                let mut meta_with_user = load_request_meta.as_ref().clone();
+                                meta_with_user.set_change_user(
+                                    ungrouped_scan_node.options.change_user.clone(),
+                                );
                                 let sql_response = transport
                                     .sql(
                                         ungrouped_scan_node.span_id.clone(),
                                         load_request.clone(),
                                         ungrouped_scan_node.auth_context.clone(),
-                                        load_request_meta.as_ref().clone(),
+                                        meta_with_user,
                                         // TODO use aliases or push everything through names?
                                         None,
                                         Some(sql.values.clone()),
@@ -950,8 +962,9 @@ impl CubeScanWrapperNode {
         ungrouped_scan_node: Option<Arc<CubeScanNode>>,
         subqueries: Arc<HashMap<String, String>>,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
-        let non_id_regex = Regex::new(r"[^a-zA-Z0-9_]")
-            .map_err(|e| CubeError::internal(format!("Can't parse regex: {}", e)))?;
+        static NON_ID_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
+
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping.as_ref() {
@@ -1001,7 +1014,7 @@ impl CubeScanWrapperNode {
 
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
-                let mut truncated_alias = non_id_regex
+                let mut truncated_alias = NON_ID_REGEX
                     .replace_all(&alias, "_")
                     .trim_start_matches("_")
                     .to_lowercase();
@@ -1272,8 +1285,96 @@ impl CubeScanWrapperNode {
                     Ok((resulting_sql, sql_query))
                 }
                 // Expr::AnyExpr { .. } => {}
-                // Expr::Like(_) => {}-=
-                // Expr::ILike(_) => {}
+                Expr::Like(like) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *like.expr,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (pattern, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *like.pattern,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (escape_char, sql_query) = match like.escape_char {
+                        Some(escape_char) => {
+                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            (Some(escape_char), sql_query)
+                        }
+                        None => (None, sql_query),
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .like_expr(LikeType::Like, expr, like.negated, pattern, escape_char)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for like expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
+                Expr::ILike(ilike) => {
+                    let (expr, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *ilike.expr,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (pattern, sql_query) = Self::generate_sql_for_expr(
+                        plan.clone(),
+                        sql_query,
+                        sql_generator.clone(),
+                        *ilike.pattern,
+                        ungrouped_scan_node.clone(),
+                        subqueries.clone(),
+                    )
+                    .await?;
+                    let (escape_char, sql_query) = match ilike.escape_char {
+                        Some(escape_char) => {
+                            let (escape_char, sql_query) = Self::generate_sql_for_expr(
+                                plan.clone(),
+                                sql_query,
+                                sql_generator.clone(),
+                                Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
+                                ungrouped_scan_node.clone(),
+                                subqueries.clone(),
+                            )
+                            .await?;
+                            (Some(escape_char), sql_query)
+                        }
+                        None => (None, sql_query),
+                    };
+                    let resulting_sql = sql_generator
+                        .get_sql_templates()
+                        .like_expr(LikeType::ILike, expr, ilike.negated, pattern, escape_char)
+                        .map_err(|e| {
+                            DataFusionError::Internal(format!(
+                                "Can't generate SQL for ilike expr: {}",
+                                e
+                            ))
+                        })?;
+                    Ok((resulting_sql, sql_query))
+                }
                 // Expr::SimilarTo(_) => {}
                 Expr::Not(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::LazyLock};
 
 use regex::Regex;
 use sqlparser::{
@@ -36,9 +36,9 @@ impl Dialect for MySqlDialectWithBackTicks {
     }
 }
 
-lazy_static! {
-    static ref SIGMA_WORKAROUND: Regex = Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap();
-}
+static SIGMA_WORKAROUND: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?s)^\s*with\s+nsp\sas\s\(.*nspname\s=\s.*\),\s+tbl\sas\s\(.*relname\s=\s.*\).*select\s+attname.*from\spg_attribute.*$"#).unwrap()
+});
 
 pub fn parse_sql_to_statements(
     query: &String,
@@ -118,13 +118,18 @@ pub fn parse_sql_to_statements(
     // Sigma Computing WITH query workaround
     // TODO: remove workaround when subquery is supported in JOIN ON conditions
     let query = if SIGMA_WORKAROUND.is_match(&query) {
-        let relnamespace_re = Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap();
-        let relnamespace_replaced = relnamespace_re.replace(
+        static RELNAMESPACE_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)from\spg_catalog\.pg_class\s+where\s+relname\s=\s(?P<relname>'(?:[^']|'')+'|\$\d+)\s+and\s+relnamespace\s=\s\(select\soid\sfrom\snsp\)"#).unwrap()
+        });
+        static ATTRELID_RE: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap()
+        });
+
+        let relnamespace_replaced = RELNAMESPACE_RE.replace(
             &query,
             "from pg_catalog.pg_class join nsp on relnamespace = nsp.oid where relname = $relname",
         );
-        let attrelid_re = Regex::new(r#"(?s)left\sjoin\spg_description\son\s+attrelid\s=\sobjoid\sand\s+attnum\s=\sobjsubid\s+where\s+attnum\s>\s0\s+and\s+attrelid\s=\s\(select\soid\sfrom\stbl\)"#).unwrap();
-        let attrelid_replaced = attrelid_re.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
+        let attrelid_replaced = ATTRELID_RE.replace(&relnamespace_replaced, "left join pg_description on attrelid = objoid and attnum = objsubid join tbl on attrelid = tbl.oid where attnum > 0");
         attrelid_replaced.to_string()
     } else {
         query

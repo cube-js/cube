@@ -1,4 +1,4 @@
-import { BaseFilter, BaseQuery, ParamAllocator } from '@cubejs-backend/schema-compiler';
+import { BaseFilter, BaseQuery } from '@cubejs-backend/schema-compiler';
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   day: 'DAY',
@@ -22,8 +22,6 @@ class FireboltFilter extends BaseFilter {
 }
 
 export class FireboltQuery extends BaseQuery {
-  public paramAllocator!: ParamAllocator;
-
   public convertTz(field: string) {
     return `${field} AT TIME ZONE '${this.timezone}'`;
   }

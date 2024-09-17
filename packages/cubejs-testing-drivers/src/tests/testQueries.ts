@@ -1609,6 +1609,180 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
       expect(response.rawData()).toMatchSnapshot();
     });
 
+    execute('querying custom granularities ECommerce: count by half_year + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year_by_1st_april + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by three_months_by_march + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'three_months_by_march',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by half_year_by_1st_april + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'half_year_by_1st_april',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by three_months_by_march + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.count',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'three_months_by_march',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.city'],
+        order: [
+          ['ECommerce.customOrderDateNoPreAgg', 'asc'],
+          ['ECommerce.city', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByUnbounded', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByUnbounded',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByTrailing', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByTrailing',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities ECommerce: count by two_mo_by_feb + no dimension + rollingCountByLeading', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.rollingCountByLeading',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.customOrderDateNoPreAgg',
+          granularity: 'two_mo_by_feb',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
+    execute('querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension', async () => {
+      const response = await client.load({
+        measures: [
+          'ECommerce.totalQuantity',
+        ],
+        timeDimensions: [{
+          dimension: 'ECommerce.orderDate',
+          granularity: 'half_year',
+          dateRange: ['2020-01-01', '2020-12-31'],
+        }],
+        dimensions: ['ECommerce.productName'],
+        order: [
+          ['ECommerce.orderDate', 'asc'],
+          ['ECommerce.productName', 'asc']
+        ],
+      });
+      expect(response.rawData()).toMatchSnapshot();
+    });
+
     if (includeIncrementalSchemaSuite) {
       incrementalSchemaLoadingSuite(execute, () => driver, tables);
     }
@@ -1816,7 +1990,7 @@ from
             ROLLUP(row, order)
             ORDER BY "rowId" ASC NULLS FIRST, "orderId" ASC NULLS FIRST OFFSET 0 ROWS FETCH FIRST 100 ROWS ONLY
         ) q1
-    ) q2 limit 100
+    ) q2 ORDER BY q2.order, q2.row DESC limit 100
 
   `);
       expect(res.rows).toMatchSnapshot('extended_nested_rollup_over_asterisk');

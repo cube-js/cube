@@ -82,7 +82,7 @@ export const SecurityContextProvider = memo(function SecurityContextProvider({
       try {
         const payload = jwtDecode(token);
         setPayload(JSON.stringify(payload, null, 2));
-      } catch (error) {
+      } catch (error: any) {
         setPayload('');
         console.error('Invalid JWT token', token);
       }

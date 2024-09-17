@@ -43,10 +43,10 @@ function formatStatePath(state: Joi.State): string {
 }
 
 const regexTimeInterval = Joi.string().custom((value, helper) => {
-  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)$/)) {
+  if (value.match(/^(-?\d+) (minute|hour|day|week|month|quarter|year)s?$/)) {
     return value;
   } else {
-    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)$/` });
+    return helper.message({ custom: `(${formatStatePath(helper.state)} = ${value}) does not match regexp: /^(-?\\d+) (minute|hour|day|week|month|quarter|year)s?$/` });
   }
 });
 
@@ -82,6 +82,10 @@ const everyCronTimeZone = Joi.string().custom((value, helper) => {
   }
 });
 
+const GranularityInterval = Joi.string().pattern(/^\d+\s+(second|minute|hour|day|week|month|quarter|year)s?(\s\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity interval');
+// Do not allow negative intervals for granularities, while offsets could be negative
+const GranularityOffset = Joi.string().pattern(/^-?(\d+\s+)(second|minute|hour|day|week|month|quarter|year)s?(\s-?\d+\s+(second|minute|hour|day|week|month|quarter|year)s?){0,7}$/, 'granularity offset');
+
 const BaseDimensionWithoutSubQuery = {
   aliases: Joi.array().items(Joi.string()),
   type: Joi.any().valid('string', 'number', 'boolean', 'time', 'geo').required(),
@@ -102,6 +106,61 @@ const BaseDimensionWithoutSubQuery = {
     })
   ]),
   meta: Joi.any(),
+  granularities: Joi.when('type', {
+    is: 'time',
+    then: Joi.object().pattern(identifierRegex,
+      Joi.alternatives([
+        Joi.object().keys({
+          interval: GranularityInterval.required(),
+          origin: Joi.string().required().custom((value, helpers) => {
+            const date = new Date(value);
+
+            if (Number.isNaN(date.getTime())) {
+              return helpers.message({ custom: 'Origin should be valid date-only form: YYYY[-MM[-DD]] or date-time form: YYYY-MM-DD[T]HH:mm[:ss[.sss[Z]]]' });
+            }
+            return value;
+          }),
+        }),
+        Joi.object().keys({
+          interval: GranularityInterval.required().custom((value, helper) => {
+            const intParsed = value.split(' ');
+            const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };
+
+            if (intParsed.length !== 2) {
+              return helper.message(msg);
+            }
+
+            const v = parseInt(intParsed[0], 10);
+            const unit = intParsed[1];
+
+            const validIntervals = {
+              // Any number of years is valid
+              year: () => true,
+              // Only months divisible by a year with no remainder are valid
+              month: () => 12 % v === 0,
+              // Only quarters divisible by a year with no remainder are valid
+              quarter: () => 4 % v === 0,
+              // Only 1 week is valid
+              week: () => v === 1,
+              // Only 1 day is valid
+              day: () => v === 1,
+              // Only hours divisible by a day with no remainder are valid
+              hour: () => 24 % v === 0,
+              // Only minutes divisible by an hour with no remainder are valid
+              minute: () => 60 % v === 0,
+              // Only seconds divisible by a minute with no remainder are valid
+              second: () => 60 % v === 0,
+            };
+
+            const isValid = Object.keys(validIntervals).some(key => unit.includes(key) && validIntervals[key]());
+
+            return isValid ? value : helper.message(msg);
+          }),
+          offset: GranularityOffset.optional(),
+        })
+      ])).optional(),
+    otherwise: Joi.forbidden()
+  })
 };
 
 const BaseDimension = Object.assign({
@@ -116,7 +175,7 @@ const FixedRollingWindow = {
   offset: Joi.any().valid('start', 'end')
 };
 
-const GranularitySchema = Joi.string().valid('second', 'minute', 'hour', 'day', 'week', 'month', 'quarter', 'year').required();
+const GranularitySchema = Joi.string().required(); // To support custom granularities
 
 const YearToDate = {
   type: Joi.string().valid('year_to_date'),
@@ -201,7 +260,7 @@ const PreAggregationRefreshKeySchema = condition(
   (s) => defined(s.sql),
   Joi.object().keys({
     sql: Joi.func().required(),
-    // We dont support timezone for this, because it's useless
+    // We don't support timezone for this, because it's useless
     // We cannot support cron interval
     every: everyInterval,
   }),
@@ -248,6 +307,10 @@ const BasePreAggregationWithoutPartitionGranularity = {
   },
   readOnly: Joi.boolean().strict(),
   streamOffset: Joi.any().valid('earliest', 'latest'),
+  outputColumnTypes: Joi.array().items(Joi.object().keys({
+    member: Joi.func().required(),
+    type: Joi.string().required()
+  })),
 };
 
 const BasePreAggregation = {
@@ -390,6 +453,7 @@ const RollUpSchema = condition(
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
       segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
     condition(
       (s) => defined(s.timeDimension),
@@ -402,6 +466,7 @@ const RollUpSchema = condition(
         measures: Joi.func(),
         dimensions: Joi.func(),
         segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
       }),
       // Rollup with multiple time dimensions
       inherit(BasePreAggregation, {
@@ -414,6 +479,7 @@ const RollUpSchema = condition(
         measures: Joi.func(),
         dimensions: Joi.func(),
         segments: Joi.func(),
+        uniqueKeyColumns: Joi.array().items(Joi.string()),
       })
     )
   ),
@@ -422,14 +488,16 @@ const RollUpSchema = condition(
       type: Joi.any().valid('rollup').required(),
       measureReferences: Joi.func(),
       dimensionReferences: Joi.func(),
-      segmentReferences: Joi.func()
+      segmentReferences: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     }),
     // Rollup without References postfix
     inherit(BasePreAggregation, {
       type: Joi.any().valid('rollup').required(),
       measures: Joi.func(),
       dimensions: Joi.func(),
-      segments: Joi.func()
+      segments: Joi.func(),
+      uniqueKeyColumns: Joi.array().items(Joi.string()),
     })
   )
 );

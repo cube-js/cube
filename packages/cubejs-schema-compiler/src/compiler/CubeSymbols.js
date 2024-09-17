@@ -9,7 +9,6 @@ import { BaseQuery } from '../adapter';
 
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
-  USER_CONTEXT: 'securityContext',
   SECURITY_CONTEXT: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
@@ -386,6 +385,7 @@ export class CubeSymbols {
         };
       } else if (type === 'dimensions') {
         memberDefinition = {
+          ...(resolvedMember.granularities ? { granularities: resolvedMember.granularities } : {}),
           sql,
           type: resolvedMember.type,
           meta: resolvedMember.meta,
@@ -495,6 +495,11 @@ export class CubeSymbols {
 
   resolveSymbol(cubeName, name) {
     const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
+
+    if (name === 'USER_CONTEXT') {
+      throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
+    }
+
     if (CONTEXT_SYMBOLS[name]) {
       // always resolves if contextSymbols aren't passed for transpile step
       const symbol = contextSymbols && contextSymbols[CONTEXT_SYMBOLS[name]] || {};
@@ -503,18 +508,32 @@ export class CubeSymbols {
       return symbol;
     }
 
-    let cube = this.isCurrentCube(name) && this.symbols[cubeName] || this.symbols[name];
-    if (sqlResolveFn && cube) {
-      cube = this.cubeReferenceProxy(
-        this.isCurrentCube(name) ? cubeName : name,
-        collectJoinHints ? [] : undefined
-      );
+    // In proxied subProperty flow `name` will be set to parent dimension|measure name,
+    // so there will be no cube = this.symbols[cubeName : name] found, but potentially
+    // during cube definition evaluation some other deeper subProperty may be requested.
+    // To distinguish such cases we pass the right now requested property name to
+    // cubeReferenceProxy, so later if subProperty is requested we'll have all the required
+    // information to construct the response.
+    let cube = this.symbols[this.isCurrentCube(name) ? cubeName : name];
+    if (sqlResolveFn) {
+      if (cube) {
+        cube = this.cubeReferenceProxy(
+          this.isCurrentCube(name) ? cubeName : name,
+          collectJoinHints ? [] : undefined
+        );
+      } else if (this.symbols[cubeName]?.[name]) {
+        cube = this.cubeReferenceProxy(
+          cubeName,
+          undefined,
+          name
+        );
+      }
     }
 
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
   }
 
-  cubeReferenceProxy(cubeName, joinHints) {
+  cubeReferenceProxy(cubeName, joinHints, refProperty) {
     if (joinHints) {
       joinHints = joinHints.concat(cubeName);
     }
@@ -522,6 +541,9 @@ export class CubeSymbols {
     const { sqlResolveFn, cubeAliasFn, query, cubeReferencesUsed } = self.resolveSymbolsCallContext || {};
     return new Proxy({}, {
       get: (v, propertyName) => {
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
         if (propertyName === '__cubeName') {
           return cubeName;
         }
@@ -534,6 +556,13 @@ export class CubeSymbols {
           return undefined;
         }
         if (propertyName === 'toString') {
+          if (refProperty) {
+            return () => this.withSymbolsCallContext(
+              () => sqlResolveFn(cube[refProperty], cubeName, refProperty),
+              { ...this.resolveSymbolsCallContext, joinHints }
+            );
+          }
+
           return () => {
             if (query) {
               query.pushCubeNameForCollectionIfNecessary(cube.cubeName());
@@ -551,26 +580,47 @@ export class CubeSymbols {
         if (propertyName === 'sql') {
           return () => query.cubeSql(cube.cubeName());
         }
-        if (propertyName === '_objectWithResolvedProperties') {
-          return true;
-        }
-        if (cube[propertyName]) {
+        if (refProperty &&
+          cube[refProperty].type === 'time' &&
+          self.resolveGranularity([cubeName, refProperty, 'granularities', propertyName], cube)
+        ) {
           return {
             toString: () => this.withSymbolsCallContext(
-              () => sqlResolveFn(cube[propertyName], cubeName, propertyName),
-              { ...this.resolveSymbolsCallContext, joinHints },
+              () => sqlResolveFn(cube[refProperty], cubeName, refProperty, propertyName),
+              { ...this.resolveSymbolsCallContext },
             ),
           };
+        }
+        if (cube[propertyName]) {
+          return this.cubeReferenceProxy(cubeName, joinHints, propertyName);
         }
         if (self.symbols[propertyName]) {
           return this.cubeReferenceProxy(propertyName, joinHints);
         }
         if (typeof propertyName === 'string') {
-          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
+          throw new UserError(`${cubeName}${refProperty ? `.${refProperty}` : ''}.${propertyName} cannot be resolved. There's no such member or cube.`);
         }
         return undefined;
       }
     });
+  }
+
+  /**
+   * Tries to resolve Granularity object.
+   * For predefined granularity it constructs it on the fly.
+   * @param {string|string[]} path
+   * @param [refCube] Optional cube object to operate on
+   */
+  resolveGranularity(path, refCube) {
+    const [cubeName, dimName, gr, granName] = Array.isArray(path) ? path : path.split('.');
+    const cube = refCube || this.symbols[cubeName];
+
+    // Predefined granularity
+    if (typeof granName === 'string' && /^(second|minute|hour|day|week|month|quarter|year)$/i.test(granName)) {
+      return { interval: `1 ${granName}` };
+    }
+
+    return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
   }
 
   isCurrentCube(name) {

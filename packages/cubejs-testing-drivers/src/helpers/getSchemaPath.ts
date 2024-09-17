@@ -67,7 +67,7 @@ export function getSchemaPath(type: string, suf?: string): [path: string, file: 
 
   fs.writeFileSync(
     path.resolve(_path, _file),
-    YAML.stringify(_content),
+    YAML.stringify(_content, { version: '1.1' }),
   );
   return [_path, _file];
 }

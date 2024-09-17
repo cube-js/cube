@@ -14,15 +14,15 @@ describe('SQL Generation', () => {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
-  
+
     cube(\`visitors\`, {
       sql: \`
-      select * from visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
-      \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      select * from visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
-      
+
       rewriteQueries: true,
-      
+
       refreshKey: {
         sql: 'SELECT 1',
       },
@@ -226,37 +226,37 @@ describe('SQL Generation', () => {
           type: 'time',
           sql: 'updated_at'
         },
-        
+
         createdAtSqlUtils: {
           type: 'time',
           sql: SQL_UTILS.convertTz('created_at')
         },
-        
+
         checkins: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         checkinsRolling: {
           sql: \`\${visitor_checkins.visitorCheckinsRolling}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         checkinsWithPropagation: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true,
           propagateFiltersToSubQuery: true
         },
-        
+
         subQueryFail: {
           sql: '2',
           type: \`number\`,
           subQuery: true
         },
-        
+
         doubledCheckings: {
           sql: \`\${checkins} * 2\`,
           type: 'number'
@@ -282,7 +282,7 @@ describe('SQL Generation', () => {
         }
       }
     });
-    
+
     view('visitors_post_aggregate', {
       cubes: [{
         join_path: 'visitors',
@@ -292,11 +292,11 @@ describe('SQL Generation', () => {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from visitor_checkins WHERE 
+      select * from visitor_checkins WHERE
       \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
       \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("(created_at - INTERVAL '3 DAY')"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
       \`,
-      
+
       rewriteQueries: true,
 
       joins: {
@@ -310,19 +310,19 @@ describe('SQL Generation', () => {
         visitor_checkins_count: {
           type: 'count'
         },
-        
+
         id_sum: {
           sql: 'id',
           type: 'sum'
         },
-        
+
         visitorCheckinsRolling: {
           type: 'count',
           rollingWindow: {
             trailing: 'unbounded'
           }
         },
-        
+
         revenue_per_checkin: {
           type: 'number',
           sql: \`\${visitors.visitor_revenue} / \${visitor_checkins_count}\`
@@ -375,7 +375,7 @@ describe('SQL Generation', () => {
           subQuery: true
         },
       },
-      
+
       preAggregations: {
         checkinSource: {
           type: 'rollup',
@@ -393,7 +393,7 @@ describe('SQL Generation', () => {
         }
       }
     });
-    
+
     view('visitors_visitors_checkins_view', {
       cubes: [{
         join_path: 'visitors',
@@ -457,19 +457,19 @@ describe('SQL Generation', () => {
         }
       }
     })
-    
+
     cube('ReferenceVisitors', {
       sql: \`
-        select * from \${visitors.sql()} as t 
+        select * from \${visitors.sql()} as t
         WHERE \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter(\`(t.created_at + interval '28 day')\`)} AND
         \${FILTER_PARAMS.ReferenceVisitors.createdAt.filter((from, to) => \`(t.created_at + interval '28 day') >= \${from} AND (t.created_at + interval '28 day') <= \${to}\`)}
       \`,
-      
+
       measures: {
         count: {
           type: 'count'
         },
-        
+
         googleSourcedCount: {
           type: 'count',
           filters: [{
@@ -477,7 +477,7 @@ describe('SQL Generation', () => {
           }]
         },
       },
-      
+
       dimensions: {
         createdAt: {
           type: 'time',
@@ -485,14 +485,14 @@ describe('SQL Generation', () => {
         }
       }
     })
-    
+
     cube('CubeWithVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongName', {
       sql: \`
       select * from cards
       \`,
-      
+
       sqlAlias: 'cube_with_long_name',
-      
+
       dataSource: 'oracle',
 
       measures: {
@@ -501,12 +501,12 @@ describe('SQL Generation', () => {
         }
       }
     });
-    
+
     cube('compound', {
       sql: \`
         select * from compound_key_cards
-      \`, 
-      
+      \`,
+
       joins: {
         visitors: {
           relationship: 'belongsTo',

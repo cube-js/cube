@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [0.36.0](https://github.com/cube-js/cube.js/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+**Note:** Version bump only for package @cubejs-client/vue
+
+
+
+
+
+## [0.35.81](https://github.com/cube-js/cube.js/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+
+### Bug Fixes
+
+* Updated jsonwebtoken in all packages ([#8282](https://github.com/cube-js/cube.js/issues/8282)) Thanks  [@jlloyd-widen](https://github.com/jlloyd-widen) ! ([ca7c292](https://github.com/cube-js/cube.js/commit/ca7c292e0122be50ac7adc9b9d4910623d19f840))
+
+
+
+
+
 ## [0.35.23](https://github.com/cube-js/cube.js/compare/v0.35.22...v0.35.23) (2024-04-25)
 
 **Note:** Version bump only for package @cubejs-client/vue

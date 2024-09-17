@@ -4,7 +4,7 @@ import { PostgresQuery } from '../../../src';
 const pgPromise = require('pg-promise');
 // eslint-disable-next-line import/no-extraneous-dependencies
 const { GenericContainer, Wait } = require('testcontainers');
-const { BaseDbRunner } = require('./BaseDbRunner');
+const { BaseDbRunner } = require('../utils/BaseDbRunner');
 
 process.env.TZ = 'GMT';
 

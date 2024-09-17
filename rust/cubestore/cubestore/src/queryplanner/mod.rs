@@ -3,6 +3,7 @@ mod optimizations;
 pub mod panic;
 mod partition_filter;
 mod planning;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 pub use planning::PlanningMeta;
 mod check_memory;
 pub mod physical_plan_flags;
@@ -98,6 +99,7 @@ pub struct QueryPlannerImpl {
     cache_store: Arc<dyn CacheStore>,
     config: Arc<dyn ConfigObj>,
     cache: Arc<SqlResultCache>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -179,12 +181,14 @@ impl QueryPlannerImpl {
         cache_store: Arc<dyn CacheStore>,
         config: Arc<dyn ConfigObj>,
         cache: Arc<SqlResultCache>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
             cache,
+            metadata_cache_factory,
         })
     }
 }
@@ -193,6 +197,7 @@ impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
+                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
                 .add_optimizer_rule(Arc::new(MaterializeNow {}))
                 .add_optimizer_rule(Arc::new(FlattenUnion {})),
         )))
@@ -292,6 +297,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     None,
                     None,
                     Vec::new(),
+                    None,
                     None,
                     None,
                 ),
@@ -409,6 +415,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
+            "date_bin" | "DATE_BIN" => CubeScalarUDFKind::DateBin,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));

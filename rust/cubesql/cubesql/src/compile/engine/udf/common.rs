@@ -1,4 +1,8 @@
-use std::{any::type_name, sync::Arc, thread};
+use std::{
+    any::type_name,
+    sync::{Arc, LazyLock},
+    thread,
+};
 
 use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
@@ -3329,17 +3333,18 @@ pub fn create_current_setting_udf() -> ScalarUDF {
 }
 
 pub fn create_quote_ident_udf() -> ScalarUDF {
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap());
+
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
         let idents = downcast_string_arg!(args[0], "str", i32);
 
-        let re = Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap();
         let result = idents
             .iter()
             .map(|ident| {
                 ident.map(|ident| {
-                    if re.is_match(ident) {
+                    if RE.is_match(ident) {
                         return ident.to_string();
                     }
                     format!("\"{}\"", ident.replace("\"", "\"\""))

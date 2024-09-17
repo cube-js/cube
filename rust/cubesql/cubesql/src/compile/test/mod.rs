@@ -31,9 +31,13 @@ pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_df_execution;
+#[cfg(test)]
 pub mod test_introspection;
 #[cfg(test)]
 pub mod test_udfs;
+#[cfg(test)]
+pub mod test_user_change;
 pub mod utils;
 pub use utils::*;
 
@@ -41,7 +45,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
     vec![
         CubeMeta {
             name: "KibanaSampleDataEcommerce".to_string(),
-            description: None,
+            description: Some("Sample data for tracking eCommerce orders from Kibana".to_string()),
             title: None,
             dimensions: vec![
                 CubeMetaDimension {
@@ -56,7 +60,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
-                    description: None,
+                    description: Some("Customer gender".to_string()),
                     _type: "string".to_string(),
                 },
                 CubeMetaDimension {
@@ -79,7 +83,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 CubeMetaMeasure {
                     name: "KibanaSampleDataEcommerce.count".to_string(),
                     title: None,
-                    description: None,
+                    description: Some("Events count".to_string()),
                     _type: "number".to_string(),
                     agg_type: Some("count".to_string()),
                 },
@@ -261,24 +265,24 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
         },
         CubeMeta {
             name: "MultiTypeCube".to_string(),
-            description: None,
+            description: Some("Test cube with a little bit of everything".to_string()),
             title: None,
             dimensions: (0..10)
                 .flat_map(|i| {
                     [
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_num{}", i),
-                            description: None,
+                            description: Some(format!("Test numeric dimention {i}")),
                             _type: "number".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
-                            description: None,
+                            description: Some(format!("Test string dimention {i}")),
                             _type: "string".to_string(),
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
-                            description: None,
+                            description: Some(format!("Test time dimention {i}")),
                             _type: "time".to_string(),
                         },
                     ]
@@ -292,21 +296,21 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             _type: "number".to_string(),
                             agg_type: Some("number".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test number measure {i}")),
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_str{}", i),
                             _type: "string".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(string) measure {i}")),
                         },
                         CubeMetaMeasure {
                             name: format!("MultiTypeCube.measure_date{}", i),
                             _type: "time".to_string(),
                             agg_type: Some("max".to_string()),
                             title: None,
-                            description: None,
+                            description: Some(format!("Test max(time) measure {i}")),
                         },
                     ]
                 })
@@ -315,35 +319,35 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                         CubeMetaMeasure {
                             name: "MultiTypeCube.count".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test count measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.maxPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test maxPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.minPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test minPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.avgPrice".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test avgPrice measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                         },
                         CubeMetaMeasure {
                             name: "MultiTypeCube.countDistinct".to_string(),
                             title: None,
-                            description: None,
+                            description: Some("Test countDistinct measure".to_string()),
                             _type: "number".to_string(),
                             agg_type: Some("countDistinct".to_string()),
                         },
@@ -528,6 +532,9 @@ OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ("expressions/true".to_string(), "TRUE".to_string()),
                     ("expressions/false".to_string(), "FALSE".to_string()),
                     ("expressions/timestamp_literal".to_string(), "timestamptz '{{ value }}'".to_string()),
+                    ("expressions/like".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}".to_string()),
+                    ("expressions/ilike".to_string(), "{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}".to_string()),
+                    ("expressions/like_escape".to_string(), "{{ like_expr }} ESCAPE {{ escape_char }}".to_string()),
                     ("quotes/identifiers".to_string(), "\"".to_string()),
                     ("quotes/escape".to_string(), "\"\"".to_string()),
                     ("params/param".to_string(), "${{ param_index + 1 }}".to_string()),
@@ -657,10 +664,19 @@ pub fn get_test_auth() -> Arc<dyn SqlAuthService> {
     Arc::new(TestSqlAuth {})
 }
 
+#[derive(Clone, Debug)]
+pub struct TestTransportLoadCall {
+    pub query: TransportLoadRequestQuery,
+    pub sql_query: Option<SqlQuery>,
+    pub ctx: AuthContextRef,
+    pub meta: LoadRequestMeta,
+}
+
 #[derive(Debug)]
 struct TestConnectionTransport {
     meta_context: Arc<MetaContext>,
     load_mocks: tokio::sync::Mutex<Vec<(TransportLoadRequestQuery, TransportLoadResponse)>>,
+    load_calls: tokio::sync::Mutex<Vec<TestTransportLoadCall>>,
 }
 
 impl TestConnectionTransport {
@@ -668,7 +684,12 @@ impl TestConnectionTransport {
         Self {
             meta_context,
             load_mocks: tokio::sync::Mutex::new(vec![]),
+            load_calls: tokio::sync::Mutex::new(vec![]),
         }
+    }
+
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.load_calls.lock().await.clone()
     }
 
     pub async fn add_cube_load_mock(
@@ -692,13 +713,17 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
+        meta: LoadRequestMeta,
         _member_to_alias: Option<HashMap<String, String>>,
         expression_params: Option<Vec<Option<String>>>,
     ) -> Result<SqlResponse, CubeError> {
+        let inputs = serde_json::json!({
+            "query": query,
+            "meta": meta,
+        });
         Ok(SqlResponse {
             sql: SqlQuery::new(
-                format!("SELECT * FROM {}", serde_json::to_string(&query).unwrap()),
+                format!("SELECT * FROM {}", serde_json::to_string(&inputs).unwrap()),
                 expression_params.unwrap_or(Vec::new()),
             ),
         })
@@ -710,16 +735,30 @@ impl TransportService for TestConnectionTransport {
         _span_id: Option<Arc<SpanId>>,
         query: TransportLoadRequestQuery,
         sql_query: Option<SqlQuery>,
-        _ctx: AuthContextRef,
-        _meta_fields: LoadRequestMeta,
+        ctx: AuthContextRef,
+        meta: LoadRequestMeta,
     ) -> Result<TransportLoadResponse, CubeError> {
-        if sql_query.is_some() {
-            unimplemented!("load with sql_query");
+        {
+            let mut calls = self.load_calls.lock().await;
+            calls.push(TestTransportLoadCall {
+                query: query.clone(),
+                sql_query: sql_query.clone(),
+                ctx: ctx.clone(),
+                meta: meta.clone(),
+            });
+        }
+
+        if let Some(sql_query) = sql_query {
+            return Err(CubeError::internal(format!(
+                "Test transport does not support load with SQL query: {sql_query:?}"
+            )));
         }
 
         let mocks = self.load_mocks.lock().await;
         let Some((_req, res)) = mocks.iter().find(|(req, _res)| req == &query) else {
-            panic!("Unexpected query: {:?}", query);
+            return Err(CubeError::internal(format!(
+                "Unexpected query in test transport: {query:?}"
+            )));
         };
         Ok(res.clone())
     }
@@ -860,6 +899,9 @@ impl TestContext {
             .or(Some(config_limit));
         self.transport.add_cube_load_mock(req, res).await
     }
+    pub async fn load_calls(&self) -> Vec<TestTransportLoadCall> {
+        self.transport.load_calls().await
+    }
 
     pub async fn convert_sql_to_cube_query(&self, query: &str) -> CompilationResult<QueryPlan> {
         // TODO push to_string() deeper
@@ -915,14 +957,10 @@ impl TestContext {
     }
 }
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: std::sync::RwLock<bool> =
-        std::sync::RwLock::new(false);
-}
+static TEST_LOGGING_INITIALIZED: std::sync::Once = std::sync::Once::new();
 
 pub fn init_testing_logger() {
-    let mut initialized = TEST_LOGGING_INITIALIZED.write().unwrap();
-    if !*initialized {
+    TEST_LOGGING_INITIALIZED.call_once(|| {
         let log_level = log::Level::Trace;
         let logger = simple_logger::SimpleLogger::new()
             .with_level(log::Level::Error.to_level_filter())
@@ -933,8 +971,7 @@ pub fn init_testing_logger() {
 
         log::set_boxed_logger(Box::new(logger)).unwrap();
         log::set_max_level(log_level.to_level_filter());
-        *initialized = true;
-    }
+    });
 }
 
 pub async fn convert_select_to_query_plan_customized(

@@ -121,7 +121,7 @@ accessible for everyone.
 | `meta`    | [`/v1/meta`][ref-ref-meta]                                                                | ✅ Yes                 |
 | `data`    | [`/v1/load`][ref-ref-load], [`/v1/sql`][ref-ref-sql]                                      | ✅ Yes                 |
 | `graphql` | `/graphql`                                                                                | ✅ Yes                 |
-| `jobs`    | [`/v1/run-scheduled-refresh`][ref-ref-rsr]<br/>[`/v1/pre-aggregations/jobs`][ref-ref-paj] | ❌ No                  |
+| `jobs`    | [`/v1/pre-aggregations/jobs`][ref-ref-paj]                                                | ❌ No                  |
 
 <InfoBox>
 
@@ -277,7 +277,6 @@ example, the following query will retrieve rows 101-200 from the `Orders` cube:
 [ref-ref-load]: /reference/rest-api#v1load
 [ref-ref-meta]: /reference/rest-api#v1meta
 [ref-ref-sql]: /reference/rest-api#v1sql
-[ref-ref-rsr]: /reference/rest-api#v1run-scheduled-refresh
 [ref-ref-paj]: /reference/rest-api#v1pre-aggregationsjobs
 [ref-security-context]: /product/auth/context
 [ref-graphql-api]: /product/apis-integrations/graphql-api

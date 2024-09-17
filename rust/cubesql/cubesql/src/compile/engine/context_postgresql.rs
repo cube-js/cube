@@ -14,6 +14,7 @@ use super::information_schema::postgres::{
     views::InfoSchemaViewsProvider as PostgresSchemaViewsProvider,
     InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
     InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
+    InfoSchemaSqlImplementationInfoProvider as PostgresInfoSchemaSqlImplementationInfoProvider,
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
@@ -70,6 +71,10 @@ impl DatabaseProtocol {
             "information_schema.role_column_grants".to_string()
         } else if let Some(_) = any.downcast_ref::<PostgresSchemaSchemataProvider>() {
             "information_schema.schemata".to_string()
+        } else if let Some(_) =
+            any.downcast_ref::<PostgresInfoSchemaSqlImplementationInfoProvider>()
+        {
+            "information_schema.sql_implementation_info".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -289,6 +294,11 @@ impl DatabaseProtocol {
                         &context.session_state.database().unwrap_or("db".to_string()),
                     )))
                 }
+                "sql_implementation_info" => {
+                    return Some(Arc::new(
+                        PostgresInfoSchemaSqlImplementationInfoProvider::new(),
+                    ))
+                }
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
@@ -327,7 +337,11 @@ impl DatabaseProtocol {
                         context.session_state.all_variables(),
                     )))
                 }
-                "pg_description" => return Some(Arc::new(PgCatalogDescriptionProvider::new())),
+                "pg_description" => {
+                    return Some(Arc::new(PgCatalogDescriptionProvider::new(
+                        &context.meta.tables,
+                    )))
+                }
                 "pg_constraint" => return Some(Arc::new(PgCatalogConstraintProvider::new())),
                 "pg_depend" => return Some(Arc::new(PgCatalogDependProvider::new())),
                 "pg_am" => return Some(Arc::new(PgCatalogAmProvider::new())),

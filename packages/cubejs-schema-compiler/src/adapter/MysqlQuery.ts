@@ -1,5 +1,7 @@
 import moment from 'moment-timezone';
 
+import { parseSqlInterval } from '@cubejs-backend/shared';
+
 import { BaseQuery } from './BaseQuery';
 import { BaseFilter } from './BaseFilter';
 import { UserError } from '../compiler/UserError';
@@ -49,15 +51,76 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public subtractInterval(date, interval) {
-    return `DATE_SUB(${date}, INTERVAL ${interval})`;
+    return `DATE_SUB(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public addInterval(date, interval) {
-    return `DATE_ADD(${date}, INTERVAL ${interval})`;
+    return `DATE_ADD(${date}, INTERVAL ${this.formatInterval(interval)})`;
   }
 
   public timeGroupedColumn(granularity, dimension) {
     return `CAST(${GRANULARITY_TO_INTERVAL[granularity](dimension)} AS DATETIME)`;
+  }
+
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.isIntervalYM(interval) ? 'MONTH' : 'SECOND';
+
+    return `TIMESTAMPADD(${timeUnit},
+        FLOOR(
+          TIMESTAMPDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted})
+        ) * TIMESTAMPDIFF(${timeUnit}, '1970-01-01 00:00:00', '1970-01-01 00:00:00' + INTERVAL ${intervalFormatted}),
+        ${this.timeStampCast(`'${origin}'`)}
+    )`;
+  }
+
+  private isIntervalYM(interval: string): boolean {
+    return /(year|month|quarter)/i.test(interval);
+  }
+
+  /**
+   * The input interval with (possible) plural units, like "2 years", "3 months", "4 weeks", "5 days"...
+   * will be converted to MYSQL dialect.
+   * @see https://dev.mysql.com/doc/refman/8.4/en/expressions.html#temporal-intervals
+   */
+  private formatInterval(interval: string): string {
+    const intervalParsed = parseSqlInterval(interval);
+    const intKeys = Object.keys(intervalParsed).length;
+
+    if (intervalParsed.year && intKeys === 1) {
+      return `${intervalParsed.year} YEAR`;
+    } else if (intervalParsed.year && intervalParsed.month && intKeys === 2) {
+      return `'${intervalParsed.year}-${intervalParsed.month}' YEAR_MONTH`;
+    } else if (intervalParsed.quarter && intKeys === 1) {
+      return `${intervalParsed.quarter} QUARTER`;
+    } else if (intervalParsed.month && intKeys === 1) {
+      return `${intervalParsed.month} MONTH`;
+    } else if (intervalParsed.week && intKeys === 1) {
+      return `${intervalParsed.week} WEEK`;
+    } else if (intervalParsed.day && intKeys === 1) {
+      return `${intervalParsed.day} DAY`;
+    } else if (intervalParsed.day && intervalParsed.hour && intKeys === 2) {
+      return `'${intervalParsed.day} ${intervalParsed.hour}' DAY_HOUR`;
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intKeys === 3) {
+      return `'${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}' DAY_MINUTE`;
+    } else if (intervalParsed.day && intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 4) {
+      return `'${intervalParsed.day} ${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' DAY_SECOND`;
+    } else if (intervalParsed.hour && intervalParsed.minute && intKeys === 2) {
+      return `'${intervalParsed.hour}:${intervalParsed.minute}' HOUR_MINUTE`;
+    } else if (intervalParsed.hour && intervalParsed.minute && intervalParsed.second && intKeys === 3) {
+      return `'${intervalParsed.hour}:${intervalParsed.minute}:${intervalParsed.second}' HOUR_SECOND`;
+    } else if (intervalParsed.minute && intervalParsed.second && intKeys === 2) {
+      return `'${intervalParsed.minute}:${intervalParsed.second}' MINUTE_SECOND`;
+    }
+
+    // No need to support microseconds.
+
+    throw new Error(`Cannot transform interval expression "${interval}" to MySQL dialect`);
   }
 
   public escapeColumnName(name) {
@@ -95,6 +158,7 @@ export class MysqlQuery extends BaseQuery {
     const templates = super.sqlTemplates();
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
+    delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.boolean = 'TINYINT';
     templates.types.timestamp = 'DATETIME';

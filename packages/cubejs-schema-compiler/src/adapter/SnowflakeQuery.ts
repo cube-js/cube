@@ -42,6 +42,36 @@ export class SnowflakeQuery extends BaseQuery {
     return `date_trunc('${GRANULARITY_TO_INTERVAL[granularity]}', ${dimension})`;
   }
 
+  /**
+   * Returns sql for source expression floored to timestamps aligned with
+   * intervals relative to origin timestamp point.
+   */
+  public dateBin(interval: string, source: string, origin: string): string {
+    const intervalFormatted = this.formatInterval(interval);
+    const timeUnit = this.diffTimeUnitForInterval(interval);
+    const beginOfTime = 'TIMESTAMP_FROM_PARTS(1970, 1, 1, 0, 0, 0)';
+
+    return `DATEADD(${timeUnit},
+        FLOOR(
+          DATEDIFF(${timeUnit}, ${this.timeStampCast(`'${origin}'`)}, ${source}) /
+          DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}'))
+        ) * DATEDIFF(${timeUnit}, ${beginOfTime}, (${beginOfTime} + interval '${intervalFormatted}')),
+        ${this.timeStampCast(`'${origin}'`)})`;
+  }
+
+  /**
+   * The input interval in format "2 years 3 months 4 weeks 5 days...."
+   * will be converted to Snowflake dialect "2 years, 3 months, 4 weeks, 5 days...."
+   */
+  private formatInterval(interval: string): string {
+    return interval.split(' ').map((word, index, arr) => {
+      if (index % 2 !== 0 && index < arr.length - 1) {
+        return `${word},`;
+      }
+      return word;
+    }).join(' ');
+  }
+
   public timeStampCast(value) {
     return `${value}::timestamp_tz`;
   }
