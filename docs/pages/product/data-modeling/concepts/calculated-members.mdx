@@ -308,7 +308,10 @@ granularity. It can be one of the [default granularities][ref-default-granularit
 ```yaml
 cubes:
   - name: users
-    sql_table: users
+    sql: >
+      SELECT '2025-01-01T00:00:00Z' AS created_at UNION ALL
+      SELECT '2025-02-01T00:00:00Z' AS created_at UNION ALL
+      SELECT '2025-03-01T00:00:00Z' AS created_at
 
     dimensions:
       - name: created_at
@@ -331,7 +334,11 @@ cubes:
 
 ```javascript
 cube(`users`, {
-  sql_table: `users`,
+  sql: `
+    SELECT '2025-01-01T00:00:00Z' AS created_at UNION ALL
+    SELECT '2025-02-01T00:00:00Z' AS created_at UNION ALL
+    SELECT '2025-03-01T00:00:00Z' AS created_at
+  `,
 
   dimensions: {
     created_at: {
@@ -360,6 +367,22 @@ cube(`users`, {
 ```
 
 </CodeTabs>
+
+If you query for `users.created_at`, `users.created_at__sunday_week`, and
+`users.created_at__year` dimensions, Cube will generate the following SQL:
+
+```sql
+SELECT
+  "users".created_at "users__created_at",
+  date_trunc('week', ("users".created_at::timestamptz AT TIME ZONE 'UTC') - interval '-1 day') + interval '-1 day' "users__created_at__sunday_week",
+  date_trunc('year', ("users".created_at::timestamptz AT TIME ZONE 'UTC')) "users__created_at__year"
+FROM (
+  SELECT '2025-01-01T00:00:00Z' AS created_at UNION ALL
+  SELECT '2025-02-01T00:00:00Z' AS created_at UNION ALL
+  SELECT '2025-03-01T00:00:00Z' AS created_at
+) AS "users"
+GROUP BY 1, 2, 3
+```
 
 ## Subquery dimensions
 
