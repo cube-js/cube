@@ -19,17 +19,17 @@
     "lint:fix": "eslint --fix **/*.js"
   },
   "dependencies": {
-    "@cubejs-backend/query-orchestrator": "^0.31.69",
-    "@cubejs-backend/schema-compiler": "^0.34.62",
+    "@cubejs-backend/query-orchestrator": "^0.36.0",
+    "@cubejs-backend/schema-compiler": "^0.36.0",
     "moment-timezone": "^0.5.45",
     "vertica-nodejs": "^1.0.3"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.31.0",
-    "@cubejs-backend/testing-shared": "^0.31.69",
+    "@cubejs-backend/linter": "^0.36.0",
+    "@cubejs-backend/testing-shared": "^0.36.0",
     "jest": "^26.6.3",
-    "testcontainers": "^8.16.0"
+    "testcontainers": "^10.13.0"
   },
   "publishConfig": {
     "access": "public"
