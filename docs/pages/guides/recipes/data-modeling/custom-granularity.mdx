@@ -30,22 +30,22 @@ We can also use them in further calculations like rendering `fiscal_quarter_labe
 cubes:
   - name: custom_granularities
     sql: >
-      SELECT '2024-01-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-02-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-03-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-04-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-05-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-06-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-07-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-08-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-09-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-10-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-11-15'::TIMESTAMP AS time UNION ALL
-      SELECT '2024-12-15'::TIMESTAMP AS time
+      SELECT '2024-01-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-02-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-03-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-04-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-05-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-06-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-07-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-08-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-09-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-10-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-11-15'::TIMESTAMP AS timestamp UNION ALL
+      SELECT '2024-12-15'::TIMESTAMP AS timestamp
 
     dimensions:
-      - name: time
-        sql: time
+      - name: timestamp
+        sql: timestamp
         type: time
 
         granularities:
@@ -64,44 +64,44 @@ cubes:
             offset: -3 months
       
       - name: sunday_week
-        sql: "{time.sunday_week}"
+        sql: "{timestamp.sunday_week}"
         type: time
       
       - name: fiscal_year
-        sql: "{time.fiscal_year}"
+        sql: "{timestamp.fiscal_year}"
         type: time
       
       - name: fiscal_quarter
-        sql: "{time.fiscal_quarter}"
+        sql: "{timestamp.fiscal_quarter}"
         type: time
 
       - name: fiscal_quarter_label
         sql: >
-          'FY' || EXTRACT(YEAR FROM {time.fiscal_year}) ||
-          '-Q' || EXTRACT(MONTH FROM {time.fiscal_year})
-        time: string
+          'FY' || EXTRACT(YEAR FROM {timestamp.fiscal_year}) ||
+          '-Q' || EXTRACT(QUARTER FROM {timestamp.fiscal_quarter})
+        type: string
 ```
 
 ```javascript
 cube(`custom_granularities`, {
   sql: `
-    SELECT '2024-01-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-02-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-03-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-04-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-05-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-06-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-07-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-08-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-09-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-10-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-11-15'::TIMESTAMP AS time UNION ALL
-    SELECT '2024-12-15'::TIMESTAMP AS time
+    SELECT '2024-01-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-02-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-03-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-04-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-05-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-06-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-07-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-08-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-09-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-10-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-11-15'::TIMESTAMP AS timestamp UNION ALL
+    SELECT '2024-12-15'::TIMESTAMP AS timestamp
   `,
 
   dimensions: {
-    time: {
-      sql: `time`,
+    timestamp: {
+      sql: `timestamp`,
       type: `time`,
 
       granularities: {
@@ -125,28 +125,32 @@ cube(`custom_granularities`, {
     },
     
     sunday_week: {
-      sql: `${time.sunday_week}`,
+      sql: `${timestamp.sunday_week}`,
       type: `time`
     },
 
     fiscal_year: {
-      sql: `${time.fiscal_year}`,
+      sql: `${timestamp.fiscal_year}`,
       type: `time`
     },
       
     fiscal_quarter: {
-      sql: `${time.fiscal_quarter}`,
+      sql: `${timestamp.fiscal_quarter}`,
       type: `time`
+    },
+
+    fiscal_quarter_label: {
+      sql: `
+        'FY' || EXTRACT(YEAR FROM ${timestamp.fiscal_year}) ||
+        '-Q' || EXTRACT(QUARTER FROM ${timestamp.fiscal_quarter})
+      `,
+      type: `string`
     }
   }
 })
 ```
 
 </CodeTabs>
-
-## Result
-
-TODO: Add screenshots with the REST API and SQL API **queries** and responses
 
 
 [ref-custom-granularities]: /reference/data-model/dimensions#granularities
