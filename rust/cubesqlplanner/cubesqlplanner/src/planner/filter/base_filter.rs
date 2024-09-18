@@ -68,6 +68,14 @@ impl BaseFilter {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
             FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
+            FilterOperator::In => self.in_where(&member_sql)?,
+            FilterOperator::NotIn => self.not_in_where(&member_sql)?,
+            FilterOperator::Set => self.set_where(&member_sql)?,
+            FilterOperator::NotSet => self.not_set_where(&member_sql)?,
+            FilterOperator::Gt => self.gt_where(&member_sql)?,
+            FilterOperator::Gte => self.gte_where(&member_sql)?,
+            FilterOperator::Lt => self.lt_where(&member_sql)?,
+            FilterOperator::Lte => self.lte_where(&member_sql)?,
         };
         Ok(res)
     }
@@ -108,6 +116,52 @@ impl BaseFilter {
         let (from, to) = self.allocate_date_params()?;
         self.templates
             .time_range_filter(member_sql.to_string(), from, to)
+    }
+
+    fn in_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        let need_null_check = self.is_need_null_chek(false);
+        self.templates.in_where(
+            member_sql.to_string(),
+            self.filter_and_allocate_values(),
+            need_null_check,
+        )
+    }
+
+    fn not_in_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        let need_null_check = self.is_need_null_chek(true);
+        self.templates.not_in_where(
+            member_sql.to_string(),
+            self.filter_and_allocate_values(),
+            need_null_check,
+        )
+    }
+
+    fn set_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates.set_where(member_sql.to_string())
+    }
+
+    fn not_set_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates.not_set_where(member_sql.to_string())
+    }
+
+    fn gt_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates
+            .gt(member_sql.to_string(), self.first_param()?)
+    }
+
+    fn gte_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates
+            .gte(member_sql.to_string(), self.first_param()?)
+    }
+
+    fn lt_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates
+            .lt(member_sql.to_string(), self.first_param()?)
+    }
+
+    fn lte_where(&self, member_sql: &str) -> Result<String, CubeError> {
+        self.templates
+            .lte(member_sql.to_string(), self.first_param()?)
     }
 
     fn allocate_date_params(&self) -> Result<(String, String), CubeError> {

@@ -577,6 +577,29 @@ export class BaseQuery {
     return false;
   }
 
+  buildSqlAndParamsTest(exportAnnotatedSql) {
+    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+      if (this.externalPreAggregationQuery()) { // TODO performance
+        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+      }
+    }
+    const rr = this.compilers.compiler.withQuery(
+      this,
+      () => this.cacheValue(
+        ['buildSqlAndParams', exportAnnotatedSql],
+        () => this.paramAllocator.buildSqlAndParams(
+          this.buildParamAnnotatedSql(),
+          exportAnnotatedSql,
+          this.shouldReuseParams
+        ),
+        { cache: this.queryCache }
+      )
+    );
+    console.log('!! js result: ', rr);
+    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
+    console.log('!! rust result: ', r);
+    return { rust: r, js: rr };
+  }
 
   /**
    * Returns an array of SQL query strings for the query.
@@ -3275,7 +3298,11 @@ export class BaseQuery {
         not_set_where: '{{ column }} IS NULL',
         in: '{{ column }} IN ({{ values_concat }}){{ is_null_check }}',
         not_in: '{{ column }} NOT IN ({{ values_concat }}){{ is_null_check }}',
-        time_range_filter: '{{ column }} >= {{ from_timestamp }} AND {{ column }} <= {{ to_timestamp }}'
+        time_range_filter: '{{ column }} >= {{ from_timestamp }} AND {{ column }} <= {{ to_timestamp }}',
+        gt: '{{ column }} > {{ param }}',
+        gte: '{{ column }} >= {{ param }}',
+        lt: '{{ column }} < {{ param }}',
+        lte: '{{ column }} <= {{ param }}'
 
       },
       quotes: {

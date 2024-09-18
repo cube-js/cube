@@ -121,6 +121,46 @@ impl FilterTemplates {
         )
     }
 
+    pub fn gt(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/gt",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn gte(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/gte",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn lt(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/lt",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
+    pub fn lte(&self, column: String, param: String) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/lte",
+            context! {
+                column => column,
+                param => param
+            },
+        )
+    }
+
     fn additional_null_check(&self, need: bool, column: &String) -> Result<String, CubeError> {
         if need {
             self.or_is_null_check(column.clone())
