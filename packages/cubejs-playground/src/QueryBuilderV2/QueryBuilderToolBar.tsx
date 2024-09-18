@@ -34,7 +34,7 @@ export function QueryBuilderToolBar() {
     isLoading,
     error,
     resultSet,
-    isQueryTouched,
+    isResultOutdated,
     isQueryEmpty,
     isApiBlocked,
     stopQuery,
@@ -81,7 +81,7 @@ export function QueryBuilderToolBar() {
               isDisabled={isQueryEmpty || !!verificationError || isVerifying || isApiBlocked}
               isLoading={isLoading}
               icon={
-                !isQueryEmpty && (isLoading || !isQueryTouched) ? (
+                !isQueryEmpty && (isLoading || !isResultOutdated) ? (
                   <ReloadOutlined />
                 ) : (
                   <PlayCircleOutlined />

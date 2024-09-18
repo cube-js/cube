@@ -74,6 +74,8 @@ context("Playground: Explore Page", () => {
       cy.setQuery(ordersCountQuery);
       cy.wait(["@context"]);
       cy.getByTestId("live-preview-btn").should("exist");
+      // avoid crashing here
+      cy.wait(10000);
     });
 
     it("does now show the Live Preview button when livePreview is disabled", () => {

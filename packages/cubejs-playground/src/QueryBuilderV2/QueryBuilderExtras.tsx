@@ -1,37 +1,38 @@
 import { DragOutlined } from '@ant-design/icons';
 import {
   Button,
+  Checkbox,
   ComboBox,
   Content,
   Dialog,
   DialogTrigger,
+  DownIcon,
   Flow,
   Grid,
+  Link,
+  NumberInput,
   Radio,
   Select,
   Space,
   Tag,
   tasty,
   Text,
+  Title,
 } from '@cube-dev/ui-kit';
 import { forwardRef, Key, useEffect, useMemo, useState } from 'react';
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  OnDragEndResponder,
-} from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, Droppable, OnDragEndResponder } from 'react-beautiful-dnd';
 import { TCubeMemberType } from '@cubejs-client/core';
 
 import { useStoredTimezones, useEvent } from './hooks';
 import { MemberLabel } from './components/MemberLabel';
 import { useQueryBuilderContext } from './context';
-import { ArrowIcon } from './icons/ArrowIcon';
 import { ORDER_LABEL_BY_TYPE } from './utils/labels';
 import { formatNumber } from './utils/formatters';
 import { TIMEZONES } from './utils/timezones';
 
-const allTimeZones: {
+const DEFAULT_LIMIT = 5_000;
+
+const ALL_TIMEZONES: {
   tzCode: string;
   label: string;
   name: string;
@@ -45,15 +46,15 @@ const allTimeZones: {
   },
   ...TIMEZONES,
 ];
-const availableTimeZones = allTimeZones.map((tz) => tz.tzCode);
+const AVAILABLE_TIMEZONES = ALL_TIMEZONES.map((tz) => tz.tzCode);
 
-const limitOptions = [
+const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 100, label: '100' },
   { key: 1000, label: '1,000' },
-  { key: 5000, label: '5,000' },
-  { key: 50000, label: '50,000 (MAX)' },
+  { key: 5000, label: '5,000 (Default)' },
+  { key: 50000, label: '50,000 (Max)' },
 ];
-const limitOptionValues = limitOptions.map((option) => option.key);
+const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];
 
 function timezoneByName(name: string) {
   return {
@@ -171,10 +172,7 @@ type OrderListItemProps = {
   onSortChange: (name: string, sorting: SortDirection) => void;
 };
 
-export const OrderListItem = forwardRef(function OrderListItem(
-  props: OrderListItemProps,
-  ref
-) {
+export const OrderListItem = forwardRef(function OrderListItem(props: OrderListItemProps, ref) {
   const {
     name,
     memberType,
@@ -187,12 +185,7 @@ export const OrderListItem = forwardRef(function OrderListItem(
   const label = props.label ?? name;
 
   return (
-    <OrderListItemStyled
-      ref={ref}
-      key={name}
-      data-member={memberType}
-      {...otherProps}
-    >
+    <OrderListItemStyled ref={ref} key={name} data-member={memberType} {...otherProps}>
       <DragOutlined style={{ fontSize: 16 }} />
 
       <MemberLabel name={label} member={memberType} />
@@ -207,19 +200,11 @@ export const OrderListItem = forwardRef(function OrderListItem(
           {ORDER_LABEL_BY_TYPE[cubeMemberKind ?? 'string'][0]}
         </SortButton>
 
-        <SortButton
-          data-member={memberType}
-          aria-label="Descending"
-          value="desc"
-        >
+        <SortButton data-member={memberType} aria-label="Descending" value="desc">
           {ORDER_LABEL_BY_TYPE[cubeMemberKind ?? 'string'][1]}
         </SortButton>
 
-        <SortButton
-          data-member={memberType}
-          aria-label="No sorting"
-          value="none"
-        >
+        <SortButton data-member={memberType} aria-label="No sorting" value="none">
           None
         </SortButton>
       </Radio.ButtonGroup>
@@ -233,9 +218,7 @@ export function QueryBuilderExtras() {
   const fields = [...(query?.dimensions ?? []), ...(query?.measures ?? [])];
   const storedTimezones = useStoredTimezones(query.timezone);
   const timeDimensions =
-    query?.timeDimensions
-      ?.filter((time) => time.granularity)
-      .map((time) => time.dimension) ?? [];
+    query?.timeDimensions?.filter((time) => time.granularity).map((time) => time.dimension) ?? [];
 
   timeDimensions.forEach((name) => {
     if (name && !fields.includes(name)) {
@@ -328,6 +311,186 @@ export function QueryBuilderExtras() {
     setAllFields(newOrder);
   });
 
+  const optionsPopover = useMemo(() => {
+    // ungrouped
+    const isSelected =
+      query.ungrouped ||
+      query.timezone ||
+      query.offset ||
+      (query.limit && query.limit !== DEFAULT_LIMIT);
+    const selectedCount =
+      (query.ungrouped ? 1 : 0) +
+      (query.timezone ? 1 : 0) +
+      (query.limit && query.limit !== DEFAULT_LIMIT ? 1 : 0) +
+      (query.offset ? 1 : 0);
+
+    // timezone
+    const timezone = query?.timezone || '';
+    const optionsWithStored = [...ALL_TIMEZONES];
+
+    [...storedTimezones].reverse().forEach((name) => {
+      if (!AVAILABLE_TIMEZONES.includes(name)) {
+        optionsWithStored.unshift(timezoneByName(name));
+      } else {
+        const option = optionsWithStored.find((tz) => tz.tzCode === name);
+
+        if (option) {
+          optionsWithStored.splice(optionsWithStored.indexOf(option), 1);
+          optionsWithStored.unshift(option);
+        }
+      }
+    });
+
+    const options = optionsWithStored.map((tz) => tz.tzCode).includes(timezone)
+      ? optionsWithStored
+      : [timezoneByName(timezone), ...optionsWithStored];
+
+    // limit
+    const limit = query.limit || DEFAULT_LIMIT;
+    const limitOptions = LIMIT_OPTION_VALUES.includes(limit)
+      ? LIMIT_OPTIONS
+      : [{ key: limit, label: formatNumber(limit) }, ...LIMIT_OPTIONS].sort(
+          (a, b) => a.key - b.key
+        );
+
+    return (
+      <DialogTrigger type="popover" placement="bottom end">
+        <Button
+          qa="QueryOptions"
+          aria-label="Query options"
+          type={isSelected ? 'primary' : 'secondary'}
+          size="small"
+          rightIcon={<DownIcon />}
+        >
+          Options
+          {selectedCount ? (
+            <Tag color="#purple-text" fill="#white" border={false}>
+              {selectedCount}
+            </Tag>
+          ) : null}
+        </Button>
+        {(close) => (
+          <Dialog width="36x">
+            <Content padding="1x 1.5x" gap="1.5x">
+              <Flow gap="1x">
+                <Title level={4} preset="h6">
+                  Query
+                </Title>
+                <Checkbox
+                  aria-label="Ungrouped"
+                  isSelected={query.ungrouped ?? false}
+                  onChange={(ungrouped) => {
+                    updateQuery({ ungrouped: ungrouped || undefined });
+                    close();
+                  }}
+                >
+                  Ungrouped
+                </Checkbox>
+              </Flow>
+              <ComboBox
+                aria-label="Timezone"
+                label="Time zone"
+                size="small"
+                listBoxStyles={{ height: '41x' }}
+                extra={
+                  timezone ? (
+                    <Link
+                      onPress={() => {
+                        updateQuery({ timezone: undefined });
+                        close();
+                      }}
+                    >
+                      Reset
+                    </Link>
+                  ) : null
+                }
+                selectedKey={timezone}
+                onSelectionChange={(val: Key) => {
+                  const timezone = val as string;
+
+                  updateQuery(() => ({
+                    timezone: timezone === '' ? undefined : timezone,
+                  }));
+
+                  close();
+                }}
+              >
+                {options.map((tz) => {
+                  const name = tz.tzCode;
+                  const zone = tz.utc;
+
+                  return (
+                    <Select.Item key={tz.tzCode} textValue={tz.label}>
+                      <Space placeContent="space-between" preset="t3m">
+                        <Text nowrap ellipsis block styles={{ width: 'max 40x' }}>
+                          {name || 'UTC (Default)'}
+                        </Text>
+                        {zone ? (
+                          <Text nowrap font="monospace" preset="c2">
+                            GMT{zone}
+                          </Text>
+                        ) : undefined}
+                      </Space>
+                    </Select.Item>
+                  );
+                })}
+              </ComboBox>
+              <Select
+                label="Limit"
+                size="small"
+                extra={
+                  limit !== DEFAULT_LIMIT ? (
+                    <Link
+                      onPress={() => {
+                        updateQuery({ limit: undefined });
+                        close();
+                      }}
+                    >
+                      Reset
+                    </Link>
+                  ) : null
+                }
+                selectedKey={String(query.limit)}
+                onSelectionChange={(val: Key) => {
+                  updateQuery(() => ({ limit: Number(val as string) }));
+                  close();
+                }}
+              >
+                {limitOptions.map((option: any) => (
+                  <Select.Item key={option.key} textValue={option.label}>
+                    {option.label}
+                  </Select.Item>
+                ))}
+              </Select>
+              <NumberInput
+                label="Offset"
+                size="small"
+                wrapperStyles={{ width: 'auto' }}
+                extra={
+                  query?.offset ? (
+                    <Link
+                      onPress={() => {
+                        updateQuery({ offset: undefined });
+                        close();
+                      }}
+                    >
+                      Reset
+                    </Link>
+                  ) : null
+                }
+                minValue={0}
+                value={query?.offset ?? 0}
+                onChange={(val) => {
+                  updateQuery({ offset: val });
+                }}
+              />
+            </Content>
+          </Dialog>
+        )}
+      </DialogTrigger>
+    );
+  }, [query.ungrouped, query.timezone, query.offset, storedTimezones.join('::'), query.limit]);
+
   const orderSelector = useMemo(() => {
     if (!allFields.length) {
       return;
@@ -339,7 +502,7 @@ export function QueryBuilderExtras() {
           qa="OrderButton"
           type={sortedFields.length ? 'primary' : 'secondary'}
           size="small"
-          rightIcon={<ArrowIcon direction="bottom" />}
+          rightIcon={<DownIcon />}
         >
           {sortedFields.length ? (
             <>
@@ -353,17 +516,11 @@ export function QueryBuilderExtras() {
           )}
         </Button>
         <Dialog width="max 80x">
-          <Content
-            padding="(1.5x - 1ow)"
-            style={{ minHeight: `${30 * allFields.length + 18}px` }}
-          >
+          <Content padding="(1.5x - 1ow)" style={{ minHeight: `${30 * allFields.length + 18}px` }}>
             <DragDropContext onDragEnd={onDrag}>
               <Droppable droppableId="queryOrder">
                 {(provided) => (
-                  <OrderListContainer
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                  >
+                  <OrderListContainer ref={provided.innerRef} {...provided.droppableProps}>
                     {allFields.map((name, index) => {
                       const memberType = getMemberType(name);
 
@@ -398,100 +555,10 @@ export function QueryBuilderExtras() {
     );
   }, [JSON.stringify(order.map), JSON.stringify(allFields), showOrder]);
 
-  const limitSelector = useMemo(() => {
-    const limit = query.limit || 5_000;
-    const options = limitOptionValues.includes(limit)
-      ? limitOptions
-      : [
-          { key: query?.limit, label: formatNumber(limit) },
-          ...limitOptions,
-        ].sort((a, b) => (a.key as number) - (b.key as number));
-
-    return (
-      <Select
-        label="Limit"
-        labelPosition="side"
-        size="small"
-        selectedKey={String(query.limit)}
-        onSelectionChange={(val: Key) => {
-          updateQuery(() => ({ limit: Number(val as string) }));
-        }}
-      >
-        {options.map((option) => (
-          <Select.Item key={option.key} textValue={option.label}>
-            {option.label}
-          </Select.Item>
-        ))}
-      </Select>
-    );
-  }, [query.limit]);
-
-  const timezoneSelector = useMemo(() => {
-    const timezone = query?.timezone || '';
-    const optionsWithStored = [...allTimeZones];
-
-    [...storedTimezones].reverse().forEach((name) => {
-      if (!availableTimeZones.includes(name)) {
-        optionsWithStored.unshift(timezoneByName(name));
-      } else {
-        const option = optionsWithStored.find((tz) => tz.tzCode === name);
-
-        if (option) {
-          optionsWithStored.splice(optionsWithStored.indexOf(option), 1);
-          optionsWithStored.unshift(option);
-        }
-      }
-    });
-
-    const options = optionsWithStored.map((tz) => tz.tzCode).includes(timezone)
-      ? optionsWithStored
-      : [timezoneByName(timezone), ...optionsWithStored];
-
-    return (
-      <ComboBox
-        aria-label="Timezone"
-        size="small"
-        width="25x"
-        listBoxStyles={{ height: '41x' }}
-        selectedKey={timezone}
-        onSelectionChange={(val: Key) => {
-          const timezone = val as string;
-
-          updateQuery(() => ({
-            timezone: timezone === '' ? undefined : timezone,
-          }));
-        }}
-      >
-        {options.map((tz) => {
-          const name = tz.tzCode;
-          const zone = tz.utc;
-
-          return (
-            <Select.Item key={tz.tzCode} textValue={tz.label}>
-              <Space placeContent="space-between" preset="t3m">
-                <Text nowrap ellipsis block styles={{ width: 'max 40x' }}>
-                  {name || 'UTC (Default)'}
-                </Text>
-                {zone ? (
-                  <Text nowrap font="monospace" preset="c2">
-                    GMT{zone}
-                  </Text>
-                ) : undefined}
-              </Space>
-            </Select.Item>
-          );
-        })}
-      </ComboBox>
-    );
-  }, [query?.timezone, storedTimezones.join('::')]);
-
   return (
-    <Space placeContent="space-between">
-      {timezoneSelector}
-      <Space>
-        {orderSelector}
-        {limitSelector}
-      </Space>
+    <Space gap="1x">
+      {orderSelector}
+      {optionsPopover}
     </Space>
   );
 }

@@ -33,5 +33,13 @@ export function getQueryHash(query: Query) {
     );
   }
 
-  return JSON.stringify(queryCopy);
+  const orderedQuery = Object.keys(queryCopy)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key as keyof Query] = queryCopy[key];
+
+      return acc;
+    }, {} as Query);
+
+  return JSON.stringify(orderedQuery);
 }

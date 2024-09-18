@@ -28,9 +28,7 @@ export function AccordionCard(props: AccordionCardProps) {
         contentStyles={CONTENT_STYLES}
       >
         <Accordion.Item key="card" qa={qa} {...restProps}>
-          <Block>
-            {typeof children === 'function' ? children() : children}
-          </Block>
+          <Block>{typeof children === 'function' ? children() : children}</Block>
         </Accordion.Item>
       </Accordion>
     </Card>
