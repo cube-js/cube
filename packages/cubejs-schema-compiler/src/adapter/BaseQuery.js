@@ -577,30 +577,6 @@ export class BaseQuery {
     return false;
   }
 
-  buildSqlAndParamsTest(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
-      }
-    }
-    const rr = this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
-        { cache: this.queryCache }
-      )
-    );
-    console.log('!! js result: ', rr);
-    const r = this.buildSqlAndParamsRust(exportAnnotatedSql);
-    console.log('!! rust result: ', r);
-    return { rust: r, js: rr };
-  }
-
   /**
    * Returns an array of SQL query strings for the query.
    * @param {boolean} [exportAnnotatedSql] - returns annotated sql with not rendered params if true
