@@ -124,6 +124,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             .join_graph()
             .build_join(all_join_hints.clone())?;
         query_tools.cached_data_mut().set_join(join);
+        //FIXME may be this filter should be applyed on other place
+        let time_dimensions = time_dimensions
+            .into_iter()
+            .filter(|dim| dim.has_granularity())
+            .collect_vec();
 
         Ok(Self {
             context,

@@ -16,7 +16,7 @@ pub struct TimeDimension {
     pub dimension: String,
     pub granularity: Option<String>,
     #[serde(rename = "dateRange")]
-    pub date_range: Vec<String>,
+    pub date_range: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

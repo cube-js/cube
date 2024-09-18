@@ -40,14 +40,16 @@ impl<'a> FilterCompiler<'a> {
     }
 
     pub fn add_time_dimension_item(&mut self, item: &BaseTimeDimension) -> Result<(), CubeError> {
-        let filter = BaseFilter::try_new(
-            self.query_tools.clone(),
-            item.member_evaluator(),
-            FilterType::Dimension,
-            "InDateRange".to_string(),
-            Some(item.get_date_range().into_iter().map(|v| Some(v)).collect()),
-        )?;
-        self.time_dimension_filters.push(FilterItem::Item(filter));
+        if let Some(date_range) = item.get_date_range() {
+            let filter = BaseFilter::try_new(
+                self.query_tools.clone(),
+                item.member_evaluator(),
+                FilterType::Dimension,
+                "InDateRange".to_string(),
+                Some(date_range.into_iter().map(|v| Some(v)).collect()),
+            )?;
+            self.time_dimension_filters.push(FilterItem::Item(filter));
+        }
         Ok(())
     }
 

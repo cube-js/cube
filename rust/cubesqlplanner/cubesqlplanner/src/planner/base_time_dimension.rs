@@ -9,7 +9,7 @@ pub struct BaseTimeDimension {
     dimension: Rc<BaseDimension>,
     query_tools: Rc<QueryTools>,
     granularity: Option<String>,
-    date_range: Vec<String>,
+    date_range: Option<Vec<String>>,
 }
 
 impl BaseMember for BaseTimeDimension {
@@ -49,7 +49,7 @@ impl BaseTimeDimension {
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<EvaluationNode>,
         granularity: Option<String>,
-        date_range: Vec<String>,
+        date_range: Option<Vec<String>>,
         index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         Ok(Rc::new(Self {
@@ -73,7 +73,7 @@ impl BaseTimeDimension {
         self.granularity.is_some()
     }
 
-    pub fn get_date_range(&self) -> Vec<String> {
+    pub fn get_date_range(&self) -> Option<Vec<String>> {
         self.date_range.clone()
     }
 
