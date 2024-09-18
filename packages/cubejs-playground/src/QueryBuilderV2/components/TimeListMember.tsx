@@ -66,8 +66,12 @@ export function TimeListMember(props: ListMemberProps) {
   // @ts-ignore
   const description = member.description;
   const isTimestampSelected = isSelected();
-  const isGranularitySelectedList = GRANULARITIES.map((granularity) => isSelected(granularity));
-  const selectedGranularity = GRANULARITIES.find((granularity) => isSelected(granularity));
+
+  const memberGranularities = (member.type === 'time' && member.granularities) ?
+    member.granularities.map(g => g.name).concat(GRANULARITIES) :
+    GRANULARITIES;
+  const isGranularitySelectedList = memberGranularities.map((granularity) => isSelected(granularity));
+  const selectedGranularity = memberGranularities.find((granularity) => isSelected(granularity));
   // const isGranularitySelected = !!isGranularitySelectedList.find((gran) => gran);
 
   open = isCompact ? false : open;
@@ -162,7 +166,7 @@ export function TimeListMember(props: ListMemberProps) {
               <Text ellipsis>value</Text>
             </ListMemberButton>
           ) : null}
-          {GRANULARITIES.map((granularity, i) => {
+          {memberGranularities.map((granularity, i) => {
             return open && !isCompact ? (
               <ListMemberButton
                 key={`${name}.${granularity}`}
