@@ -44,6 +44,22 @@ impl FilterTemplates {
         )
     }
 
+    pub fn time_range_filter(
+        &self,
+        column: String,
+        from_timestamp: String,
+        to_timestamp: String,
+    ) -> Result<String, CubeError> {
+        self.render.render_template(
+            &"filters/time_range_filter",
+            context! {
+                column => column,
+                from_timestamp => from_timestamp,
+                to_timestamp => to_timestamp,
+            },
+        )
+    }
+
     pub fn in_where(
         &self,
         column: String,

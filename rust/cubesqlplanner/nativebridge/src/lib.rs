@@ -371,6 +371,7 @@ impl NativeService {
         quote! {
             pub trait #service_ident {
                 #( #methods )*
+                fn as_any(self: Rc<Self>) -> Rc<dyn Any>;
                 #static_data_method
             }
         }
@@ -456,6 +457,9 @@ impl NativeService {
 
             impl<IT:InnerTypes> #service_ident for #struct_ident<IT> {
                 #( #methods )*
+                fn as_any(self: Rc<Self>) -> Rc<dyn Any> {
+                    self.clone()
+                }
                 #static_data_method
             }
         }

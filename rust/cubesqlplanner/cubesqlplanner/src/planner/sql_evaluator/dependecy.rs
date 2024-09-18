@@ -3,6 +3,7 @@ use super::{
     DimensionEvaluatorFactory, EvaluationNode, MeasureEvaluator, MeasureEvaluatorFactory,
     MemberEvaluator, MemberEvaluatorFactory,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{self, MemberSql};
 use cubenativeutils::CubeError;
@@ -29,21 +30,34 @@ impl StructDependency {
     }
 }
 
+pub enum ContextSymbolDep {
+    SecurityContext,
+    FilterParams,
+    FilterGroup,
+}
+
 pub enum Dependency {
     SingleDependency(Rc<EvaluationNode>),
     StructDependency(StructDependency),
+    ContextDependency(ContextSymbolDep),
 }
 
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(
+        compiler: &'a mut Compiler,
+        cube_evaluator: Rc<dyn CubeEvaluator>,
+        base_tools: Rc<dyn BaseTools>,
+    ) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
+            base_tools,
         }
     }
 
@@ -70,6 +84,10 @@ impl<'a> DependenciesBuilder<'a> {
 
         for (i, dep) in call_deps.iter().enumerate() {
             if dep.parent.is_some() {
+                continue;
+            }
+            if let Some(context_dep) = self.build_context_dep(&dep.name) {
+                result.push(context_dep);
                 continue;
             }
             if childs[i].is_empty() {
@@ -113,6 +131,19 @@ impl<'a> DependenciesBuilder<'a> {
         }
 
         Ok(result)
+    }
+
+    fn build_context_dep(&self, name: &str) -> Option<Dependency> {
+        match name {
+            "USER_CONTEXT" | "SECURITY_CONTEXT" => Some(Dependency::ContextDependency(
+                ContextSymbolDep::SecurityContext,
+            )),
+            "FILTER_PARAMS" => Some(Dependency::ContextDependency(
+                ContextSymbolDep::FilterParams,
+            )),
+            "FILTER_GROUP" => Some(Dependency::ContextDependency(ContextSymbolDep::FilterGroup)),
+            _ => None,
+        }
     }
 
     //FIXME may be should be moved to BaseTools

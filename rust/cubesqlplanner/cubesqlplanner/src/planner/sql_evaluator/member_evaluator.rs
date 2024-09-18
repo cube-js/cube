@@ -1,7 +1,8 @@
 use super::dependecy::Dependency;
 use super::{
-    CubeNameEvaluator, CubeTableEvaluator, CubeTableEvaluatorFactory, DimensionEvaluator,
-    JoinConditionEvaluator, MeasureEvaluator,
+    Compiler, CubeNameEvaluator, CubeTableEvaluator, CubeTableEvaluatorFactory, DimensionEvaluator,
+    JoinConditionEvaluator, MeasureEvaluator, MeasureFilterEvaluator,
+    MeasureFilterEvaluatorFactory,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::MemberSql;
@@ -19,6 +20,7 @@ pub enum MemberEvaluatorType {
     CubeName(CubeNameEvaluator),
     CubeTable(CubeTableEvaluator),
     JoinCondition(JoinConditionEvaluator),
+    MeasureFilter(MeasureFilterEvaluator),
 }
 
 pub struct EvaluationNode {
@@ -69,6 +71,16 @@ impl EvaluationNode {
         })
     }
 
+    pub fn new_measure_filter(
+        evaluator: MeasureFilterEvaluator,
+        deps: Vec<Dependency>,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            evaluator: MemberEvaluatorType::MeasureFilter(evaluator),
+            deps,
+        })
+    }
+
     pub fn deps(&self) -> &Vec<Dependency> {
         &self.deps
     }
@@ -86,5 +98,9 @@ pub trait MemberEvaluatorFactory: Sized {
     fn cube_name(&self) -> &String;
     fn deps_names(&self) -> Result<Vec<String>, CubeError>;
     fn member_sql(&self) -> Option<Rc<dyn MemberSql>>;
-    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError>;
+    fn build(
+        self,
+        deps: Vec<Dependency>,
+        compiler: &mut Compiler,
+    ) -> Result<Rc<EvaluationNode>, CubeError>;
 }

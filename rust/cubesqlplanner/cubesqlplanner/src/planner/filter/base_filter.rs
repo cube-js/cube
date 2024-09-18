@@ -5,9 +5,12 @@ use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{default_evaluate, EvaluationNode, MemberEvaluator};
 use crate::planner::sql_templates::filter::FilterTemplates;
-use crate::planner::{BaseMember, IndexedMember};
+use crate::planner::{evaluate_with_context, BaseMember, Context, IndexedMember};
+use chrono::TimeZone;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::rc::Rc;
 use std::str::FromStr;
 
@@ -24,6 +27,14 @@ pub struct BaseFilter {
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,
     templates: FilterTemplates,
+}
+
+lazy_static! {
+    static ref DATE_TIME_LOCAL_MS_RE: Regex =
+        Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d$").unwrap();
+    static ref DATE_TIME_LOCAL_U_RE: Regex =
+        Regex::new(r"^\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\d\d\d\d\d$").unwrap();
+    static ref DATE_RE: Regex = Regex::new(r"^\d\d\d\d-\d\d-\d\d$").unwrap();
 }
 
 impl BaseFilter {
@@ -50,11 +61,13 @@ impl BaseFilter {
         }))
     }
 
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        let member_sql = default_evaluate(&self.member_evaluator, self.query_tools.clone())?;
+    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+        let member_sql =
+            evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
         let res = match self.filter_operator {
             FilterOperator::Equal => self.equals_where(&member_sql)?,
             FilterOperator::NotEqual => self.not_equals_where(&member_sql)?,
+            FilterOperator::InDateRange => self.in_date_range(&member_sql)?,
         };
         Ok(res)
     }
@@ -91,9 +104,121 @@ impl BaseFilter {
         }
     }
 
+    fn in_date_range(&self, member_sql: &str) -> Result<String, CubeError> {
+        let (from, to) = self.allocate_date_params()?;
+        self.templates
+            .time_range_filter(member_sql.to_string(), from, to)
+    }
+
+    fn allocate_date_params(&self) -> Result<(String, String), CubeError> {
+        if self.values.len() >= 2 {
+            let from = if let Some(from_str) = &self.values[0] {
+                self.query_tools
+                    .base_tools()
+                    .in_db_time_zone(self.format_from_date(&from_str)?)?
+            } else {
+                return Err(CubeError::user(format!(
+                    "Arguments for date range is not valid"
+                )));
+            };
+
+            let to = if let Some(to_str) = &self.values[1] {
+                self.query_tools
+                    .base_tools()
+                    .in_db_time_zone(self.format_to_date(&to_str)?)?
+            } else {
+                return Err(CubeError::user(format!(
+                    "Arguments for date range is not valid"
+                )));
+            };
+            let from = self.allocate_timestamp_param(&from);
+            let to = self.allocate_timestamp_param(&to);
+            Ok((from, to))
+        } else {
+            Err(CubeError::user(format!(
+                "2 arguments expected for date range, got {}",
+                self.values.len()
+            )))
+        }
+    }
+
+    fn format_from_date(&self, date: &str) -> Result<String, CubeError> {
+        let precision = self.query_tools.base_tools().timestamp_precision()?;
+        if precision == 3 {
+            if DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else if precision == 6 {
+            if date.len() == 23 && DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(format!("{}000", date));
+            } else if date.len() == 26 && DATE_TIME_LOCAL_U_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Unsupported timestamp precision: {}",
+                precision
+            )));
+        }
+
+        if DATE_RE.is_match(date) {
+            return Ok(format!(
+                "{}T00:00:00.{}",
+                date,
+                "0".repeat(precision as usize)
+            ));
+        }
+        //FIXME chrono don't support parsing date without specified format
+        Err(CubeError::user(format!(
+            "Unsupported date format: {}",
+            date
+        )))
+    }
+
+    fn format_to_date(&self, date: &str) -> Result<String, CubeError> {
+        let precision = self.query_tools.base_tools().timestamp_precision()?;
+        if precision == 3 {
+            if DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else if precision == 6 {
+            if date.len() == 23 && DATE_TIME_LOCAL_MS_RE.is_match(date) {
+                if date.ends_with(".999") {
+                    return Ok(format!("{}999", date));
+                }
+                return Ok(format!("{}000", date));
+            } else if date.len() == 26 && DATE_TIME_LOCAL_U_RE.is_match(date) {
+                return Ok(date.to_string());
+            }
+        } else {
+            return Err(CubeError::user(format!(
+                "Unsupported timestamp precision: {}",
+                precision
+            )));
+        }
+
+        if DATE_RE.is_match(date) {
+            return Ok(format!(
+                "{}T23:59:59.{}",
+                date,
+                "9".repeat(precision as usize)
+            ));
+        }
+        //FIXME chrono don't support parsing date without specified format
+        Err(CubeError::user(format!(
+            "Unsupported date format: {}",
+            date
+        )))
+    }
+
     fn allocate_param(&self, param: &str) -> String {
         let index = self.query_tools.allocaate_param(param);
-        format!("${}", index)
+        format!("${}$", index)
+    }
+
+    fn allocate_timestamp_param(&self, param: &str) -> String {
+        let index = self.query_tools.allocaate_param(param);
+        format!("${}$::timestamptz", index)
     }
 
     fn first_param(&self) -> Result<String, CubeError> {

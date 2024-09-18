@@ -1,41 +1,37 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
 use crate::planner::sql_evaluator::default_visitor::{
-    DefaultEvaluatorVisitor, PostProcesVisitorItem, ReplaceVisitorItem,
+    DefaultEvaluatorVisitor, PostProcesNodeProcessorItem, ReplaceNodeProcessorItem,
 };
+use crate::planner::sql_evaluator::post_processors::default_post_processor;
 use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct Context {
     cube_alias_prefix: Option<String>,
-    replace_visitors: Vec<Rc<dyn ReplaceVisitorItem>>,
-    post_process_visitors: Vec<Rc<dyn PostProcesVisitorItem>>,
+    replace_visitors: Vec<Rc<dyn ReplaceNodeProcessorItem>>,
+    post_process_visitors: Vec<Rc<dyn PostProcesNodeProcessorItem>>,
 }
 
 impl Context {
     pub fn new(
         cube_alias_prefix: Option<String>,
-        replace_visitors: Vec<Rc<dyn ReplaceVisitorItem>>,
-        post_process_visitors: Vec<Rc<dyn PostProcesVisitorItem>>,
+        replace_visitors: Vec<Rc<dyn ReplaceNodeProcessorItem>>,
     ) -> Rc<Self> {
         Rc::new(Self {
             cube_alias_prefix,
             replace_visitors,
-            post_process_visitors,
+            post_process_visitors: vec![default_post_processor()],
         })
     }
 
     pub fn new_with_cube_alias_prefix(cube_alias_prefix: String) -> Rc<Self> {
-        Self::new(Some(cube_alias_prefix), vec![], vec![])
+        Self::new(Some(cube_alias_prefix), vec![])
     }
 
     pub fn default() -> Rc<Self> {
-        Rc::new(Self {
-            cube_alias_prefix: Default::default(),
-            replace_visitors: Default::default(),
-            post_process_visitors: Default::default(),
-        })
+        Self::new(Default::default(), Default::default())
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> DefaultEvaluatorVisitor {

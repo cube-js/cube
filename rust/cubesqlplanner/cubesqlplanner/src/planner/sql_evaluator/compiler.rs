@@ -3,9 +3,10 @@ use super::join_hints_collector::JoinHintsCollector;
 use super::{
     CubeNameEvaluatorFactory, CubeTableEvaluatorFactory, DimensionEvaluator,
     DimensionEvaluatorFactory, EvaluationNode, JoinConditionEvaluator,
-    JoinConditionEvaluatorFactory, MeasureEvaluator, MeasureEvaluatorFactory, MemberEvaluator,
-    MemberEvaluatorFactory, TraversalVisitor,
+    JoinConditionEvaluatorFactory, MeasureEvaluator, MeasureEvaluatorFactory,
+    MeasureFilterEvaluatorFactory, MemberEvaluator, MemberEvaluatorFactory, TraversalVisitor,
 };
+use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use cubenativeutils::CubeError;
@@ -15,13 +16,15 @@ use std::collections::HashSet;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
+    base_tools: Rc<dyn BaseTools>,
     members: HashMap<(String, String), Rc<EvaluationNode>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
+    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, base_tools: Rc<dyn BaseTools>) -> Self {
         Self {
             cube_evaluator,
+            base_tools,
             members: HashMap::new(),
         }
     }
@@ -105,6 +108,17 @@ impl Compiler {
         )
     }
 
+    pub fn add_measure_filter_evaluator(
+        &mut self,
+        cube_name: String,
+        sql: Rc<dyn MemberSql>,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
+        self.add_evaluator_impl(
+            &cube_name,
+            MeasureFilterEvaluatorFactory::try_new(&cube_name, sql)?,
+        )
+    }
+
     pub fn join_hints(&self) -> Vec<String> {
         let mut collector = JoinHintsCollector::new();
         for member in self.members.values() {
@@ -132,10 +146,11 @@ impl Compiler {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         let dep_names = factory.deps_names()?;
         let cube_name = factory.cube_name();
-        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
+        let dep_builder =
+            DependenciesBuilder::new(self, self.cube_evaluator.clone(), self.base_tools.clone());
         let deps = dep_builder.build(cube_name.clone(), factory.member_sql())?;
 
-        let node = factory.build(deps)?;
+        let node = factory.build(deps, self)?;
         let key = (T::evaluator_name().to_string(), full_name.clone());
         if T::is_cachable() {
             self.members.insert(key, node.clone());

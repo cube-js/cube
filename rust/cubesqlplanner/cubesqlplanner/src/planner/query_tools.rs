@@ -5,6 +5,8 @@ use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
+use chrono::{TimeZone, Utc};
+use chrono_tz::Tz;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use datafusion::logical_plan::ExprSchema;
@@ -42,6 +44,7 @@ pub struct QueryTools {
     params_allocator: Rc<RefCell<ParamsAllocator>>,
     evaluator_compiler: Rc<RefCell<Compiler>>,
     cached_data: RefCell<QueryToolsCachedData>,
+    timezone: Option<Tz>,
 }
 
 impl QueryTools {
@@ -49,9 +52,22 @@ impl QueryTools {
         cube_evaluator: Rc<dyn CubeEvaluator>,
         base_tools: Rc<dyn BaseTools>,
         join_graph: Rc<dyn JoinGraph>,
+        timezone_name: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(cube_evaluator.clone())));
+        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
+            cube_evaluator.clone(),
+            base_tools.clone(),
+        )));
+        let timezone = if let Some(timezone) = timezone_name {
+            Some(
+                timezone
+                    .parse::<Tz>()
+                    .map_err(|e| CubeError::user(format!("Incorrect timezone {}", timezone)))?,
+            )
+        } else {
+            None
+        };
         Ok(Rc::new(Self {
             cube_evaluator,
             base_tools,
@@ -60,6 +76,7 @@ impl QueryTools {
             params_allocator: Rc::new(RefCell::new(ParamsAllocator::new())),
             evaluator_compiler,
             cached_data: RefCell::new(QueryToolsCachedData::new()),
+            timezone,
         }))
     }
 
@@ -73,6 +90,10 @@ impl QueryTools {
 
     pub fn join_graph(&self) -> &Rc<dyn JoinGraph> {
         &self.join_graph
+    }
+
+    pub fn timezone(&self) -> &Option<Tz> {
+        &self.timezone
     }
 
     pub fn cached_data(&self) -> Ref<'_, QueryToolsCachedData> {
@@ -132,5 +153,14 @@ impl QueryTools {
     }
     pub fn get_allocated_params(&self) -> Vec<String> {
         self.params_allocator.borrow().get_params().clone()
+    }
+    pub fn build_sql_and_params(
+        &self,
+        sql: &str,
+        should_reuse_params: bool,
+    ) -> Result<(String, Vec<String>), CubeError> {
+        self.params_allocator
+            .borrow()
+            .build_sql_and_params(sql, should_reuse_params)
     }
 }

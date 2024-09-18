@@ -3,6 +3,7 @@ use std::str::FromStr;
 pub enum FilterOperator {
     Equal,
     NotEqual,
+    InDateRange,
 }
 
 impl FromStr for FilterOperator {
@@ -12,6 +13,7 @@ impl FromStr for FilterOperator {
         match s.to_lowercase().as_str() {
             "equals" => Ok(Self::Equal),
             "notequals" => Ok(Self::NotEqual),
+            "indaterange" => Ok(Self::InDateRange),
             _ => Err(CubeError::user(format!("Unknown filter operator {}", s))),
         }
     }

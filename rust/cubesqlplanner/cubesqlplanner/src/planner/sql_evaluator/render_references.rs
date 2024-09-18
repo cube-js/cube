@@ -1,20 +1,20 @@
-use super::default_visitor::ReplaceVisitorItem;
+use super::default_visitor::ReplaceNodeProcessorItem;
 use super::{EvaluationNode, MemberEvaluatorType};
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub struct RenderReferencesVisitor {
+pub struct RenderReferencesNodeProcessor {
     references: HashMap<String, String>,
 }
 
-impl RenderReferencesVisitor {
+impl RenderReferencesNodeProcessor {
     pub fn new(references: HashMap<String, String>) -> Rc<Self> {
         Rc::new(Self { references })
     }
 }
 
-impl ReplaceVisitorItem for RenderReferencesVisitor {
+impl ReplaceNodeProcessorItem for RenderReferencesNodeProcessor {
     fn replace_if_needed(
         &self,
         node: &Rc<super::EvaluationNode>,

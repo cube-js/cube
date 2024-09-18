@@ -1,6 +1,6 @@
 use super::dependecy::Dependency;
 use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
-use super::{MemberEvaluator, MemberEvaluatorFactory};
+use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{self, MemberSql, MemberSqlArg};
@@ -29,6 +29,10 @@ impl DimensionEvaluator {
             member_sql,
             definition,
         }
+    }
+    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+        let sql = self.member_sql.call(args)?;
+        Ok(sql)
     }
     pub fn default_evaluate_sql(
         &self,
@@ -99,7 +103,11 @@ impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
         Some(self.sql.clone())
     }
 
-    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError> {
+    fn build(
+        self,
+        deps: Vec<Dependency>,
+        _compiler: &mut Compiler,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self {
             cube_name,
             name,

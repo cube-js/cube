@@ -5,9 +5,9 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use minijinja::{context, value::Value, Environment};
+use std::any::Any;
 use std::collections::HashMap;
 use std::marker::PhantomData;
-use std::rc::Rc;
 
 pub trait SqlTemplatesRender {
     fn contains_template(&self, template_name: &str) -> bool;

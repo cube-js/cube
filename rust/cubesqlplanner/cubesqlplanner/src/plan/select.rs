@@ -26,7 +26,7 @@ impl Select {
             .collect::<Result<Vec<_>, _>>()?
             .join(", ");
         let where_condition = if let Some(filter) = &self.filter {
-            format!(" WHERE {}", filter.to_sql()?)
+            format!(" WHERE {}", filter.to_sql(self.context.clone())?)
         } else {
             format!("")
         };
@@ -44,7 +44,7 @@ impl Select {
         };
 
         let having = if let Some(having) = &self.having {
-            format!(" HAVING {}", having.to_sql()?)
+            format!(" HAVING {}", having.to_sql(self.context.clone())?)
         } else {
             format!("")
         };

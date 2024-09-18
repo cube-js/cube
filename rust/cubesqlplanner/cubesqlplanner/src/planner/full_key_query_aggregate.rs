@@ -1,7 +1,7 @@
 use super::base_join_condition::DimensionJoinCondition;
 use super::query_tools::QueryTools;
 use super::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
-use super::sql_evaluator::render_references::RenderReferencesVisitor;
+use super::sql_evaluator::render_references::RenderReferencesNodeProcessor;
 use super::sql_evaluator::{Compiler, EvaluationNode};
 use super::IndexedMember;
 use super::{
@@ -22,6 +22,9 @@ pub struct FullKeyAggregateQueryBuilder {
     query_tools: Rc<QueryTools>,
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
+    dimensions_filters: Vec<FilterItem>,
+    time_dimensions_filters: Vec<FilterItem>,
+    measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
 }
 
@@ -31,12 +34,18 @@ impl FullKeyAggregateQueryBuilder {
         measures: Vec<Rc<BaseMeasure>>,
         dimensions: Vec<Rc<BaseDimension>>,
         time_dimensions: Vec<Rc<BaseTimeDimension>>,
+        dimensions_filters: Vec<FilterItem>,
+        time_dimensions_filters: Vec<FilterItem>,
+        measures_filters: Vec<FilterItem>,
     ) -> Self {
         Self {
             query_tools,
             measures,
             dimensions,
             time_dimensions,
+            dimensions_filters,
+            time_dimensions_filters,
+            measures_filters,
         }
     }
 
@@ -105,10 +114,10 @@ impl FullKeyAggregateQueryBuilder {
             .map(|m| Ok((m.measure().clone(), m.alias_name()?)))
             .collect::<Result<HashMap<_, _>, CubeError>>()?;
 
-        let context = Context::new(None, vec![RenderReferencesVisitor::new(references)], vec![]);
+        let context = Context::new(None, vec![RenderReferencesNodeProcessor::new(references)]);
 
         let select = Select {
-            projection: self.dimensions_references_and_measures("q0", outer_measures)?,
+            projection: self.dimensions_references_and_measures("q_0", outer_measures)?,
             from: From::new(FromSource::Join(Rc::new(Join {
                 root,
                 joins: join_items,
@@ -149,7 +158,7 @@ impl FullKeyAggregateQueryBuilder {
         let select = Select {
             projection: self.select_all_dimensions_and_measures(measures)?,
             from: source,
-            filter: None,
+            filter: self.all_filters(),
             group_by: self.group_by(),
             having: None,
             order_by: vec![],
@@ -209,17 +218,12 @@ impl FullKeyAggregateQueryBuilder {
         key_cube_name: &String,
     ) -> Result<Rc<Select>, CubeError> {
         let source = self.make_join_node()?;
-        let dimensions = self
-            .dimensions
-            .iter()
-            .chain(dimensions.iter())
-            .unique_by(|d| d.dimension())
-            .cloned()
-            .collect_vec();
+        let dimensions = self.dimensions_for_select_append(dimensions);
+
         let select = Select {
-            projection: dimensions.iter().map(|d| Expr::Field(d.clone())).collect(),
+            projection: self.columns_to_expr(&dimensions),
             from: source,
-            filter: None,
+            filter: self.all_filters(),
             group_by: vec![],
             having: None,
             order_by: vec![],
@@ -227,6 +231,20 @@ impl FullKeyAggregateQueryBuilder {
             is_distinct: true,
         };
         Ok(Rc::new(select))
+    }
+
+    fn all_filters(&self) -> Option<Filter> {
+        let items = self
+            .time_dimensions_filters
+            .iter()
+            .chain(self.dimensions_filters.iter())
+            .cloned()
+            .collect_vec();
+        if items.is_empty() {
+            None
+        } else {
+            Some(Filter { items })
+        }
     }
 
     fn make_join_node(&self /*TODO dimensions for subqueries*/) -> Result<From, CubeError> {
@@ -303,6 +321,27 @@ impl FullKeyAggregateQueryBuilder {
             .iter()
             .map(|d| -> Rc<dyn IndexedMember> { d.clone() });
         dimensions.chain(time_dimensions).collect()
+    }
+
+    fn dimensions_for_select_append(
+        &self,
+        append: &Vec<Rc<BaseDimension>>,
+    ) -> Vec<Rc<dyn IndexedMember>> {
+        let time_dimensions = self
+            .time_dimensions
+            .iter()
+            .map(|d| -> Rc<dyn IndexedMember> { d.clone() });
+        let append_dims = append
+            .iter()
+            .map(|d| -> Rc<dyn IndexedMember> { d.clone() });
+        let dimensions = self
+            .dimensions
+            .iter()
+            .map(|d| -> Rc<dyn IndexedMember> { d.clone() });
+        dimensions
+            .chain(time_dimensions)
+            .chain(append_dims)
+            .collect()
     }
 
     fn columns_to_expr(&self, columns: &Vec<Rc<dyn IndexedMember>>) -> Vec<Expr> {

@@ -8,6 +8,7 @@ use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,9 +23,16 @@ pub struct TimeDimension {
 pub struct FilterItem {
     pub or: Option<Vec<FilterItem>>,
     pub and: Option<Vec<FilterItem>>,
-    pub member: Option<String>,
+    member: Option<String>,
+    pub dimension: Option<String>,
     pub operator: Option<String>,
     pub values: Option<Vec<Option<String>>>,
+}
+
+impl FilterItem {
+    pub fn member(&self) -> Option<&String> {
+        self.member.as_ref().or(self.dimension.as_ref())
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]

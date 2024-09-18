@@ -1,8 +1,9 @@
 use super::dependecy::Dependency;
 use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
-use super::{MemberEvaluator, MemberEvaluatorFactory};
+use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
+use crate::cube_bridge::measure_filter::MeasureFilter;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
@@ -13,6 +14,7 @@ pub struct MeasureEvaluator {
     cube_name: String,
     name: String,
     definition: Rc<dyn MeasureDefinition>,
+    measure_filters: Vec<Rc<EvaluationNode>>,
     member_sql: Rc<dyn MemberSql>,
 }
 
@@ -22,12 +24,14 @@ impl MeasureEvaluator {
         name: String,
         member_sql: Rc<dyn MemberSql>,
         definition: Rc<dyn MeasureDefinition>,
+        measure_filters: Vec<Rc<EvaluationNode>>,
     ) -> Self {
         Self {
             cube_name,
             name,
             member_sql,
             definition,
+            measure_filters,
         }
     }
 
@@ -40,6 +44,19 @@ impl MeasureEvaluator {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
+    }
+
+    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+        let sql = self.member_sql.call(args)?;
+        Ok(sql)
+    }
+
+    pub fn measure_type(&self) -> &String {
+        &self.definition.static_data().measure_type
+    }
+
+    pub fn measure_filters(&self) -> &Vec<Rc<EvaluationNode>> {
+        &self.measure_filters
     }
 
     pub fn default_evaluate_sql(
@@ -63,6 +80,35 @@ impl MeasureEvaluator {
 }
 
 impl MemberEvaluator for MeasureEvaluator {
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+}
+
+pub struct MeasureFilterEvaluator {
+    cube_name: String,
+    member_sql: Rc<dyn MemberSql>,
+}
+
+impl MeasureFilterEvaluator {
+    pub fn new(cube_name: String, member_sql: Rc<dyn MemberSql>) -> Self {
+        Self {
+            cube_name,
+            member_sql,
+        }
+    }
+
+    pub fn full_name(&self) -> String {
+        format!("{}.measure_filter", self.cube_name)
+    }
+
+    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+        let sql = self.member_sql.call(args)?;
+        Ok(sql)
+    }
+}
+
+impl MemberEvaluator for MeasureFilterEvaluator {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
@@ -128,15 +174,74 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
         }
     }
 
-    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError> {
+    fn build(
+        self,
+        deps: Vec<Dependency>,
+        compiler: &mut Compiler,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self {
             cube_name,
             name,
             sql,
             definition,
         } = self;
+        let mut measure_filters = vec![];
+        if let Some(filters) = definition.filters()? {
+            for filter in filters.items().iter() {
+                let node =
+                    compiler.add_measure_filter_evaluator(cube_name.clone(), filter.sql()?)?;
+                measure_filters.push(node);
+            }
+        }
+
         Ok(EvaluationNode::new_measure(
-            MeasureEvaluator::new(cube_name, name, sql, definition),
+            MeasureEvaluator::new(cube_name, name, sql, definition, measure_filters),
+            deps,
+        ))
+    }
+}
+
+pub struct MeasureFilterEvaluatorFactory {
+    cube_name: String,
+    sql: Rc<dyn MemberSql>,
+}
+
+impl MeasureFilterEvaluatorFactory {
+    pub fn try_new(cube_name: &String, sql: Rc<dyn MemberSql>) -> Result<Self, CubeError> {
+        Ok(Self {
+            cube_name: cube_name.clone(),
+            sql,
+        })
+    }
+}
+
+impl MemberEvaluatorFactory for MeasureFilterEvaluatorFactory {
+    fn is_cachable() -> bool {
+        false
+    }
+    fn evaluator_name() -> String {
+        "measure_filter".to_string()
+    }
+    fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
+        Some(self.sql.clone())
+    }
+
+    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
+        Ok(self.sql.args_names().clone())
+    }
+
+    fn build(
+        self,
+        deps: Vec<Dependency>,
+        _compiler: &mut Compiler,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
+        let Self { cube_name, sql } = self;
+        Ok(EvaluationNode::new_measure_filter(
+            MeasureFilterEvaluator::new(cube_name, sql),
             deps,
         ))
     }

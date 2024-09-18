@@ -19,6 +19,8 @@ use cubenativeutils::wrappers::serializer::NativeSerialize;
 use cubenativeutils::wrappers::NativeType;
 use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
+use std::any::Any;
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
@@ -27,6 +29,7 @@ pub struct BaseQuery<IT: InnerTypes> {
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     dimensions_filters: Vec<FilterItem>,
+    time_dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
     all_join_hints: Vec<String>,
@@ -41,6 +44,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.cube_evaluator()?,
             options.base_tools()?,
             options.join_graph()?,
+            options.static_data().timezone.clone(),
         )?;
         let evaluator_compiler_cell = query_tools.evaluator_compiler().clone();
         let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
@@ -109,7 +113,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                 filter_compiler.add_item(filter)?;
             }
         }
-        let (dimensions_filters, measures_filters) = filter_compiler.extract_result();
+        for time_dimension in &time_dimensions {
+            filter_compiler.add_time_dimension_item(time_dimension)?;
+        }
+        let (dimensions_filters, time_dimensions_filters, measures_filters) =
+            filter_compiler.extract_result();
 
         let all_join_hints = evaluator_compiler.join_hints();
         let join = query_tools
@@ -123,6 +131,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             measures,
             dimensions,
             time_dimensions,
+            time_dimensions_filters,
             dimensions_filters,
             measures_filters,
             all_join_hints,
@@ -132,9 +141,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
         let sql = plan.to_sql()?;
-        let params = self.get_params()?;
+        let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
+
         let res = self.context.empty_array();
-        res.set(0, sql.to_native(self.context.clone())?)?;
+        res.set(0, result_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
         let result = NativeObjectHandle::new(res.into_object());
 
@@ -147,6 +157,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             self.measures.clone(),
             self.dimensions.clone(),
             self.time_dimensions.clone(),
+            self.dimensions_filters.clone(),
+            self.time_dimensions_filters.clone(),
+            self.measures_filters.clone(),
         );
         if let Some(select) = full_key_aggregate_query_builder.build()? {
             Ok(GenerationPlan::Select(select))
@@ -160,13 +173,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn simple_query(&self) -> Result<GenerationPlan, CubeError> {
-        let filter = if self.dimensions_filters.is_empty() {
-            None
-        } else {
-            Some(Filter {
-                items: self.dimensions_filters.clone(),
-            })
-        };
+        let filter = self.all_filters();
         let having = if self.measures_filters.is_empty() {
             None
         } else {
@@ -272,6 +279,20 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             vec![OrderBy::new(Expr::Field(self.dimensions[0].clone()), true)]
         } else {
             vec![]
+        }
+    }
+
+    fn all_filters(&self) -> Option<Filter> {
+        let items = self
+            .time_dimensions_filters
+            .iter()
+            .chain(self.dimensions_filters.iter())
+            .cloned()
+            .collect_vec();
+        if items.is_empty() {
+            None
+        } else {
+            Some(Filter { items })
         }
     }
 

@@ -42,7 +42,7 @@ impl TraversalVisitor for JoinHintsCollector {
                 self.hints.insert(e.cube_name().clone());
                 true
             }
-            MemberEvaluatorType::JoinCondition(_) => false,
+            _ => false,
         };
         Ok(res)
     }

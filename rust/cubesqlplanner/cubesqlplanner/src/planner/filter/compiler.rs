@@ -1,9 +1,11 @@
 use super::base_filter::{BaseFilter, FilterType};
+use super::filter_operator::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::Compiler;
 use crate::planner::sql_evaluator::MemberEvaluator;
+use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -11,6 +13,7 @@ pub struct FilterCompiler<'a> {
     evaluator_compiler: &'a mut Compiler,
     query_tools: Rc<QueryTools>,
     dimension_filters: Vec<FilterItem>,
+    time_dimension_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
 }
 
@@ -20,6 +23,7 @@ impl<'a> FilterCompiler<'a> {
             evaluator_compiler,
             query_tools,
             dimension_filters: vec![],
+            time_dimension_filters: vec![],
             measures_filters: vec![],
         }
     }
@@ -35,8 +39,24 @@ impl<'a> FilterCompiler<'a> {
         Ok(())
     }
 
-    pub fn extract_result(self) -> (Vec<FilterItem>, Vec<FilterItem>) {
-        (self.dimension_filters, self.measures_filters)
+    pub fn add_time_dimension_item(&mut self, item: &BaseTimeDimension) -> Result<(), CubeError> {
+        let filter = BaseFilter::try_new(
+            self.query_tools.clone(),
+            item.member_evaluator(),
+            FilterType::Dimension,
+            "InDateRange".to_string(),
+            Some(item.get_date_range().into_iter().map(|v| Some(v)).collect()),
+        )?;
+        self.time_dimension_filters.push(FilterItem::Item(filter));
+        Ok(())
+    }
+
+    pub fn extract_result(self) -> (Vec<FilterItem>, Vec<FilterItem>, Vec<FilterItem>) {
+        (
+            self.dimension_filters,
+            self.time_dimension_filters,
+            self.measures_filters,
+        )
     }
 
     fn compile_item(
@@ -59,7 +79,7 @@ impl<'a> FilterCompiler<'a> {
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(FilterItem::Group(Rc::new(FilterGroup::new(op, items))))
         } else {
-            if let (Some(member), Some(operator)) = (&item.member, &item.operator) {
+            if let (Some(member), Some(operator)) = (item.member(), &item.operator) {
                 let evaluator = match item_type {
                     FilterType::Dimension => self
                         .evaluator_compiler
@@ -93,7 +113,7 @@ impl<'a> FilterCompiler<'a> {
         } else if let Some(items) = &item.and {
             self.get_item_type_from_vec(&items, expected_type)
         } else {
-            if let Some(member) = &item.member {
+            if let Some(member) = item.member() {
                 let member_path = member.split(".").map(|m| m.to_string()).collect::<Vec<_>>();
                 if self.query_tools.cube_evaluator().is_measure(member_path)? {
                     Ok(Some(FilterType::Measure))

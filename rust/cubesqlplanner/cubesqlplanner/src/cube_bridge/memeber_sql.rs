@@ -1,3 +1,8 @@
+use super::{
+    filter_group::{FilterGroup, NativeFilterGroup},
+    filter_params::{FilterParams, NativeFilterParams},
+    security_context::{NativeSecurityContext, SecurityContext},
+};
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::{NativeFunction, NativeStruct, NativeType};
 use cubenativeutils::wrappers::serializer::{
@@ -18,9 +23,16 @@ pub struct MemberSqlStruct {
     pub properties: HashMap<String, String>,
 }
 
+pub enum ContextSymbolArg {
+    SecurityContext(Rc<dyn SecurityContext>),
+    FilterParams(Rc<dyn FilterParams>),
+    FilterGroup(Rc<dyn FilterGroup>),
+}
+
 pub enum MemberSqlArg {
     String(String),
     Struct(MemberSqlStruct),
+    ContextSymbol(ContextSymbolArg),
 }
 
 pub trait MemberSql {
@@ -81,6 +93,23 @@ impl<IT: InnerTypes> MemberSql for NativeMemberSql<IT> {
             .map(|a| match a {
                 MemberSqlArg::String(s) => s.to_native(context_holder.clone()),
                 MemberSqlArg::Struct(s) => s.to_native(context_holder.clone()),
+                MemberSqlArg::ContextSymbol(symbol) => match symbol {
+                    ContextSymbolArg::SecurityContext(context) => context
+                        .as_any()
+                        .downcast::<NativeSecurityContext<IT>>()
+                        .unwrap()
+                        .to_native(context_holder.clone()),
+                    ContextSymbolArg::FilterParams(params) => params
+                        .as_any()
+                        .downcast::<NativeFilterParams<IT>>()
+                        .unwrap()
+                        .to_native(context_holder.clone()),
+                    ContextSymbolArg::FilterGroup(group) => group
+                        .as_any()
+                        .downcast::<NativeFilterGroup<IT>>()
+                        .unwrap()
+                        .to_native(context_holder.clone()),
+                },
             })
             .collect::<Result<Vec<_>, _>>()?;
 

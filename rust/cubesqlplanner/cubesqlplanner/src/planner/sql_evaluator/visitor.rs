@@ -1,4 +1,7 @@
-use super::{dependecy::Dependency, EvaluationNode};
+use super::{
+    dependecy::{ContextSymbolDep, Dependency},
+    EvaluationNode,
+};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg, MemberSqlStruct};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -41,10 +44,12 @@ pub trait TraversalVisitor {
                             self.apply(dep)?;
                         }
                         Dependency::StructDependency(_) => unimplemented!(),
+                        Dependency::ContextDependency(_) => {}
                     }
                 }
                 Ok(())
             }
+            Dependency::ContextDependency(_) => Ok(()),
         }
     }
 }
@@ -74,6 +79,11 @@ pub trait EvaluatorVisitor {
         let result = self.evaluate_sql(node, deps)?;
         self.post_process(node, result)
     }
+
+    fn apply_context_symbol(
+        &mut self,
+        contex_symbol: &ContextSymbolDep,
+    ) -> Result<MemberSqlArg, CubeError>;
 
     fn evaluate_sql(
         &mut self,
@@ -111,9 +121,11 @@ pub fn default_single_dep_evaluator<V: EvaluatorVisitor + ?Sized>(
                         res.properties.insert(k.clone(), visitor.apply(dep)?);
                     }
                     Dependency::StructDependency(_) => unimplemented!(),
+                    Dependency::ContextDependency(_) => unimplemented!(),
                 }
             }
             Ok(MemberSqlArg::Struct(res))
         }
+        Dependency::ContextDependency(contex_symbol) => visitor.apply_context_symbol(contex_symbol),
     }
 }

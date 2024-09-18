@@ -55,6 +55,10 @@ impl BaseDimension {
         }))
     }
 
+    pub fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.member_evaluator.clone()
+    }
+
     pub fn dimension(&self) -> &String {
         &self.dimension
     }

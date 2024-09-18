@@ -1,6 +1,6 @@
 use super::dependecy::Dependency;
+use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
 use super::{EvaluationNode, MemberEvaluatorType};
-use super::{MemberEvaluator, MemberEvaluatorFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{self, MemberSql, MemberSqlArg};
@@ -20,6 +20,9 @@ impl JoinConditionEvaluator {
             cube_name,
             member_sql,
         }
+    }
+    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+        self.member_sql.call(args)
     }
     pub fn default_evaluate_sql(
         &self,
@@ -75,7 +78,11 @@ impl MemberEvaluatorFactory for JoinConditionEvaluatorFactory {
         Some(self.sql.clone())
     }
 
-    fn build(self, deps: Vec<Dependency>) -> Result<Rc<EvaluationNode>, CubeError> {
+    fn build(
+        self,
+        deps: Vec<Dependency>,
+        _compiler: &mut Compiler,
+    ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self { cube_name, sql } = self;
         Ok(EvaluationNode::new_join_condition(
             JoinConditionEvaluator::new(cube_name, sql),

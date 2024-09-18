@@ -8,6 +8,7 @@ pub mod join_hints_collector;
 pub mod measure_evaluator;
 pub mod member_evaluator;
 pub mod multiplied_measures_collector;
+pub mod post_processors;
 pub mod render_references;
 pub mod visitor;
 
@@ -18,7 +19,10 @@ pub use cube_evaluator::{
 pub use default_visitor::default_evaluate;
 pub use dimension_evaluator::{DimensionEvaluator, DimensionEvaluatorFactory};
 pub use join_evaluator::{JoinConditionEvaluator, JoinConditionEvaluatorFactory};
-pub use measure_evaluator::{MeasureEvaluator, MeasureEvaluatorFactory};
+pub use measure_evaluator::{
+    MeasureEvaluator, MeasureEvaluatorFactory, MeasureFilterEvaluator,
+    MeasureFilterEvaluatorFactory,
+};
 pub use member_evaluator::{
     EvaluationNode, MemberEvaluator, MemberEvaluatorFactory, MemberEvaluatorType,
 };

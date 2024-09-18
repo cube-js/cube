@@ -81,6 +81,10 @@ impl BaseTimeDimension {
         self.dimension.clone()
     }
 
+    pub fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.dimension.member_evaluator()
+    }
+
     pub fn index(&self) -> usize {
         self.dimension.index()
     }

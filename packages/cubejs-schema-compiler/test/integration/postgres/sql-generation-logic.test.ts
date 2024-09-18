@@ -402,6 +402,7 @@ describe('SQL Generation', () => {
     });
 
     console.log(query.buildSqlAndParams());
+    const r = query.buildSqlAndParamsTest();
 
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));

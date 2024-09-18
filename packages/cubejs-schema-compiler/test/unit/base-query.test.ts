@@ -50,7 +50,7 @@ describe('SQL Generation', () => {
         timeDimensions: [],
         filters: [],
       });
-      const queryAndParams = query.buildSqlAndParamsTest();
+      const queryAndParams = query.buildSqlAndParams();
       const expected = 'SELECT\n' +
           '      count("cards".id) "cards__count"\n' +
           '    FROM\n' +
@@ -135,7 +135,7 @@ describe('SQL Generation', () => {
         filters: [],
       });
 
-      const queryAndParams = query.buildSqlAndParamsTest();
+      const queryAndParams = query.buildSqlAndParams();
       const expected = 'SELECT\n' +
           '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
           '    FROM\n' +
@@ -937,7 +937,7 @@ describe('SQL Generation', () => {
         timezone: 'America/Los_Angeles',
       });
 
-      const queryAndParams = query.buildSqlAndParamsTest();
+      const queryAndParams = query.buildSqlAndParams();
 
       /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
       expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */

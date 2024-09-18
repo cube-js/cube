@@ -55,9 +55,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                 true
             }
             MemberEvaluatorType::Dimension(e) => true,
-            MemberEvaluatorType::CubeName(e) => false,
-            MemberEvaluatorType::CubeTable(e) => false,
-            MemberEvaluatorType::JoinCondition(_) => false,
+            _ => false,
         };
         Ok(res)
     }

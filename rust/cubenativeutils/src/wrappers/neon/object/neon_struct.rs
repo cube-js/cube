@@ -111,9 +111,12 @@ impl<'cx, C: Context<'cx> + 'cx> NativeStruct<NeonInnerTypes<'cx, C>> for NeonSt
             let neon_method = this
                 .get::<JsFunction, _, _>(cx, method)
                 .map_err(|_| CubeError::internal(format!("Method `{}` not found", method)))?;
-            neon_method
-                .call(cx, this, neon_args)
-                .map_err(|_| CubeError::internal(format!("Failed to call method `{}`", method)))
+            neon_method.call(cx, this, neon_args).map_err(|err| {
+                CubeError::internal(format!(
+                    "Failed to call method `{} {} {:?}",
+                    method, err, err
+                ))
+            })
         })?;
         Ok(NativeObjectHandle::new(NeonObject::new(
             self.object.context.clone(),
