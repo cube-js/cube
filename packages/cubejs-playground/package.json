@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "0.36.1",
+  "version": "0.36.2",
   "engines": {},
   "repository": {
     "type": "git",
@@ -66,8 +66,8 @@
     "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
     "@cube-dev/ui-kit": "0.37.3",
-    "@cubejs-client/core": "^0.36.0",
-    "@cubejs-client/react": "^0.36.0",
+    "@cubejs-client/core": "^0.36.2",
+    "@cubejs-client/react": "^0.36.2",
     "@types/flexsearch": "^0.7.3",
     "@types/node": "^18",
     "@types/react": "^18.3.4",

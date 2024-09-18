@@ -1,6 +1,6 @@
 {
   "name": "@cubejs-backend/testing-shared",
-  "version": "0.36.1",
+  "version": "0.36.2",
   "description": "Cube.js Testing Helpers",
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
@@ -22,7 +22,7 @@
   "dependencies": {
     "@cubejs-backend/dotenv": "^9.0.2",
     "@cubejs-backend/query-orchestrator": "^0.36.1",
-    "@cubejs-backend/schema-compiler": "^0.36.1",
+    "@cubejs-backend/schema-compiler": "^0.36.2",
     "@cubejs-backend/shared": "^0.36.0",
     "@testcontainers/kafka": "~10.13.0",
     "dedent": "^0.7.0",
