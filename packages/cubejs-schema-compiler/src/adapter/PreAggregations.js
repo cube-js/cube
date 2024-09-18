@@ -431,7 +431,11 @@ export class PreAggregations {
   static sortTimeDimensionsWithRollupGranularity(timeDimensions) {
     return timeDimensions && R.sortBy(
       R.prop(0),
-      timeDimensions.map(d => [d.expressionPath(), d.rollupGranularity()])
+      timeDimensions.map(d => (d.isPredefinedGranularity() ?
+        [d.expressionPath(), d.rollupGranularity(), null] :
+        // For custom granularities we need to add its name to the list (for exact matches)
+        [d.expressionPath(), d.rollupGranularity(), d.granularity]
+      ))
     ) || [];
   }
 
@@ -548,7 +552,8 @@ export class PreAggregations {
         backAlias(references.sortedTimeDimensions || sortTimeDimensions(references.timeDimensions));
       const qryTimeDimensions = references.allowNonStrictDateRangeMatch
         ? transformedQuery.timeDimensions
-        : transformedQuery.sortedTimeDimensions;
+        : transformedQuery.sortedTimeDimensions.map(t => t.slice(0, 2));
+      // slice above is used to exclude possible custom granularity returned from sortTimeDimensionsWithRollupGranularity()
 
       const backAliasMeasures = backAlias(references.measures);
       const backAliasSortedDimensions = backAlias(references.sortedDimensions || references.dimensions);
@@ -615,9 +620,16 @@ export class PreAggregations {
      * @returns {Array<Array<string>>}
      */
     const expandTimeDimension = (timeDimension) => {
-      const [dimension, granularity] = timeDimension;
-      return expandGranularity(granularity)
+      const [dimension, granularity, customGranularity] = timeDimension;
+      const res = expandGranularity(granularity)
         .map((newGranularity) => [dimension, newGranularity]);
+
+      if (customGranularity) {
+        // For custom granularities we add it upfront to the list (for exact matches)
+        res.unshift([dimension, customGranularity]);
+      }
+
+      return res;
     };
 
     /**
@@ -782,7 +794,7 @@ export class PreAggregations {
   }
 
   /**
-   * Returns an array of potencially applicable for the query preaggs in the
+   * Returns an array of potentially applicable for the query preaggs in the
    * same order they appear in the schema file.
    * @returns {Array<Object>}
    */

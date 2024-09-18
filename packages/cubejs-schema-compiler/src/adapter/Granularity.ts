@@ -51,6 +51,10 @@ export class Granularity {
     }
   }
 
+  public isPredefined(): boolean {
+    return this.predefinedGranularity;
+  }
+
   public originFormatted(): string {
     return this.origin.format('YYYY-MM-DDTHH:mm:ss.SSS');
   }
