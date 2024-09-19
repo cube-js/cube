@@ -287,6 +287,7 @@ impl TableCreator {
         trace_obj: &Option<String>,
         extension: &Option<serde_json::Value>,
     ) -> Result<IdRow<Table>, CubeError> {
+        log::info!("Creating '{}.{}'", schema_name, table_name);
         let columns_to_set = convert_columns_type(columns)?;
         let mut indexes_to_create = Vec::new();
         if let Some(mut p) = partitioned_index {
@@ -435,6 +436,8 @@ impl TableCreator {
             None
         };
 
+        log::info!("Validated size for '{}.{}'", schema_name, table_name);
+
         let trace_obj_to_save = trace_obj.clone();
 
         let source_columns = if let Some(source_table) = source_table {
@@ -477,6 +480,8 @@ impl TableCreator {
             )
             .await?;
 
+        log::info!("Created unready table for '{}'", table.get_row().get_table_name());
+
         Ok(table)
     }
     async fn finalize_external_table(
@@ -485,6 +490,7 @@ impl TableCreator {
         listener: JobResultListener,
         trace_obj: &Option<String>,
     ) -> Result<FinalizeExternalTableResult, CubeError> {
+        log::info!("Starting finalizing table: '{}'", table.get_row().get_table_name());
         let wait_for = table
             .get_row()
             .locations()
@@ -518,6 +524,8 @@ impl TableCreator {
             }
         }
 
+        log::info!("Import complete for table: '{}'", table.get_row().get_table_name());
+
         let mut futures = Vec::new();
         let indexes = self.db.get_table_indexes(table.get_id()).await?;
         let partitions = self
@@ -536,12 +544,15 @@ impl TableCreator {
             .into_iter()
             .collect::<Result<Vec<_>, _>>()?;
 
+        log::info!("Finished warmup for table: '{}'", table.get_row().get_table_name());
+
         let ready_table = self.db.table_ready(table.get_id(), true).await?;
 
         if let Some(trace_obj) = trace_obj.as_ref() {
             incoming_traffic_agent_event(trace_obj, ready_table.get_row().total_download_size())?;
         }
 
+        log::info!("Finalization complete for table: '{}'", table.get_row().get_table_name());
         Ok(FinalizeExternalTableResult::Ok)
     }
 }
