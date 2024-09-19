@@ -8,7 +8,7 @@ module.exports = {
   "integrations": "Integrations",
   "sql-runner": "SQL Runner",
   "query-history": "Query History",
-  "pre-aggregations": "Pre-Aggregations",
+  "pre-aggregations": "Pre-aggregations",
   "performance": "Performance Insights",
   "monitoring": "Monitoring Integrations",
   "access-control": "Access Control",
