@@ -128,7 +128,25 @@ interface SnowflakeDriverExportGCS {
   credentials: any,
 }
 
-export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS;
+interface SnowflakeDriverExportAzureBase {
+  bucketType: 'azure',
+  bucketName: string,
+}
+
+interface SnowflakeDriverExportAzureByKey extends SnowflakeDriverExportAzureBase {
+  accountKey: string,
+  sasToken?: string,
+}
+
+interface SnowflakeDriverExportAzureByToken extends SnowflakeDriverExportAzureBase {
+  accountKey?: string,
+  sasToken: string,
+}
+
+type SnowflakeDriverExportAzure = SnowflakeDriverExportAzureByKey | SnowflakeDriverExportAzureByToken;
+
+export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS
+  | SnowflakeDriverExportAzure;
 
 interface SnowflakeDriverOptions {
   account: string,
@@ -295,8 +313,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
     }
 
+    if (bucketType === 'azure') {
+      return {
+        bucketType,
+        bucketName: getEnv('dbExportBucket', { dataSource }),
+        accountKey: getEnv('dbExportBucketAzureKey', { dataSource }),
+        sasToken: getEnv('dbExportAzureSasToken', { dataSource }),
+      };
+    }
+
     throw new Error(
-      `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
+      `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs', 'azure'].join(',')}`
     );
   }
 
@@ -308,7 +335,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   ): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       dataSource,
-      supported: ['s3', 'gcs'],
+      supported: ['s3', 'gcs', 'azure'],
     });
     if (bucketType) {
       const exportBucket = this.createExportBucket(
@@ -567,6 +594,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         optionsToExport.STORAGE_INTEGRATION = (
           <SnowflakeDriverExportGCS> this.config.exportBucket
         ).integrationName;
+        break;
+      case 'azure':
+        // Seems that Azure doesn't provide any configurable options.
+        // @see https://docs.snowflake.com/en/user-guide/data-unload-azure
         break;
       default:
         throw new Error('Unsupported export bucket type.');

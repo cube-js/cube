@@ -744,7 +744,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Region for the AWS based export bucket srorage.
+   * AWS Region for the AWS based export bucket storage.
    */
   dbExportBucketAwsRegion: ({
     dataSource,
@@ -757,7 +757,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Azure Key for the Azure based export bucket srorage.
+   * Azure Key for the Azure based export bucket storage.
    */
   dbExportBucketAzureKey: ({
     dataSource,
