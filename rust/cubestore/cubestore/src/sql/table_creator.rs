@@ -416,23 +416,11 @@ impl TableCreator {
         }
 
         let partition_split_threshold = if let Some(locations) = locations.as_ref() {
-            let size = join_all(
-                locations
-                    .iter()
-                    .map(|location| {
-                        let location = location.to_string();
-                        let import_service = self.import_service.clone();
-                        return async move {
-                            import_service.estimate_location_row_count(&location).await
-                        };
-                    })
-                    .collect::<Vec<_>>(),
-            )
-            .await
-            .into_iter()
-            .collect::<Result<Vec<_>, _>>()?
-            .into_iter()
-            .sum::<u64>();
+            let import_service = self.import_service.clone();
+            let mut size = 0;
+            for location in locations {
+                size += import_service.estimate_location_row_count(location).await?;
+            }
 
             let mut sel_workers_count = self.config_obj.select_workers().len() as u64;
             if sel_workers_count == 0 {
