@@ -6,7 +6,8 @@ import {
   createCubeSchemaWithCustomGranularities,
   createCubeSchemaYaml,
   createJoinedCubesSchema,
-  createSchemaYaml
+  createSchemaYaml,
+  createSchemaYamlForGroupFilterParamsTests
 } from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
@@ -1398,8 +1399,60 @@ describe('SQL Generation', () => {
           },
         ],
       });
-      const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toContain('select * from order where ((type = $0$))');
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain('select * from order where ((type = ?))');
+    });
+
+    it('propagate filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYaml({
+          cubes: [{
+            name: 'Order',
+            sql: `WITH cte as (select *
+                               from order
+                               where {FILTER_PARAMS.Order.type.filter('type')}
+                    )
+                    select * from cte`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [{
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            }]
+          }],
+          views: [{
+            name: 'orders_view',
+            cubes: [{
+              join_path: 'Order',
+              prefix: true,
+              includes: [
+                'type',
+                'count',
+              ]
+            }]
+          }]
+        })
+      );
+
+      await compiler.compiler.compile();
+      const query = new BaseQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(type\s=\s\?\)\)/.test(queryString)).toBeTruthy();
     });
   });
 
@@ -1526,6 +1579,173 @@ describe('SQL Generation', () => {
       });
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
+
+    it('propagate 1 filter param from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+           from order
+           where {FILTER_GROUP(
+             FILTER_PARAMS.Order.dim0.filter('dim0')
+               , FILTER_PARAMS.Order.dim1.filter('dim1')
+             )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+                    from order
+                    where {FILTER_GROUP(
+                            FILTER_PARAMS.Order.dim0.filter('dim0'),
+                            FILTER_PARAMS.Order.dim1.filter('dim1')
+                      )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte (ref as cube and view dimensions)', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.orders_view.dim0.filter('dim0')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
     });
   });
 });

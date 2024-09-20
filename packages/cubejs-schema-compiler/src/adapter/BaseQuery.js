@@ -3806,11 +3806,15 @@ export class BaseQuery {
           .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
           .reduce((a, b) => ({ ...a, ...b }), {})
         : {};
+      // Filtering aliases that somehow relate to this group members
+      const aliasesForGroupMembers = Object.entries(aliases)
+        .filter(([key, value]) => groupMembers.includes(key))
+        .map(([_key, value]) => value);
       const filter = BaseQuery.findAndSubTreeForFilterGroup(
         newGroupFilter({ operator: 'and', values: allFilters }),
         groupMembers,
         newGroupFilter,
-        Object.values(aliases)
+        aliasesForGroupMembers
       );
 
       return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases)})`;
@@ -3846,15 +3850,16 @@ export class BaseQuery {
                     .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
-                // Filtering aliases that somehow relate to this cube
-                const filteredAliases = Object.entries(aliases)
-                  .filter(([key, value]) => key.startsWith(cubeNameObj.cube) || value.startsWith(cubeNameObj.cube))
-                  .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+                // Filtering aliases that somehow relate to this group member
+                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
+                const aliasesForGroupMembers = Object.entries(aliases)
+                  .filter(([key, _value]) => key === groupMember)
+                  .map(([_key, value]) => value);
                 const filter = BaseQuery.findAndSubTreeForFilterGroup(
                   newGroupFilter({ operator: 'and', values: allFilters }),
-                  [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
+                  [groupMember],
                   newGroupFilter,
-                  Object.values(filteredAliases)
+                  aliasesForGroupMembers
                 );
 
                 return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;

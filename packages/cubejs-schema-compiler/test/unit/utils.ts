@@ -226,6 +226,45 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
   return YAML.dump(schema);
 }
 
+export function createSchemaYamlForGroupFilterParamsTests(cubeDefSql: string): string {
+  return createSchemaYaml({
+    cubes: [
+      {
+        name: 'Order',
+        sql: cubeDefSql,
+        measures: [{
+          name: 'count',
+          type: 'count',
+        }],
+        dimensions: [
+          {
+            name: 'dim0',
+            sql: 'dim0',
+            type: 'string'
+          },
+          {
+            name: 'dim1',
+            sql: 'dim1',
+            type: 'string'
+          }
+        ]
+      },
+    ],
+    views: [{
+      name: 'orders_view',
+      cubes: [{
+        join_path: 'Order',
+        prefix: true,
+        includes: [
+          'count',
+          'dim0',
+          'dim1',
+        ]
+      }]
+    }]
+  });
+}
+
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
   return `
     cubes:
