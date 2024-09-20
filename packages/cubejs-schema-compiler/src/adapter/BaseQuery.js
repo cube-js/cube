@@ -3758,7 +3758,7 @@ export class BaseQuery {
       return newGroupFilter({ operator: filter.operator, values }).filterToWhere();
     }
 
-    const filterParams = filter && filter.filterParams();
+    const filterParams = filter.filterParams();
     const filterParamArg = filterParamArgs.filter(p => {
       const member = p.__member();
       return member === filter.measure ||
