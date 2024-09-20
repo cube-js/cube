@@ -608,8 +608,6 @@ export class CubeSymbols {
         const parentIndex = currResolveIndexFn();
         cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
         return cube;
-      } else if (this.symbols[cubeName]?.[name]) {
-        depsResolveFn(name, undefined);
       }
     }
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
