@@ -718,7 +718,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Key for the AWS based export bucket srorage.
+   * AWS Key for the AWS based export bucket storage.
    */
   dbExportBucketAwsKey: ({
     dataSource,
@@ -731,7 +731,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * AWS Secret for the AWS based export bucket srorage.
+   * AWS Secret for the AWS based export bucket storage.
    */
   dbExportBucketAwsSecret: ({
     dataSource,
@@ -766,6 +766,19 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure SAS Token for the Azure based export bucket storage.
+   */
+  dbExportAzureSasToken: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN', dataSource)
     ]
   ),
 
