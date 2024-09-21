@@ -47,6 +47,7 @@ interface AthenaDriverOptions extends AthenaClientConfig {
   workGroup?: string
   catalog?: string
   schema?: string
+  database?: string
   S3OutputLocation?: string
   exportBucket?: string
   pollTimeout?: number
@@ -149,6 +150,9 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       catalog:
         config.catalog ||
         getEnv('athenaAwsCatalog', { dataSource }),
+      database:
+        config.database ||
+        getEnv('dbName', { dataSource }),
       exportBucket:
         config.exportBucket ||
         getEnv('dbExportBucket', { dataSource }),
@@ -492,7 +496,10 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       ResultConfiguration: {
         OutputLocation: this.config.S3OutputLocation
       },
-      ...(this.config.catalog != null ? { QueryExecutionContext: { Catalog: this.config.catalog } } : {})
+      QueryExecutionContext: {
+        Catalog: this.config.catalog,
+        Database: this.config.database
+      }
     };
     const { QueryExecutionId } = await this.athena.startQueryExecution(request);
     return { QueryExecutionId: checkNonNullable('StartQueryExecution', QueryExecutionId) };
