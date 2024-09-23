@@ -427,10 +427,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Determines whether export bucket feature is configured or not.
    */
   public async isUnloadSupported() {
-    if (!this.config.exportBucket) {
-      return false;
-    }
-    return true;
+    return this.config.exportBucket !== undefined;
   }
 
   /**
