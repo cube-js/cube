@@ -708,10 +708,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
       }
     }
-    if (csvFiles.length === 0) {
-      throw new Error('No CSV files were exported to the specified bucket. ' +
-        'Please check your export bucket configuration.');
-    }
+
     return csvFiles;
   }
 
