@@ -19,6 +19,13 @@ import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
 import { Storage } from '@google-cloud/storage';
+import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
+  ContainerSASPermissions,
+  SASProtocol,
+  generateBlobSASQueryParameters,
+} from '@azure/storage-blob';
 
 import { cancelCombinator } from './utils';
 import {
@@ -44,6 +51,11 @@ import {
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
 } from './driver.interface';
+
+export type AzureStorageClientConfig = {
+  azureKey: string,
+  sasToken?: string,
+};
 
 const sortByKeys = (unordered: any) => {
   const ordered: any = {};
@@ -696,5 +708,45 @@ export abstract class BaseDriver implements DriverInterface {
     } else {
       return [];
     }
+  }
+
+  protected async extractFilesFromAzure(
+    azureConfig: AzureStorageClientConfig,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const parts = bucketName.split('.blob.core.windows.net/');
+    const account = parts[0];
+    const container = parts[1].split('/')[0];
+    const credential = new StorageSharedKeyCredential(account, azureConfig.azureKey);
+    const url = `https://${account}.blob.core.windows.net`;
+    const blobServiceClient = azureConfig.sasToken ?
+      new BlobServiceClient(`${url}?${azureConfig.sasToken}`) :
+      new BlobServiceClient(url, credential);
+
+    const csvFiles: string[] = [];
+    const expr = new RegExp(`${tableName}\\/.*\\.csv(\\.gz)?$`, 'i');
+    const containerClient = blobServiceClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat({ prefix: tableName });
+    for await (const blob of blobsList) {
+      if (blob.name && expr.test(blob.name)) {
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: blob.name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
+      }
+    }
+
+    return csvFiles;
   }
 }

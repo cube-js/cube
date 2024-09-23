@@ -25,7 +25,6 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@azure/storage-blob": "^12.9.0",
     "@cubejs-backend/base-driver": "^0.36.0",
     "@cubejs-backend/shared": "^0.36.0",
     "@google-cloud/storage": "^5.8.5",

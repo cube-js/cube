@@ -25,13 +25,6 @@ import {
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { Storage } from '@google-cloud/storage';
-import {
-  BlobServiceClient,
-  StorageSharedKeyCredential,
-  ContainerSASPermissions,
-  SASProtocol,
-  generateBlobSASQueryParameters,
-} from '@azure/storage-blob';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
@@ -631,85 +624,45 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async getCsvFiles(tableName: string): Promise<string[]> {
     const { bucketType, bucketName } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
-    const { credentials } = (
-      <SnowflakeDriverExportGCS> this.config.exportBucket
-    );
-    switch (bucketType) {
-      case 's3':
-        return this.extractUnloadedFilesFromS3(
-          {
-            credentials: {
-              accessKeyId: (
-                <SnowflakeDriverExportAWS> this.config.exportBucket
-              ).keyId,
-              secretAccessKey: (
-                <SnowflakeDriverExportAWS> this.config.exportBucket
-              ).secretKey,
-            },
-            region: (
-              <SnowflakeDriverExportAWS> this.config.exportBucket
-            ).region,
+
+    if (bucketType === 's3') {
+      const cfg = <SnowflakeDriverExportAWS> this.config.exportBucket;
+
+      return this.extractUnloadedFilesFromS3(
+        {
+          credentials: {
+            accessKeyId: cfg.keyId,
+            secretAccessKey: cfg.secretKey,
           },
-          bucketName,
-          tableName,
-        );
-      case 'gcs':
-        return this.extractFilesFromGCS(
-          new Storage({
-            credentials,
-            projectId: credentials.project_id
-          }),
-          bucketName,
-          tableName,
-        );
-      case 'azure':
-        return this.extractFilesFromAzure(
-          bucketName,
-          tableName,
-        );
-      default:
-        throw new Error(`Unsupported export bucket type: ${bucketType}`);
+          region: cfg.region,
+        },
+        bucketName,
+        tableName,
+      );
+    } else if (bucketType === 'gcs') {
+      const { credentials } = (
+        <SnowflakeDriverExportGCS> this.config.exportBucket
+      );
+      return this.extractFilesFromGCS(
+        new Storage({
+          credentials,
+          projectId: credentials.project_id
+        }),
+        bucketName,
+        tableName,
+      );
+    } else if (bucketType === 'azure') {
+      const { azureKey, sasToken } = (
+        <SnowflakeDriverExportAzure> this.config.exportBucket
+      );
+      return this.extractFilesFromAzure(
+        { azureKey, sasToken },
+        bucketName,
+        tableName,
+      );
+    } else {
+      throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }
-  }
-
-  protected async extractFilesFromAzure(
-    bucketName: string,
-    tableName: string
-  ): Promise<string[]> {
-    const parts = bucketName.split('.blob.core.windows.net/');
-    const account = parts[0];
-    const container = parts[1].split('/')[0];
-    const config = <SnowflakeDriverExportAzure> this.config.exportBucket;
-    const credential = new StorageSharedKeyCredential(account, config.azureKey);
-    const url = `https://${account}.blob.core.windows.net`;
-    const blobServiceClient = config.sasToken ?
-      new BlobServiceClient(`${url}?${config.sasToken}`) :
-      new BlobServiceClient(url, credential);
-
-    const csvFiles: string[] = [];
-    const expr = new RegExp(`${tableName}\\/.*\\.csv.gz$`, 'i');
-    const containerClient = blobServiceClient.getContainerClient(container);
-    const blobsList = containerClient.listBlobsFlat({ prefix: tableName });
-    for await (const blob of blobsList) {
-      if (blob.name && expr.test(blob.name)) {
-        const sas = generateBlobSASQueryParameters(
-          {
-            containerName: container,
-            blobName: blob.name,
-            permissions: ContainerSASPermissions.parse('r'),
-            startsOn: new Date(new Date().valueOf()),
-            expiresOn:
-              new Date(new Date().valueOf() + 1000 * 60 * 60),
-            protocol: SASProtocol.Https,
-            version: '2020-08-04',
-          },
-          credential,
-        ).toString();
-        csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
-      }
-    }
-
-    return csvFiles;
   }
 
   /**
