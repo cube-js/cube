@@ -681,9 +681,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     const container = parts[1].split('/')[0];
     const config = <SnowflakeDriverExportAzure> this.config.exportBucket;
     const credential = new StorageSharedKeyCredential(account, config.azureKey);
+    const url = `https://${account}.blob.core.windows.net`;
     const blobServiceClient = config.sasToken ?
-      new BlobServiceClient(`https://${account}.blob.core.windows.net${config.sasToken}`) :
-      new BlobServiceClient(`https://${account}.blob.core.windows.net`, credential);
+      new BlobServiceClient(`${url}?${config.sasToken}`) :
+      new BlobServiceClient(url, credential);
 
     const csvFiles: string[] = [];
     const expr = new RegExp(`${tableName}\\/.*\\.csv$`, 'i');
@@ -704,11 +705,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           },
           credential,
         ).toString();
-        csvFiles.push(`https://${
-          account
-        }.blob.core.windows.net/${
-          container
-        }/${blob.name}?${sas}`);
+        csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
       }
     }
     if (csvFiles.length === 0) {
