@@ -1,15 +1,14 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{default_evaluate, DimensionEvaluator, EvaluationNode, MemberEvaluator};
+use super::sql_evaluator::EvaluationNode;
 use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct BaseDimension {
     dimension: String,
     query_tools: Rc<QueryTools>,
+    #[allow(dead_code)]
     definition: Rc<dyn DimensionDefinition>,
     member_evaluator: Rc<EvaluationNode>,
     index: usize,
@@ -61,12 +60,6 @@ impl BaseDimension {
 
     pub fn dimension(&self) -> &String {
         &self.dimension
-    }
-
-    fn path(&self) -> Result<Vec<String>, CubeError> {
-        self.query_tools
-            .cube_evaluator()
-            .parse_path("dimensions".to_string(), self.dimension.clone())
     }
 
     //FIXME May be should be part of BaseMember Trait

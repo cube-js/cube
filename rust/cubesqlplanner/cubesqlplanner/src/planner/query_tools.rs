@@ -1,19 +1,16 @@
 use super::sql_evaluator::Compiler;
-use super::{BaseDimension, BaseMeasure, BaseMember, ParamsAllocator};
+use super::ParamsAllocator;
 use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::join_graph::JoinGraph;
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
-use chrono::{TimeZone, Utc};
 use chrono_tz::Tz;
 use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
-use datafusion::logical_plan::ExprSchema;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::cell::{Ref, RefCell, RefMut};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct QueryToolsCachedData {
@@ -55,15 +52,12 @@ impl QueryTools {
         timezone_name: Option<String>,
     ) -> Result<Rc<Self>, CubeError> {
         let templates_render = base_tools.sql_templates()?;
-        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(
-            cube_evaluator.clone(),
-            base_tools.clone(),
-        )));
+        let evaluator_compiler = Rc::new(RefCell::new(Compiler::new(cube_evaluator.clone())));
         let timezone = if let Some(timezone) = timezone_name {
             Some(
                 timezone
                     .parse::<Tz>()
-                    .map_err(|e| CubeError::user(format!("Incorrect timezone {}", timezone)))?,
+                    .map_err(|_| CubeError::user(format!("Incorrect timezone {}", timezone)))?,
             )
         } else {
             None

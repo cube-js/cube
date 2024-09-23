@@ -11,7 +11,6 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
-use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::hash_map::HashMap;
 use std::rc::Rc;
@@ -51,7 +50,7 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
         &self,
         context: NativeContextHolder<IT>,
     ) -> Result<NativeObjectHandle<IT>, CubeError> {
-        let mut res = context.empty_struct();
+        let res = context.empty_struct();
         for (k, v) in self.properties.iter() {
             res.set_field(k, v.to_native(context.clone())?)?;
         }
@@ -59,7 +58,7 @@ impl<IT: InnerTypes> NativeSerialize<IT> for MemberSqlStruct {
             res.set_field(
                 "toString",
                 NativeObjectHandle::new(context.to_string_fn(to_string_fn.clone()).into_object()),
-            );
+            )?;
         }
         Ok(NativeObjectHandle::new(res.into_object()))
     }

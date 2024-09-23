@@ -1,16 +1,14 @@
 use super::dependecy::Dependency;
-use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
-use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
+use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode};
+use super::{Compiler, MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
-use crate::cube_bridge::measure_filter::MeasureFilter;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
-use std::any::Any;
 use std::rc::Rc;
 
-pub struct MeasureEvaluator {
+pub struct MeasureSymbol {
     cube_name: String,
     name: String,
     definition: Rc<dyn MeasureDefinition>,
@@ -18,7 +16,7 @@ pub struct MeasureEvaluator {
     member_sql: Rc<dyn MemberSql>,
 }
 
-impl MeasureEvaluator {
+impl MeasureSymbol {
     pub fn new(
         cube_name: String,
         name: String,
@@ -79,18 +77,18 @@ impl MeasureEvaluator {
     }
 }
 
-impl MemberEvaluator for MeasureEvaluator {
+impl MemberSymbol for MeasureSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct MeasureFilterEvaluator {
+pub struct MeasureFilterSymbol {
     cube_name: String,
     member_sql: Rc<dyn MemberSql>,
 }
 
-impl MeasureFilterEvaluator {
+impl MeasureFilterSymbol {
     pub fn new(cube_name: String, member_sql: Rc<dyn MemberSql>) -> Self {
         Self {
             cube_name,
@@ -108,20 +106,20 @@ impl MeasureFilterEvaluator {
     }
 }
 
-impl MemberEvaluator for MeasureFilterEvaluator {
+impl MemberSymbol for MeasureFilterSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct MeasureEvaluatorFactory {
+pub struct MeasureSymbolFactory {
     cube_name: String,
     name: String,
     sql: Rc<dyn MemberSql>,
     definition: Rc<dyn MeasureDefinition>,
 }
 
-impl MeasureEvaluatorFactory {
+impl MeasureSymbolFactory {
     pub fn try_new(
         full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -154,8 +152,8 @@ impl MeasureEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
-    fn evaluator_name() -> String {
+impl MemberSymbolFactory for MeasureSymbolFactory {
+    fn symbol_name() -> String {
         "measure".to_string()
     }
     fn cube_name(&self) -> &String {
@@ -195,18 +193,18 @@ impl MemberEvaluatorFactory for MeasureEvaluatorFactory {
         }
 
         Ok(EvaluationNode::new_measure(
-            MeasureEvaluator::new(cube_name, name, sql, definition, measure_filters),
+            MeasureSymbol::new(cube_name, name, sql, definition, measure_filters),
             deps,
         ))
     }
 }
 
-pub struct MeasureFilterEvaluatorFactory {
+pub struct MeasureFilterSymbolFactory {
     cube_name: String,
     sql: Rc<dyn MemberSql>,
 }
 
-impl MeasureFilterEvaluatorFactory {
+impl MeasureFilterSymbolFactory {
     pub fn try_new(cube_name: &String, sql: Rc<dyn MemberSql>) -> Result<Self, CubeError> {
         Ok(Self {
             cube_name: cube_name.clone(),
@@ -215,11 +213,11 @@ impl MeasureFilterEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for MeasureFilterEvaluatorFactory {
+impl MemberSymbolFactory for MeasureFilterSymbolFactory {
     fn is_cachable() -> bool {
         false
     }
-    fn evaluator_name() -> String {
+    fn symbol_name() -> String {
         "measure_filter".to_string()
     }
     fn cube_name(&self) -> &String {
@@ -241,7 +239,7 @@ impl MemberEvaluatorFactory for MeasureFilterEvaluatorFactory {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self { cube_name, sql } = self;
         Ok(EvaluationNode::new_measure_filter(
-            MeasureFilterEvaluator::new(cube_name, sql),
+            MeasureFilterSymbol::new(cube_name, sql),
             deps,
         ))
     }

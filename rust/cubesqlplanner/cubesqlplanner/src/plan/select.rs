@@ -3,7 +3,6 @@ use itertools::Itertools;
 use super::{Expr, Filter, From, OrderBy};
 use crate::planner::{Context, IndexedMember};
 use cubenativeutils::CubeError;
-use std::fmt::{self, format};
 use std::rc::Rc;
 
 pub struct Select {

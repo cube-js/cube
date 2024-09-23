@@ -1,8 +1,5 @@
-use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
-use super::dimension_definition::{DimensionDefinition, NativeDimensionDefinition};
 use super::filter_group::{FilterGroup, NativeFilterGroup};
 use super::filter_params::{FilterParams, NativeFilterParams};
-use super::measure_definition::{MeasureDefinition, NativeMeasureDefinition};
 use super::memeber_sql::{MemberSql, NativeMemberSql};
 use super::security_context::{NativeSecurityContext, SecurityContext};
 use super::sql_templates_render::{NativeSqlTemplatesRender, SqlTemplatesRender};
@@ -12,9 +9,8 @@ use cubenativeutils::wrappers::serializer::{
 use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::any::Any;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Deserialize, Debug)]

@@ -2,7 +2,6 @@ use super::From;
 use crate::planner::{BaseJoinCondition, Context};
 use cubenativeutils::CubeError;
 
-use std::fmt;
 use std::rc::Rc;
 pub struct JoinItem {
     pub from: From,

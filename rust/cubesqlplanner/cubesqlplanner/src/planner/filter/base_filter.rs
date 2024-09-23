@@ -1,13 +1,8 @@
 use super::filter_operator::FilterOperator;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::MeasureDefinition;
-use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{default_evaluate, EvaluationNode, MemberEvaluator};
+use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::sql_templates::filter::FilterTemplates;
-use crate::planner::{evaluate_with_context, BaseMember, Context, IndexedMember};
-use chrono::TimeZone;
-use convert_case::{Case, Casing};
+use crate::planner::{evaluate_with_context, Context};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -23,6 +18,7 @@ pub enum FilterType {
 pub struct BaseFilter {
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<EvaluationNode>,
+    #[allow(dead_code)]
     filter_type: FilterType,
     filter_operator: FilterOperator,
     values: Vec<Option<String>>,

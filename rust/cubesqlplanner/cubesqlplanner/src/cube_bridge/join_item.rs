@@ -1,5 +1,5 @@
 use super::join_item_definition::{JoinItemDefinition, NativeJoinItemDefinition};
-use cubenativeutils::wrappers::object::{NativeArray, NativeType};
+use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };

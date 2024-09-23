@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{DimensionEvaluator, EvaluationNode};
+use super::sql_evaluator::EvaluationNode;
 use super::BaseDimension;
-use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
+use super::{BaseMember, Context, IndexedMember};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

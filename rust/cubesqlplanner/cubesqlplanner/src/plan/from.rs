@@ -2,7 +2,6 @@ use super::Join;
 use super::Select;
 use crate::planner::{BaseCube, Context};
 use cubenativeutils::CubeError;
-use std::fmt;
 use std::rc::Rc;
 
 #[derive(Clone)]

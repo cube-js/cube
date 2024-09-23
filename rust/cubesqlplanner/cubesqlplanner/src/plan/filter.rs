@@ -1,9 +1,6 @@
-use itertools::Itertools;
-
 use crate::planner::filter::BaseFilter;
 use crate::planner::Context;
 use cubenativeutils::CubeError;
-use std::boxed::Box;
 use std::fmt;
 use std::rc::Rc;
 

@@ -1,6 +1,6 @@
 use crate::cube_bridge::sql_templates_render::SqlTemplatesRender;
 use cubenativeutils::CubeError;
-use minijinja::{context, value::Value, Environment};
+use minijinja::context;
 use std::rc::Rc;
 
 pub struct FilterTemplates {

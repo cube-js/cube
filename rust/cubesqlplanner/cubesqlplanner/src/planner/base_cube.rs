@@ -1,8 +1,6 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{default_evaluate, DimensionEvaluator, EvaluationNode, MemberEvaluator};
+use super::sql_evaluator::EvaluationNode;
 use super::{evaluate_with_context, Context};
-use crate::cube_bridge::cube_definition::CubeDefinition;
-use crate::cube_bridge::evaluator::CubeEvaluator;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub struct BaseCube {
@@ -16,9 +14,6 @@ impl BaseCube {
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<EvaluationNode>,
     ) -> Result<Rc<Self>, CubeError> {
-        let definition = query_tools
-            .cube_evaluator()
-            .cube_from_path(cube_name.clone())?;
         Ok(Rc::new(Self {
             cube_name,
             member_evaluator,

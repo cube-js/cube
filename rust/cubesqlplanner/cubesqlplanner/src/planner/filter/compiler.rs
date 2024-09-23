@@ -1,10 +1,8 @@
 use super::base_filter::{BaseFilter, FilterType};
-use super::filter_operator::FilterOperator;
 use crate::cube_bridge::base_query_options::FilterItem as NativeFilterItem;
 use crate::plan::filter::{FilterGroup, FilterGroupOperator, FilterItem};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::Compiler;
-use crate::planner::sql_evaluator::MemberEvaluator;
 use crate::planner::BaseTimeDimension;
 use cubenativeutils::CubeError;
 use std::rc::Rc;

@@ -1,27 +1,25 @@
 use super::dependecy::Dependency;
-use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
-use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
+use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode};
+use super::{Compiler, MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::cube_definition::CubeDefinition;
-use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::any::Any;
 use std::rc::Rc;
 
-pub struct CubeNameEvaluator {
+pub struct CubeNameSymbol {
     cube_name: String,
 }
 
-impl CubeNameEvaluator {
+impl CubeNameSymbol {
     pub fn new(cube_name: String) -> Self {
         Self { cube_name }
     }
 
-    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
+    pub fn evaluate_sql(&self, _args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
         Ok(self.cube_name.clone())
     }
     pub fn default_evaluate_sql(
@@ -35,17 +33,17 @@ impl CubeNameEvaluator {
     }
 }
 
-impl MemberEvaluator for CubeNameEvaluator {
+impl MemberSymbol for CubeNameSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct CubeNameEvaluatorFactory {
+pub struct CubeNameSymbolFactory {
     cube_name: String,
 }
 
-impl CubeNameEvaluatorFactory {
+impl CubeNameSymbolFactory {
     pub fn try_new(
         full_name: &String,
         _cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -57,8 +55,8 @@ impl CubeNameEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for CubeNameEvaluatorFactory {
-    fn evaluator_name() -> String {
+impl MemberSymbolFactory for CubeNameSymbolFactory {
+    fn symbol_name() -> String {
         "cube_name".to_string()
     }
 
@@ -76,24 +74,25 @@ impl MemberEvaluatorFactory for CubeNameEvaluatorFactory {
 
     fn build(
         self,
-        deps: Vec<Dependency>,
+        _deps: Vec<Dependency>,
         _compiler: &mut Compiler,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self { cube_name } = self;
-        Ok(EvaluationNode::new_cube_name(CubeNameEvaluator::new(
+        Ok(EvaluationNode::new_cube_name(CubeNameSymbol::new(
             cube_name,
         )))
     }
 }
 
-pub struct CubeTableEvaluator {
+pub struct CubeTableSymbol {
     cube_name: String,
     member_sql: Rc<dyn MemberSql>,
+    #[allow(dead_code)]
     definition: Rc<dyn CubeDefinition>,
     is_table_sql: bool,
 }
 
-impl CubeTableEvaluator {
+impl CubeTableSymbol {
     pub fn new(
         cube_name: String,
         member_sql: Rc<dyn MemberSql>,
@@ -128,47 +127,22 @@ impl CubeTableEvaluator {
         };
         Ok(res)
     }
-    pub fn default_evaluate_sql(
-        &self,
-        args: Vec<MemberSqlArg>,
-        tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        lazy_static! {
-            static ref SIMPLE_ASTERIX_RE: Regex =
-                Regex::new(r#"(?i)^\s*select\s+\*\s+from\s+([a-zA-Z0-9_\-`".*]+)\s*$"#).unwrap();
-        }
-        let sql = self.member_sql.call(args)?;
-        let res = if self.is_table_sql {
-            sql
-        } else {
-            if let Some(captures) = SIMPLE_ASTERIX_RE.captures(&sql) {
-                if let Some(table) = captures.get(1) {
-                    table.as_str().to_owned()
-                } else {
-                    format!("({})", sql)
-                }
-            } else {
-                format!("({})", sql)
-            }
-        };
-        Ok(res)
-    }
 }
 
-impl MemberEvaluator for CubeTableEvaluator {
+impl MemberSymbol for CubeTableSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct CubeTableEvaluatorFactory {
+pub struct CubeTableSymbolFactory {
     cube_name: String,
     sql: Rc<dyn MemberSql>,
     definition: Rc<dyn CubeDefinition>,
     is_table_sql: bool,
 }
 
-impl CubeTableEvaluatorFactory {
+impl CubeTableSymbolFactory {
     pub fn try_new(
         cube_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -195,8 +169,8 @@ impl CubeTableEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for CubeTableEvaluatorFactory {
-    fn evaluator_name() -> String {
+impl MemberSymbolFactory for CubeTableSymbolFactory {
+    fn symbol_name() -> String {
         "cube_table".to_string()
     }
 
@@ -224,7 +198,7 @@ impl MemberEvaluatorFactory for CubeTableEvaluatorFactory {
             is_table_sql,
         } = self;
         Ok(EvaluationNode::new_cube_table(
-            CubeTableEvaluator::new(cube_name, sql, definition, is_table_sql),
+            CubeTableSymbol::new(cube_name, sql, definition, is_table_sql),
             deps,
         ))
     }

@@ -1,22 +1,22 @@
 use super::dependecy::Dependency;
-use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode, MemberEvaluatorType};
-use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
+use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode};
+use super::{Compiler, MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{self, MemberSql, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
-use std::any::Any;
 use std::rc::Rc;
 
-pub struct DimensionEvaluator {
+pub struct DimensionSymbol {
     cube_name: String,
     name: String,
     member_sql: Rc<dyn MemberSql>,
+    #[allow(dead_code)]
     definition: Rc<dyn DimensionDefinition>,
 }
 
-impl DimensionEvaluator {
+impl DimensionSymbol {
     pub fn new(
         cube_name: String,
         name: String,
@@ -53,20 +53,20 @@ impl DimensionEvaluator {
     }
 }
 
-impl MemberEvaluator for DimensionEvaluator {
+impl MemberSymbol for DimensionSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct DimensionEvaluatorFactory {
+pub struct DimensionSymbolFactory {
     cube_name: String,
     name: String,
     sql: Rc<dyn MemberSql>,
     definition: Rc<dyn DimensionDefinition>,
 }
 
-impl DimensionEvaluatorFactory {
+impl DimensionSymbolFactory {
     pub fn try_new(
         full_name: &String,
         cube_evaluator: Rc<dyn CubeEvaluator>,
@@ -86,8 +86,8 @@ impl DimensionEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
-    fn evaluator_name() -> String {
+impl MemberSymbolFactory for DimensionSymbolFactory {
+    fn symbol_name() -> String {
         "dimension".to_string()
     }
 
@@ -115,7 +115,7 @@ impl MemberEvaluatorFactory for DimensionEvaluatorFactory {
             definition,
         } = self;
         Ok(EvaluationNode::new_dimension(
-            DimensionEvaluator::new(cube_name, name, sql, definition),
+            DimensionSymbol::new(cube_name, name, sql, definition),
             deps,
         ))
     }

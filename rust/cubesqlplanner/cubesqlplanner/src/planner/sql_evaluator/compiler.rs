@@ -1,35 +1,29 @@
 use super::dependecy::DependenciesBuilder;
 use super::join_hints_collector::JoinHintsCollector;
 use super::{
-    CubeNameEvaluatorFactory, CubeTableEvaluatorFactory, DimensionEvaluator,
-    DimensionEvaluatorFactory, EvaluationNode, JoinConditionEvaluator,
-    JoinConditionEvaluatorFactory, MeasureEvaluator, MeasureEvaluatorFactory,
-    MeasureFilterEvaluatorFactory, MemberEvaluator, MemberEvaluatorFactory, TraversalVisitor,
+    CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, EvaluationNode,
+    JoinConditionSymbolFactory, MeasureFilterSymbolFactory, MeasureSymbolFactory,
+    MemberSymbolFactory, TraversalVisitor,
 };
-use crate::cube_bridge::base_tools::BaseTools;
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
+use crate::cube_bridge::memeber_sql::MemberSql;
 use cubenativeutils::CubeError;
-use std::any::Any;
 use std::collections::HashMap;
-use std::collections::HashSet;
 use std::rc::Rc;
 pub struct Compiler {
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    base_tools: Rc<dyn BaseTools>,
     members: HashMap<(String, String), Rc<EvaluationNode>>,
 }
 
 impl Compiler {
-    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>, base_tools: Rc<dyn BaseTools>) -> Self {
+    pub fn new(cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
         Self {
             cube_evaluator,
-            base_tools,
             members: HashMap::new(),
         }
     }
 
-    pub fn add_evaluator<T: MemberEvaluatorFactory + 'static>(
+    pub fn add_evaluator<T: MemberSymbolFactory + 'static>(
         &mut self,
         full_name: &String,
         factory: T,
@@ -45,12 +39,12 @@ impl Compiler {
         &mut self,
         measure: String,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
-        if let Some(exists) = self.exists_member::<MeasureEvaluatorFactory>(&measure) {
+        if let Some(exists) = self.exists_member::<MeasureSymbolFactory>(&measure) {
             Ok(exists.clone())
         } else {
             self.add_evaluator_impl(
                 &measure,
-                MeasureEvaluatorFactory::try_new(&measure, self.cube_evaluator.clone())?,
+                MeasureSymbolFactory::try_new(&measure, self.cube_evaluator.clone())?,
             )
         }
     }
@@ -59,12 +53,12 @@ impl Compiler {
         &mut self,
         dimension: String,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
-        if let Some(exists) = self.exists_member::<DimensionEvaluatorFactory>(&dimension) {
+        if let Some(exists) = self.exists_member::<DimensionSymbolFactory>(&dimension) {
             Ok(exists.clone())
         } else {
             self.add_evaluator_impl(
                 &dimension,
-                DimensionEvaluatorFactory::try_new(&dimension, self.cube_evaluator.clone())?,
+                DimensionSymbolFactory::try_new(&dimension, self.cube_evaluator.clone())?,
             )
         }
     }
@@ -73,12 +67,12 @@ impl Compiler {
         &mut self,
         cube_name: String,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
-        if let Some(exists) = self.exists_member::<CubeNameEvaluatorFactory>(&cube_name) {
+        if let Some(exists) = self.exists_member::<CubeNameSymbolFactory>(&cube_name) {
             Ok(exists.clone())
         } else {
             self.add_evaluator_impl(
                 &cube_name,
-                CubeNameEvaluatorFactory::try_new(&cube_name, self.cube_evaluator.clone())?,
+                CubeNameSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?,
             )
         }
     }
@@ -87,12 +81,12 @@ impl Compiler {
         &mut self,
         cube_name: String,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
-        if let Some(exists) = self.exists_member::<CubeTableEvaluatorFactory>(&cube_name) {
+        if let Some(exists) = self.exists_member::<CubeTableSymbolFactory>(&cube_name) {
             Ok(exists.clone())
         } else {
             self.add_evaluator_impl(
                 &cube_name,
-                CubeTableEvaluatorFactory::try_new(&cube_name, self.cube_evaluator.clone())?,
+                CubeTableSymbolFactory::try_new(&cube_name, self.cube_evaluator.clone())?,
             )
         }
     }
@@ -104,7 +98,7 @@ impl Compiler {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         self.add_evaluator_impl(
             &cube_name,
-            JoinConditionEvaluatorFactory::try_new(&cube_name, sql, self.cube_evaluator.clone())?,
+            JoinConditionSymbolFactory::try_new(&cube_name, sql)?,
         )
     }
 
@@ -115,43 +109,41 @@ impl Compiler {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         self.add_evaluator_impl(
             &cube_name,
-            MeasureFilterEvaluatorFactory::try_new(&cube_name, sql)?,
+            MeasureFilterSymbolFactory::try_new(&cube_name, sql)?,
         )
     }
 
-    pub fn join_hints(&self) -> Vec<String> {
+    pub fn join_hints(&self) -> Result<Vec<String>, CubeError> {
         let mut collector = JoinHintsCollector::new();
         for member in self.members.values() {
-            collector.apply(member);
+            collector.apply(member)?;
         }
-        collector.extract_result()
+        Ok(collector.extract_result())
     }
 
-    fn exists_member<T: MemberEvaluatorFactory>(
+    fn exists_member<T: MemberSymbolFactory>(
         &self,
         full_name: &String,
     ) -> Option<Rc<EvaluationNode>> {
         if T::is_cachable() {
-            let key = (T::evaluator_name(), full_name.clone());
+            let key = (T::symbol_name(), full_name.clone());
             self.members.get(&key).cloned()
         } else {
             None
         }
     }
 
-    fn add_evaluator_impl<T: MemberEvaluatorFactory + 'static>(
+    fn add_evaluator_impl<T: MemberSymbolFactory + 'static>(
         &mut self,
         full_name: &String,
         factory: T,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
-        let dep_names = factory.deps_names()?;
         let cube_name = factory.cube_name();
-        let dep_builder =
-            DependenciesBuilder::new(self, self.cube_evaluator.clone(), self.base_tools.clone());
+        let dep_builder = DependenciesBuilder::new(self, self.cube_evaluator.clone());
         let deps = dep_builder.build(cube_name.clone(), factory.member_sql())?;
 
         let node = factory.build(deps, self)?;
-        let key = (T::evaluator_name().to_string(), full_name.clone());
+        let key = (T::symbol_name().to_string(), full_name.clone());
         if T::is_cachable() {
             self.members.insert(key, node.clone());
         }

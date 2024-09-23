@@ -1,6 +1,5 @@
 use crate::planner::{Context, IndexedMember};
 use cubenativeutils::CubeError;
-use std::fmt;
 use std::rc::Rc;
 
 pub enum Expr {

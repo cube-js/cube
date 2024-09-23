@@ -1,16 +1,14 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{default_evaluate, EvaluationNode, MeasureEvaluator, MemberEvaluator};
+use super::sql_evaluator::EvaluationNode;
 use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
-use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
-use crate::cube_bridge::memeber_sql::MemberSql;
-use convert_case::{Case, Casing};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
+    #[allow(dead_code)]
     definition: Rc<dyn MeasureDefinition>,
     member_evaluator: Rc<EvaluationNode>,
     cube_name: String,
@@ -78,12 +76,6 @@ impl BaseMeasure {
 
     pub fn cube_name(&self) -> &String {
         &self.cube_name
-    }
-
-    fn path(&self) -> Result<Vec<String>, CubeError> {
-        self.query_tools
-            .cube_evaluator()
-            .parse_path("measures".to_string(), self.measure.clone())
     }
 
     fn unescaped_alias_name(&self) -> Result<String, CubeError> {

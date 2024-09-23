@@ -538,7 +538,7 @@ describe('SQL Generation', () => {
     });
     `);
 
-  it('simple join', async () => {
+  it('simple join 2', async () => {
     await compiler.compile();
 
     console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));

@@ -1,10 +1,8 @@
 use super::EvaluationNode;
-use super::MemberEvaluator;
 use super::TraversalVisitor;
-use super::{CubeNameEvaluator, DimensionEvaluator, MeasureEvaluator, MemberEvaluatorType};
+use super::{MemberSymbol, MemberSymbolType};
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
-use std::collections::HashSet;
 use std::rc::Rc;
 
 pub struct RootMeasureResult {
@@ -34,8 +32,8 @@ impl MultipliedMeasuresCollector {
 
 impl TraversalVisitor for MultipliedMeasuresCollector {
     fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
-        let res = match node.evaluator() {
-            MemberEvaluatorType::Measure(e) => {
+        let res = match node.symbol() {
+            MemberSymbolType::Measure(e) => {
                 let full_name = e.full_name();
                 let join = self.query_tools.cached_data().join()?;
                 let multiplied = join
@@ -54,7 +52,7 @@ impl TraversalVisitor for MultipliedMeasuresCollector {
                 self.parent_measure = Some(full_name);
                 true
             }
-            MemberEvaluatorType::Dimension(e) => true,
+            MemberSymbolType::Dimension(_) => true,
             _ => false,
         };
         Ok(res)

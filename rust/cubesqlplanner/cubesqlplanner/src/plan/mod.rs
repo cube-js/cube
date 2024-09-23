@@ -15,8 +15,6 @@ pub use join::{Join, JoinItem};
 pub use order::OrderBy;
 pub use select::Select;
 
-use std::fmt::{self, write};
-
 pub enum GenerationPlan {
     Select(Select),
 }

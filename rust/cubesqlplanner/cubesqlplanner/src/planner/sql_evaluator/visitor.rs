@@ -2,7 +2,7 @@ use super::{
     dependecy::{ContextSymbolDep, Dependency},
     EvaluationNode,
 };
-use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg, MemberSqlStruct};
+use crate::cube_bridge::memeber_sql::{MemberSqlArg, MemberSqlStruct};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -31,14 +31,13 @@ pub trait TraversalVisitor {
         match dep {
             Dependency::SingleDependency(dep) => self.apply(dep),
             Dependency::StructDependency(dep) => {
-                let mut res = MemberSqlStruct::default();
-                if let Some(sql_fn) = &dep.sql_fn {
+                if dep.sql_fn.is_some() {
                     self.apply(node)?;
                 }
                 if let Some(to_string_fn) = &dep.to_string_fn {
                     self.apply(to_string_fn)?;
                 }
-                for (k, v) in dep.properties.iter() {
+                for (_, v) in dep.properties.iter() {
                     match v {
                         Dependency::SingleDependency(dep) => {
                             self.apply(dep)?;
@@ -55,7 +54,7 @@ pub trait TraversalVisitor {
 }
 
 pub trait EvaluatorVisitor {
-    fn on_node_enter(&mut self, node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
+    fn on_node_enter(&mut self, _node: &Rc<EvaluationNode>) -> Result<(), CubeError> {
         Ok(())
     }
     fn evaluate_deps(&mut self, node: &Rc<EvaluationNode>) -> Result<Vec<MemberSqlArg>, CubeError> {
@@ -73,31 +72,12 @@ pub trait EvaluatorVisitor {
         default_single_dep_evaluator(self, dep, node)
     }
 
-    fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<String, CubeError> {
-        self.on_node_enter(node)?;
-        let deps = self.evaluate_deps(node)?;
-        let result = self.evaluate_sql(node, deps)?;
-        self.post_process(node, result)
-    }
+    fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<String, CubeError>;
 
     fn apply_context_symbol(
         &mut self,
         contex_symbol: &ContextSymbolDep,
     ) -> Result<MemberSqlArg, CubeError>;
-
-    fn evaluate_sql(
-        &mut self,
-        node: &Rc<EvaluationNode>,
-        args: Vec<MemberSqlArg>,
-    ) -> Result<String, CubeError>;
-
-    fn post_process(
-        &mut self,
-        node: &Rc<EvaluationNode>,
-        result: String,
-    ) -> Result<String, CubeError> {
-        Ok(result)
-    }
 }
 
 pub fn default_single_dep_evaluator<V: EvaluatorVisitor + ?Sized>(

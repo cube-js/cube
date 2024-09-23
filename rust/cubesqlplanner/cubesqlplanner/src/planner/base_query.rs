@@ -1,14 +1,12 @@
 use super::filter::compiler::FilterCompiler;
-use super::full_key_query_aggregate::{self, FullKeyAggregateQueryBuilder};
+use super::full_key_query_aggregate::FullKeyAggregateQueryBuilder;
 use super::query_tools::QueryTools;
-use super::sql_evaluator::{Compiler, EvaluationNode};
+use super::sql_evaluator::EvaluationNode;
 use super::{
-    BaseCube, BaseDimension, BaseJoinCondition, BaseMeasure, BaseTimeDimension, Context,
-    IndexedMember, SqlJoinCondition,
+    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, Context, IndexedMember,
+    SqlJoinCondition,
 };
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::join_definition::JoinDefinition;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{
     Expr, Filter, FilterItem, From, FromSource, GenerationPlan, Join, JoinItem, OrderBy, Select,
@@ -20,7 +18,6 @@ use cubenativeutils::wrappers::NativeType;
 use cubenativeutils::wrappers::{NativeContextHolder, NativeObjectHandle};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::any::Any;
 use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
@@ -32,7 +29,6 @@ pub struct BaseQuery<IT: InnerTypes> {
     time_dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
-    all_join_hints: Vec<String>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -119,10 +115,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         let (dimensions_filters, time_dimensions_filters, measures_filters) =
             filter_compiler.extract_result();
 
-        let all_join_hints = evaluator_compiler.join_hints();
-        let join = query_tools
-            .join_graph()
-            .build_join(all_join_hints.clone())?;
+        let all_join_hints = evaluator_compiler.join_hints()?;
+        let join = query_tools.join_graph().build_join(all_join_hints)?;
         query_tools.cached_data_mut().set_join(join);
         //FIXME may be this filter should be applyed on other place
         let time_dimensions = time_dimensions
@@ -139,7 +133,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             time_dimensions_filters,
             dimensions_filters,
             measures_filters,
-            all_join_hints,
         })
     }
 
@@ -157,7 +150,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<GenerationPlan, CubeError> {
-        let mut full_key_aggregate_query_builder = FullKeyAggregateQueryBuilder::new(
+        let full_key_aggregate_query_builder = FullKeyAggregateQueryBuilder::new(
             self.query_tools.clone(),
             self.measures.clone(),
             self.dimensions.clone(),
@@ -171,10 +164,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         } else {
             self.simple_query()
         }
-    }
-
-    fn get_params(&self) -> Result<Vec<String>, CubeError> {
-        Ok(self.query_tools.get_allocated_params())
     }
 
     fn simple_query(&self) -> Result<GenerationPlan, CubeError> {
@@ -240,11 +229,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                         from: From::new(FromSource::Cube(
                             self.cube_from_path(join.static_data().original_to.clone())?,
                         )),
-                        on: SqlJoinCondition::try_new(
-                            join.static_data().original_from.clone(),
-                            self.query_tools.clone(),
-                            evaluator,
-                        )?,
+                        on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
                         is_inner: false,
                     })
                 })
@@ -298,25 +283,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             None
         } else {
             Some(Filter { items })
-        }
-    }
-
-    fn get_field_index(&self, id: &str) -> Option<usize> {
-        let upper_id = id.to_uppercase();
-        if let Some(ind) = self
-            .dimensions
-            .iter()
-            .position(|d| d.dimension().to_uppercase() == upper_id)
-        {
-            Some(ind + 1)
-        } else if let Some(ind) = self
-            .measures
-            .iter()
-            .position(|m| m.measure().to_uppercase() == upper_id)
-        {
-            Some(ind + self.dimensions.len())
-        } else {
-            None
         }
     }
 }

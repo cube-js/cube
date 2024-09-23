@@ -1,11 +1,6 @@
-use super::{
-    Compiler, CubeNameEvaluator, CubeNameEvaluatorFactory, DimensionEvaluator,
-    DimensionEvaluatorFactory, EvaluationNode, MeasureEvaluator, MeasureEvaluatorFactory,
-    MemberEvaluator, MemberEvaluatorFactory,
-};
-use crate::cube_bridge::base_tools::BaseTools;
+use super::{Compiler, EvaluationNode};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{self, MemberSql};
+use crate::cube_bridge::memeber_sql::MemberSql;
 use cubenativeutils::CubeError;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -45,19 +40,13 @@ pub enum Dependency {
 pub struct DependenciesBuilder<'a> {
     compiler: &'a mut Compiler,
     cube_evaluator: Rc<dyn CubeEvaluator>,
-    base_tools: Rc<dyn BaseTools>,
 }
 
 impl<'a> DependenciesBuilder<'a> {
-    pub fn new(
-        compiler: &'a mut Compiler,
-        cube_evaluator: Rc<dyn CubeEvaluator>,
-        base_tools: Rc<dyn BaseTools>,
-    ) -> Self {
+    pub fn new(compiler: &'a mut Compiler, cube_evaluator: Rc<dyn CubeEvaluator>) -> Self {
         DependenciesBuilder {
             compiler,
             cube_evaluator,
-            base_tools,
         }
     }
 
@@ -106,8 +95,10 @@ impl<'a> DependenciesBuilder<'a> {
                 for child_ind in childs[i].iter() {
                     let name = &call_deps[*child_ind].name;
                     if name.as_str() == "sql" {
-                        self.compiler
-                            .add_cube_table_evaluator(new_cube_name.clone());
+                        sql_fn = Some(
+                            self.compiler
+                                .add_cube_table_evaluator(new_cube_name.clone())?,
+                        );
                     } else if name.as_str() == "toString" {
                         to_string_fn = Some(
                             self.compiler

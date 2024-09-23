@@ -1,20 +1,16 @@
 use super::dependecy::Dependency;
-use super::{Compiler, MemberEvaluator, MemberEvaluatorFactory};
-use super::{EvaluationNode, MemberEvaluatorType};
-use crate::cube_bridge::dimension_definition::DimensionDefinition;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::memeber_sql::{self, MemberSql, MemberSqlArg};
-use crate::planner::query_tools::QueryTools;
+use super::EvaluationNode;
+use super::{Compiler, MemberSymbol, MemberSymbolFactory};
+use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use cubenativeutils::CubeError;
-use std::any::Any;
 use std::rc::Rc;
 
-pub struct JoinConditionEvaluator {
+pub struct JoinConditionSymbol {
     cube_name: String,
     member_sql: Rc<dyn MemberSql>,
 }
 
-impl JoinConditionEvaluator {
+impl JoinConditionSymbol {
     pub fn new(cube_name: String, member_sql: Rc<dyn MemberSql>) -> Self {
         Self {
             cube_name,
@@ -24,32 +20,21 @@ impl JoinConditionEvaluator {
     pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
         self.member_sql.call(args)
     }
-    pub fn default_evaluate_sql(
-        &self,
-        args: Vec<MemberSqlArg>,
-        tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        self.member_sql.call(args)
-    }
 }
 
-impl MemberEvaluator for JoinConditionEvaluator {
+impl MemberSymbol for JoinConditionSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
 
-pub struct JoinConditionEvaluatorFactory {
+pub struct JoinConditionSymbolFactory {
     cube_name: String,
     sql: Rc<dyn MemberSql>,
 }
 
-impl JoinConditionEvaluatorFactory {
-    pub fn try_new(
-        cube_name: &String,
-        sql: Rc<dyn MemberSql>,
-        cube_evaluator: Rc<dyn CubeEvaluator>,
-    ) -> Result<Self, CubeError> {
+impl JoinConditionSymbolFactory {
+    pub fn try_new(cube_name: &String, sql: Rc<dyn MemberSql>) -> Result<Self, CubeError> {
         Ok(Self {
             cube_name: cube_name.clone(),
             sql,
@@ -57,8 +42,8 @@ impl JoinConditionEvaluatorFactory {
     }
 }
 
-impl MemberEvaluatorFactory for JoinConditionEvaluatorFactory {
-    fn evaluator_name() -> String {
+impl MemberSymbolFactory for JoinConditionSymbolFactory {
+    fn symbol_name() -> String {
         "join".to_string()
     }
 
@@ -85,7 +70,7 @@ impl MemberEvaluatorFactory for JoinConditionEvaluatorFactory {
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         let Self { cube_name, sql } = self;
         Ok(EvaluationNode::new_join_condition(
-            JoinConditionEvaluator::new(cube_name, sql),
+            JoinConditionSymbol::new(cube_name, sql),
             deps,
         ))
     }

@@ -1,18 +1,16 @@
 use super::base_join_condition::DimensionJoinCondition;
 use super::query_tools::QueryTools;
 use super::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
-use super::sql_evaluator::render_references::RenderReferencesNodeProcessor;
-use super::sql_evaluator::{Compiler, EvaluationNode};
+use super::sql_evaluator::node_processors::with_render_references_default_node_processor;
+use super::sql_evaluator::EvaluationNode;
+use super::BaseMember;
 use super::IndexedMember;
 use super::{
-    BaseCube, BaseDimension, BaseJoinCondition, BaseMeasure, BaseTimeDimension, Context,
-    PrimaryJoinCondition, SqlJoinCondition,
+    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, Context, PrimaryJoinCondition,
+    SqlJoinCondition,
 };
-use super::{BaseMember, BaseQuery};
 use crate::cube_bridge::memeber_sql::MemberSql;
-use crate::plan::{
-    Expr, Filter, FilterItem, From, FromSource, GenerationPlan, Join, JoinItem, OrderBy, Select,
-};
+use crate::plan::{Expr, Filter, FilterItem, From, FromSource, Join, JoinItem, OrderBy, Select};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -24,6 +22,7 @@ pub struct FullKeyAggregateQueryBuilder {
     dimensions: Vec<Rc<BaseDimension>>,
     dimensions_filters: Vec<FilterItem>,
     time_dimensions_filters: Vec<FilterItem>,
+    #[allow(dead_code)]
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
 }
@@ -114,7 +113,10 @@ impl FullKeyAggregateQueryBuilder {
             .map(|m| Ok((m.measure().clone(), m.alias_name()?)))
             .collect::<Result<HashMap<_, _>, CubeError>>()?;
 
-        let context = Context::new(None, vec![RenderReferencesNodeProcessor::new(references)]);
+        let context = Context::new(
+            None,
+            with_render_references_default_node_processor(references),
+        );
 
         let select = Select {
             projection: self.dimensions_references_and_measures("q_0", outer_measures)?,
@@ -182,11 +184,7 @@ impl FullKeyAggregateQueryBuilder {
         let mut joins = vec![];
         joins.push(JoinItem {
             from: pk_cube,
-            on: PrimaryJoinCondition::try_new(
-                key_cube_name.clone(),
-                self.query_tools.clone(),
-                primary_keys_dimensions,
-            )?,
+            on: PrimaryJoinCondition::try_new(self.query_tools.clone(), primary_keys_dimensions)?,
             is_inner: false,
         });
         let join = Rc::new(Join {
@@ -269,11 +267,7 @@ impl FullKeyAggregateQueryBuilder {
                         from: From::new(FromSource::Cube(
                             self.cube_from_path(join.static_data().original_to.clone())?,
                         )),
-                        on: SqlJoinCondition::try_new(
-                            join.static_data().original_from.clone(),
-                            self.query_tools.clone(),
-                            evaluator,
-                        )?,
+                        on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
                         is_inner: false,
                     })
                 })
