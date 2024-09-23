@@ -18,6 +18,7 @@ import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
 
 import { cancelCombinator } from './utils';
 import {
@@ -467,7 +468,7 @@ export abstract class BaseDriver implements DriverInterface {
     const conditionString = conditions.join(' OR ');
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
-    
+
     const [primaryKeys, foreignKeys] = await Promise.all([
       this.primaryKeys(conditionString, parameters),
       this.foreignKeys(conditionString, parameters)
@@ -671,5 +672,29 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
+  }
+
+  /**
+   * Returns an array of signed GCS URLs of the unloaded csv files.
+   */
+  protected async extractFilesFromGCS(
+    storage: Storage,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const bucket = storage.bucket(bucketName);
+    const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
+    if (files.length) {
+      const csvFile = await Promise.all(files.map(async (file) => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        });
+        return url;
+      }));
+      return csvFile;
+    } else {
+      return [];
+    }
   }
 }

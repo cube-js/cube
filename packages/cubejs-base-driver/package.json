@@ -32,6 +32,7 @@
     "@aws-sdk/client-s3": "^3.49.0",
     "@aws-sdk/s3-request-presigner": "^3.49.0",
     "@cubejs-backend/shared": "^0.36.0",
+    "@google-cloud/storage": "^5.8.5",
     "ramda": "^0.27.0"
   },
   "devDependencies": {
