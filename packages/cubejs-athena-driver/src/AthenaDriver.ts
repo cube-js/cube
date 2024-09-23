@@ -17,8 +17,6 @@ import {
   ColumnInfo,
   StartQueryExecutionCommandInput,
 } from '@aws-sdk/client-athena';
-import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import * as stream from 'stream';
 import {
   BaseDriver,
@@ -126,7 +124,7 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
       getEnv('athenaAwsSecret', { dataSource });
 
     const { schema, ...restConfig } = config;
-    
+
     this.schema = schema ||
       getEnv('dbName', { dataSource }) ||
       getEnv('dbSchema', { dataSource });
@@ -438,31 +436,18 @@ export class AthenaDriver extends BaseDriver implements DriverInterface {
    * Returns an array of signed URLs of the unloaded csv files.
    */
   private async getCsvFiles(tableName: string): Promise<string[]> {
-    const client = new S3({
-      credentials: this.config.credentials,
-      region: this.config.region,
-    });
     const { bucket, prefix } = AthenaDriver.splitS3Path(
       `${this.config.exportBucket}/${tableName}`
     );
-    const list = await client.listObjectsV2({
-      Bucket: bucket,
-      Prefix: prefix.slice(1), // skip leading
-    });
-    if (!list.Contents) {
-      return [];
-    } else {
-      const files = await Promise.all(
-        list.Contents.map(async (file) => {
-          const command = new GetObjectCommand({
-            Bucket: bucket,
-            Key: file.Key,
-          });
-          return getSignedUrl(client, command, { expiresIn: 3600 });
-        })
-      );
-      return files;
-    }
+
+    return this.extractUnloadedFilesFromS3(
+      {
+        credentials: this.config.credentials,
+        region: this.config.region,
+      },
+      bucket,
+      prefix.slice(1),
+    );
   }
 
   public informationSchemaQuery() {
