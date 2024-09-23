@@ -676,7 +676,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const parts = bucketName.split('://')[1].split('.blob.core.windows.net/');
+    const parts = bucketName.split('.blob.core.windows.net/');
     const account = parts[0];
     const container = parts[1].split('/')[0];
     const config = <SnowflakeDriverExportAzure> this.config.exportBucket;
@@ -687,7 +687,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       new BlobServiceClient(url, credential);
 
     const csvFiles: string[] = [];
-    const expr = new RegExp(`${tableName}\\/.*\\.csv$`, 'i');
+    const expr = new RegExp(`${tableName}\\/.*\\.csv.gz$`, 'i');
     const containerClient = blobServiceClient.getContainerClient(container);
     const blobsList = containerClient.listBlobsFlat({ prefix: tableName });
     for await (const blob of blobsList) {
