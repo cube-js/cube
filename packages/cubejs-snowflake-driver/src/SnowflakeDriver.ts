@@ -25,6 +25,13 @@ import {
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
 import { Storage } from '@google-cloud/storage';
+import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
+  ContainerSASPermissions,
+  SASProtocol,
+  generateBlobSASQueryParameters,
+} from '@azure/storage-blob';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
@@ -655,33 +662,60 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
           bucketName,
           tableName,
         );
+      case 'azure':
+        return this.extractFilesFromAzure(
+          bucketName,
+          tableName,
+        );
       default:
-        throw new Error('Unsupported export bucket type.');
+        throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }
   }
 
-  /**
-   * Returns an array of signed GCS URLs of the unloaded csv files.
-   */
-  protected async extractFilesFromGCS(
-    storage: Storage,
+  protected async extractFilesFromAzure(
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
-    const bucket = storage.bucket(bucketName);
-    const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
-    if (files.length) {
-      const csvFile = await Promise.all(files.map(async (file) => {
-        const [url] = await file.getSignedUrl({
-          action: 'read',
-          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
-        });
-        return url;
-      }));
-      return csvFile;
-    } else {
-      return [];
+    const parts = bucketName.split('://')[1].split('.blob.core.windows.net/');
+    const account = parts[0];
+    const container = parts[1].split('/')[0];
+    const config = <SnowflakeDriverExportAzure> this.config.exportBucket;
+    const credential = new StorageSharedKeyCredential(account, config.azureKey);
+    const blobServiceClient = config.sasToken ?
+      new BlobServiceClient(`https://${account}.blob.core.windows.net${config.sasToken}`) :
+      new BlobServiceClient(`https://${account}.blob.core.windows.net`, credential);
+
+    const csvFiles: string[] = [];
+    const expr = new RegExp(`${tableName}\\/.*\\.csv$`, 'i');
+    const containerClient = blobServiceClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat({ prefix: tableName });
+    for await (const blob of blobsList) {
+      if (blob.name && expr.test(blob.name)) {
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: blob.name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFiles.push(`https://${
+          account
+        }.blob.core.windows.net/${
+          container
+        }/${blob.name}?${sas}`);
+      }
     }
+    if (csvFiles.length === 0) {
+      throw new Error('No CSV files were exported to the specified bucket. ' +
+        'Please check your export bucket configuration.');
+    }
+    return csvFiles;
   }
 
   /**
