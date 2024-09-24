@@ -329,12 +329,12 @@ describe('API Gateway', () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
     expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
       .toStrictEqual({
-        granularities: [{
+        granularity: {
           name: 'half_year_by_1st_april',
           title: 'Half Year By1 St April',
           interval: '6 months',
           offset: '3 months',
-        }]
+        }
       });
   });
 
