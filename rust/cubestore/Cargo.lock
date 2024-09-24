@@ -1324,7 +1324,7 @@ checksum = "c2e66c9d817f1720209181c316d28635c050fa304f9c79e47a520882661b7308"
 [[package]]
 name = "datafusion"
 version = "4.0.0-SNAPSHOT"
-source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#faf7acb5a3f3d4976711f6faf76c7750b22b0eda"
+source = "git+https://github.com/cube-js/arrow-datafusion?branch=cube#7e935118e556a31c35f5e5bb4ecb465cefb19ebb"
 dependencies = [
  "ahash",
  "arrow",
