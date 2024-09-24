@@ -98,6 +98,9 @@
       "path": "packages/cubejs-trino-driver"
     },
     {
+      "path": "packages/cubejs-pinot-driver"
+    },
+    {
       "path": "packages/cubejs-server-core"
     },
     {

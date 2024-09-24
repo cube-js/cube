@@ -1,0 +1,78 @@
+services:
+  pinot-controller:
+    image: apachepinot/pinot:1.1.0
+    hostname: pinot-controller
+    restart: unless-stopped
+    command: StartController -configFileName /tmp/data/test-resources/controller.conf
+    container_name: pinot-controller-cube-tests
+    ports:
+      - 9000:9000
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f "http://localhost:9000/health"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./pinot-resources:/tmp/data/test-resources:ro
+
+  pinot-broker:
+    image: apachepinot/pinot:1.1.0
+    hostname: pinot-broker
+    restart: unless-stopped
+    command: StartBroker -zkAddress zookeeper:2181 -configFileName /tmp/data/test-resources/broker.conf
+    container_name: pinot-broker-cube-tests
+    volumes:
+      - ./pinot-resources:/tmp/data/test-resources:ro
+    ports:
+      - 8099:8099
+    depends_on:
+      pinot-controller:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f "http://localhost:8099/health"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  pinot-server:
+    image: apachepinot/pinot:1.1.0
+    hostname: pinot-server
+    restart: unless-stopped
+    container_name: pinot-server-cube-tests
+    command: StartServer -zkAddress zookeeper:2181
+    ports:
+      - 8098:8098
+      - 8097:8097
+    depends_on:
+      pinot-broker:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f "http://localhost:8097/health"
+      interval: 5s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  ###
+  # Utils (Zookeeper, Kafka, Spark, ...)
+  ###
+  zookeeper:
+    image: zookeeper:latest
+    hostname: zookeeper
+    ports:
+      - 2181:2181
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_PORT: 2181
+      ZOO_SERVERS: server.1=zookeeper:2888:3888;2181
+    healthcheck:
+      test: nc -z localhost 2181 || exit -1
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 2s

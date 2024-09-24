@@ -23,5 +23,6 @@ module.exports = {
   "singlestore": "SingleStore",
   "snowflake": "Snowflake",
   "sqlite": "SQLite",
-  "trino": "Trino"
+  "trino": "Trino",
+  "pinot": "Pinot"
 }
