@@ -6,6 +6,7 @@
  */
 
 import R from 'ramda';
+import { isPredefinedGranularity } from '@cubejs-backend/shared';
 import { MetaConfig, MetaConfigMap, toConfigMap } from './toConfigMap';
 import { MemberType } from '../types/strings';
 import { MemberType as MemberTypeEnum } from '../types/enums';
@@ -32,6 +33,10 @@ type ConfigItem = {
   drillMembers?: any[];
   drillMembersGrouped?: any;
   granularities?: GranularityMeta[];
+};
+
+type AnnotatedConfigItem = Omit<ConfigItem, 'granularities'> & {
+  granularity?: GranularityMeta;
 };
 
 /**
@@ -101,15 +106,29 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
                 `${td.dimension}.${td.granularity}`
               );
 
-              if (an && an[1].granularities) {
-                // No need to send all the granularities defined, only those make sense for this query
-                an[1].granularities = an[1].granularities.filter(g => g.name === td.granularity);
+              let dimAnnotation: [string, AnnotatedConfigItem] | undefined;
+
+              if (an) {
+                let granularityMeta: GranularityMeta | undefined;
+                if (isPredefinedGranularity(td.granularity)) {
+                  granularityMeta = {
+                    name: td.granularity,
+                    title: td.granularity,
+                    interval: `1 ${td.granularity}`,
+                  };
+                } else if (an[1].granularities) {
+                  // No need to send all the granularities defined, only those make sense for this query
+                  granularityMeta = an[1].granularities.find(g => g.name === td.granularity);
+                }
+
+                const { granularities: _, ...rest } = an[1];
+                dimAnnotation = [an[0], { ...rest, granularity: granularityMeta }];
               }
 
               // TODO: deprecated: backward compatibility for
               // referencing time dimensions without granularity
               if (dimensions.indexOf(td.dimension) !== -1) {
-                return [an].filter(a => !!a);
+                return [dimAnnotation].filter(a => !!a);
               }
 
               const dimWithoutGranularity = annotation(
@@ -122,7 +141,7 @@ function prepareAnnotation(metaConfig: MetaConfig[], query: any) {
                 dimWithoutGranularity[1].granularities = undefined;
               }
 
-              return [an].concat([dimWithoutGranularity])
+              return [dimAnnotation].concat([dimWithoutGranularity])
                 .filter(a => !!a);
             }
           )
