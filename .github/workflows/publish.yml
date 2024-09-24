@@ -381,10 +381,6 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
-          # Workaround for yarn v1, it uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-          config-inline: |
-            [worker.oci]
-              max-parallelism = 1
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
