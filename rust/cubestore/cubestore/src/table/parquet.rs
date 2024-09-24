@@ -113,21 +113,22 @@ impl ParquetTableStore {
         arrow_schema(&self.table)
     }
 
-    pub fn writer_props(&self) -> WriterProperties {
-        self.metadata_cache_factory.build_writer_props(
-            WriterProperties::builder()
-                .set_max_row_group_size(self.row_group_size)
-                .set_writer_version(WriterVersion::PARQUET_2_0),
-        )
+    pub fn writer_props(&self) -> Result<WriterProperties, CubeError> {
+        self.metadata_cache_factory
+            .build_writer_props(
+                WriterProperties::builder()
+                    .set_max_row_group_size(self.row_group_size)
+                    .set_writer_version(WriterVersion::PARQUET_2_0),
+            )
+            .map_err(CubeError::from)
     }
 
     pub fn write_data(&self, dest_file: &str, columns: Vec<ArrayRef>) -> Result<(), CubeError> {
         let schema = Arc::new(arrow_schema(&self.table));
         let batch = RecordBatch::try_new(schema.clone(), columns.to_vec())?;
 
-        // TODO: Just look for every place SerializedFileWriter is constructed and see if we missed one.
         let mut w =
-            ArrowWriter::try_new(File::create(dest_file)?, schema, Some(self.writer_props()))?;
+            ArrowWriter::try_new(File::create(dest_file)?, schema, Some(self.writer_props()?))?;
         w.write(&batch)?;
         w.close()?;
 
