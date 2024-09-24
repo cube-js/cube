@@ -1,4 +1,10 @@
-import { ChartType, TimeDimensionGranularity } from '@cubejs-client/core';
+import {
+  ChartType,
+  TimeDimensionGranularity,
+  granularityFor,
+  minGranularityForIntervals,
+  isPredefinedGranularity
+} from '@cubejs-client/core';
 import { UseCubeQueryResult } from '@cubejs-client/react';
 import { Skeleton, Tag, tasty } from '@cube-dev/ui-kit';
 import formatDate from 'date-fns/format';
@@ -113,7 +119,12 @@ function CartesianChart({
       return (key as string).split('.').length === 3;
     }
   ) as string;
-  const granularity = granularityField?.split('.')[2];
+  let granularity = granularityField?.split('.')[2];
+
+  if (!isPredefinedGranularity(granularity)) {
+    const granularityInfo = resultSet?.loadResponse.results[0].annotation.timeDimensions[granularityField]?.granularity;
+    granularity = minGranularityForIntervals(granularityInfo.interval, granularityInfo.offset || granularityFor(granularityInfo.origin));
+  }
 
   const formatDate = useMemo(() => {
     if (dateFormat) {
