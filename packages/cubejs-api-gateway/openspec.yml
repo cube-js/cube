@@ -103,10 +103,17 @@ components:
       required:
         - name
         - title
+        - interval
       properties:
         name:
           type: "string"
         title:
+          type: "string"
+        interval:
+          type: "string"
+        offset:
+          type: "string"
+        origin:
           type: "string"
     V1CubeMetaDimension:
       type: "object"
