@@ -114,11 +114,13 @@ impl ParquetTableStore {
     }
 
     pub fn writer_props(&self) -> Result<WriterProperties, CubeError> {
-        self.metadata_cache_factory.build_writer_props(
-            WriterProperties::builder()
-                .set_max_row_group_size(self.row_group_size)
-                .set_writer_version(WriterVersion::PARQUET_2_0),
-        ).map_err(CubeError::from)
+        self.metadata_cache_factory
+            .build_writer_props(
+                WriterProperties::builder()
+                    .set_max_row_group_size(self.row_group_size)
+                    .set_writer_version(WriterVersion::PARQUET_2_0),
+            )
+            .map_err(CubeError::from)
     }
 
     pub fn write_data(&self, dest_file: &str, columns: Vec<ArrayRef>) -> Result<(), CubeError> {
