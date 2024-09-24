@@ -1188,11 +1188,12 @@ async fn write_to_files_impl(
     mut pick_writer: impl FnMut(&RecordBatch) -> WriteBatchTo,
 ) -> Result<(), CubeError> {
     let schema = Arc::new(store.arrow_schema());
+    let writer_props = store.writer_props()?;
     let mut writers = files.into_iter().map(move |f| -> Result<_, CubeError> {
         Ok(ArrowWriter::try_new(
             File::create(f)?,
             schema.clone(),
-            Some(store.writer_props()),
+            Some(writer_props.clone()),
         )?)
     });
 
