@@ -160,6 +160,36 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
       }
     }
 
+    // Install & load extensions if configured in env variable.
+    const extensions = getEnv('duckdbExtensions', this.config);
+    for (const extension of extensions) {
+      try {
+        await execAsync('INSTALL ' + extension);
+      } catch (e) {
+        if (this.logger) {
+          console.error('DuckDB - error on installing ' + extension, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+
+      try {
+        await execAsync('LOAD ' + extension);
+      } catch (e) {
+        if (this.logger) {
+          console.error('DuckDB - error on loading ' + extension, {
+            e
+          });
+        }
+
+        // DuckDB will lose connection_ref on connection on error, this will lead to broken connection object
+        throw e;
+      }
+    }
+
     if (this.config.initSql) {
       try {
         await execAsync(this.config.initSql);
