@@ -174,6 +174,13 @@ jobs:
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    env:
+      CLOUD_DATABASES: athena bigquery databricks-jdbc databricks-jdbc-export-bucket snowflake
+      # As per docs:
+      # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
+      # secrets as job-level environment variables, then referencing the environment variables
+      # to conditionally run steps in the job.
+      DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
     strategy:
       matrix:
         node:
@@ -239,6 +246,10 @@ jobs:
 
       - name: Run tests
         uses: nick-fields/retry@v3
+        # It's enough to test for any one secret because they are set all at once or not set all
+        if: |
+          (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
+          (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
