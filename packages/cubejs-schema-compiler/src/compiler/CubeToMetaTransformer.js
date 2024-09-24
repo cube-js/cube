@@ -85,6 +85,9 @@ export class CubeToMetaTransformer {
                 ? R.compose(R.map((g) => ({
                   name: g[0],
                   title: this.title(cubeTitle, g, true),
+                  interval: g[1].interval,
+                  offset: g[1].offset,
+                  origin: g[1].origin,
                 })), R.toPairs)(nameToDimension[1].granularities)
                 : undefined,
           })),
