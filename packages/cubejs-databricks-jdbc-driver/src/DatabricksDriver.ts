@@ -669,11 +669,16 @@ export class DatabricksDriver extends JDBCDriver {
   private async getCsvFiles(
     tableName: string,
   ): Promise<string[]> {
+    // this.config.exportBucket includes schema
+    // so it looks like: s3://real-bucket-name
+    // The extractors in BaseDriver expect just clean bucket name
+    const url = new URL(this.config.exportBucket || '');
+
     switch (this.config.bucketType) {
       case 'azure':
         return this.extractFilesFromAzure(
           { azureKey: this.config.azureKey || '' },
-          this.config.exportBucket || '',
+          url.host,
           tableName,
         );
       case 's3':
@@ -685,7 +690,7 @@ export class DatabricksDriver extends JDBCDriver {
             },
             region: this.config.awsRegion || '',
           },
-          this.config.exportBucket || '',
+          url.host,
           tableName,
         );
       default:
