@@ -24,7 +24,6 @@ import {
   DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
-import { Storage } from '@google-cloud/storage';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
@@ -643,14 +642,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       const { credentials } = (
         <SnowflakeDriverExportGCS> this.config.exportBucket
       );
-      return this.extractFilesFromGCS(
-        new Storage({
-          credentials,
-          projectId: credentials.project_id
-        }),
-        bucketName,
-        tableName,
-      );
+      return this.extractFilesFromGCS({ credentials }, bucketName, tableName);
     } else if (bucketType === 'azure') {
       const { azureKey, sasToken } = (
         <SnowflakeDriverExportAzure> this.config.exportBucket
