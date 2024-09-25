@@ -3,21 +3,20 @@
  * @license Apache-2.0
  * @fileoverview The `DatabricksDriver` and related types declaration.
  */
-/* eslint-disable camelcase */
+
 import {
   getEnv,
   assertDataSource,
 } from '@cubejs-backend/shared';
-import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import {
-  BlobServiceClient,
-  StorageSharedKeyCredential,
-  ContainerSASPermissions,
-  SASProtocol,
-  generateBlobSASQueryParameters,
-} from '@azure/storage-blob';
-import { DriverCapabilities, QueryColumnsResult, QueryOptions, QuerySchemasResult, QueryTablesResult, UnloadOptions, GenericDataBaseType } from '@cubejs-backend/base-driver';
+  DriverCapabilities,
+  QueryColumnsResult,
+  QueryOptions,
+  QuerySchemasResult,
+  QueryTablesResult,
+  UnloadOptions,
+  GenericDataBaseType
+} from '@cubejs-backend/base-driver';
 import {
   JDBCDriver,
   JDBCDriverConfiguration,
@@ -486,7 +485,9 @@ export class DatabricksDriver extends JDBCDriver {
         return columnTypes.map(({ name, type }) => ({
           column_name: name,
           data_type: type,
+          // eslint-disable-next-line camelcase
           table_name,
+          // eslint-disable-next-line camelcase
           schema_name,
         }));
       })

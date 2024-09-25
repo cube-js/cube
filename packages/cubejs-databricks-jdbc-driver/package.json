@@ -28,9 +28,6 @@
     "bin"
   ],
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.49.0",
-    "@aws-sdk/s3-request-presigner": "^3.49.0",
-    "@azure/storage-blob": "^12.9.0",
     "@cubejs-backend/base-driver": "^0.36.0",
     "@cubejs-backend/jdbc-driver": "^0.36.0",
     "@cubejs-backend/schema-compiler": "^0.36.2",
