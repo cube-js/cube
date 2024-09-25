@@ -57,6 +57,10 @@ export type AzureStorageClientConfig = {
   sasToken?: string,
 };
 
+export type GoogleStorageClientConfig = {
+  credentials: any,
+};
+
 const sortByKeys = (unordered: any) => {
   const ordered: any = {};
 
@@ -690,10 +694,14 @@ export abstract class BaseDriver implements DriverInterface {
    * Returns an array of signed GCS URLs of the unloaded csv files.
    */
   protected async extractFilesFromGCS(
-    storage: Storage,
+    gcsConfig: GoogleStorageClientConfig,
     bucketName: string,
     tableName: string
   ): Promise<string[]> {
+    const storage = new Storage({
+      credentials: gcsConfig.credentials,
+      projectId: gcsConfig.credentials.project_id
+    });
     const bucket = storage.bucket(bucketName);
     const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
     if (files.length) {
