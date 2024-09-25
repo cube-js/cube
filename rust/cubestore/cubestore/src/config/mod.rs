@@ -2007,8 +2007,7 @@ impl Config {
             .register_typed::<dyn ChunkDataStore, _, _, _>(async move |i| {
                 let metadata_cache_factory = i
                     .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
-                    .await
-                    .cache_factory();
+                    .await;
                 ChunkStore::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2025,10 +2024,10 @@ impl Config {
         self.injector
             .register_typed::<dyn CubestoreParquetMetadataCache, _, _, _>(async move |i| {
                 let c = i.get_service_typed::<dyn ConfigObj>().await;
-                let metadata_cache_factory = i
+                let cubestore_metadata_cache_factory = i
                     .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
-                    .await
-                    .cache_factory();
+                    .await;
+                let metadata_cache_factory: &_ = cubestore_metadata_cache_factory.cache_factory();
                 CubestoreParquetMetadataCacheImpl::new(
                     match c.metadata_cache_max_capacity_bytes() {
                         0 => metadata_cache_factory.make_noop_cache(),
@@ -2045,8 +2044,7 @@ impl Config {
             .register_typed::<dyn CompactionService, _, _, _>(async move |i| {
                 let metadata_cache_factory = i
                     .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
-                    .await
-                    .cache_factory();
+                    .await;
                 CompactionServiceImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2093,7 +2091,8 @@ impl Config {
                     i.get_service_typed().await,
                     i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                         .await
-                        .cache_factory(),
+                        .cache_factory()
+                        .clone(),
                 )
             })
             .await;
@@ -2195,7 +2194,8 @@ impl Config {
                 let metadata_cache_factory = i
                     .get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                     .await
-                    .cache_factory();
+                    .cache_factory()
+                    .clone();
                 QueryPlannerImpl::new(
                     i.get_service_typed().await,
                     i.get_service_typed().await,
@@ -2211,7 +2211,8 @@ impl Config {
                 QueryExecutorImpl::new(
                     i.get_service_typed::<dyn CubestoreMetadataCacheFactory>()
                         .await
-                        .cache_factory(),
+                        .cache_factory()
+                        .clone(),
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                 )

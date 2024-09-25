@@ -1660,6 +1660,7 @@ mod tests {
 
     use crate::metastore::job::JobType;
     use crate::store::compaction::CompactionService;
+    use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use async_compression::tokio::write::GzipEncoder;
     use cuberockstore::rocksdb::{Options, DB};
     use datafusion::physical_plan::parquet::BasicMetadataCacheFactory;
@@ -1728,7 +1729,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
-                Arc::new(BasicMetadataCacheFactory::new()),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1807,7 +1808,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
-                Arc::new(BasicMetadataCacheFactory::new()),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));
@@ -1917,7 +1918,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
-                Arc::new(BasicMetadataCacheFactory::new()),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 rows_per_chunk,
             );
             let limits = Arc::new(ConcurrencyLimits::new(4));

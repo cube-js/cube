@@ -10,7 +10,6 @@ use datafusion::physical_plan::hash_aggregate::{
     AggregateMode, AggregateStrategy, HashAggregateExec,
 };
 use datafusion::physical_plan::memory::MemoryExec;
-use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr};
 use serde::{de, Deserialize, Serialize};
 extern crate bincode;
@@ -39,7 +38,7 @@ use crate::config::ConfigObj;
 use crate::metastore::chunks::chunk_file_name;
 use crate::queryplanner::trace_data_loaded::DataLoadedSize;
 use crate::table::data::cmp_partition_key;
-use crate::table::parquet::{arrow_schema, ParquetTableStore};
+use crate::table::parquet::{arrow_schema, CubestoreMetadataCacheFactory, ParquetTableStore};
 use compaction::{merge_chunks, merge_replay_handles};
 use datafusion::arrow::array::{Array, ArrayRef, Int64Builder, StringBuilder, UInt64Array};
 use datafusion::arrow::record_batch::RecordBatch;
@@ -183,7 +182,7 @@ pub struct ChunkStore {
     remote_fs: Arc<dyn RemoteFs>,
     cluster: Arc<dyn Cluster>,
     config: Arc<dyn ConfigObj>,
-    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
     memory_chunks: RwLock<HashMap<String, RecordBatch>>,
     chunk_size: usize,
 }
@@ -344,7 +343,7 @@ impl ChunkStore {
         remote_fs: Arc<dyn RemoteFs>,
         cluster: Arc<dyn Cluster>,
         config: Arc<dyn ConfigObj>,
-        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+        metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory>,
         chunk_size: usize,
     ) -> Arc<ChunkStore> {
         let store = ChunkStore {
@@ -592,7 +591,7 @@ impl ChunkDataStore for ChunkStore {
                 )))])
         } else {
             let (local_file, index) = self.download_chunk(chunk, partition, index).await?;
-            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> =
+            let metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory> =
                 self.metadata_cache_factory.clone();
             Ok(cube_ext::spawn_blocking(move || -> Result<_, CubeError> {
                 let parquet = ParquetTableStore::new(index, ROW_GROUP_SIZE, metadata_cache_factory);
@@ -807,6 +806,7 @@ mod tests {
     use crate::metastore::{BaseRocksStoreFs, IndexDef, IndexType, RocksMetaStore};
     use crate::remotefs::LocalDirRemoteFs;
     use crate::table::data::{concat_record_batches, rows_to_columns};
+    use crate::table::parquet::CubestoreMetadataCacheFactoryImpl;
     use crate::{metastore::ColumnType, table::TableValue};
     use cuberockstore::rocksdb::{Options, DB};
     use datafusion::arrow::array::{Int64Array, StringArray};
@@ -950,7 +950,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
-                Arc::new(BasicMetadataCacheFactory::new()),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 10,
             );
 
@@ -1054,7 +1054,7 @@ mod tests {
                 remote_fs.clone(),
                 Arc::new(MockCluster::new()),
                 config.config_obj(),
-                Arc::new(BasicMetadataCacheFactory::new()),
+                CubestoreMetadataCacheFactoryImpl::new(Arc::new(BasicMetadataCacheFactory::new())),
                 10,
             );
 
@@ -1384,16 +1384,23 @@ impl ChunkStore {
             let local_file = self.remote_fs.temp_upload_path(remote_path.clone()).await?;
             let local_file = scopeguard::guard(local_file, ensure_temp_file_is_dropped);
             let local_file_copy = local_file.clone();
-            let metadata_cache_factory: Arc<dyn MetadataCacheFactory> =
+            let metadata_cache_factory: Arc<dyn CubestoreMetadataCacheFactory> =
                 self.metadata_cache_factory.clone();
+
+            let table = self
+                .meta_store
+                .get_table_by_id(index.get_row().table_id())
+                .await?;
+
+            let parquet = ParquetTableStore::new(
+                index.get_row().clone(),
+                ROW_GROUP_SIZE,
+                metadata_cache_factory,
+            );
+
+            let writer_props = parquet.writer_props(&table).await?;
             cube_ext::spawn_blocking(move || -> Result<(), CubeError> {
-                let parquet = ParquetTableStore::new(
-                    index.get_row().clone(),
-                    ROW_GROUP_SIZE,
-                    metadata_cache_factory,
-                );
-                parquet.write_data(&local_file_copy, data)?;
-                Ok(())
+                parquet.write_data_given_props(&local_file_copy, data, writer_props)
             })
             .await??;
 
