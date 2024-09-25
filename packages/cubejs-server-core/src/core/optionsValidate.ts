@@ -132,6 +132,7 @@ const schemaOptions = Joi.object().keys({
       queryCacheOptions: Joi.object().keys({
         refreshKeyRenewalThreshold: Joi.number().min(0).integer(),
         backgroundRenew: Joi.boolean(),
+        maxInMemoryCacheEntries: Joi.number().min(0).integer(),
         queueOptions: schemaQueueOptions,
         externalQueueOptions: schemaQueueOptions
       }),
