@@ -11,7 +11,9 @@ redirect_from:
 
 In order to connect Google BigQuery to Cube, you need to provide service account
 credentials. Cube requires the service account to have **BigQuery Data Viewer**
-and **BigQuery Job User** roles enabled. You can learn more about acquiring
+and **BigQuery Job User** roles enabled. If you plan to use pre-aggregations, 
+the account will need the **BigQuery Data Editor** role instead of **BigQuery Data Viewer**. 
+You can learn more about acquiring
 Google BigQuery credentials [here][bq-docs-getting-started].
 
 </InfoBox>
