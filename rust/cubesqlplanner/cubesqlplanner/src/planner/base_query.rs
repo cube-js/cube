@@ -9,7 +9,8 @@ use super::{
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{
-    Expr, Filter, FilterItem, From, FromSource, GenerationPlan, Join, JoinItem, OrderBy, Select,
+    Expr, Filter, FilterItem, From, FromSource, GenerationPlan, Join, JoinItem, JoinSource,
+    OrderBy, Select,
 };
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
@@ -209,12 +210,10 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
     fn make_from_node(&self) -> Result<From, CubeError> {
         let join = self.query_tools.cached_data().join()?.clone();
-        let root = From::new(FromSource::Cube(
-            self.cube_from_path(join.static_data().root.clone())?,
-        ));
+        let root = self.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
         if joins.items().is_empty() {
-            Ok(root)
+            Ok(From::new_from_cube(root))
         } else {
             let join_items = joins
                 .items()
@@ -226,16 +225,16 @@ impl<IT: InnerTypes> BaseQuery<IT> {
                         definition.sql()?,
                     )?;
                     Ok(JoinItem {
-                        from: From::new(FromSource::Cube(
+                        from: JoinSource::new_from_cube(
                             self.cube_from_path(join.static_data().original_to.clone())?,
-                        )),
+                        ),
                         on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
                         is_inner: false,
                     })
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
             let result = From::new(FromSource::Join(Rc::new(Join {
-                root,
+                root: JoinSource::new_from_cube(root),
                 joins: join_items,
             })));
             Ok(result)

@@ -10,7 +10,9 @@ use super::{
     SqlJoinCondition,
 };
 use crate::cube_bridge::memeber_sql::MemberSql;
-use crate::plan::{Expr, Filter, FilterItem, From, FromSource, Join, JoinItem, OrderBy, Select};
+use crate::plan::{
+    Expr, Filter, FilterItem, From, FromSource, Join, JoinItem, JoinSource, OrderBy, Select,
+};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -86,16 +88,16 @@ impl FullKeyAggregateQueryBuilder {
         outer_measures: &Vec<Rc<BaseMeasure>>,
         joins: Vec<Rc<Select>>,
     ) -> Result<Select, CubeError> {
-        let root = From::new(FromSource::Subquery(joins[0].clone(), format!("q_0")));
+        let root = JoinSource::new_from_select(joins[0].clone(), format!("q_0"));
         let mut join_items = vec![];
         let columns_to_select = self.dimensions_for_select();
         for (i, join) in joins.iter().skip(1).enumerate() {
             let left_alias = format!("q_{}", i);
             let right_alias = format!("q_{}", i + 1);
-            let from = From::new(FromSource::Subquery(
+            let from = JoinSource::new_from_select(
                 join.clone(),
                 self.query_tools.escape_column_name(&format!("q_{}", i + 1)),
-            ));
+            );
             let join_item = JoinItem {
                 from,
                 on: DimensionJoinCondition::try_new(
@@ -178,9 +180,7 @@ impl FullKeyAggregateQueryBuilder {
         let primary_keys_dimensions = self.primary_keys_dimensions(key_cube_name)?;
         let keys_query = self.key_query(&primary_keys_dimensions, key_cube_name)?;
 
-        let pk_cube = From::new(FromSource::Cube(
-            self.cube_from_path(key_cube_name.clone())?,
-        ));
+        let pk_cube = JoinSource::new_from_cube(self.cube_from_path(key_cube_name.clone())?);
         let mut joins = vec![];
         joins.push(JoinItem {
             from: pk_cube,
@@ -188,10 +188,10 @@ impl FullKeyAggregateQueryBuilder {
             is_inner: false,
         });
         let join = Rc::new(Join {
-            root: From::new(FromSource::Subquery(
+            root: JoinSource::new_from_select(
                 keys_query,
                 self.query_tools.escape_column_name("keys"),
-            )), //FIXME replace with constant
+            ), //FIXME replace with constant
             joins,
         });
         let select = Select {
@@ -247,12 +247,10 @@ impl FullKeyAggregateQueryBuilder {
 
     fn make_join_node(&self /*TODO dimensions for subqueries*/) -> Result<From, CubeError> {
         let join = self.query_tools.cached_data().join()?.clone();
-        let root = From::new(FromSource::Cube(
-            self.cube_from_path(join.static_data().root.clone())?,
-        ));
+        let root = self.cube_from_path(join.static_data().root.clone())?;
         let joins = join.joins()?;
         if joins.items().is_empty() {
-            Ok(root)
+            Ok(From::new_from_cube(root))
         } else {
             let join_items = joins
                 .items()
@@ -264,16 +262,16 @@ impl FullKeyAggregateQueryBuilder {
                         definition.sql()?,
                     )?;
                     Ok(JoinItem {
-                        from: From::new(FromSource::Cube(
+                        from: JoinSource::new_from_cube(
                             self.cube_from_path(join.static_data().original_to.clone())?,
-                        )),
+                        ),
                         on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
                         is_inner: false,
                     })
                 })
                 .collect::<Result<Vec<_>, CubeError>>()?;
             let result = From::new(FromSource::Join(Rc::new(Join {
-                root,
+                root: JoinSource::new_from_cube(root),
                 joins: join_items,
             })));
             Ok(result)
