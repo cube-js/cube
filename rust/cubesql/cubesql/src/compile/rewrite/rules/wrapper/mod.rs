@@ -15,6 +15,7 @@ mod is_null_expr;
 mod like_expr;
 mod limit;
 mod literal;
+mod merge;
 mod negative_expr;
 mod not_expr;
 mod order;
@@ -84,6 +85,7 @@ impl RewriteRules for WrapperRules {
         self.not_expr_rules(&mut rules);
         self.distinct_rules(&mut rules);
         self.like_expr_rules(&mut rules);
+        self.merge_rules(&mut rules);
 
         rules
     }
