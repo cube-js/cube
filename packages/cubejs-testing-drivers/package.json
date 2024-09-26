@@ -24,6 +24,7 @@
     "clickhouse-driver": "yarn test-driver -i dist/test/clickhouse-driver.test.js",
     "clickhouse-core": "yarn test-driver -i dist/test/clickhouse-core.test.js",
     "clickhouse-full": "yarn test-driver -i dist/test/clickhouse-full.test.js",
+    "clickhouse-export-bucket-s3-full": "yarn test-driver -i dist/test/clickhouse-export-bucket-s3-full.test.js",
     "databricks-jdbc-driver": "yarn test-driver -i dist/test/databricks-jdbc-driver.test.js",
     "databricks-jdbc-core": "yarn test-driver -i dist/test/databricks-jdbc-core.test.js",
     "databricks-jdbc-full": "yarn test-driver -i dist/test/databricks-jdbc-full.test.js",
