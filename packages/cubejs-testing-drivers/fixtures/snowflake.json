@@ -30,6 +30,16 @@
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
         }
       }
+    },
+    "export-bucket-gcs": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "gcs",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_gcs",
+          "CUBEJS_DB_EXPORT_GCS_CREDENTIALS": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS}"
+        }
+      }
     }
   },
   "cube": {

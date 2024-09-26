@@ -186,6 +186,7 @@ jobs:
         snowflake-export-bucket-s3
         snowflake-export-bucket-azure
         snowflake-export-bucket-azure-via-storage-integration
+        snowflake-export-bucket-gcs
       # As per docs:
       # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
       # secrets as job-level environment variables, then referencing the environment variables
@@ -210,6 +211,7 @@ jobs:
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-azure
           - snowflake-export-bucket-azure-via-storage-integration
+          - snowflake-export-bucket-gcs
       fail-fast: false
 
     steps:
