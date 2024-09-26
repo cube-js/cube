@@ -42,6 +42,7 @@
     "snowflake-core": "yarn test-driver -i dist/test/snowflake-core.test.js",
     "snowflake-full": "yarn test-driver -i dist/test/snowflake-full.test.js",
     "snowflake-export-bucket-s3-full": "yarn test-driver -i dist/test/snowflake-export-bucket-s3-full.test.js",
+    "snowflake-export-bucket-azure-full": "yarn test-driver -i dist/test/snowflake-export-bucket-azure-full.test.js",
     "tst": "clear && yarn tsc && yarn bigquery-core"
   },
   "files": [

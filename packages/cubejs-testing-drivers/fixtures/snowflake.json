@@ -10,6 +10,16 @@
           "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1"
         }
       }
+    },
+    "export-bucket-azure": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN}"
+        }
+      }
     }
   },
   "cube": {
@@ -153,7 +163,7 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "SKIPED FOR ALL                         ",
+    "SKIPPED FOR ALL                         ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
