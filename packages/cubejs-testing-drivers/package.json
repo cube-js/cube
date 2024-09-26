@@ -17,7 +17,7 @@
     "test-driver": "TZ=UTC jest --forceExit --runInBand --verbose",
     "athena-driver": "yarn test-driver -i dist/test/athena-driver.test.js",
     "athena-core": "yarn test-driver -i dist/test/athena-core.test.js",
-    "athena-full": "yarn test-driver -i dist/test/athena-full.test.js",
+    "athena-export-bucket-s3-full": "yarn test-driver -i dist/test/athena-export-bucket-s3-full.test.js",
     "bigquery-driver": "yarn test-driver -i dist/test/bigquery-driver.test.js",
     "bigquery-core": "yarn test-driver -i dist/test/bigquery-core.test.js",
     "bigquery-full": "yarn test-driver -i dist/test/bigquery-full.test.js",
