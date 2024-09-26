@@ -134,7 +134,7 @@ interface SnowflakeDriverExportAzure {
   bucketType: 'azure',
   bucketName: string,
   azureKey: string,
-  sasToken: string,
+  sasToken?: string,
   integrationName?: string,
 }
 
@@ -314,12 +314,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (bucketType === 'azure') {
       // integrationName is optional for azure
       const integrationName = getEnv('dbExportIntegration', { dataSource });
+      // sasToken is optional for azure if storage integration is used
+      const sasToken = getEnv('dbExportAzureSasToken', { dataSource });
 
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
         azureKey: getEnv('dbExportBucketAzureKey', { dataSource }),
-        sasToken: getEnv('dbExportAzureSasToken', { dataSource }),
+        ...(sasToken !== undefined && { sasToken }),
         ...(integrationName !== undefined && { integrationName }),
       };
     }
