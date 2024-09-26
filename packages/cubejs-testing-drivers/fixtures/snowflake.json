@@ -20,6 +20,16 @@
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN}"
         }
       }
+    },
+    "export-bucket-azure-via-storage-integration": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_INTEGRATION": "drivers_tests_preaggs_azure",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
+        }
+      }
     }
   },
   "cube": {
