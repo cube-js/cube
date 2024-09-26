@@ -27,7 +27,7 @@
     "databricks-jdbc-driver": "yarn test-driver -i dist/test/databricks-jdbc-driver.test.js",
     "databricks-jdbc-core": "yarn test-driver -i dist/test/databricks-jdbc-core.test.js",
     "databricks-jdbc-full": "yarn test-driver -i dist/test/databricks-jdbc-full.test.js",
-    "databricks-jdbc-export-bucket-full": "yarn test-driver -i dist/test/databricks-jdbc-export-bucket-full.test.js",
+    "databricks-jdbc-export-bucket-s3-full": "yarn test-driver -i dist/test/databricks-jdbc-export-bucket-s3-full.test.js",
     "mssql-driver": "yarn test-driver -i dist/test/mssql-driver.test.js",
     "mssql-core": "yarn test-driver -i dist/test/mssql-core.test.js",
     "mssql-full": "yarn test-driver -i dist/test/mssql-full.test.js",

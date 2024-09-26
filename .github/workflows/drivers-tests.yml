@@ -175,7 +175,7 @@ jobs:
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     env:
-      CLOUD_DATABASES: athena bigquery databricks-jdbc databricks-jdbc-export-bucket snowflake
+      CLOUD_DATABASES: athena bigquery databricks-jdbc databricks-jdbc-export-bucket-s3 snowflake
       # As per docs:
       # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
       # secrets as job-level environment variables, then referencing the environment variables
@@ -191,7 +191,7 @@ jobs:
           - clickhouse
           - clickhouse-export-bucket-s3
           - databricks-jdbc
-          - databricks-jdbc-export-bucket
+          - databricks-jdbc-export-bucket-s3
           - mssql
           - mysql
           - postgres

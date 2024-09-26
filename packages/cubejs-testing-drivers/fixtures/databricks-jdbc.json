@@ -1,6 +1,6 @@
 {
   "extendedEnvs": {
-    "export-bucket": {
+    "export-bucket-s3": {
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
