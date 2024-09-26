@@ -737,11 +737,10 @@ export abstract class BaseDriver implements DriverInterface {
       new BlobServiceClient(url, credential);
 
     const csvFiles: string[] = [];
-    const expr = new RegExp(`${tableName}\\/.*\\.csv(\\.gz)?$`, 'i');
     const containerClient = blobServiceClient.getContainerClient(container);
     const blobsList = containerClient.listBlobsFlat({ prefix: tableName });
     for await (const blob of blobsList) {
-      if (blob.name && expr.test(blob.name)) {
+      if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
         const sas = generateBlobSASQueryParameters(
           {
             containerName: container,
