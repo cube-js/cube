@@ -1,22 +1,9 @@
-import { indexBy, prop, clone, equals, fromPairs, toPairs } from 'ramda';
-
-export const DEFAULT_GRANULARITY = 'day';
-
-export const GRANULARITIES = [
-  { name: undefined, title: 'w/o grouping' },
-  { name: 'second', title: 'Second' },
-  { name: 'minute', title: 'Minute' },
-  { name: 'hour', title: 'Hour' },
-  { name: 'day', title: 'Day' },
-  { name: 'week', title: 'Week' },
-  { name: 'month', title: 'Month' },
-  { name: 'quarter', title: 'Quarter' },
-  { name: 'year', title: 'Year' },
-];
+import { clone, equals, fromPairs, indexBy, prop, toPairs } from 'ramda';
+import { DEFAULT_GRANULARITY } from './time';
 
 export function removeEmptyQueryFields(_query) {
   const query = _query || {};
-  
+
   return fromPairs(
     toPairs(query)
       .map(([key, value]) => {
@@ -27,7 +14,7 @@ export function removeEmptyQueryFields(_query) {
             return null;
           }
         }
-        
+
         if (key === 'order' && value) {
           if (Array.isArray(value) && !value.length) {
             return null;
@@ -44,7 +31,7 @@ export function removeEmptyQueryFields(_query) {
 
 export function validateQuery(_query) {
   const query = _query || {};
-  
+
   return removeEmptyQueryFields({
     ...query,
     filters: (query.filters || []).filter((f) => f.operator),

@@ -271,22 +271,22 @@ class CubeApi {
             if (v.type === 'number') {
               return k;
             }
-            
+
             return undefined;
           }).filter(Boolean);
-          
+
           result.data = result.data.map((row) => {
             numericMembers.forEach((key) => {
               if (row[key] != null) {
                 row[key] = Number(row[key]);
               }
             });
-            
+
             return row;
           });
         });
       }
-      
+
       if (response.results[0].query.responseFormat &&
         response.results[0].query.responseFormat === ResultType.COMPACT) {
         response.results.forEach((result, j) => {
@@ -302,7 +302,7 @@ class CubeApi {
         });
       }
     }
-    
+
     return new ResultSet(response, {
       parseDateMeasures: this.parseDateMeasures
     });
@@ -388,3 +388,4 @@ export default (apiToken, options) => new CubeApi(apiToken, options);
 
 export { CubeApi, HttpTransport, ResultSet, RequestError, Meta };
 export * from './utils';
+export * from './time';
