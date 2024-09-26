@@ -670,7 +670,9 @@ export class DatabricksDriver extends JDBCDriver {
     tableName: string,
   ): Promise<string[]> {
     // this.config.exportBucket includes schema
-    // so it looks like: s3://real-bucket-name
+    // so it looks like:
+    // s3://real-bucket-name
+    // wasbs://account.blob.core.windows.net/real-bucket-name
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
 
