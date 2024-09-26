@@ -2268,7 +2268,9 @@ pub fn create_measure_udaf() -> AggregateUDF {
         DataType::Float64,
         Arc::new(DataType::Float64),
         Volatility::Immutable,
-        Arc::new(|| todo!("Not implemented")),
+        Arc::new(|| {
+            Err(DataFusionError::NotImplemented("MEASURE function was used in context where it's not supported. Try replacing MEASURE with the measure type-matching function (SUM/AVG/etc).".to_string()))
+        }),
         Arc::new(vec![DataType::Float64]),
     )
 }
