@@ -1,4 +1,17 @@
 {
+  "extendedEnvs": {
+    "export-bucket-s3": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "snowflake-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-west-1"
+        }
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",
@@ -15,11 +28,6 @@
       "CUBEJS_DB_SNOWFLAKE_REGION": "us-west-2",
       "CUBEJS_DB_SNOWFLAKE_WAREHOUSE": "COMPUTE_WH",
       "CUBEJS_DB_SNOWFLAKE_ROLE": "PUBLIC",
-      "CUBEJS_DB_EXPORT_BUCKET": "athena-drivers-tests-preaggs",
-      "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_ATHENA_CUBEJS_AWS_SECRET}",
-      "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1",
       "CUBEJS_PG_SQL_PORT": "5656",
       "CUBEJS_SQL_USER": "admin",
       "CUBEJS_SQL_PASSWORD": "admin_password",
