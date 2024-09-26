@@ -181,6 +181,7 @@ jobs:
         clickhouse-export-bucket-s3
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
+        databricks-jdbc-export-bucket-azure
         snowflake
         snowflake-export-bucket-s3
         snowflake-export-bucket-azure
@@ -200,6 +201,7 @@ jobs:
           - clickhouse-export-bucket-s3
           - databricks-jdbc
           - databricks-jdbc-export-bucket-s3
+          - databricks-jdbc-export-bucket-azure
           - mssql
           - mysql
           - postgres
