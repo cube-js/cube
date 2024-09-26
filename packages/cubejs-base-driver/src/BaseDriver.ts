@@ -665,6 +665,10 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     const storage = new S3(clientOptions);
+    // It looks that different driver configurations use different formats
+    // for the bucket - some expect only names, some - full url-like names.
+    // So we unify this.
+    bucketName = bucketName.replace(/^[a-zA-Z]+:\/\//, '');
 
     const list = await storage.listObjectsV2({
       Bucket: bucketName,
