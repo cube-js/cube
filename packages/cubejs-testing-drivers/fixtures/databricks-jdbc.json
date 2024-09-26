@@ -15,7 +15,7 @@
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
-          "CUBEJS_DB_EXPORT_BUCKET": "databricks-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET": "coreteamdevtest.blob.core.windows.net/databricks-drivers-tests-preaggs",
           "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
         }
       }
