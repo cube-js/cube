@@ -189,6 +189,7 @@ jobs:
           - athena
           - bigquery
           - clickhouse
+          - clickhouse-export-bucket-s3
           - databricks-jdbc
           - databricks-jdbc-export-bucket
           - mssql
