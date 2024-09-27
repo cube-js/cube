@@ -1511,6 +1511,10 @@ export class BaseQuery {
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
         throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
       }
+      if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === "COUNT(*)") {
+        const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
+        throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
+      }
       return [m.measure, collectedMeasures];
     }));
   }
