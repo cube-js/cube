@@ -20,7 +20,7 @@
     "athena-export-bucket-s3-full": "yarn test-driver -i dist/test/athena-export-bucket-s3-full.test.js",
     "bigquery-driver": "yarn test-driver -i dist/test/bigquery-driver.test.js",
     "bigquery-core": "yarn test-driver -i dist/test/bigquery-core.test.js",
-    "bigquery-full": "yarn test-driver -i dist/test/bigquery-full.test.js",
+    "bigquery-export-bucket-gcs-full": "yarn test-driver -i dist/test/bigquery-export-bucket-gcs-full.test.js",
     "clickhouse-driver": "yarn test-driver -i dist/test/clickhouse-driver.test.js",
     "clickhouse-core": "yarn test-driver -i dist/test/clickhouse-core.test.js",
     "clickhouse-full": "yarn test-driver -i dist/test/clickhouse-full.test.js",

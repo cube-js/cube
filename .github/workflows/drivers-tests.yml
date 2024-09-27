@@ -177,7 +177,7 @@ jobs:
     env:
       CLOUD_DATABASES: >
         athena-export-bucket-s3
-        bigquery
+        bigquery-export-bucket-gcs
         clickhouse-export-bucket-s3
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
@@ -198,7 +198,7 @@ jobs:
           - 20.x
         database:
           - athena-export-bucket-s3
-          - bigquery
+          - bigquery-export-bucket-gcs
           - clickhouse
           - clickhouse-export-bucket-s3
           - databricks-jdbc
