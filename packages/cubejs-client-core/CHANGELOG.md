@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+
+### Features
+
+* **client-core:** timeseries for custom intervals ([#8742](https://github.com/cube-js/cube/issues/8742)) ([ae989e1](https://github.com/cube-js/cube/commit/ae989e131d84e4926b8d9fd7588ec42d23e9bdda))
+
+
+
+
+
 ## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
 
 
