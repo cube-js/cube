@@ -331,9 +331,6 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     );
   }
 
-  /**
-   * @todo Move to BaseDriver in the future?
-   */
   protected getExportBucket(
     dataSource: string,
   ): SnowflakeDriverExportBucket | undefined {
