@@ -9142,32 +9142,12 @@
   dependencies:
     "@types/node" "*"
 
-"@types/node@*", "@types/node@^18":
+"@types/node@*", "@types/node@12.12.50", "@types/node@^12", "@types/node@^14", "@types/node@^16", "@types/node@^18":
   version "18.19.46"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.19.46.tgz#51801396c01153e0626e36f43386e83bc768b072"
   integrity sha512-vnRgMS7W6cKa1/0G3/DTtQYpVrZ8c0Xm6UkLaVFrb9jtcVC3okokW09Ki1Qdrj9ISokszD69nY4WDLRlvHlhAA==
   dependencies:
     undici-types "~5.26.4"
-
-"@types/node@12.12.50":
-  version "12.12.50"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.50.tgz#e9b2e85fafc15f2a8aa8fdd41091b983da5fd6ee"
-  integrity sha512-5ImO01Fb8YsEOYpV+aeyGYztcYcjGsBvN4D7G5r1ef2cuQOpymjWNQi5V0rKHE6PC2ru3HkoUr/Br2/8GUA84w==
-
-"@types/node@^12":
-  version "12.20.55"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-12.20.55.tgz#c329cbd434c42164f846b909bd6f85b5537f6240"
-  integrity sha512-J8xLz7q2OFulZ2cyGTLE1TbbZcjpno7FaN6zdJNrgAdrJ+DZzh/uFR6YrTb4C+nXakvud8Q4+rbhoIWlYQbUFQ==
-
-"@types/node@^14":
-  version "14.18.63"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-14.18.63.tgz#1788fa8da838dbb5f9ea994b834278205db6ca2b"
-  integrity sha512-fAtCfv4jJg+ExtXhvCkCqUKZ+4ok/JQk01qDKhL5BDDoS3AxKXhV5/MAVUZyQnSEd2GT92fkgZl0pz0Q0AzcIQ==
-
-"@types/node@^16":
-  version "16.18.111"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-16.18.111.tgz#db44583d67b747f1a3150e7e6f12ea0324b27a2c"
-  integrity sha512-U1l6itlxU+vrJ9KyowQLKV9X+UuQBRhBF9v/XkGhAGgNHHRWzyY7FfTYRXt3vYOXPrd8UGlbYFK5HdneKCwXPQ==
 
 "@types/normalize-package-data@^2.4.0":
   version "2.4.1"
@@ -9211,7 +9191,7 @@
   resolved "https://registry.yarnpkg.com/@types/qs/-/qs-6.9.7.tgz#63bb7d067db107cc1e457c303bc25d511febf6cb"
   integrity sha512-FGa1F62FT09qcrueBA6qYTrJPVDzah9a+493+o2PCXsesWHIn27G98TsSMs3WPNbZIEj4+VJf6saSFpvD+3Zsw==
 
-"@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
+"@types/ramda@0.27.40", "@types/ramda@^0.27.32", "@types/ramda@^0.27.34", "@types/ramda@^0.27.40":
   version "0.27.40"
   resolved "https://registry.yarnpkg.com/@types/ramda/-/ramda-0.27.40.tgz#99f307356fe553095ee4d3c2af2b0eb3af7a8413"
   integrity sha512-V99ZfTH2tqVYdLDAlgh2uT+N074HPgqnAsMjALKSBqogYd0HbuuGMqNukJ6fk9Ml/Htaus76fsc4Yh3p7q1VdQ==
@@ -21130,7 +21110,7 @@ minimist-options@4.1.0, minimist-options@^4.0.2:
     is-plain-obj "^1.1.0"
     kind-of "^6.0.3"
 
-minimist@^1.2.0, minimist@^1.2.3, minimist@^1.2.5, minimist@^1.2.6:
+minimist@^1.2.0, minimist@^1.2.3, minimist@^1.2.5:
   version "1.2.8"
   resolved "https://registry.yarnpkg.com/minimist/-/minimist-1.2.8.tgz#c1a464e7693302e082a075cee0c057741ac4772c"
   integrity sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==
