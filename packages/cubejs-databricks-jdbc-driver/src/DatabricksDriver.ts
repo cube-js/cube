@@ -672,7 +672,7 @@ export class DatabricksDriver extends JDBCDriver {
     // this.config.exportBucket includes schema
     // so it looks like:
     // s3://real-bucket-name
-    // wasbs://account.blob.core.windows.net/real-bucket-name
+    // wasbs://real-container-name@account.blob.core.windows.net
     // The extractors in BaseDriver expect just clean bucket name
     const url = new URL(this.config.exportBucket || '');
 
@@ -680,7 +680,9 @@ export class DatabricksDriver extends JDBCDriver {
       case 'azure':
         return this.extractFilesFromAzure(
           { azureKey: this.config.azureKey || '' },
-          url.host,
+          // Databricks uses different bucket address form, so we need to transform it
+          // to the one understandable by extractFilesFromAzure implementation
+          `${url.host}/${url.username}`,
           tableName,
         );
       case 's3':
