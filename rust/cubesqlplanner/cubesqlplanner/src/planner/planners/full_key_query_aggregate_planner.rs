@@ -1,11 +1,12 @@
-use super::base_join_condition::DimensionJoinCondition;
-use super::query_tools::QueryTools;
-use super::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
-use super::sql_evaluator::sql_nodes::with_render_references_default_node_processor;
-use super::BaseMember;
-use super::QueryRequest;
-use super::{BaseDimension, BaseMeasure, PrimaryJoinCondition, VisitorContext};
+use super::{CommonUtils, JoinPlanner, OrderPlanner};
 use crate::plan::{From, FromSource, Join, JoinItem, JoinSource, Select};
+use crate::planner::base_join_condition::DimensionJoinCondition;
+use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
+use crate::planner::sql_evaluator::sql_nodes::with_render_references_default_node_processor;
+use crate::planner::BaseMember;
+use crate::planner::QueryProperties;
+use crate::planner::{BaseDimension, BaseMeasure, PrimaryJoinCondition, VisitorContext};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashMap;
@@ -13,14 +14,20 @@ use std::rc::Rc;
 
 pub struct FullKeyAggregateQueryPlanner {
     query_tools: Rc<QueryTools>,
-    query_request: Rc<QueryRequest>,
+    query_properties: Rc<QueryProperties>,
+    join_planner: JoinPlanner,
+    order_planner: OrderPlanner,
+    common_utils: CommonUtils,
 }
 
 impl FullKeyAggregateQueryPlanner {
-    pub fn new(query_tools: Rc<QueryTools>, query_request: Rc<QueryRequest>) -> Self {
+    pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
+            join_planner: JoinPlanner::new(query_tools.clone()),
+            order_planner: OrderPlanner::new(query_properties.clone()),
+            common_utils: CommonUtils::new(query_tools.clone()),
             query_tools,
-            query_request,
+            query_properties,
         }
     }
 
@@ -53,7 +60,7 @@ impl FullKeyAggregateQueryPlanner {
             .collect_vec();
         let aggregate = self.outer_measures_join_full_key_aggregate(
             &inner_measures,
-            &self.query_request.measures(),
+            &self.query_properties.measures(),
             joins,
         )?;
         Ok(Some(aggregate))
@@ -67,7 +74,7 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Select, CubeError> {
         let root = JoinSource::new_from_select(joins[0].clone(), format!("q_0"));
         let mut join_items = vec![];
-        let columns_to_select = self.query_request.dimensions_for_select();
+        let columns_to_select = self.query_properties.dimensions_for_select();
         for (i, join) in joins.iter().skip(1).enumerate() {
             let left_alias = format!("q_{}", i);
             let right_alias = format!("q_{}", i + 1);
@@ -99,7 +106,7 @@ impl FullKeyAggregateQueryPlanner {
 
         let select = Select {
             projection: self
-                .query_request
+                .query_properties
                 .dimensions_references_and_measures("q_0", outer_measures)?,
             from: From::new(FromSource::Join(Rc::new(Join {
                 root,
@@ -108,7 +115,7 @@ impl FullKeyAggregateQueryPlanner {
             filter: None,
             group_by: vec![],
             having: None,
-            order_by: self.query_request.default_order(),
+            order_by: self.order_planner.default_order(),
             context,
             is_distinct: false,
         };
@@ -117,7 +124,7 @@ impl FullKeyAggregateQueryPlanner {
 
     fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
-        for m in self.query_request.measures().iter() {
+        for m in self.query_properties.measures().iter() {
             if let Some(multiple) =
                 collect_multiplied_measures(self.query_tools.clone(), m.member_evaluator())?
             {
@@ -137,14 +144,14 @@ impl FullKeyAggregateQueryPlanner {
         &self,
         measures: &Vec<Rc<BaseMeasure>>,
     ) -> Result<Rc<Select>, CubeError> {
-        let source = self.query_request.make_join_node()?;
+        let source = self.join_planner.make_join_node()?;
         let select = Select {
             projection: self
-                .query_request
+                .query_properties
                 .select_all_dimensions_and_measures(measures)?,
             from: source,
-            filter: self.query_request.all_filters(),
-            group_by: self.query_request.group_by(),
+            filter: self.query_properties.all_filters(),
+            group_by: self.query_properties.group_by(),
             having: None,
             order_by: vec![],
             context: VisitorContext::new_with_cube_alias_prefix("main".to_string()),
@@ -158,11 +165,11 @@ impl FullKeyAggregateQueryPlanner {
         key_cube_name: &String,
         measures: &Vec<Rc<BaseMeasure>>,
     ) -> Result<Rc<Select>, CubeError> {
-        let primary_keys_dimensions = self.query_request.primary_keys_dimensions(key_cube_name)?;
+        let primary_keys_dimensions = self.common_utils.primary_keys_dimensions(key_cube_name)?;
         let keys_query = self.key_query(&primary_keys_dimensions, key_cube_name)?;
 
         let pk_cube =
-            JoinSource::new_from_cube(self.query_request.cube_from_path(key_cube_name.clone())?);
+            JoinSource::new_from_cube(self.common_utils.cube_from_path(key_cube_name.clone())?);
         let mut joins = vec![];
         joins.push(JoinItem {
             from: pk_cube,
@@ -177,13 +184,13 @@ impl FullKeyAggregateQueryPlanner {
             joins,
         });
         let select = Select {
-            projection: self.query_request.dimensions_references_and_measures(
+            projection: self.query_properties.dimensions_references_and_measures(
                 &self.query_tools.escape_column_name("keys"),
                 &measures,
             )?,
             from: From::new(FromSource::Join(join)),
             filter: None,
-            group_by: self.query_request.group_by(),
+            group_by: self.query_properties.group_by(),
             having: None,
             order_by: vec![],
             context: VisitorContext::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
@@ -197,13 +204,15 @@ impl FullKeyAggregateQueryPlanner {
         dimensions: &Vec<Rc<BaseDimension>>,
         key_cube_name: &String,
     ) -> Result<Rc<Select>, CubeError> {
-        let source = self.query_request.make_join_node()?;
-        let dimensions = self.query_request.dimensions_for_select_append(dimensions);
+        let source = self.join_planner.make_join_node()?;
+        let dimensions = self
+            .query_properties
+            .dimensions_for_select_append(dimensions);
 
         let select = Select {
-            projection: self.query_request.columns_to_expr(&dimensions),
+            projection: self.query_properties.columns_to_expr(&dimensions),
             from: source,
-            filter: self.query_request.all_filters(),
+            filter: self.query_properties.all_filters(),
             group_by: vec![],
             having: None,
             order_by: vec![],

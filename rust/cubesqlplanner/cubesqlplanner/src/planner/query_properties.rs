@@ -1,20 +1,13 @@
 use super::filter::compiler::FilterCompiler;
 use super::query_tools::QueryTools;
-use super::sql_evaluator::EvaluationNode;
-use super::{
-    BaseCube, BaseDimension, BaseMeasure, BaseMember, BaseTimeDimension, SqlJoinCondition,
-};
+use super::{BaseDimension, BaseMeasure, BaseMember, BaseTimeDimension};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::memeber_sql::MemberSql;
-use crate::plan::{
-    Expr, Filter, FilterItem, From, FromSource, Join, JoinItem, JoinSource, OrderBy,
-};
+use crate::plan::{Expr, Filter, FilterItem};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
-pub struct QueryRequest {
-    query_tools: Rc<QueryTools>,
+pub struct QueryProperties {
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
     dimensions_filters: Vec<FilterItem>,
@@ -23,7 +16,7 @@ pub struct QueryRequest {
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
 }
 
-impl QueryRequest {
+impl QueryProperties {
     pub fn try_new(
         query_tools: Rc<QueryTools>,
         options: Rc<dyn BaseQueryOptions>,
@@ -97,7 +90,6 @@ impl QueryRequest {
             .collect_vec();
 
         Ok(Rc::new(Self {
-            query_tools,
             measures,
             dimensions,
             time_dimensions,
@@ -109,6 +101,14 @@ impl QueryRequest {
 
     pub fn measures(&self) -> &Vec<Rc<BaseMeasure>> {
         &self.measures
+    }
+
+    pub fn dimensions(&self) -> &Vec<Rc<BaseDimension>> {
+        &self.dimensions
+    }
+
+    pub fn time_dimensions(&self) -> &Vec<Rc<BaseTimeDimension>> {
+        &self.time_dimensions
     }
 
     pub fn measures_filters(&self) -> &Vec<FilterItem> {
@@ -189,24 +189,6 @@ impl QueryRequest {
         columns.iter().map(|d| Expr::Field(d.clone())).collect_vec()
     }
 
-    pub fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-
-        let evaluator = evaluator_compiler.add_cube_table_evaluator(cube_path.to_string())?;
-        BaseCube::try_new(cube_path.to_string(), self.query_tools.clone(), evaluator)
-    }
-
-    pub fn compile_join_condition(
-        &self,
-        cube_name: &String,
-        sql: Rc<dyn MemberSql>,
-    ) -> Result<Rc<EvaluationNode>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        evaluator_compiler.add_join_condition_evaluator(cube_name.clone(), sql)
-    }
-
     pub fn group_by(&self) -> Vec<Rc<dyn BaseMember>> {
         self.dimensions
             .iter()
@@ -217,75 +199,5 @@ impl QueryRequest {
                     .map(|f| -> Rc<dyn BaseMember> { f.clone() }),
             )
             .collect()
-    }
-
-    pub fn primary_keys_dimensions(
-        &self,
-        cube_name: &String,
-    ) -> Result<Vec<Rc<BaseDimension>>, CubeError> {
-        let evaluator_compiler_cell = self.query_tools.evaluator_compiler().clone();
-        let mut evaluator_compiler = evaluator_compiler_cell.borrow_mut();
-        let primary_keys = self
-            .query_tools
-            .cube_evaluator()
-            .static_data()
-            .primary_keys
-            .get(cube_name)
-            .unwrap();
-
-        let dims = primary_keys
-            .iter()
-            .map(|d| {
-                let full_name = format!("{}.{}", cube_name, d);
-                let evaluator = evaluator_compiler.add_dimension_evaluator(full_name.clone())?;
-                BaseDimension::try_new(full_name, self.query_tools.clone(), evaluator)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(dims)
-    }
-
-    pub fn default_order(&self) -> Vec<OrderBy> {
-        if let Some(granularity_dim) = self.time_dimensions.iter().find(|d| d.has_granularity()) {
-            vec![OrderBy::new(Expr::Field(granularity_dim.clone()), true)]
-        } else if !self.measures.is_empty() && !self.dimensions.is_empty() {
-            vec![OrderBy::new(Expr::Field(self.measures[0].clone()), false)]
-        } else if !self.dimensions.is_empty() {
-            vec![OrderBy::new(Expr::Field(self.dimensions[0].clone()), true)]
-        } else {
-            vec![]
-        }
-    }
-
-    pub fn make_join_node(&self, /*TODO dimensions for subqueries*/) -> Result<From, CubeError> {
-        let join = self.query_tools.cached_data().join()?.clone();
-        let root = self.cube_from_path(join.static_data().root.clone())?;
-        let joins = join.joins()?;
-        if joins.items().is_empty() {
-            Ok(From::new_from_cube(root))
-        } else {
-            let join_items = joins
-                .items()
-                .iter()
-                .map(|join| {
-                    let definition = join.join()?;
-                    let evaluator = self.compile_join_condition(
-                        &join.static_data().original_from,
-                        definition.sql()?,
-                    )?;
-                    Ok(JoinItem {
-                        from: JoinSource::new_from_cube(
-                            self.cube_from_path(join.static_data().original_to.clone())?,
-                        ),
-                        on: SqlJoinCondition::try_new(self.query_tools.clone(), evaluator)?,
-                        is_inner: false,
-                    })
-                })
-                .collect::<Result<Vec<_>, CubeError>>()?;
-            let result = From::new(FromSource::Join(Rc::new(Join {
-                root: JoinSource::new_from_cube(root),
-                joins: join_items,
-            })));
-            Ok(result)
-        }
     }
 }

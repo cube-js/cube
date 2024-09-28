@@ -1,7 +1,7 @@
-use super::full_key_query_aggregate::FullKeyAggregateQueryPlanner;
+use super::planners::FullKeyAggregateQueryPlanner;
+use super::planners::SimpleQueryPlanner;
 use super::query_tools::QueryTools;
-use super::simple_query::SimpleQueryPlanner;
-use super::QueryRequest;
+use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::Select;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
@@ -15,7 +15,7 @@ use std::rc::Rc;
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
     query_tools: Rc<QueryTools>,
-    request: Rc<QueryRequest>,
+    request: Rc<QueryProperties>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -30,7 +30,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             options.static_data().timezone.clone(),
         )?;
 
-        let request = QueryRequest::try_new(query_tools.clone(), options)?;
+        let request = QueryProperties::try_new(query_tools.clone(), options)?;
 
         Ok(Self {
             context,
@@ -58,7 +58,8 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         if let Some(select) = full_key_aggregate_query_builder.plan()? {
             Ok(select)
         } else {
-            let simple_query_builder = SimpleQueryPlanner::new(self.request.clone());
+            let simple_query_builder =
+                SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
             simple_query_builder.plan()
         }
     }
