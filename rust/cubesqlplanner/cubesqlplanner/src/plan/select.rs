@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use super::{Expr, Filter, From, OrderBy};
-use crate::planner::{IndexedMember, VisitorContext};
+use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -9,7 +9,7 @@ pub struct Select {
     pub projection: Vec<Expr>,
     pub from: From,
     pub filter: Option<Filter>,
-    pub group_by: Vec<Rc<dyn IndexedMember>>,
+    pub group_by: Vec<Rc<dyn BaseMember>>,
     pub having: Option<Filter>,
     pub order_by: Vec<OrderBy>,
     pub context: Rc<VisitorContext>,

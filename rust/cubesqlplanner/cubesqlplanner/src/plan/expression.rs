@@ -1,9 +1,9 @@
-use crate::planner::{IndexedMember, VisitorContext};
+use crate::planner::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub enum Expr {
-    Field(Rc<dyn IndexedMember>),
+    Field(Rc<dyn BaseMember>),
     Reference(String, String),
 }
 

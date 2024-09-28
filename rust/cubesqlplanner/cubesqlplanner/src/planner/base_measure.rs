@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseMember, IndexedMember, VisitorContext};
+use super::{evaluate_with_context, BaseMember, VisitorContext};
 use crate::cube_bridge::measure_definition::MeasureDefinition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -12,7 +12,6 @@ pub struct BaseMeasure {
     definition: Rc<dyn MeasureDefinition>,
     member_evaluator: Rc<EvaluationNode>,
     cube_name: String,
-    index: usize,
 }
 
 impl BaseMember for BaseMeasure {
@@ -30,18 +29,11 @@ impl BaseMember for BaseMeasure {
     }
 }
 
-impl IndexedMember for BaseMeasure {
-    fn index(&self) -> usize {
-        self.index
-    }
-}
-
 impl BaseMeasure {
     pub fn try_new(
         measure: String,
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<EvaluationNode>,
-        index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
             .cube_evaluator()
@@ -58,7 +50,6 @@ impl BaseMeasure {
             definition,
             member_evaluator,
             cube_name,
-            index,
         }))
     }
 
@@ -68,10 +59,6 @@ impl BaseMeasure {
 
     pub fn measure(&self) -> &String {
         &self.measure
-    }
-
-    pub fn index(&self) -> usize {
-        self.index
     }
 
     pub fn cube_name(&self) -> &String {

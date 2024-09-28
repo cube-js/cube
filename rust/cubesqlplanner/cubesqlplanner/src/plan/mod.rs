@@ -17,15 +17,3 @@ pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use select::Select;
 pub use union::Union;
-
-pub enum GenerationPlan {
-    Select(Select),
-}
-
-impl GenerationPlan {
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        match self {
-            GenerationPlan::Select(select) => select.to_sql(),
-        }
-    }
-}

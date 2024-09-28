@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseDimension, BaseMember, IndexedMember, VisitorContext};
+use super::{evaluate_with_context, BaseDimension, BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub trait BaseJoinCondition {
@@ -67,14 +67,14 @@ impl BaseJoinCondition for PrimaryJoinCondition {
 pub struct DimensionJoinCondition {
     left_alias: String,
     right_alias: String,
-    dimensions: Vec<Rc<dyn IndexedMember>>,
+    dimensions: Vec<Rc<dyn BaseMember>>,
 }
 
 impl DimensionJoinCondition {
     pub fn try_new(
         left_alias: String,
         right_alias: String,
-        dimensions: Vec<Rc<dyn IndexedMember>>,
+        dimensions: Vec<Rc<dyn BaseMember>>,
     ) -> Result<Rc<Self>, CubeError> {
         Ok(Rc::new(Self {
             left_alias,

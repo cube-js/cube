@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseMember, IndexedMember, VisitorContext};
+use super::{evaluate_with_context, BaseMember, VisitorContext};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -11,7 +11,6 @@ pub struct BaseDimension {
     #[allow(dead_code)]
     definition: Rc<dyn DimensionDefinition>,
     member_evaluator: Rc<EvaluationNode>,
-    index: usize,
 }
 
 impl BaseMember for BaseDimension {
@@ -28,18 +27,11 @@ impl BaseMember for BaseDimension {
     }
 }
 
-impl IndexedMember for BaseDimension {
-    fn index(&self) -> usize {
-        self.index
-    }
-}
-
 impl BaseDimension {
     pub fn try_new(
         dimension: String,
         query_tools: Rc<QueryTools>,
         member_evaluator: Rc<EvaluationNode>,
-        index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         let definition = query_tools
             .cube_evaluator()
@@ -50,7 +42,6 @@ impl BaseDimension {
             query_tools,
             definition,
             member_evaluator,
-            index,
         }))
     }
 

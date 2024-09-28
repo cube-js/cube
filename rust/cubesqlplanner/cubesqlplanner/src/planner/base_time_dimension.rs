@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
 use super::BaseDimension;
-use super::{BaseMember, IndexedMember, VisitorContext};
+use super::{BaseMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -37,12 +37,6 @@ impl BaseMember for BaseTimeDimension {
     }
 }
 
-impl IndexedMember for BaseTimeDimension {
-    fn index(&self) -> usize {
-        self.dimension.index()
-    }
-}
-
 impl BaseTimeDimension {
     pub fn try_new(
         dimension: String,
@@ -50,15 +44,9 @@ impl BaseTimeDimension {
         member_evaluator: Rc<EvaluationNode>,
         granularity: Option<String>,
         date_range: Option<Vec<String>>,
-        index: usize,
     ) -> Result<Rc<Self>, CubeError> {
         Ok(Rc::new(Self {
-            dimension: BaseDimension::try_new(
-                dimension,
-                query_tools.clone(),
-                member_evaluator,
-                index,
-            )?,
+            dimension: BaseDimension::try_new(dimension, query_tools.clone(), member_evaluator)?,
             query_tools,
             granularity,
             date_range,
@@ -83,10 +71,6 @@ impl BaseTimeDimension {
 
     pub fn member_evaluator(&self) -> Rc<EvaluationNode> {
         self.dimension.member_evaluator()
-    }
-
-    pub fn index(&self) -> usize {
-        self.dimension.index()
     }
 
     pub fn unescaped_alias_name(&self) -> Result<String, CubeError> {
