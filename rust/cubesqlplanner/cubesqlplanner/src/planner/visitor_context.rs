@@ -1,21 +1,18 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::node_processors::default_node_processor;
+use super::sql_evaluator::sql_nodes::{default_node_processor, SqlNode};
 use super::sql_evaluator::EvaluationNode;
-use crate::planner::sql_evaluator::default_visitor::{DefaultEvaluatorVisitor, NodeProcessorItem};
 use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
+use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct Context {
+pub struct VisitorContext {
     cube_alias_prefix: Option<String>,
-    node_processor: Rc<dyn NodeProcessorItem>,
+    node_processor: Rc<dyn SqlNode>,
 }
 
-impl Context {
-    pub fn new(
-        cube_alias_prefix: Option<String>,
-        node_processor: Rc<dyn NodeProcessorItem>,
-    ) -> Rc<Self> {
+impl VisitorContext {
+    pub fn new(cube_alias_prefix: Option<String>, node_processor: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self {
             cube_alias_prefix,
             node_processor,
@@ -30,8 +27,8 @@ impl Context {
         Self::new(Default::default(), default_node_processor())
     }
 
-    pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> DefaultEvaluatorVisitor {
-        DefaultEvaluatorVisitor::new(
+    pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {
+        SqlEvaluatorVisitor::new(
             query_tools,
             self.cube_alias_prefix.clone(),
             self.node_processor.clone(),
@@ -46,7 +43,7 @@ impl Context {
 pub fn evaluate_with_context(
     node: &Rc<EvaluationNode>,
     query_tools: Rc<QueryTools>,
-    context: Rc<Context>,
+    context: Rc<VisitorContext>,
 ) -> Result<String, CubeError> {
     let mut visitor = context.make_visitor(query_tools);
     visitor.apply(node)

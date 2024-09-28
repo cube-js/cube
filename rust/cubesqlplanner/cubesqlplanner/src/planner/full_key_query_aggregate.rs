@@ -1,13 +1,13 @@
 use super::base_join_condition::DimensionJoinCondition;
 use super::query_tools::QueryTools;
 use super::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
-use super::sql_evaluator::node_processors::with_render_references_default_node_processor;
+use super::sql_evaluator::sql_nodes::with_render_references_default_node_processor;
 use super::sql_evaluator::EvaluationNode;
 use super::BaseMember;
 use super::IndexedMember;
 use super::{
-    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, Context, PrimaryJoinCondition,
-    SqlJoinCondition,
+    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, PrimaryJoinCondition,
+    SqlJoinCondition, VisitorContext,
 };
 use crate::cube_bridge::memeber_sql::MemberSql;
 use crate::plan::{
@@ -115,7 +115,7 @@ impl FullKeyAggregateQueryBuilder {
             .map(|m| Ok((m.measure().clone(), m.alias_name()?)))
             .collect::<Result<HashMap<_, _>, CubeError>>()?;
 
-        let context = Context::new(
+        let context = VisitorContext::new(
             None,
             with_render_references_default_node_processor(references),
         );
@@ -166,7 +166,7 @@ impl FullKeyAggregateQueryBuilder {
             group_by: self.group_by(),
             having: None,
             order_by: vec![],
-            context: Context::new_with_cube_alias_prefix("main".to_string()),
+            context: VisitorContext::new_with_cube_alias_prefix("main".to_string()),
             is_distinct: false,
         };
         Ok(Rc::new(select))
@@ -204,7 +204,7 @@ impl FullKeyAggregateQueryBuilder {
             group_by: self.group_by(),
             having: None,
             order_by: vec![],
-            context: Context::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
+            context: VisitorContext::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
             is_distinct: false,
         };
         Ok(Rc::new(select))
@@ -225,7 +225,7 @@ impl FullKeyAggregateQueryBuilder {
             group_by: vec![],
             having: None,
             order_by: vec![],
-            context: Context::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
+            context: VisitorContext::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
             is_distinct: true,
         };
         Ok(Rc::new(select))

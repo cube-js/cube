@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
+use super::{evaluate_with_context, BaseMember, IndexedMember, VisitorContext};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -15,7 +15,7 @@ pub struct BaseDimension {
 }
 
 impl BaseMember for BaseDimension {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let alias_name = self.alias_name()?;
 
         Ok(format!("{} {}", self.dimension_sql(context)?, alias_name))
@@ -67,7 +67,7 @@ impl BaseDimension {
         Ok(self.query_tools.alias_name(&self.dimension))
     }
 
-    pub fn dimension_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn dimension_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 }

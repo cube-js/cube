@@ -1,4 +1,4 @@
-use crate::planner::{Context, IndexedMember};
+use crate::planner::{IndexedMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -8,7 +8,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         match self {
             Expr::Field(field) => field.to_sql(context),
             Expr::Reference(cube_alias, field_alias) => {

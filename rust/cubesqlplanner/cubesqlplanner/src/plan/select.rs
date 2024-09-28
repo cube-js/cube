@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use super::{Expr, Filter, From, OrderBy};
-use crate::planner::{Context, IndexedMember};
+use crate::planner::{IndexedMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -12,7 +12,7 @@ pub struct Select {
     pub group_by: Vec<Rc<dyn IndexedMember>>,
     pub having: Option<Filter>,
     pub order_by: Vec<OrderBy>,
-    pub context: Rc<Context>,
+    pub context: Rc<VisitorContext>,
     pub is_distinct: bool,
 }
 

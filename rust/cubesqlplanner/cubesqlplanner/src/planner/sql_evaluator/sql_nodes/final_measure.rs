@@ -1,30 +1,30 @@
+use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::default_visitor::DefaultEvaluatorVisitor;
-use crate::planner::sql_evaluator::default_visitor::NodeProcessorItem;
+use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct FinalMeasureNodeProcessor {
-    input: Rc<dyn NodeProcessorItem>,
+pub struct FinalMeasureSqlNode {
+    input: Rc<dyn SqlNode>,
 }
 
-impl FinalMeasureNodeProcessor {
-    pub fn new(input: Rc<dyn NodeProcessorItem>) -> Rc<Self> {
+impl FinalMeasureSqlNode {
+    pub fn new(input: Rc<dyn SqlNode>) -> Rc<Self> {
         Rc::new(Self { input })
     }
 }
 
-impl NodeProcessorItem for FinalMeasureNodeProcessor {
-    fn process(
+impl SqlNode for FinalMeasureSqlNode {
+    fn to_sql(
         &self,
-        visitor: &mut DefaultEvaluatorVisitor,
+        visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {
         let res = match node.symbol() {
             MemberSymbolType::Measure(ev) => {
-                let input = self.input.process(visitor, node, query_tools.clone())?;
+                let input = self.input.to_sql(visitor, node, query_tools.clone())?;
 
                 if ev.is_calculated() {
                     input

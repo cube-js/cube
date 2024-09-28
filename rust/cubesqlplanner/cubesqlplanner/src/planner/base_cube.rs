@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, Context};
+use super::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub struct BaseCube {
@@ -21,7 +21,7 @@ impl BaseCube {
         }))
     }
 
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let cube_sql = self.table_sql(context.clone())?;
         let cube_alias = self.query_tools.escape_column_name(
             &self
@@ -33,7 +33,7 @@ impl BaseCube {
         Ok(format!("{} {} {}", cube_sql, as_syntax_join, cube_alias))
     }
 
-    pub fn table_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn table_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 }

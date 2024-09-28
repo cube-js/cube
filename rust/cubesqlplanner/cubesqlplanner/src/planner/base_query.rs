@@ -3,8 +3,8 @@ use super::full_key_query_aggregate::FullKeyAggregateQueryBuilder;
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
 use super::{
-    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, Context, IndexedMember,
-    SqlJoinCondition,
+    BaseCube, BaseDimension, BaseMeasure, BaseTimeDimension, IndexedMember, SqlJoinCondition,
+    VisitorContext,
 };
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::cube_bridge::memeber_sql::MemberSql;
@@ -183,7 +183,7 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             group_by: self.group_by(),
             having,
             order_by: self.default_order(),
-            context: Context::default(),
+            context: VisitorContext::default(),
             is_distinct: false,
         };
         Ok(GenerationPlan::Select(select))

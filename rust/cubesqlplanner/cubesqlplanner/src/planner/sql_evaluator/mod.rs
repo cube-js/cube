@@ -1,6 +1,5 @@
 pub mod compiler;
 pub mod cube_symbol;
-pub mod default_visitor;
 mod dependecy;
 pub mod dimension_symbol;
 pub mod join_hints_collector;
@@ -8,7 +7,8 @@ pub mod join_symbol;
 pub mod measure_symbol;
 pub mod member_symbol;
 pub mod multiplied_measures_collector;
-pub mod node_processors;
+pub mod sql_nodes;
+pub mod sql_visitor;
 pub mod visitor;
 
 pub use compiler::Compiler;
@@ -21,4 +21,5 @@ pub use measure_symbol::{
     MeasureFilterSymbol, MeasureFilterSymbolFactory, MeasureSymbol, MeasureSymbolFactory,
 };
 pub use member_symbol::{EvaluationNode, MemberSymbol, MemberSymbolFactory, MemberSymbolType};
+pub use sql_visitor::SqlEvaluatorVisitor;
 pub use visitor::{EvaluatorVisitor, TraversalVisitor};

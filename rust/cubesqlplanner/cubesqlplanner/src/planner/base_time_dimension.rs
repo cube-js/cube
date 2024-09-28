@@ -1,7 +1,7 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
 use super::BaseDimension;
-use super::{BaseMember, Context, IndexedMember};
+use super::{BaseMember, IndexedMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -13,7 +13,7 @@ pub struct BaseTimeDimension {
 }
 
 impl BaseMember for BaseTimeDimension {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let alias_name = self.alias_name()?;
 
         let field_sql = if let Some(granularity) = &self.granularity {

@@ -2,7 +2,7 @@ use super::filter_operator::FilterOperator;
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::sql_templates::filter::FilterTemplates;
-use crate::planner::{evaluate_with_context, Context};
+use crate::planner::{evaluate_with_context, VisitorContext};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -57,7 +57,7 @@ impl BaseFilter {
         }))
     }
 
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let member_sql =
             evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
         let res = match self.filter_operator {

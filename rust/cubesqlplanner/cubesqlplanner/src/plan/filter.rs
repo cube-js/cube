@@ -1,5 +1,5 @@
 use crate::planner::filter::BaseFilter;
-use crate::planner::Context;
+use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
@@ -40,7 +40,7 @@ impl fmt::Display for FilterGroupOperator {
 }
 
 impl FilterItem {
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let res = match self {
             FilterItem::Group(group) => {
                 let operator = format!(" {} ", group.operator.to_string());
@@ -61,7 +61,7 @@ impl FilterItem {
 }
 
 impl Filter {
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let res = self
             .items
             .iter()

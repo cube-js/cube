@@ -1,6 +1,6 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseMember, Context, IndexedMember};
+use super::{evaluate_with_context, BaseMember, IndexedMember, VisitorContext};
 use crate::cube_bridge::measure_definition::MeasureDefinition;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -16,7 +16,7 @@ pub struct BaseMeasure {
 }
 
 impl BaseMember for BaseMeasure {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let sql = evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
         let alias_name = self.alias_name()?;
 

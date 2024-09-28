@@ -1,6 +1,6 @@
 use super::dependecy::Dependency;
-use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode};
 use super::{Compiler, MemberSymbol, MemberSymbolFactory};
+use super::{EvaluationNode, SqlEvaluatorVisitor};
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
@@ -24,7 +24,7 @@ impl CubeNameSymbol {
     }
     pub fn default_evaluate_sql(
         &self,
-        visitor: &DefaultEvaluatorVisitor,
+        visitor: &SqlEvaluatorVisitor,
         tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {
         Ok(tools.escape_column_name(

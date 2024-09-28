@@ -1,5 +1,5 @@
 use super::{QueryPlan, Select};
-use crate::planner::{BaseCube, BaseJoinCondition, Context};
+use crate::planner::{BaseCube, BaseJoinCondition, VisitorContext};
 use cubenativeutils::CubeError;
 
 use std::rc::Rc;
@@ -22,7 +22,7 @@ impl JoinSource {
         Self::Cube(cube)
     }
 
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let sql = match &self {
             JoinSource::Cube(cube) => {
                 let cubesql = cube.to_sql(context.clone())?;
@@ -48,7 +48,7 @@ pub struct Join {
 }
 
 impl JoinItem {
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let operator = if self.is_inner { "INNER" } else { "LEFT" };
         let on_sql = self.on.to_sql(context.clone())?;
         Ok(format!(
@@ -61,7 +61,7 @@ impl JoinItem {
 }
 
 impl Join {
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let joins_sql = self
             .joins
             .iter()

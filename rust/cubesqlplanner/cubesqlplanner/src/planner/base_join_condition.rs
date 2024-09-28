@@ -1,10 +1,10 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::EvaluationNode;
-use super::{evaluate_with_context, BaseDimension, BaseMember, Context, IndexedMember};
+use super::{evaluate_with_context, BaseDimension, BaseMember, IndexedMember, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 pub trait BaseJoinCondition {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError>;
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError>;
 }
 pub struct SqlJoinCondition {
     member_evaluator: Rc<EvaluationNode>,
@@ -23,7 +23,7 @@ impl SqlJoinCondition {
 }
 
 impl BaseJoinCondition for SqlJoinCondition {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)
     }
 }
@@ -46,7 +46,7 @@ impl PrimaryJoinCondition {
 }
 
 impl BaseJoinCondition for PrimaryJoinCondition {
-    fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let result = self
             .dimensions
             .iter()
@@ -85,7 +85,7 @@ impl DimensionJoinCondition {
 }
 
 impl BaseJoinCondition for DimensionJoinCondition {
-    fn to_sql(&self, _context: Rc<Context>) -> Result<String, CubeError> {
+    fn to_sql(&self, _context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let res = if self.dimensions.is_empty() {
             "1 = 1".to_string()
         } else {

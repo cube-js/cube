@@ -1,4 +1,5 @@
 use super::dependecy::ContextSymbolDep;
+use super::sql_nodes::SqlNode;
 use super::visitor::EvaluatorVisitor;
 use super::EvaluationNode;
 use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg};
@@ -6,27 +7,18 @@ use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub trait NodeProcessorItem {
-    fn process(
-        &self,
-        visitor: &mut DefaultEvaluatorVisitor,
-        node: &Rc<EvaluationNode>,
-        query_tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError>;
-}
-
 #[derive(Clone)]
-pub struct DefaultEvaluatorVisitor {
+pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
     cube_alias_prefix: Option<String>,
-    node_processor: Rc<dyn NodeProcessorItem>,
+    node_processor: Rc<dyn SqlNode>,
 }
 
-impl DefaultEvaluatorVisitor {
+impl SqlEvaluatorVisitor {
     pub fn new(
         query_tools: Rc<QueryTools>,
         cube_alias_prefix: Option<String>,
-        node_processor: Rc<dyn NodeProcessorItem>,
+        node_processor: Rc<dyn SqlNode>,
     ) -> Self {
         Self {
             query_tools,
@@ -40,11 +32,11 @@ impl DefaultEvaluatorVisitor {
     }
 }
 
-impl EvaluatorVisitor for DefaultEvaluatorVisitor {
+impl EvaluatorVisitor for SqlEvaluatorVisitor {
     fn apply(&mut self, node: &Rc<EvaluationNode>) -> Result<String, CubeError> {
         self.on_node_enter(node)?;
-        let processor = self.node_processor.clone();
-        let result = processor.process(self, node, self.query_tools.clone())?;
+        let node_processor = self.node_processor.clone();
+        let result = node_processor.to_sql(self, node, self.query_tools.clone())?;
         Ok(result)
     }
 

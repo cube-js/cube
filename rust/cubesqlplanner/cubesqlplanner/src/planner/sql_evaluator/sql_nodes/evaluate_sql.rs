@@ -1,23 +1,23 @@
+use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::default_visitor::DefaultEvaluatorVisitor;
-use crate::planner::sql_evaluator::default_visitor::NodeProcessorItem;
 use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
+use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
 use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub struct EvaluateSqlProcessor {}
+pub struct EvaluateSqlNode {}
 
-impl EvaluateSqlProcessor {
+impl EvaluateSqlNode {
     pub fn new() -> Rc<Self> {
         Rc::new(Self {})
     }
 }
 
-impl NodeProcessorItem for EvaluateSqlProcessor {
-    fn process(
+impl SqlNode for EvaluateSqlNode {
+    fn to_sql(
         &self,
-        visitor: &mut DefaultEvaluatorVisitor,
+        visitor: &mut SqlEvaluatorVisitor,
         node: &Rc<EvaluationNode>,
         _query_tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {

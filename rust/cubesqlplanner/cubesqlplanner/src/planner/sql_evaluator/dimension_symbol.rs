@@ -1,6 +1,6 @@
 use super::dependecy::Dependency;
-use super::{default_visitor::DefaultEvaluatorVisitor, EvaluationNode};
 use super::{Compiler, MemberSymbol, MemberSymbolFactory};
+use super::{EvaluationNode, SqlEvaluatorVisitor};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
@@ -36,7 +36,7 @@ impl DimensionSymbol {
     }
     pub fn default_evaluate_sql(
         &self,
-        visitor: &DefaultEvaluatorVisitor,
+        visitor: &SqlEvaluatorVisitor,
         args: Vec<MemberSqlArg>,
         tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {

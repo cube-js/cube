@@ -1,6 +1,6 @@
 use super::Join;
 use super::QueryPlan;
-use crate::planner::{BaseCube, Context};
+use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -34,7 +34,7 @@ impl From {
         Self::new(FromSource::Subquery(plan, alias))
     }
 
-    pub fn to_sql(&self, context: Rc<Context>) -> Result<String, CubeError> {
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let sql = match &self.source {
             FromSource::Empty => format!(""),
             FromSource::Cube(cube) => {
