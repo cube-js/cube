@@ -78,7 +78,7 @@ flatbuffers = "23.1.21"
 http-auth-basic = "0.1.2"
 tracing = "0.1.25"
 tracing-futures = { version = "0.2.5" }
-lru = "0.6.5"
+lru = "0.7.1"
 moka = { version = "0.10.1", features = ["future"]}
 ctor = "0.1.20"
 json = "0.12.4"
