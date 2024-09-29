@@ -401,8 +401,6 @@ describe('SQL Generation', () => {
       timezone: 'America/Los_Angeles'
     });
 
-    console.log(query.buildSqlAndParams());
-
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       console.log(JSON.stringify(res));
       expect(res).toEqual(

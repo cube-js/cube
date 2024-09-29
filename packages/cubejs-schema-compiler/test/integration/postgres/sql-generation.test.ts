@@ -561,9 +561,6 @@ describe('SQL Generation', () => {
       }]
     });
 
-    const queryAndParams = query.buildSqlAndParams();
-    console.log(queryAndParams);
-
     return dbRunner.testQuery(query.buildSqlAndParams()).then(res => {
       expect(res).toEqual(
         [

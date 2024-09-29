@@ -493,8 +493,81 @@ export class CubeSymbols {
     return joinHints;
   }
 
+  resolveSymbolsCallDeps(cubeName, sql) {
+    try {
+      return this.resolveSymbolsCallDeps2(cubeName, sql);
+    } catch (e) {
+      console.log(e);
+      return [];
+    }
+  }
+
+  resolveSymbolsCallDeps2(cubeName, sql) {
+    const deps = [];
+    this.resolveSymbolsCall(sql, (name) => {
+      deps.push({ name, undefined });
+      const resolvedSymbol = this.resolveSymbol(
+        cubeName,
+        name
+      );
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return '';
+    }, {
+      depsResolveFn: (name, parent) => {
+        deps.push({ name, parent });
+        return deps.length - 1;
+      },
+      currResolveIndexFn: () => deps.length - 1,
+      contextSymbols: this.depsContextSymbols(),
+
+    });
+    return deps;
+  }
+
+  depsContextSymbols() {
+    return Object.assign({
+      filterParams: this.filtersProxyDep(),
+      filterGroup: this.filterGroupFunctionDep(),
+      securityContext: BaseQuery.contextSymbolsProxyFrom({}, (param) => param)
+    });
+  }
+
+  filtersProxyDep() {
+    return new Proxy({}, {
+      get: (target, name) => {
+        if (name === '_objectWithResolvedProperties') {
+          return true;
+        }
+        // allFilters is null whenever it's used to test if the member is owned by cube so it should always render to `1 = 1`
+        // and do not check cube validity as it's part of compilation step.
+        const cubeName = this.cubeNameFromPath(name);
+        return new Proxy({ cube: cubeName }, {
+          get: (cubeNameObj, propertyName) => ({
+            filter: (column) => ({
+              __column() {
+                return column;
+              },
+              __member() {
+                return this.pathFromArray([cubeNameObj.cube, propertyName]);
+              },
+              toString() {
+                return '';
+              }
+            })
+          })
+        });
+      }
+    });
+  }
+
+  filterGroupFunctionDep() {
+    return (...filterParamArgs) => '';
+  }
+
   resolveSymbol(cubeName, name) {
-    const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
+    const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
 
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
@@ -528,8 +601,14 @@ export class CubeSymbols {
           name
         );
       }
+    } else if (depsResolveFn) {
+      if (cube) {
+        const newCubeName = this.isCurrentCube(name) ? cubeName : name;
+        const parentIndex = currResolveIndexFn();
+        cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
+        return cube;
+      }
     }
-
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
   }
 
@@ -621,6 +700,44 @@ export class CubeSymbols {
     }
 
     return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
+  }
+
+  cubeDependenciesProxy(parentIndex, cubeName) {
+    const self = this;
+    const { depsResolveFn } = self.resolveSymbolsCallContext || {};
+    return new Proxy({}, {
+      get: (v, propertyName) => {
+        if (propertyName === '__cubeName') {
+          depsResolveFn('__cubeName', parentIndex);
+          return cubeName;
+        }
+        const cube = self.symbols[cubeName];
+
+        if (propertyName === 'toString') {
+          depsResolveFn('toString', parentIndex);
+          return () => '';
+        }
+        if (propertyName === 'sql') {
+          depsResolveFn('sql', parentIndex);
+          return () => '';
+        }
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (cube[propertyName]) {
+          depsResolveFn(propertyName, parentIndex);
+          return '';
+        }
+        if (self.symbols[propertyName]) {
+          const index = depsResolveFn(propertyName, parentIndex);
+          return this.cubeDependenciesProxy(index, propertyName);
+        }
+        if (typeof propertyName === 'string') {
+          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
+        }
+        return undefined;
+      }
+    });
   }
 
   isCurrentCube(name) {

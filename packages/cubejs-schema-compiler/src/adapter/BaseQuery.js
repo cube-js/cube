@@ -609,11 +609,18 @@ export class BaseQuery {
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
       joinRoot: this.join.root,
+      joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      filters: this.options.filters,
+      baseTools: this,
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
+    // FIXME
+    res[1] = [...res[1]];
     return res;
   }
 
@@ -3233,6 +3240,21 @@ export class BaseQuery {
         ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
         like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
       },
+      filters: {
+        equals: '{{ column }} = {{ value }}{{ is_null_check }}',
+        not_equals: '{{ column }} <> {{ value }}{{ is_null_check }}',
+        or_is_null_check: ' OR {{ column }} IS NULL',
+        set_where: '{{ column }} IS NOT NULL',
+        not_set_where: '{{ column }} IS NULL',
+        in: '{{ column }} IN ({{ values_concat }}){{ is_null_check }}',
+        not_in: '{{ column }} NOT IN ({{ values_concat }}){{ is_null_check }}',
+        time_range_filter: '{{ column }} >= {{ from_timestamp }} AND {{ column }} <= {{ to_timestamp }}',
+        gt: '{{ column }} > {{ param }}',
+        gte: '{{ column }} >= {{ param }}',
+        lt: '{{ column }} < {{ param }}',
+        lte: '{{ column }} <= {{ param }}'
+
+      },
       quotes: {
         identifiers: '"',
         escape: '""'
@@ -3659,6 +3681,10 @@ export class BaseQuery {
       },
       securityContext: BaseQuery.contextSymbolsProxyFrom({}, allocateParam),
     };
+  }
+
+  securityContextForRust() {
+    return this.contextSymbolsProxy(this.contextSymbols.securityContext);
   }
 
   contextSymbolsProxy(symbols) {
