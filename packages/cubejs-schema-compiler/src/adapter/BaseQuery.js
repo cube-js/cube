@@ -2151,7 +2151,7 @@ export class BaseQuery {
   }
 
   measureSql(measure) {
-    return  this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
+    return this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
   }
 
   autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
