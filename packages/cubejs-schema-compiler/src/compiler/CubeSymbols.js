@@ -477,7 +477,6 @@ export class CubeSymbols {
     const funcDefinition = func.toString();
     if (!this.funcArgumentsValues[funcDefinition]) {
       const match = funcDefinition.match(FunctionRegex);
-
       if (match && (match[1] || match[2] || match[3])) {
         this.funcArgumentsValues[funcDefinition] = (match[1] || match[2] || match[3]).split(',').map(s => s.trim());
       } else if (match) {
