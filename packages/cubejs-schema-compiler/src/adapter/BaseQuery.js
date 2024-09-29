@@ -262,7 +262,6 @@ export class BaseQuery {
     this.allFilters = this.timeDimensions.concat(this.segments).concat(this.filters);
 
     this.join = this.joinGraph.buildJoin(this.allJoinHints);
-
     this.cubeAliasPrefix = this.options.cubeAliasPrefix;
     this.preAggregationsSchemaOption = this.options.preAggregationsSchema ?? DEFAULT_PREAGGREGATIONS_SCHEMA;
     this.externalQueryClass = this.options.externalQueryClass;
@@ -2152,9 +2151,7 @@ export class BaseQuery {
   }
 
   measureSql(measure) {
-    const res = this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
-
-    return res;
+    return  this.evaluateSymbolSql(measure.path()[0], measure.path()[1], measure.measureDefinition());
   }
 
   autoPrefixWithCubeName(cubeName, sql, isMemberExpr = false) {
@@ -2377,29 +2374,6 @@ export class BaseQuery {
 
   primaryKeyName(cubeName, primaryKey) {
     return `${cubeName}.${primaryKey}`;
-  }
-
-  resolveSymbolsCallDeps(cubeName, sql) {
-    const self = this;
-    const { cubeEvaluator } = this;
-    const deps = [];
-    cubeEvaluator.resolveSymbolsCall(sql, (name) => {
-      const resolvedSymbol = cubeEvaluator.resolveSymbol(
-        cubeName,
-        name
-      );
-      if (resolvedSymbol._objectWithResolvedProperties) {
-        return resolvedSymbol;
-      }
-      return '';
-    }, {
-      depsResolveFn: (name, parent) => {
-        deps.push({ name, parent });
-        return deps.length - 1;
-      },
-      contextSymbols: this.parametrizedContextSymbols(),
-    });
-    return deps;
   }
 
   evaluateSql(cubeName, sql, options) {
