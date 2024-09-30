@@ -2866,8 +2866,11 @@ export class BaseQuery {
 
   newSubQueryForCube(cube, options) {
     if (this.options.queryFactory) {
-      options.paramAllocator = null;
-      return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
+      // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
+      // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
+      // have unique parameter allocator symbols. Using the wrong allocator can break the query, especially when rollup joins involve
+      // different cubes that require different allocators.
+      return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
     }
 
     return this.newSubQuery(options);
@@ -3522,7 +3525,7 @@ export class BaseQuery {
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
             return [
-              this.paramAllocator.buildSqlAndParams(
+              preAggregationQueryForSql.paramAllocator.buildSqlAndParams(
                 preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
               ).concat({
                 external: false,
