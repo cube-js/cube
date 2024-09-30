@@ -59,7 +59,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     ops::Index,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 pub use super::rewriter::CubeRunner;
@@ -170,8 +170,8 @@ macro_rules! add_plan_list_node {
     }};
 }
 
-lazy_static! {
-    static ref EXCLUDED_PARAM_VALUES: HashSet<ScalarValue> = vec![
+static EXCLUDED_PARAM_VALUES: LazyLock<HashSet<ScalarValue>> = LazyLock::new(|| {
+    vec![
         ScalarValue::Utf8(Some("second".to_string())),
         ScalarValue::Utf8(Some("minute".to_string())),
         ScalarValue::Utf8(Some("hour".to_string())),
@@ -182,8 +182,8 @@ lazy_static! {
     ]
     .into_iter()
     .chain((0..50).map(|i| ScalarValue::Int64(Some(i))))
-    .collect();
-}
+    .collect()
+});
 
 pub struct LogicalPlanToLanguageConverter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -2045,12 +2045,9 @@ impl LanguageToLogicalPlanConverter {
                         query.order = if !query_order.is_empty() {
                             Some(query_order)
                         } else {
-                            // Probably if no order was specified in client SQL,
+                            // If no order was specified in client SQL,
                             // there should be no order implicitly added.
-                            // But this is a breaking change. So for now,
-                            // only for ungrouped queries no implicit order is added
-                            // and there is an env flag: CUBESQL_SQL_NO_IMPLICIT_ORDER
-                            // in case when it is set to true - no implicit order is
+                            // in case when CUBESQL_SQL_NO_IMPLICIT_ORDER it is set to true - no implicit order is
                             // added for all queries.
                             // We need to return empty array so the processing in
                             // BaseQuery.js won't automatically add default order

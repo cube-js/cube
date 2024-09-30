@@ -490,6 +490,8 @@ describe('PreAggregations', () => {
           dimensions: [id, source],
           timeDimension: createdAt,
           granularity: 'day',
+          build_range_start: { sql: "SELECT DATE_SUB(NOW(), interval '96 hour')" },
+          build_range_end: { sql: "SELECT NOW()" },
           partitionGranularity: 'day'
         }
       }

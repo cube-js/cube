@@ -129,8 +129,9 @@ jobs:
           - os: macos-12
             target: x86_64-apple-darwin
             executable_name: cubestored
-            strip: true
-            compress: true
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
+            strip: false
+            compress: false
       fail-fast: false
     steps:
       - uses: actions/checkout@v4

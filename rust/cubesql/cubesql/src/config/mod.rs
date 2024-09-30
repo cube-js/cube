@@ -6,7 +6,10 @@ use crate::{
         injection::{DIService, Injector},
         processing_loop::{ProcessingLoop, ShutdownMode},
     },
-    sql::{PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService},
+    sql::{
+        pg_auth_service::{PostgresAuthService, PostgresAuthServiceDefaultImpl},
+        PostgresServer, ServerManager, SessionManager, SqlAuthDefaultImpl, SqlAuthService,
+    },
     transport::{HttpTransport, TransportService},
     CubeError,
 };
@@ -168,7 +171,7 @@ impl ConfigObjImpl {
             stream_mode: env_parse("CUBESQL_STREAM_MODE", false),
             non_streaming_query_max_row_limit: env_parse("CUBEJS_DB_QUERY_LIMIT", 50000),
             max_sessions: env_parse("CUBEJS_MAX_SESSIONS", 1024),
-            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", false),
+            no_implicit_order: env_parse("CUBESQL_SQL_NO_IMPLICIT_ORDER", true),
         }
     }
 }
@@ -237,11 +240,6 @@ impl ConfigObj for ConfigObjImpl {
     }
 }
 
-lazy_static! {
-    pub static ref TEST_LOGGING_INITIALIZED: tokio::sync::RwLock<bool> =
-        tokio::sync::RwLock::new(false);
-}
-
 impl Config {
     pub fn default() -> Config {
         Config {
@@ -271,7 +269,7 @@ impl Config {
                 stream_mode: false,
                 non_streaming_query_max_row_limit: 50000,
                 max_sessions: 1024,
-                no_implicit_order: false,
+                no_implicit_order: true,
             }),
         }
     }
@@ -308,6 +306,12 @@ impl Config {
             .await;
 
         self.injector
+            .register_typed::<dyn PostgresAuthService, _, _, _>(|_| async move {
+                Arc::new(PostgresAuthServiceDefaultImpl::new())
+            })
+            .await;
+
+        self.injector
             .register_typed::<dyn CompilerCache, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(CompilerCacheImpl::new(
@@ -321,6 +325,7 @@ impl Config {
             .register_typed::<ServerManager, _, _, _>(|i| async move {
                 let config = i.get_service_typed::<dyn ConfigObj>().await;
                 Arc::new(ServerManager::new(
+                    i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,
                     i.get_service_typed().await,

@@ -1,3 +1,6 @@
+use super::cube_definition::{CubeDefinition, NativeCubeDefinition};
+use super::measure_filter::{MeasureFiltersVec, NativeMeasureFiltersVec};
+use super::memeber_sql::{MemberSql, NativeMemberSql};
 use cubenativeutils::wrappers::serializer::{
     NativeDeserialize, NativeDeserializer, NativeSerialize,
 };
@@ -5,6 +8,8 @@ use cubenativeutils::wrappers::NativeContextHolder;
 use cubenativeutils::wrappers::NativeObjectHandle;
 use cubenativeutils::CubeError;
 use serde::{Deserialize, Serialize};
+use std::any::Any;
+use std::rc::Rc;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MeasureDefinitionStatic {
@@ -15,26 +20,13 @@ pub struct MeasureDefinitionStatic {
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]
 pub trait MeasureDefinition {
-    fn sql(&self) -> Result<String, CubeError>;
-}
+    #[optional]
+    #[field]
+    fn sql(&self) -> Result<Option<Rc<dyn MemberSql>>, CubeError>;
 
-/*
-export type MeasureDefinition = {
-  type: string,
-  sql: Function,
-  ownedByCube: boolean,
-  rollingWindow?: any
-  filters?: any
-  primaryKey?: true,
-  drillFilters?: any,
-  postAggregate?: boolean,
-  groupBy?: Function,
-  reduceBy?: Function,
-  addGroupBy?: Function,
-  timeShift?: TimeShiftDefinition[],
-  groupByReferences?: string[],
-  reduceByReferences?: string[],
-  addGroupByReferences?: string[],
-  timeShiftReferences?: TimeShiftDefinitionReference[],
-};
- */
+    fn cube(&self) -> Result<Rc<dyn CubeDefinition>, CubeError>;
+
+    #[optional]
+    #[field]
+    fn filters(&self) -> Result<Option<Rc<dyn MeasureFiltersVec>>, CubeError>;
+}

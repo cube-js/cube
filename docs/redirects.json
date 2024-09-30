@@ -1,5 +1,10 @@
 [
   {
+    "source": "/guides/recipes/data-modeling/fiscal-year-quarter-dimensions",
+    "destination": "/guides/recipes/data-modeling/custom-granularity",
+    "permanent": true
+  },
+  {
     "source": "/product/workspace/semantic-layer-sync",
     "destination": "/product/apis-integrations/semantic-layer-sync",
     "permanent": true

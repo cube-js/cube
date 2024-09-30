@@ -22,7 +22,7 @@ click <Btn>Generate Git credentials</Btn> to obtain Git credentials:
 The instructions to set up Cube Cloud as a Git remote are also available on the
 same screen:
 
-```bash{promptUser: user}
+```bash
 git config credential.helper store
 git remote add cubecloud <YOUR-CUBE-CLOUD-GIT-URL>
 git push cubecloud master
@@ -68,7 +68,7 @@ configuration files directly from your local project directory.
 You can obtain a Cube Cloud deploy token from your
 deployment's <Btn>Settings</Btn> screen.
 
-```bash{promptUser: user}
+```bash
 npx cubejs-cli deploy --token TOKEN
 ```
 

@@ -14,9 +14,9 @@ import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public readonly options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 
@@ -225,12 +225,11 @@ describe('index.test', () => {
         release: () => {}
       },
       externalDialectFactory: () => {},
-      cacheAndQueueDriver: 'redis',
+      cacheAndQueueDriver: 'cubestore',
       contextToAppId: () => 'STANDALONE',
       contextToOrchestratorId: () => 'EMPTY',
       repositoryFactory: () => {},
       checkAuth: () => {},
-      checkAuthMiddleware: () => {},
       queryTransformer: () => {},
       preAggregationsSchema: () => {},
       schemaVersion: () => {},
@@ -313,7 +312,7 @@ describe('index.test', () => {
     expect(createOrchestratorApiSpy.mock.calls[0]).toEqual([
       expect.any(Function),
       {
-        cacheAndQueueDriver: 'redis',
+        cacheAndQueueDriver: 'cubestore',
         contextToDbType: expect.any(Function),
         contextToExternalDbType: expect.any(Function),
         continueWaitTimeout: 10,
@@ -424,7 +423,7 @@ describe('index.test', () => {
         dataSource: 'main',
         dbType: 'mysql',
       }]);
-      
+
       expect(dataSourcesSpy).toHaveBeenCalled();
       dataSourcesSpy.mockClear();
     });

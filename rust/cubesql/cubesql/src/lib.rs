@@ -15,8 +15,6 @@
 
 // trace_macros!(false);
 
-#[macro_use]
-extern crate lazy_static;
 extern crate core;
 
 pub mod compile;
