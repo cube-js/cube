@@ -77,8 +77,8 @@ cubes:
 
       - name: fiscal_quarter_label
         sql: >
-          'FY' || EXTRACT(YEAR FROM {timestamp.fiscal_year}) ||
-          '-Q' || EXTRACT(QUARTER FROM {timestamp.fiscal_quarter})
+          'FY' || (EXTRACT(YEAR FROM {timestamp.fiscal_year}) + 1) ||
+          '-Q' || EXTRACT(QUARTER FROM {timestamp.fiscal_quarter} + INTERVAL '3 MONTHS')
         type: string
 ```
 
@@ -141,8 +141,8 @@ cube(`custom_granularities`, {
 
     fiscal_quarter_label: {
       sql: `
-        'FY' || EXTRACT(YEAR FROM ${timestamp.fiscal_year}) ||
-        '-Q' || EXTRACT(QUARTER FROM ${timestamp.fiscal_quarter})
+          'FY' || (EXTRACT(YEAR FROM {timestamp.fiscal_year}) + 1) ||
+          '-Q' || EXTRACT(QUARTER FROM {timestamp.fiscal_quarter} + INTERVAL '3 MONTHS')
       `,
       type: `string`
     }
@@ -151,6 +151,12 @@ cube(`custom_granularities`, {
 ```
 
 </CodeTabs>
+
+## Result
+
+Querying this data modal would yield the following result:
+
+<Screenshot src="https://ucarecdn.com/c385c29d-e145-47da-8551-2be5efb1c268/"/>
 
 
 [ref-custom-granularities]: /reference/data-model/dimensions#granularities
