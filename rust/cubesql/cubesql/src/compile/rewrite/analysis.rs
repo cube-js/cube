@@ -34,8 +34,6 @@ use std::{cmp::Ordering, fmt::Debug, ops::Index, sync::Arc};
 
 pub type MemberNameToExpr = (Option<String>, Member, Expr);
 
-pub type MemberNameToExpr = (Option<String>, Member, Expr);
-
 #[derive(Clone, Debug)]
 pub struct LogicalPlanData {
     pub iteration_timestamp: usize,

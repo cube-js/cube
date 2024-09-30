@@ -49,33 +49,6 @@ Scheduled refreshes will continue to work in the background.
 
 </WarningBox>
 
-## Matching queries
-
-When executing a query, Cube will try to [match and fulfill it with a
-pre-aggregation][ref-matching-preaggs] in the first place.
-
-If there's no matching pre-aggregation, Cube will query the upstream data
-source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
-
-## Rollup-only mode
-
-In the rollup-only mode, Cube will **only** fulfill queries using
-pre-aggregations. To enable the rollup-only mode, use the
-`CUBEJS_ROLLUP_ONLY` environment variable.
-
-It can be useful to prevent queries from your end users from ever hitting the
-upstream data source, e.g., if you prefer to use your data warehouse only to
-build and refresh pre-aggregations and keep it suspended the rest of the time.
-
-<WarningBox>
-
-When the rollup-only mode is used with a single-node deployment (where the API
-instance also serves as a [refresh worker][ref-deploy-refresh-wrkr]), queries
-that can't be fulfilled with pre-aggregations will result in an error.
-Scheduled refreshes will continue to work in the background.
-
-</WarningBox>
-
 ## Refresh strategy
 
 Refresh strategy can be customized by setting the

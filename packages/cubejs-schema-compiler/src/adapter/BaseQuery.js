@@ -2293,6 +2293,7 @@ export class BaseQuery {
         ) {
           this.safeEvaluateSymbolContext().currentMeasure = parentMeasure;
         }
+
         return result;
       } else if (type === 'dimension') {
         if ((this.safeEvaluateSymbolContext().renderedReference || {})[memberPath]) {

@@ -104,10 +104,11 @@ impl WrapperRules {
                                     ColumnExprColumn(column.clone()),
                                 ));
 
-                        let column_expr =
-                            egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
-                        subst.insert(dimension_var, column_expr);
-                        return true;
+                            let column_expr =
+                                egraph.add(LogicalPlanLanguage::ColumnExpr([column_expr_column]));
+                            subst.insert(dimension_var, column_expr);
+                            return true;
+                        }
                     }
                 }
                 if let Some((member, _)) = &egraph[subst[members_var]]
