@@ -655,9 +655,9 @@ pre-aggregation definition.
 
 ### `granularity`
 
-The `granularity` property defines the granularity of data _within_ the
-pre-aggregation. If set to `week`, for example, then Cube will pre-aggregate the
-data by week and persist it to Cube Store.
+The `granularity` property defines the time dimension granularity of data
+_within_ the pre-aggregation. If set to `week`, for example, then Cube will
+pre-aggregate the data by week and persist it to Cube Store.
 
 <CodeTabs>
 
@@ -695,8 +695,9 @@ cubes:
 
 </CodeTabs>
 
-The value can be one of `second`, `minute`, `hour`, `day`, `week`, `month`,
-`quarter` or `year`. This property is required when using
+The value can be either a default granularity (i.e., `second`, `minute`, `hour`,
+`day`, `week`, `month`, `quarter`, or `year`) or a [custom
+granularity][ref-custom-granularity]. This property is required when using
 [`time_dimension`][self-timedimension].
 
 ### `segments`
@@ -1748,3 +1749,4 @@ cubes:
 [ref-aggregating-indexes]: /product/caching/using-pre-aggregations#aggregating-indexes
 [ref-pre-aggs]: /product/caching/using-pre-aggregations
 [ref-ref-cubes]: /reference/data-model/cube
+[ref-custom-granularity]: /reference/data-model/dimensions#granularities
