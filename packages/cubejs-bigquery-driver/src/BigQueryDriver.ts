@@ -325,6 +325,11 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     const bigQueryTable = this.bigquery.dataset(schema).table(tableName);
     const [job] = await bigQueryTable.createExtractJob(destination, { format: 'CSV', gzip: true });
     await this.waitForJobResult(job, { table }, false);
+    // There is an implementation for extracting and signing urls from S3
+    // @see BaseDriver->extractUnloadedFilesFromS3()
+    // Please use that if you need. Here is a different flow
+    // because bigquery requires storage/bucket object for other things,
+    // and there is no need to initiate another one (created in extractUnloadedFilesFromS3()).
     const [files] = await this.bucket.getFiles({ prefix: `${table}-` });
     const urls = await Promise.all(files.map(async file => {
       const [url] = await file.getSignedUrl({

@@ -8,8 +8,6 @@ import { getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import { DownloadTableCSVData, DriverCapabilities, UnloadOptions } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { S3, GetObjectCommand } from '@aws-sdk/client-s3';
 
 interface RedshiftDriverExportRequiredAWS {
   bucketType: 's3',
@@ -213,7 +211,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         UNLOAD ('SELECT ${columns} FROM ${tableName}')
         TO '${bucketType}://${bucketName}/${exportPathName}/'
       `;
-      
+
       // Prefer the unloadArn if it is present
       const credentialQuery = unloadArn
         ? `iam_role '${unloadArn}'`
@@ -234,36 +232,27 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
         };
       }
 
-      const client = new S3({
-        credentials: (keyId && secretKey) ? {
-          accessKeyId: keyId,
-          secretAccessKey: secretKey,
-        } : undefined,
-        region,
-      });
-      const list = await client.listObjectsV2({
-        Bucket: bucketName,
-        Prefix: exportPathName,
-      });
-      if (list && list.Contents) {
-        const csvFile = await Promise.all(
-          list.Contents.map(async (file) => {
-            const command = new GetObjectCommand({
-              Bucket: bucketName,
-              Key: file.Key,
-            });
-            return getSignedUrl(client, command, { expiresIn: 3600 });
-          })
-        );
+      const csvFile = await this.extractUnloadedFilesFromS3(
+        {
+          credentials: (keyId && secretKey) ? {
+            accessKeyId: keyId,
+            secretAccessKey: secretKey,
+          } : undefined,
+          region,
+        },
+        bucketName,
+        exportPathName,
+      );
 
-        return {
-          exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
-          csvFile,
-          types
-        };
+      if (csvFile.length === 0) {
+        throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
       }
 
-      throw new Error('Unable to UNLOAD table, there are no files in S3 storage');
+      return {
+        exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
+        csvFile,
+        types
+      };
     } finally {
       conn.removeAllListeners('notice');
 

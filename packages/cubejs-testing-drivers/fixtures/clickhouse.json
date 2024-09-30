@@ -1,4 +1,17 @@
 {
+  "extendedEnvs": {
+    "export-bucket-s3": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
+          "CUBEJS_DB_EXPORT_BUCKET": "clickhouse-drivers-tests-preaggs",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
+          "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
+    }
+  },
   "cube": {
     "environment": {
       "CUBEJS_API_SECRET": "mysupersecret",
