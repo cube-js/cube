@@ -1,0 +1,127 @@
+# a -> b -> c
+cubes:
+####
+  - name: a
+    sql_table: public.a
+    joins:
+      - name: b
+        sql: "{a}.id = {b}.a_id"
+        relationship: one_to_many
+      # - name: s1
+      #   sql: "{a}.s1_id = {b}.id"
+      #   relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: c_id
+        sql: c_id
+        type: number
+      - name: s1_id
+        sql: s1_id
+        type: number
+      - name: shared_id_s1
+        sql: shared_id_s1
+        type: number
+    measures:
+      - name: count
+        type: count
+####        
+  - name: b
+    sql_table: public.b
+    joins: 
+      - name: c
+        sql: "{b}.id = {c}.b_id"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: shared_id_s1
+        sql: shared_id_s1
+        type: number
+    measures:
+      - name: count
+        type: count
+####        
+  - name: c
+    sql_table: public.c
+    joins: 
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+      - name: a_id
+        sql: a_id
+        type: number
+      - name: b_id
+        sql: b_id
+        type: number
+    measures:
+      - name: count
+        type: count
+####
+  - name: s1
+    sql_table: public.s1
+    joins:
+      - name: a
+        sql: "{s1}.id = {a.shared_id_s1}"
+        relationship: many_to_one
+      - name: b
+        sql: "{s1}.id = {b.shared_id_s1}"
+        relationship: many_to_one
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+      - name: s2_id
+        sql: s2_id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+####
+  - name: s2
+    sql_table: public.s1
+    joins:
+      - name: s1
+        sql: "{s2}.id = {s1.s2_id}"
+        relationship: one_to_many
+    dimensions:
+      - name: id
+        sql: id
+        type: number
+        primary_key: true
+    measures:
+      - name: count
+        type: count
+
+views:
+  - name: sp
+    cubes:
+      - join_path: a
+        includes: "*"
+        prefix: true
+      - join_path: b
+        includes: "*"
+        prefix: true
+
+      - join_path: s1
+        includes: "*"
+        split: true
+      - join_path: s2
+        includes: "*"
+        split: true
+      # - join_path: s3
+      #   includes: "*"
+      #   split: true
+      # - join_path: s3
+      #   includes: "*"
+      #   split: true
