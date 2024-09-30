@@ -4,6 +4,7 @@ use crate::{
     sql::{
         compiler_cache::CompilerCache,
         database_variables::{mysql_default_global_variables, postgres_default_global_variables},
+        pg_auth_service::PostgresAuthService,
         SqlAuthService,
     },
     transport::TransportService,
@@ -37,6 +38,7 @@ pub struct ServerManager {
     // References to shared things
     pub auth: Arc<dyn SqlAuthService>,
     pub transport: Arc<dyn TransportService>,
+    pub pg_auth: Arc<dyn PostgresAuthService>,
     // Non references
     pub configuration: ServerConfiguration,
     pub nonce: Option<Vec<u8>>,
@@ -52,6 +54,7 @@ impl ServerManager {
     pub fn new(
         auth: Arc<dyn SqlAuthService>,
         transport: Arc<dyn TransportService>,
+        pg_auth: Arc<dyn PostgresAuthService>,
         compiler_cache: Arc<dyn CompilerCache>,
         nonce: Option<Vec<u8>>,
         config_obj: Arc<dyn ConfigObj>,
@@ -59,6 +62,7 @@ impl ServerManager {
         Self {
             auth,
             transport,
+            pg_auth,
             compiler_cache,
             nonce,
             config_obj,

@@ -6,8 +6,11 @@ redirect_from:
 
 # Playground
 
-Playground is a web-based tool which allows executing queries and previewing
-their results.
+Playground is a web-based tool that helps validate the data model by executing
+[queries][ref-queries] and previewing their results. It is supposed to be used
+by data engineers and developers while building the [data model][ref-data-modeling].
+If you'd like to let end users query the data, [connect a BI tool][ref-dataviz-tools]
+or use the [JavaScript SDKs][ref-js-sdk] to build your own query builder.
 
 <SuccessBox>
 
@@ -15,30 +18,154 @@ Playground is available in Cube Cloud on [all tiers](https://cube.dev/pricing).
 
 </SuccessBox>
 
-Cube Core and Cube Cloud both provide the Playground experience; however, a few
-additional features are available in Cube Cloud.
+<SuccessBox>
+
+Playground is available in Cube Core at [localhost:4000](http://localhost:4000)
+when it's run in the [development mode][ref-dev-mode].
+
+</SuccessBox>
+
+You can [view](#viewing-the-data-model) the data model entities or [search](#searching-the-data-model)
+for them, [compose](#composing-queries) a query from scratch or [paste](#pasting-a-query)
+an exsiting query, view [results](#viewing-results), check a [generated
+query](#viewing-a-generated-query), or copy equivalent [queries for data APIs](#copying-api-queries).
+
+## Viewing the data model
+
+You can see a list of all cubes or views in the sidebar on the left. Choose either
+<Btn>Cubes</Btn> or <Btn>Views</Btn> to switch between cubes and views and click
+on a cube or a view to view a list of its members.
 
 <Screenshot
-  alt="Playground Query and Results Example"
-  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
+  highlight="inset(7.5% 74% 1% 4% round 10px)"
+  src="https://ucarecdn.com/08d5cc69-431d-43d9-8da4-804029adf1fa/"
 />
 
-## Running Playground
+Measures, dimensions, and segments are shown using distinct colors. If a member has
+a [title][ref-data-model-title] or a [description][ref-data-model-description] set
+in the data model, they will be shown in a tooltip. If a member is not
+[public][ref-data-model-public], you will see a lock sign next to it.
 
-### Cube Core
+<InfoBox>
 
-Playground is available at [http://localhost:4000](http://localhost:4000) when
-Cube is run in [development mode][ref-dev-mode], i.e., when `CUBEJS_DEV_MODE` is
-set to `true`.
+Even if a cube, a view, or their member is not public, Playground would still allow
+you to query and validate it.
 
-<WarningBox>
+</InfoBox>
 
-Since Playground exposes all data models and allows running all possible
-queries, it should not be used in production. You can [connect a BI
-tool][ref-dataviz-tools] or use the [JavaScript SDKs][ref-js-sdk] to build your
-own query builder and use it to query your Cube in a secure way.
+### Switching the security context
 
-</WarningBox>
+You can click on the <Btn>Security Context</Btn> button in the top right corner to
+change the security context. Changing the security context can affect the contents
+of the sidebar that you see:
+
+<Screenshot src="https://ucarecdn.com/1a0721e8-8f7c-44ce-ad02-d688721a73f1/" />
+
+## Searching the data model
+
+You can search for cubes, views, and their members using the search bar in the
+sidebar on the left. Click on the element in the search results to add it to a new
+or existing query.
+
+<Screenshot
+  highlight="inset(7.5% 74% 1% 4% round 10px)"
+  src="https://ucarecdn.com/c9e3a8e5-d9f5-4a15-82c1-859bbebd8493/"
+/>
+
+## Composing queries
+
+You can compose a new query by selecting desired measures, dimensions, and segments
+in the sidebar on the left. Click on the _funnel_ icon next to any member to add a filter
+for it to the query.
+
+Click <Btn>All members</Btn> or <Btn>Used members</Btn> to show only members of the
+query or all available members. Click <Btn>Reset</Btn> to remove all members from the query.
+
+<Screenshot
+  highlight="inset(7.5% 74% 1% 4% round 10px)"
+  src="https://ucarecdn.com/1f052da4-1e7d-46c0-98b5-616eabbaa128/"
+/>
+
+Use the <Btn>Order</Btn> drop-down on the right to specify how the
+[results](/product/workspace/playground#viewing-results) shall be sorted.
+
+<Screenshot
+  highlight="inset(35% 9% 15% 64% round 10px)"
+  src="https://ucarecdn.com/82719c33-8881-42c6-9353-acd2e678014b/"
+/>
+
+Use the <Btn>Options</Btn> drop-down on the right to specify if the query shall be
+[ungrouped][ref-ungrouped-query], to set a [time zone][ref-time-zone], or to set
+a [row limit][ref-row-limit] and an offset.
+
+<Screenshot
+  highlight="inset(35% 0 15% 80% round 10px)"
+  src="https://ucarecdn.com/92dac6aa-f260-4ee3-9065-f1b29fe0d99f/"
+/>
+
+### Pasting a query
+
+You can also compose a new query by clicking on the _pencil_ button in the sidebar on the
+left and pasting a [REST API][ref-rest-api] query or a [GraphQL API][ref-graphql-api]
+query from the clipboard and clicking <Btn>Apply</Btn>.
+
+<Screenshot src="https://ucarecdn.com/d34949a1-40a7-4cb5-b180-efa63f94b201/" />
+
+Pasting a [SQL API][ref-sql-api] query is not supported.
+
+### Using query tabs
+
+You can use query tabs to keep results of previous queries while still being
+able to make new queries. Previous queries are kept in the local storage in your browser
+and will be restored when you open Playground once again.
+
+You can also double-click on a query tab to give it a meaningful name.
+
+## Viewing results
+
+Click <Btn>Run Query</Btn> on the top to run (or re-run) the query and check the
+querying time in the top right corner. Click on the querying time to open [Rollup
+Designer][ref-rollup-designer] that would help you create a pre-aggregation
+to accelerate the query.
+
+View query results on the <Btn>Results</Btn> tab. Check the number of rows in the result
+set on the bottom and use the pagination control in the bottom right corner, if needed.
+
+<Screenshot
+  highlight="inset(7.5% 0 0 26% round 10px)"
+  src="https://ucarecdn.com/399016dc-06de-4652-a86f-ca98f944725e/"
+/>
+
+Expand the <Btn>Chart</Btn> pane to visualize the results. Choose one of visualization
+types and pivot data via the <Btn>Pivot</Btn> drop-down, if needed. Click <Btn>Code</Btn>
+to generate front-end code in [Chart Prototyping][ref-chart-prototyping].
+
+<Screenshot
+  highlight="inset(7.5% 0 0 26% round 10px)"
+  src="https://ucarecdn.com/368ceb39-c3b9-45c4-8a7a-873cee571d69/"
+/>
+
+## Viewing a generated query
+
+View the SQL query that Cube did (or will) run against the data source to get the results
+on the <Btn>Generated SQL</Btn> tab. Click <Btn>Copy</Btn> to put it into your clipboard.
+
+<Screenshot
+  highlight="inset(7.5% 0 0 26% round 10px)"
+  src="https://ucarecdn.com/d2b6e514-9219-49ea-bae6-bcd0f1936542/"
+/>
+
+## Copying API queries
+
+View the queries for respective data APIs on the <Btn>SQL API</Btn>, <Btn>REST API</Btn>,
+and <Btn>GraphQL API</Btn> tabs. Click <Btn>Copy</Btn> to put one of them into your clipboard.
+
+<Screenshot
+  highlight="inset(7.5% 0 0 26% round 10px)"
+  src="https://ucarecdn.com/1b32fe0d-9a2a-4251-a650-6226a3006e86/"
+/>
+
+{/*
 
 You can use this Playground to view and [generate data model][ref-data-model]
 files.
@@ -56,78 +183,26 @@ manually.
 
 </WarningBox>
 
-### Cube Cloud
-
-Playground is available out of the box to authenticated [Cube Cloud][cube-cloud]
-users.
-
-When editing the data model through the [data model editor][ref-devtools-ide],
-Playground will switch to the Development API and its status will be visible in
-Playground:
-
-<Screenshot
-  alt="Playground during API restart"
-  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
-/>
-
-## Query tabs
-
-You can use query tabs to keep results of previous queries while still being
-able to make new queries. The query tabs can be found at the top of the
-Developer Playground:
-
-<Screenshot
-  alt="Cube Developer Playground Tabs"
-  src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/"
-/>
-
-You can also double-click a query tab to give it a meaningful name:
-
-<video width="100%" controls>
-  <source
-    src="https://ucarecdn.com/9e3d7651-4dca-4cd3-9fc9-541c3182effd/video.mp4"
-    type="video/mp4"
-  />
-</video>
-
-## Editing the Security Context
-
-The security context used for queries can be modified by clicking <Btn>Add
-Security Context</Btn>:
-
-<Screenshot src="https://ucarecdn.com/06bece10-f322-4b4a-9250-234d1bae98db/" />
-
-You can paste in an existing JWT if desired; or create a brand-new one by
-providing a JSON object that represents the decoded JWT.
-
-## Executing generated SQL
-
-To see the SQL generated by a query, click <Btn>Generated SQL</Btn>:
-
-<Screenshot src="https://ucarecdn.com/43011e86-8a0e-414b-a192-3c07a47c2694/" />
-
-If you're using Cube Cloud, you can copy this SQL and run it in your data source
-using the [SQL Runner][ref-workspace-sqlrunner].
-
-## Accelerating queries
-
-When you execute a query that has no matching [pre-aggregations][ref-caching-preaggs-gs],
-you would see this notificaton. Clicking on it will open [Rollup
-Designer][ref-rollup-designer] that would help you create a pre-aggregation
-to accelerate the query:
-
-<Screenshot
-  highlight="inset(22.5% 0 65% 72.5% round 10px)"
-  src="https://ucarecdn.com/582acb98-373b-4617-9aa8-263b0653cd00/"
-/>
+*/}
 
 [cube-cloud]: https://cube.dev/cloud
-[ref-dev-mode]: /product/configuration
+[ref-dev-mode]: /product/configuration#development-mode
 [ref-devtools-ide]: /cloud/dev-tools/cube-ide
 [ref-caching-preaggs-gs]: /product/caching/getting-started-pre-aggregations
-[ref-workspace-sqlrunner]: /product/workspace/sql-runner
 [ref-rollup-designer]: /product/workspace/rollup-designer
 [ref-dataviz-tools]: /product/configuration/visualization-tools
 [ref-js-sdk]: /product/apis-integrations/javascript-sdk
 [ref-data-model]: /product/workspace/data-model#generating-data-model-files
 [ref-multiple-data-sources]: /product/configuration/advanced/multiple-data-sources
+[ref-queries]: /product/apis-integrations/queries
+[ref-data-modeling]: /product/data-modeling
+[ref-data-model-title]: /reference/data-model/measures#title
+[ref-data-model-description]: /reference/data-model/measures#description
+[ref-data-model-public]: /reference/data-model/measures#public
+[ref-rest-api]: /product/apis-integrations/rest-api
+[ref-graphql-api]: /product/apis-integrations/graphql-api
+[ref-sql-api]: /product/apis-integrations/sql-api
+[ref-ungrouped-query]: /product/apis-integrations/queries#ungrouped-query
+[ref-time-zone]: /product/apis-integrations/queries#time-zone
+[ref-row-limit]: /product/apis-integrations/queries#limit
+[ref-chart-prototyping]: /product/workspace/vizard

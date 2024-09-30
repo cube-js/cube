@@ -519,7 +519,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29c39203181991a7dd4343b8005bd804e7a9a37afb8ac070e43771e8c820bbde"
 dependencies = [
  "chrono",
- "chrono-tz-build",
+ "chrono-tz-build 0.0.3",
+ "phf",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d59ae0466b83e838b81a54256c39d5d7c20b9d7daa10510a242d9b75abd5936e"
+dependencies = [
+ "chrono",
+ "chrono-tz-build 0.2.1",
  "phf",
 ]
 
@@ -528,6 +539,17 @@ name = "chrono-tz-build"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6f509c3a87b33437b05e2458750a0700e5bdd6956176773e6c7d6dd15a283a0c"
+dependencies = [
+ "parse-zoneinfo",
+ "phf",
+ "phf_codegen",
+]
+
+[[package]]
+name = "chrono-tz-build"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
 dependencies = [
  "parse-zoneinfo",
  "phf",
@@ -681,7 +703,7 @@ dependencies = [
 [[package]]
 name = "cube-ext"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "arrow",
  "chrono",
@@ -748,12 +770,14 @@ dependencies = [
  "cubesql",
  "findshlibs",
  "futures",
+ "lazy_static",
  "libc",
  "log",
  "log-reroute",
  "minijinja",
  "neon",
  "once_cell",
+ "regex",
  "serde",
  "serde_derive",
  "serde_json",
@@ -777,7 +801,7 @@ dependencies = [
  "byteorder",
  "bytes",
  "chrono",
- "chrono-tz",
+ "chrono-tz 0.6.3",
  "comfy-table 7.1.0",
  "csv",
  "cubeclient",
@@ -788,7 +812,6 @@ dependencies = [
  "futures-util",
  "hashbrown 0.14.3",
  "itertools",
- "lazy_static",
  "log",
  "lru",
  "minijinja",
@@ -819,12 +842,18 @@ name = "cubesqlplanner"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
+ "chrono-tz 0.8.6",
+ "convert_case",
  "cubeclient",
  "cubenativeutils",
  "datafusion",
  "itertools",
+ "lazy_static",
+ "minijinja",
  "nativebridge",
  "neon",
+ "regex",
  "serde",
  "serde_json",
  "tokio",
@@ -839,7 +868,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 [[package]]
 name = "datafusion"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -872,7 +901,7 @@ dependencies = [
 [[package]]
 name = "datafusion-common"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "arrow",
  "ordered-float 2.10.1",
@@ -883,7 +912,7 @@ dependencies = [
 [[package]]
 name = "datafusion-data-access"
 version = "1.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "async-trait",
  "chrono",
@@ -896,7 +925,7 @@ dependencies = [
 [[package]]
 name = "datafusion-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -907,7 +936,7 @@ dependencies = [
 [[package]]
 name = "datafusion-physical-expr"
 version = "7.0.0"
-source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=400fa0d889a8a38ca69f36d5750dfb572fc6018e#400fa0d889a8a38ca69f36d5750dfb572fc6018e"
+source = "git+https://github.com/cube-js/arrow-datafusion.git?rev=dcf3e4aa26fd112043ef26fa4a78db5dbd443c86#dcf3e4aa26fd112043ef26fa4a78db5dbd443c86"
 dependencies = [
  "ahash 0.7.8",
  "arrow",
@@ -976,15 +1005,6 @@ name = "either"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a26ae43d7bcc3b814de94796a5e736d4029efb0ee900c12e2d54c993ad1a1e07"
-
-[[package]]
-name = "env_logger"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
-dependencies = [
- "log",
-]
 
 [[package]]
 name = "env_logger"

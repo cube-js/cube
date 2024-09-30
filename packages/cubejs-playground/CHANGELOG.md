@@ -3,6 +3,63 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
+
+
+### Features
+
+* **cubejs-playground:** add support for ungrouped and offset options ([#8719](https://github.com/cube-js/cube/issues/8719)) ([7d77b4a](https://github.com/cube-js/cube/commit/7d77b4ad6ce76e0e6d06f23f0cbb74b265b7c299))
+
+
+
+
+
+## [0.36.1](https://github.com/cube-js/cube/compare/v0.36.0...v0.36.1) (2024-09-16)
+
+**Note:** Version bump only for package @cubejs-client/playground
+
+
+
+
+
+# [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+
+* chore!: Support for Node.js 16 was removed ([8b83021](https://github.com/cube-js/cube/commit/8b830214ab3d16ebfadc65cb9587a08b0496fb93))
+
+
+### Features
+
+* **cubejs-client/playground:** new query builder & new chart prototyping ([#8678](https://github.com/cube-js/cube/issues/8678)) ([6099144](https://github.com/cube-js/cube/commit/609914492d6ca6c4b2be507a2af0eb5e70fdf6de))
+
+
+### BREAKING CHANGES
+
+* Node.js is EOL, it was deprecated in v0.35.0
+
+
+
+
+
+## [0.35.81](https://github.com/cube-js/cube/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+
+### Bug Fixes
+
+* Updated jsonwebtoken in all packages ([#8282](https://github.com/cube-js/cube/issues/8282)) Thanks  [@jlloyd-widen](https://github.com/jlloyd-widen) ! ([ca7c292](https://github.com/cube-js/cube/commit/ca7c292e0122be50ac7adc9b9d4910623d19f840))
+
+
+
+
+
 ## [0.35.48](https://github.com/cube-js/cube/compare/v0.35.47...v0.35.48) (2024-06-14)
 
 **Note:** Version bump only for package @cubejs-client/playground

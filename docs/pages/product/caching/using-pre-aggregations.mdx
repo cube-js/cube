@@ -49,33 +49,6 @@ Scheduled refreshes will continue to work in the background.
 
 </WarningBox>
 
-## Matching queries
-
-When executing a query, Cube will try to [match and fulfill it with a
-pre-aggregation][ref-matching-preaggs] in the first place.
-
-If there's no matching pre-aggregation, Cube will query the upstream data
-source instead, unless the [rollup-only mode](#rollup-only-mode) is enabled.
-
-## Rollup-only mode
-
-In the rollup-only mode, Cube will **only** fulfill queries using
-pre-aggregations. To enable the rollup-only mode, use the
-`CUBEJS_ROLLUP_ONLY` environment variable.
-
-It can be useful to prevent queries from your end users from ever hitting the
-upstream data source, e.g., if you prefer to use your data warehouse only to
-build and refresh pre-aggregations and keep it suspended the rest of the time.
-
-<WarningBox>
-
-When the rollup-only mode is used with a single-node deployment (where the API
-instance also serves as a [refresh worker][ref-deploy-refresh-wrkr]), queries
-that can't be fulfilled with pre-aggregations will result in an error.
-Scheduled refreshes will continue to work in the background.
-
-</WarningBox>
-
 ## Refresh strategy
 
 Refresh strategy can be customized by setting the
@@ -986,13 +959,10 @@ Cube Store in parallel:
   />
 </div>
 
-Enabling the export bucket functionality requires extra configuration; please
-refer to the database-specific documentation for more details:
-
-- [AWS Athena][ref-export-athena]
-- [AWS Redshift][ref-export-redshift]
-- [BigQuery][ref-export-bigquery]
-- [Snowflake][ref-export-snowflake]
+Enabling the export bucket functionality requires extra configuration and is 
+not available for all data sources. Please
+refer to the [database-specific documentation][ref-config-db] for more details. 
+Data sources that support export buckets will have an "Export Bucket" section with more information.
 
 When using cloud storage, it is important to correctly configure any data
 retention policies to clean up the data in the export bucket as Cube does not
@@ -1049,10 +1019,6 @@ of this member. For numeric types, it will most likely be an integer, a float,
 or a decimal type, depending on the nature of your data.
 
 
-[ref-export-athena]: /product/configuration/data-sources/aws-athena#export-bucket
-[ref-export-redshift]: /product/configuration/data-sources/aws-redshift#export-bucket
-[ref-export-bigquery]: /product/configuration/data-sources/google-bigquery#export-bucket
-[ref-export-snowflake]: /product/configuration/data-sources/snowflake#export-bucket
 [ref-caching-in-mem-default-refresh-key]: /product/caching#default-refresh-keys
 [ref-config-db]: /product/configuration/data-sources
 [ref-config-driverfactory]: /reference/configuration/config#driverfactory

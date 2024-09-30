@@ -309,6 +309,7 @@ export class ScaffoldingSchema {
 
   protected joins(tableName: TableName, tableDefinition: ColumnData[]) {
     const cubeName = (name: string) => (this.options.snakeCase ? toSnakeCase(name) : inflection.camelize(name));
+
     return R.unnest(tableDefinition
       .map(column => {
         let columnsToJoin: ColumnsToJoin[] = [];
@@ -330,6 +331,7 @@ export class ScaffoldingSchema {
           this.tableNamesToTables[inflection.tableize(withoutId)] ||
           this.tableNamesToTables[this.fixCase(withoutId)] ||
           this.tableNamesToTables[(inflection.tableize(this.fixCase(withoutId)))];
+
           if (!tablesToJoin) {
             return null;
           }

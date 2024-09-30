@@ -108,12 +108,12 @@ jobs:
     strategy:
       matrix:
         # Current used version + 1 LTS
-        node-version: [18, 20]
+        node-version: [20, 22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
-          - node-version: 18
+          - node-version: 20
             target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
@@ -147,7 +147,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -211,7 +211,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
@@ -250,7 +250,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -304,7 +304,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: [windows-2019]
         python-version: ["fallback"]
       fail-fast: false
@@ -332,7 +332,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"

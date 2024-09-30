@@ -856,6 +856,7 @@ pub trait MetaStore: DIService + Send + Sync {
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
         drop_if_exists: bool,
+        extension: Option<String>,
     ) -> Result<IdRow<Table>, CubeError>;
     async fn table_ready(&self, id: u64, is_ready: bool) -> Result<IdRow<Table>, CubeError>;
     async fn seal_table(&self, id: u64) -> Result<IdRow<Table>, CubeError>;
@@ -2087,6 +2088,7 @@ impl MetaStore for RocksMetaStore {
         partition_split_threshold: Option<u64>,
         trace_obj: Option<String>,
         drop_if_exists: bool,
+        extension: Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         self.write_operation(move |db_ref, batch_pipe| {
             batch_pipe.invalidate_tables_cache();
@@ -2189,6 +2191,7 @@ impl MetaStore for RocksMetaStore {
                 aggregate_column_indices,
                 seq_column_index,
                 partition_split_threshold,
+                extension,
             );
             let table_id = rocks_table.insert(table, batch_pipe)?;
 
@@ -5143,6 +5146,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -5166,6 +5170,7 @@ mod tests {
                 None,
                 None,
                 false,
+                None,
             )
             .await
             .unwrap();
@@ -5290,6 +5295,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5315,6 +5321,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5406,6 +5413,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5498,6 +5506,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -5571,6 +5580,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5594,6 +5604,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -5620,6 +5631,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .is_err());
@@ -6104,6 +6116,7 @@ mod tests {
                         None,
                         None,
                         false,
+                        None,
                     )
                     .await
                     .unwrap();
@@ -6326,6 +6339,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();
@@ -6467,6 +6481,7 @@ mod tests {
                     None,
                     None,
                     false,
+                    None,
                 )
                 .await
                 .unwrap();

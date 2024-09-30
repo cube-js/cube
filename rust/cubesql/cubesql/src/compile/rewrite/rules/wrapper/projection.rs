@@ -325,30 +325,25 @@ impl WrapperRules {
                 for ungrouped in
                     var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
                 {
-                    for ungrouped in
-                        var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped)
-                            .cloned()
-                    {
-                        subst.insert(
-                            select_ungrouped_var,
-                            egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
-                                WrappedSelectUngrouped(ungrouped),
-                            )),
-                        );
-                        subst.insert(
-                            select_ungrouped_scan_var,
-                            egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
-                                WrappedSelectUngroupedScan(ungrouped),
-                            )),
-                        );
-                        subst.insert(
-                            select_alias_var,
-                            egraph.add(LogicalPlanLanguage::WrappedSelectAlias(
-                                WrappedSelectAlias(projection_alias),
-                            )),
-                        );
-                        return true;
-                    }
+                    subst.insert(
+                        select_ungrouped_var,
+                        egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
+                            WrappedSelectUngrouped(ungrouped),
+                        )),
+                    );
+                    subst.insert(
+                        select_ungrouped_scan_var,
+                        egraph.add(LogicalPlanLanguage::WrappedSelectUngroupedScan(
+                            WrappedSelectUngroupedScan(ungrouped),
+                        )),
+                    );
+                    subst.insert(
+                        select_alias_var,
+                        egraph.add(LogicalPlanLanguage::WrappedSelectAlias(WrappedSelectAlias(
+                            projection_alias,
+                        ))),
+                    );
+                    return true;
                 }
             }
         }

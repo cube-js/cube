@@ -340,7 +340,7 @@ describe('SQLInterface', () => {
 
       await native.execSql(
         instance,
-        'SELECT order_date FROM KibanaSampleDataEcommerce LIMIT 100000;',
+        'SELECT order_date FROM KibanaSampleDataEcommerce ORDER BY order_date DESC LIMIT 100000;',
         cubeSqlStream
       );
 

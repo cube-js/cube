@@ -1091,12 +1091,7 @@ Used in the [REST API][ref-rest-api]. Default implementation parses the [JSON
 Web Token][link-jwt] in the `Authorization` header, verifies it, and sets its
 payload to the `securityContext`. [Read more][ref-sec-ctx] about JWT generation.
 
-<ReferenceBox>
-
-Currently, assigning to security context doesn't work in Python.
-Please [track this issue](https://github.com/cube-js/cube/issues/8133).
-
-</ReferenceBox>
+Called on each request.
 
 You can return an object with the `security_context` field if you want to
 customize [`SECURITY_CONTEXT`][ref-schema-cube-ref-ctx-sec-ctx].

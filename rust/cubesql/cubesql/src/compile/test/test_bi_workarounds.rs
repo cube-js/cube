@@ -44,7 +44,7 @@ async fn test_powerbi_count_distinct_with_max_case() {
             dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
             segments: Some(vec![]),
             time_dimensions: None,
-            order: None,
+            order: Some(vec![]),
             limit: Some(1000001),
             offset: None,
             filters: None,

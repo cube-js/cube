@@ -233,14 +233,6 @@ Cube also allows you to provide your own JWT verification logic by setting a
 file. This function is expected to verify a JWT and return its claims as the
 security context.
 
-<WarningBox>
-
-Previous versions of Cube allowed setting a `checkAuthMiddleware()` parameter,
-which is now deprecated. We advise [migrating to a newer version of
-Cube][ref-config-migrate-cube].
-
-</WarningBox>
-
 As an example, if you needed to retrieve user information from an LDAP server,
 you might do the following:
 
