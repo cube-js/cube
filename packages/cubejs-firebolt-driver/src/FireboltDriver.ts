@@ -90,7 +90,8 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: true,
-      apiEndpoint: getEnv('fireboltApiEndpoint', { dataSource }),
+      apiEndpoint:
+        getEnv('fireboltApiEndpoint', { dataSource }) || 'api.app.firebolt.io',
       ...config,
       connection: {
         auth,
