@@ -5,7 +5,7 @@ use crate::{
     compile::{
         engine::{
             df::{
-                optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
+                optimizers::{FilterPushDown, LimitPushDown, SortPushDown, WindowMerge},
                 scan::CubeScanNode,
                 wrapper::CubeScanWrapperNode,
             },
@@ -105,6 +105,7 @@ pub trait QueryEngine {
 
         let optimizer_config = OptimizerConfig::new();
         let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
+            Arc::new(WindowMerge::new()),
             Arc::new(ProjectionDropOut::new()),
             Arc::new(FilterPushDown::new()),
             Arc::new(SortPushDown::new()),
