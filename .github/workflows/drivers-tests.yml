@@ -144,6 +144,8 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     runs-on: ubuntu-20.04
     timeout-minutes: 30
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -154,6 +156,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: (env.DOCKERHUB_USERNAME != '')
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Download native build
@@ -167,7 +170,18 @@ jobs:
           context: .
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
           tags: cubejs/cube:testing-drivers
-          push: true
+          push: ${{ (env.DOCKERHUB_USERNAME != '') }}
+      - name: Save Docker image as artifact
+        run: |
+          IMAGE_TAG=cubejs/cube:testing-drivers
+          docker save -o image.tar $IMAGE_TAG
+          gzip image.tar
+        continue-on-error: true
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar.gz
 
   tests:
     runs-on: ubuntu-20.04
@@ -260,6 +274,16 @@ jobs:
         run: |
           cd packages/cubejs-testing-drivers
           yarn tsc
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image into Docker Daemon
+        run: |
+          gunzip image.tar.gz
+          docker load -i image.tar
 
       - name: Run tests
         uses: nick-fields/retry@v3
