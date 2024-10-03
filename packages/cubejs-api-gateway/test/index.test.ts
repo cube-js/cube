@@ -471,7 +471,7 @@ describe('API Gateway', () => {
         queryRewrite: async (query, _context) => {
           query.limit = 2;
           return query;
-        }
+        },
       }
     );
 
