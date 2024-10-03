@@ -10,6 +10,10 @@ import { BaseQuery } from '../adapter';
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
+  // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
+  // is allowed in RBAC policies for query-time attribute matching
+  security_context: 'securityContext',
+  securityContext: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
   SQL_UTILS: 'sqlUtils'
@@ -139,6 +143,7 @@ export class CubeSymbols {
     this.camelCaseTypes(cube.dimensions);
     this.camelCaseTypes(cube.segments);
     this.camelCaseTypes(cube.preAggregations);
+    this.camelCaseTypes(cube.accessPolicy);
 
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
@@ -404,6 +409,34 @@ export class CubeSymbols {
       }
       return [memberRef.name || path[path.length - 1], memberDefinition];
     });
+  }
+
+  /**
+   * This method is mainly used for evaluating RLS conditions and filters.
+   * It allows referencing security_context (lowecase) in dynamic conditions or filter values.
+   *
+   * It currently does not support async calls because inner resolveSymbol and
+   * resolveSymbolsCall are sync. Async support may be added later with deeper
+   * refactoring.
+   */
+  evaluateContextFunction(cube, contextFn, context = {}) {
+    const cubeEvaluator = this;
+
+    const res = cubeEvaluator.resolveSymbolsCall(contextFn, (name) => {
+      const resolvedSymbol = this.resolveSymbol(cube, name);
+      if (resolvedSymbol) {
+        return resolvedSymbol;
+      }
+      throw new UserError(
+        `Cube references are not allowed when evaluating RLS conditions or filters. Found: ${name} in ${cube.name}`
+      );
+    }, {
+      contextSymbols: {
+        securityContext: context.securityContext,
+      }
+    });
+
+    return res;
   }
 
   evaluateReferences(cube, referencesFn, options = {}) {

@@ -4,6 +4,8 @@ import { QueryCache } from '../adapter/QueryCache';
 export class CompilerCache extends QueryCache {
   protected readonly queryCache: LRUCache<string, QueryCache>;
 
+  protected readonly rbacCache: LRUCache<string, any>;
+
   public constructor({ maxQueryCacheSize, maxQueryCacheAge }) {
     super();
 
@@ -12,6 +14,15 @@ export class CompilerCache extends QueryCache {
       maxAge: (maxQueryCacheAge * 1000) || 1000 * 60 * 10,
       updateAgeOnGet: true
     });
+
+    this.rbacCache = new LRUCache({
+      max: 10000,
+      maxAge: 1000 * 60 * 5, // 5 minutes
+    });
+  }
+
+  public getRbacCacheInstance(): LRUCache<string, any> {
+    return this.rbacCache;
   }
 
   public getQueryCache(key: unknown): QueryCache {

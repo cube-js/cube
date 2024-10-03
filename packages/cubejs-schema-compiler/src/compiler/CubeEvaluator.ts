@@ -65,6 +65,8 @@ export class CubeEvaluator extends CubeSymbols {
 
   public byFileName: Record<string, any> = {};
 
+  private isRbacEnabledCache: boolean | null = null;
+
   public constructor(
     protected readonly cubeValidator: CubeValidator
   ) {
@@ -112,7 +114,69 @@ export class CubeEvaluator extends CubeSymbols {
 
     this.prepareHierarchies(cube);
 
+    this.prepareAccessPolicy(cube, errorReporter);
+
     return cube;
+  }
+
+  private allMembersOrList(cube: any, specifier: string | string[]): string[] {
+    const types = ['measures', 'dimensions', 'segments'];
+    if (specifier === '*') {
+      const allMembers = R.unnest(types.map(type => Object.keys(cube[type] || {})));
+      return allMembers;
+    } else {
+      return specifier as string[] || [];
+    }
+  }
+
+  private prepareAccessPolicy(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.accessPolicy) {
+      return;
+    }
+
+    const memberMapper = (memberType: string) => (member: string) => {
+      if (member.indexOf('.') !== -1) {
+        const cubeName = member.split('.')[0];
+        if (cubeName !== cube.name) {
+          errorReporter.error(
+            `Paths aren't allowed in the accessPolicy policy but '${member}' provided as ${memberType} for ${cube.name}`
+          );
+        }
+        return member;
+      }
+      return this.pathFromArray([cube.name, member]);
+    };
+
+    const filterEvaluator = (filter: any) => {
+      if (filter.member) {
+        filter.memberReference = this.evaluateReferences(cube.name, filter.member);
+        filter.memberReference = memberMapper('a filter member reference')(filter.memberReference);
+      } else {
+        if (filter.and) {
+          filter.and.forEach(filterEvaluator);
+        }
+        if (filter.or) {
+          filter.or.forEach(filterEvaluator);
+        }
+      }
+    };
+
+    for (const policy of cube.accessPolicy) {
+      for (const filter of policy?.rowLevel?.filters || []) {
+        filterEvaluator(filter);
+      }
+
+      if (policy.memberLevel) {
+        policy.memberLevel.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberLevel.includes || '*'
+        ).map(memberMapper('an includes member'));
+        policy.memberLevel.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberLevel.excludes || []
+        ).map(memberMapper('an excludes member'));
+      }
+    }
   }
 
   private prepareHierarchies(cube: any) {
@@ -513,6 +577,19 @@ export class CubeEvaluator extends CubeSymbols {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
+  }
+
+  public isRbacEnabledForCube(cube: any): boolean {
+    return cube.accessPolicy && cube.accessPolicy.length;
+  }
+
+  public isRbacEnabled(): boolean {
+    if (this.isRbacEnabledCache === null) {
+      this.isRbacEnabledCache = this.cubeNames().some(
+        cubeName => this.isRbacEnabledForCube(this.cubeFromPath(cubeName))
+      );
+    }
+    return this.isRbacEnabledCache;
   }
 
   protected parsePathAnyType(path) {
