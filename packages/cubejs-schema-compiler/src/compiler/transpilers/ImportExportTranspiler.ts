@@ -50,7 +50,7 @@ export class ImportExportTranspiler implements TranspilerInterface {
           }
         });
         const addExportCall = t.callExpression(t.identifier('addExport'), [t.objectExpression(<t.ObjectProperty[]>declarations)]);
-        if (path.get('declaration')) {
+        if ('declaration' in path.node && path.node.declaration) {
           path.replaceWithMultiple([
             // @todo fix without any
             (<any>path.get('declaration')).node,
