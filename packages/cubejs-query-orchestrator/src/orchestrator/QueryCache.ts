@@ -949,7 +949,7 @@ export class QueryCache {
       }
     }
 
-    if (!res && this.redisCache && !options.useInMemory) {
+    if (!res && this.redisCache) {
       res = await this.redisCache.getJson(redisKey);
       if (res) {
         this.logger('Found redis cache entry', {
@@ -1012,9 +1012,9 @@ export class QueryCache {
         this.memoryCache.set(redisKey, parsedResult);
       }
 
-      if (this.redisCache && !options.useInMemory) {
+      if (this.redisCache) {
         await this.redisCache.setJson(redisKey, parsedResult, renewalThreshold);
-        this.logger('Using redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+        this.logger('Storing redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       }
 
       return parsedResult.result;
