@@ -63,9 +63,9 @@ export class RedisQueryCacheClient {
     return await this.redis.del(namespacedKey)
   }
 
-  public async exists(key: string): Promise<number> {
+  public async exists(key: string): Promise<boolean> {
     const namespacedKey = this.getNamespacedKey(key)
-    return await this.redis.exists(namespacedKey)
+    return (await this.redis.exists(namespacedKey)) === 1
   }
 
   public disconnect(): void {
