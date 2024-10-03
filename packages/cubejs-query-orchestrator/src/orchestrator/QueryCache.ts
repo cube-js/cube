@@ -1012,7 +1012,7 @@ export class QueryCache {
         this.memoryCache.set(redisKey, parsedResult);
       }
 
-      if (this.redisCache) {
+      if (this.redisCache && !(await this.redisCache.exists(redisKey))) {
         await this.redisCache.setJson(redisKey, parsedResult, renewalThreshold);
         this.logger('Storing redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
       }
