@@ -19,6 +19,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { RedisQueryCacheClient } from './RedisQueryCacheClient';
 
 type QueryOptions = {
   external?: boolean;
@@ -141,6 +142,8 @@ export class QueryCache {
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
+  protected redisCache?: RedisQueryCacheClient;
+
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -167,6 +170,13 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+
+    const redisUrl = process.env.CUBEJS_DEFINITE_REDIS_QUERY_CACHE_URL;
+    const redisNamespace = process.env.CUBEJS_DEFINITE_REDIS_QUERY_CACHE_NAMESPACE;
+
+    if (redisUrl && redisNamespace) {
+      this.redisCache = new RedisQueryCacheClient({ url: redisUrl, namespace: redisNamespace, logger: this.logger });
+    }
   }
 
   /**
@@ -939,8 +949,27 @@ export class QueryCache {
       }
     }
 
+    if (!res && this.redisCache && !options.useInMemory) {
+      res = await this.redisCache.getJson(redisKey);
+      if (res) {
+        this.logger('Found redis cache entry', {
+          cacheKey,
+          requestId: options.requestId,
+          spanId
+        })
+      }
+      else {
+        this.logger('Missing redis cache entry', {
+          cacheKey,
+          requestId: options.requestId,
+          spanId
+        })
+      }
+    }
+
     if (!res) {
       res = await this.cacheDriver.get(redisKey);
+      this.logger('Found driver cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
     }
 
     if (res) {
@@ -982,6 +1011,12 @@ export class QueryCache {
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);
       }
+
+      if (this.redisCache && !options.useInMemory) {
+        await this.redisCache.setJson(redisKey, parsedResult, renewalThreshold);
+        this.logger('Using redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
+      }
+
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });

@@ -35,6 +35,7 @@
     "csv-write-stream": "^2.0.0",
     "es5-ext": "0.10.53",
     "generic-pool": "^3.7.1",
+    "ioredis": "^5.4.1",
     "lru-cache": "^6.0.0",
     "moment-timezone": "^0.5.33",
     "ramda": "^0.27.2"
