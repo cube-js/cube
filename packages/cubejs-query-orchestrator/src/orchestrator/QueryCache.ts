@@ -956,13 +956,26 @@ export class QueryCache {
     }
 
     if (!res && this.redisCache) {
-      res = await this.redisCache.getJson(redisKey);
-      if (res) {
-        this.logger('Found redis cache entry', {
-          cacheKey,
-          requestId: options.requestId,
-          spanId
-        })
+      const redisValue = await this.redisCache.getJson(redisKey);
+      if (redisValue) {
+        if (renewalKey && redisValue.renewalKey !== renewalKey) {
+          this.redisCache?.delete(redisKey);
+          this.logger('Deleting redis cache entry because renewal key has changed', {
+            cacheKey,
+            requestId: options.requestId,
+            spanId,
+            renewalKey,
+            cachedRenewalKey: redisValue.renewalKey
+          });
+        }
+        else {
+          this.logger('Found redis cache entry', {
+            cacheKey,
+            requestId: options.requestId,
+            spanId
+          });
+          res = redisValue;
+        }
       }
       else {
         this.logger('Missing redis cache entry', {
