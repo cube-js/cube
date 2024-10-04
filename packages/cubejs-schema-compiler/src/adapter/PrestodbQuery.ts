@@ -116,8 +116,8 @@ export class PrestodbQuery extends BaseQuery {
       'FROM (\n  {{ from }}\n) AS {{ from_alias }} \n' +
       '{% if group_by %} GROUP BY {{ group_by }}{% endif %}' +
       '{% if order_by %} ORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
-      '{% if offset %}\nOFFSET {{ offset }}{% endif %}' +
-      '{% if limit %}\nLIMIT {{ limit }}{% endif %}';
+      '{% if offset is not none %}\nOFFSET {{ offset }}{% endif %}' +
+      '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}';
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';

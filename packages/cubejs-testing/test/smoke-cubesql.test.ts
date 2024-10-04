@@ -390,6 +390,13 @@ describe('SQL API', () => {
       expect(res.rows).toEqual([]);
     });
 
+    test('zero limited dimension aggregated queries through wrapper', async () => {
+      // Attempts to trigger query generation from SQL templates, not from Cube
+      const query = 'SELECT MIN(t.maxval) FROM (SELECT MAX(createdAt) as maxval FROM Orders LIMIT 10) t LIMIT 0';
+      const res = await connection.query(query);
+      expect(res.rows).toEqual([]);
+    });
+
     test('select dimension agg where false', async () => {
       const query =
           'SELECT MAX("createdAt") AS "max" FROM "BigOrders" WHERE 1 = 0';

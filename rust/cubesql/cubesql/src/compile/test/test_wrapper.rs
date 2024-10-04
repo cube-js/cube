@@ -964,3 +964,40 @@ async fn test_case_wrapper_escaping() {
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
 }
+
+/// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
+#[tokio::test]
+async fn test_wrapper_limit_zero() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+            SELECT
+                MIN(t.a)
+            FROM (
+                SELECT
+                    MAX(order_date) AS a
+                FROM
+                    KibanaSampleDataEcommerce
+                LIMIT 10
+            ) t LIMIT 0
+            "#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let logical_plan = query_plan.as_logical_plan();
+    assert!(logical_plan
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql
+        .contains("LIMIT 0"));
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
