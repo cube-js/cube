@@ -19,6 +19,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { PreAggregationDescription } from './PreAggregations';
 import { getCacheHash } from './utils';
 import { CacheAndQueryDriverType } from './QueryOrchestrator';
+import { RedisQueryCacheClient } from './RedisQueryCacheClient';
 
 type QueryOptions = {
   external?: boolean;
@@ -141,6 +142,8 @@ export class QueryCache {
 
   protected memoryCache: LRUCache<string, CacheEntry>;
 
+  protected redisCache?: RedisQueryCacheClient;
+
   public constructor(
     protected readonly redisPrefix: string,
     protected readonly driverFactory: DriverFactoryByDataSource,
@@ -167,6 +170,13 @@ export class QueryCache {
     this.memoryCache = new LRUCache<string, CacheEntry>({
       max: options.maxInMemoryCacheEntries || 10000
     });
+
+    const redisUrl = process.env.CUBEJS_DEFINITE_REDIS_QUERY_CACHE_URL;
+    const redisNamespace = process.env.CUBEJS_DEFINITE_REDIS_QUERY_CACHE_NAMESPACE;
+
+    if (redisUrl && redisNamespace) {
+      this.redisCache = new RedisQueryCacheClient({ url: redisUrl, namespace: redisNamespace, logger: this.logger });
+    }
   }
 
   /**
@@ -861,12 +871,18 @@ export class QueryCache {
         dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
         lambdaTypes: options.lambdaTypes,
-      }).then(res => {
+      }).then(async res => {
         const result = {
           time: (new Date()).getTime(),
           result: res,
           renewalKey
         };
+
+        if (this.redisCache) {
+          await this.redisCache.setJson(redisKey, result, expiration);
+          this.logger('Storing redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle, expiration });
+        }
+
         return this
           .cacheDriver
           .set(redisKey, result, expiration)
@@ -898,7 +914,7 @@ export class QueryCache {
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      return await fetchNew();
     }
 
     let res;
@@ -939,8 +955,40 @@ export class QueryCache {
       }
     }
 
+    if (!res && this.redisCache) {
+      const redisValue = await this.redisCache.getJson(redisKey);
+      if (redisValue) {
+        if (renewalKey && redisValue.renewalKey !== renewalKey) {
+          this.redisCache?.delete(redisKey);
+          this.logger('Deleting redis cache entry because renewal key has changed', {
+            cacheKey,
+            requestId: options.requestId,
+            spanId,
+            renewalKey: redisValue.renewalKey,
+            newRenewalKey: renewalKey
+          });
+        }
+        else {
+          this.logger('Found redis cache entry', {
+            cacheKey,
+            requestId: options.requestId,
+            spanId
+          });
+          res = redisValue;
+        }
+      }
+      else {
+        this.logger('Missing redis cache entry', {
+          cacheKey,
+          requestId: options.requestId,
+          spanId
+        })
+      }
+    }
+
     if (!res) {
       res = await this.cacheDriver.get(redisKey);
+      this.logger('Found driver cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
     }
 
     if (res) {
@@ -968,14 +1016,17 @@ export class QueryCache {
       ) {
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
+          return await fetchNew();
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
+          try {
+            await fetchNew();
+          }
+          catch (e: any) {
             if (!(e instanceof ContinueWaitError)) {
               this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             }
-          });
+          }
         }
       }
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
@@ -985,7 +1036,7 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      return await fetchNew();
     }
   }
 
