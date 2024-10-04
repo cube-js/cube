@@ -762,7 +762,7 @@ export class QueryCache {
             cacheKey,
             expireSecs,
             {
-              renewalThreshold: renewalThreshold || 6 * 60 * 60,
+              renewalThreshold: renewalThreshold || 24 * 60 * 60,
               renewalKey: cacheKeyQueryResults && [
                 cacheKeyQueries,
                 cacheKeyQueryResults,
