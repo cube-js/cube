@@ -187,6 +187,7 @@ export class DatabricksQuery extends BaseQuery {
   public sqlTemplates() {
     const templates = super.sqlTemplates();
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
+    templates.functions.DATEPART = 'DATE_PART({{ args_concat }})';
     templates.functions.BTRIM = 'TRIM({% if args[1] is defined %}{{ args[1] }} FROM {% endif %}{{ args[0] }})';
     templates.functions.LTRIM = 'LTRIM({{ args|reverse|join(", ") }})';
     templates.functions.RTRIM = 'RTRIM({{ args|reverse|join(", ") }})';
@@ -194,6 +195,7 @@ export class DatabricksQuery extends BaseQuery {
     templates.functions.LEAST = 'LEAST({{ args_concat }})';
     templates.functions.GREATEST = 'GREATEST({{ args_concat }})';
     templates.expressions.timestamp_literal = 'from_utc_timestamp(\'{{ value }}\', \'UTC\')';
+    templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '``';
     // TODO: Databricks has `TIMESTAMP_NTZ` with logic similar to Pg's `TIMESTAMP`
