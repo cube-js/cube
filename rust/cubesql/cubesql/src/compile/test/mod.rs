@@ -38,6 +38,8 @@ pub mod test_introspection;
 pub mod test_udfs;
 #[cfg(test)]
 pub mod test_user_change;
+#[cfg(test)]
+pub mod test_wrapper;
 pub mod utils;
 pub use utils::*;
 
