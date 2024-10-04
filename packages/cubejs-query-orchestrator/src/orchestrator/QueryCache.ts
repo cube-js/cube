@@ -914,7 +914,7 @@ export class QueryCache {
 
     if (options.forceNoCache) {
       this.logger('Force no cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      return await fetchNew();
     }
 
     let res;
@@ -1016,14 +1016,17 @@ export class QueryCache {
       ) {
         if (options.waitForRenew) {
           this.logger('Waiting for renew', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          return fetchNew();
+          return await fetchNew();
         } else {
           this.logger('Renewing existing key', { cacheKey, renewalThreshold, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-          fetchNew().catch(e => {
+          try {
+            await fetchNew();
+          }
+          catch (e: any) {
             if (!(e instanceof ContinueWaitError)) {
               this.logger('Error renewing', { cacheKey, error: e.stack || e, requestId: options.requestId, spanId, primaryQuery, renewCycle });
             }
-          });
+          }
         }
       }
       this.logger('Using cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
@@ -1033,7 +1036,7 @@ export class QueryCache {
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      return fetchNew();
+      return await fetchNew();
     }
   }
 
