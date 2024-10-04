@@ -871,12 +871,18 @@ export class QueryCache {
         dataSource: options.dataSource,
         useCsvQuery: options.useCsvQuery,
         lambdaTypes: options.lambdaTypes,
-      }).then(res => {
+      }).then(async res => {
         const result = {
           time: (new Date()).getTime(),
           result: res,
           renewalKey
         };
+
+        if (this.redisCache) {
+          await this.redisCache.setJson(redisKey, result, expiration);
+          this.logger('Storing redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle, expiration });
+        }
+
         return this
           .cacheDriver
           .set(redisKey, result, expiration)
@@ -1011,12 +1017,6 @@ export class QueryCache {
       if (options.useInMemory && renewedAgo + inMemoryCacheDisablePeriod <= renewalThreshold * 1000) {
         this.memoryCache.set(redisKey, parsedResult);
       }
-
-      if (this.redisCache && !(await this.redisCache.exists(redisKey))) {
-        await this.redisCache.setJson(redisKey, parsedResult, renewalThreshold);
-        this.logger('Storing redis cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
-      }
-
       return parsedResult.result;
     } else {
       this.logger('Missing cache for', { cacheKey, requestId: options.requestId, spanId, primaryQuery, renewCycle });
