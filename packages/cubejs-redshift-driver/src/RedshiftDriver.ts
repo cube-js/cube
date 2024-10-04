@@ -6,7 +6,13 @@
 
 import { getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { DownloadTableCSVData, DriverCapabilities, UnloadOptions } from '@cubejs-backend/base-driver';
+import {
+  DownloadTableCSVData,
+  DriverCapabilities,
+  StreamOptions,
+  StreamTableDataWithTypes,
+  UnloadOptions
+} from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
 
 interface RedshiftDriverExportRequiredAWS {
@@ -89,6 +95,32 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       readOnly: false,
       exportBucket: this.getExportBucket(dataSource),
     };
+  }
+
+  protected static checkValuesLimit(values?: unknown[]) {
+    // Redshift server is not exactly compatible with PostgreSQL protocol
+    // And breaks after 32767 parameter values with `there is no parameter $-32768`
+    // This is a bug/misbehaviour on server side, nothing we can do besides generate a more meaningful error
+    const length = (values?.length ?? 0);
+    if (length >= 32768) {
+      throw new Error(`Redshift server does not support more than 32767 parameters, but ${length} passed`);
+    }
+  }
+
+  public override async stream(
+    query: string,
+    values: unknown[],
+    options: StreamOptions
+  ): Promise<StreamTableDataWithTypes> {
+    RedshiftDriver.checkValuesLimit(values);
+
+    return super.stream(query, values, options);
+  }
+
+  protected override async queryResponse(query: string, values: unknown[]) {
+    RedshiftDriver.checkValuesLimit(values);
+
+    return super.queryResponse(query, values);
   }
 
   protected getExportBucket(

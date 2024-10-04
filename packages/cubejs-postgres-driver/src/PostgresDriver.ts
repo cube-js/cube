@@ -296,6 +296,8 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     values: unknown[],
     { highWaterMark }: StreamOptions
   ): Promise<StreamTableDataWithTypes> {
+    PostgresDriver.checkValuesLimit(values);
+
     const conn = await this.pool.connect();
 
     try {
@@ -324,7 +326,22 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
     }
   }
 
+  protected static checkValuesLimit(values?: unknown[]) {
+    // PostgreSQL protocol allows sending up to 65535 params in a single bind message
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/tcop/postgres.c#L1698-L1708
+    // See https://github.com/postgres/postgres/blob/REL_16_0/src/backend/libpq/pqformat.c#L428-L431
+    // But 'pg' module does not check for params count, and ends up sending incorrect bind message
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/serializer.ts#L155
+    // See https://github.com/brianc/node-postgres/blob/92cb640fd316972e323ced6256b2acd89b1b58e0/packages/pg-protocol/src/buffer-writer.ts#L32-L37
+    const length = (values?.length ?? 0);
+    if (length >= 65536) {
+      throw new Error(`PostgreSQL protocol does not support more than 65535 parameters, but ${length} passed`);
+    }
+  }
+
   protected async queryResponse(query: string, values: unknown[]) {
+    PostgresDriver.checkValuesLimit(values);
+
     const conn = await this.pool.connect();
 
     try {
