@@ -964,8 +964,8 @@ export class QueryCache {
             cacheKey,
             requestId: options.requestId,
             spanId,
-            renewalKey,
-            cachedRenewalKey: redisValue.renewalKey
+            renewalKey: redisValue.renewalKey,
+            newRenewalKey: renewalKey
           });
         }
         else {
