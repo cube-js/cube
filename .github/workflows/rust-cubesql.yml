@@ -41,11 +41,21 @@ jobs:
           shared-key: cubesql-${{ runner.OS }}-x86_64-unknown-linux-gnu
       - name: Lint CubeSQL
         run: cd rust/cubesql && cargo fmt --all -- --check
+      - name: Lint Native utils
+        run: cd rust/cubenativeutils && cargo fmt --all -- --check
+      - name: Lint SQL planner
+        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
       # TODO replace with clippy once cubesql is ready
       - name: Check CubeSQL
         run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
+      # TODO replace with clippy once cubenativeutils is ready
+      - name: Check Native utils
+        run: cd rust/cubenativeutils && cargo check --locked --workspace --all-targets --keep-going
+      # TODO replace with clippy once cubesqlplanner is ready
+      - name: Check SQL planner
+        run: cd rust/cubesqlplanner && cargo check --locked --workspace --all-targets --keep-going
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
