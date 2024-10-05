@@ -43,16 +43,12 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
-      # TODO replace with clippy once cubesql is ready
-      - name: Check CubeSQL
-        run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
+      - name: Clippy CubeSQL
+        run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
-      # CubeSQL is not ready for Clippy
-      #- name: Clippy CubeSQL
-      #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster
