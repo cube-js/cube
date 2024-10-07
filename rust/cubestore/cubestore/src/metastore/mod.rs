@@ -2134,7 +2134,7 @@ impl MetaStore for RocksMetaStore {
             } else {
                 None
             };
-            let aggregate_column_indices = if let Some(aggrs) = aggregates {
+            let aggregate_column_indices = if let Some(ref aggrs) = aggregates {
                 let res = aggrs.iter()
                     .map(|aggr| {
                         let aggr_column = &aggr.1;
@@ -2232,6 +2232,14 @@ impl MetaStore for RocksMetaStore {
                     index_def,
                 )?;
             }
+
+            let aggr_column_names = if let Some(ref aggrs) = aggregates {
+                aggrs.iter()
+                    .map(|aggr| aggr.1.clone())
+                    .collect::<Vec<String>>()
+            } else {
+                vec![]
+            };
             let def_index_columns = table_id
                 .get_row()
                 .unique_key_columns()
@@ -2242,9 +2250,10 @@ impl MetaStore for RocksMetaStore {
                     ColumnType::Bytes => None,
                     ColumnType::HyperLogLog(_) => None,
                     _ => {
-                        if seq_column_index.is_none()
-                            || seq_column_index.is_some()
-                                && c.get_index() as u64 != seq_column_index.unwrap()
+                        if !aggr_column_names.contains(&c.get_name())
+                            && seq_column_index.is_none()
+                            || (seq_column_index.is_some()
+                                && c.get_index() as u64 != seq_column_index.unwrap())
                         {
                             Some(c.get_name().clone())
                         } else {
