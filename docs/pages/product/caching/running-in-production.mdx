@@ -221,6 +221,13 @@ Cube Store cluster uses both persistent and scratch storage.
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files.
 
+<InfoBox>
+
+Persistent storage can be [encrypted](#data-at-rest-encryption) to ensure
+data-at-rest protection.
+
+</InfoBox>
+
 Cube Store can be configured to use either AWS S3, Google Cloud Storage (GCS), or
 Azure Blob Storage as persistent storage. If desired, a local path on
 the server can also be used in case all Cube Store cluster nodes are
