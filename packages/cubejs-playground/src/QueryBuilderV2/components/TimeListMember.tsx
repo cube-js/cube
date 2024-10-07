@@ -6,8 +6,8 @@ import {
   Text,
   TimeIcon,
   CalendarIcon,
+  CalendarEditIcon,
   TooltipProvider,
-  CubeIcon,
 } from '@cube-dev/ui-kit';
 import { Cube, TCubeDimension, TimeDimensionGranularity } from '@cubejs-client/core';
 
@@ -191,8 +191,7 @@ export function TimeListMember(props: ListMemberProps) {
               <Text ellipsis>value</Text>
             </ListMemberButton>
           ) : null}
-          {/* TODO: Add special icon for custom granularities and use it here */}
-          {granularityItems(customGranularities, <CubeIcon />)}
+          {granularityItems(customGranularities, <CalendarEditIcon />)}
           {granularityItems(PREDEFINED_GRANULARITIES, <CalendarIcon />)}
         </Flex>
       ) : null}

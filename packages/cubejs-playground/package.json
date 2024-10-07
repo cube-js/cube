@@ -65,7 +65,7 @@
   "devDependencies": {
     "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
-    "@cube-dev/ui-kit": "0.37.3",
+    "@cube-dev/ui-kit": "0.37.4",
     "@cubejs-client/core": "^0.36.4",
     "@cubejs-client/react": "^0.36.4",
     "@types/flexsearch": "^0.7.3",
