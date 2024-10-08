@@ -221,13 +221,6 @@ Cube Store cluster uses both persistent and scratch storage.
 Cube Store makes use of a separate storage layer for storing metadata as well as
 for persisting pre-aggregations as Parquet files.
 
-<InfoBox>
-
-Persistent storage can be [encrypted](#data-at-rest-encryption) to ensure
-data-at-rest protection.
-
-</InfoBox>
-
 Cube Store can be configured to use either AWS S3, Google Cloud Storage (GCS), or
 Azure Blob Storage as persistent storage. If desired, a local path on
 the server can also be used in case all Cube Store cluster nodes are
@@ -254,6 +247,14 @@ Using Azure Blob Storage with Cube Store is only supported in Cube Cloud on
 [Enterprise and above plans](https://cube.dev/pricing).
 
 </SuccessBox>
+
+<InfoBox>
+
+As an additional layer on top of standard AWS S3, Google Cloud Storage (GCS), or
+Azure Blob Storage encryption, persistent storage can optionally use [Parquet
+encryption](#data-at-rest-encryption) for data-at-rest protection.
+
+</InfoBox>
 
 A simplified example using AWS S3 might look like:
 
@@ -334,11 +335,14 @@ only allows access from the Cube deployment.
 
 ### Data-at-rest encryption
 
-Cube Store provides data-at-rest protection by utilizing the [modular encryption
-mechanism][link-parquet-encryption] of Parquet files in its [persistent
-storage](#persistent-storage). Pre-aggregation data is secured using the
-[AES cipher][link-aes] with 256-bit keys. Data encyption and decryption are
-completely seamless to Cube Store operations.
+[Persistent storage](#persistent-storage) is secured using the standard AWS S3,
+Google Cloud Storage (GCS), or Azure Blob Storage encryption.
+
+Cube Store also provides optional data-at-rest protection by utilizing the
+[modular encryption mechanism][link-parquet-encryption] of Parquet files in its
+persistent storage. Pre-aggregation data is secured using the [AES cipher][link-aes]
+with 256-bit keys. Data encyption and decryption are completely seamless to Cube
+Store operations.
 
 <SuccessBox>
 
