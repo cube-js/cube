@@ -53,7 +53,7 @@ const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 1000, label: '1,000' },
   { key: 5000, label: '5,000 (Default)' },
   { key: 50000, label: '50,000 (Max)' },
-] as const;
+];
 const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];
 
 function timezoneByName(name: string) {
