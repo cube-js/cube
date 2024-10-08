@@ -58,24 +58,29 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
     }
 
     fn get_sql_type(&self) -> ColumnType {
-        let from_type = match &self._type.to_lowercase().as_str() {
-            &"number" => ColumnType::Double,
-            &"boolean" => ColumnType::Boolean,
+        let self_type = self._type.to_lowercase();
+        let self_type = self_type.as_str();
+
+        let from_type = match self_type {
+            "number" => ColumnType::Double,
+            "boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
         };
 
-        match &self.agg_type {
-            Some(agg_type) => match agg_type.as_str() {
-                "count" => ColumnType::Int64,
-                "countDistinct" => ColumnType::Int64,
-                "countDistinctApprox" => ColumnType::Int64,
-                "sum" => ColumnType::Double,
-                "avg" => ColumnType::Double,
-                "min" => ColumnType::Double,
-                "max" => ColumnType::Double,
-                "runningTotal" => ColumnType::Double,
-                _ => from_type,
-            },
+        match (self_type, &self.agg_type.as_deref()) {
+            (_, Some("count")) => ColumnType::Int64,
+            (_, Some("countDistinct")) => ColumnType::Int64,
+            (_, Some("countDistinctApprox")) => ColumnType::Int64,
+
+            // TODO is Timestamp ok here?
+            ("time", Some("min")) => ColumnType::Timestamp,
+            ("time", Some("max")) => ColumnType::Timestamp,
+
+            (_, Some("sum")) => ColumnType::Double,
+            (_, Some("avg")) => ColumnType::Double,
+            (_, Some("min")) => ColumnType::Double,
+            (_, Some("max")) => ColumnType::Double,
+            (_, Some("runningTotal")) => ColumnType::Double,
             _ => from_type,
         }
     }
