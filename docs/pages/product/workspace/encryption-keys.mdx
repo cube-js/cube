@@ -23,8 +23,8 @@ On the <Btn>Encryption Keys</Btn> page, you can see all previously provided keys
 ### Add a key
 
 To add an encryption key, click <Btn>Create</Btn> to open a modal window.
-Provide any string as the key name and paste a [Base64-encoded][link-base64]
-string as the 256-bit key value.
+Provide the key name and the key value: an 256-bit AES encryption key, encoded
+in [standard Base64][link-base64] in its canonical representation.
 
 <Screenshot src="https://ucarecdn.com/9338679e-9ed0-4ac2-86a8-975e08699c34/" />
 
@@ -60,10 +60,10 @@ querying `system.tables` in Cube Store via [SQL Runner][ref-sql-runner]:
 
 <WarningBox>
 
-Only newly built or rebuilt pre-aggregation partitions will use the newly added
-encryption key. Previously built partitions will still be encrypted using
-previously provided keys. If you [drop a key](#drop-a-key) before these partitions
-are rebuilt, querying them will yield an error.
+Only newly built or rebuilt pre-aggregation partitions will be encrypted using the
+newly added encryption key. Previously built partitions will still be encrypted
+using previously provided keys. If you [drop a key](#drop-a-key) before these
+partitions are rebuilt, querying them will yield an error.
 
 </WarningBox>
 
@@ -82,7 +82,7 @@ To drop an encryption key, click <Btn>Delete</Btn> next to it.
 
 
 [ref-cube-store-encryption]: /product/caching/running-in-production#data-at-rest-encryption
-[link-base64]: https://en.wikipedia.org/wiki/Base64
+[link-base64]: https://datatracker.ietf.org/doc/html/rfc4648#section-4
 [ref-pre-aggs-refresh-strategy]: /product/caching/using-pre-aggregations#refresh-strategy
 [ref-pre-aggs-build-manually]: /product/workspace/pre-aggregations
 [ref-pre-aggs-incremental]: /reference/data-model/pre-aggregations#incremental
