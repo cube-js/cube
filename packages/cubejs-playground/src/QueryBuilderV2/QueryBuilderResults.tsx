@@ -55,6 +55,7 @@ import {
 
 import { formatCurrency, formatNumber } from './utils/formatters';
 import { useDeepMemo, useIntervalEffect } from './hooks';
+import { OutdatedLabel } from './components/OutdatedLabel';
 import { CopyButton } from './components/CopyButton';
 import { Panel } from './components/Panel';
 import { ListMemberButton } from './components/ListMemberButton';
@@ -661,7 +662,7 @@ interface MemberItem {
 export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boolean }) {
   const {
     isLoading,
-    isQueryTouched,
+    isResultOutdated,
     query,
     members,
     measures: measuresUpdater,
@@ -703,7 +704,6 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
   const dimensions = query?.dimensions || [];
   const timeDimensions = query?.timeDimensions?.filter((member) => !!member.granularity) || [];
   const totalColumns = measures.length + dimensions.length + grouping.getAll().length;
-  const isOutdated = executedQuery && isQueryTouched;
   const isColumnsSelected = !!totalColumns;
 
   // scroll table to the top when page is changed
@@ -1190,11 +1190,7 @@ export function QueryBuilderResults({ forceMinHeight }: { forceMinHeight?: boole
 
       <TableFooter>
         <Space>
-          {isLoading ? (
-            <LoadingOutlined />
-          ) : isOutdated ? (
-            <Badge type="disabled">OUTDATED</Badge>
-          ) : undefined}
+          {isLoading ? <LoadingOutlined /> : isResultOutdated ? <OutdatedLabel /> : undefined}
           {executedQuery && !isLoading && isColumnsSelected && queryRelated && (
             <Space gap="1x">
               <Text preset="t3m">

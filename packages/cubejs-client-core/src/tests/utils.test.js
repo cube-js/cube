@@ -1,7 +1,7 @@
 import 'jest';
 
-import { TIME_SERIES, dayRange } from '../ResultSet';
 import { defaultOrder } from '../utils';
+import { dayRange, TIME_SERIES } from '../time';
 
 describe('utils', () => {
   test('default order', () => {

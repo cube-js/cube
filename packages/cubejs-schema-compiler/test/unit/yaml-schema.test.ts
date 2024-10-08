@@ -324,10 +324,12 @@ describe('Yaml Schema Testing', () => {
               granularities:
                 - name: six_months
                   interval: 6 months
+                  title: 6 month intervals
                 - name: three_months_offset
                   interval: 3 months
                   offset: 2 weeks
                 - name: fiscal_year_1st_april
+                  title: Fiscal year by Apr
                   interval: 1 year
                   origin: >
                     2024-04-01

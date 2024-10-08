@@ -49,13 +49,7 @@ function metaToTypes(meta: Meta) {
   return types;
 }
 
-export function convertJsonQueryToGraphQL({
-  meta,
-  query,
-}: {
-  meta?: Meta | null;
-  query: Query;
-}) {
+export function convertJsonQueryToGraphQL({ meta, query }: { meta?: Meta | null; query: Query }) {
   const types = meta ? metaToTypes(meta) : null;
 
   if (!types) {
@@ -150,9 +144,7 @@ export class CubeGraphQLConverter {
   }
 
   public convert() {
-    return t.print(
-      baseCubeQuery(this.getCubeArgs(), this.getFieldsSelections())
-    );
+    return t.print(baseCubeQuery(this.getCubeArgs(), this.getFieldsSelections()));
   }
 
   private resolveFilter(
@@ -231,10 +223,7 @@ export class CubeGraphQLConverter {
           );
         }
 
-        return this.objectFieldFilter(
-          item.filters,
-          unCapitalize(item.cubeName)
-        );
+        return this.objectFieldFilter(item.filters, unCapitalize(item.cubeName));
       } else {
         return this.objectField(
           this.booleanFilter(
@@ -289,10 +278,7 @@ export class CubeGraphQLConverter {
     const filters = Array.isArray(filter) ? filter : [filter];
 
     const value = (f: any): t.ValueNode => {
-      const kind =
-        this.types[f.member || f.dimension] === 'number'
-          ? t.Kind.FLOAT
-          : t.Kind.STRING;
+      const kind = this.types[f.member || f.dimension] === 'number' ? t.Kind.FLOAT : t.Kind.STRING;
 
       if (['set', 'notSet'].includes(f.operator)) {
         return {
@@ -332,13 +318,8 @@ export class CubeGraphQLConverter {
         );
       }
 
-      if (
-        singleValueOperators.includes(f.operator) &&
-        (f.values || []).length > 1
-      ) {
-        throw new Error(
-          `Filter operator "${f.operator}" must have a single value`
-        );
+      if (singleValueOperators.includes(f.operator) && (f.values || []).length > 1) {
+        throw new Error(`Filter operator "${f.operator}" must have a single value`);
       }
 
       return {
@@ -363,9 +344,7 @@ export class CubeGraphQLConverter {
                       value:
                         f.operator === 'equals' && (f.values || []).length <= 1
                           ? f.operator in OPERATORS_MAP
-                          : OPERATORS_MAP[
-                              f.operator as keyof typeof OPERATORS_MAP
-                            ] || f.operator,
+                          : OPERATORS_MAP[f.operator as keyof typeof OPERATORS_MAP] || f.operator,
                     },
                     value: value(f),
                   },
@@ -393,10 +372,7 @@ export class CubeGraphQLConverter {
     return fields;
   }
 
-  private objectField(
-    fields: t.ObjectFieldNode | t.ObjectFieldNode[],
-    fieldName: string
-  ) {
+  private objectField(fields: t.ObjectFieldNode | t.ObjectFieldNode[], fieldName: string) {
     return {
       kind: t.Kind.OBJECT_FIELD,
       name: {
@@ -411,10 +387,7 @@ export class CubeGraphQLConverter {
   }
 
   // OR: [{ orders: { status: { equals: "active"} }}]
-  private booleanFilter(
-    kind: FilterKind,
-    values: t.ObjectValueNode[]
-  ): t.ObjectFieldNode {
+  private booleanFilter(kind: FilterKind, values: t.ObjectValueNode[]): t.ObjectFieldNode {
     return {
       kind: t.Kind.OBJECT_FIELD,
       name: {
@@ -502,7 +475,7 @@ export class CubeGraphQLConverter {
   private getCubeArgs() {
     const cubeArgsKeys: [
       string,
-      typeof t.Kind.STRING | typeof t.Kind.INT | typeof t.Kind.OBJECT
+      typeof t.Kind.STRING | typeof t.Kind.INT | typeof t.Kind.OBJECT,
     ][] = [
       ['timezone', t.Kind.STRING],
       ['limit', t.Kind.INT],
@@ -584,18 +557,13 @@ export class CubeGraphQLConverter {
         initCube(cubeName);
 
         // eslint-disable-next-line
-        const currentField = this.cubes[cubeName].fields.find(
-          ({ name }) => name === field
-        );
+        const currentField = this.cubes[cubeName].fields.find(({ name }) => name === field);
 
         this.cubes[cubeName].fields.push({
           name: field,
           ...(gqlGranularity
             ? {
-                granularities: [
-                  ...(currentField?.granularities || []),
-                  gqlGranularity,
-                ],
+                granularities: [...(currentField?.granularities || []), gqlGranularity],
               }
             : null),
         });
@@ -607,9 +575,7 @@ export class CubeGraphQLConverter {
       const [name, field] = td.dimension.split('.');
       const cubeFieldName = `${name}.${field}`;
       if (td.granularity) {
-        map[cubeFieldName] = (map[cubeFieldName] || []).concat([
-          td.granularity,
-        ]);
+        map[cubeFieldName] = (map[cubeFieldName] || []).concat([td.granularity]);
       }
     });
 
@@ -618,9 +584,7 @@ export class CubeGraphQLConverter {
       const cubeName = unCapitalize(name);
       initCube(cubeName);
 
-      const existingField = this.cubes[cubeName].fields.find(
-        (f) => f.name === field
-      );
+      const existingField = this.cubes[cubeName].fields.find((f) => f.name === field);
 
       if (existingField) {
         existingField.granularities = uniqArray([
@@ -650,9 +614,7 @@ export class CubeGraphQLConverter {
           );
         }
 
-        const exists = this.cubes[gqlCubeName].fields.find(
-          ({ name }) => name === member
-        );
+        const exists = this.cubes[gqlCubeName].fields.find(({ name }) => name === member);
 
         if (!exists) {
           throw new Error(

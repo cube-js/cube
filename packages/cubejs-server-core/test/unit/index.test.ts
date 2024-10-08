@@ -14,9 +14,9 @@ import { OrchestratorApiOptions } from '../../src/core/OrchestratorApi';
 
 // It's just a mock to open protected methods
 class CubejsServerCoreOpen extends CubejsServerCore {
-  public readonly optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public readonly options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
   public getRefreshScheduler = super.getRefreshScheduler;
 

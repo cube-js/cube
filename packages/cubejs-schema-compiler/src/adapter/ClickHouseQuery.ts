@@ -272,6 +272,7 @@ export class ClickHouseQuery extends BaseQuery {
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
+    delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';
     templates.quotes.escape = '\\`';
     templates.types.boolean = 'BOOL';

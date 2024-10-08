@@ -16,7 +16,9 @@ context("Playground: Rollup Designer", () => {
 
       cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.getByTestId("rd-btn").click();
+      cy.wait(1000);
       cy.getByTestId("rd-modal").should("be.visible");
+      cy.wait(1000);
       cy.getByTestId("rd-query-tab").should("exist");
 
       cy.getByTestId("member-tag-Orders.Count").should("exist");
@@ -37,8 +39,9 @@ context("Playground: Rollup Designer", () => {
 
       cy.getByQa("QueryBuilder", { timeout: 30 * 1000 }).should("exist");
       cy.getByTestId("rd-btn").click();
+      cy.wait(1000);
       cy.getByTestId("rd-modal").should("be.visible");
-
+      cy.wait(1000);
       cy.getByTestId("rd-query-tab").should("not.exist");
     });
 

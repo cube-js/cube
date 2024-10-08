@@ -111,6 +111,7 @@ const BaseDimensionWithoutSubQuery = {
     then: Joi.object().pattern(identifierRegex,
       Joi.alternatives([
         Joi.object().keys({
+          title: Joi.string(),
           interval: GranularityInterval.required(),
           origin: Joi.string().required().custom((value, helpers) => {
             const date = new Date(value);
@@ -122,6 +123,7 @@ const BaseDimensionWithoutSubQuery = {
           }),
         }),
         Joi.object().keys({
+          title: Joi.string(),
           interval: GranularityInterval.required().custom((value, helper) => {
             const intParsed = value.split(' ');
             const msg = { custom: 'Arbitrary intervals cannot be used without origin point specified' };

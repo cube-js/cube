@@ -609,11 +609,18 @@ export class BaseQuery {
     const queryParams = {
       measures: this.options.measures,
       dimensions: this.options.dimensions,
+      timeDimensions: this.options.timeDimensions,
+      timezone: this.options.timezone,
       joinRoot: this.join.root,
+      joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      filters: this.options.filters,
+      baseTools: this,
 
     };
     const res = nativeBuildSqlAndParams(queryParams);
+    // FIXME
+    res[1] = [...res[1]];
     return res;
   }
 
@@ -1510,6 +1517,10 @@ export class BaseQuery {
       );
       if (m.expressionName && !collectedMeasures.length && !m.isMemberExpression) {
         throw new UserError(`Subquery dimension ${m.expressionName} should reference at least one measure`);
+      }
+      if (!collectedMeasures.length && m.isMemberExpression && m.query.allCubeNames.length > 1 && m.measureSql() === "COUNT(*)") {
+        const cubeName = m.expressionCubeName ? `\`${m.expressionCubeName}\` ` : '';
+        throw new UserError(`The query contains \`COUNT(*)\` expression but cube/view ${cubeName}is missing \`count\` measure`);
       }
       return [m.measure, collectedMeasures];
     }));
@@ -2855,8 +2866,11 @@ export class BaseQuery {
 
   newSubQueryForCube(cube, options) {
     if (this.options.queryFactory) {
-      options.paramAllocator = null;
-      return this.options.queryFactory.createQuery(cube, this.compilers, this.subQueryOptions(options));
+      // When dealing with rollup joins, it's crucial to use the correct parameter allocator for the specific cube in use.
+      // By default, we'll use BaseQuery, but it's important to note that different databases (Oracle, PostgreSQL, MySQL, Druid, etc.)
+      // have unique parameter allocator symbols. Using the wrong allocator can break the query, especially when rollup joins involve
+      // different cubes that require different allocators.
+      return this.options.queryFactory.createQuery(cube, this.compilers, { ...this.subQueryOptions(options), paramAllocator: null });
     }
 
     return this.newSubQuery(options);
@@ -3225,6 +3239,24 @@ export class BaseQuery {
         not: 'NOT ({{ expr }})',
         true: 'TRUE',
         false: 'FALSE',
+        like: '{{ expr }} {% if negated %}NOT {% endif %}LIKE {{ pattern }}',
+        ilike: '{{ expr }} {% if negated %}NOT {% endif %}ILIKE {{ pattern }}',
+        like_escape: '{{ like_expr }} ESCAPE {{ escape_char }}',
+      },
+      filters: {
+        equals: '{{ column }} = {{ value }}{{ is_null_check }}',
+        not_equals: '{{ column }} <> {{ value }}{{ is_null_check }}',
+        or_is_null_check: ' OR {{ column }} IS NULL',
+        set_where: '{{ column }} IS NOT NULL',
+        not_set_where: '{{ column }} IS NULL',
+        in: '{{ column }} IN ({{ values_concat }}){{ is_null_check }}',
+        not_in: '{{ column }} NOT IN ({{ values_concat }}){{ is_null_check }}',
+        time_range_filter: '{{ column }} >= {{ from_timestamp }} AND {{ column }} <= {{ to_timestamp }}',
+        gt: '{{ column }} > {{ param }}',
+        gte: '{{ column }} >= {{ param }}',
+        lt: '{{ column }} < {{ param }}',
+        lte: '{{ column }} <= {{ param }}'
+
       },
       quotes: {
         identifiers: '"',
@@ -3493,7 +3525,7 @@ export class BaseQuery {
         if (preAggregation.refreshKey) {
           if (preAggregation.refreshKey.sql) {
             return [
-              this.paramAllocator.buildSqlAndParams(
+              preAggregationQueryForSql.paramAllocator.buildSqlAndParams(
                 preAggregationQueryForSql.evaluateSql(cube, preAggregation.refreshKey.sql)
               ).concat({
                 external: false,
@@ -3654,6 +3686,10 @@ export class BaseQuery {
     };
   }
 
+  securityContextForRust() {
+    return this.contextSymbolsProxy(this.contextSymbols.securityContext);
+  }
+
   contextSymbolsProxy(symbols) {
     return BaseQuery.contextSymbolsProxyFrom(symbols, this.paramAllocator.allocateParam.bind(this.paramAllocator));
   }
@@ -3803,11 +3839,15 @@ export class BaseQuery {
           .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
           .reduce((a, b) => ({ ...a, ...b }), {})
         : {};
+      // Filtering aliases that somehow relate to this group members
+      const aliasesForGroupMembers = Object.entries(aliases)
+        .filter(([key, value]) => groupMembers.includes(key))
+        .map(([_key, value]) => value);
       const filter = BaseQuery.findAndSubTreeForFilterGroup(
         newGroupFilter({ operator: 'and', values: allFilters }),
         groupMembers,
         newGroupFilter,
-        Object.values(aliases)
+        aliasesForGroupMembers
       );
 
       return `(${BaseQuery.renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases)})`;
@@ -3843,15 +3883,16 @@ export class BaseQuery {
                     .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
                     .reduce((a, b) => ({ ...a, ...b }), {})
                   : {};
-                // Filtering aliases that somehow relate to this cube
-                const filteredAliases = Object.entries(aliases)
-                  .filter(([key, value]) => key.startsWith(cubeNameObj.cube) || value.startsWith(cubeNameObj.cube))
-                  .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+                // Filtering aliases that somehow relate to this group member
+                const groupMember = cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName]);
+                const aliasesForGroupMembers = Object.entries(aliases)
+                  .filter(([key, _value]) => key === groupMember)
+                  .map(([_key, value]) => value);
                 const filter = BaseQuery.findAndSubTreeForFilterGroup(
                   newGroupFilter({ operator: 'and', values: allFilters }),
-                  [cubeEvaluator.pathFromArray([cubeNameObj.cube, propertyName])],
+                  [groupMember],
                   newGroupFilter,
-                  Object.values(filteredAliases)
+                  aliasesForGroupMembers
                 );
 
                 return `(${BaseQuery.renderFilterParams(filter, [this], allocateParam, newGroupFilter, aliases)})`;

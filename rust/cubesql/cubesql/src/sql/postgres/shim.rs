@@ -3,7 +3,7 @@ use std::{
     time::SystemTime,
 };
 
-use super::extended::PreparedStatement;
+use super::{extended::PreparedStatement, pg_auth_service::AuthenticationStatus};
 use crate::{
     compile::{
         convert_statement_to_cube_query,
@@ -24,8 +24,11 @@ use crate::{
 use futures::{pin_mut, FutureExt, StreamExt};
 use log::{debug, error, trace};
 use pg_srv::{
-    buffer, protocol,
-    protocol::{ErrorCode, ErrorResponse, Format, InitialMessage, PortalCompletion},
+    buffer,
+    protocol::{
+        self, AuthenticationRequest, ErrorCode, ErrorResponse, Format, InitialMessage,
+        PortalCompletion,
+    },
     PgType, PgTypeId, ProtocolError,
 };
 use sqlparser::ast::{self, CloseCursor, FetchDirection, Query, SetExpr, Statement, Value};
@@ -46,10 +49,9 @@ pub struct AsyncPostgresShim {
     logger: Arc<dyn ContextLogger>,
 }
 
-#[derive(PartialEq, Eq)]
 pub enum StartupState {
     // Initial parameters which client sends in the first message, we use it later in auth method
-    Success(HashMap<String, String>),
+    Success(HashMap<String, String>, AuthenticationRequest),
     SslRequested,
     Denied,
     CancelRequest,
@@ -313,25 +315,23 @@ impl AsyncPostgresShim {
     }
 
     pub async fn run(&mut self) -> Result<(), ConnectionError> {
-        let initial_parameters = match self.process_initial_message().await? {
-            StartupState::Success(parameters) => parameters,
+        let (initial_parameters, auth_method) = match self.process_initial_message().await? {
+            StartupState::Success(parameters, auth_method) => (parameters, auth_method),
             StartupState::SslRequested => match self.process_initial_message().await? {
-                StartupState::Success(parameters) => parameters,
+                StartupState::Success(parameters, auth_method) => (parameters, auth_method),
                 _ => return Ok(()),
             },
             StartupState::Denied | StartupState::CancelRequest => return Ok(()),
         };
 
-        match buffer::read_message(&mut self.socket).await? {
-            protocol::FrontendMessage::PasswordMessage(password_message) => {
-                if !self
-                    .authenticate(password_message, initial_parameters)
-                    .await?
-                {
-                    return Ok(());
-                }
-            }
-            _ => return Ok(()),
+        let message_tag_parser = self.session.server.pg_auth.get_pg_message_tag_parser();
+        let auth_secret =
+            buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)).await?;
+        if !self
+            .authenticate(auth_method, auth_secret, initial_parameters)
+            .await?
+        {
+            return Ok(());
         }
 
         self.ready().await?;
@@ -351,7 +351,7 @@ impl AsyncPostgresShim {
                 true = async { semifast_shutdownable && { semifast_shutdown_interruptor.cancelled().await; true } } => {
                     return Self::flush_and_write_admin_shutdown_fatal_message(self).await;
                 }
-                message_result = buffer::read_message(&mut self.socket) => message_result?
+                message_result = buffer::read_message(&mut self.socket, Arc::clone(&message_tag_parser)) => message_result?
             };
 
             let result = match message {
@@ -716,73 +716,62 @@ impl AsyncPostgresShim {
             return Ok(StartupState::Denied);
         }
 
-        self.write(protocol::Authentication::new(
-            protocol::AuthenticationRequest::CleartextPassword,
-        ))
-        .await?;
+        let auth_method = self.session.server.pg_auth.get_auth_method(&parameters);
+        self.write(protocol::Authentication::new(auth_method.clone()))
+            .await?;
 
-        Ok(StartupState::Success(parameters))
+        Ok(StartupState::Success(parameters, auth_method))
     }
 
     pub async fn authenticate(
         &mut self,
-        password_message: protocol::PasswordMessage,
+        auth_request: AuthenticationRequest,
+        auth_secret: protocol::FrontendMessage,
         parameters: HashMap<String, String>,
     ) -> Result<bool, ConnectionError> {
-        let user = parameters.get("user").unwrap().clone();
-        let authenticate_response = self
+        let auth_service = self.session.server.auth.clone();
+        let auth_status = self
             .session
             .server
-            .auth
-            .authenticate(Some(user.clone()), Some(password_message.password.clone()))
+            .pg_auth
+            .authenticate(auth_service, auth_request, auth_secret, &parameters)
             .await;
-
-        let mut auth_context: Option<AuthContextRef> = None;
-
-        let auth_success = match authenticate_response {
-            Ok(authenticate_response) => {
-                auth_context = Some(authenticate_response.context);
-                if !authenticate_response.skip_password_check {
-                    match authenticate_response.password {
-                        None => false,
-                        Some(password) => password == password_message.password,
-                    }
-                } else {
-                    true
-                }
-            }
-            _ => false,
+        let result = match auth_status {
+            AuthenticationStatus::UnexpectedFrontendMessage => Err((
+                "invalid authorization specification".to_string(),
+                protocol::ErrorCode::InvalidAuthorizationSpecification,
+            )),
+            AuthenticationStatus::Failed(err) => Err((err, protocol::ErrorCode::InvalidPassword)),
+            AuthenticationStatus::Success(user, auth_context) => Ok((user, auth_context)),
         };
 
-        if !auth_success {
-            let error_response = protocol::ErrorResponse::fatal(
-                protocol::ErrorCode::InvalidPassword,
-                format!("password authentication failed for user \"{}\"", &user),
-            );
-            buffer::write_message(
-                &mut self.partial_write_buf,
-                &mut self.socket,
-                error_response,
-            )
-            .await?;
+        match result {
+            Err((message, code)) => {
+                let error_response = protocol::ErrorResponse::fatal(code, message);
+                buffer::write_message(
+                    &mut self.partial_write_buf,
+                    &mut self.socket,
+                    error_response,
+                )
+                .await?;
 
-            return Ok(false);
+                Ok(false)
+            }
+            Ok((user, auth_context)) => {
+                let database = parameters
+                    .get("database")
+                    .map(|v| v.clone())
+                    .unwrap_or("db".to_string());
+                self.session.state.set_database(Some(database));
+                self.session.state.set_user(Some(user));
+                self.session.state.set_auth_context(Some(auth_context));
+
+                self.write(protocol::Authentication::new(AuthenticationRequest::Ok))
+                    .await?;
+
+                Ok(true)
+            }
         }
-
-        let database = parameters
-            .get("database")
-            .map(|v| v.clone())
-            .unwrap_or("db".to_string());
-        self.session.state.set_database(Some(database));
-        self.session.state.set_user(Some(user));
-        self.session.state.set_auth_context(auth_context);
-
-        self.write(protocol::Authentication::new(
-            protocol::AuthenticationRequest::Ok,
-        ))
-        .await?;
-
-        Ok(true)
     }
 
     pub async fn ready(&mut self) -> Result<(), ConnectionError> {

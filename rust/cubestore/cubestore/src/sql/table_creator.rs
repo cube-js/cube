@@ -24,7 +24,7 @@ use std::mem::take;
 #[async_trait]
 
 pub trait TableExtensionService: DIService + Send + Sync {
-    async fn get_extension(&self) -> Option<serde_json::Value>;
+    async fn get_extension(&self) -> Result<Option<serde_json::Value>, CubeError>;
 }
 
 pub struct TableExtensionServiceImpl;
@@ -37,8 +37,8 @@ impl TableExtensionServiceImpl {
 
 #[async_trait]
 impl TableExtensionService for TableExtensionServiceImpl {
-    async fn get_extension(&self) -> Option<serde_json::Value> {
-        None
+    async fn get_extension(&self) -> Result<Option<serde_json::Value>, CubeError> {
+        Ok(None)
     }
 }
 
@@ -99,7 +99,7 @@ impl TableCreator {
         trace_obj: &Option<String>,
     ) -> Result<IdRow<Table>, CubeError> {
         let extension: Option<serde_json::Value> =
-            self.table_extension_service.get_extension().await;
+            self.table_extension_service.get_extension().await?;
         if !if_not_exists {
             return self
                 .create_table_loop(

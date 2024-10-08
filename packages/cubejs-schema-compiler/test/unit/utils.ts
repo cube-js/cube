@@ -38,6 +38,10 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           min: {
             sql: \`amount\`,
             type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
           }
         },
 
@@ -48,9 +52,25 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
             sql: 'id',
             primaryKey: true
           },
+          id_cube: {
+            type: 'number',
+            sql: \`\${CUBE}.id\`,
+          },
+          other_id: {
+            type: 'number',
+            sql: 'other_id',
+          },
           type: {
             type: 'string',
             sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE.type}\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
           },
           createdAt: {
             type: 'time',
@@ -88,8 +108,10 @@ export function createCubeSchemaWithCustomGranularities(name: string): string {
             granularities: {
               half_year: {
                 interval: '6 months',
+                title: '6 month intervals'
               },
               half_year_by_1st_april: {
+                title: 'Half year from Apr to Oct',
                 interval: '6 months',
                 offset: '3 months'
               },
@@ -222,6 +244,45 @@ export type CreateSchemaOptions = {
 
 export function createSchemaYaml(schema: CreateSchemaOptions): string {
   return YAML.dump(schema);
+}
+
+export function createSchemaYamlForGroupFilterParamsTests(cubeDefSql: string): string {
+  return createSchemaYaml({
+    cubes: [
+      {
+        name: 'Order',
+        sql: cubeDefSql,
+        measures: [{
+          name: 'count',
+          type: 'count',
+        }],
+        dimensions: [
+          {
+            name: 'dim0',
+            sql: 'dim0',
+            type: 'string'
+          },
+          {
+            name: 'dim1',
+            sql: 'dim1',
+            type: 'string'
+          }
+        ]
+      },
+    ],
+    views: [{
+      name: 'orders_view',
+      cubes: [{
+        join_path: 'Order',
+        prefix: true,
+        includes: [
+          'count',
+          'dim0',
+          'dim1',
+        ]
+      }]
+    }]
+  });
 }
 
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {

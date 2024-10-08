@@ -4704,19 +4704,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
     );
     register_fun_stub!(
         udf,
-        "regexp_instr",
-        tsigs = [
-            [Utf8, Utf8],
-            [Utf8, Utf8, Int32],
-            [Utf8, Utf8, Int32, Int32],
-            [Utf8, Utf8, Int32, Int32, Int32],
-            [Utf8, Utf8, Int32, Int32, Int32, Utf8],
-            [Utf8, Utf8, Int32, Int32, Int32, Utf8, Int32],
-        ],
-        rettyp = Int32
-    );
-    register_fun_stub!(
-        udf,
         "regexp_like",
         tsigs = [[Utf8, Utf8], [Utf8, Utf8, Utf8],],
         rettyp = Boolean

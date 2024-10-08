@@ -121,6 +121,7 @@ export class PrestodbQuery extends BaseQuery {
     templates.expressions.extract = 'EXTRACT({{ date_part }} FROM {{ expr }})';
     templates.expressions.interval_single_date_part = 'INTERVAL \'{{ num }}\' {{ date_part }}';
     templates.expressions.timestamp_literal = 'from_iso8601_timestamp(\'{{ value }}\')';
+    delete templates.expressions.ilike;
     templates.types.string = 'VARCHAR';
     templates.types.float = 'REAL';
     // Presto intervals have a YearMonth or DayTime type variants, but no universal type

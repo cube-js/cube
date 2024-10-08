@@ -4,9 +4,7 @@ import { Styles } from '@cube-dev/ui-kit';
 export type ShowExtra = 'onHover' | boolean;
 
 export type AccordionProps = {
-  children:
-    | ReactElement<AccordionItemProps>
-    | ReactElement<AccordionItemProps>[];
+  children: ReactElement<AccordionItemProps> | ReactElement<AccordionItemProps>[];
   qa?: string;
   isLazy?: boolean;
   size?: 'small' | 'normal';
@@ -19,10 +17,7 @@ export type AccordionContextType = Pick<
   'size' | 'isSeparated' | 'isLazy' | 'titleStyles' | 'contentStyles' | 'qa'
 >;
 export type AccordionProviderProps = PropsWithChildren<
-  Pick<
-    AccordionProps,
-    'size' | 'isSeparated' | 'isLazy' | 'titleStyles' | 'contentStyles' | 'qa'
-  >
+  Pick<AccordionProps, 'size' | 'isSeparated' | 'isLazy' | 'titleStyles' | 'contentStyles' | 'qa'>
 >;
 export type AccordionItemProps = {
   title: string | number;

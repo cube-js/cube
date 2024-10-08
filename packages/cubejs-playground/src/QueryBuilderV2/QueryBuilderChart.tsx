@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Badge,
   Button,
   Dialog,
   DialogTrigger,
@@ -26,6 +25,7 @@ import { useQueryBuilderContext } from './context';
 import { PivotAxes, PivotOptions } from './Pivot';
 import { ArrowIcon } from './icons/ArrowIcon';
 import { AccordionCard } from './components/AccordionCard';
+import { OutdatedLabel } from './components/OutdatedLabel';
 import { QueryBuilderChartResults } from './QueryBuilderChartResults';
 
 const CHART_HEIGHT = 400;
@@ -40,16 +40,11 @@ const ALLOWED_CHART_TYPES = ['table', 'line', 'bar', 'area'];
 
 export function QueryBuilderChart(props: QueryBuilderChartProps) {
   const [isVizardLoaded, setIsVizardLoaded] = useState(false);
-  const [isExpanded, setIsExpanded] = useLocalStorage(
-    'QueryBuilder:Chart:expanded',
-    false
-  );
+  const [isExpanded, setIsExpanded] = useLocalStorage('QueryBuilder:Chart:expanded', false);
   const { maxHeight = CHART_HEIGHT, onToggle } = props;
   let {
     query,
     isLoading,
-    isQueryTouched,
-    executedQuery,
     chartType,
     setChartType,
     pivotConfig,
@@ -57,9 +52,9 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
     resultSet,
     apiToken,
     apiUrl,
+    isResultOutdated,
     VizardComponent,
   } = useQueryBuilderContext();
-  const isOutdated = executedQuery && isQueryTouched;
   const containerRef = useRef<HTMLDivElement>(null);
 
   if (!ALLOWED_CHART_TYPES.includes(chartType || '')) {
@@ -146,8 +141,8 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
           isExpanded ? (
             <LoadingOutlined />
           ) : undefined
-        ) : isOutdated ? (
-          <Badge type="disabled">OUTDATED</Badge>
+        ) : isResultOutdated ? (
+          <OutdatedLabel />
         ) : undefined
       }
       extra={
@@ -226,9 +221,7 @@ export function QueryBuilderChart(props: QueryBuilderChartProps) {
       }}
     >
       <>
-        {isLoading ? (
-          <Skeleton height={400} layout="chart" padding="0 1x 1x 1x" />
-        ) : undefined}
+        {isLoading ? <Skeleton height={400} layout="chart" padding="0 1x 1x 1x" /> : undefined}
         {chart}
       </>
     </AccordionCard>

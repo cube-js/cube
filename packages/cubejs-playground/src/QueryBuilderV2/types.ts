@@ -1,10 +1,4 @@
-import {
-  ChartType,
-  Cube,
-  PivotConfig,
-  PreAggregationType,
-  Query,
-} from '@cubejs-client/core';
+import { ChartType, Cube, PivotConfig, PreAggregationType, Query } from '@cubejs-client/core';
 import { VizState } from '@cubejs-client/react';
 import { FC, ReactNode } from 'react';
 
@@ -48,9 +42,7 @@ export interface QueryBuilderProps extends QueryBuilderSharedProps {
   defaultChartType?: ChartType;
   defaultPivotConfig?: PivotConfig;
   tracking?: QueryBuilderTracking;
-  onQueryChange?:
-    | ((data: { query: Query; chartType?: ChartType }) => void)
-    | undefined;
+  onQueryChange?: ((data: { query: Query; chartType?: ChartType }) => void) | undefined;
 }
 
 export type CubeStats = {
@@ -73,4 +65,8 @@ export interface RequestStatusProps {
   external: boolean | null;
   extDbType: string;
   preAggregationType?: PreAggregationType;
+}
+
+export interface QueryOptions {
+  ungrouped?: boolean;
 }

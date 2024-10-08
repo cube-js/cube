@@ -15,6 +15,7 @@ use super::information_schema::postgres::{
     InfoSchemaRoleColumnGrantsProvider as PostgresInfoSchemaRoleColumnGrantsProvider,
     InfoSchemaRoleTableGrantsProvider as PostgresInfoSchemaRoleTableGrantsProvider,
     InfoSchemaSqlImplementationInfoProvider as PostgresInfoSchemaSqlImplementationInfoProvider,
+    InfoSchemaSqlSizingProvider as PostgresInfoSchemaSqlSizingProvider,
     InfoSchemaTestingBlockingProvider, InfoSchemaTestingDatasetProvider, PgCatalogAmProvider,
     PgCatalogAttrdefProvider, PgCatalogAttributeProvider, PgCatalogClassProvider,
     PgCatalogConstraintProvider, PgCatalogDatabaseProvider, PgCatalogDependProvider,
@@ -37,10 +38,10 @@ use crate::{
 };
 
 use super::information_schema::redshift::{
-    RedshiftLateBindingViewUnpackedTableProvider, RedshiftStlDdltextProvider,
-    RedshiftStlQueryProvider, RedshiftStlQuerytextProvider,
-    RedshiftSvvExternalSchemasTableProvider, RedshiftSvvTableInfoProvider,
-    RedshiftSvvTablesTableProvider,
+    RedshiftLateBindingViewUnpackedTableProvider, RedshiftPgExternalSchemaProvider,
+    RedshiftStlDdltextProvider, RedshiftStlQueryProvider, RedshiftStlQuerytextProvider,
+    RedshiftStvSlicesProvider, RedshiftSvvExternalSchemasTableProvider,
+    RedshiftSvvTableInfoProvider, RedshiftSvvTablesTableProvider,
 };
 
 impl DatabaseProtocol {
@@ -75,6 +76,8 @@ impl DatabaseProtocol {
             any.downcast_ref::<PostgresInfoSchemaSqlImplementationInfoProvider>()
         {
             "information_schema.sql_implementation_info".to_string()
+        } else if let Some(_) = any.downcast_ref::<PostgresInfoSchemaSqlSizingProvider>() {
+            "information_schema.sql_sizing".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTableProvider>() {
             "pg_catalog.pg_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogTypeProvider>() {
@@ -133,12 +136,16 @@ impl DatabaseProtocol {
             "pg_catalog.pg_views".to_string()
         } else if let Some(_) = any.downcast_ref::<PgCatalogStatUserTablesProvider>() {
             "pg_catalog.pg_stat_user_tables".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftPgExternalSchemaProvider>() {
+            "pg_catalog.pg_external_schema".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTablesTableProvider>() {
             "public.svv_tables".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvExternalSchemasTableProvider>() {
             "public.svv_external_schemas".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftSvvTableInfoProvider>() {
             "public.svv_table_info".to_string()
+        } else if let Some(_) = any.downcast_ref::<RedshiftStvSlicesProvider>() {
+            "public.stv_slices".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftStlDdltextProvider>() {
             "public.stl_ddltext".to_string()
         } else if let Some(_) = any.downcast_ref::<RedshiftStlQueryProvider>() {
@@ -235,6 +242,7 @@ impl DatabaseProtocol {
                             &context.meta.tables,
                         )))
                     }
+                    "stv_slices" => return Some(Arc::new(RedshiftStvSlicesProvider::new())),
                     "stl_ddltext" => return Some(Arc::new(RedshiftStlDdltextProvider::new())),
                     "stl_query" => return Some(Arc::new(RedshiftStlQueryProvider::new())),
                     "stl_querytext" => return Some(Arc::new(RedshiftStlQuerytextProvider::new())),
@@ -299,6 +307,7 @@ impl DatabaseProtocol {
                         PostgresInfoSchemaSqlImplementationInfoProvider::new(),
                     ))
                 }
+                "sql_sizing" => return Some(Arc::new(PostgresInfoSchemaSqlSizingProvider::new())),
                 #[cfg(debug_assertions)]
                 "testing_dataset" => {
                     return Some(Arc::new(InfoSchemaTestingDatasetProvider::new(5, 1000)))
@@ -391,6 +400,9 @@ impl DatabaseProtocol {
                     return Some(Arc::new(PgCatalogStatUserTablesProvider::new(
                         &context.meta.tables,
                     )))
+                }
+                "pg_external_schema" => {
+                    return Some(Arc::new(RedshiftPgExternalSchemaProvider::new()))
                 }
                 _ => return None,
             },

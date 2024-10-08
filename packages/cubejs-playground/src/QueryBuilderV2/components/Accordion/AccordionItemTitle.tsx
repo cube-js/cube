@@ -1,11 +1,5 @@
 import { memo, PropsWithChildren, ReactText, useState } from 'react';
-import {
-  useFocus,
-  useFocusVisible,
-  useFocusWithin,
-  useHover,
-  usePress,
-} from 'react-aria';
+import { useFocus, useFocusVisible, useFocusWithin, useHover, usePress } from 'react-aria';
 import { mergeProps, Styles, tasty, Text } from '@cube-dev/ui-kit';
 
 import { Arrow } from '../Arrow';
@@ -111,8 +105,7 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
   const { pressProps } = usePress({ onPress: onExpand });
 
   const shouldShowFocus = isFocusVisible && isFocused;
-  const hasUserHovered =
-    isHovered || shouldShowFocus || (isFocusWithin && isFocusVisible);
+  const hasUserHovered = isHovered || shouldShowFocus || (isFocusWithin && isFocusVisible);
 
   return (
     <StyledAccordionItemTitleWrap
@@ -144,9 +137,7 @@ export function AccordionItemTitle(props: AccordionItemTitleProps) {
   );
 }
 
-const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: {
-  isExpanded: boolean;
-}) {
+const AccordionItemIcon = memo(function StyledAccordionItemIcon(props: { isExpanded: boolean }) {
   const { isExpanded } = props;
 
   return (
@@ -188,10 +179,7 @@ function AccordionItemExtra(
   return <ExtraSection mods={{ show }}>{children}</ExtraSection>;
 }
 
-function shouldShowExtra(
-  showExtra: AccordionItemProps['showExtra'],
-  isHovered: boolean
-) {
+function shouldShowExtra(showExtra: AccordionItemProps['showExtra'], isHovered: boolean) {
   if (typeof showExtra === 'boolean') {
     return showExtra;
   }

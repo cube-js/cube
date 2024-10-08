@@ -174,20 +174,44 @@ jobs:
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    env:
+      CLOUD_DATABASES: >
+        athena-export-bucket-s3
+        bigquery-export-bucket-gcs
+        clickhouse-export-bucket-s3
+        databricks-jdbc
+        databricks-jdbc-export-bucket-s3
+        databricks-jdbc-export-bucket-azure
+        snowflake
+        snowflake-export-bucket-s3
+        snowflake-export-bucket-azure
+        snowflake-export-bucket-azure-via-storage-integration
+        snowflake-export-bucket-gcs
+      # As per docs:
+      # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
+      # secrets as job-level environment variables, then referencing the environment variables
+      # to conditionally run steps in the job.
+      DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
     strategy:
       matrix:
         node:
           - 20.x
         database:
-          - athena
-          - bigquery
+          - athena-export-bucket-s3
+          - bigquery-export-bucket-gcs
           - clickhouse
+          - clickhouse-export-bucket-s3
           - databricks-jdbc
-          - databricks-jdbc-export-bucket
+          - databricks-jdbc-export-bucket-s3
+          - databricks-jdbc-export-bucket-azure
           - mssql
           - mysql
           - postgres
           - snowflake
+          - snowflake-export-bucket-s3
+          - snowflake-export-bucket-azure
+          - snowflake-export-bucket-azure-via-storage-integration
+          - snowflake-export-bucket-gcs
       fail-fast: false
 
     steps:
@@ -238,6 +262,11 @@ jobs:
           yarn tsc
 
       - name: Run tests
+        uses: nick-fields/retry@v3
+        # It's enough to test for any one secret because they are set all at once or not set all
+        if: |
+          (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
+          (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
@@ -245,6 +274,13 @@ jobs:
 
           # BigQuery
           DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS }}
+
+          #GCS
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS }}
+
+          # Azure
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY }}
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN }}
 
           # Databricks
           DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL }}
@@ -255,7 +291,12 @@ jobs:
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
-        run: |
-          cd ./packages/cubejs-testing-drivers
-          export DEBUG=testcontainers
-          yarn ${{ matrix.database }}-full
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: |
+            cd ./packages/cubejs-testing-drivers
+            export DEBUG=testcontainers
+            yarn ${{ matrix.database }}-full

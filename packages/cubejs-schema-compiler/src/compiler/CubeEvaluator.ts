@@ -462,9 +462,10 @@ export class CubeEvaluator extends CubeSymbols {
 
   public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
-    return this.evaluatedCubes[cubeAndName[0]] &&
+    const symbol = this.evaluatedCubes[cubeAndName[0]] &&
       this.evaluatedCubes[cubeAndName[0]][type] &&
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    return symbol !== undefined;
   }
 
   public byPathAnyType(path: string[]) {

@@ -6,7 +6,8 @@ import {
   createCubeSchemaWithCustomGranularities,
   createCubeSchemaYaml,
   createJoinedCubesSchema,
-  createSchemaYaml
+  createSchemaYaml,
+  createSchemaYamlForGroupFilterParamsTests
 } from './utils';
 import { BigqueryQuery } from '../../src/adapter/BigqueryQuery';
 
@@ -39,7 +40,7 @@ describe('SQL Generation', () => {
       })
     );
 
-    it('Simple query', async () => {
+    it('Simple query - count measure', async () => {
       await compilers.compiler.compile();
 
       const query = new PostgresQuery(compilers, {
@@ -50,7 +51,314 @@ describe('SQL Generation', () => {
         filters: [],
       });
       const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
       expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+
+    it('Simple query - sum measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.sum'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      sum("cards".amount) "cards__sum"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toContain('card_tbl');
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+
+    it('Simple query - dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [],
+        filters: [],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - time dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.count'
+        ],
+        dimensions: [
+          'cards.type'
+        ],
+        timeDimensions: [
+          {
+            dimension: 'cards.createdAt',
+            granularity: 'day',
+            dateRange: ['2021-01-01', '2021-01-02']
+          }
+        ],
+        timezone: 'America/Los_Angeles',
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
+      expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
+      expect(queryAndParams[0]).toContain('ORDER BY 2');
+    });
+    it('Simple query - complex measure', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards" ';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - complex dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_complex'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      CONCAT("cards".type, \' \', "cards".location) "cards__type_complex", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - CUBE dimension', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type_with_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type_with_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - CUBE id', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.id_cube'
+        ],
+        measures: [
+          'cards.diff'
+        ],
+        filters: [],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".id "cards__id_cube", max("cards".amount) - min("cards".amount) "cards__diff"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+    });
+    it('Simple query - simple filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.type',
+            operator: 'equals',
+            values: ['type_value']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) AND ("cards".type = $3) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', 'type_value'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+    it('Simple query - null and many equals filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: [null]
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: [null]
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', 't2']
+              },
+
+            ]
+
+          },
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['t1', null, 't2']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['t1', null, 't2']
+              },
+
+            ]
+
+          },
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type IS NULL) OR ("cards".type IS NOT NULL)) AND (("cards".type IN ($1, $2)) OR ("cards".type NOT IN ($3, $4) OR "cards".type IS NULL)) AND (("cards".type IN ($5, $6) OR "cards".type IS NULL) OR ("cards".type NOT IN ($7, $8))) GROUP BY 1 ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      // let expectedParams = [ 'type_value', 'not_type_value', 'type_value' ];
+      // expect(queryAndParams[1]).toEqual(expectedParams);
+    });
+
+    it('Simple query - dimension and measure filter', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cards.type'
+        ],
+        measures: [
+          'cards.count'
+        ],
+        filters: [
+          {
+            or: [
+              {
+                member: 'cards.type',
+                operator: 'equals',
+                values: ['type_value']
+              },
+              {
+                member: 'cards.type',
+                operator: 'notEquals',
+                values: ['not_type_value']
+              },
+
+            ]
+
+          },
+          {
+            member: 'cards.count',
+            operator: 'equals',
+            values: ['3']
+          }],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+      const expected = 'SELECT\n' +
+          '      "cards".type "cards__type", count("cards".id) "cards__count"\n' +
+          '    FROM\n' +
+          '      card_tbl AS "cards"  WHERE (("cards".type = $1) OR ("cards".type <> $2 OR "cards".type IS NULL)) GROUP BY 1 HAVING (count("cards".id) = $3) ORDER BY 2 DESC';
+      expect(queryAndParams[0]).toEqual(expected);
+      const expectedParams = ['type_value', 'not_type_value', '3'];
+      expect(queryAndParams[1]).toEqual(expectedParams);
     });
   });
 
@@ -567,6 +875,74 @@ describe('SQL Generation', () => {
     });
   });
 
+  describe('Base joins', () => {
+    const compilers = /** @type Compilers */ prepareCompiler([
+      createCubeSchema({
+        name: 'cardsA',
+        sqlTable: 'card_tbl',
+        joins: `{
+          cardsB: {
+            sql: \`\${CUBE}.other_id = \${cardsB}.id\`,
+            relationship: 'one_to_one'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsB',
+        sqlTable: 'card2_tbl',
+        joins: `{
+          cardsC: {
+            sql: \`\${CUBE}.other_id = \${cardsC}.id\`,
+            relationship: 'hasMany'
+          },
+        }`
+      }),
+      createCubeSchema({
+        name: 'cardsC',
+        sqlTable: 'card3_tbl',
+      }),
+
+    ]);
+
+    it('Base joins - one-one join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsA.type',
+          'cardsB.type'
+        ],
+        measures: [
+          'cardsC.count',
+        ],
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id');
+    });
+
+    it('Base joins - multiplied join', async () => {
+      await compilers.compiler.compile();
+
+      const query = new PostgresQuery(compilers, {
+        dimensions: [
+          'cardsB.type',
+        ],
+        measures: [
+          'cardsB.sum',
+          'cardsC.count',
+        ],
+        timezone: 'America/Los_Angeles',
+      });
+
+      const queryAndParams = query.buildSqlAndParams();
+
+      /* expect(queryAndParams[0]).toContain('LEFT JOIN card2_tbl AS "cards_b" ON "cards_a".other_id = "cards_b".id');
+      expect(queryAndParams[0]).toContain('LEFT JOIN card3_tbl AS "cards_c" ON "cards_b".other_id = "cards_c".id'); */
+    });
+  });
   describe('Common - JS', () => {
     const compilers = /** @type Compilers */ prepareCompiler(
       createCubeSchema({
@@ -1398,8 +1774,60 @@ describe('SQL Generation', () => {
           },
         ],
       });
-      const cubeSQL = query.cubeSql('Order');
-      expect(cubeSQL).toContain('select * from order where ((type = $0$))');
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(queryString).toContain('select * from order where ((type = ?))');
+    });
+
+    it('propagate filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYaml({
+          cubes: [{
+            name: 'Order',
+            sql: `WITH cte as (select *
+                               from order
+                               where {FILTER_PARAMS.Order.type.filter('type')}
+                    )
+                    select * from cte`,
+            measures: [{
+              name: 'count',
+              type: 'count',
+            }],
+            dimensions: [{
+              name: 'type',
+              sql: 'type',
+              type: 'string'
+            }]
+          }],
+          views: [{
+            name: 'orders_view',
+            cubes: [{
+              join_path: 'Order',
+              prefix: true,
+              includes: [
+                'type',
+                'count',
+              ]
+            }]
+          }]
+        })
+      );
+
+      await compiler.compiler.compile();
+      const query = new BaseQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_type',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(type\s=\s\?\)\)/.test(queryString)).toBeTruthy();
     });
   });
 
@@ -1526,6 +1954,173 @@ describe('SQL Generation', () => {
       });
       const cubeSQL = query.cubeSql('Order');
       expect(cubeSQL).toContain('where ((((dim0 = $0$) AND (dim1 = $1$)) OR ((dim0 = $2$) AND (dim1 = $3$))))');
+    });
+
+    it('propagate 1 filter param from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+           from order
+           where {FILTER_GROUP(
+             FILTER_PARAMS.Order.dim0.filter('dim0')
+               , FILTER_PARAMS.Order.dim1.filter('dim1')
+             )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `select *
+                    from order
+                    where {FILTER_GROUP(
+                            FILTER_PARAMS.Order.dim0.filter('dim0'),
+                            FILTER_PARAMS.Order.dim1.filter('dim1')
+                      )}`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 2 filter params within cte from view into cube\'s query', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.Order.dim1.filter('dim1')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+          {
+            member: 'orders_view.Order_dim1',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\s+AND\s+\(dim1\s+=\s+\$2\)\)/.test(queryString)).toBeTruthy();
+    });
+
+    it('propagate 1 filter param within cte (ref as cube and view dimensions)', async () => {
+      /** @type {Compilers} */
+      const compiler = prepareYamlCompiler(
+        createSchemaYamlForGroupFilterParamsTests(
+          `with cte as (
+                        select *
+                        from order
+                        where
+                           {FILTER_GROUP(
+                             FILTER_PARAMS.Order.dim0.filter('dim0'),
+                             FILTER_PARAMS.orders_view.dim0.filter('dim0')
+                           )}
+                    )
+                    select * from cte`
+        )
+      );
+
+      await compiler.compiler.compile();
+      const query = new PostgresQuery(compiler, {
+        measures: ['orders_view.Order_count'],
+        filters: [
+          {
+            member: 'orders_view.Order_dim0',
+            operator: 'equals',
+            values: ['online'],
+          },
+        ],
+      });
+      const queryAndParams = query.buildSqlAndParams();
+      const queryString = queryAndParams[0];
+      expect(/select\s+\*\s+from\s+order\s+where\s+\(\(dim0\s=\s\$1\)\)/.test(queryString)).toBeTruthy();
     });
   });
 });

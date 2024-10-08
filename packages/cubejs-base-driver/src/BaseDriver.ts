@@ -18,6 +18,14 @@ import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
+import { Storage } from '@google-cloud/storage';
+import {
+  BlobServiceClient,
+  StorageSharedKeyCredential,
+  ContainerSASPermissions,
+  SASProtocol,
+  generateBlobSASQueryParameters,
+} from '@azure/storage-blob';
 
 import { cancelCombinator } from './utils';
 import {
@@ -43,6 +51,15 @@ import {
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
 } from './driver.interface';
+
+export type AzureStorageClientConfig = {
+  azureKey: string,
+  sasToken?: string,
+};
+
+export type GoogleStorageClientConfig = {
+  credentials: any,
+};
 
 const sortByKeys = (unordered: any) => {
   const ordered: any = {};
@@ -467,7 +484,7 @@ export abstract class BaseDriver implements DriverInterface {
     const conditionString = conditions.join(' OR ');
 
     const query = this.getColumnsForSpecificTablesQuery(conditionString);
-    
+
     const [primaryKeys, foreignKeys] = await Promise.all([
       this.primaryKeys(conditionString, parameters),
       this.foreignKeys(conditionString, parameters)
@@ -648,6 +665,10 @@ export abstract class BaseDriver implements DriverInterface {
     prefix: string
   ): Promise<string[]> {
     const storage = new S3(clientOptions);
+    // It looks that different driver configurations use different formats
+    // for the bucket - some expect only names, some - full url-like names.
+    // So we unify this.
+    bucketName = bucketName.replace(/^[a-zA-Z]+:\/\//, '');
 
     const list = await storage.listObjectsV2({
       Bucket: bucketName,
@@ -671,5 +692,72 @@ export abstract class BaseDriver implements DriverInterface {
     }
 
     throw new Error('Unable to retrieve list of files from S3 storage after unloading.');
+  }
+
+  /**
+   * Returns an array of signed GCS URLs of the unloaded csv files.
+   */
+  protected async extractFilesFromGCS(
+    gcsConfig: GoogleStorageClientConfig,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const storage = new Storage({
+      credentials: gcsConfig.credentials,
+      projectId: gcsConfig.credentials.project_id
+    });
+    const bucket = storage.bucket(bucketName);
+    const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
+    if (files.length) {
+      const csvFile = await Promise.all(files.map(async (file) => {
+        const [url] = await file.getSignedUrl({
+          action: 'read',
+          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
+        });
+        return url;
+      }));
+      return csvFile;
+    } else {
+      return [];
+    }
+  }
+
+  protected async extractFilesFromAzure(
+    azureConfig: AzureStorageClientConfig,
+    bucketName: string,
+    tableName: string
+  ): Promise<string[]> {
+    const parts = bucketName.split('.blob.core.windows.net/');
+    const account = parts[0];
+    const container = parts[1].split('/')[0];
+    const credential = new StorageSharedKeyCredential(account, azureConfig.azureKey);
+    const url = `https://${account}.blob.core.windows.net`;
+    const blobServiceClient = azureConfig.sasToken ?
+      new BlobServiceClient(`${url}?${azureConfig.sasToken}`) :
+      new BlobServiceClient(url, credential);
+
+    const csvFiles: string[] = [];
+    const containerClient = blobServiceClient.getContainerClient(container);
+    const blobsList = containerClient.listBlobsFlat({ prefix: `${tableName}/` });
+    for await (const blob of blobsList) {
+      if (blob.name && (blob.name.endsWith('.csv.gz') || blob.name.endsWith('.csv'))) {
+        const sas = generateBlobSASQueryParameters(
+          {
+            containerName: container,
+            blobName: blob.name,
+            permissions: ContainerSASPermissions.parse('r'),
+            startsOn: new Date(new Date().valueOf()),
+            expiresOn:
+              new Date(new Date().valueOf() + 1000 * 60 * 60),
+            protocol: SASProtocol.Https,
+            version: '2020-08-04',
+          },
+          credential,
+        ).toString();
+        csvFiles.push(`${url}/${container}/${blob.name}?${sas}`);
+      }
+    }
+
+    return csvFiles;
   }
 }

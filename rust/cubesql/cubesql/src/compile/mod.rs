@@ -18440,4 +18440,152 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_thoughtspot_like_escape_push_down() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT CAST("customer_gender" AS TEXT) AS "customer_gender"
+            FROM "public"."KibanaSampleDataEcommerce"
+            WHERE
+                "customer_gender" LIKE (
+                    '%' || replace(
+                        replace(
+                            replace(
+                                'ale',
+                                '!',
+                                '!!'
+                            ),
+                            '%',
+                            '!%'
+                        ),
+                        '_',
+                        '!_'
+                    ) || '%'
+                ) ESCAPE '!'
+            GROUP BY 1
+            ORDER BY 1
+            LIMIT 100
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("LIKE "));
+        assert!(sql.contains("ESCAPE "));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_sql_sizing() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_sql_sizing",
+            execute_query(
+                r#"
+                SELECT supported_value
+                FROM INFORMATION_SCHEMA.SQL_SIZING
+                WHERE
+                    sizing_id = 34
+                    or sizing_id = 30
+                    or sizing_id = 31
+                    or sizing_id = 10005
+                    or sizing_id = 32
+                    or sizing_id = 35
+                    or sizing_id = 107
+                    or sizing_id = 97
+                    or sizing_id = 99
+                    or sizing_id = 100
+                    or sizing_id = 101
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_stv_slices() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_stv_slices",
+            execute_query(
+                r#"
+                with nodes as (
+                    select count(distinct node) as node_count
+                    from STV_SLICES
+                )
+                select
+                    case
+                        when diststyle = 'ALL' then size/cast(nodes.node_count as float) 
+                        else size
+                    end as sizeMBs
+                from SVV_TABLE_INFO
+                join nodes on 1=1
+                where
+                    "table" = 'KibanaSampleDataEcommerce'
+                    and "schema" = 'public';
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_pg_external_schema() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_pg_external_schema",
+            execute_query(
+                r#"
+                select nspname
+                from pg_external_schema pe
+                join pg_namespace pn on pe.esoid = pn.oid 
+                where
+                    nspowner != 1
+                    and nspname = 'public'
+                "#
+                .to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_quicksight_regexp_instr() -> Result<(), CubeError> {
+        insta::assert_snapshot!(
+            "quicksight_regexp_instr",
+            execute_query(
+                r#"SELECT regexp_instr('abcdefg', 'd.f', 3)"#.to_string(),
+                DatabaseProtocol::PostgreSQL
+            )
+            .await?
+        );
+
+        Ok(())
+    }
 }

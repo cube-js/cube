@@ -316,6 +316,28 @@ describe('API Gateway', () => {
     expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
   });
 
+  test('custom granularities in annotation', async () => {
+    const { app } = await createApiGateway();
+
+    const res = await request(app)
+      .get(
+        '/cubejs-api/v1/load?query={"measures":["Foo.bar"],"timeDimensions":[{"dimension":"Foo.timeGranularities","granularity":"half_year_by_1st_april"}]}'
+      )
+      .set('Authorization', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-IDcSemACt8x4iTMCda8Yhe3iZaWbvV5XKSTbuAn0M')
+      .expect(200);
+    console.log(res.body);
+    expect(res.body && res.body.data).toStrictEqual([{ 'Foo.bar': 42 }]);
+    expect(res.body.annotation.timeDimensions['Foo.timeGranularities.half_year_by_1st_april'])
+      .toStrictEqual({
+        granularity: {
+          name: 'half_year_by_1st_april',
+          title: 'Half Year By1 St April',
+          interval: '6 months',
+          offset: '3 months',
+        }
+      });
+  });
+
   test('dry-run', async () => {
     const { app } = await createApiGateway();
 
