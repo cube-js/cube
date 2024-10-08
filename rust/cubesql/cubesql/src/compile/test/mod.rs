@@ -31,6 +31,8 @@ pub mod rewrite_engine;
 #[cfg(test)]
 pub mod test_bi_workarounds;
 #[cfg(test)]
+pub mod test_cube_join;
+#[cfg(test)]
 pub mod test_df_execution;
 #[cfg(test)]
 pub mod test_introspection;
@@ -38,6 +40,8 @@ pub mod test_introspection;
 pub mod test_udfs;
 #[cfg(test)]
 pub mod test_user_change;
+#[cfg(test)]
+pub mod test_wrapper;
 pub mod utils;
 pub use utils::*;
 
