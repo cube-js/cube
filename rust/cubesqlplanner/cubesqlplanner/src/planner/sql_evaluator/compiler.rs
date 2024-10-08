@@ -1,5 +1,5 @@
+use super::collectors::JoinHintsCollector;
 use super::dependecy::DependenciesBuilder;
-use super::join_hints_collector::JoinHintsCollector;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, EvaluationNode,
     JoinConditionSymbolFactory, MeasureFilterSymbolFactory, MeasureSymbolFactory,

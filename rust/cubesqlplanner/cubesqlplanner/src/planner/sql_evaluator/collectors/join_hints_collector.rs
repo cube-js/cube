@@ -1,4 +1,6 @@
-use super::{EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor};
+use crate::planner::sql_evaluator::{
+    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
+};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;

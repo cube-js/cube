@@ -604,6 +604,29 @@ export class BaseQuery {
       );
     }
   }
+  buildSqlAndParamsTest(exportAnnotatedSql) {
+      if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
+        if (this.externalPreAggregationQuery()) { // TODO performance
+          return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
+        }
+      }
+      let js_res = this.compilers.compiler.withQuery(
+        this,
+        () => this.cacheValue(
+          ['buildSqlAndParams', exportAnnotatedSql],
+          () => this.paramAllocator.buildSqlAndParams(
+            this.buildParamAnnotatedSql(),
+            exportAnnotatedSql,
+            this.shouldReuseParams
+          ),
+          { cache: this.queryCache }
+        )
+      );
+      let rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
+      console.log("js result: ", js_res);
+      console.log("rust result: ", rust);
+      return js_res;
+  }
 
   buildSqlAndParamsRust(exportAnnotatedSql) {
     const queryParams = {

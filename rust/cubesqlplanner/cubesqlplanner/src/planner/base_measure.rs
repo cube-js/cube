@@ -27,6 +27,10 @@ impl BaseMember for BaseMeasure {
             .query_tools
             .escape_column_name(&self.unescaped_alias_name()?))
     }
+
+    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.member_evaluator.clone()
+    }
 }
 
 impl BaseMeasure {

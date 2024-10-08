@@ -35,6 +35,10 @@ impl BaseMember for BaseTimeDimension {
             .query_tools
             .escape_column_name(&self.unescaped_alias_name()?))
     }
+
+    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.dimension.member_evaluator()
+    }
 }
 
 impl BaseTimeDimension {

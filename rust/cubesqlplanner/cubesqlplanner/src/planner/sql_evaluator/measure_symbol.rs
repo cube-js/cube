@@ -75,6 +75,13 @@ impl MeasureSymbol {
             Ok(format!("{}({})", measure_type, sql))
         }
     }
+
+    pub fn is_post_aggregate(&self) -> bool {
+        self.definition
+            .static_data()
+            .post_aggregate
+            .unwrap_or(false)
+    }
 }
 
 impl MemberSymbol for MeasureSymbol {

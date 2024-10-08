@@ -16,6 +16,8 @@ pub struct MeasureDefinitionStatic {
     #[serde(rename = "type")]
     pub measure_type: String,
     pub owned_by_cube: Option<bool>,
+    #[serde(rename = "postAggregate")]
+    pub post_aggregate: Option<bool>,
 }
 
 #[nativebridge::native_bridge(MeasureDefinitionStatic)]

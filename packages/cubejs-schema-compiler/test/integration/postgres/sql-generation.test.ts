@@ -601,10 +601,10 @@ describe('SQL Generation', () => {
     await compiler.compile();
     const query = new PostgresQuery({ joinGraph, cubeEvaluator, compiler }, q);
 
-    console.log(query.buildSqlAndParams());
+    //console.log(query.buildSqlAndParams());
 
-    const res = await dbRunner.testQuery(query.buildSqlAndParams());
-    console.log(JSON.stringify(res));
+    const res = await dbRunner.testQuery(query.buildSqlAndParamsTest());
+    //console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       expectedResult

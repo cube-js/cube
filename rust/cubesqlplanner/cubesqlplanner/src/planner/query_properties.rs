@@ -189,6 +189,29 @@ impl QueryProperties {
         columns.iter().map(|d| Expr::Field(d.clone())).collect_vec()
     }
 
+    pub fn all_members(&self, exclude_time_dimensions: bool) -> Vec<Rc<dyn BaseMember>> {
+        let dimensions = self
+            .dimensions
+            .iter()
+            .map(|d| -> Rc<dyn BaseMember> { d.clone() });
+        let measures = self
+            .measures
+            .iter()
+            .map(|m| -> Rc<dyn BaseMember> { m.clone() });
+        if exclude_time_dimensions {
+            dimensions.chain(measures).collect_vec()
+        } else {
+            let time_dimensions = self
+                .dimensions
+                .iter()
+                .map(|d| -> Rc<dyn BaseMember> { d.clone() });
+            dimensions
+                .chain(measures)
+                .chain(time_dimensions)
+                .collect_vec()
+        }
+    }
+
     pub fn group_by(&self) -> Vec<Rc<dyn BaseMember>> {
         self.dimensions
             .iter()

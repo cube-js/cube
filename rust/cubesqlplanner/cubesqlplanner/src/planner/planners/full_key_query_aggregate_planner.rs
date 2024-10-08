@@ -1,8 +1,8 @@
 use super::{CommonUtils, JoinPlanner, OrderPlanner};
-use crate::plan::{From, FromSource, Join, JoinItem, JoinSource, Select};
+use crate::plan::{Filter, From, FromSource, Join, JoinItem, JoinSource, Select};
 use crate::planner::base_join_condition::DimensionJoinCondition;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
+use crate::planner::sql_evaluator::collectors::collect_multiplied_measures;
 use crate::planner::sql_evaluator::sql_nodes::with_render_references_default_node_processor;
 use crate::planner::BaseMember;
 use crate::planner::QueryProperties;
@@ -104,6 +104,14 @@ impl FullKeyAggregateQueryPlanner {
             with_render_references_default_node_processor(references),
         );
 
+        let having = if self.query_properties.measures_filters().is_empty() {
+            None
+        } else {
+            Some(Filter {
+                items: self.query_properties.measures_filters().clone(),
+            })
+        };
+
         let select = Select {
             projection: self
                 .query_properties
@@ -114,7 +122,7 @@ impl FullKeyAggregateQueryPlanner {
             }))),
             filter: None,
             group_by: vec![],
-            having: None,
+            having,
             order_by: self.order_planner.default_order(),
             context,
             is_distinct: false,

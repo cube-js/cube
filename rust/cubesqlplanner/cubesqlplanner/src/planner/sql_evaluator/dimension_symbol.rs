@@ -51,6 +51,13 @@ impl DimensionSymbol {
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
     }
+
+    pub fn is_post_aggregate(&self) -> bool {
+        self.definition
+            .static_data()
+            .post_aggregate
+            .unwrap_or(false)
+    }
 }
 
 impl MemberSymbol for DimensionSymbol {

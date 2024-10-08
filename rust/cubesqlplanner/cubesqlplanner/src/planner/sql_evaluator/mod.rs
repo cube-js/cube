@@ -1,12 +1,11 @@
+pub mod collectors;
 pub mod compiler;
 pub mod cube_symbol;
 mod dependecy;
 pub mod dimension_symbol;
-pub mod join_hints_collector;
 pub mod join_symbol;
 pub mod measure_symbol;
 pub mod member_symbol;
-pub mod multiplied_measures_collector;
 pub mod sql_nodes;
 pub mod sql_visitor;
 pub mod visitor;
