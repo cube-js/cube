@@ -68,14 +68,12 @@ export function TimeListMember(props: ListMemberProps) {
   const description = member.description;
   const isTimestampSelected = isSelected();
 
-  const customGranularities = (member.type === 'time' && member.granularities) ?
-    member.granularities.map(g => g.name) : [];
-  const memberGranularities = (member.type === 'time' && member.granularities) ?
-    member.granularities.map(g => g.name).concat(PREDEFINED_GRANULARITIES) :
-    PREDEFINED_GRANULARITIES;
+  const customGranularities =
+    member.type === 'time' && member.granularities ? member.granularities.map((g) => g.name) : [];
+  const memberGranularities = customGranularities.concat(PREDEFINED_GRANULARITIES);
   const isGranularitySelectedMap = {};
   memberGranularities.forEach((granularity) => {
-    isGranularitySelectedMap[granularity] = isSelected(granularity)
+    isGranularitySelectedMap[granularity] = isSelected(granularity);
   });
   const selectedGranularity = memberGranularities.find((granularity) => isSelected(granularity));
 
@@ -144,7 +142,8 @@ export function TimeListMember(props: ListMemberProps) {
       return null;
     }
 
-    return items.map((granularity, i) => (<ListMemberButton
+    return items.map((granularity, i) => (
+      <ListMemberButton
         key={`${name}.${granularity}`}
         icon={icon}
         data-member="timeDimension"
@@ -157,7 +156,7 @@ export function TimeListMember(props: ListMemberProps) {
         <Text ellipsis>{granularity}</Text>
       </ListMemberButton>
     ));
-  }
+  };
 
   return (
     <>

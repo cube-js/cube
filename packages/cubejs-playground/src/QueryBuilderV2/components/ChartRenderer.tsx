@@ -3,7 +3,7 @@ import {
   TimeDimensionGranularity,
   granularityFor,
   minGranularityForIntervals,
-  isPredefinedGranularity
+  isPredefinedGranularity,
 } from '@cubejs-client/core';
 import { UseCubeQueryResult } from '@cubejs-client/react';
 import { Skeleton, Tag, tasty } from '@cube-dev/ui-kit';
@@ -122,8 +122,14 @@ function CartesianChart({
   let granularity = granularityField?.split('.')[2];
 
   if (!isPredefinedGranularity(granularity)) {
-    const granularityInfo = resultSet?.loadResponse.results[0].annotation.timeDimensions[granularityField]?.granularity;
-    granularity = minGranularityForIntervals(granularityInfo.interval, granularityInfo.offset || granularityFor(granularityInfo.origin));
+    const granularityInfo =
+      resultSet?.loadResponse.results[0]?.annotation.timeDimensions[granularityField]?.granularity;
+    if (granularityInfo) {
+      granularity = minGranularityForIntervals(
+        granularityInfo.interval,
+        granularityInfo.offset || granularityFor(granularityInfo.origin)
+      );
+    }
   }
 
   const formatDate = useMemo(() => {
