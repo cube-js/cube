@@ -60,7 +60,7 @@ querying `system.tables` in Cube Store via [SQL Runner][ref-sql-runner]:
 
 <WarningBox>
 
-Only newly built or rebuilt pre-aggregation partitions will use the newly addded
+Only newly built or rebuilt pre-aggregation partitions will use the newly added
 encryption key. Previously built partitions will still be encrypted using
 previously provided keys. If you [drop a key](#drop-a-key) before these partitions
 are rebuilt, querying them will yield an error.
