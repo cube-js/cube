@@ -16,9 +16,9 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe, AuthContextRef,
-        AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
-        SqlAuthService,
+        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe,
+        pg_auth_service::PostgresAuthServiceDefaultImpl, AuthContextRef, AuthenticateResponse,
+        HttpAuthContext, ServerManager, Session, SessionManager, SqlAuthService,
     },
     transport::{
         CubeStreamReceiver, LoadRequestMeta, SpanId, SqlGenerator, SqlResponse, SqlTemplates,
@@ -610,6 +610,7 @@ async fn get_test_session_with_config_and_transport(
     let server = Arc::new(ServerManager::new(
         get_test_auth(),
         test_transport.clone(),
+        Arc::new(PostgresAuthServiceDefaultImpl::new()),
         Arc::new(CompilerCacheImpl::new(config_obj.clone(), test_transport)),
         None,
         config_obj,

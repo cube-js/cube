@@ -14,6 +14,11 @@ redirect_from:
 
 ## Setup
 
+<WarningBox>
+If you're having Network error and Snowflake can't be reached please make sure you tried 
+[format 2 for an account id][snowflake-format-2].
+</WarningBox>
+
 ### Manual
 
 Add the following to a `.env` file in your Cube project:
@@ -170,3 +175,4 @@ connections are made over HTTPS.
   https://docs.snowflake.com/en/sql-reference/functions/approx_count_distinct.html
 [snowflake-docs-warehouse]:
   https://docs.snowflake.com/en/user-guide/warehouses.html
+[snowflake-format-2]: https://docs.snowflake.com/en/user-guide/admin-account-identifier#format-2-account-locator-in-a-region

@@ -8,35 +8,38 @@ redirect_from:
 With a rich set of APIs, Cube can power and deliver data to all kinds of data
 applications.
 
-<Diagram src="https://ucarecdn.com/df9de86e-4829-4c9d-9882-0984fbd8c719/" />
-
 [Data APIs](#data-apis) are used to run queries against the data model.
 Despite using various transports and query formats, all data APIs share common
 [querying concepts][ref-queries].
 
+<Diagram src="https://ucarecdn.com/023ca78a-aa96-493a-9799-95955a6d8948/" />
+
 Also, there are [management APIs](#management-apis) to control Cube deployments
 externally.
+
+<Diagram src="https://ucarecdn.com/8b9c0a27-c9bf-4f32-86b7-223c9fae8cc8/" />
 
 ## Data APIs
 
 A few rules of thumb to help you choose an API:
 
-When implementing internal or self-serve [business intelligence][cube-issbi] use
+* When implementing internal or self-serve [business intelligence][cube-issbi] use
 case, pick the [SQL API][ref-sql-api] and [Semantic Layer Sync][ref-sls]. The
 SQL API allows querying Cube with a Postgres-compatible [dialect of
 SQL][ref-sql-syntax], either by writing queries manually or generating them with
 BI tools.
 
-To connect to Microsoft Excel, use the [MDX API][ref-mdx-api]. To connect to Google Sheets, use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets].
+* To connect to Microsoft Excel, use the [MDX API][ref-mdx-api]. To connect to
+Google Sheets, use [Cube Cloud for Sheets][ref-cube-cloud-for-sheets].
 
-When implementing [embedded analytics][cube-ea] and [real-time
+* When implementing [embedded analytics][cube-ea] and [real-time
 analytics][cube-rta] use cases, pick [REST API][ref-rest-api] or [GraphQL
 API][ref-graphql-api]. Also, the [JavaScript SDK][ref-js-sdk] will simplify
 integration with your front-end code. The REST API uses a [JSON-based query
 format][ref-json-syntax], and the GraphQL API accepts [GraphQL
 queries][ref-graphql-syntax].
 
-For AI use cases, consider using the [AI API][ref-ai-api].
+* For AI use cases, consider using the [AI API][ref-ai-api].
 
 <ReferenceBox>
 

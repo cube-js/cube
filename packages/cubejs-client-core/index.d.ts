@@ -943,10 +943,22 @@ declare module '@cubejs-client/core' {
     format?: 'currency' | 'percent';
   };
 
-  export type TCubeDimension = BaseCubeMember & {
+  export type CubeTimeDimensionGranularity = {
+    name: string;
+    title: string;
+  }
+
+  export type BaseCubeDimension = BaseCubeMember & {
     primaryKey?: boolean;
     suggestFilterValues: boolean;
-  };
+  }
+
+  export type CubeTimeDimension = BaseCubeDimension &
+    { type: 'time'; granularities?: CubeTimeDimensionGranularity[] };
+
+  export type TCubeDimension =
+    (BaseCubeDimension & { type: Exclude<BaseCubeDimension['type'], 'time'> }) |
+    CubeTimeDimension;
 
   export type TCubeSegment = Omit<BaseCubeMember, 'type'>;
 
@@ -1291,4 +1303,10 @@ declare module '@cubejs-client/core' {
     stage: string;
     timeElapsed: number;
   };
+
+  export function granularityFor(dateStr: string): string;
+
+  export function minGranularityForIntervals(i1: string, i2: string): string;
+
+  export function isPredefinedGranularity(granularity: TimeDimensionGranularity): boolean;
 }

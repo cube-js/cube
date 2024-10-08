@@ -1,21 +1,53 @@
-use crate::planner::BaseCube;
-use std::fmt;
+use super::Join;
+use super::QueryPlan;
+use crate::planner::{BaseCube, VisitorContext};
+use cubenativeutils::CubeError;
 use std::rc::Rc;
 
-pub enum From {
+#[derive(Clone)]
+pub enum FromSource {
     Empty,
     Cube(Rc<BaseCube>),
+    Join(Rc<Join>),
+    Subquery(Rc<QueryPlan>, String),
 }
 
-impl fmt::Display for From {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            From::Empty => write!(f, ""),
-            From::Cube(cube) => {
-                writeln!(f, "FROM")?;
-                let cubesql = cube.to_sql().map_err(|_| fmt::Error)?;
-                write!(f, "{}", cubesql)
+#[derive(Clone)]
+pub struct From {
+    pub source: FromSource,
+}
+
+impl From {
+    pub fn new(source: FromSource) -> Self {
+        Self { source }
+    }
+
+    pub fn new_from_cube(cube: Rc<BaseCube>) -> Self {
+        Self::new(FromSource::Cube(cube))
+    }
+
+    pub fn new_from_join(join: Rc<Join>) -> Self {
+        Self::new(FromSource::Join(join))
+    }
+
+    pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
+        Self::new(FromSource::Subquery(plan, alias))
+    }
+
+    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        let sql = match &self.source {
+            FromSource::Empty => format!(""),
+            FromSource::Cube(cube) => {
+                let cubesql = cube.to_sql(context.clone())?;
+                format!("      {} ", cubesql)
             }
-        }
+            FromSource::Join(j) => {
+                format!("{}", j.to_sql(context.clone())?)
+            }
+            FromSource::Subquery(s, alias) => {
+                format!("({}) AS {}", s.to_sql()?, alias)
+            }
+        };
+        Ok(sql)
     }
 }

@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://cube.dev/events/cube-rollup-san-francisco?ref=github-readme">
+  <a href="https://cube.registration.goldcast.io/events/e0bdd44b-6e9a-4581-be45-9b46fae010b8?ref=github-readme">
     <img src="https://ucarecdn.com/459df450-5984-42da-9211-a1d70a96e6a5/"/>
   </a>
 </p>

@@ -432,6 +432,7 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
+        ctx.register_udf(create_regexp_instr_udf());
         ctx.register_udf(create_ends_with_udf());
         ctx.register_udf(create_position_udf());
         ctx.register_udf(create_date_to_timestamp_udf());
