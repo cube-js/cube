@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.36.7](https://github.com/cube-js/cube/compare/v0.36.6...v0.36.7) (2024-10-08)
+
+
+### Bug Fixes
+
+* Add explicit parameters limit in PostgreSQL and Redshift drivers ([#8784](https://github.com/cube-js/cube/issues/8784)) ([ad6abec](https://github.com/cube-js/cube/commit/ad6abec6608b86d896f0f43786b23d9c9306f4f8))
+
+
+### Features
+
+* **cubesql:** Support `DATE_PART` SQL push down with Databricks ([#8779](https://github.com/cube-js/cube/issues/8779)) ([8fa0d53](https://github.com/cube-js/cube/commit/8fa0d53600e6d5b2a42cb94160918939e7f33d10))
+
+
+
+
+
 ## [0.36.6](https://github.com/cube-js/cube/compare/v0.36.5...v0.36.6) (2024-10-03)
 
 
