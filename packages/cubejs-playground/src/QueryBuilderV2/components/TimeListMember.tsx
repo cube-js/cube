@@ -1,24 +1,17 @@
-import { useRef, useState } from 'react';
-import {
-  Action,
-  Flex,
-  Space,
-  Text,
-  TimeIcon,
-  CalendarIcon,
-  CalendarEditIcon,
-  TooltipProvider,
-} from '@cube-dev/ui-kit';
+import { useMemo, useRef, useState } from 'react';
+import { Flex, Space, Text, TimeIcon, TooltipProvider } from '@cube-dev/ui-kit';
 import { Cube, TCubeDimension, TimeDimensionGranularity } from '@cubejs-client/core';
+
+import { GranularityListMember } from '@/modules/playground/components/QueryBuilder/components/GranularityListMember';
 
 import { ArrowIcon } from '../icons/ArrowIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
 import { useHasOverflow } from '../hooks/has-overflow';
+import { titleize } from '../utils/index';
 
 import { ListMemberButton } from './ListMemberButton';
 import { FilterByMemberButton } from './FilterByMemberButton';
-import { MemberBadge } from './Badge';
 import { FilteredLabel } from './FilteredLabel';
 
 interface ListMemberProps {
@@ -70,8 +63,21 @@ export function TimeListMember(props: ListMemberProps) {
 
   const customGranularities =
     member.type === 'time' && member.granularities ? member.granularities.map((g) => g.name) : [];
+  const customGranularitiesTitleMap = useMemo(() => {
+    return (
+      member.type === 'time' &&
+      member.granularities?.reduce(
+        (map, granularity) => {
+          map[granularity.name] = granularity.title;
+
+          return map;
+        },
+        {} as Record<string, string>
+      )
+    );
+  }, [member.type === 'time' ? member.granularities : null]);
   const memberGranularities = customGranularities.concat(PREDEFINED_GRANULARITIES);
-  const isGranularitySelectedMap = {};
+  const isGranularitySelectedMap: Record<string, boolean> = {};
   memberGranularities.forEach((granularity) => {
     isGranularitySelectedMap[granularity] = isSelected(granularity);
   });
@@ -80,6 +86,8 @@ export function TimeListMember(props: ListMemberProps) {
   open = isCompact ? false : open;
 
   const hasOverflow = useHasOverflow(textRef);
+  const isAutoTitle = titleize(member.name) === title;
+
   const button = (
     <ListMemberButton
       icon={
@@ -106,22 +114,7 @@ export function TimeListMember(props: ListMemberProps) {
       <Text ref={textRef} ellipsis>
         {filterString ? <FilteredLabel text={name} filter={filterString} /> : name}
       </Text>
-      {(isCompact || !open) && selectedGranularity ? (
-        <TooltipProvider
-          delay={1000}
-          title="Click the granularity label to remove it from the query"
-        >
-          <Action
-            onPress={() => {
-              onGranularityToggle(member.name, selectedGranularity);
-            }}
-          >
-            <MemberBadge isSpecial type="timeDimension">
-              {selectedGranularity}
-            </MemberBadge>
-          </Action>
-        </TooltipProvider>
-      ) : null}
+
       <Space gap=".5x">
         <Space gap="1x">
           {description ? <ItemInfoIcon title={title} description={description} /> : undefined}
@@ -137,30 +130,34 @@ export function TimeListMember(props: ListMemberProps) {
     </ListMemberButton>
   );
 
-  const granularityItems = (items, icon) => {
-    if (!open || isCompact) {
-      return null;
-    }
+  const granularityItems = (items: string[], isCustom?: boolean) => {
+    return items.map((granularity: string) => {
+      if (
+        ((!open || isCompact) && !isGranularitySelectedMap[granularity]) ||
+        !customGranularitiesTitleMap
+      ) {
+        return null;
+      }
 
-    return items.map((granularity, i) => (
-      <ListMemberButton
-        key={`${name}.${granularity}`}
-        icon={icon}
-        data-member="timeDimension"
-        isSelected={isGranularitySelectedMap[granularity]}
-        onPress={() => {
-          onGranularityToggle(member.name, granularity);
-          setOpen(false);
-        }}
-      >
-        <Text ellipsis>{granularity}</Text>
-      </ListMemberButton>
-    ));
+      return (
+        <GranularityListMember
+          key={`${name}.${granularity}`}
+          name={granularity}
+          title={customGranularitiesTitleMap[granularity]}
+          isCustom={isCustom}
+          isSelected={isGranularitySelectedMap[granularity]}
+          onToggle={() => {
+            onGranularityToggle(member.name, granularity);
+            setOpen(false);
+          }}
+        />
+      );
+    });
   };
 
   return (
     <>
-      {hasOverflow ? (
+      {hasOverflow || !isAutoTitle ? (
         <TooltipProvider
           title={
             <>
@@ -175,7 +172,7 @@ export function TimeListMember(props: ListMemberProps) {
       ) : (
         button
       )}
-      {open || isCompact ? (
+      {open || isCompact || selectedGranularity ? (
         <Flex flow="column" gap="1bw" padding="4.5x left">
           {open && !isCompact ? (
             <ListMemberButton
@@ -190,8 +187,8 @@ export function TimeListMember(props: ListMemberProps) {
               <Text ellipsis>value</Text>
             </ListMemberButton>
           ) : null}
-          {granularityItems(customGranularities, <CalendarEditIcon />)}
-          {granularityItems(PREDEFINED_GRANULARITIES, <CalendarIcon />)}
+          {granularityItems(customGranularities, true)}
+          {granularityItems(PREDEFINED_GRANULARITIES)}
         </Flex>
       ) : null}
     </>

@@ -7,7 +7,6 @@ import {
 } from '@cubejs-client/core';
 import { UseCubeQueryResult } from '@cubejs-client/react';
 import { Skeleton, Tag, tasty } from '@cube-dev/ui-kit';
-import formatDate from 'date-fns/format';
 import { ComponentType, memo, useCallback, useMemo } from 'react';
 import { Col, Row, Statistic, Table } from 'antd';
 import {
@@ -34,27 +33,9 @@ import {
   getChartColorByIndex,
   getChartSolidColorByIndex,
 } from '../utils/chart-colors';
+import { formatDateByGranularity, formatDateByPattern } from '../utils/index';
 
 import { LocalError } from './LocalError';
-
-const FORMAT_MAP = {
-  second: 'HH:mm:ss, yyyy-LL-dd',
-  minute: 'HH:mm, yyyy-LL-dd',
-  hour: 'HH:00, yyyy-LL-dd',
-  day: 'yyyy-LL-dd',
-  week: "'W'w yyyy-LL-dd",
-  month: 'LLL yyyy',
-  quarter: 'QQQ yyyy',
-  year: 'yyyy',
-};
-
-export function formatDateByGranularity(timestamp: Date, granularity?: TimeDimensionGranularity) {
-  return formatDate(timestamp, FORMAT_MAP[granularity ?? 'second']);
-}
-
-export function formatDateByPattern(timestamp: Date, format?: string) {
-  return formatDate(timestamp, format ?? FORMAT_MAP['second']);
-}
 
 function CustomDot(props: any) {
   const { cx, cy, fill } = props;
