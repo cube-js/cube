@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { Flex, Space, Text, TimeIcon, TooltipProvider } from '@cube-dev/ui-kit';
 import { Cube, TCubeDimension, TimeDimensionGranularity } from '@cubejs-client/core';
 
-import { GranularityListMember } from '@/modules/playground/components/QueryBuilder/components/GranularityListMember';
+import { GranularityListMember } from './GranularityListMember';
 
 import { ArrowIcon } from '../icons/ArrowIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
