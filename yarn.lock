@@ -4242,10 +4242,10 @@
   resolved "https://registry.yarnpkg.com/@ctrl/tinycolor/-/tinycolor-3.6.1.tgz#b6c75a56a1947cc916ea058772d666a2c8932f31"
   integrity sha512-SITSV6aIXsuVNV3f3O0f2n/cgyEDWoSqtZMYiAmcsYHydcKrOz3gUxB/iXd/Qf08+IZX4KpgNbvUdMBmWz+kcA==
 
-"@cube-dev/ui-kit@0.37.3":
-  version "0.37.3"
-  resolved "https://registry.yarnpkg.com/@cube-dev/ui-kit/-/ui-kit-0.37.3.tgz#cb0bbba199fe63e692ee1b163f7473e6dd0eb9e9"
-  integrity sha512-7VJXTm+Z9MYdCErzssb2LkkyF3xzAtrfiD1JkJVX+M/Pc6is3JHLp0MQWBOe859ue4bj6AobHaTZcGB4mpxesg==
+"@cube-dev/ui-kit@0.37.4":
+  version "0.37.4"
+  resolved "https://registry.yarnpkg.com/@cube-dev/ui-kit/-/ui-kit-0.37.4.tgz#5e79a6875cd20ce24db401aecb594c9278f71313"
+  integrity sha512-F7P+XAL5ZO1pKauRkeaVxQc0iBx05urKHfZbSvq5Pubavif8HWMBce22rGQ/N7N9+GnTFt0Wt1zq+FEdJsvBUA==
   dependencies:
     "@ant-design/icons" "^5.3.4"
     "@internationalized/date" "^3.5.2"

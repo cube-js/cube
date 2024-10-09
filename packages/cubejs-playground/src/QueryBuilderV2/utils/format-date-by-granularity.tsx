@@ -13,7 +13,11 @@ const FORMAT_MAP = {
 };
 
 export function formatDateByGranularity(timestamp: Date, granularity?: TimeDimensionGranularity) {
-  return formatDate(timestamp, FORMAT_MAP[granularity ?? 'second']);
+  return formatDate(
+    timestamp,
+    FORMAT_MAP[(granularity as Exclude<TimeDimensionGranularity, string>) ?? 'second'] ??
+      FORMAT_MAP['second']
+  );
 }
 
 export function formatDateByPattern(timestamp: Date, format?: string) {

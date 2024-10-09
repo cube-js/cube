@@ -11,3 +11,4 @@ export * from './use-commit-press';
 export * from './uncapitalize';
 export * from './uniq-array';
 export * from './graphql-converters';
+export * from './titleize';
