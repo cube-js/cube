@@ -2,14 +2,13 @@ import { useMemo, useRef, useState } from 'react';
 import { Flex, Space, Text, TimeIcon, TooltipProvider } from '@cube-dev/ui-kit';
 import { Cube, TCubeDimension, TimeDimensionGranularity } from '@cubejs-client/core';
 
-import { GranularityListMember } from './GranularityListMember';
-
 import { ArrowIcon } from '../icons/ArrowIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
 import { useHasOverflow } from '../hooks/has-overflow';
 import { titleize } from '../utils/index';
 
+import { GranularityListMember } from './GranularityListMember';
 import { ListMemberButton } from './ListMemberButton';
 import { FilterByMemberButton } from './FilterByMemberButton';
 import { FilteredLabel } from './FilteredLabel';
