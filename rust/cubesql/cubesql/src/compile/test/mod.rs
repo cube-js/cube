@@ -506,7 +506,7 @@ FROM (
 ) AS {{ from_alias }} {% endif %} {% if filter %}
 WHERE {{ filter }}{% endif %}{% if group_by %}
 GROUP BY {{ group_by }}{% endif %}{% if order_by %}
-ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit %}
+ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}{% if offset %}
 OFFSET {{ offset }}{% endif %}"#.to_string(),
                     ),

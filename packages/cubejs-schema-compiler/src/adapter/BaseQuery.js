@@ -3217,7 +3217,7 @@ export class BaseQuery {
           '{% if filter %}\nWHERE {{ filter }}{% endif %}' +
           '{% if group_by %}\nGROUP BY {{ group_by }}{% endif %}' +
           '{% if order_by %}\nORDER BY {{ order_by | map(attribute=\'expr\') | join(\', \') }}{% endif %}' +
-          '{% if limit %}\nLIMIT {{ limit }}{% endif %}' +
+          '{% if limit is not none %}\nLIMIT {{ limit }}{% endif %}' +
           '{% if offset %}\nOFFSET {{ offset }}{% endif %}',
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },

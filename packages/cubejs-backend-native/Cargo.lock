@@ -811,6 +811,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown 0.14.3",
+ "indexmap 1.9.3",
  "itertools",
  "log",
  "lru",
