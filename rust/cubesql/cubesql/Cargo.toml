@@ -10,12 +10,12 @@ homepage = "https://cube.dev"
 
 [dependencies]
 arc-swap = "1"
-datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "dcf3e4aa26fd112043ef26fa4a78db5dbd443c86", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
+datafusion = { git = 'https://github.com/cube-js/arrow-datafusion.git', rev = "11a4ed10b184b2f1b22f7458702ae0c63f011241", default-features = false, features = ["regex_expressions", "unicode_expressions"] }
 anyhow = "1.0"
 thiserror = "1.0.50"
 cubeclient = { path = "../cubeclient" }
 pg-srv = { path = "../pg-srv" }
-sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "6a54d27d3b75a04b9f9cbe309a83078aa54b32fd" }
+sqlparser = { git = 'https://github.com/cube-js/sqlparser-rs.git', rev = "5fe1b77d1a91b80529a0b7af0b89411d3cba5137" }
 base64 = "0.13.0"
 tokio = { version = "^1.35", features = ["full", "rt", "tracing"] }
 serde = { version = "^1.0", features = ["derive"] }

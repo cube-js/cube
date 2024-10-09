@@ -271,6 +271,7 @@ export class ClickHouseQuery extends BaseQuery {
     templates.functions.DATETRUNC = 'DATE_TRUNC({{ args_concat }})';
     // TODO: Introduce additional filter in jinja? or parseDateTimeBestEffort?
     // https://github.com/ClickHouse/ClickHouse/issues/19351
+    delete templates.functions.PERCENTILECONT;
     templates.expressions.timestamp_literal = 'parseDateTimeBestEffort(\'{{ value }}\')';
     delete templates.expressions.like_escape;
     templates.quotes.identifiers = '`';

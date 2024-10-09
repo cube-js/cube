@@ -1,6 +1,6 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, alias_expr,
+        agg_fun_expr, agg_fun_expr_within_group_empty_tail, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis},
         case_expr, cast_expr, column_expr, is_null_expr, literal_expr, literal_int,
         rules::{members::MemberRules, split::SplitRules},
@@ -21,10 +21,31 @@ impl SplitRules {
     ) {
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function",
-            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
-            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             // ?distinct would always match
-            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "?output_fun_name",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             |alias_column| alias_column,
             self.transform_aggregate_function(
                 Some("?fun_name"),
@@ -54,15 +75,24 @@ impl SplitRules {
                         "?data_type",
                     )],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 )
             },
-            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             // ?distinct would always match
             |alias_column| {
                 agg_fun_expr(
                     "?output_fun_name",
                     vec![cast_expr(alias_column, "?data_type")],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 )
             },
             |alias_column| cast_expr(alias_column, "?data_type"),
@@ -86,10 +116,31 @@ impl SplitRules {
         );
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function-simple-count",
-            || agg_fun_expr("?fun_name", vec![literal_expr("?literal")], "?distinct"),
-            || agg_fun_expr("?fun_name", vec![literal_expr("?literal")], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![literal_expr("?literal")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![literal_expr("?literal")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             // ?distinct would always match
-            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "?output_fun_name",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             |alias_column| alias_column,
             self.transform_aggregate_function(
                 Some("?fun_name"),
@@ -111,16 +162,31 @@ impl SplitRules {
         );
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function-non-matching-count",
-            || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![column_expr("?column")],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             || {
                 agg_fun_expr(
                     "Count",
                     vec![literal_int(1)],
                     "AggregateFunctionExprDistinct:false",
+                    agg_fun_expr_within_group_empty_tail(),
                 )
             },
             // ?distinct would always match
-            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "?output_fun_name",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             |alias_column| alias_column,
             self.transform_aggregate_function(
                 Some("?fun_name"),
@@ -142,15 +208,30 @@ impl SplitRules {
         );
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function-sum-count-constant",
-            || agg_fun_expr("?fun_name", vec![literal_int(1)], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![literal_int(1)],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             || {
                 agg_fun_expr(
                     "Count",
                     vec![literal_int(1)],
                     "AggregateFunctionExprDistinct:false",
+                    agg_fun_expr_within_group_empty_tail(),
                 )
             },
-            |alias_column| agg_fun_expr("?output_fun_name", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "?output_fun_name",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             |alias_column| alias_column,
             self.transform_aggregate_function(
                 Some("?fun_name"),
@@ -172,10 +253,24 @@ impl SplitRules {
         );
         self.single_arg_split_point_rules(
             "aggregate-function-invariant-constant",
-            || agg_fun_expr("?fun_name", vec!["?constant"], "?distinct"),
+            || {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec!["?constant"],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             || "?constant".to_string(),
             // ?distinct would always match
-            |alias_column| agg_fun_expr("?fun_name", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "?fun_name",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             self.transform_invariant_constant("?fun_name", "?distinct", "?constant"),
             false,
             rules,
@@ -193,10 +288,18 @@ impl SplitRules {
                         Some(literal_int(0)),
                     )],
                     "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
                 )
             },
             || literal_int(0),
-            |alias_column| agg_fun_expr("Max", vec![alias_column], "?distinct"),
+            |alias_column| {
+                agg_fun_expr(
+                    "Max",
+                    vec![alias_column],
+                    "?distinct",
+                    agg_fun_expr_within_group_empty_tail(),
+                )
+            },
             |alias_column| alias_column,
             self.transform_powerbi_max_case("?column", "?alias_to_cube"),
             self.transform_powerbi_max_case("?column", "?alias_to_cube"),
