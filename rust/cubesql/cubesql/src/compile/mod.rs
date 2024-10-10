@@ -851,11 +851,67 @@ mod tests {
                 time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(0),
-                offset: None,
+                offset: Some(0),
                 filters: None,
                 ungrouped: Some(true),
             }
         );
+    }
+
+    #[tokio::test]
+    async fn test_pushdown_limit_0_grouped() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT KibanaSampleDataEcommerce.customer_gender FROM \"public\".\"KibanaSampleDataEcommerce\" GROUP BY 1 LIMIT 0".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![]),
+                limit: Some(0),
+                offset: None,
+                filters: None,
+                ungrouped: None,
+            }
+        )
+    }
+
+    #[tokio::test]
+    async fn test_pushdown_limit_0_ungrouped() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let logical_plan = convert_select_to_query_plan(
+            "SELECT KibanaSampleDataEcommerce.customer_gender FROM \"public\".\"KibanaSampleDataEcommerce\" LIMIT 0".to_string(),
+            DatabaseProtocol::PostgreSQL
+        ).await.as_logical_plan();
+
+        assert_eq!(
+            logical_plan.find_cube_scan().request,
+            V1LoadRequestQuery {
+                measures: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
+                segments: Some(vec![]),
+                time_dimensions: None,
+                order: Some(vec![]),
+                limit: Some(0),
+                offset: None,
+                filters: None,
+                ungrouped: Some(true),
+            }
+        )
     }
 
     #[tokio::test]

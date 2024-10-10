@@ -1573,14 +1573,14 @@ impl MemberRules {
         move |egraph, subst| {
             let mut skip_value = None;
             for skip in var_iter!(egraph[subst[skip_var]], LimitSkip) {
-                if skip.unwrap_or_default() > 0 {
+                if skip.is_some() {
                     skip_value = *skip;
                     break;
                 }
             }
             let mut fetch_value = None;
             for fetch in var_iter!(egraph[subst[fetch_var]], LimitFetch) {
-                if fetch.unwrap_or_default() > 0 {
+                if fetch.is_some() {
                     fetch_value = *fetch;
                     break;
                 }
