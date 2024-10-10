@@ -133,9 +133,21 @@ interface SnowflakeDriverExportGCS {
 interface SnowflakeDriverExportAzure {
   bucketType: 'azure',
   bucketName: string,
-  azureKey: string,
+  azureKey?: string,
   sasToken?: string,
   integrationName?: string,
+  /**
+   * The client ID of a Microsoft Entra app registration.
+   */
+  clientId?: string,
+  /**
+   * ID of the application's Microsoft Entra tenant. Also called its directory ID.
+   */
+  tenantId?: string,
+  /**
+   * The path to a file containing a Kubernetes service account token that authenticates the identity.
+   */
+  tokenFilePath?: string,
 }
 
 export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS
@@ -317,12 +329,30 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       // sasToken is optional for azure if storage integration is used
       const sasToken = getEnv('dbExportAzureSasToken', { dataSource });
 
+      if (!integrationName && !sasToken) {
+        throw new Error(
+          'Unsupported exportBucket configuration, some keys are empty: integrationName|sasToken'
+        );
+      }
+
+      // azureKey is optional if DefaultAzureCredential() is used
+      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource });
+
+      // These 3 options make sense in case you want to authorize to Azure from
+      // application running in the k8s environment.
+      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource });
+      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource });
+      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource });
+
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
-        azureKey: getEnv('dbExportBucketAzureKey', { dataSource }),
-        ...(sasToken !== undefined && { sasToken }),
         ...(integrationName !== undefined && { integrationName }),
+        ...(sasToken !== undefined && { sasToken }),
+        ...(azureKey !== undefined && { azureKey }),
+        ...(clientId !== undefined && { clientId }),
+        ...(tenantId !== undefined && { tenantId }),
+        ...(tokenFilePath !== undefined && { tokenFilePath }),
       };
     }
 
@@ -643,11 +673,11 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       );
       return this.extractFilesFromGCS({ credentials }, bucketName, tableName);
     } else if (bucketType === 'azure') {
-      const { azureKey, sasToken } = (
+      const { azureKey, sasToken, clientId, tenantId, tokenFilePath } = (
         <SnowflakeDriverExportAzure> this.config.exportBucket
       );
       return this.extractFilesFromAzure(
-        { azureKey, sasToken },
+        { azureKey, sasToken, clientId, tenantId, tokenFilePath },
         bucketName,
         tableName,
       );
