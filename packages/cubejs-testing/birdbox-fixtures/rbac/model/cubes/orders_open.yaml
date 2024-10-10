@@ -1,0 +1,19 @@
+cubes:
+  # An open cube with no access policy
+  - name: orders_open
+    sql_table: orders
+
+    dimensions:
+      - name: id
+        sql: id
+        type: string
+        primary_key: true
+
+      - name: created_at
+        sql: created_at
+        type: time
+
+    measures:
+      - name: count
+        sql: id
+        type: count
