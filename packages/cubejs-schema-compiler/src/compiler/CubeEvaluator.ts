@@ -14,7 +14,7 @@ export type SegmentDefinition = {
   ownedByCube: boolean,
   fieldType?: string,
   // TODO should we have it here?
-  postAggregate?: boolean,
+  multiStage?: boolean,
 };
 
 export type DimensionDefinition = {
@@ -23,7 +23,7 @@ export type DimensionDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
-  postAggregate?: boolean,
+  multiStage?: boolean,
   shiftInterval?: string,
 };
 
@@ -47,7 +47,7 @@ export type MeasureDefinition = {
   filters?: any
   primaryKey?: true,
   drillFilters?: any,
-  postAggregate?: boolean,
+  multiStage?: boolean,
   groupBy?: Function,
   reduceBy?: Function,
   addGroupBy?: Function,
@@ -107,8 +107,8 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
 
-    this.evaluatePostAggregateReferences(cube.name, cube.measures);
-    this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+    this.evaluateMultiStageReferences(cube.name, cube.measures);
+    this.evaluateMultiStageReferences(cube.name, cube.dimensions);
 
     this.prepareHierarchies(cube);
 
@@ -165,14 +165,14 @@ export class CubeEvaluator extends CubeSymbols {
     return [];
   }
 
-  private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
+  private evaluateMultiStageReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
     if (!obj) {
       return;
     }
 
     // eslint-disable-next-line no-restricted-syntax
     for (const member of Object.values(obj)) {
-      if (member.postAggregate) {
+      if (member.multiStage) {
         if (member.groupBy) {
           member.groupByReferences = this.evaluateReferences(cubeName, member.groupBy);
         }

@@ -556,17 +556,17 @@ const measureTypeWithCount = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox'
 );
 
-const postAggregateMeasureType = Joi.string().valid(
+const multiStageMeasureType = Joi.string().valid(
   'count', 'number', 'string', 'boolean', 'time', 'sum', 'avg', 'min', 'max', 'countDistinct', 'runningTotal', 'countDistinctApprox',
   'rank'
 );
 
-const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.postAggregate'), [
+const MeasuresSchema = Joi.object().pattern(identifierRegex, Joi.alternatives().conditional(Joi.ref('.multiStage'), [
   {
     is: true,
     then: inherit(BaseMeasure, {
-      postAggregate: Joi.boolean().strict(),
-      type: postAggregateMeasureType.required(),
+      multiStage: Joi.boolean().strict(),
+      type: multiStageMeasureType.required(),
       sql: Joi.func(), // TODO .required(),
       groupBy: Joi.func(),
       reduceBy: Joi.func(),
@@ -679,7 +679,7 @@ const baseSchema = {
       sql: Joi.func().required()
     }),
     inherit(BaseDimension, {
-      postAggregate: Joi.boolean().valid(true),
+      multiStage: Joi.boolean().valid(true),
       type: Joi.any().valid('number').required(),
       sql: Joi.func().required(),
       addGroupBy: Joi.func(),

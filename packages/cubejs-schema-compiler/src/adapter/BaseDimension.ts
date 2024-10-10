@@ -64,11 +64,11 @@ export class BaseDimension {
     return [this];
   }
 
-  public isPostAggregate() {
+  public isMultiStage() {
     if (this.expression) { // TODO
       return false;
     }
-    return this.definition().postAggregate;
+    return this.definition().multiStage;
   }
 
   public cube() {
