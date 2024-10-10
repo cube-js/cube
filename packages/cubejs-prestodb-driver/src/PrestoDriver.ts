@@ -240,7 +240,10 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       throw new Error('Unload without query is not supported');
     }
 
-    const types = await this.unloadWithSql(tableName, options);
+    const types = options.query
+      ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
+      : await this.unloadWithTable(tableName);
+      
     const csvFile = await this.getCsvFiles(tableName);
 
     return {
@@ -260,30 +263,46 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
     return types.map((c) => `CAST(${c.name} AS varchar) ${c.name}`).join(', ');
   }
 
-  private async unloadWithSql(tableFullName: string, options: UnloadOptions) {
-    if (!options.query) {
-      throw new Error('Unload query is missed.');
-    }
+  private async unloadWithSql(tableFullName: string, sql: string, params: any[]) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: sql,
+      typeParams: params,
+      fromSql: sql,
+      fromParams: params
+    });
+  }
+
+  private async unloadWithTable(tableFullName: string) {
+    return this.unloadGeneric({
+      tableFullName,
+      typeSql: `SELECT * FROM ${tableFullName}`,
+      typeParams: [],
+      fromSql: tableFullName,
+      fromParams: []
+    });
+  }
+
+  private async unloadGeneric(params: {tableFullName: string, typeSql: string, typeParams: any[], fromSql: string, fromParams: any[]}) {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
 
     const { bucketType, exportBucket } = this.config;
-    const { sql, params } = options.query;
-    const types = await this.queryColumnTypes(sql, params);
+    const types = await this.queryColumnTypes(params.typeSql, params.typeParams);
     
-    const { schema, tableName } = this.splitTableFullName(tableFullName);
+    const { schema, tableName } = this.splitTableFullName(params.tableFullName);
     const tableWithCatalogAndSchema = `${this.config.catalog}.${schema}.${tableName}`;
     const protocol = bucketType === 'gcs' ? 'gs' : bucketType;
     const externalLocation = `${protocol}://${exportBucket}/${schema}/${tableName}`;
     const withParams = `( external_location = '${externalLocation}', format = 'CSV')`;
-    const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${sql})`;
+    const select = `SELECT ${this.generateTableColumnsForExport(types)} FROM (${params.fromSql})`;
     const createTableQuery = `CREATE TABLE ${tableWithCatalogAndSchema} WITH ${withParams} AS (${select})`;
 
     try {
       await this.query(
         createTableQuery,
-        params,
+        params.fromParams,
       );
     } finally {
       await this.query(`DROP TABLE IF EXISTS ${tableWithCatalogAndSchema}`, []);
