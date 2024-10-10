@@ -131,18 +131,19 @@ export function TimeListMember(props: ListMemberProps) {
 
   const granularityItems = (items: string[], isCustom?: boolean) => {
     return items.map((granularity: string) => {
-      if (
-        ((!open || isCompact) && !isGranularitySelectedMap[granularity]) ||
-        !customGranularitiesTitleMap
-      ) {
+      if ((!open || isCompact) && !isGranularitySelectedMap[granularity]) {
         return null;
       }
+
+      const title = customGranularitiesTitleMap
+        ? customGranularitiesTitleMap[granularity]
+        : titleize(granularity);
 
       return (
         <GranularityListMember
           key={`${name}.${granularity}`}
           name={granularity}
-          title={customGranularitiesTitleMap[granularity]}
+          title={title}
           isCustom={isCustom}
           isSelected={isGranularitySelectedMap[granularity]}
           onToggle={() => {
