@@ -95,6 +95,7 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       ssl: this.getSslOptions(dataSource),
       bucketType: getEnv('dbExportBucketType', { supported: ['gcs'], dataSource }),
       exportBucket: getEnv('dbExportBucket', { dataSource }),
+      credentials: getEnv('dbExportGCSCredentials', { dataSource }),
       ...config
     };
     this.catalog = this.config.catalog;
