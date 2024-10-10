@@ -1844,7 +1844,7 @@ from
     from
       "public"."BigECommerce" "BigECommerce"
   `);
-      expect(res.rows).toMatchSnapshot('multi_stage_percentage_of_total');
+      expect(res.rows).toMatchSnapshot('post_aggregate_percentage_of_total');
     });
 
     executePg('SQL API: reuse params', async (connection) => {
