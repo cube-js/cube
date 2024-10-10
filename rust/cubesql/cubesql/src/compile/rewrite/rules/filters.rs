@@ -363,6 +363,22 @@ impl RewriteRules for FilterRules {
                 self.transform_change_user_eq("?column", "?literal", "?user"),
             ),
             transforming_rewrite(
+                "user-is-not-null-filter",
+                filter_replacer(
+                    is_not_null_expr(column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    literal_bool(true),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_user_is_not_null("?column"),
+            ),
+            transforming_rewrite(
                 "join-field-filter-eq",
                 filter_replacer(
                     binary_expr(
@@ -3334,6 +3350,22 @@ impl FilterRules {
                 }
             }
 
+            false
+        }
+    }
+
+    fn transform_user_is_not_null(
+        &self,
+        column_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+
+        move |egraph, subst| {
+            for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
+                if column.name.eq_ignore_ascii_case("__user") {
+                    return true;
+                }
+            }
             false
         }
     }
