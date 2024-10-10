@@ -1221,7 +1221,6 @@ impl LogicalPlanAnalysis {
                 Some(c.to_string())
             }
             LogicalPlanLanguage::CubeScan(params) => cube_reference(params[0]),
-            LogicalPlanLanguage::Extension(params) => cube_reference(params[0]),
             _ => None,
         }
     }
