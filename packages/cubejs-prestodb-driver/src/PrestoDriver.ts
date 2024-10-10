@@ -236,10 +236,6 @@ export class PrestoDriver extends BaseDriver implements DriverInterface {
       }`);
     }
 
-    if (!options.query) {
-      throw new Error('Unload without query is not supported');
-    }
-
     const types = options.query
       ? await this.unloadWithSql(tableName, options.query.sql, options.query.params)
       : await this.unloadWithTable(tableName);
