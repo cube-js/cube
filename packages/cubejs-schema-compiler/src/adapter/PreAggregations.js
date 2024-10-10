@@ -373,7 +373,7 @@ export class PreAggregations {
       );
 
     const isAdditive = R.all(m => m.isAdditive(), query.measures);
-    const hasPostAggregate = R.any(m => m.isPostAggregate(), query.measures);
+    const hasMultiStage = R.any(m => m.isMultiStage(), query.measures);
     const leafMeasures = leafMeasurePaths.map(path => query.newMeasure(path));
     const leafMeasureAdditive = R.all(m => m.isAdditive(), leafMeasures);
     const cumulativeMeasures = leafMeasures
@@ -416,7 +416,7 @@ export class PreAggregations {
       ungrouped: query.ungrouped,
       sortedUsedCubePrimaryKeys,
       sortedAllCubeNames,
-      hasPostAggregate
+      hasMultiStage
     };
   }
 
@@ -707,7 +707,7 @@ export class PreAggregations {
      */
     const canUseFn =
       (
-        transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures && !transformedQuery.hasPostAggregate || transformedQuery.ungrouped
+        transformedQuery.leafMeasureAdditive && !transformedQuery.hasMultipliedMeasures && !transformedQuery.hasMultiStage || transformedQuery.ungrouped
       ) ? (r) => canUsePreAggregationLeafMeasureAdditive(r) ||
           canUsePreAggregationNotAdditive(r)
         : canUsePreAggregationNotAdditive;
