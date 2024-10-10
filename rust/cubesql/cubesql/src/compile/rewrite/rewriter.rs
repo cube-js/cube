@@ -31,6 +31,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
+use uuid::Uuid;
 
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
@@ -229,7 +230,7 @@ impl Rewriter {
 
     pub async fn run_rewrite_to_completion(
         &mut self,
-        auth_context: AuthContextRef,
+        compiler_id: Uuid,
         qtrace: &mut Option<Qtrace>,
     ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
         let cube_context = self.cube_context.clone();
@@ -243,7 +244,7 @@ impl Rewriter {
             .server
             .compiler_cache
             .rewrite_rules(
-                auth_context.clone(),
+                compiler_id,
                 cube_context.session_state.protocol.clone(),
                 false,
             )
@@ -311,6 +312,7 @@ impl Rewriter {
     pub async fn find_best_plan(
         &mut self,
         root: Id,
+        compiler_id: Uuid,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
@@ -326,7 +328,7 @@ impl Rewriter {
             .server
             .compiler_cache
             .rewrite_rules(
-                auth_context.clone(),
+                compiler_id,
                 cube_context.session_state.protocol.clone(),
                 true,
             )
