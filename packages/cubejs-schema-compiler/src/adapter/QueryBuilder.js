@@ -38,7 +38,6 @@ const ADAPTERS = {
   elasticsearch: ElasticSearchQuery,
   materialize: PostgresQuery,
   cubestore: CubeStoreQuery,
-  trino: PrestodbQuery,
 };
 
 export const queryClass = (dbType, dialectClass) => dialectClass || ADAPTERS[dbType];
