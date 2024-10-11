@@ -361,7 +361,7 @@ describe('SQL API', () => {
   limit
     1000001
     `);
-      expect(res.rows).toMatchSnapshot('power bi multi stage measure wrap');
+      expect(res.rows).toMatchSnapshot('power bi post aggregate measure wrap');
     });
 
     test('percentage of total sum', async () => {
