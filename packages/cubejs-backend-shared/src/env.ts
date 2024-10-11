@@ -1414,6 +1414,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token path.
+   */
+  snowflakeOAuthTokenPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
