@@ -164,6 +164,7 @@ interface SnowflakeDriverOptions {
   clientSessionKeepAlive?: boolean,
   database?: string,
   authenticator?: string,
+  oauthTokenPath?: string,
   token?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
@@ -269,6 +270,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
       privateKey,
@@ -391,15 +393,26 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return undefined;
   }
 
-  private async readOAuthToken(dataSource: string) {
-    const tokenPath = getEnv('snowflakeOAuthTokenPath', { dataSource });
+  private async readOAuthToken() {
+    const tokenPath = this.config.oauthTokenPath;
+
+    if (!tokenPath) {
+      return undefined;
+    }
+
+    try {
+      await fs.access(tokenPath);
+    } catch (error) {
+      throw new Error(`File ${tokenPath} provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist.`);
+    }
+
     const token = await fs.readFile(tokenPath, 'utf8');
     return token.trim();
   }
 
   private async createConnection() {
     if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
-      this.config.token = await this.readOAuthToken(this.config.dataSource);
+      this.config.token = await this.readOAuthToken();
     }
 
     const connection = snowflake.createConnection(this.config);
