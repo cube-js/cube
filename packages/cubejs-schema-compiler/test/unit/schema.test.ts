@@ -1,5 +1,5 @@
 import { prepareCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaWithCustomGranularities } from './utils';
+import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -366,5 +366,13 @@ describe('Schema Testing', () => {
       CubeC: { relationship: 'hasMany' },
       CubeD: { relationship: 'belongsTo' }
     });
+  });
+
+  it('valid schema with accessPolicy', async () => {
+    const { compiler } = prepareCompiler([
+      createCubeSchemaWithAccessPolicy('ProtectedCube'),
+    ]);
+    await compiler.compile();
+    compiler.throwIfAnyErrors();
   });
 });

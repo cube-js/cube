@@ -33,7 +33,7 @@ describe('SQL API', () => {
     const conn = new PgClient({
       database: 'db',
       port: pgPort,
-      host: 'localhost',
+      host: '127.0.0.1',
       user,
       password,
       ssl: false,
