@@ -68,7 +68,7 @@ impl WrapperRules {
                             "?grouped_subqueries",
                         ),
                         wrapper_pullup_replacer(
-                            wrapped_select_joins_empty_tail(),
+                            "?joins",
                             "?alias_to_cube",
                             "?push_to_cube",
                             "?in_projection",
@@ -111,7 +111,7 @@ impl WrapperRules {
                             "?aggr_expr",
                             "?window_expr",
                             "?cube_scan_input",
-                            wrapped_select_joins_empty_tail(),
+                            "?joins",
                             "?filter_expr",
                             wrapped_select_having_expr_empty_tail(),
                             "WrappedSelectLimit:None",
