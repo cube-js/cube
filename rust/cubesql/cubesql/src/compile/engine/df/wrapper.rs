@@ -1406,6 +1406,8 @@ impl CubeScanWrapperNode {
             .map_err(|e| DataFusionError::Internal(format!("Can't generate SQL for type: {}", e)))
     }
 
+    /// This function is async to be able to call to JS land,
+    /// in case some SQL generation could not be done through Jinja
     pub fn generate_sql_for_expr<'ctx>(
         plan: Arc<Self>,
         mut sql_query: SqlQuery,
