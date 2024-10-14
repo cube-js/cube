@@ -143,7 +143,7 @@ impl ConfigObjImpl {
             .ok()
             .map(|v| v.parse::<u64>().unwrap())
             .unwrap_or(120);
-        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", false);
+        let sql_push_down = env_parse("CUBESQL_SQL_PUSH_DOWN", true);
         Self {
             bind_address: env::var("CUBESQL_BIND_ADDR").ok().or_else(|| {
                 env::var("CUBESQL_PORT")
