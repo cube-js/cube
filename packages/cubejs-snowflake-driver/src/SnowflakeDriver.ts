@@ -394,11 +394,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   }
 
   private async readOAuthToken() {
-    const tokenPath = this.config.oauthTokenPath;
-
-    if (!tokenPath) {
-      return undefined;
-    }
+    const tokenPath = this.config.oauthTokenPath || '/snowflake/session/token';
 
     try {
       await fs.access(tokenPath);
