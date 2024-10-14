@@ -262,7 +262,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 .chain(
                     vec![
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            name: "WideCube.count".to_string(),
                             title: None,
                             description: None,
                             r#type: "number".to_string(),
@@ -270,7 +270,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            name: "WideCube.maxPrice".to_string(),
                             title: None,
                             description: None,
                             r#type: "number".to_string(),
@@ -278,7 +278,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            name: "WideCube.minPrice".to_string(),
                             title: None,
                             description: None,
                             r#type: "number".to_string(),
@@ -286,7 +286,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            name: "WideCube.avgPrice".to_string(),
                             title: None,
                             description: None,
                             r#type: "number".to_string(),
@@ -294,7 +294,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             meta: None,
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            name: "WideCube.countDistinct".to_string(),
                             title: None,
                             description: None,
                             r#type: "number".to_string(),
