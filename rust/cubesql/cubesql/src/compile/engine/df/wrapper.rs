@@ -1264,7 +1264,7 @@ impl CubeScanWrapperNode {
                                         subqueries_sql.clone(),
                                     )
                                     .await?;
-                                    let join_condition = join_condition[0].expr.clone();
+                                    let join_condition = join_condition[0].0.expr.clone();
                                     sql = new_sql;
 
                                     let join_sql_expression = {
@@ -1310,7 +1310,7 @@ impl CubeScanWrapperNode {
                                     measures: Some(
                                         aggregate
                                             .iter()
-                                            .map(|m| {
+                                            .map(|(m, _used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
                                                     &ungrouped_scan_node.used_cubes,
@@ -1318,14 +1318,14 @@ impl CubeScanWrapperNode {
                                             })
                                             .chain(
                                                 // TODO understand type of projections
-                                                projection.iter().map(|m| {
+                                                projection.iter().map(|(m, _used_members)| {
                                                     Self::ungrouped_member_def(
                                                         m,
                                                         &ungrouped_scan_node.used_cubes,
                                                     )
                                                 }),
                                             )
-                                            .chain(window.iter().map(|m| {
+                                            .chain(window.iter().map(|(m, _used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
                                                     &ungrouped_scan_node.used_cubes,
@@ -1337,7 +1337,7 @@ impl CubeScanWrapperNode {
                                         group_by
                                             .iter()
                                             .zip(group_descs.iter())
-                                            .map(|(m, t)| {
+                                            .map(|((m, _used_members), t)| {
                                                 Self::dimension_member_def(
                                                     m,
                                                     &ungrouped_scan_node.used_cubes,
@@ -1349,7 +1349,7 @@ impl CubeScanWrapperNode {
                                     segments: Some(
                                         filter
                                             .iter()
-                                            .map(|m| {
+                                            .map(|(m, _used_members)| {
                                                 Self::ungrouped_member_def(
                                                     m,
                                                     &ungrouped_scan_node.used_cubes,
@@ -1399,7 +1399,7 @@ impl CubeScanWrapperNode {
                                                             ))
                                                         })?;
                                                         Ok(vec![
-                                                            aliased_column.alias.clone(),
+                                                            aliased_column.0.alias.clone(),
                                                             if *asc { "asc".to_string() } else { "desc".to_string() },
                                                         ])
                                                     }
@@ -1470,24 +1470,24 @@ impl CubeScanWrapperNode {
                                     .get_sql_templates()
                                     .select(
                                         sql.sql.to_string(),
-                                        projection,
-                                        group_by,
+                                        projection.into_iter().map(|(m, _)| m).collect(),
+                                        group_by.into_iter().map(|(m, _)| m).collect(),
                                         group_descs,
-                                        aggregate,
+                                        aggregate.into_iter().map(|(m, _)| m).collect(),
                                         // TODO
                                         from_alias.unwrap_or("".to_string()),
                                         if !filter.is_empty() {
                                             Some(
                                                 filter
                                                     .iter()
-                                                    .map(|f| f.expr.to_string())
+                                                    .map(|(f, _)| f.expr.to_string())
                                                     .join(" AND "),
                                             )
                                         } else {
                                             None
                                         },
                                         None,
-                                        order,
+                                        order.into_iter().map(|(m, _)| m).collect(),
                                         limit,
                                         offset,
                                         distinct,
@@ -1549,7 +1549,7 @@ impl CubeScanWrapperNode {
         can_rename_columns: bool,
         push_to_cube_context: Option<&PushToCubeContext<'_>>,
         subqueries: Arc<HashMap<String, String>>,
-    ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
+    ) -> result::Result<(Vec<(AliasedColumn, HashSet<String>)>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping {
@@ -1565,6 +1565,7 @@ impl CubeScanWrapperNode {
                 original_expr.clone()
             };
 
+            let mut used_members = HashSet::new();
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
                 plan.clone(),
                 sql,
@@ -1572,7 +1573,7 @@ impl CubeScanWrapperNode {
                 expr.clone(),
                 push_to_cube_context,
                 subqueries.clone(),
-                None,
+                Some(&mut used_members),
             )
             .await?;
             let expr_sql =
@@ -1580,10 +1581,13 @@ impl CubeScanWrapperNode {
             sql = new_sql_query;
 
             let alias = next_remapper.add_expr(&schema, &original_expr, &expr)?;
-            aliased_columns.push(AliasedColumn {
-                expr: expr_sql,
-                alias,
-            });
+            aliased_columns.push((
+                AliasedColumn {
+                    expr: expr_sql,
+                    alias,
+                },
+                used_members,
+            ));
         }
         Ok((aliased_columns, sql))
     }
