@@ -226,35 +226,35 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                 .chain(
                     vec![
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.count".to_string(),
+                            name: "WideCube.count".to_string(),
                             title: None,
                             description: None,
                             _type: "number".to_string(),
                             agg_type: Some("count".to_string()),
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.maxPrice".to_string(),
+                            name: "WideCube.maxPrice".to_string(),
                             title: None,
                             description: None,
                             _type: "number".to_string(),
                             agg_type: Some("max".to_string()),
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.minPrice".to_string(),
+                            name: "WideCube.minPrice".to_string(),
                             title: None,
                             description: None,
                             _type: "number".to_string(),
                             agg_type: Some("min".to_string()),
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.avgPrice".to_string(),
+                            name: "WideCube.avgPrice".to_string(),
                             title: None,
                             description: None,
                             _type: "number".to_string(),
                             agg_type: Some("avg".to_string()),
                         },
                         CubeMetaMeasure {
-                            name: "KibanaSampleDataEcommerce.countDistinct".to_string(),
+                            name: "WideCube.countDistinct".to_string(),
                             title: None,
                             description: None,
                             _type: "number".to_string(),
