@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.36.11](https://github.com/cube-js/cube/compare/v0.36.10...v0.36.11) (2024-10-14)
+
+
+### Features
+
+* **snowflake-driver:** OAuth token path support ([#8808](https://github.com/cube-js/cube/issues/8808)) ([9d5b7e8](https://github.com/cube-js/cube/commit/9d5b7e8ed6d7618dac0f35784844ef9d17cd751b))
+
+
+
+
+
 ## [0.36.10](https://github.com/cube-js/cube/compare/v0.36.9...v0.36.10) (2024-10-14)
 
 
