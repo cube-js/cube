@@ -248,7 +248,7 @@ export class SchemaPage extends Component<SchemaPageProps, any> {
             tabBarExtraContent={
               <ButtonDropdown
                 show={this.state.shown}
-                disabled={!checkedKeys.length}
+                disabled={true}
                 type="primary"
                 data-testid="chart-type-btn"
                 overlay={
