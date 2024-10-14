@@ -56,31 +56,37 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     name: "KibanaSampleDataEcommerce.order_date".to_string(),
                     description: None,
                     _type: "time".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.last_mod".to_string(),
                     description: None,
                     _type: "time".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     description: Some("Customer gender".to_string()),
                     _type: "string".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.notes".to_string(),
                     description: None,
                     _type: "string".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     description: None,
                     _type: "number".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "KibanaSampleDataEcommerce.has_subscription".to_string(),
                     description: None,
                     _type: "boolean".to_string(),
+                    granularities: None,
                 },
             ],
             measures: vec![
@@ -155,16 +161,19 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     name: "Logs.id".to_string(),
                     description: None,
                     _type: "number".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "Logs.read".to_string(),
                     description: None,
                     _type: "boolean".to_string(),
+                    granularities: None,
                 },
                 CubeMetaDimension {
                     name: "Logs.content".to_string(),
                     description: None,
                     _type: "string".to_string(),
+                    granularities: None,
                 },
             ],
             measures: vec![
@@ -213,6 +222,7 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                     name: format!("WideCube.dim{}", i),
                     description: None,
                     _type: "number".to_string(),
+                    granularities: None,
                 })
                 .collect(),
             measures: (0..100)
@@ -278,16 +288,19 @@ pub fn get_test_meta() -> Vec<CubeMeta> {
                             name: format!("MultiTypeCube.dim_num{}", i),
                             description: Some(format!("Test numeric dimention {i}")),
                             _type: "number".to_string(),
+                            granularities: None,
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_str{}", i),
                             description: Some(format!("Test string dimention {i}")),
                             _type: "string".to_string(),
+                            granularities: None,
                         },
                         CubeMetaDimension {
                             name: format!("MultiTypeCube.dim_date{}", i),
                             description: Some(format!("Test time dimention {i}")),
                             _type: "time".to_string(),
+                            granularities: None,
                         },
                     ]
                 })
