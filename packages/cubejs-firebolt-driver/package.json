@@ -31,7 +31,7 @@
     "@cubejs-backend/base-driver": "^1.0.0",
     "@cubejs-backend/schema-compiler": "^1.0.0",
     "@cubejs-backend/shared": "^1.0.0",
-    "firebolt-sdk": "^1.2.0"
+    "firebolt-sdk": "^1.8.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
