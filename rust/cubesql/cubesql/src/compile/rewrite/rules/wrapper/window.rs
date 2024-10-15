@@ -91,7 +91,13 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
-                    "?joins",
+                    wrapper_pullup_replacer(
+                        "?joins",
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
                     wrapper_pullup_replacer(
                         "?filter_expr",
                         "?alias_to_cube",

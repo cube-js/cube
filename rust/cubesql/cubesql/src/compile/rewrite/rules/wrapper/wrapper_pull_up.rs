@@ -61,7 +61,13 @@ impl WrapperRules {
                             "?in_projection",
                             "?cube_members",
                         ),
-                        wrapped_select_joins_empty_tail(),
+                        wrapper_pullup_replacer(
+                            wrapped_select_joins_empty_tail(),
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
                         wrapper_pullup_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
@@ -184,7 +190,14 @@ impl WrapperRules {
                             "?in_projection",
                             "?cube_members",
                         ),
-                        wrapped_select_joins_empty_tail(),
+                        wrapper_pullup_replacer(
+                            // TODO handle non-empty joins
+                            wrapped_select_joins_empty_tail(),
+                            "?alias_to_cube",
+                            "?push_to_cube",
+                            "?in_projection",
+                            "?cube_members",
+                        ),
                         wrapper_pullup_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
