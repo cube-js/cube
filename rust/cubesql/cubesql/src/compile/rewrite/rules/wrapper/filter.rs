@@ -172,7 +172,13 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
-                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_joins_empty_tail(),
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
                     wrapped_select_filter_expr(
                         wrapper_pushdown_replacer(
                             "?filter_expr",
@@ -287,7 +293,13 @@ impl WrapperRules {
                         "?in_projection",
                         "?cube_members",
                     ),
-                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        wrapped_select_joins_empty_tail(),
+                        "?alias_to_cube",
+                        "?push_to_cube",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
                     wrapped_select_filter_expr(
                         wrapper_pushdown_replacer(
                             "?filter_expr",
