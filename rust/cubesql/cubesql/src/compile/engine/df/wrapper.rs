@@ -862,7 +862,6 @@ impl CubeScanWrapperNode {
                                 // Here it should just generate the literal
                                 // 2. It would not allow to provide aliases for expressions, instead it usually generates them
                                 let (expr, sql) = Self::generate_sql_for_expr(
-                                    plan.clone(),
                                     new_sql,
                                     generator.clone(),
                                     expr,
@@ -1583,7 +1582,7 @@ impl CubeScanWrapperNode {
     }
 
     async fn generate_column_expr(
-        plan: Arc<Self>,
+        _plan: Arc<Self>,
         schema: DFSchemaRef,
         exprs: impl IntoIterator<Item = Expr>,
         mut sql: SqlQuery,
@@ -1611,7 +1610,6 @@ impl CubeScanWrapperNode {
 
             let mut used_members = HashSet::new();
             let (expr_sql, new_sql_query) = Self::generate_sql_for_expr(
-                plan.clone(),
                 sql,
                 generator.clone(),
                 expr.clone(),
@@ -1736,7 +1734,6 @@ impl CubeScanWrapperNode {
     /// This function is async to be able to call to JS land,
     /// in case some SQL generation could not be done through Jinja
     pub fn generate_sql_for_expr<'ctx>(
-        plan: Arc<Self>,
         mut sql_query: SqlQuery,
         sql_generator: Arc<dyn SqlGenerator>,
         expr: Expr,
@@ -1748,7 +1745,6 @@ impl CubeScanWrapperNode {
             match expr {
                 Expr::Alias(expr, _) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -1787,7 +1783,6 @@ impl CubeScanWrapperNode {
                                 // So we can generate that as if it were regular column expression
 
                                 return Self::generate_sql_for_expr(
-                                    plan.clone(),
                                     sql_query,
                                     sql_generator.clone(),
                                     expr,
@@ -1810,7 +1805,6 @@ impl CubeScanWrapperNode {
                             }
                             MemberField::Literal(value) => {
                                 Self::generate_sql_for_expr(
-                                    plan.clone(),
                                     sql_query,
                                     sql_generator.clone(),
                                     Expr::Literal(value.clone()),
@@ -1862,7 +1856,6 @@ impl CubeScanWrapperNode {
                 // Expr::ScalarVariable(_, _) => {}
                 Expr::BinaryExpr { left, op, right } => {
                     let (left, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *left,
@@ -1872,7 +1865,6 @@ impl CubeScanWrapperNode {
                     )
                     .await?;
                     let (right, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *right,
@@ -1895,7 +1887,6 @@ impl CubeScanWrapperNode {
                 // Expr::AnyExpr { .. } => {}
                 Expr::Like(like) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *like.expr,
@@ -1905,7 +1896,6 @@ impl CubeScanWrapperNode {
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *like.pattern,
@@ -1917,7 +1907,6 @@ impl CubeScanWrapperNode {
                     let (escape_char, sql_query) = match like.escape_char {
                         Some(escape_char) => {
                             let (escape_char, sql_query) = Self::generate_sql_for_expr(
-                                plan.clone(),
                                 sql_query,
                                 sql_generator.clone(),
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
@@ -1943,7 +1932,6 @@ impl CubeScanWrapperNode {
                 }
                 Expr::ILike(ilike) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *ilike.expr,
@@ -1953,7 +1941,6 @@ impl CubeScanWrapperNode {
                     )
                     .await?;
                     let (pattern, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *ilike.pattern,
@@ -1965,7 +1952,6 @@ impl CubeScanWrapperNode {
                     let (escape_char, sql_query) = match ilike.escape_char {
                         Some(escape_char) => {
                             let (escape_char, sql_query) = Self::generate_sql_for_expr(
-                                plan.clone(),
                                 sql_query,
                                 sql_generator.clone(),
                                 Expr::Literal(ScalarValue::Utf8(Some(escape_char.to_string()))),
@@ -1992,7 +1978,6 @@ impl CubeScanWrapperNode {
                 // Expr::SimilarTo(_) => {}
                 Expr::Not(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2015,7 +2000,6 @@ impl CubeScanWrapperNode {
                 }
                 Expr::IsNotNull(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2037,7 +2021,6 @@ impl CubeScanWrapperNode {
                 }
                 Expr::IsNull(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2059,7 +2042,6 @@ impl CubeScanWrapperNode {
                 }
                 Expr::Negative(expr) => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2088,7 +2070,6 @@ impl CubeScanWrapperNode {
                 } => {
                     let expr = if let Some(expr) = expr {
                         let (expr, sql_query_next) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             *expr,
@@ -2105,7 +2086,6 @@ impl CubeScanWrapperNode {
                     let mut when_then_expr_sql = Vec::new();
                     for (when, then) in when_then_expr {
                         let (when, sql_query_next) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             *when,
@@ -2115,7 +2095,6 @@ impl CubeScanWrapperNode {
                         )
                         .await?;
                         let (then, sql_query_next) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query_next,
                             sql_generator.clone(),
                             *then,
@@ -2129,7 +2108,6 @@ impl CubeScanWrapperNode {
                     }
                     let else_expr = if let Some(else_expr) = else_expr {
                         let (else_expr, sql_query_next) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             *else_expr,
@@ -2153,7 +2131,6 @@ impl CubeScanWrapperNode {
                 }
                 Expr::Cast { expr, data_type } => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2174,7 +2151,6 @@ impl CubeScanWrapperNode {
                     nulls_first,
                 } => {
                     let (expr, sql_query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2582,7 +2558,6 @@ impl CubeScanWrapperNode {
                     let mut sql_args = Vec::new();
                     for arg in args {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2620,7 +2595,6 @@ impl CubeScanWrapperNode {
                                         )));
                                     }
                                     let (arg_sql, query) = Self::generate_sql_for_expr(
-                                        plan.clone(),
                                         sql_query,
                                         sql_generator.clone(),
                                         args[1].clone(),
@@ -2664,7 +2638,6 @@ impl CubeScanWrapperNode {
                     let mut sql_args = Vec::new();
                     for arg in args {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2705,7 +2678,6 @@ impl CubeScanWrapperNode {
                             }
                         }
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2735,7 +2707,6 @@ impl CubeScanWrapperNode {
                         let mut sql_exprs = Vec::new();
                         for expr in exprs {
                             let (sql, query) = Self::generate_sql_for_expr(
-                                plan.clone(),
                                 sql_query,
                                 sql_generator.clone(),
                                 expr,
@@ -2764,7 +2735,6 @@ impl CubeScanWrapperNode {
                         let mut sql_exprs = Vec::new();
                         for expr in exprs {
                             let (sql, query) = Self::generate_sql_for_expr(
-                                plan.clone(),
                                 sql_query,
                                 sql_generator.clone(),
                                 expr,
@@ -2806,7 +2776,6 @@ impl CubeScanWrapperNode {
                     let mut sql_args = Vec::new();
                     for arg in args {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2821,7 +2790,6 @@ impl CubeScanWrapperNode {
                     let mut sql_partition_by = Vec::new();
                     for arg in partition_by {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2836,7 +2804,6 @@ impl CubeScanWrapperNode {
                     let mut sql_order_by = Vec::new();
                     for arg in order_by {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             arg,
@@ -2921,7 +2888,6 @@ impl CubeScanWrapperNode {
                 } => {
                     let mut sql_query = sql_query;
                     let (sql_expr, query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2934,7 +2900,6 @@ impl CubeScanWrapperNode {
                     let mut sql_in_exprs = Vec::new();
                     for expr in list {
                         let (sql, query) = Self::generate_sql_for_expr(
-                            plan.clone(),
                             sql_query,
                             sql_generator.clone(),
                             expr,
@@ -2966,7 +2931,6 @@ impl CubeScanWrapperNode {
                 } => {
                     let mut sql_query = sql_query;
                     let (sql_expr, query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *expr,
@@ -2977,7 +2941,6 @@ impl CubeScanWrapperNode {
                     .await?;
                     sql_query = query;
                     let (subquery_sql, query) = Self::generate_sql_for_expr(
-                        plan.clone(),
                         sql_query,
                         sql_generator.clone(),
                         *subquery,
