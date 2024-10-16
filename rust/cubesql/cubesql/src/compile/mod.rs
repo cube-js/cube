@@ -15455,8 +15455,8 @@ ORDER BY "source"."str0" ASC
                     r#"SELECT {{ select_concat | map(attribute='aliased') | join(', ') }}
 FROM ({{ from }}) AS {{ from_alias }}
 {% if group_by %} GROUP BY {{ group_by | map(attribute='index') | join(', ') }}{% endif %}
-{% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if offset %}
-OFFSET {{ offset }}{% endif %}{% if limit %}
+{% if order_by %} ORDER BY {{ order_by | map(attribute='expr') | join(', ') }}{% endif %}{% if offset is not none %}
+OFFSET {{ offset }}{% endif %}{% if limit is not none %}
 LIMIT {{ limit }}{% endif %}"#.to_string(),
                 ),
             ]

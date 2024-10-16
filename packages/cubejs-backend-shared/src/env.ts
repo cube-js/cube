@@ -783,6 +783,45 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Azure Client ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Federated Token File Path for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTokenFilePAth: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_FEDERATED_TOKEN_FILE', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Tenant ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTenantId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID', dataSource)
+    ]
+  ),
+
+  /**
    * Export bucket options for Integration based.
    */
   dbExportIntegration: ({
@@ -1375,6 +1414,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token path.
+   */
+  snowflakeOAuthTokenPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
@@ -1581,7 +1633,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
   nodeEnv: () => get('NODE_ENV')
     .asString(),

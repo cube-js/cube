@@ -498,7 +498,7 @@ impl Rewriter {
     pub fn sql_push_down_enabled() -> bool {
         env::var("CUBESQL_SQL_PUSH_DOWN")
             .map(|v| v.to_lowercase() == "true")
-            .unwrap_or(false)
+            .unwrap_or(true)
     }
 
     pub fn rewrite_rules(
