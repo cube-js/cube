@@ -694,20 +694,13 @@ dependencies = [
  "async-trait",
  "convert_case",
  "cubesql",
- "findshlibs",
- "futures",
  "lazy_static",
- "libc",
  "log",
- "log-reroute",
- "minijinja",
  "neon",
- "once_cell",
  "regex",
  "serde",
  "serde_derive",
  "serde_json",
- "simple_logger",
  "tokio",
  "uuid 0.8.2",
 ]
@@ -983,18 +976,6 @@ name = "fastrand"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9fc0510504f03c51ada170672ac806f1f105a88aa97a5281117e1ddc3368e51a"
-
-[[package]]
-name = "findshlibs"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40b9e59cd0f7e0806cca4be089683ecb6434e602038df21fe6bf6711b2f07f64"
-dependencies = [
- "cc",
- "lazy_static",
- "libc",
- "winapi",
-]
 
 [[package]]
 name = "flatbuffers"
@@ -1625,17 +1606,6 @@ name = "log"
 version = "0.4.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
-
-[[package]]
-name = "log-reroute"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "741a3ba679a9a1d331319dda1c7d8f204e9f6760fd867e28576a45d17048bc02"
-dependencies = [
- "arc-swap",
- "log",
- "once_cell",
-]
 
 [[package]]
 name = "lru"
