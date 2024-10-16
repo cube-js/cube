@@ -240,6 +240,18 @@ impl AsyncPostgresShim {
         return Ok(());
     }
 
+    async fn get_compiler_id_and_refresh_cache_if_needed(&self) -> Result<Uuid, CubeError> {
+        self.session
+            .session_manager
+            .server
+            .compiler_cache
+            .get_compiler_id_and_refresh_if_needed(
+                self.auth_context()?,
+                self.session.state.protocol.clone(),
+            )
+            .await
+    }
+
     pub async fn run_on(
         fast_shutdown_interruptor: CancellationToken,
         semifast_shutdown_interruptor: CancellationToken,
@@ -1021,11 +1033,12 @@ impl AsyncPostgresShim {
                     source_statement.bind(body.to_bind_values(&parameters)?)?;
                 drop(statements_guard);
 
+                let compiler_id = self.get_compiler_id_and_refresh_cache_if_needed().await?;
                 let meta = self
                     .session
                     .server
                     .compiler_cache
-                    .meta(self.auth_context()?, self.session.state.protocol.clone())
+                    .meta(compiler_id, self.session.state.protocol.clone())
                     .await?;
 
                 let plan = convert_statement_to_cube_query(
@@ -1113,11 +1126,12 @@ impl AsyncPostgresShim {
             .map(|param| param.coltype.to_pg_tid())
             .collect();
 
+        let compiler_id = self.get_compiler_id_and_refresh_cache_if_needed().await?;
         let meta = self
             .session
             .server
             .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
+            .meta(compiler_id, self.session.state.protocol.clone())
             .await?;
 
         let stmt_replacer = StatementPlaceholderReplacer::new();
@@ -1709,11 +1723,12 @@ impl AsyncPostgresShim {
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
     ) -> Result<(), ConnectionError> {
+        let compiler_id = self.get_compiler_id_and_refresh_cache_if_needed().await?;
         let meta = self
             .session
             .server
             .compiler_cache
-            .meta(self.auth_context()?, self.session.state.protocol.clone())
+            .meta(compiler_id, self.session.state.protocol.clone())
             .await?;
 
         let statements =
