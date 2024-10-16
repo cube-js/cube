@@ -284,6 +284,7 @@ FROM
     KibanaSampleDataEcommerce
 WHERE
     __user = 'gopher'
+    AND LOWER(customer_gender) = 'test'
 GROUP BY 1
 ;
         "#
