@@ -356,8 +356,8 @@ impl QueryRouter {
                         )])],
                     )),
                 )),
-                QueryPlan::DataFusionSelect(flags, plan, context)
-                | QueryPlan::CreateTempTable(flags, plan, context, _, _) => {
+                QueryPlan::DataFusionSelect(plan, context)
+                | QueryPlan::CreateTempTable(plan, context, _, _) => {
                     // EXPLAIN over CREATE TABLE AS shows the SELECT query plan
                     let plan = Arc::new(plan);
                     let schema = LogicalPlan::explain_schema();
@@ -385,7 +385,7 @@ impl QueryRouter {
                         })
                     };
 
-                    Ok(QueryPlan::DataFusionSelect(flags, explain_plan, context))
+                    Ok(QueryPlan::DataFusionSelect(explain_plan, context))
                 }
             }
         })
@@ -596,7 +596,7 @@ impl QueryRouter {
         span_id: Option<Arc<SpanId>>,
     ) -> Result<QueryPlan, CompilationError> {
         let plan = self.select_to_plan(stmt, qtrace, span_id).await?;
-        let QueryPlan::DataFusionSelect(flags, plan, ctx) = plan else {
+        let QueryPlan::DataFusionSelect(plan, ctx) = plan else {
             return Err(CompilationError::internal(
                 "unable to build DataFusion plan from Query".to_string(),
             ));
@@ -608,8 +608,8 @@ impl QueryRouter {
                 "table name contains no ident parts".to_string(),
             ));
         };
+
         Ok(QueryPlan::CreateTempTable(
-            flags,
             plan,
             ctx,
             table_name.value.to_string(),
@@ -708,9 +708,11 @@ impl QueryRouter {
         }
 
         let sql_query_engine = SqlQueryEngine::new(self.session_manager.clone());
-        sql_query_engine
+        let (plan, _) = sql_query_engine
             .plan(stmt, qtrace, span_id, self.meta.clone(), self.state.clone())
-            .await
+            .await?;
+
+        Ok(plan)
     }
 }
 

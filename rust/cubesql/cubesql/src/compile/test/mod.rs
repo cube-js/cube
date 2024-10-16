@@ -933,19 +933,21 @@ impl TestContext {
                 .await
                 .map_err(|e| CubeError::internal(format!("Error during planning: {}", e)))?;
             match query {
-                QueryPlan::DataFusionSelect(flags, plan, ctx) => {
+                QueryPlan::DataFusionSelect(plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
                     let frame = batches_to_dataframe(&df.schema().into(), batches)?;
 
                     output.push(frame.print());
-                    output_flags = flags;
                 }
                 QueryPlan::MetaTabular(flags, frame) => {
                     output.push(frame.print());
                     output_flags = flags;
                 }
-                QueryPlan::MetaOk(flags, _) | QueryPlan::CreateTempTable(flags, _, _, _, _) => {
+                QueryPlan::CreateTempTable(_, _, _, _) => {
+                    // nothing to do
+                }
+                QueryPlan::MetaOk(flags, _) => {
                     output_flags = flags;
                 }
             }
