@@ -39,6 +39,7 @@ impl SimpleQueryPlanner {
             having,
             order_by: self.order_planner.default_order(),
             context: VisitorContext::default(),
+            ctes: vec![],
             is_distinct: false,
         };
         Ok(select)

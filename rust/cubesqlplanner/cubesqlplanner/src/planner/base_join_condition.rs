@@ -54,7 +54,7 @@ impl BaseJoinCondition for PrimaryJoinCondition {
                 Ok(format!(
                     "{}.{} = {}",
                     self.query_tools.escape_column_name("keys"),
-                    dim.alias_name()?,
+                    dim.alias_name(),
                     dim.dimension_sql(context.clone())?
                 ))
             })
@@ -67,14 +67,14 @@ impl BaseJoinCondition for PrimaryJoinCondition {
 pub struct DimensionJoinCondition {
     left_alias: String,
     right_alias: String,
-    dimensions: Vec<Rc<dyn BaseMember>>,
+    dimensions: Rc<Vec<String>>,
 }
 
 impl DimensionJoinCondition {
     pub fn try_new(
         left_alias: String,
         right_alias: String,
-        dimensions: Vec<Rc<dyn BaseMember>>,
+        dimensions: Rc<Vec<String>>,
     ) -> Result<Rc<Self>, CubeError> {
         Ok(Rc::new(Self {
             left_alias,
@@ -92,15 +92,15 @@ impl BaseJoinCondition for DimensionJoinCondition {
             self
             .dimensions
             .iter()
-            .map(|dim| -> Result<String, CubeError> {
-                Ok(format!(
+            .map(|alias| {
+                format!(
                     "({left_alias}.{alias} = {right_alias}.{alias} OR ({left_alias}.{alias} IS NULL AND {right_alias}.{alias} IS NULL))",
                     left_alias = self.left_alias,
                     right_alias = self.right_alias,
-                    alias = dim.alias_name()?,
-                ))
+                    alias = alias,
+                )
             })
-            .collect::<Result<Vec<_>, _>>()?
+            .collect::<Vec<_>>()
             .join(" AND ")
         };
         Ok(res)

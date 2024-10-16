@@ -7,6 +7,27 @@ use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::rc::Rc;
 
+#[derive(Clone, Debug)]
+pub struct OrderByItem {
+    name: String,
+    desc: bool,
+}
+
+impl OrderByItem {
+    pub fn new(name: String, desc: bool) -> Self {
+        Self { name, desc }
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+
+    pub fn desc(&self) -> bool {
+        self.desc
+    }
+}
+
+#[derive(Clone)]
 pub struct QueryProperties {
     measures: Vec<Rc<BaseMeasure>>,
     dimensions: Vec<Rc<BaseDimension>>,
@@ -14,6 +35,7 @@ pub struct QueryProperties {
     time_dimensions_filters: Vec<FilterItem>,
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
+    order_by: Vec<OrderByItem>,
 }
 
 impl QueryProperties {
@@ -89,6 +111,15 @@ impl QueryProperties {
             .filter(|dim| dim.has_granularity())
             .collect_vec();
 
+        let order_by = if let Some(order) = &options.static_data().order {
+            order
+                .iter()
+                .map(|o| OrderByItem::new(o.id.clone(), o.is_desc()))
+                .collect_vec()
+        } else {
+            Self::default_order(&dimensions, &time_dimensions, &measures)
+        };
+
         Ok(Rc::new(Self {
             measures,
             dimensions,
@@ -96,7 +127,33 @@ impl QueryProperties {
             time_dimensions_filters,
             dimensions_filters,
             measures_filters,
+            order_by,
         }))
+    }
+
+    pub fn new_from_precompiled(
+        measures: Vec<Rc<BaseMeasure>>,
+        dimensions: Vec<Rc<BaseDimension>>,
+        time_dimensions: Vec<Rc<BaseTimeDimension>>,
+        time_dimensions_filters: Vec<FilterItem>,
+        dimensions_filters: Vec<FilterItem>,
+        measures_filters: Vec<FilterItem>,
+        order_by: Vec<OrderByItem>,
+    ) -> Rc<Self> {
+        let order_by = if order_by.is_empty() {
+            Self::default_order(&dimensions, &time_dimensions, &measures)
+        } else {
+            order_by
+        };
+        Rc::new(Self {
+            measures,
+            dimensions,
+            time_dimensions,
+            time_dimensions_filters,
+            dimensions_filters,
+            measures_filters,
+            order_by,
+        })
     }
 
     pub fn measures(&self) -> &Vec<Rc<BaseMeasure>> {
@@ -111,8 +168,53 @@ impl QueryProperties {
         &self.time_dimensions
     }
 
+    pub fn time_dimensions_filters(&self) -> &Vec<FilterItem> {
+        &self.time_dimensions_filters
+    }
+
+    pub fn dimensions_filters(&self) -> &Vec<FilterItem> {
+        &self.dimensions_filters
+    }
+
     pub fn measures_filters(&self) -> &Vec<FilterItem> {
         &self.measures_filters
+    }
+
+    pub fn set_measures(&mut self, measures: Vec<Rc<BaseMeasure>>) {
+        self.measures = measures;
+    }
+
+    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
+        self.dimensions = dimensions;
+    }
+
+    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
+        self.time_dimensions = time_dimensions;
+    }
+
+    pub fn set_time_dimensions_filters(&mut self, time_dimensions_filters: Vec<FilterItem>) {
+        self.time_dimensions_filters = time_dimensions_filters
+    }
+
+    pub fn set_dimensions_filters(&mut self, dimenstions_filters: Vec<FilterItem>) {
+        self.dimensions_filters = dimenstions_filters
+    }
+
+    pub fn set_measures_filters(&mut self, measures_filters: Vec<FilterItem>) {
+        self.measures_filters = measures_filters
+    }
+
+    pub fn order_by(&self) -> &Vec<OrderByItem> {
+        &self.order_by
+    }
+
+    pub fn set_order_by(&mut self, order_by: Vec<OrderByItem>) {
+        self.order_by = order_by;
+    }
+
+    pub fn set_order_by_to_default(&mut self) {
+        self.order_by =
+            Self::default_order(&self.dimensions, &self.time_dimensions, &self.measures);
     }
 
     pub fn all_filters(&self) -> Option<Filter> {
@@ -147,7 +249,7 @@ impl QueryProperties {
         let dimensions_refs = self
             .dimensions_for_select()
             .into_iter()
-            .map(|d| Ok(Expr::Reference(cube_name.to_string(), d.alias_name()?)));
+            .map(|d| Ok(Expr::Reference(Some(cube_name.to_string()), d.alias_name())));
         let measures = measures.iter().map(|m| Ok(Expr::Field(m.clone())));
         dimensions_refs
             .chain(measures)
@@ -202,25 +304,37 @@ impl QueryProperties {
             dimensions.chain(measures).collect_vec()
         } else {
             let time_dimensions = self
-                .dimensions
+                .time_dimensions
                 .iter()
                 .map(|d| -> Rc<dyn BaseMember> { d.clone() });
             dimensions
-                .chain(measures)
                 .chain(time_dimensions)
+                .chain(measures)
                 .collect_vec()
         }
     }
 
-    pub fn group_by(&self) -> Vec<Rc<dyn BaseMember>> {
+    pub fn group_by(&self) -> Vec<Expr> {
         self.dimensions
             .iter()
-            .map(|f| -> Rc<dyn BaseMember> { f.clone() })
-            .chain(
-                self.time_dimensions
-                    .iter()
-                    .map(|f| -> Rc<dyn BaseMember> { f.clone() }),
-            )
+            .map(|f| Expr::Field(f.clone()))
+            .chain(self.time_dimensions.iter().map(|f| Expr::Field(f.clone())))
             .collect()
+    }
+
+    pub fn default_order(
+        dimensions: &Vec<Rc<BaseDimension>>,
+        time_dimensions: &Vec<Rc<BaseTimeDimension>>,
+        measures: &Vec<Rc<BaseMeasure>>,
+    ) -> Vec<OrderByItem> {
+        let mut result = Vec::new();
+        if let Some(granularity_dim) = time_dimensions.iter().find(|d| d.has_granularity()) {
+            result.push(OrderByItem::new(granularity_dim.full_name(), false));
+        } else if !measures.is_empty() && !dimensions.is_empty() {
+            result.push(OrderByItem::new(measures[0].full_name(), true));
+        } else if !dimensions.is_empty() {
+            result.push(OrderByItem::new(dimensions[0].full_name(), false));
+        }
+        result
     }
 }

@@ -1,6 +1,4 @@
-use super::planners::{
-    FullKeyAggregateQueryPlanner, PostAggregateQueryPlanner, SimpleQueryPlanner,
-};
+use super::planners::{FullKeyAggregateQueryPlanner, SimpleQueryPlanner};
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
@@ -54,9 +52,6 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
-        let post_aggregate_query_planner =
-            PostAggregateQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-        post_aggregate_query_planner.plan()?;
         let full_key_aggregate_query_builder =
             FullKeyAggregateQueryPlanner::new(self.query_tools.clone(), self.request.clone());
         if let Some(select) = full_key_aggregate_query_builder.plan()? {

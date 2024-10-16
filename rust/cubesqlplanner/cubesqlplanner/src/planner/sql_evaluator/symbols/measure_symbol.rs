@@ -1,18 +1,40 @@
-use super::dependecy::Dependency;
-use super::{Compiler, MemberSymbol, MemberSymbolFactory};
-use super::{EvaluationNode, SqlEvaluatorVisitor};
+use super::{MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::MeasureDefinition;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
+
+pub struct MeasureOrderBy {
+    evaluation_node: Rc<EvaluationNode>,
+    direction: String,
+}
+
+impl MeasureOrderBy {
+    pub fn new(evaluation_node: Rc<EvaluationNode>, direction: String) -> Self {
+        Self {
+            evaluation_node,
+            direction,
+        }
+    }
+
+    pub fn evaluation_node(&self) -> &Rc<EvaluationNode> {
+        &self.evaluation_node
+    }
+
+    pub fn direction(&self) -> &String {
+        &self.direction
+    }
+}
 
 pub struct MeasureSymbol {
     cube_name: String,
     name: String,
     definition: Rc<dyn MeasureDefinition>,
     measure_filters: Vec<Rc<EvaluationNode>>,
+    measure_order_by: Vec<MeasureOrderBy>,
     member_sql: Rc<dyn MemberSql>,
 }
 
@@ -23,6 +45,7 @@ impl MeasureSymbol {
         member_sql: Rc<dyn MemberSql>,
         definition: Rc<dyn MeasureDefinition>,
         measure_filters: Vec<Rc<EvaluationNode>>,
+        measure_order_by: Vec<MeasureOrderBy>,
     ) -> Self {
         Self {
             cube_name,
@@ -30,6 +53,7 @@ impl MeasureSymbol {
             member_sql,
             definition,
             measure_filters,
+            measure_order_by,
         }
     }
 
@@ -57,6 +81,14 @@ impl MeasureSymbol {
         &self.measure_filters
     }
 
+    pub fn measure_order_by(&self) -> &Vec<MeasureOrderBy> {
+        &self.measure_order_by
+    }
+
+    pub fn definition(&self) -> Rc<dyn MeasureDefinition> {
+        self.definition.clone()
+    }
+
     pub fn default_evaluate_sql(
         &self,
         visitor: &SqlEvaluatorVisitor,
@@ -76,44 +108,12 @@ impl MeasureSymbol {
         }
     }
 
-    pub fn is_post_aggregate(&self) -> bool {
-        self.definition
-            .static_data()
-            .post_aggregate
-            .unwrap_or(false)
+    pub fn is_multi_stage(&self) -> bool {
+        self.definition.static_data().multi_stage.unwrap_or(false)
     }
 }
 
 impl MemberSymbol for MeasureSymbol {
-    fn cube_name(&self) -> &String {
-        &self.cube_name
-    }
-}
-
-pub struct MeasureFilterSymbol {
-    cube_name: String,
-    member_sql: Rc<dyn MemberSql>,
-}
-
-impl MeasureFilterSymbol {
-    pub fn new(cube_name: String, member_sql: Rc<dyn MemberSql>) -> Self {
-        Self {
-            cube_name,
-            member_sql,
-        }
-    }
-
-    pub fn full_name(&self) -> String {
-        format!("{}.measure_filter", self.cube_name)
-    }
-
-    pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
-        let sql = self.member_sql.call(args)?;
-        Ok(sql)
-    }
-}
-
-impl MemberSymbol for MeasureFilterSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
     }
@@ -193,60 +193,28 @@ impl MemberSymbolFactory for MeasureSymbolFactory {
         let mut measure_filters = vec![];
         if let Some(filters) = definition.filters()? {
             for filter in filters.items().iter() {
-                let node =
-                    compiler.add_measure_filter_evaluator(cube_name.clone(), filter.sql()?)?;
+                let node = compiler.add_simple_sql_evaluator(cube_name.clone(), filter.sql()?)?;
                 measure_filters.push(node);
             }
         }
 
+        let mut measure_order_by = vec![];
+        if let Some(group_by) = definition.order_by()? {
+            for item in group_by.items().iter() {
+                let node = compiler.add_simple_sql_evaluator(cube_name.clone(), item.sql()?)?;
+                measure_order_by.push(MeasureOrderBy::new(node, item.dir()?));
+            }
+        }
+
         Ok(EvaluationNode::new_measure(
-            MeasureSymbol::new(cube_name, name, sql, definition, measure_filters),
-            deps,
-        ))
-    }
-}
-
-pub struct MeasureFilterSymbolFactory {
-    cube_name: String,
-    sql: Rc<dyn MemberSql>,
-}
-
-impl MeasureFilterSymbolFactory {
-    pub fn try_new(cube_name: &String, sql: Rc<dyn MemberSql>) -> Result<Self, CubeError> {
-        Ok(Self {
-            cube_name: cube_name.clone(),
-            sql,
-        })
-    }
-}
-
-impl MemberSymbolFactory for MeasureFilterSymbolFactory {
-    fn is_cachable() -> bool {
-        false
-    }
-    fn symbol_name() -> String {
-        "measure_filter".to_string()
-    }
-    fn cube_name(&self) -> &String {
-        &self.cube_name
-    }
-
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>> {
-        Some(self.sql.clone())
-    }
-
-    fn deps_names(&self) -> Result<Vec<String>, CubeError> {
-        Ok(self.sql.args_names().clone())
-    }
-
-    fn build(
-        self,
-        deps: Vec<Dependency>,
-        _compiler: &mut Compiler,
-    ) -> Result<Rc<EvaluationNode>, CubeError> {
-        let Self { cube_name, sql } = self;
-        Ok(EvaluationNode::new_measure_filter(
-            MeasureFilterSymbol::new(cube_name, sql),
+            MeasureSymbol::new(
+                cube_name,
+                name,
+                sql,
+                definition,
+                measure_filters,
+                measure_order_by,
+            ),
             deps,
         ))
     }

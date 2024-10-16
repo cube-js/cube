@@ -2,8 +2,8 @@ use super::collectors::JoinHintsCollector;
 use super::dependecy::DependenciesBuilder;
 use super::{
     CubeNameSymbolFactory, CubeTableSymbolFactory, DimensionSymbolFactory, EvaluationNode,
-    JoinConditionSymbolFactory, MeasureFilterSymbolFactory, MeasureSymbolFactory,
-    MemberSymbolFactory, TraversalVisitor,
+    JoinConditionSymbolFactory, MeasureSymbolFactory, MemberSymbolFactory, SimpleSqlSymbolFactory,
+    TraversalVisitor,
 };
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::MemberSql;
@@ -102,14 +102,14 @@ impl Compiler {
         )
     }
 
-    pub fn add_measure_filter_evaluator(
+    pub fn add_simple_sql_evaluator(
         &mut self,
         cube_name: String,
         sql: Rc<dyn MemberSql>,
     ) -> Result<Rc<EvaluationNode>, CubeError> {
         self.add_evaluator_impl(
             &cube_name,
-            MeasureFilterSymbolFactory::try_new(&cube_name, sql)?,
+            SimpleSqlSymbolFactory::try_new(&cube_name, sql)?,
         )
     }
 

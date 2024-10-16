@@ -623,8 +623,8 @@ export class BaseQuery {
         )
       );
       let rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
-      console.log("js result: ", js_res);
-      console.log("rust result: ", rust);
+      console.log("js result: ", js_res[0]);
+      console.log("rust result: ", rust[0]);
       return js_res;
   }
 
@@ -637,6 +637,7 @@ export class BaseQuery {
       joinRoot: this.join.root,
       joinGraph: this.joinGraph,
       cubeEvaluator: this.cubeEvaluator,
+      order: this.options.order,
       filters: this.options.filters,
       baseTools: this,
 
@@ -1053,6 +1054,7 @@ export class BaseQuery {
 
     const multipliedMeasures = measuresToRender(true, false)(measureToHierarchy);
     const regularMeasures = measuresToRender(false, false)(measureToHierarchy);
+
     const cumulativeMeasures =
       R.pipe(
         R.map(multiplied => R.xprod([multiplied], measuresToRender(multiplied, true)(measureToHierarchy))),

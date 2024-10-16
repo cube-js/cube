@@ -6,6 +6,7 @@ pub mod join;
 pub mod order;
 pub mod query_plan;
 pub mod select;
+pub mod subquery;
 pub mod union;
 
 pub use expression::Expr;
@@ -15,4 +16,5 @@ pub use join::{Join, JoinItem, JoinSource};
 pub use order::OrderBy;
 pub use query_plan::QueryPlan;
 pub use select::Select;
+pub use subquery::Subquery;
 pub use union::Union;

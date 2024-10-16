@@ -604,7 +604,7 @@ describe('SQL Generation', () => {
     //console.log(query.buildSqlAndParams());
 
     const res = await dbRunner.testQuery(query.buildSqlAndParamsTest());
-    //console.log(JSON.stringify(res));
+    console.log(JSON.stringify(res));
 
     expect(res).toEqual(
       expectedResult
@@ -2529,7 +2529,7 @@ describe('SQL Generation', () => {
     }]
   ));
 
-  it('multi stage complex graph with time dimension through view', async () => runQueryTest(
+  it('multi stage complex graph with time dimension through view 1', async () => runQueryTest(
     {
       measures: ['visitors_multi_stage.adjusted_rank_sum', 'visitors_multi_stage.visitor_revenue'],
       dimensions: ['visitors_multi_stage.source'],
