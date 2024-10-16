@@ -1,3 +1,4 @@
+pub mod otel_tracing;
 pub mod tracing;
 use crate::CubeError;
 use async_trait::async_trait;
@@ -10,6 +11,7 @@ use futures::{Sink, StreamExt};
 use futures_timer::Delay;
 use log::{Level, Log, Metadata, Record};
 use nanoid::nanoid;
+pub use otel_tracing::OpenTelemetryLogger;
 use reqwest::header::HeaderMap;
 use serde_json::{Map, Number, Value};
 use std::collections::{HashMap, HashSet};

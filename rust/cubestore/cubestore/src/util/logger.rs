@@ -1,4 +1,4 @@
-use crate::telemetry::ReportingLogger;
+use crate::telemetry::{OpenTelemetryLogger, ReportingLogger};
 use log::{Level, Log, Metadata, Record};
 use simple_logger::SimpleLogger;
 use std::env;
@@ -30,7 +30,12 @@ pub fn init_cube_logger(enable_telemetry: bool) {
     }
     let mut logger: Box<dyn Log> = Box::new(ContextLogger::new(ctx, logger));
     if enable_telemetry {
-        logger = Box::new(ReportingLogger::new(logger))
+        // No need to introduce special env vars, let's use the de facto standard ones
+        if let Ok(_) = env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
+            logger = Box::new(OpenTelemetryLogger::new(logger));
+        } else {
+            logger = Box::new(ReportingLogger::new(logger));
+        }
     }
 
     log::set_boxed_logger(logger).expect("Failed to initialize logger");
