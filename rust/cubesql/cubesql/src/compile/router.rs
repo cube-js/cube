@@ -230,101 +230,34 @@ impl QueryRouter {
         variable: &Vec<ast::Ident>,
         span_id: Option<Arc<SpanId>>,
     ) -> CompilationResult<QueryPlan> {
-        let name = variable.to_vec()[0].value.clone();
-        if self.state.protocol == DatabaseProtocol::PostgreSQL {
-            let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
-            let full_variable = match full_variable.as_str() {
-                "transaction_isolation_level" => "transaction_isolation",
-                x => x,
-            };
-            let stmt = if name.eq_ignore_ascii_case("all") {
-                parse_sql_to_statement(
-                    &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
-                        .to_string(),
-                    self.state.protocol.clone(),
-                    &mut None,
-                )?
-            } else {
-                parse_sql_to_statement(
-                    // TODO: column name might be expected to match variable name
-                    &format!(
-                        "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
-                        escape_single_quote_string(full_variable),
-                    ),
-                    self.state.protocol.clone(),
-                    &mut None,
-                )?
-            };
+        let full_variable = variable.iter().map(|v| v.value.to_lowercase()).join("_");
+        let full_variable = match full_variable.as_str() {
+            "transaction_isolation_level" => "transaction_isolation",
+            x => x,
+        };
 
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
-                .await
-        } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
-            Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![dataframe::Column::new(
-                        "Database".to_string(),
-                        ColumnType::String,
-                        ColumnFlags::empty(),
-                    )],
-                    vec![
-                        dataframe::Row::new(vec![dataframe::TableValue::String("db".to_string())]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "information_schema".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "mysql".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String(
-                            "performance_schema".to_string(),
-                        )]),
-                        dataframe::Row::new(vec![dataframe::TableValue::String("sys".to_string())]),
-                    ],
-                )),
-            ))
-        } else if name.eq_ignore_ascii_case("processlist") {
-            let stmt = parse_sql_to_statement(
-                &"SELECT * FROM information_schema.processlist".to_string(),
+        let name = variable.to_vec()[0].value.clone();
+        let stmt = if name.eq_ignore_ascii_case("all") {
+            parse_sql_to_statement(
+                &"SELECT name, setting, short_desc as description FROM pg_catalog.pg_settings"
+                    .to_string(),
                 self.state.protocol.clone(),
                 &mut None,
-            )?;
-
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
-                .await
-        } else if name.eq_ignore_ascii_case("warnings") {
-            Ok(QueryPlan::MetaTabular(
-                StatusFlags::empty(),
-                Box::new(dataframe::DataFrame::new(
-                    vec![
-                        dataframe::Column::new(
-                            "Level".to_string(),
-                            ColumnType::VarStr,
-                            ColumnFlags::NOT_NULL,
-                        ),
-                        dataframe::Column::new(
-                            "Code".to_string(),
-                            ColumnType::Int32,
-                            ColumnFlags::NOT_NULL | ColumnFlags::UNSIGNED,
-                        ),
-                        dataframe::Column::new(
-                            "Message".to_string(),
-                            ColumnType::VarStr,
-                            ColumnFlags::NOT_NULL,
-                        ),
-                    ],
-                    vec![],
-                )),
-            ))
+            )?
         } else {
-            self.create_df_logical_plan(
-                ast::Statement::ShowVariable {
-                    variable: variable.clone(),
-                },
+            parse_sql_to_statement(
+                // TODO: column name might be expected to match variable name
+                &format!(
+                    "SELECT setting FROM pg_catalog.pg_settings where name = '{}'",
+                    escape_single_quote_string(full_variable),
+                ),
+                self.state.protocol.clone(),
                 &mut None,
-                span_id.clone(),
-            )
+            )?
+        };
+
+        self.create_df_logical_plan(stmt, &mut None, span_id.clone())
             .await
-        }
     }
 
     fn explain_to_plan(
