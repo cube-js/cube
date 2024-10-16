@@ -47,12 +47,7 @@ pub enum QueryPlan {
     // Query will be executed via Data Fusion
     DataFusionSelect(LogicalPlan, DFSessionContext),
     // Query will be executed via DataFusion and saved to session
-    CreateTempTable(
-        LogicalPlan,
-        DFSessionContext,
-        String,
-        Arc<TempTableManager>,
-    ),
+    CreateTempTable(LogicalPlan, DFSessionContext, String, Arc<TempTableManager>),
 }
 
 impl fmt::Debug for QueryPlan {
@@ -85,8 +80,9 @@ impl fmt::Debug for QueryPlan {
 impl QueryPlan {
     pub fn as_logical_plan(&self) -> LogicalPlan {
         match self {
-            QueryPlan::DataFusionSelect(plan, _)
-            | QueryPlan::CreateTempTable(plan, _, _, _) => plan.clone(),
+            QueryPlan::DataFusionSelect(plan, _) | QueryPlan::CreateTempTable(plan, _, _, _) => {
+                plan.clone()
+            }
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
             }
@@ -110,8 +106,7 @@ impl QueryPlan {
 
     pub fn print(&self, pretty: bool) -> Result<String, CubeError> {
         match self {
-            QueryPlan::DataFusionSelect(plan, _)
-            | QueryPlan::CreateTempTable(plan, _, _, _) => {
+            QueryPlan::DataFusionSelect(plan, _) | QueryPlan::CreateTempTable(plan, _, _, _) => {
                 if pretty {
                     Ok(plan.display_indent().to_string())
                 } else {

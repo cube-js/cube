@@ -253,13 +253,7 @@ pub trait QueryEngine {
             qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
         }
 
-        Ok((
-            QueryPlan::DataFusionSelect(
-                rewrite_plan,
-                ctx,
-            ),
-            metadata
-        ))
+        Ok((QueryPlan::DataFusionSelect(rewrite_plan, ctx), metadata))
     }
 
     fn evaluate_wrapped_sql(
@@ -480,7 +474,8 @@ impl QueryEngine for SqlQueryEngine {
         stmt: &Self::AstStatementType,
     ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError> {
         let df_query_planner = SqlToRel::new_with_options(cube_ctx, true);
-        let plan = df_query_planner.statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))?;
+        let plan =
+            df_query_planner.statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))?;
 
         Ok((plan, ()))
     }
