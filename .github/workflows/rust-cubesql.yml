@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
     branches:
       - 'master'
@@ -12,6 +14,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
 
 jobs:
@@ -43,6 +47,10 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
+      - name: Lint cubenativeutils
+        run: cd rust/cubenativeutils && cargo fmt --all -- --check
+      - name: Lint cubesqlplanner
+        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
       - name: Clippy CubeSQL
         run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native

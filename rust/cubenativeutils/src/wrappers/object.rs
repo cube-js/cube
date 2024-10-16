@@ -1,7 +1,6 @@
 use super::inner_types::InnerTypes;
 use super::object_handle::NativeObjectHandle;
 use cubesql::CubeError;
-use regex::Regex;
 
 pub trait NativeObject<IT: InnerTypes>: Clone {
     fn get_context(&self) -> IT::Context;
