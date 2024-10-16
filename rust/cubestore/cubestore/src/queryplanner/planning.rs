@@ -1300,8 +1300,7 @@ fn pick_partitions(
             continue;
         }
 
-        //FIXME !!!!! emergency fix for APM, might break the limit pushdown, need to be solved on
-        //another way
+        //FIXME !!!!! emergency fix for APM, need to be solved on another way
         let chunks = chunks
             .into_iter()
             .map(|c| {
