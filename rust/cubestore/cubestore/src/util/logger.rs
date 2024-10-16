@@ -1,3 +1,4 @@
+use crate::telemetry::otel_tracing::init_tracing_telemetry;
 use crate::telemetry::{OpenTelemetryLogger, ReportingLogger};
 use log::{Level, Log, Metadata, Record};
 use simple_logger::SimpleLogger;
@@ -33,6 +34,7 @@ pub fn init_cube_logger(enable_telemetry: bool) {
         // No need to introduce special env vars, let's use the de facto standard ones
         if let Ok(_) = env::var("OTEL_EXPORTER_OTLP_ENDPOINT") {
             logger = Box::new(OpenTelemetryLogger::new(logger));
+            init_tracing_telemetry();
         } else {
             logger = Box::new(ReportingLogger::new(logger));
         }

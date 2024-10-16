@@ -7,12 +7,22 @@ use opentelemetry::trace::{SpanKind, Tracer, TracerProvider};
 use opentelemetry::{KeyValue, StringValue};
 use opentelemetry_sdk::logs::{LogRecord as LogRecordSDK, Logger as LoggerSDK};
 use opentelemetry_sdk::trace::Tracer as TracerSDK;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::Registry;
 
 const OTEL_SERVICE_NAME: &str = "cubestore";
 
 lazy_static! {
     pub static ref OT_TRACER: TracerSDK = init_tracing().unwrap();
     pub static ref OT_LOGGER: LoggerSDK = init_logging().unwrap();
+}
+
+pub fn init_tracing_telemetry() {
+    let telemetry = tracing_opentelemetry::layer().with_tracer(OT_TRACER.clone());
+    let subscriber = Registry::default().with(telemetry);
+
+    tracing::subscriber::set_global_default(subscriber)
+        .expect("setting default tracing subscriber failed");
 }
 
 pub fn init_tracing() -> Result<TracerSDK, Box<dyn std::error::Error>> {
