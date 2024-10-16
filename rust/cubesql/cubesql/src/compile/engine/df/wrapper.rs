@@ -260,6 +260,24 @@ fn expr_name(e: &Expr, schema: &Arc<DFSchema>) -> Result<String> {
     }
 }
 
+fn expr_to_column_with_relation(e: &Expr, schema: &Arc<DFSchema>) -> Result<Column> {
+    match e {
+        Expr::Column(col) => Ok(col.clone()),
+        Expr::Sort { expr, .. } => expr_to_column_with_relation(expr, schema),
+        _ => Ok(Column::from_name(e.name(schema)?)),
+    }
+}
+
+fn create_truncated_alias(original_alias: &str) -> String {
+    static NON_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
+    let mut truncated_alias = NON_ID_REGEX
+        .replace_all(&original_alias, "_")
+        .trim_start_matches("_")
+        .to_lowercase();
+    truncated_alias.truncate(16);
+    truncated_alias
+}
+
 pub struct SqlGenerationResult {
     pub data_source: Option<String>,
     pub from_alias: Option<String>,
@@ -335,7 +353,7 @@ impl CubeScanWrapperNode {
                 schema
                     .fields()
                     .iter()
-                    .map(|f| MemberField::Member(column_remapping.get(&Column::from_name(f.name().to_string())).map(|x| x.name.to_string()).unwrap_or(f.name().to_string())))
+                    .map(|f| MemberField::Member(column_remapping.get(&Column::from_name(f.name().to_string())).map(|x| x.name.to_string()).unwrap_or(create_truncated_alias(f.name()))))
                     .collect()
             } else {
                 schema
@@ -962,9 +980,6 @@ impl CubeScanWrapperNode {
         ungrouped_scan_node: Option<Arc<CubeScanNode>>,
         subqueries: Arc<HashMap<String, String>>,
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
-        static NON_ID_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
-
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
             let expr = if let Some(column_remapping) = column_remapping.as_ref() {
@@ -1001,8 +1016,7 @@ impl CubeScanWrapperNode {
                 Self::escape_interpolation_quotes(expr_sql, ungrouped_scan_node.is_some());
             sql = new_sql_query;
 
-            let original_alias = expr_name(&original_expr, &schema)?;
-            let original_alias_key = Column::from_name(&original_alias);
+            let original_alias_key = expr_to_column_with_relation(&original_expr, &schema)?;
             if let Some(alias_column) = next_remapping.get(&original_alias_key) {
                 let alias = alias_column.name.clone();
                 aliased_columns.push(AliasedColumn {
@@ -1012,13 +1026,10 @@ impl CubeScanWrapperNode {
                 continue;
             }
 
+            let original_alias = expr_name(&original_expr, &schema)?;
             let alias = if can_rename_columns {
                 let alias = expr_name(&expr, &schema)?;
-                let mut truncated_alias = NON_ID_REGEX
-                    .replace_all(&alias, "_")
-                    .trim_start_matches("_")
-                    .to_lowercase();
-                truncated_alias.truncate(16);
+                let truncated_alias = create_truncated_alias(&alias);
                 let mut alias = truncated_alias.clone();
                 for i in 1..10000 {
                     if !next_remapping
@@ -1035,33 +1046,25 @@ impl CubeScanWrapperNode {
             };
             if !next_remapping.contains_key(&Column::from_name(&alias)) {
                 next_remapping.insert(original_alias_key, Column::from_name(&alias));
+                let no_relation_alias = Column::from_name(&original_alias);
+                if !next_remapping.contains_key(&no_relation_alias) {
+                    next_remapping.insert(no_relation_alias, Column::from_name(&alias));
+                }
                 if let Some(from_alias) = &from_alias {
+                    let original_relation = match original_expr {
+                        Expr::Column(column) => column.relation,
+                        _ => None,
+                    };
                     next_remapping.insert(
                         Column {
                             name: original_alias.clone(),
-                            relation: Some(from_alias.clone()),
+                            relation: Some(original_relation.unwrap_or(from_alias.clone())),
                         },
                         Column {
                             name: alias.clone(),
                             relation: Some(from_alias.clone()),
                         },
                     );
-                    if let Expr::Column(column) = &original_expr {
-                        if let Some(original_relation) = &column.relation {
-                            if original_relation != from_alias {
-                                next_remapping.insert(
-                                    Column {
-                                        name: original_alias.clone(),
-                                        relation: Some(original_relation.clone()),
-                                    },
-                                    Column {
-                                        name: alias.clone(),
-                                        relation: Some(from_alias.clone()),
-                                    },
-                                );
-                            }
-                        }
-                    }
                 }
             } else {
                 return Err(CubeError::internal(format!(
