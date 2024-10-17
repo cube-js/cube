@@ -16,6 +16,8 @@ pub struct V1CubeMetaDimension {
     pub description: Option<String>,
     #[serde(rename = "type")]
     pub _type: String,
+    #[serde(rename = "granularities", skip_serializing_if = "Option::is_none")]
+    pub granularities: Option<Vec<crate::models::V1CubeMetaDimensionGranularity>>,
 }
 
 impl V1CubeMetaDimension {
@@ -24,6 +26,7 @@ impl V1CubeMetaDimension {
             name,
             description: None,
             _type,
+            granularities: None,
         }
     }
 }

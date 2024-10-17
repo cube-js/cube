@@ -129,4 +129,8 @@ export class PrestodbQuery extends BaseQuery {
     templates.types.binary = 'VARBINARY';
     return templates;
   }
+
+  public castToString(sql: any): string {
+    return `CAST(${sql} as VARCHAR)`;
+  }
 }

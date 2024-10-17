@@ -33,7 +33,7 @@ describe('SQL API', () => {
     const conn = new PgClient({
       database: 'db',
       port: pgPort,
-      host: 'localhost',
+      host: '127.0.0.1',
       user,
       password,
       ssl: false,
@@ -328,7 +328,7 @@ describe('SQL API', () => {
       expect(res.rows).toMatchSnapshot('metabase max number');
     });
 
-    test('power bi post aggregate measure wrap', async () => {
+    test('power bi multi stage measure wrap', async () => {
       const res = await connection.query(`
   select
     "_"."createdAt",
@@ -414,9 +414,9 @@ describe('SQL API', () => {
     test('select null in subquery with streaming', async () => {
       const query = `
       SELECT * FROM (
-        SELECT NULL AS "usr", 
-        value AS val 
-        FROM "SegmentTest" WHERE segment_eq_1 IS FALSE 
+        SELECT NULL AS "usr",
+        value AS val
+        FROM "SegmentTest" WHERE segment_eq_1 IS FALSE
         ORDER BY value
       ) "y";`;
       const res = await connection.query(query);
@@ -425,7 +425,7 @@ describe('SQL API', () => {
 
     test('tableau bi fiscal year query', async () => {
       const query = `
-      SELECT 
+      SELECT
         CAST("orders"."status" AS TEXT) AS "status",
         CAST(TRUNC(EXTRACT(YEAR FROM ("orders"."createdAt" + 11 * INTERVAL '1 MONTH'))) AS INT) AS "yr:created_at:ok"
       FROM
@@ -438,7 +438,7 @@ describe('SQL API', () => {
 
     test('query with intervals', async () => {
       const query = `
-      SELECT 
+      SELECT
         "orders"."createdAt" AS "timestamp",
         "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
         "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",
@@ -454,7 +454,7 @@ describe('SQL API', () => {
 
     test('query with intervals (SQL PUSH DOWN)', async () => {
       const query = `
-      SELECT 
+      SELECT
         CONCAT(DATE(createdAt), ' :') AS d,
         "orders"."createdAt" + 11 * INTERVAL '1 YEAR' AS "c0",
         "orders"."createdAt" + 11 * INTERVAL '2 MONTH' AS "c1",

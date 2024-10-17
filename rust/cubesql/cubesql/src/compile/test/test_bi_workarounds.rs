@@ -1,3 +1,5 @@
+use pretty_assertions::assert_eq;
+
 use super::LogicalPlanTestUtils;
 use crate::{
     compile::{

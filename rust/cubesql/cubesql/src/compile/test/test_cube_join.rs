@@ -1,6 +1,7 @@
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::compile::{

@@ -24,6 +24,7 @@ import {
   DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
+import fs from 'fs/promises';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
@@ -163,6 +164,8 @@ interface SnowflakeDriverOptions {
   clientSessionKeepAlive?: boolean,
   database?: string,
   authenticator?: string,
+  oauthTokenPath?: string,
+  token?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
   privateKey?: string,
@@ -207,7 +210,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
       'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
-      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS'
+      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS',
+      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
     ];
   }
 
@@ -266,6 +270,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
       privateKey,
@@ -388,11 +393,35 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return undefined;
   }
 
+  private async readOAuthToken() {
+    const tokenPath = this.config.oauthTokenPath || '/snowflake/session/token';
+
+    try {
+      await fs.access(tokenPath);
+    } catch (error) {
+      throw new Error(`File ${tokenPath} provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist.`);
+    }
+
+    const token = await fs.readFile(tokenPath, 'utf8');
+    return token.trim();
+  }
+
+  private async createConnection() {
+    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+      this.config.token = await this.readOAuthToken();
+    }
+
+    const connection = snowflake.createConnection(this.config);
+
+    return connection;
+  }
+
   /**
    * Test driver's connection.
    */
   public async testConnection() {
-    const connection = snowflake.createConnection(this.config);
+    const connection = await this.createConnection();
+
     await new Promise(
       (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
     );
@@ -411,7 +440,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    */
   protected async initConnection() {
     try {
-      const connection = snowflake.createConnection(this.config);
+      const connection = await this.createConnection();
+
       await new Promise(
         (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
       );

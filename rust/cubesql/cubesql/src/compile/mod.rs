@@ -5325,26 +5325,6 @@ ORDER BY
     }
 
     #[tokio::test]
-    async fn test_show_processlist() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_processlist",
-            execute_query("SHOW processlist".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_warnings() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_warnings",
-            execute_query("SHOW warnings".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn test_information_schema_collations() -> Result<(), CubeError> {
         insta::assert_snapshot!(
             "information_schema_collations",

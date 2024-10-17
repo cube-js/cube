@@ -170,7 +170,8 @@ export class FireboltDriver extends BaseDriver implements DriverInterface {
 
   public async testConnection(): Promise<void> {
     try {
-      await this.query('select 1');
+      const connection = await this.getConnection();
+      await connection.testConnection();
     } catch (error) {
       console.log(error);
       throw new Error('Unable to connect');

@@ -349,7 +349,14 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 change_user_member("?user"),
-                self.transform_change_user_eq("?column", "?literal", "?user"),
+                self.transform_change_user_eq(
+                    "?column",
+                    "?literal",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?user",
+                ),
             ),
             transforming_rewrite(
                 "change-user-equal-filter",
@@ -360,7 +367,35 @@ impl RewriteRules for FilterRules {
                     "?filter_aliases",
                 ),
                 change_user_member("?user"),
-                self.transform_change_user_eq("?column", "?literal", "?user"),
+                self.transform_change_user_eq(
+                    "?column",
+                    "?literal",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                    "?user",
+                ),
+            ),
+            transforming_rewrite(
+                "user-is-not-null-filter",
+                filter_replacer(
+                    is_not_null_expr(column_expr("?column")),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                filter_replacer(
+                    literal_bool(true),
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
+                self.transform_user_is_not_null(
+                    "?column",
+                    "?alias_to_cube",
+                    "?members",
+                    "?filter_aliases",
+                ),
             ),
             transforming_rewrite(
                 "join-field-filter-eq",
@@ -3308,32 +3343,99 @@ impl FilterRules {
         &self,
         column_var: &'static str,
         literal_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
         change_user_member_var: &'static str,
     ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
-        let column_var = column_var.parse().unwrap();
-        let literal_var = literal_var.parse().unwrap();
-        let change_user_member_var = change_user_member_var.parse().unwrap();
-
+        let column_var = var!(column_var);
+        let literal_var = var!(literal_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let change_user_member_var = var!(change_user_member_var);
+        let meta_context = self.meta_context.clone();
         move |egraph, subst| {
-            for literal in var_iter!(egraph[subst[literal_var]], LiteralExprValue) {
-                if let ScalarValue::Utf8(Some(change_user)) = literal {
-                    let specified_user = change_user.clone();
+            let literals = var_iter!(egraph[subst[literal_var]], LiteralExprValue)
+                .cloned()
+                .collect::<Vec<_>>();
+            for literal in literals {
+                let ScalarValue::Utf8(Some(user_name)) = literal else {
+                    continue;
+                };
 
-                    for column in var_iter!(egraph[subst[column_var]], ColumnExprColumn).cloned() {
-                        if column.name.eq_ignore_ascii_case("__user") {
-                            subst.insert(
-                                change_user_member_var,
-                                egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
-                                    ChangeUserMemberValue(specified_user),
-                                )),
-                            );
+                let aliases_es =
+                    var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                for aliases in aliases_es {
+                    let Some((member_name, cube)) = Self::filter_member_name(
+                        egraph,
+                        subst,
+                        &meta_context,
+                        alias_to_cube_var,
+                        column_var,
+                        members_var,
+                        &aliases,
+                    ) else {
+                        continue;
+                    };
 
-                            return true;
-                        }
+                    let user_member_name = format!("{}.__user", cube.name);
+                    if !member_name.eq_ignore_ascii_case(&user_member_name) {
+                        continue;
                     }
+
+                    subst.insert(
+                        change_user_member_var,
+                        egraph.add(LogicalPlanLanguage::ChangeUserMemberValue(
+                            ChangeUserMemberValue(user_name.clone()),
+                        )),
+                    );
+                    return true;
                 }
             }
 
+            false
+        }
+    }
+
+    fn transform_user_is_not_null(
+        &self,
+        column_var: &'static str,
+        alias_to_cube_var: &'static str,
+        members_var: &'static str,
+        filter_aliases_var: &'static str,
+    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+        let column_var = var!(column_var);
+        let alias_to_cube_var = var!(alias_to_cube_var);
+        let members_var = var!(members_var);
+        let filter_aliases_var = var!(filter_aliases_var);
+        let meta_context = self.meta_context.clone();
+        move |egraph, subst| {
+            let aliases_es = var_iter!(egraph[subst[filter_aliases_var]], FilterReplacerAliases)
+                .cloned()
+                .collect::<Vec<_>>();
+            for aliases in aliases_es {
+                let Some((member_name, cube)) = Self::filter_member_name(
+                    egraph,
+                    subst,
+                    &meta_context,
+                    alias_to_cube_var,
+                    column_var,
+                    members_var,
+                    &aliases,
+                ) else {
+                    continue;
+                };
+
+                let user_member_name = format!("{}.__user", cube.name);
+                if !member_name.eq_ignore_ascii_case(&user_member_name) {
+                    continue;
+                }
+
+                return true;
+            }
             false
         }
     }
