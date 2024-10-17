@@ -33,14 +33,15 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
    * Class constructor.
    */
   constructor(config = {}) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-    
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      isTestConnectionDisabled: getEnv('dbDisableTestConnection', { dataSource }),
+    });
+
     this.config = {
       secretArn:
         config.secretArn ||
@@ -66,7 +67,11 @@ class AuroraServerlessMySqlDriver extends BaseDriver {
   }
 
   async testConnection() {
-    return this.dataApi.query('SELECT 1');
+    if (this.isTestConnectionDisabled()) {
+      return;
+    }
+
+    await this.dataApi.query('SELECT 1');
   }
 
   positionBindings(sql) {
