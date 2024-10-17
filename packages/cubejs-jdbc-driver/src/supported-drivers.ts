@@ -63,5 +63,19 @@ export const SupportedDrivers: Record<string, DriverOptionsInterface> = {
       user: process.env.CUBEJS_DB_USER,
       password: process.env.CUBEJS_DB_PASS,
     }
+  },
+  arrowflight: {
+    driverClass: 'org.apache.arrow.driver.jdbc.ArrowFlightJdbcDriver',
+    prepareConnectionQueries: [],
+    mavenDependency: {
+      groupId: 'org.apache.arrow',
+      artifactId: 'flight-sql-jdbc-driver',
+      version: '17.0.0'
+    },
+    jdbcUrl: () => `jdbc:arrow-flight-sql://${process.env.CUBEJS_DB_HOST}:${process.env.CUBEJS_DB_PORT}/?useEncryption=${process.env.CUBEJS_DB_TLS_ENABLED}`,
+    properties: {
+      user: process.env.CUBEJS_DB_USER,
+      password: process.env.CUBEJS_DB_PASS
+    }
   }
 };
