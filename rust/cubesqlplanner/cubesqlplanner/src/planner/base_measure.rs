@@ -24,7 +24,6 @@ impl MeasureTimeShift {
                 let duration = if let Some(duration) = captures.get(1) {
                     duration.as_str().parse::<i64>().ok()
                 } else {
-                    println!("!!! KKK");
                     None
                 };
                 let granularity = if let Some(granularity) = captures.get(2) {
@@ -35,11 +34,9 @@ impl MeasureTimeShift {
                 if let Some((duration, granularity)) = duration.zip(granularity) {
                     Some((duration, granularity))
                 } else {
-                    println!("!!! CCCC");
                     None
                 }
             } else {
-                println!("!!! EEEE");
                 None
             };
         if let Some((duration, granularity)) = parsed_interval {

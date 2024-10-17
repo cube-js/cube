@@ -140,8 +140,6 @@ impl MultiStageQueryPlanner {
             state.clone()
         };
 
-        println!("!!!! new state {:?}", new_state);
-
         let childs = member_childs(&member)?;
         let input = childs
             .into_iter()
