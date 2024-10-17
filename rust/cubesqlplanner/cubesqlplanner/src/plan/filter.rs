@@ -4,14 +4,16 @@ use cubenativeutils::CubeError;
 use std::fmt;
 use std::rc::Rc;
 
+#[derive(Clone)]
 pub enum FilterGroupOperator {
     Or,
     And,
 }
 
+#[derive(Clone)]
 pub struct FilterGroup {
-    operator: FilterGroupOperator,
-    items: Vec<FilterItem>,
+    pub operator: FilterGroupOperator,
+    pub items: Vec<FilterItem>,
 }
 
 impl FilterGroup {
@@ -49,7 +51,11 @@ impl FilterItem {
                     .iter()
                     .map(|itm| itm.to_sql(context.clone()))
                     .collect::<Result<Vec<_>, _>>()?;
-                format!("({})", items_sql.join(&operator))
+                if items_sql.is_empty() {
+                    format!("( 1 = 1 )")
+                } else {
+                    format!("({})", items_sql.join(&operator))
+                }
             }
             FilterItem::Item(item) => {
                 let sql = item.to_sql(context.clone())?;

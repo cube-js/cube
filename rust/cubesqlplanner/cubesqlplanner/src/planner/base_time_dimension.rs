@@ -14,7 +14,7 @@ pub struct BaseTimeDimension {
 
 impl BaseMember for BaseTimeDimension {
     fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
-        let alias_name = self.alias_name()?;
+        let alias_name = self.alias_name();
 
         let field_sql = if let Some(granularity) = &self.granularity {
             let converted_tz = self
@@ -30,10 +30,17 @@ impl BaseMember for BaseTimeDimension {
         Ok(format!("{} {}", field_sql, alias_name))
     }
 
-    fn alias_name(&self) -> Result<String, CubeError> {
-        Ok(self
-            .query_tools
-            .escape_column_name(&self.unescaped_alias_name()?))
+    fn alias_name(&self) -> String {
+        self.query_tools
+            .escape_column_name(&self.unescaped_alias_name())
+    }
+
+    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.dimension.member_evaluator()
+    }
+
+    fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
+        self.clone()
     }
 }
 
@@ -73,15 +80,14 @@ impl BaseTimeDimension {
         self.dimension.member_evaluator()
     }
 
-    pub fn unescaped_alias_name(&self) -> Result<String, CubeError> {
+    pub fn unescaped_alias_name(&self) -> String {
         let granularity = if let Some(granularity) = &self.granularity {
             granularity
         } else {
             "day"
         };
 
-        Ok(self
-            .query_tools
-            .alias_name(&format!("{}_{}", self.dimension.dimension(), granularity)))
+        self.query_tools
+            .alias_name(&format!("{}_{}", self.dimension.dimension(), granularity))
     }
 }

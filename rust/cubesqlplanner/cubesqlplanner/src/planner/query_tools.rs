@@ -106,6 +106,10 @@ impl QueryTools {
         name.to_case(Case::Snake).replace(".", "__")
     }
 
+    pub fn escaped_alias_name(&self, name: &str) -> String {
+        self.escape_column_name(&self.alias_name(name))
+    }
+
     pub fn cube_alias_name(&self, name: &str, prefix: &Option<String>) -> String {
         if let Some(prefix) = prefix {
             self.alias_name(&format!("{}__{}", prefix, self.alias_name(name)))

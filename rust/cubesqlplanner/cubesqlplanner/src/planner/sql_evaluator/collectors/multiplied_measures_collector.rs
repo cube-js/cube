@@ -1,7 +1,7 @@
-use super::EvaluationNode;
-use super::TraversalVisitor;
-use super::{MemberSymbol, MemberSymbolType};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::{
+    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
+};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

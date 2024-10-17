@@ -1,5 +1,5 @@
 use super::query_tools::QueryTools;
-use super::sql_evaluator::sql_nodes::{default_node_processor, SqlNode};
+use super::sql_evaluator::sql_nodes::{SqlNode, SqlNodesFactory};
 use super::sql_evaluator::EvaluationNode;
 use crate::planner::sql_evaluator::visitor::EvaluatorVisitor;
 use crate::planner::sql_evaluator::SqlEvaluatorVisitor;
@@ -19,12 +19,18 @@ impl VisitorContext {
         })
     }
 
-    pub fn new_with_cube_alias_prefix(cube_alias_prefix: String) -> Rc<Self> {
-        Self::new(Some(cube_alias_prefix), default_node_processor())
+    pub fn new_with_cube_alias_prefix(
+        nodes_factory: Rc<SqlNodesFactory>,
+        cube_alias_prefix: String,
+    ) -> Rc<Self> {
+        Self::new(
+            Some(cube_alias_prefix),
+            nodes_factory.default_node_processor(),
+        )
     }
 
-    pub fn default() -> Rc<Self> {
-        Self::new(Default::default(), default_node_processor())
+    pub fn default(nodes_factory: Rc<SqlNodesFactory>) -> Rc<Self> {
+        Self::new(Default::default(), nodes_factory.default_node_processor())
     }
 
     pub fn make_visitor(&self, query_tools: Rc<QueryTools>) -> SqlEvaluatorVisitor {

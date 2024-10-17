@@ -1,36 +1,40 @@
-use super::{QueryPlan, Select};
+use super::{QueryPlan, Select, Subquery};
 use crate::planner::{BaseCube, BaseJoinCondition, VisitorContext};
 use cubenativeutils::CubeError;
 
 use std::rc::Rc;
 
 pub enum JoinSource {
-    Subquery(Rc<QueryPlan>, String),
+    Subquery(Subquery),
     Cube(Rc<BaseCube>),
+    TableReference(String, String),
 }
 
 impl JoinSource {
     pub fn new_from_query_plan(plan: Rc<QueryPlan>, alias: String) -> Self {
-        Self::Subquery(plan, alias)
+        Self::Subquery(Subquery::new(plan, alias))
     }
 
     pub fn new_from_select(plan: Rc<Select>, alias: String) -> Self {
-        Self::Subquery(Rc::new(QueryPlan::Select(plan)), alias)
+        Self::Subquery(Subquery::new(Rc::new(QueryPlan::Select(plan)), alias))
     }
 
     pub fn new_from_cube(cube: Rc<BaseCube>) -> Self {
         Self::Cube(cube)
     }
 
+    pub fn new_from_reference(reference: String, alias: String) -> Self {
+        Self::TableReference(reference, alias)
+    }
+
     pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let sql = match &self {
             JoinSource::Cube(cube) => {
                 let cubesql = cube.to_sql(context.clone())?;
-                format!("      {} ", cubesql)
+                format!(" {} ", cubesql)
             }
-            JoinSource::Subquery(s, alias) => {
-                format!("({}) AS {}", s.to_sql()?, alias)
-            }
+            JoinSource::Subquery(s) => s.to_sql()?,
+            JoinSource::TableReference(r, alias) => format!(" {} as {} ", r, alias),
         };
         Ok(sql)
     }
