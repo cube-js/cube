@@ -20,12 +20,7 @@ import {
   Title,
 } from '@cube-dev/ui-kit';
 import { forwardRef, Key, useEffect, useMemo, useState } from 'react';
-import {
-  DragDropContext,
-  Draggable,
-  Droppable,
-  OnDragEndResponder,
-} from 'react-beautiful-dnd';
+import { DragDropContext, Draggable, Droppable, OnDragEndResponder } from 'react-beautiful-dnd';
 import { TCubeMemberType } from '@cubejs-client/core';
 
 import { useStoredTimezones, useEvent } from './hooks';
@@ -59,9 +54,7 @@ const LIMIT_OPTIONS: { key: number; label: string }[] = [
   { key: 5000, label: '5,000 (Default)' },
   { key: 50000, label: '50,000 (Max)' },
 ];
-const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map(
-  (option) => option.key
-) as number[];
+const LIMIT_OPTION_VALUES = LIMIT_OPTIONS.map((option) => option.key) as number[];
 
 function timezoneByName(name: string) {
   return {
@@ -179,10 +172,7 @@ type OrderListItemProps = {
   onSortChange: (name: string, sorting: SortDirection) => void;
 };
 
-export const OrderListItem = forwardRef(function OrderListItem(
-  props: OrderListItemProps,
-  ref
-) {
+export const OrderListItem = forwardRef(function OrderListItem(props: OrderListItemProps, ref) {
   const {
     name,
     memberType,
@@ -195,12 +185,7 @@ export const OrderListItem = forwardRef(function OrderListItem(
   const label = props.label ?? name;
 
   return (
-    <OrderListItemStyled
-      ref={ref}
-      key={name}
-      data-member={memberType}
-      {...otherProps}
-    >
+    <OrderListItemStyled ref={ref} key={name} data-member={memberType} {...otherProps}>
       <DragOutlined style={{ fontSize: 16 }} />
 
       <MemberLabel name={label} member={memberType} />
@@ -215,19 +200,11 @@ export const OrderListItem = forwardRef(function OrderListItem(
           {ORDER_LABEL_BY_TYPE[cubeMemberKind ?? 'string'][0]}
         </SortButton>
 
-        <SortButton
-          data-member={memberType}
-          aria-label="Descending"
-          value="desc"
-        >
+        <SortButton data-member={memberType} aria-label="Descending" value="desc">
           {ORDER_LABEL_BY_TYPE[cubeMemberKind ?? 'string'][1]}
         </SortButton>
 
-        <SortButton
-          data-member={memberType}
-          aria-label="No sorting"
-          value="none"
-        >
+        <SortButton data-member={memberType} aria-label="No sorting" value="none">
           None
         </SortButton>
       </Radio.ButtonGroup>
@@ -241,9 +218,7 @@ export function QueryBuilderExtras() {
   const fields = [...(query?.dimensions ?? []), ...(query?.measures ?? [])];
   const storedTimezones = useStoredTimezones(query.timezone);
   const timeDimensions =
-    query?.timeDimensions
-      ?.filter((time) => time.granularity)
-      .map((time) => time.dimension) ?? [];
+    query?.timeDimensions?.filter((time) => time.granularity).map((time) => time.dimension) ?? [];
 
   timeDimensions.forEach((name) => {
     if (name && !fields.includes(name)) {
@@ -430,7 +405,11 @@ export function QueryBuilderExtras() {
                   ) : null
                 }
                 selectedKey={timezone}
-                onSelectionChange={(val: Key) => {
+                onSelectionChange={(val: Key | null) => {
+                  if (!val) {
+                    return;
+                  }
+
                   const timezone = val as string;
 
                   updateQuery(() => ({
@@ -447,12 +426,7 @@ export function QueryBuilderExtras() {
                   return (
                     <Select.Item key={tz.tzCode} textValue={tz.label}>
                       <Space placeContent="space-between" preset="t3m">
-                        <Text
-                          nowrap
-                          ellipsis
-                          block
-                          styles={{ width: 'max 40x' }}
-                        >
+                        <Text nowrap ellipsis block styles={{ width: 'max 40x' }}>
                           {name || 'UTC (Default)'}
                         </Text>
                         {zone ? (
@@ -519,13 +493,7 @@ export function QueryBuilderExtras() {
         )}
       </DialogTrigger>
     );
-  }, [
-    query.ungrouped,
-    query.timezone,
-    query.offset,
-    storedTimezones.join('::'),
-    query.limit,
-  ]);
+  }, [query.ungrouped, query.timezone, query.offset, storedTimezones.join('::'), query.limit]);
 
   const orderSelector = useMemo(() => {
     if (!allFields.length) {
@@ -552,17 +520,11 @@ export function QueryBuilderExtras() {
           )}
         </Button>
         <Dialog width="max 80x">
-          <Content
-            padding="(1.5x - 1ow)"
-            style={{ minHeight: `${30 * allFields.length + 18}px` }}
-          >
+          <Content padding="(1.5x - 1ow)" style={{ minHeight: `${30 * allFields.length + 18}px` }}>
             <DragDropContext onDragEnd={onDrag}>
               <Droppable droppableId="queryOrder">
                 {(provided) => (
-                  <OrderListContainer
-                    ref={provided.innerRef}
-                    {...provided.droppableProps}
-                  >
+                  <OrderListContainer ref={provided.innerRef} {...provided.droppableProps}>
                     {allFields.map((name, index) => {
                       const memberType = getMemberType(name);
 
