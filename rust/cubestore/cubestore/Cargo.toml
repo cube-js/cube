@@ -108,6 +108,7 @@ anyhow = "1.0"
 arc-swap = "1.7.1"
 tracing-opentelemetry = "0.27.0"
 tracing-subscriber = "0.3.18"
+tracing-log = "0.2.0"
 opentelemetry = "0.26.0"
 opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.26.0", default-features = false, features = [

@@ -1,6 +1,6 @@
-use log::{Level, Log, Metadata, Record};
+use log::{Log, Metadata, Record};
 use opentelemetry::trace::TracerProvider;
-use tracing::{event, Level as TracingLevel};
+use tracing_log::LogTracer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
 
@@ -26,46 +26,34 @@ pub fn init_tracing_telemetry() {
 }
 
 pub struct OpenTelemetryLogger {
-    logger: Box<dyn Log>,
+    inner_logger: Box<dyn Log>,
+    otel_logger: Box<dyn Log>,
 }
 
 impl OpenTelemetryLogger {
     pub fn new(logger: Box<dyn Log>) -> Self {
-        Self { logger }
+        Self {
+            inner_logger: logger,
+            otel_logger: Box::new(LogTracer::new()),
+        }
     }
 }
 
 impl Log for OpenTelemetryLogger {
     fn enabled<'a>(&self, metadata: &Metadata<'a>) -> bool {
-        self.logger.enabled(metadata)
+        self.inner_logger.enabled(metadata)
     }
 
     fn log<'a>(&self, record: &Record<'a>) {
         if !self.enabled(record.metadata()) {
             return;
         }
-        self.logger.log(&record);
-
-        match record.metadata().level() {
-            Level::Error => {
-                event!(TracingLevel::ERROR, "{}", record.args().to_string());
-            }
-            Level::Warn => {
-                event!(TracingLevel::WARN, "{}", record.args().to_string());
-            }
-            Level::Info => {
-                event!(TracingLevel::INFO, "{}", record.args().to_string());
-            }
-            Level::Debug => {
-                event!(TracingLevel::DEBUG, "{}", record.args().to_string());
-            }
-            Level::Trace => {
-                event!(TracingLevel::TRACE, "{}", record.args().to_string());
-            }
-        }
+        self.inner_logger.log(&record);
+        self.otel_logger.log(&record);
     }
 
     fn flush(&self) {
-        self.logger.flush()
+        self.inner_logger.flush();
+        self.otel_logger.flush();
     }
 }
