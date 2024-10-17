@@ -3,13 +3,10 @@ export function useServerCoreVersionGte(version: string, currentVersion: string)
     let gt = false;
 
     try {
-      const [major, minor, patch] = currentVersion.split('.').map(Number);
-      const [major1, minor1, patch1] = version.split('.').map(Number);
+      const [, m, p] = currentVersion.split('.').map(Number);
+      const [, m1, p1] = version.split('.').map(Number);
 
-      gt =
-        major > major1 ||
-        (major === major1 && minor > minor1) ||
-        (major === major1 && minor === minor1 && patch >= patch1);
+      gt = m > m1 || (m === m1 && p >= p1);
     } catch (_) {
       //
     }

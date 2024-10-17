@@ -419,7 +419,7 @@ const TypeToChartComponent = {
     });
 
     columnData.forEach((field: any, i: number) => {
-      if (field.key && typeof field.key === 'string') {
+      if (field.key) {
         granularityMap[field.key] = field.key.split('.')[2];
       } else {
         field.key = `key${i}`; // fallback index

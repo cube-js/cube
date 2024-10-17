@@ -38,7 +38,6 @@ export function QueryBuilderToolBar() {
     isQueryEmpty,
     isApiBlocked,
     stopQuery,
-    executedQuery,
     RequestStatusComponent,
   } = useQueryBuilderContext();
 
@@ -82,7 +81,7 @@ export function QueryBuilderToolBar() {
               isDisabled={isQueryEmpty || !!verificationError || isVerifying || isApiBlocked}
               isLoading={isLoading}
               icon={
-                !isQueryEmpty && executedQuery && !isResultOutdated ? (
+                !isQueryEmpty && (isLoading || !isResultOutdated) ? (
                   <ReloadOutlined />
                 ) : (
                   <PlayCircleOutlined />
