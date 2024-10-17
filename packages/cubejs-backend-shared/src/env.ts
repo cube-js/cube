@@ -480,6 +480,17 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
+   * Flag to disable driver's test connection probes
+   */
+  dbDisableTestConnection: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    !!process.env[keyByDataSource('CUBEJS_DB_DISABLE_TEST_CONNECTION', dataSource)]
+  ),
+
+  /**
    * Database max pool size.
    */
   dbMaxPoolSize: ({
@@ -500,7 +511,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
   dbPollMaxInterval: ({
@@ -514,7 +525,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * Polling timeout. Currently used in BigQuery, Dremio and Athena.
    * TODO: clarify this env.
    */
   dbPollTimeout: ({
@@ -532,7 +543,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
