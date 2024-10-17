@@ -57,3 +57,94 @@ impl Log for OpenTelemetryLogger {
         self.otel_logger.flush();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use log::{Level, Metadata, Record};
+    use std::sync::{Arc, Mutex};
+
+    struct MockLogger {
+        logs: Arc<Mutex<Vec<String>>>,
+        enabled: bool,
+    }
+
+    impl MockLogger {
+        fn new(enabled: bool) -> Self {
+            MockLogger {
+                logs: Arc::new(Mutex::new(Vec::new())),
+                enabled,
+            }
+        }
+    }
+
+    impl Log for MockLogger {
+        fn enabled<'a>(&self, _metadata: &Metadata<'a>) -> bool {
+            self.enabled
+        }
+
+        fn log<'a>(&self, record: &Record<'a>) {
+            let message = format!("{} - {}", record.level(), record.args());
+            self.logs.lock().unwrap().push(message);
+        }
+
+        fn flush(&self) {}
+    }
+
+    #[test]
+    fn test_log_forwarding_enabled() {
+        let mock_inner_logger = Box::new(MockLogger::new(true));
+        let mock_otel_logger = Box::new(MockLogger::new(true));
+
+        let inner_logs = Arc::clone(&mock_inner_logger.logs);
+        let otel_logs = Arc::clone(&mock_otel_logger.logs);
+
+        let logger = OpenTelemetryLogger {
+            inner_logger: mock_inner_logger,
+            otel_logger: mock_otel_logger,
+        };
+
+        let record = Record::builder()
+            .level(Level::Info)
+            .args(format_args!("Test log message"))
+            .build();
+
+        logger.log(&record);
+
+        let inner_log_messages = inner_logs.lock().unwrap();
+        let otel_log_messages = otel_logs.lock().unwrap();
+
+        assert_eq!(
+            inner_log_messages.get(0).unwrap(),
+            "INFO - Test log message"
+        );
+        assert_eq!(otel_log_messages.get(0).unwrap(), "INFO - Test log message");
+    }
+
+    #[test]
+    fn test_log_forwarding_disabled() {
+        let mock_inner_logger = Box::new(MockLogger::new(false));
+        let mock_otel_logger = Box::new(MockLogger::new(false));
+
+        let inner_logs = Arc::clone(&mock_inner_logger.logs);
+        let otel_logs = Arc::clone(&mock_otel_logger.logs);
+
+        let logger = OpenTelemetryLogger {
+            inner_logger: mock_inner_logger,
+            otel_logger: mock_otel_logger,
+        };
+
+        let record = Record::builder()
+            .level(Level::Info)
+            .args(format_args!("Test log message"))
+            .build();
+
+        logger.log(&record);
+
+        let inner_log_messages = inner_logs.lock().unwrap();
+        let otel_log_messages = otel_logs.lock().unwrap();
+
+        assert_eq!(inner_log_messages.len(), 0);
+        assert_eq!(otel_log_messages.len(), 0);
+    }
+}
