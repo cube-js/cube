@@ -10,7 +10,7 @@ pub mod subquery;
 pub mod union;
 
 pub use expression::Expr;
-pub use filter::{Filter, FilterItem};
+pub use filter::{Filter, FilterGroup, FilterItem};
 pub use from::{From, FromSource};
 pub use join::{Join, JoinItem, JoinSource};
 pub use order::OrderBy;

@@ -5,6 +5,7 @@ use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::{Expr, Filter, FilterItem};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
+use std::collections::HashSet;
 use std::rc::Rc;
 
 #[derive(Clone, Debug)]
@@ -36,6 +37,8 @@ pub struct QueryProperties {
     measures_filters: Vec<FilterItem>,
     time_dimensions: Vec<Rc<BaseTimeDimension>>,
     order_by: Vec<OrderByItem>,
+    row_limit: Option<usize>,
+    offset: Option<usize>,
 }
 
 impl QueryProperties {
@@ -120,6 +123,17 @@ impl QueryProperties {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         };
 
+        let row_limit = if let Some(row_limit) = &options.static_data().row_limit {
+            row_limit.parse::<usize>().ok()
+        } else {
+            None
+        };
+        let offset = if let Some(offset) = &options.static_data().offset {
+            offset.parse::<usize>().ok()
+        } else {
+            None
+        };
+
         Ok(Rc::new(Self {
             measures,
             dimensions,
@@ -128,6 +142,8 @@ impl QueryProperties {
             dimensions_filters,
             measures_filters,
             order_by,
+            row_limit,
+            offset,
         }))
     }
 
@@ -139,12 +155,15 @@ impl QueryProperties {
         dimensions_filters: Vec<FilterItem>,
         measures_filters: Vec<FilterItem>,
         order_by: Vec<OrderByItem>,
+        row_limit: Option<usize>,
+        offset: Option<usize>,
     ) -> Rc<Self> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         } else {
             order_by
         };
+
         Rc::new(Self {
             measures,
             dimensions,
@@ -153,6 +172,8 @@ impl QueryProperties {
             dimensions_filters,
             measures_filters,
             order_by,
+            row_limit,
+            offset,
         })
     }
 
@@ -178,6 +199,14 @@ impl QueryProperties {
 
     pub fn measures_filters(&self) -> &Vec<FilterItem> {
         &self.measures_filters
+    }
+
+    pub fn row_limit(&self) -> Option<usize> {
+        self.row_limit
+    }
+
+    pub fn offset(&self) -> Option<usize> {
+        self.offset
     }
 
     pub fn set_measures(&mut self, measures: Vec<Rc<BaseMeasure>>) {
@@ -336,5 +365,31 @@ impl QueryProperties {
             result.push(OrderByItem::new(dimensions[0].full_name(), false));
         }
         result
+    }
+    pub fn all_filtered_members(&self) -> HashSet<String> {
+        let mut result = HashSet::new();
+        for item in self.dimensions_filters().iter() {
+            self.fill_members_from_filter_item(item, &mut result);
+        }
+        for item in self.time_dimensions_filters().iter() {
+            self.fill_members_from_filter_item(item, &mut result);
+        }
+        for item in self.measures_filters().iter() {
+            self.fill_members_from_filter_item(item, &mut result);
+        }
+        result
+    }
+
+    fn fill_members_from_filter_item(&self, item: &FilterItem, members: &mut HashSet<String>) {
+        match item {
+            FilterItem::Group(group) => {
+                for item in group.items.iter() {
+                    self.fill_members_from_filter_item(item, members)
+                }
+            }
+            FilterItem::Item(item) => {
+                members.insert(item.member_name());
+            }
+        }
     }
 }

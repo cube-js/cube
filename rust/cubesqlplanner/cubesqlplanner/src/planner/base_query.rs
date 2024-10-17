@@ -1,8 +1,9 @@
-use super::planners::{FullKeyAggregateQueryPlanner, SimpleQueryPlanner};
+use super::planners::FullKeyAggregateQueryPlanner;
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::Select;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -52,14 +53,11 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
-        let full_key_aggregate_query_builder =
-            FullKeyAggregateQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-        if let Some(select) = full_key_aggregate_query_builder.plan()? {
-            Ok(select)
-        } else {
-            let simple_query_builder =
-                SimpleQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-            simple_query_builder.plan()
-        }
+        let full_key_aggregate_query_builder = FullKeyAggregateQueryPlanner::new(
+            self.query_tools.clone(),
+            self.request.clone(),
+            SqlNodesFactory::new(),
+        );
+        full_key_aggregate_query_builder.plan()
     }
 }

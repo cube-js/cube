@@ -51,6 +51,10 @@ impl DimensionSymbol {
         format!("{}.{}", self.cube_name, self.name)
     }
 
+    pub fn owned_by_cube(&self) -> bool {
+        self.definition.static_data().owned_by_cube.unwrap_or(true)
+    }
+
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
     }

@@ -97,7 +97,7 @@ describe('SQL Generation', () => {
             type: 'prior',
           }]
         },
-        cagr_1d: {
+        cagr_day: {
           multi_stage: true,
           sql: \`ROUND(100 * \${revenue} / NULLIF(\${revenue_day_ago}, 0))\`,
           type: 'number',
@@ -603,7 +603,7 @@ describe('SQL Generation', () => {
 
     //console.log(query.buildSqlAndParams());
 
-    const res = await dbRunner.testQuery(query.buildSqlAndParamsTest());
+    const res = await dbRunner.testQuery(query.buildSqlAndParams());
     console.log(JSON.stringify(res));
 
     expect(res).toEqual(
@@ -836,7 +836,7 @@ describe('SQL Generation', () => {
     measures: [
       'visitors.revenue',
       'visitors.revenue_day_ago',
-      'visitors.cagr_1d'
+      'visitors.cagr_day'
     ],
     timeDimensions: [{
       dimension: 'visitors.created_at',
@@ -848,8 +848,8 @@ describe('SQL Generation', () => {
     }],
     timezone: 'America/Los_Angeles'
   }, [
-    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_1d: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
-    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_1d: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
+    { visitors__created_at_day: '2017-01-05T00:00:00.000Z', visitors__cagr_day: '150', visitors__revenue: '300', visitors__revenue_day_ago: '200' },
+    { visitors__created_at_day: '2017-01-06T00:00:00.000Z', visitors__cagr_day: '300', visitors__revenue: '900', visitors__revenue_day_ago: '300' }
   ]));
 
   it('sql utils', async () => runQueryTest({
@@ -2529,7 +2529,7 @@ describe('SQL Generation', () => {
     }]
   ));
 
-  it('multi stage complex graph with time dimension through view 1', async () => runQueryTest(
+  it('multi stage complex graph with time dimension through view', async () => runQueryTest(
     {
       measures: ['visitors_multi_stage.adjusted_rank_sum', 'visitors_multi_stage.visitor_revenue'],
       dimensions: ['visitors_multi_stage.source'],

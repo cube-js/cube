@@ -237,6 +237,7 @@ export class BaseQuery {
     this.multiStageTimeDimensions = (this.options.multiStageTimeDimensions || []).map(this.newTimeDimension.bind(this));
     this.segments = (this.options.segments || []).map(this.newSegment.bind(this));
 
+
     const filters = this.extractFiltersAsTree(this.options.filters || []);
 
     // measure_filter (the one extracted from filters parameter on measure and
@@ -639,6 +640,9 @@ export class BaseQuery {
       cubeEvaluator: this.cubeEvaluator,
       order: this.options.order,
       filters: this.options.filters,
+      limit: this.options.limit ? this.options.limit.toString() : null,
+      rowLimit: this.options.rowLimit ? this.options.rowLimit.toString() : null,
+      offset: this.options.offset ? this.options.offset.toString() : null,
       baseTools: this,
 
     };
@@ -2463,7 +2467,6 @@ export class BaseQuery {
       fn,
       context
     );
-
     return context.joinHints;
   }
 

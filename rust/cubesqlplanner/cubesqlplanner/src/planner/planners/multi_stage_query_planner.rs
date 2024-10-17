@@ -1,43 +1,50 @@
 use super::multi_stage::MultiStageMemberQueryPlanner;
 use super::multi_stage::{MultiStageApplyedState, MultiStageQueryDescription};
-use super::{FullKeyAggregateQueryPlanner, OrderPlanner, SimpleQueryPlanner};
-use crate::plan::{
-    Expr, From, FromSource, Join, JoinItem, JoinSource, OrderBy, QueryPlan, Select, Subquery,
-};
-use crate::planner::base_join_condition::DimensionJoinCondition;
+use crate::plan::{Expr, From, Select, Subquery};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
-use crate::planner::sql_evaluator::sql_nodes::{
-    multi_stage_rank_node_processor, with_render_references_default_node_processor,
-};
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, BaseMember, VisitorContext};
+use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
 use cubenativeutils::CubeError;
-use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
     query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
-    order_planner: OrderPlanner,
 }
 
 impl MultiStageQueryPlanner {
     pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
         Self {
-            order_planner: OrderPlanner::new(query_properties.clone()),
             query_tools,
             query_properties,
         }
     }
-    pub fn get_cte_queries(
-        &self,
-        multi_stage_members: &Vec<Rc<BaseMeasure>>,
-    ) -> Result<(Vec<Rc<Subquery>>, Vec<String>), CubeError> {
+    pub fn get_cte_queries(&self) -> Result<(Vec<Rc<Subquery>>, Vec<String>), CubeError> {
+        let multi_stage_members = self
+            .query_properties
+            .all_members(false)
+            .into_iter()
+            .filter_map(|memb| -> Option<Result<_, CubeError>> {
+                match has_multi_stage_members(&memb.member_evaluator()) {
+                    Ok(true) => Some(Ok(memb)),
+                    Ok(false) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if multi_stage_members.is_empty() {
+            return Ok((vec![], vec![]));
+        }
         let mut descriptions = Vec::new();
-        let state = MultiStageApplyedState::new(self.query_properties.dimensions().clone());
+        let all_filter_members = self.query_properties.all_filtered_members();
+        let state = MultiStageApplyedState::new(
+            self.query_properties.dimensions().clone(),
+            all_filter_members,
+        );
 
         let top_level_ctes = multi_stage_members
             .into_iter()
@@ -75,9 +82,11 @@ impl MultiStageQueryPlanner {
             group_by: vec![],
             having: None,
             order_by: vec![],
-            context: VisitorContext::default(),
+            context: VisitorContext::default(SqlNodesFactory::new()),
             ctes: vec![],
             is_distinct: false,
+            limit: None,
+            offset: None,
         })
     }
 
@@ -87,6 +96,7 @@ impl MultiStageQueryPlanner {
         state: Rc<MultiStageApplyedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
+        let member_name = member.full_name();
         if let Some(exists) = descriptions
             .iter()
             .find(|q| q.is_match_member_and_state(&member, &state))
@@ -94,21 +104,43 @@ impl MultiStageQueryPlanner {
             return Ok(exists.clone());
         };
 
-        let new_state = if let Some(measure) =
-            BaseMeasure::try_new_from_precompiled(member.clone(), self.query_tools.clone())
+        let (dimensions_to_add, time_shifts) = if let Some(measure) =
+            BaseMeasure::try_new_from_precompiled(member.clone(), self.query_tools.clone())?
         {
-            if let Some(add_group_by) = measure.add_group_by() {
-                let dimensions_to_add = add_group_by
+            let dimensions_to_add = if let Some(add_group_by) = measure.add_group_by() {
+                add_group_by
                     .iter()
                     .map(|name| self.compile_dimension(name))
-                    .collect::<Result<Vec<_>, _>>()?;
-                state.add_dimensions(dimensions_to_add)
+                    .collect::<Result<Vec<_>, _>>()?
             } else {
-                state.clone()
+                vec![]
+            };
+
+            (dimensions_to_add, measure.time_shifts().clone())
+        } else {
+            (vec![], vec![])
+        };
+
+        let new_state = if !dimensions_to_add.is_empty()
+            || !time_shifts.is_empty()
+            || state.is_filter_allowed(&member_name)
+        {
+            let mut new_state = state.clone_state();
+            if !dimensions_to_add.is_empty() {
+                new_state.add_dimensions(dimensions_to_add);
             }
+            if !time_shifts.is_empty() {
+                new_state.add_time_shifts(time_shifts);
+            }
+            if state.is_filter_allowed(&member_name) {
+                new_state.disallow_filter(&member_name);
+            }
+            Rc::new(new_state)
         } else {
             state.clone()
         };
+
+        println!("!!!! new state {:?}", new_state);
 
         let childs = member_childs(&member)?;
         let input = childs

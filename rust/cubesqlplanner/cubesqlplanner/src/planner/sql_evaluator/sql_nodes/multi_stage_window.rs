@@ -1,7 +1,6 @@
 use super::SqlNode;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType};
-use crate::planner::sql_evaluator::{EvaluatorVisitor, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{EvaluationNode, MemberSymbolType, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 

@@ -1,6 +1,6 @@
 use super::{MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::cube_bridge::measure_definition::MeasureDefinition;
+use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode, SqlEvaluatorVisitor};
@@ -73,6 +73,13 @@ impl MeasureSymbol {
         Ok(sql)
     }
 
+    pub fn owned_by_cube(&self) -> bool {
+        self.definition()
+            .static_data()
+            .owned_by_cube
+            .unwrap_or(true)
+    }
+
     pub fn measure_type(&self) -> &String {
         &self.definition.static_data().measure_type
     }
@@ -87,6 +94,10 @@ impl MeasureSymbol {
 
     pub fn definition(&self) -> Rc<dyn MeasureDefinition> {
         self.definition.clone()
+    }
+
+    pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
+        &self.definition.static_data().time_shift_references
     }
 
     pub fn default_evaluate_sql(

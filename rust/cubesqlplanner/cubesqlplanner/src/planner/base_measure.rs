@@ -1,15 +1,73 @@
 use super::query_tools::QueryTools;
 use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
 use super::{evaluate_with_context, BaseMember, VisitorContext};
-use crate::cube_bridge::measure_definition::MeasureDefinition;
+use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::rc::Rc;
+
+#[derive(Clone, Debug)]
+pub struct MeasureTimeShift {
+    pub interval: String,
+    pub time_dimension: String,
+}
+
+lazy_static! {
+    static ref INTERVAL_MATCH_RE: Regex =
+        Regex::new(r"^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$").unwrap();
+}
+impl MeasureTimeShift {
+    pub fn try_from_reference(reference: &TimeShiftReference) -> Result<Self, CubeError> {
+        let parsed_interval =
+            if let Some(captures) = INTERVAL_MATCH_RE.captures(&reference.interval) {
+                let duration = if let Some(duration) = captures.get(1) {
+                    duration.as_str().parse::<i64>().ok()
+                } else {
+                    println!("!!! KKK");
+                    None
+                };
+                let granularity = if let Some(granularity) = captures.get(2) {
+                    Some(granularity.as_str().to_owned())
+                } else {
+                    None
+                };
+                if let Some((duration, granularity)) = duration.zip(granularity) {
+                    Some((duration, granularity))
+                } else {
+                    println!("!!! CCCC");
+                    None
+                }
+            } else {
+                println!("!!! EEEE");
+                None
+            };
+        if let Some((duration, granularity)) = parsed_interval {
+            let duration = if reference.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                duration * (-1)
+            } else {
+                duration
+            };
+
+            Ok(Self {
+                interval: format!("{duration} {granularity}"),
+                time_dimension: reference.time_dimension.clone(),
+            })
+        } else {
+            Err(CubeError::user(format!(
+                "Invalid interval: {}",
+                reference.interval
+            )))
+        }
+    }
+}
 
 pub struct BaseMeasure {
     measure: String,
     query_tools: Rc<QueryTools>,
     member_evaluator: Rc<EvaluationNode>,
     definition: Rc<dyn MeasureDefinition>,
+    time_shifts: Vec<MeasureTimeShift>,
     cube_name: String,
 }
 
@@ -54,28 +112,49 @@ impl BaseMeasure {
                 measure
             ))),
         }?;
+
+        let time_shifts = Self::parse_time_shifts(&definition)?;
         Ok(Rc::new(Self {
             measure,
             query_tools,
             definition,
             member_evaluator,
             cube_name,
+            time_shifts,
         }))
     }
 
     pub fn try_new_from_precompiled(
         evaluation_node: Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
-    ) -> Option<Rc<Self>> {
-        match evaluation_node.symbol() {
-            MemberSymbolType::Measure(s) => Some(Rc::new(Self {
-                measure: s.full_name(),
-                query_tools: query_tools.clone(),
-                member_evaluator: evaluation_node.clone(),
-                definition: s.definition().clone(),
-                cube_name: s.cube_name().clone(),
-            })),
+    ) -> Result<Option<Rc<Self>>, CubeError> {
+        let res = match evaluation_node.symbol() {
+            MemberSymbolType::Measure(s) => {
+                let time_shifts = Self::parse_time_shifts(&s.definition())?;
+                Some(Rc::new(Self {
+                    measure: s.full_name(),
+                    query_tools: query_tools.clone(),
+                    member_evaluator: evaluation_node.clone(),
+                    definition: s.definition().clone(),
+                    cube_name: s.cube_name().clone(),
+                    time_shifts,
+                }))
+            }
             _ => None,
+        };
+        Ok(res)
+    }
+
+    fn parse_time_shifts(
+        definition: &Rc<dyn MeasureDefinition>,
+    ) -> Result<Vec<MeasureTimeShift>, CubeError> {
+        if let Some(time_shifts) = &definition.static_data().time_shift_references {
+            time_shifts
+                .iter()
+                .map(|t| MeasureTimeShift::try_from_reference(t))
+                .collect::<Result<Vec<_>, _>>()
+        } else {
+            Ok(vec![])
         }
     }
 
@@ -109,6 +188,14 @@ impl BaseMeasure {
             "number" | "string" | "time" | "boolean" => true,
             _ => false,
         }
+    }
+
+    pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
+        &self.definition.static_data().time_shift_references
+    }
+
+    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
+        &self.time_shifts
     }
 
     pub fn is_multi_stage(&self) -> bool {

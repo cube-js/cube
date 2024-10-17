@@ -56,6 +56,10 @@ pub struct BaseQueryOptionsStatic {
     pub timezone: Option<String>,
     pub filters: Option<Vec<FilterItem>>,
     pub order: Option<Vec<OrderByItem>>,
+    pub limit: Option<String>,
+    #[serde(rename = "rowLimit")]
+    pub row_limit: Option<String>,
+    pub offset: Option<String>,
 }
 
 #[nativebridge::native_bridge(BaseQueryOptionsStatic)]

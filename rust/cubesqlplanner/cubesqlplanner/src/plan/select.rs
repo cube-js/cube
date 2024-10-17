@@ -15,6 +15,8 @@ pub struct Select {
     pub context: Rc<VisitorContext>,
     pub ctes: Vec<Rc<Subquery>>,
     pub is_distinct: bool,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
 }
 
 impl Select {
@@ -77,12 +79,22 @@ impl Select {
 
         let distinct = if self.is_distinct { "DISTINCT " } else { "" };
         let from = self.from.to_sql(self.context.clone())?;
+        let limit = if let Some(limit) = self.limit {
+            format!(" LIMIT {limit}")
+        } else {
+            format!("")
+        };
+        let offset = if let Some(offset) = self.offset {
+            format!(" OFFSET {offset}")
+        } else {
+            format!("")
+        };
 
         let res = format!(
             "{ctes}SELECT\
             \n      {distinct}{projection}\
             \n    FROM\
-            \n{from}{where_condition}{group_by}{having}{order_by}",
+            \n{from}{where_condition}{group_by}{having}{order_by}{limit}{offset}",
         );
         Ok(res)
     }

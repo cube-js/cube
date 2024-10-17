@@ -96,34 +96,29 @@ export class JoinGraph {
   }
 
   buildJoin(cubesToJoin) {
-    console.log("!!!! here ", cubesToJoin);
-    try {
-      if (!cubesToJoin.length) {
-        return null;
-      }
-      const key = JSON.stringify(cubesToJoin);
-      if (!this.builtJoins[key]) {
-        const join = R.pipe(
-          R.map(
-            cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
-          ),
-          R.filter(R.identity),
-          R.sortBy(joinTree => joinTree.joins.length)
-        )(cubesToJoin)[0];
-        if (!join) {
-          throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
-        }
-        this.builtJoins[key] = Object.assign(join, {
-          multiplicationFactor: R.compose(
-            R.fromPairs,
-            R.map(v => [this.cubeFromPath(v), this.findMultiplicationFactorFor(this.cubeFromPath(v), join.joins)])
-          )(cubesToJoin)
-        });
-      }
-    return this.builtJoins[key];
-    } catch (e) {
-      console.log("!!!! errr ", e);
+    if (!cubesToJoin.length) {
+      return null;
     }
+    const key = JSON.stringify(cubesToJoin);
+    if (!this.builtJoins[key]) {
+      const join = R.pipe(
+        R.map(
+          cube => this.buildJoinTreeForRoot(cube, R.without([cube], cubesToJoin))
+        ),
+        R.filter(R.identity),
+        R.sortBy(joinTree => joinTree.joins.length)
+      )(cubesToJoin)[0];
+      if (!join) {
+        throw new UserError(`Can't find join path to join ${cubesToJoin.map(v => `'${v}'`).join(', ')}`);
+      }
+      this.builtJoins[key] = Object.assign(join, {
+        multiplicationFactor: R.compose(
+          R.fromPairs,
+          R.map(v => [this.cubeFromPath(v), this.findMultiplicationFactorFor(this.cubeFromPath(v), join.joins)])
+        )(cubesToJoin)
+      });
+    }
+    return this.builtJoins[key];
   }
 
   cubeFromPath(cubePath) {
