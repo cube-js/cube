@@ -93,13 +93,14 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      isTestConnectionDisabled: getEnv('dbDisableTestConnection', { dataSource }),
+    });
 
     this.options = {
       scopes: [
@@ -155,6 +156,10 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
+    if (this.isTestConnectionDisabled()) {
+      return;
+    }
+
     await this.bigquery.query({
       query: 'SELECT ? AS number',
       params: ['1'],

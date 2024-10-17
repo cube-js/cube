@@ -111,14 +111,15 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
-    
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      isTestConnectionDisabled: getEnv('dbDisableTestConnection', { dataSource }),
+    });
+
     this.pool = new Pool({
       idleTimeoutMillis: 30000,
       max:
@@ -146,9 +147,9 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   protected primaryKeysQuery(conditionString?: string): string | null {
-    return `SELECT 
+    return `SELECT
       columns.table_schema as ${this.quoteIdentifier('table_schema')},
-      columns.table_name as ${this.quoteIdentifier('table_name')}, 
+      columns.table_name as ${this.quoteIdentifier('table_name')},
       columns.column_name as ${this.quoteIdentifier('column_name')}
     FROM information_schema.table_constraints tc
     JOIN information_schema.constraint_column_usage AS ccu USING (constraint_schema, constraint_name)
@@ -225,6 +226,10 @@ export class PostgresDriver<Config extends PostgresDriverConfiguration = Postgre
   }
 
   public async testConnection(): Promise<void> {
+    if (this.isTestConnectionDisabled()) {
+      return;
+    }
+
     try {
       await this.pool.query('SELECT $1::int AS number', ['1']);
     } catch (e) {
