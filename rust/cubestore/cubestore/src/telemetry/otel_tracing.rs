@@ -1,6 +1,7 @@
 use log::{Log, Metadata, Record};
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::KeyValue;
+use opentelemetry_sdk::trace::TracerProvider as TracerProviderSDK;
 use opentelemetry_sdk::Resource;
 use tracing_log::LogTracer;
 use tracing_subscriber::layer::SubscriberExt;
@@ -8,7 +9,7 @@ use tracing_subscriber::Registry;
 
 const OTEL_SERVICE_NAME: &str = "cubestore";
 
-pub fn init_tracing_telemetry(version: String) {
+pub fn init_tracing_telemetry(version: String) -> TracerProviderSDK {
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .http()
         .with_http_client(reqwest::Client::new());
@@ -31,6 +32,8 @@ pub fn init_tracing_telemetry(version: String) {
 
     tracing::subscriber::set_global_default(subscriber)
         .expect("setting default tracing subscriber failed");
+
+    tracer_provider
 }
 
 pub struct OpenTelemetryLogger {

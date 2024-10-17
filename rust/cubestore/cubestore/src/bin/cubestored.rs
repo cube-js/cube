@@ -8,6 +8,7 @@ use cubestore::util::{metrics, spawn_malloc_trim_loop};
 use cubestore::{app_metrics, CubeError};
 use datafusion::cube_ext;
 use log::debug;
+use opentelemetry_sdk::trace::TracerProvider;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -80,8 +81,13 @@ fn main() {
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        // Holding trace_provider to automatically flush spans during drop.
+        // opentelemetry::global::shutdown_tracer_provider() doesn't work correctly in v0.26
+        // @see https://github.com/open-telemetry/opentelemetry-rust/issues/1961
+        let mut tracer_provider: Option<TracerProvider> = None;
+
         if enable_telemetry {
-            init_tracing_telemetry(version);
+            tracer_provider = Some(init_tracing_telemetry(version));
         }
         // TODO: Should this be avoided if otel is configured?
         init_agent_sender().await;
@@ -101,10 +107,8 @@ fn main() {
         stop_on_ctrl_c(&services).await;
         services.wait_processing_loops().await.unwrap();
 
-        if enable_telemetry {
-            // This still doesn't prevent errors:
-            // OpenTelemetry trace error occurred. cannot send message to batch processor as the channel is closed
-            opentelemetry::global::shutdown_tracer_provider();
+        if let Some(provider) = tracer_provider {
+            let _ = provider.shutdown();
         }
     });
 }
