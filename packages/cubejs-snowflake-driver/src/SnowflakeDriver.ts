@@ -241,13 +241,14 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super({
-      testConnectionTimeout: config.testConnectionTimeout,
-    });
-
     const dataSource =
       config.dataSource ||
       assertDataSource('default');
+
+    super({
+      testConnectionTimeout: config.testConnectionTimeout,
+      isTestConnectionDisabled: getEnv('dbDisableTestConnection', { dataSource }),
+    });
 
     let privateKey = getEnv('snowflakePrivateKey', { dataSource });
     if (privateKey && !privateKey.endsWith('\n')) {
@@ -420,6 +421,10 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Test driver's connection.
    */
   public async testConnection() {
+    if (this.isTestConnectionDisabled()) {
+      return;
+    }
+
     const connection = await this.createConnection();
 
     await new Promise(

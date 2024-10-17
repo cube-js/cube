@@ -171,9 +171,11 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
  * Base driver class.
  */
 export abstract class BaseDriver implements DriverInterface {
-  private testConnectionTimeoutValue = 10000;
+  private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger: any;
+
+  protected isTestConnectionDisabledFlag: boolean = false;
 
   /**
    * Class constructor.
@@ -184,8 +186,14 @@ export abstract class BaseDriver implements DriverInterface {
      * request before determining it as not valid. Default - 10000 ms.
      */
     testConnectionTimeout?: number,
+
+    /**
+     * Flag for serverless DWHs to omit test connection probes.
+     */
+    isTestConnectionDisabled?: boolean,
   } = {}) {
     this.testConnectionTimeoutValue = _options.testConnectionTimeout || 10000;
+    this.isTestConnectionDisabledFlag = _options.isTestConnectionDisabled || false;
   }
 
   protected informationSchemaQuery() {
@@ -678,6 +686,10 @@ export abstract class BaseDriver implements DriverInterface {
 
   public wrapQueryWithLimit(query: { query: string, limit: number}) {
     query.query = `SELECT * FROM (${query.query}) AS t LIMIT ${query.limit}`;
+  }
+
+  public isTestConnectionDisabled(): boolean {
+    return !!this.isTestConnectionDisabledFlag;
   }
 
   /**
