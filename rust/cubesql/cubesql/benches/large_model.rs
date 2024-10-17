@@ -93,6 +93,7 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
                 name: format!("{}.n{}", cube_name, n),
                 description: None,
                 _type: "number".to_string(),
+                granularities: None,
             })
             .collect(),
         segments: vec![],
