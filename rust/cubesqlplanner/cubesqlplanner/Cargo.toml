@@ -26,3 +26,27 @@ regex = "1.3.9"
 version = "=1"
 default-features = false
 features = ["napi-1", "napi-4", "napi-6", "futures"]
+
+# Code in cubesqlplanner workspace is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+clone_on_copy = "allow"
+collapsible_else_if = "allow"
+default_constructed_unit_structs = "allow"
+enum_variant_names = "allow"
+map_clone = "allow"
+manual_map = "allow"
+manual_unwrap_or_default = "allow"
+match_like_matches_macro = "allow"
+needless_borrow = "allow"
+needless_question_mark = "allow"
+new_without_default = "allow"
+ptr_arg = "allow"
+redundant_closure = "allow"
+result_large_err = "allow"
+should_implement_trait = "allow"
+to_string_in_format_args = "allow"
+useless_format = "allow"
+vec_init_then_push = "allow"
