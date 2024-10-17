@@ -1,5 +1,6 @@
 use cubestore::config::{validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
+use cubestore::telemetry::otel_tracing::init_tracing_telemetry;
 use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
@@ -12,7 +13,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
-const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");
+const PACKAGE_JSON: &'static str = include_str!("../../../package.json");
 
 fn main() {
     let package_json: Value = serde_json::from_str(PACKAGE_JSON).unwrap();
@@ -54,6 +55,9 @@ fn main() {
             ))
         })
         .unwrap();
+    if enable_telemetry {
+        init_tracing_telemetry();
+    }
     init_cube_logger(enable_telemetry);
 
     log::info!("Cube Store version {}", version);
