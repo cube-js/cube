@@ -124,11 +124,18 @@ impl WrapperRules {
                         "?order_expr",
                         "?select_alias",
                         "?select_distinct",
-                        "?select_ungrouped",
+                        // this should inherit lower instead of higher
+                        // sematics is that "input of WS in ungrouped", and we use input from lower
+                        // lower WrappedSelect is simple, but if it's ungrouped, then
+                        // "?select_ungrouped",
+                        "WrappedSelectUngrouped:true",
                         "?select_ungrouped_scan",
                     ),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    // TODO why fixed false? is
+                    // "WrapperPullupReplacerUngrouped:false",
+                    // "WrapperPullupReplacerUngrouped:true",
+                    "?ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
