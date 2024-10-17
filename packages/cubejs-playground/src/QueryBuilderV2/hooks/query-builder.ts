@@ -1124,9 +1124,10 @@ export function useQueryBuilder(props: QueryBuilderProps) {
     isQueryEmpty,
     isApiTokenChanged,
     isDataModelChanged,
-    isResultOutdated:
+    isResultOutdated: !!(
       executedQuery &&
-      (queryHash !== getQueryHash(executedQuery) || isApiTokenChanged || isDataModelChanged),
+      (queryHash !== getQueryHash(executedQuery) || isApiTokenChanged || isDataModelChanged)
+    ),
     queryHash,
     cubeApi,
     hasPrivateMembers,
