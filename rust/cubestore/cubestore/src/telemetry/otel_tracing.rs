@@ -1,18 +1,26 @@
 use log::{Log, Metadata, Record};
 use opentelemetry::trace::TracerProvider;
+use opentelemetry::KeyValue;
+use opentelemetry_sdk::Resource;
 use tracing_log::LogTracer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::Registry;
 
 const OTEL_SERVICE_NAME: &str = "cubestore";
 
-pub fn init_tracing_telemetry() {
+pub fn init_tracing_telemetry(version: String) {
     let otlp_exporter = opentelemetry_otlp::new_exporter()
         .http()
         .with_http_client(reqwest::Client::new());
     let tracer_provider = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(otlp_exporter)
+        .with_trace_config(opentelemetry_sdk::trace::Config::default().with_resource(
+            Resource::new(vec![
+                KeyValue::new("service.name", OTEL_SERVICE_NAME),
+                KeyValue::new("service.version", version),
+            ]),
+        ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)
         .expect("Should be able to initialise the tracer_provider");
 

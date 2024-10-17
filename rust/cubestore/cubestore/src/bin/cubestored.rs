@@ -55,9 +55,6 @@ fn main() {
             ))
         })
         .unwrap();
-    if enable_telemetry {
-        init_tracing_telemetry();
-    }
     init_cube_logger(enable_telemetry);
 
     log::info!("Cube Store version {}", version);
@@ -83,6 +80,10 @@ fn main() {
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        if enable_telemetry {
+            init_tracing_telemetry(version);
+        }
+        // TODO: Should this be avoided if otel is configured?
         init_agent_sender().await;
 
         validate_config(config.config_obj().as_ref()).report_and_abort_on_errors();
@@ -99,6 +100,12 @@ fn main() {
 
         stop_on_ctrl_c(&services).await;
         services.wait_processing_loops().await.unwrap();
+
+        if enable_telemetry {
+            // This still doesn't prevent errors:
+            // OpenTelemetry trace error occurred. cannot send message to batch processor as the channel is closed
+            opentelemetry::global::shutdown_tracer_provider();
+        }
     });
 }
 
