@@ -1,23 +1,9 @@
 use super::dependecy::Dependency;
 use super::{
-    Compiler, CubeNameSymbol, CubeTableSymbol, DimensionSymbol, JoinConditionSymbol,
-    MeasureFilterSymbol, MeasureSymbol,
+    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, JoinConditionSymbol, MeasureSymbol,
+    MemberSymbolType, SimpleSqlSymbol,
 };
-use crate::cube_bridge::memeber_sql::MemberSql;
-use cubenativeutils::CubeError;
 use std::rc::Rc;
-pub trait MemberSymbol {
-    fn cube_name(&self) -> &String;
-}
-
-pub enum MemberSymbolType {
-    Dimension(DimensionSymbol),
-    Measure(MeasureSymbol),
-    CubeName(CubeNameSymbol),
-    CubeTable(CubeTableSymbol),
-    JoinCondition(JoinConditionSymbol),
-    MeasureFilter(MeasureFilterSymbol),
-}
 
 pub struct EvaluationNode {
     symbol: MemberSymbolType,
@@ -64,9 +50,9 @@ impl EvaluationNode {
         })
     }
 
-    pub fn new_measure_filter(symbol: MeasureFilterSymbol, deps: Vec<Dependency>) -> Rc<Self> {
+    pub fn new_simple_sql(symbol: SimpleSqlSymbol, deps: Vec<Dependency>) -> Rc<Self> {
         Rc::new(Self {
-            symbol: MemberSymbolType::MeasureFilter(symbol),
+            symbol: MemberSymbolType::SimpleSql(symbol),
             deps,
         })
     }
@@ -78,19 +64,15 @@ impl EvaluationNode {
     pub fn symbol(&self) -> &MemberSymbolType {
         &self.symbol
     }
-}
 
-pub trait MemberSymbolFactory: Sized {
-    fn symbol_name() -> String; //FIXME maybe Enum should be used
-    fn is_cachable() -> bool {
-        true
+    pub fn full_name(&self) -> String {
+        self.symbol.full_name()
     }
-    fn cube_name(&self) -> &String;
-    fn deps_names(&self) -> Result<Vec<String>, CubeError>;
-    fn member_sql(&self) -> Option<Rc<dyn MemberSql>>;
-    fn build(
-        self,
-        deps: Vec<Dependency>,
-        compiler: &mut Compiler,
-    ) -> Result<Rc<EvaluationNode>, CubeError>;
+
+    pub fn is_measure(&self) -> bool {
+        self.symbol.is_measure()
+    }
+    pub fn is_dimension(&self) -> bool {
+        self.symbol.is_dimension()
+    }
 }

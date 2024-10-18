@@ -57,6 +57,10 @@ impl BaseFilter {
         }))
     }
 
+    pub fn member_name(&self) -> String {
+        self.member_evaluator.full_name()
+    }
+
     pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
         let member_sql =
             evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;

@@ -1,9 +1,11 @@
-use super::{CommonUtils, JoinPlanner, OrderPlanner};
-use crate::plan::{From, FromSource, Join, JoinItem, JoinSource, Select};
+use super::{CommonUtils, JoinPlanner, MultiStageQueryPlanner, OrderPlanner, SimpleQueryPlanner};
+use crate::plan::{Filter, From, FromSource, Join, JoinItem, JoinSource, Select};
 use crate::planner::base_join_condition::DimensionJoinCondition;
 use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::multiplied_measures_collector::collect_multiplied_measures;
-use crate::planner::sql_evaluator::sql_nodes::with_render_references_default_node_processor;
+use crate::planner::sql_evaluator::collectors::{
+    collect_multiplied_measures, has_multi_stage_members,
+};
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::BaseMember;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, PrimaryJoinCondition, VisitorContext};
@@ -17,26 +19,45 @@ pub struct FullKeyAggregateQueryPlanner {
     query_properties: Rc<QueryProperties>,
     join_planner: JoinPlanner,
     order_planner: OrderPlanner,
+    multi_stage_planner: MultiStageQueryPlanner,
     common_utils: CommonUtils,
+    context_factory: Rc<SqlNodesFactory>,
 }
 
 impl FullKeyAggregateQueryPlanner {
-    pub fn new(query_tools: Rc<QueryTools>, query_properties: Rc<QueryProperties>) -> Self {
+    pub fn new(
+        query_tools: Rc<QueryTools>,
+        query_properties: Rc<QueryProperties>,
+        context_factory: Rc<SqlNodesFactory>,
+    ) -> Self {
         Self {
             join_planner: JoinPlanner::new(query_tools.clone()),
             order_planner: OrderPlanner::new(query_properties.clone()),
             common_utils: CommonUtils::new(query_tools.clone()),
+            multi_stage_planner: MultiStageQueryPlanner::new(
+                query_tools.clone(),
+                query_properties.clone(),
+            ),
             query_tools,
             query_properties,
+            context_factory,
         }
     }
 
-    pub fn plan(self) -> Result<Option<Select>, CubeError> {
+    pub fn plan(self) -> Result<Select, CubeError> {
         let measures = self.full_key_aggregate_measures()?;
-        if measures.multiplied_measures.is_empty() {
-            return Ok(None);
+
+        if measures.is_simple_query() {
+            let simple_query_builder = SimpleQueryPlanner::new(
+                self.query_tools.clone(),
+                self.query_properties.clone(),
+                self.context_factory.clone(),
+            );
+            return simple_query_builder.plan();
         }
+
         let mut joins = Vec::new();
+
         if !measures.regular_measures.is_empty() {
             let regular_subquery = self.regular_measures_subquery(&measures.regular_measures)?;
             joins.push(regular_subquery);
@@ -52,18 +73,28 @@ impl FullKeyAggregateQueryPlanner {
             joins.push(aggregate_subquery);
         }
 
+        let (cte_queries, cte_aliases) = self.multi_stage_planner.get_cte_queries()?;
+        for alias in cte_aliases {
+            joins.push(self.multi_stage_planner.cte_select(&alias));
+        }
+
         let inner_measures = measures
             .multiplied_measures
             .iter()
+            .chain(measures.multi_stage_measures.iter())
             .chain(measures.regular_measures.iter())
             .cloned()
             .collect_vec();
-        let aggregate = self.outer_measures_join_full_key_aggregate(
+
+        let mut aggregate = self.outer_measures_join_full_key_aggregate(
             &inner_measures,
             &self.query_properties.measures(),
             joins,
         )?;
-        Ok(Some(aggregate))
+
+        aggregate.ctes = cte_queries;
+
+        Ok(aggregate)
     }
 
     fn outer_measures_join_full_key_aggregate(
@@ -74,7 +105,13 @@ impl FullKeyAggregateQueryPlanner {
     ) -> Result<Select, CubeError> {
         let root = JoinSource::new_from_select(joins[0].clone(), format!("q_0"));
         let mut join_items = vec![];
-        let columns_to_select = self.query_properties.dimensions_for_select();
+        let dimensions_to_select = self
+            .query_properties
+            .dimensions_for_select()
+            .iter()
+            .map(|d| d.alias_name())
+            .collect_vec();
+        let dimensions_to_select = Rc::new(dimensions_to_select);
         for (i, join) in joins.iter().skip(1).enumerate() {
             let left_alias = format!("q_{}", i);
             let right_alias = format!("q_{}", i + 1);
@@ -87,7 +124,7 @@ impl FullKeyAggregateQueryPlanner {
                 on: DimensionJoinCondition::try_new(
                     left_alias,
                     right_alias,
-                    columns_to_select.clone(),
+                    dimensions_to_select.clone(),
                 )?,
                 is_inner: true,
             };
@@ -96,13 +133,22 @@ impl FullKeyAggregateQueryPlanner {
 
         let references = inner_measures
             .iter()
-            .map(|m| Ok((m.measure().clone(), m.alias_name()?)))
+            .map(|m| Ok((m.measure().clone(), m.alias_name())))
             .collect::<Result<HashMap<_, _>, CubeError>>()?;
 
         let context = VisitorContext::new(
             None,
-            with_render_references_default_node_processor(references),
+            self.context_factory
+                .with_render_references_default_node_processor(references),
         );
+
+        let having = if self.query_properties.measures_filters().is_empty() {
+            None
+        } else {
+            Some(Filter {
+                items: self.query_properties.measures_filters().clone(),
+            })
+        };
 
         let select = Select {
             projection: self
@@ -114,10 +160,13 @@ impl FullKeyAggregateQueryPlanner {
             }))),
             filter: None,
             group_by: vec![],
-            having: None,
+            having,
             order_by: self.order_planner.default_order(),
             context,
+            ctes: vec![],
             is_distinct: false,
+            limit: self.query_properties.row_limit(),
+            offset: self.query_properties.offset(),
         };
         Ok(select)
     }
@@ -125,16 +174,18 @@ impl FullKeyAggregateQueryPlanner {
     fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
         let mut result = FullKeyAggregateMeasures::default();
         for m in self.query_properties.measures().iter() {
-            if let Some(multiple) =
+            if has_multi_stage_members(m.member_evaluator())? {
+                result.multi_stage_measures.push(m.clone())
+            } else if let Some(multiple) =
                 collect_multiplied_measures(self.query_tools.clone(), m.member_evaluator())?
             {
                 if multiple.multiplied {
                     result.multiplied_measures.push(m.clone());
                 } else {
-                    result.regular_measures.push(m.clone())
+                    result.regular_measures.push(m.clone());
                 }
             } else {
-                result.regular_measures.push(m.clone())
+                result.regular_measures.push(m.clone());
             }
         }
         Ok(result)
@@ -154,8 +205,14 @@ impl FullKeyAggregateQueryPlanner {
             group_by: self.query_properties.group_by(),
             having: None,
             order_by: vec![],
-            context: VisitorContext::new_with_cube_alias_prefix("main".to_string()),
+            ctes: vec![],
+            context: VisitorContext::new_with_cube_alias_prefix(
+                self.context_factory.clone(),
+                "main".to_string(),
+            ),
             is_distinct: false,
+            limit: None,
+            offset: None,
         };
         Ok(Rc::new(select))
     }
@@ -193,8 +250,14 @@ impl FullKeyAggregateQueryPlanner {
             group_by: self.query_properties.group_by(),
             having: None,
             order_by: vec![],
-            context: VisitorContext::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
+            ctes: vec![],
+            context: VisitorContext::new_with_cube_alias_prefix(
+                self.context_factory.clone(),
+                format!("{}_key", key_cube_name),
+            ),
             is_distinct: false,
+            limit: None,
+            offset: None,
         };
         Ok(Rc::new(select))
     }
@@ -216,8 +279,14 @@ impl FullKeyAggregateQueryPlanner {
             group_by: vec![],
             having: None,
             order_by: vec![],
-            context: VisitorContext::new_with_cube_alias_prefix(format!("{}_key", key_cube_name)),
+            ctes: vec![],
+            context: VisitorContext::new_with_cube_alias_prefix(
+                self.context_factory.clone(),
+                format!("{}_key", key_cube_name),
+            ),
             is_distinct: true,
+            limit: None,
+            offset: None,
         };
         Ok(Rc::new(select))
     }
@@ -226,5 +295,12 @@ impl FullKeyAggregateQueryPlanner {
 #[derive(Default)]
 struct FullKeyAggregateMeasures {
     pub multiplied_measures: Vec<Rc<BaseMeasure>>,
+    pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
     pub regular_measures: Vec<Rc<BaseMeasure>>,
+}
+
+impl FullKeyAggregateMeasures {
+    pub fn is_simple_query(&self) -> bool {
+        self.multi_stage_measures.is_empty() && self.multiplied_measures.is_empty()
+    }
 }

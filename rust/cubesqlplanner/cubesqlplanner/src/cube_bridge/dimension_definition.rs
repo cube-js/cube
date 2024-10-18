@@ -13,7 +13,10 @@ use std::rc::Rc;
 pub struct DimenstionDefinitionStatic {
     #[serde(rename = "type")]
     pub dimension_type: String,
+    #[serde(rename = "ownedByCube")]
     pub owned_by_cube: Option<bool>,
+    #[serde(rename = "multiStage")]
+    pub multi_stage: Option<bool>,
 }
 
 #[nativebridge::native_bridge(DimenstionDefinitionStatic)]

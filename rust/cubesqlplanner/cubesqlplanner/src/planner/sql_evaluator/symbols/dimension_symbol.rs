@@ -1,10 +1,9 @@
-use super::dependecy::Dependency;
-use super::{Compiler, MemberSymbol, MemberSymbolFactory};
-use super::{EvaluationNode, SqlEvaluatorVisitor};
+use super::{MemberSymbol, MemberSymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::query_tools::QueryTools;
+use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode, SqlEvaluatorVisitor};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -50,6 +49,14 @@ impl DimensionSymbol {
 
     pub fn full_name(&self) -> String {
         format!("{}.{}", self.cube_name, self.name)
+    }
+
+    pub fn owned_by_cube(&self) -> bool {
+        self.definition.static_data().owned_by_cube.unwrap_or(true)
+    }
+
+    pub fn is_multi_stage(&self) -> bool {
+        self.definition.static_data().multi_stage.unwrap_or(false)
     }
 }
 
