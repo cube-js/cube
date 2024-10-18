@@ -1,7 +1,7 @@
-import states from './states.json';
 import { createRoot } from 'react-dom/client';
 import ELK from 'elkjs/lib/elk.bundled.js';
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import type { ElkNode, LayoutOptions } from 'elkjs';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import ReactFlow, {
     ReactFlowProvider,
     Panel,
@@ -11,8 +11,48 @@ import ReactFlow, {
     Handle,
     Position,
 } from 'reactflow';
-
+import type {
+    Edge as ReactFlowEdge,
+    FitView,
+    Node as ReactFlowNode,
+    NodeProps,
+} from 'reactflow';
 import 'reactflow/dist/style.css';
+
+import statesData from './states.json';
+
+type InputNodeData = {
+    id: string;
+    label: string;
+    comboId: string;
+};
+type InputEdgeData = {
+    source: string;
+    target: string;
+};
+type InputComboData = {
+    id: string;
+    label: string;
+};
+type StateData = {
+    nodes: Array<InputNodeData>;
+    removedNodes: Array<InputNodeData>;
+    edges: Array<InputEdgeData>;
+    removedEdges: Array<InputEdgeData>;
+    combos: Array<InputComboData>;
+    removedCombos: Array<InputComboData>;
+    appliedRules: Array<string>;
+};
+type InputData = Array<StateData>;
+
+type NodeData = {
+    label: string;
+};
+type Node = ReactFlowNode<NodeData>;
+type Edge = ReactFlowEdge<null>;
+
+// TODO proper parsing here
+const states = statesData as InputData;
 
 // First is initial state
 const totalIterations = states.length - 1;
@@ -21,8 +61,11 @@ const data = {
     edges: states[0].edges,
     combos: states[0].combos,
 };
-const sizeByNode = (n) => [60 + n.label.length * 5, 30];
-const toGroupNode = (n) => ({
+const sizeByNode = (n: InputNodeData): [number, number] => [
+    60 + n.label.length * 5,
+    30,
+];
+const toGroupNode = (n: InputComboData): Node => ({
     ...n,
     type: 'group',
     data: { label: n.label },
@@ -30,7 +73,7 @@ const toGroupNode = (n) => ({
     width: 200,
     height: 200,
 });
-const toRegularNode = (n) => ({
+const toRegularNode = (n: InputNodeData): Node => ({
     ...n,
     type: 'default',
     extent: 'parent',
@@ -41,7 +84,7 @@ const toRegularNode = (n) => ({
     draggable: false,
     connectable: false,
 });
-const toEdge = (n) => ({
+const toEdge = (n: InputEdgeData): Edge => ({
     ...n,
     id: `${n.source}->${n.target}`,
     style:
@@ -55,15 +98,15 @@ const initialNodes = data.combos
 const initialEdges = data.edges.map(toEdge);
 
 async function layout(
-    options,
-    nodes,
-    edges,
-    setNodes,
-    setEdges,
-    fitView,
-    navHistory,
-    showOnlySelected,
-    abortSignal,
+    options: LayoutOptions,
+    nodes: Array<Node>,
+    edges: Array<Edge>,
+    setNodes: (nodes: Array<Node>) => void,
+    setEdges: (nodes: Array<Edge>) => void,
+    fitView: FitView,
+    navHistory: NavHistoryState,
+    showOnlySelected: boolean,
+    abortSignal: AbortSignal,
 ) {
     const defaultOptions = {
         'elk.algorithm': 'layered',
@@ -76,12 +119,20 @@ async function layout(
 
     nodes.forEach((n) => {
         if (n.style && n.style.width && n.style.height) {
+            if (typeof n.style.width === 'string') {
+                throw new Error('Unexpeted CSS width');
+            }
+            if (typeof n.style.height === 'string') {
+                throw new Error('Unexpeted CSS height');
+            }
             n.width = n.style.width;
             n.height = n.style.height;
         }
     });
     nodes = nodes.filter((n) => !isHiddenNode(showOnlySelected, navHistory, n));
     edges = edges.filter((e) => !isHiddenEdge(showOnlySelected, navHistory, e));
+
+    type ElkNodeWithChildren = ElkNode & { children: Array<ElkNode> };
 
     const nodesMap = new Map(
         nodes.map((node) => [
@@ -93,7 +144,7 @@ async function layout(
                     width: node.width ?? undefined,
                     height: node.height ?? undefined,
                     children: [],
-                },
+                } as ElkNodeWithChildren,
             },
         ]),
     );
@@ -105,7 +156,8 @@ async function layout(
         if (node.parentNode === undefined) {
             return;
         }
-        nodesMap.get(node.parentNode).elkNode.children.push(elkNode);
+        // Safety: we've just inserted every node from nodes to map
+        nodesMap.get(node.parentNode)!.elkNode.children.push(elkNode);
     }
 
     // Primitive edges are deprecated in ELK, so we should use ElkExtendedEdge, that use arrays, essentially hyperedges
@@ -115,7 +167,7 @@ async function layout(
         targets: [edge.target],
     }));
 
-    const graph = {
+    const graph: ElkNode = {
         id: 'root',
         layoutOptions,
         children: [...nodesMap.values()]
@@ -124,17 +176,24 @@ async function layout(
         edges: elkEdges,
     };
 
-    function elk2flow(elkNode, flatChildren) {
-        const node = nodesMap.get(elkNode.id).node;
+    function elk2flow(elkNode: ElkNode, flatChildren: Array<Node>): void {
+        const nodePair = nodesMap.get(elkNode.id);
+        if (nodePair === undefined) {
+            throw new Error('Unexpected node id from ELK');
+        }
+        const node = nodePair.node;
 
+        if (elkNode.x === undefined || elkNode.y === undefined) {
+            throw new Error('Unexpected position from ELK');
+        }
         node.position = { x: elkNode.x, y: elkNode.y };
         node.style = {
             ...node.style,
             width: elkNode.width,
             height: elkNode.height,
         };
-        node.width = elkNode.width;
-        node.height = elkNode.height;
+        node.width = elkNode.width ?? null;
+        node.height = elkNode.height ?? null;
         flatChildren.push(node);
         (elkNode.children ?? []).forEach((child) => {
             elk2flow(child, flatChildren);
@@ -150,9 +209,9 @@ async function layout(
 
     // By mutating the children in-place we saves ourselves from creating a
     // needless copy of the nodes array.
-    const flatChildren = [];
+    const flatChildren: Array<Node> = [];
 
-    children.forEach((elkNode) => {
+    (children ?? []).forEach((elkNode) => {
         elk2flow(elkNode, flatChildren);
     });
 
@@ -176,14 +235,18 @@ async function layout(
 const highlightColor = 'rgba(170,255,170,0.71)';
 const selectColor = 'rgba(170,187,255,0.71)';
 
-const zoomTo = (fitView, classId) => {
+const zoomTo = (fitView: FitView, classId: Array<string>): void => {
     if (!classId) {
         return;
     }
     fitView({ duration: 600, nodes: classId.map((id) => ({ id: `c${id}` })) });
 };
 
-function isHiddenNode(showOnlySelected, navHistory, n) {
+function isHiddenNode(
+    showOnlySelected: boolean,
+    navHistory: NavHistoryState,
+    n: Node,
+): boolean {
     return (
         showOnlySelected &&
         navHistory.indexOf(
@@ -192,7 +255,11 @@ function isHiddenNode(showOnlySelected, navHistory, n) {
     );
 }
 
-const nodeStyles = (nodes, navHistory, showOnlySelected) => {
+const nodeStyles = (
+    nodes: Array<Node>,
+    navHistory: NavHistoryState,
+    showOnlySelected: boolean,
+): Array<Node> => {
     return nodes.map((n) => {
         return {
             ...n,
@@ -208,7 +275,11 @@ const nodeStyles = (nodes, navHistory, showOnlySelected) => {
     });
 };
 
-function isHiddenEdge(showOnlySelected, navHistory, e) {
+function isHiddenEdge(
+    showOnlySelected: boolean,
+    navHistory: NavHistoryState,
+    e: Edge,
+): boolean {
     return (
         showOnlySelected &&
         (navHistory.indexOf(e.source.replace(/^(\d+)(-?).*$/, '$1')) === -1 ||
@@ -216,7 +287,11 @@ function isHiddenEdge(showOnlySelected, navHistory, e) {
     );
 }
 
-const edgeStyles = (edges, navHistory, showOnlySelected) => {
+const edgeStyles = (
+    edges: Array<Edge>,
+    navHistory: NavHistoryState,
+    showOnlySelected: boolean,
+): Array<Edge> => {
     return edges.map((e) => {
         return {
             ...e,
@@ -225,7 +300,7 @@ const edgeStyles = (edges, navHistory, showOnlySelected) => {
     });
 };
 
-const splitLabel = (label) => {
+const splitLabel = (label: string): Array<string> => {
     const result = [''];
     let isDigit = false;
     for (let i = 0; i < label.length; i++) {
@@ -245,8 +320,9 @@ const splitLabel = (label) => {
 };
 
 const ChildrenNode =
-    ({ navigate /*, nodes*/ }) =>
-    ({ data: { label } }) => {
+    ({ navigate /*, nodes*/ }: { navigate: (id: string) => void }) =>
+    (props: NodeProps<NodeData>) => {
+        const { label } = props.data;
         return (
             <div>
                 <Handle type="target" position={Position.Top} />
@@ -276,12 +352,19 @@ const ChildrenNode =
         );
     };
 
-function jsonClone(t) {
+type PreNodesState = {
+    preNodes: Array<Node>;
+    preEdges: Array<Edge>;
+};
+
+function jsonClone<T>(t: T): T {
     return JSON.parse(JSON.stringify(t));
 }
 
+type NavHistoryState = Array<string>;
+
 const LayoutFlow = () => {
-    const [{ preNodes, preEdges }, setPreNodesEdges] = useState({
+    const [{ preNodes, preEdges }, setPreNodesEdges] = useState<PreNodesState>({
         preNodes: initialNodes,
         preEdges: initialEdges,
     });
@@ -295,8 +378,8 @@ const LayoutFlow = () => {
     const { fitView } = useReactFlow();
 
     const [navigateTo, setNavigateTo] = useState('');
-    const [navHistory, setNavHistory] = useState([]);
-    const [showOnlySelected, setShowOnlySelected] = useState(false);
+    const [navHistory, setNavHistory] = useState<NavHistoryState>([]);
+    const [showOnlySelected, setShowOnlySelected] = useState<boolean>(false);
 
     const prevState = () => {
         if (stateIdx === 0) {
@@ -305,7 +388,7 @@ const LayoutFlow = () => {
         let newNodes = preNodes;
         let newEdges = preEdges;
         const toRemove = states[stateIdx];
-        let toRemoveNodeIds = toRemove.nodes
+        let toRemoveNodeIds = (toRemove.nodes as Array<{ id: string }>)
             .concat(toRemove.combos)
             .map((n) => n.id);
         let toRemoveEdgeIds = toRemove.edges.map((n) => toEdge(n).id);
@@ -317,14 +400,14 @@ const LayoutFlow = () => {
         newNodes = newNodes.concat(
             (toRemove.removedNodes || []).map(toRegularNode),
         );
-        const edgeMap = (toRemove.removedEdges || [])
+        const edgeMap: Record<string, Edge> = (toRemove.removedEdges || [])
             .map(toEdge)
             .reduce((acc, val) => ({ ...acc, [val.id]: val }), {});
         newEdges = newEdges.concat(
             Object.keys(edgeMap).map((key) => edgeMap[key]),
         );
         const toHighlight = states[stateIdx - 1];
-        const toHighlightNodeIds = toHighlight.nodes
+        const toHighlightNodeIds = (toHighlight.nodes as Array<{ id: string }>)
             .concat(toHighlight.combos)
             .map((n) => n.id);
         newNodes = newNodes.map((n) => ({
@@ -348,7 +431,7 @@ const LayoutFlow = () => {
         let newEdges = preEdges;
         setStateIdx(stateIdx + 1);
         const toAdd = states[stateIdx + 1];
-        let toRemoveNodeIds = toAdd.removedNodes
+        let toRemoveNodeIds = (toAdd.removedNodes as Array<{ id: string }>)
             .concat(toAdd.removedCombos)
             .map((n) => n.id);
         let toRemoveEdgeIds = toAdd.removedEdges.map((n) => toEdge(n).id);
@@ -367,7 +450,7 @@ const LayoutFlow = () => {
                     style: { ...n.style, backgroundColor: highlightColor },
                 })),
         );
-        const edgeMap = (toAdd.edges || [])
+        const edgeMap: Record<string, Edge> = (toAdd.edges || [])
             .map(toEdge)
             .reduce((acc, val) => ({ ...acc, [val.id]: val }), {});
         newEdges = newEdges.concat(
@@ -378,7 +461,7 @@ const LayoutFlow = () => {
     };
 
     const navigate = useCallback(
-        (id) => {
+        (id: string): void => {
             zoomTo(fitView, [id]);
             if (!navHistory.includes(id)) {
                 setNavHistory(navHistory.concat(id));
