@@ -1,5 +1,6 @@
 use cubestore::config::{validate_config, Config, CubeServices};
 use cubestore::http::status::serve_status_probes;
+use cubestore::telemetry::otel_tracing::init_tracing_telemetry;
 use cubestore::telemetry::{init_agent_sender, track_event};
 use cubestore::util::logger::init_cube_logger;
 use cubestore::util::metrics::init_metrics;
@@ -7,12 +8,13 @@ use cubestore::util::{metrics, spawn_malloc_trim_loop};
 use cubestore::{app_metrics, CubeError};
 use datafusion::cube_ext;
 use log::debug;
+use opentelemetry_sdk::trace::TracerProvider;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::runtime::Builder;
 
-const PACKAGE_JSON: &'static str = std::include_str!("../../../package.json");
+const PACKAGE_JSON: &'static str = include_str!("../../../package.json");
 
 fn main() {
     let package_json: Value = serde_json::from_str(PACKAGE_JSON).unwrap();
@@ -79,6 +81,15 @@ fn main() {
     }
     let runtime = tokio_builder.build().unwrap();
     runtime.block_on(async move {
+        // Holding trace_provider to automatically flush spans during drop.
+        // opentelemetry::global::shutdown_tracer_provider() doesn't work correctly in v0.26
+        // @see https://github.com/open-telemetry/opentelemetry-rust/issues/1961
+        let mut tracer_provider: Option<TracerProvider> = None;
+
+        if enable_telemetry {
+            tracer_provider = Some(init_tracing_telemetry(version));
+        }
+        // TODO: Should this be avoided if otel is configured?
         init_agent_sender().await;
 
         validate_config(config.config_obj().as_ref()).report_and_abort_on_errors();
@@ -95,6 +106,10 @@ fn main() {
 
         stop_on_ctrl_c(&services).await;
         services.wait_processing_loops().await.unwrap();
+
+        if let Some(provider) = tracer_provider {
+            let _ = provider.shutdown();
+        }
     });
 }
 
