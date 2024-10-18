@@ -18,32 +18,42 @@ import type {
     NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { z } from 'zod';
 
 import statesData from './states.json';
 
-type InputNodeData = {
-    id: string;
-    label: string;
-    comboId: string;
-};
-type InputEdgeData = {
-    source: string;
-    target: string;
-};
-type InputComboData = {
-    id: string;
-    label: string;
-};
-type StateData = {
-    nodes: Array<InputNodeData>;
-    removedNodes: Array<InputNodeData>;
-    edges: Array<InputEdgeData>;
-    removedEdges: Array<InputEdgeData>;
-    combos: Array<InputComboData>;
-    removedCombos: Array<InputComboData>;
-    appliedRules: Array<string>;
-};
-type InputData = Array<StateData>;
+const InputNodeData = z.object({
+    id: z.string(),
+    label: z.string(),
+    comboId: z.string(),
+});
+type InputNodeData = z.infer<typeof InputNodeData>;
+
+const InputEdgeData = z.object({
+    source: z.string(),
+    target: z.string(),
+});
+type InputEdgeData = z.infer<typeof InputEdgeData>;
+
+const InputComboData = z.object({
+    id: z.string(),
+    label: z.string(),
+});
+type InputComboData = z.infer<typeof InputComboData>;
+
+const StateData = z.object({
+    nodes: z.array(InputNodeData),
+    removedNodes: z.array(InputNodeData),
+    edges: z.array(InputEdgeData),
+    removedEdges: z.array(InputEdgeData),
+    combos: z.array(InputComboData),
+    removedCombos: z.array(InputComboData),
+    appliedRules: z.array(z.string()),
+});
+type StateData = z.infer<typeof StateData>;
+
+const InputData = z.array(StateData);
+type InputData = z.infer<typeof InputData>;
 
 type NodeData = {
     label: string;
@@ -51,8 +61,7 @@ type NodeData = {
 type Node = ReactFlowNode<NodeData>;
 type Edge = ReactFlowEdge<null>;
 
-// TODO proper parsing here
-const states = statesData as InputData;
+const states = InputData.parse(statesData);
 
 // First is initial state
 const totalIterations = states.length - 1;
