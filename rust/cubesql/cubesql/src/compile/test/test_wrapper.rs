@@ -1043,6 +1043,104 @@ async fn test_wrapper_filter_flatten() {
                 "cube_name": "KibanaSampleDataEcommerce",
                 "alias": "sum_kibanasample",
                 "cube_params": ["KibanaSampleDataEcommerce"],
+                // This SUM(sumPrice) is invalid in grouped query
+                "expr": "SUM(${KibanaSampleDataEcommerce.sumPrice})",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            dimensions: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "customer_gender",
+                "cube_params": ["KibanaSampleDataEcommerce"],
+                "expr": "${KibanaSampleDataEcommerce.customer_gender}",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            segments: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "lower_kibanasamp",
+                "cube_params": ["KibanaSampleDataEcommerce"],
+                "expr": "(LOWER(${KibanaSampleDataEcommerce.customer_gender}) = $0$)",
+                "grouping_set": null,
+            })
+            .to_string(),]),
+            time_dimensions: None,
+            order: Some(vec![]),
+            limit: Some(50000),
+            offset: None,
+            filters: None,
+            ungrouped: None,
+        }
+    );
+
+    let _physical_plan = query_plan.as_physical_plan().await.unwrap();
+}
+
+// There's a lot of breakage due to "aggregate function calls cannot be nested"
+// TODO debug
+// TODO add test like that
+
+// TODO recheck this, it seems that specific cube (KibanaSampleDataEcommerce vs MultiTypeCube) can influence extraction
+#[tokio::test]
+async fn test_wrapper_double_agg_filter_flatten() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"-- SELECT
+--     "Staples"."dim_str2" AS "Prod Type2",
+--     CAST(TRUNC(EXTRACT(MONTH FROM "Staples"."dim_date1")) AS INTEGER) AS "mn:Order Date:ok"
+-- --     AVG("Staples"."avgPrice") AS "sum:Gross Profit:ok"
+-- --     COUNT(*) as c
+-- FROM "MultiTypeCube" "Staples"
+-- WHERE
+-- --     (CAST(TRUNC(EXTRACT(MONTH FROM "Staples"."dim_date1")) AS INTEGER) <= 8)
+--     (Staples.dim_num1 % 100) <= 8
+-- GROUP BY
+--     1,
+--     2
+
+-- SELECT
+--     "MultiTypeCube"."dim_str2" AS "Prod Type2",
+--     CAST(TRUNC(EXTRACT(MONTH FROM "MultiTypeCube"."dim_date1")) AS INTEGER) AS "mn:Order Date:ok",
+--     AVG("MultiTypeCube"."avgPrice") AS "sum:Gross Profit:ok"
+-- FROM "MultiTypeCube" "MultiTypeCube"
+-- WHERE
+--     (CAST(TRUNC(EXTRACT(MONTH FROM "MultiTypeCube"."dim_date1")) AS INTEGER) <= 8)
+-- GROUP BY
+--     1,
+--     2
+
+SELECT
+    customer_gender,
+    CAST(TRUNC(EXTRACT(MONTH FROM order_date)) AS INTEGER),
+    AVG(avgPrice)
+FROM
+    KibanaSampleDataEcommerce
+WHERE
+    CAST(TRUNC(EXTRACT(MONTH FROM order_date)) AS INTEGER) <= 8
+GROUP BY
+    1, 2
+"#
+            .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+        .await;
+
+    assert_eq!(
+        query_plan
+            .as_logical_plan()
+            .find_cube_scan_wrapper()
+            .request
+            .unwrap(),
+        TransportLoadRequestQuery {
+            measures: Some(vec![json!({
+                "cube_name": "KibanaSampleDataEcommerce",
+                "alias": "sum_kibanasample",
+                "cube_params": ["KibanaSampleDataEcommerce"],
                 "expr": "SUM(${KibanaSampleDataEcommerce.sumPrice})",
                 "grouping_set": null,
             })
