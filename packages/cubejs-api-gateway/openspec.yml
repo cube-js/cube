@@ -98,6 +98,8 @@ components:
           type: "string"
         shortTitle:
           type: "string"
+        meta:
+          type: "object"
     V1CubeMetaDimensionGranularity:
       type: "object"
       required:
@@ -131,6 +133,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/V1CubeMetaDimensionGranularity"
+        meta:
+          type: "object"
     V1CubeMetaMeasure:
       type: "object"
       required:
@@ -147,6 +151,8 @@ components:
           type: "string"
         aggType:
           type: "string"
+        meta:
+          type: "object"
     V1CubeMeta:
       type: "object"
       required:
@@ -162,6 +168,8 @@ components:
           type: "string"
         type:
           $ref: "#/components/schemas/V1CubeMetaType"
+        meta:
+          type: "object"
         description:
           type: "string"
         measures:

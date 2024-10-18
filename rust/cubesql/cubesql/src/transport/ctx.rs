@@ -234,6 +234,7 @@ mod tests {
                 measures: vec![],
                 segments: vec![],
                 joins: None,
+                meta: None,
             },
             CubeMeta {
                 name: "test2".to_string(),
@@ -244,6 +245,7 @@ mod tests {
                 measures: vec![],
                 segments: vec![],
                 joins: None,
+                meta: None,
             },
         ];
 

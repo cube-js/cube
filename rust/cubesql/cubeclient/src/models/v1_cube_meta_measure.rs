@@ -20,6 +20,8 @@ pub struct V1CubeMetaMeasure {
     pub r#type: String,
     #[serde(rename = "aggType", skip_serializing_if = "Option::is_none")]
     pub agg_type: Option<String>,
+    #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
 }
 
 impl V1CubeMetaMeasure {
@@ -30,6 +32,7 @@ impl V1CubeMetaMeasure {
             description: None,
             r#type,
             agg_type: None,
+            meta: None,
         }
     }
 }
