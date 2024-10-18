@@ -15,7 +15,7 @@ use crate::{
         analysis::LogicalPlanAnalysis,
         fun_expr, fun_expr_var_arg, list_rewrite_with_lists_and_vars, original_expr_name,
         projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, RewriteRules},
         rules::{members::MemberRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite, AliasExprAlias, ListApplierListPattern, ListPattern, ListType,
         LogicalPlanLanguage,
@@ -217,11 +217,7 @@ impl SplitRules {
         match_rule: impl Fn() -> String + Clone,
         inner_rule: impl Fn() -> String + Clone,
         outer_rule: impl Fn(String) -> String + Clone,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
@@ -255,11 +251,7 @@ impl SplitRules {
         match_rule: impl Fn() -> String,
         inner_rule: impl Fn() -> String,
         outer_rule: impl Fn(String) -> String,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
@@ -295,11 +287,7 @@ impl SplitRules {
         match_rule: impl Fn() -> String,
         inner_rule: impl Fn() -> String,
         outer_rule: impl Fn(String) -> String,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
@@ -335,18 +323,8 @@ impl SplitRules {
         inner_alias_var: &str,
         outer_alias_column_var: &str,
         is_projection: bool,
-        transform_fn: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
-            + Clone
-            + Send
-            + Sync,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut egg::Subst) -> bool
-           + Sync
-           + Send
-           + Clone {
+        transform_fn: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Clone + Send + Sync,
+    ) -> impl Fn(&mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let match_expr_var = var!(match_expr_var);
         let inner_alias_var = var!(inner_alias_var);
         let outer_alias_column_var = var!(outer_alias_column_var);

@@ -3,6 +3,7 @@ use crate::{
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
         analysis::{LogicalPlanAnalysis, OriginalExpr},
         cast_expr, projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
+        rewriter::CubeEGraph,
         rules::split::SplitRules,
         transforming_rewrite, AliasExprAlias, CastExprDataType, LiteralExprValue,
         LogicalPlanLanguage, ScalarFunctionExprFun,
@@ -15,7 +16,7 @@ use datafusion::{
     physical_plan::functions::BuiltinScalarFunction,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl SplitRules {
     pub fn cast_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
@@ -90,7 +91,7 @@ impl SplitRules {
         expr_var: &'static str,
         data_type_var: &'static str,
         new_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let data_type_var = var!(data_type_var);
         let new_expr_var = var!(new_expr_var);
