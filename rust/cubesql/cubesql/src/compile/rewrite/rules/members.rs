@@ -1688,7 +1688,7 @@ impl MemberRules {
                         .find_cube_with_name(time_dimension_name.split(".").next().unwrap())
                     {
                         if let Some(time_dimension) = cube.dimensions.iter().find(|d| {
-                            d._type == "time" && d.name.eq_ignore_ascii_case(&time_dimension_name)
+                            d.r#type == "time" && d.name.eq_ignore_ascii_case(&time_dimension_name)
                         }) {
                             for granularity in
                                 var_iter!(egraph[subst[granularity_var]], LiteralExprValue)

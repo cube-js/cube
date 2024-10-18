@@ -151,6 +151,7 @@ components:
       type: "object"
       required:
         - name
+        - type
         - measures
         - dimensions
         - segments
@@ -159,6 +160,8 @@ components:
           type: "string"
         title:
           type: "string"
+        type:
+          $ref: "#/components/schemas/V1CubeMetaType"
         description:
           type: "string"
         measures:
@@ -177,6 +180,12 @@ components:
           type: "array"
           items:
             $ref: "#/components/schemas/V1CubeMetaJoin"
+    V1CubeMetaType:
+      type: "string"
+      description: Type of cube
+      enum:
+        - "cube"
+        - "view"
     V1MetaResponse:
       type: "object"
       properties:

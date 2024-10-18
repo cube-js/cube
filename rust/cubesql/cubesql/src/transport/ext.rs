@@ -58,7 +58,7 @@ impl V1CubeMetaMeasureExt for CubeMetaMeasure {
     }
 
     fn get_sql_type(&self) -> ColumnType {
-        let from_type = match &self._type.to_lowercase().as_str() {
+        let from_type = match &self.r#type.to_lowercase().as_str() {
             &"number" => ColumnType::Double,
             &"boolean" => ColumnType::Boolean,
             _ => ColumnType::String,
@@ -111,7 +111,7 @@ impl V1CubeMetaDimensionExt for CubeMetaDimension {
     }
 
     fn is_time(&self) -> bool {
-        self._type.to_lowercase().eq("time")
+        self.r#type.to_lowercase().eq("time")
     }
 
     fn sql_can_be_null(&self) -> bool {
@@ -120,7 +120,7 @@ impl V1CubeMetaDimensionExt for CubeMetaDimension {
     }
 
     fn get_sql_type(&self) -> ColumnType {
-        match self._type.to_lowercase().as_str() {
+        match self.r#type.to_lowercase().as_str() {
             "time" => ColumnType::Timestamp,
             "number" => ColumnType::Double,
             "boolean" => ColumnType::Boolean,
@@ -354,7 +354,7 @@ impl V1CubeMetaExt for CubeMeta {
             .iter()
             .find(|m| m.name.eq_ignore_ascii_case(member_name))
         {
-            return Some(match dimension._type.as_str() {
+            return Some(match dimension.r#type.as_str() {
                 "number" => MemberType::Number,
                 "boolean" => MemberType::Boolean,
                 "string" => MemberType::String,
