@@ -1,9 +1,7 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, list_rewrite, list_rewrite_with_lists,
-    list_rewrite_with_lists_and_vars, rewrite, ListApplierListPattern, ListPattern, ListType,
-    LogicalPlanLanguage,
+    list_rewrite, list_rewrite_with_lists, list_rewrite_with_lists_and_vars, rewrite,
+    rewriter::CubeRewrite, ListApplierListPattern, ListPattern, ListType,
 };
-use egg::Rewrite;
 
 pub mod case;
 pub mod common;
@@ -22,7 +20,7 @@ pub fn replacer_push_down_node(
     list_node: &str,
     replacer_node: impl Fn(String) -> String,
     include_tail: bool,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     let push_down_rule = rewrite(
         &format!("{}-push-down", name),
         replacer_node(format!("({} ?left ?right)", list_node)),
@@ -52,7 +50,7 @@ pub fn replacer_flat_push_down_node(
     list_type: ListType,
     replacer_node: impl Fn(String) -> String,
     include_tail: bool,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     let push_down_rule = list_rewrite(
         &format!("{}-push-down", name),
         list_type.clone(),
@@ -86,7 +84,7 @@ pub fn replacer_pull_up_node(
     list_node: &str,
     substitute_list_node: &str,
     replacer_node: impl Fn(String) -> String,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     let pull_up_rule = rewrite(
         &format!("{}-pull-up", name),
         format!(
@@ -106,7 +104,7 @@ pub fn replacer_flat_pull_up_node(
     substitute_list_type: ListType,
     replacer_node: impl Fn(String) -> String,
     top_level_elem_vars: &[&str],
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     let pull_up_rule = list_rewrite_with_lists_and_vars(
         &format!("{}-pull-up", name),
         list_type,
@@ -131,7 +129,7 @@ pub fn replacer_push_down_node_substitute_rules(
     list_node: &str,
     substitute_node: &str,
     replacer_node: impl Fn(String) -> String,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     vec![
         rewrite(
             &format!("{}-push-down", name),
@@ -156,7 +154,7 @@ pub fn replacer_flat_push_down_node_substitute_rules(
     list_type: ListType,
     substitute_type: ListType,
     replacer_node: impl Fn(String) -> String,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+) -> Vec<CubeRewrite> {
     vec![
         list_rewrite_with_lists(
             &format!("{}-push-down", name),

@@ -2,7 +2,7 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, Member, OriginalExpr},
+        analysis::{ConstantFolding, Member, OriginalExpr},
         between_expr, binary_expr, case_expr, case_expr_var_arg, cast_expr, change_user_member,
         column_expr, cube_scan, cube_scan_filters, cube_scan_filters_empty_tail, cube_scan_members,
         dimension_expr, expr_column_name, filter, filter_member, filter_op, filter_op_filters,
@@ -10,7 +10,7 @@ use crate::{
         fun_expr_args_legacy, fun_expr_var_arg, inlist_expr, inlist_expr_list, is_not_null_expr,
         is_null_expr, like_expr, limit, list_rewrite, literal_bool, literal_expr, literal_int,
         literal_string, measure_expr, negative_expr, not_expr, projection, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         scalar_fun_expr_args_empty_tail, segment_member, time_dimension_date_range_replacer,
         time_dimension_expr, transform_original_expr_to_alias, transforming_chain_rewrite,
         transforming_rewrite, transforming_rewrite_with_root, udf_expr, udf_expr_var_arg,
@@ -45,7 +45,7 @@ use datafusion::{
     logical_plan::{Column, Expr, Operator},
     scalar::ScalarValue,
 };
-use egg::{Rewrite, Subst, Var};
+use egg::{Subst, Var};
 use std::{
     collections::HashSet,
     fmt::Display,
@@ -66,7 +66,7 @@ impl FilterRules {
 }
 
 impl RewriteRules for FilterRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
                 "push-down-filter",
@@ -4992,9 +4992,7 @@ impl FilterRules {
     }
 }
 
-fn filter_simplify_push_down(
-    node_type: impl Display,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+fn filter_simplify_push_down(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-push-down", node_type),
         filter_simplify_replacer(format!("({} ?left ?right)", node_type)),
@@ -5007,9 +5005,7 @@ fn filter_simplify_push_down(
     )
 }
 
-fn filter_simplify_push_down_tail(
-    node_type: impl Display,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+fn filter_simplify_push_down_tail(node_type: impl Display) -> CubeRewrite {
     rewrite(
         &format!("filter-simplify-{}-empty-tail-push-down", node_type),
         filter_simplify_replacer(node_type.to_string()),

@@ -4,14 +4,14 @@ use crate::{
         agg_fun_expr, aggr_aggr_expr_empty_tail, aggr_aggr_expr_legacy as aggr_aggr_expr,
         aggr_group_expr_empty_tail, aggr_group_expr_legacy as aggr_group_expr, aggregate,
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
         fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
         inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
         literal_float, literal_int, literal_string, original_expr_name,
         outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
         projection_expr_empty_tail, projection_expr_legacy as projection_expr, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::members::MemberRules,
         transforming_chain_rewrite, transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
         AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, CastExprDataType, ColumnExprColumn,
@@ -30,7 +30,7 @@ use datafusion::{
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
-use egg::{Id, Rewrite, Subst, Var};
+use egg::{Id, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct OldSplitRules {
@@ -39,7 +39,7 @@ pub struct OldSplitRules {
 }
 
 impl RewriteRules for OldSplitRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
                 "split-projection-aggregate",
@@ -4667,7 +4667,7 @@ impl OldSplitRules {
         is_measure: bool,
         is_dimension: bool,
         unwrap_agg_chain: Option<Vec<(&'a str, String)>>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>
+    ) -> Vec<CubeRewrite>
     where
         M: Fn(fn(D, DD) -> String) -> String,
         C: Fn(fn(D, DD) -> String) -> Vec<(&'a str, String)>,
