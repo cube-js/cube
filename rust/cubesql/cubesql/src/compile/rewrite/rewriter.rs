@@ -185,6 +185,74 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     }
 }
 
+fn write_debug_iterations(runner: &CubeRunner, stage: &str) -> Result<(), CubeError> {
+    let dir = format!("egraph-debug-{}", stage);
+    let _ = fs::create_dir_all(dir.clone());
+    let _ = fs::create_dir_all(format!("{}/public", dir));
+    let _ = fs::create_dir_all(format!("{}/src", dir));
+    fs::copy(
+        "egraph-debug-template/public/index.html",
+        format!("{}/public/index.html", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/package.json",
+        format!("{}/package.json", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/src/index.js",
+        format!("{}/src/index.js", dir),
+    )?;
+
+    let mut iterations = Vec::new();
+    let mut last_debug_data: Option<DebugData> = None;
+    for i in &runner.iterations {
+        let debug_data_clone = i.data.debug_info.as_ref().unwrap().debug_data.clone();
+        let mut debug_data = i.data.debug_info.as_ref().unwrap().debug_data.clone();
+        if let Some(last) = last_debug_data {
+            debug_data
+                .nodes
+                .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
+            debug_data.edges.retain(|n| {
+                !last
+                    .edges
+                    .iter()
+                    .any(|ln| ln.source == n.source && ln.target == n.target)
+            });
+            debug_data
+                .combos
+                .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
+
+            debug_data.removed_nodes = last.nodes.clone();
+            debug_data
+                .removed_nodes
+                .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
+            debug_data.removed_edges = last.edges.clone();
+            debug_data.removed_edges.retain(|n| {
+                !debug_data_clone
+                    .edges
+                    .iter()
+                    .any(|ln| ln.source == n.source && ln.target == n.target)
+            });
+            debug_data.removed_combos = last.combos.clone();
+            debug_data
+                .removed_combos
+                .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
+        }
+        debug_data.applied_rules = Some(i.applied.iter().map(|s| format!("{:?}", s)).collect());
+        iterations.push(debug_data);
+        last_debug_data = Some(debug_data_clone);
+    }
+    fs::write(
+        format!("{}/src/iterations.js", dir),
+        &format!(
+            "export const iterations = {};",
+            serde_json::to_string_pretty(&iterations)?
+        ),
+    )?;
+
+    Ok(())
+}
+
 impl Rewriter {
     pub fn new(graph: CubeEGraph, cube_context: Arc<CubeContext>) -> Self {
         Self {
@@ -414,70 +482,7 @@ impl Rewriter {
             }
         };
         if IterInfo::egraph_debug_enabled() {
-            let dir = format!("egraph-debug-{}", stage);
-            let _ = fs::create_dir_all(dir.clone());
-            let _ = fs::create_dir_all(format!("{}/public", dir));
-            let _ = fs::create_dir_all(format!("{}/src", dir));
-            fs::copy(
-                "egraph-debug-template/public/index.html",
-                format!("{}/public/index.html", dir),
-            )?;
-            fs::copy(
-                "egraph-debug-template/package.json",
-                format!("{}/package.json", dir),
-            )?;
-            fs::copy(
-                "egraph-debug-template/src/index.js",
-                format!("{}/src/index.js", dir),
-            )?;
-
-            let mut iterations = Vec::new();
-            let mut last_debug_data: Option<DebugData> = None;
-            for i in &runner.iterations {
-                let debug_data_clone = i.data.debug_info.as_ref().unwrap().debug_data.clone();
-                let mut debug_data = i.data.debug_info.as_ref().unwrap().debug_data.clone();
-                if let Some(last) = last_debug_data {
-                    debug_data
-                        .nodes
-                        .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
-                    debug_data.edges.retain(|n| {
-                        !last
-                            .edges
-                            .iter()
-                            .any(|ln| ln.source == n.source && ln.target == n.target)
-                    });
-                    debug_data
-                        .combos
-                        .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
-
-                    debug_data.removed_nodes = last.nodes.clone();
-                    debug_data
-                        .removed_nodes
-                        .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
-                    debug_data.removed_edges = last.edges.clone();
-                    debug_data.removed_edges.retain(|n| {
-                        !debug_data_clone
-                            .edges
-                            .iter()
-                            .any(|ln| ln.source == n.source && ln.target == n.target)
-                    });
-                    debug_data.removed_combos = last.combos.clone();
-                    debug_data
-                        .removed_combos
-                        .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
-                }
-                debug_data.applied_rules =
-                    Some(i.applied.iter().map(|s| format!("{:?}", s)).collect());
-                iterations.push(debug_data);
-                last_debug_data = Some(debug_data_clone);
-            }
-            fs::write(
-                format!("{}/src/iterations.js", dir),
-                &format!(
-                    "export const iterations = {};",
-                    serde_json::to_string_pretty(&iterations)?
-                ),
-            )?;
+            write_debug_iterations(&runner, stage)?;
         }
         if let Some(stop_reason) = stop_reason {
             return Err(CubeError::user(format!(
