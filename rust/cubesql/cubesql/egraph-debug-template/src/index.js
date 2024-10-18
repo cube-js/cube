@@ -212,7 +212,7 @@ const splitLabel = (label) => {
 };
 
 const ChildrenNode =
-    ({ navigate, nodes }) =>
+    ({ navigate /*, nodes*/ }) =>
     ({ data: { label } }) => {
         return (
             <div>
@@ -224,10 +224,12 @@ const ChildrenNode =
                                 style={{ color: 'blue', cursor: 'pointer' }}
                                 onClick={() => navigate(s)}
                                 key={i}
-                                title={nodes
-                                    .filter((n) => n.id.indexOf(`${s}-`) === 0)
-                                    .map((n) => n.label)
-                                    .join(', ')}
+                                // title is broken due to circular deps, see nodeTypes comment
+                                // TODO fix it
+                                // title={nodes
+                                //     .filter((n) => n.id.indexOf(`${s}-`) === 0)
+                                //     .map((n) => n.label)
+                                //     .join(', ')}
                             >
                                 {s}
                             </span>
@@ -350,9 +352,12 @@ const LayoutFlow = () => {
 
     const nodeTypes = useMemo(
         () => ({
-            default: ChildrenNode({ navigate, nodes }),
+            // `nodeTypes` can't depend on `nodes`, because `nodes` will be changed by ReactFlow
+            // There will be a dep cycle nodeTypes -> ReactFlow instance -> onNodesChange -> nodes -> nodeTypes
+            default: ChildrenNode({ navigate /*, nodes*/ }),
         }),
-        [navHistory],
+        // TODO dependency on navigate will cause nodeTypes rebuild after each navigation history change
+        [navigate],
     );
 
     useEffect(() => {
