@@ -19,6 +19,11 @@
     "prettier": "3.3.3",
     "react-scripts": "5.0.1"
   },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
   "prettier": {
     "singleQuote": true,
     "tabWidth": 4
