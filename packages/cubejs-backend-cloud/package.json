@@ -23,7 +23,7 @@
   "author": "Cube Dev, Inc.",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^1.0.0",
+    "@cubejs-backend/linter": "~1.0.0",
     "@types/fs-extra": "^9.0.8",
     "@types/jest": "^27",
     "@types/request-promise": "^4.1.46",
@@ -31,8 +31,8 @@
     "typescript": "~5.2.2"
   },
   "dependencies": {
-    "@cubejs-backend/dotenv": "^9.0.2",
-    "@cubejs-backend/shared": "^1.0.0",
+    "@cubejs-backend/dotenv": "~9.0.2",
+    "@cubejs-backend/shared": "~1.0.0",
     "chokidar": "^3.5.1",
     "env-var": "^6.3.0",
     "fs-extra": "^9.1.0",
