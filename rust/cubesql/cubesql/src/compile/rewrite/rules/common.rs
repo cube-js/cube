@@ -3,7 +3,7 @@ use crate::{
         agg_fun_expr, alias_expr,
         analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
         binary_expr, column_expr, fun_expr,
-        rewriter::{RewriteRules, Rewriter},
+        rewriter::{CubeEGraph, RewriteRules, Rewriter},
         transform_original_expr_to_alias, transforming_rewrite_with_root, udf_expr, AliasExprAlias,
         LogicalPlanLanguage,
     },
@@ -11,7 +11,7 @@ use crate::{
     var,
 };
 use datafusion::{logical_plan::DFSchema, scalar::ScalarValue};
-use egg::{EGraph, Id, Rewrite, Subst};
+use egg::{Id, Rewrite, Subst};
 use std::{fmt::Display, sync::Arc};
 
 pub struct CommonRules {
@@ -89,8 +89,7 @@ impl CommonRules {
         &self,
         literal_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let alias_var = var!(alias_var);
 
