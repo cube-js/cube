@@ -5065,8 +5065,8 @@ impl OldSplitRules {
                                 meta.find_cube_by_column(&alias_to_cube, &column)
                             {
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
-                                    if is_time_dimension && dimension._type == "time"
-                                        || !is_time_dimension && dimension._type != "time"
+                                    if is_time_dimension && dimension.r#type == "time"
+                                        || !is_time_dimension && dimension.r#type != "time"
                                     {
                                         if let Some(expr_name) =
                                             original_expr_name(egraph, subst[arg_expr_var])

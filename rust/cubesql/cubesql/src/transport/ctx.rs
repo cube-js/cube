@@ -220,6 +220,7 @@ impl MetaContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::CubeMetaType;
 
     #[test]
     fn test_find_tables() {
@@ -228,6 +229,7 @@ mod tests {
                 name: "test1".to_string(),
                 description: None,
                 title: None,
+                r#type: CubeMetaType::Cube,
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
@@ -237,6 +239,7 @@ mod tests {
                 name: "test2".to_string(),
                 description: None,
                 title: None,
+                r#type: CubeMetaType::Cube,
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
