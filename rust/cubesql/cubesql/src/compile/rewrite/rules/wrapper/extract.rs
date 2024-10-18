@@ -1,12 +1,12 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        analysis::LogicalPlanAnalysis, literal_expr, rewriter::CubeEGraph,
+        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl WrapperRules {
     pub fn extract_rules(
@@ -51,7 +51,7 @@ impl WrapperRules {
     fn transform_date_part_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {

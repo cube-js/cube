@@ -3,6 +3,7 @@ use crate::{
         aggregate,
         analysis::{LogicalPlanAnalysis, LogicalPlanData},
         cube_scan_wrapper, grouping_set_expr, original_expr_name, rewrite,
+        rewriter::CubeEGraph,
         rules::{members::MemberRules, wrapper::WrapperRules},
         subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
         wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
@@ -17,7 +18,7 @@ use crate::{
     var, var_iter,
 };
 use datafusion::logical_plan::Column;
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Rewrite, Subst, Var};
 use std::ops::IndexMut;
 
 impl WrapperRules {
@@ -357,7 +358,7 @@ impl WrapperRules {
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
@@ -381,7 +382,7 @@ impl WrapperRules {
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
@@ -410,7 +411,7 @@ impl WrapperRules {
     }
 
     fn transform_aggregate_impl(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         group_expr_var: Var,
         aggr_expr_var: Var,
@@ -440,7 +441,7 @@ impl WrapperRules {
     fn check_rollup_allowed(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -474,7 +475,7 @@ impl WrapperRules {
         _cast_data_type_var: Option<&'static str>,
         cube_members_var: &'static str,
         measure_out_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
         let fun_name_var = fun_name_var.map(|v| var!(v));

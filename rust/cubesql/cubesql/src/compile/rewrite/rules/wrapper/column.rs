@@ -2,13 +2,14 @@ use crate::{
     compile::rewrite::{
         analysis::{LogicalPlanAnalysis, Member},
         column_expr, rewrite,
+        rewriter::CubeEGraph,
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ColumnExprColumn,
         LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl WrapperRules {
     pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
@@ -78,7 +79,7 @@ impl WrapperRules {
         column_name_var: &'static str,
         members_var: &'static str,
         dimension_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
@@ -143,7 +144,7 @@ impl WrapperRules {
         &self,
         column_name_var: &'static str,
         members_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_name_var = var!(column_name_var);
         let members_var = var!(members_var);
         let meta = self.meta_context.clone();

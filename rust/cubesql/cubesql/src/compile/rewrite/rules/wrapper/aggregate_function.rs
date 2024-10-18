@@ -1,14 +1,14 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        AggregateFunctionExprDistinct, AggregateFunctionExprFun, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        agg_fun_expr, analysis::LogicalPlanAnalysis, rewrite, rewriter::CubeEGraph,
+        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl WrapperRules {
     pub fn window_function_rules(
@@ -67,7 +67,7 @@ impl WrapperRules {
         fun_var: &'static str,
         distinct_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let distinct_var = var!(distinct_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
