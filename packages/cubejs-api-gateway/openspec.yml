@@ -182,6 +182,7 @@ components:
             $ref: "#/components/schemas/V1CubeMetaJoin"
     V1CubeMetaType:
       type: "string"
+      description: Type of cube
       enum:
         - "cube"
         - "view"
