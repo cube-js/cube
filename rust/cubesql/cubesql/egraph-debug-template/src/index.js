@@ -97,11 +97,18 @@ function layout(
                 }),
         );
 
+    // Primitive edges are deprecated in ELK, so we should use ElkExtendedEdge, that use arrays, essentially hyperedges
+    const elkEdges = edges.map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+    }));
+
     const graph = {
         id: 'root',
         layoutOptions: layoutOptions,
         children: Object.keys(groupNodes).map((key) => groupNodes[key]),
-        edges: edges,
+        edges: elkEdges,
     };
 
     const elk = new ELK();
