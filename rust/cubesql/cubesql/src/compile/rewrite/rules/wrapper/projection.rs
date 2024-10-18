@@ -1,24 +1,22 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, projection, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, subquery, transforming_rewrite, wrapped_select,
-        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
-        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
-        wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
-        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
-        ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped, WrappedSelectUngroupedScan,
-        WrapperPullupReplacerUngrouped,
+        cube_scan_wrapper, projection,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
+        wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
+        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
+        wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
+        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        ListType, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
+        WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst, Var};
+use egg::{Subst, Var};
 
 impl WrapperRules {
-    pub fn projection_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn projection_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-projection-to-cube-scan",
             projection(
@@ -133,10 +131,7 @@ impl WrapperRules {
         }
     }
 
-    pub fn projection_rules_subquery(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn projection_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-projection-and-subquery-to-cube-scan",
             projection(

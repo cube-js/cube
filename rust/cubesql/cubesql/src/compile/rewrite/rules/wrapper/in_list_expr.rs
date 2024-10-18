@@ -1,18 +1,17 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, inlist_expr, rewrite, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        inlist_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn in_list_expr_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn in_list_expr_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-in-list-only-consts-push-down",

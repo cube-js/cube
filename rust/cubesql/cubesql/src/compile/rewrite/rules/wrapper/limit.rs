@@ -1,16 +1,17 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, limit, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapped_select,
-        wrapper_pullup_replacer, LimitFetch, LimitSkip, LogicalPlanLanguage, WrappedSelectLimit,
-        WrappedSelectOffset,
+        cube_scan_wrapper, limit,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapped_select, wrapper_pullup_replacer, LimitFetch, LimitSkip,
+        LogicalPlanLanguage, WrappedSelectLimit, WrappedSelectOffset,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn limit_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn limit_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-limit-to-cube-scan",
             limit(

@@ -1,21 +1,23 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, filter, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, subquery, transforming_rewrite, wrapped_select,
-        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr,
-        wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
-        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
-        wrapped_select_order_expr_empty_tail, wrapped_select_projection_expr_empty_tail,
-        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
-        WrappedSelectUngrouped, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
+        cube_scan_wrapper, filter,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
+        wrapped_select_filter_expr, wrapped_select_filter_expr_empty_tail,
+        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
+        wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
+        wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
+        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        LogicalPlanLanguage, WrappedSelectUngrouped, WrappedSelectUngroupedScan,
+        WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst, Var};
+use egg::{Subst, Var};
 
 impl WrapperRules {
-    pub fn filter_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn filter_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO respect having filter for push down to wrapped select
         // rules.extend(vec![rewrite(
         //     "wrapper-push-down-filter-to-wrapped-select",
@@ -215,10 +217,7 @@ impl WrapperRules {
         );
     }
 
-    pub fn filter_rules_subquery(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn filter_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-filter-and-subquery-to-cube-scan",
             filter(

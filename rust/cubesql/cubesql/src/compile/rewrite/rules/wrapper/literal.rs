@@ -1,24 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, LiteralExprValue,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 
 use crate::compile::rewrite::{
-    rewriter::CubeEGraph,
+    rewriter::{CubeEGraph, CubeRewrite},
     rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
 };
 use datafusion::scalar::ScalarValue;
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn literal_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn literal_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-push-down-literal",

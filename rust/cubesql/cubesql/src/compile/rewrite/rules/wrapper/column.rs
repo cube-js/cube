@@ -1,18 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, Member},
+        analysis::Member,
         column_expr, rewrite,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ColumnExprColumn,
         LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn column_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-column",
