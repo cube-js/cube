@@ -7,9 +7,12 @@ use crate::{
     var, var_iter,
 };
 
-use crate::compile::rewrite::rules::utils::{DecomposedDayTime, DecomposedMonthDayNano};
+use crate::compile::rewrite::{
+    rewriter::CubeEGraph,
+    rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
+};
 use datafusion::scalar::ScalarValue;
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl WrapperRules {
     pub fn literal_rules(
@@ -60,7 +63,7 @@ impl WrapperRules {
         &self,
         alias_to_cube_var: &str,
         value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let meta = self.meta_context.clone();
@@ -100,7 +103,7 @@ impl WrapperRules {
         alias_to_cube_var: &str,
         value_var: &str,
         new_value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);

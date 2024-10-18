@@ -1,12 +1,12 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, inlist_expr, rewrite, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        analysis::LogicalPlanAnalysis, inlist_expr, rewrite, rewriter::CubeEGraph,
+        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::{Rewrite, Subst};
 
 impl WrapperRules {
     pub fn in_list_expr_rules(
@@ -106,7 +106,7 @@ impl WrapperRules {
     fn transform_in_list_expr(
         &self,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -133,9 +133,9 @@ impl WrapperRules {
     fn transform_in_list_only_consts(
         &self,
         list_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let list_var = var!(list_var);
-        move |egraph: &mut EGraph<_, LogicalPlanAnalysis>, subst| {
+        move |egraph: &mut CubeEGraph, subst| {
             return egraph[subst[list_var]].data.constant_in_list.is_some();
         }
     }

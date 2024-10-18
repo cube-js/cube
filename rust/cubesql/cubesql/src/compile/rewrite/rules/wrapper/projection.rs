@@ -1,17 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, projection, rules::wrapper::WrapperRules,
-        subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
-        wrapped_select_filter_expr_empty_tail, wrapped_select_group_expr_empty_tail,
-        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
-        wrapped_select_order_expr_empty_tail, wrapped_select_subqueries_empty_tail,
-        wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        ListType, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped,
-        WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
+        analysis::LogicalPlanAnalysis, cube_scan_wrapper, projection, rewriter::CubeEGraph,
+        rules::wrapper::WrapperRules, subquery, transforming_rewrite, wrapped_select,
+        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
+        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
+        wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
+        wrapped_select_subqueries_empty_tail, wrapped_select_window_expr_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
+        ProjectionAlias, WrappedSelectAlias, WrappedSelectUngrouped, WrappedSelectUngroupedScan,
+        WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Rewrite, Subst, Var};
 
 impl WrapperRules {
     pub fn projection_rules(
@@ -246,7 +247,7 @@ impl WrapperRules {
         select_alias_var: &'static str,
         select_ungrouped_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let projection_alias_var = var!(projection_alias_var);
         let ungrouped_var = var!(ungrouped_var);
@@ -276,7 +277,7 @@ impl WrapperRules {
         select_alias_var: &'static str,
         select_ungrouped_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let expr_var = var!(expr_var);
         let projection_alias_var = var!(projection_alias_var);
@@ -309,7 +310,7 @@ impl WrapperRules {
     }
 
     fn transform_projection_impl(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         expr_var: Var,
         projection_alias_var: Var,

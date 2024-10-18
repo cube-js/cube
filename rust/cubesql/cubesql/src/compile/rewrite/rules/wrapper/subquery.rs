@@ -1,6 +1,6 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation,
+        analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation, rewriter::CubeEGraph,
         rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
         WrapperPullupReplacerAliasToCube,
@@ -8,7 +8,7 @@ use crate::{
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Rewrite, Subst, Var};
 use std::sync::Arc;
 
 impl WrapperRules {
@@ -79,7 +79,7 @@ impl WrapperRules {
         &self,
         source_table_name_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta_context = self.meta_context.clone();
@@ -113,7 +113,7 @@ impl WrapperRules {
     }
 
     pub fn transform_check_subquery_allowed(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         meta: Arc<MetaContext>,
         alias_to_cube_var: Var,
@@ -140,7 +140,7 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
         move |egraph, subst| {
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
