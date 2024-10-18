@@ -338,12 +338,15 @@ const LayoutFlow = () => {
         setPreNodesEdges({ preNodes: newNodes, preEdges: newEdges });
     };
 
-    const navigate = (id) => {
-        zoomTo(fitView, [id]);
-        if (!navHistory.includes(id)) {
-            setNavHistory(navHistory.concat(id));
-        }
-    };
+    const navigate = useCallback(
+        (id) => {
+            zoomTo(fitView, [id]);
+            if (!navHistory.includes(id)) {
+                setNavHistory(navHistory.concat(id));
+            }
+        },
+        [fitView, navHistory],
+    );
 
     const nodeTypes = useMemo(
         () => ({
