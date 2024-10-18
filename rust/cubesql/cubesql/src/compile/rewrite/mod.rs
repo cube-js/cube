@@ -5,8 +5,12 @@ pub mod language;
 pub mod rewriter;
 pub mod rules;
 
+use self::analysis::{LogicalPlanData, MemberNameToExpr};
 use crate::{
-    compile::rewrite::analysis::{LogicalPlanAnalysis, OriginalExpr},
+    compile::rewrite::{
+        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        rewriter::CubeEGraph,
+    },
     CubeError,
 };
 use analysis::MemberNamesToExpr;
@@ -23,8 +27,8 @@ use datafusion::{
     scalar::ScalarValue,
 };
 use egg::{
-    rewrite, Applier, EGraph, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher,
-    Subst, Symbol, Var,
+    rewrite, Applier, Id, Language, Pattern, PatternAst, Rewrite, SearchMatches, Searcher, Subst,
+    Symbol, Var,
 };
 use itertools::Itertools;
 use std::{
@@ -33,8 +37,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-
-use self::analysis::{LogicalPlanData, MemberNameToExpr};
 
 // trace_macros!(true);
 
@@ -676,10 +678,7 @@ pub fn transforming_rewrite<T>(
     transform_fn: T,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -698,10 +697,7 @@ pub fn transforming_rewrite_with_root<T>(
     transform_fn: T,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -719,10 +715,7 @@ pub fn transforming_chain_rewrite<T>(
     transform_fn: T,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -748,10 +741,7 @@ pub fn transforming_chain_rewrite_with_root<T>(
     transform_fn: T,
 ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-        + Sync
-        + Send
-        + 'static,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
     Rewrite::new(
         name.to_string(),
@@ -904,7 +894,7 @@ impl ListNodeSearcher {
 
     fn search_from_list_matches<'a>(
         &'a self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         limit: usize,
         list_subst: &Subst,
         output: &mut Vec<Subst>,
@@ -968,7 +958,7 @@ impl ListNodeSearcher {
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
     fn search_eclass_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
@@ -989,7 +979,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeSearcher {
 
     fn search_eclasses_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
@@ -1109,7 +1099,7 @@ impl ListNodeApplier {
 impl Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for ListNodeApplier {
     fn apply_one(
         &self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         mut eclass: Id,
         subst: &Subst,
         _searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
@@ -2097,10 +2087,7 @@ fn distinct(input: impl Display) -> String {
     format!("(Distinct {})", input)
 }
 
-pub fn original_expr_name(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    id: Id,
-) -> Option<String> {
+pub fn original_expr_name(egraph: &CubeEGraph, id: Id) -> Option<String> {
     egraph[id]
         .data
         .original_expr
@@ -2123,7 +2110,7 @@ pub struct ChainSearcher {
 impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
     fn search_eclasses_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclasses: &mut dyn Iterator<Item = Id>,
         limit: usize,
     ) -> Vec<SearchMatches<LogicalPlanLanguage>> {
@@ -2141,7 +2128,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
 
     fn search_eclass_with_limit(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         eclass: Id,
         limit: usize,
     ) -> Option<SearchMatches<LogicalPlanLanguage>> {
@@ -2164,7 +2151,7 @@ impl Searcher<LogicalPlanLanguage, LogicalPlanAnalysis> for ChainSearcher {
 impl ChainSearcher {
     fn search_match_chained<'a>(
         &self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         mut cur_match: SearchMatches<'a, LogicalPlanLanguage>,
     ) -> Option<SearchMatches<'a, LogicalPlanLanguage>> {
         let mut new_substs = vec![];
@@ -2195,7 +2182,7 @@ impl ChainSearcher {
 
 pub struct TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     pattern: Pattern<LogicalPlanLanguage>,
     vars_to_substitute: T,
@@ -2203,7 +2190,7 @@ where
 
 impl<T> TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     pub fn new(pattern: &str, vars_to_substitute: T) -> Self {
         Self {
@@ -2215,11 +2202,11 @@ where
 
 impl<T> Applier<LogicalPlanLanguage, LogicalPlanAnalysis> for TransformingPattern<T>
 where
-    T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool,
+    T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool,
 {
     fn apply_one(
         &self,
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         eclass: Id,
         subst: &Subst,
         searcher_ast: Option<&PatternAst<LogicalPlanLanguage>>,
@@ -2237,13 +2224,13 @@ where
 
 pub fn transform_original_expr_to_alias(
     alias_expr_var: &'static str,
-) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool {
+) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
     let alias_expr_var = var!(alias_expr_var);
     move |egraph, root, subst| add_root_original_expr_alias(egraph, root, subst, alias_expr_var)
 }
 
 pub fn add_root_original_expr_alias(
-    egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    egraph: &mut CubeEGraph,
     root: Id,
     subst: &mut Subst,
     alias_expr_var: Var,
