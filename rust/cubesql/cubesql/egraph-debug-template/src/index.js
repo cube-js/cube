@@ -470,5 +470,8 @@ function rootComponent() {
 }
 
 const rootElement = document.getElementById('ui');
+if (rootElement === null) {
+    throw new Error('Root element not found');
+}
 const root = createRoot(rootElement);
 root.render(rootComponent());
