@@ -1,4 +1,4 @@
-import { states } from './states';
+import states from './states.json';
 import { createRoot } from 'react-dom/client';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import React, { useCallback, useState, useEffect, useMemo } from 'react';

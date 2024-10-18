@@ -261,11 +261,8 @@ fn write_debug_states(
         last_debug_data = Some(debug_data_clone);
     }
     fs::write(
-        format!("{}/src/states.js", dir),
-        &format!(
-            "export const states = {};",
-            serde_json::to_string_pretty(&states)?
-        ),
+        format!("{}/src/states.json", dir),
+        serde_json::to_string_pretty(&states)?,
     )?;
 
     Ok(())
