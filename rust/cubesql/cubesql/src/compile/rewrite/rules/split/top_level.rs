@@ -1,22 +1,20 @@
 use crate::{
     compile::rewrite::{
         aggr_aggr_expr_empty_tail, aggr_group_expr_empty_tail, aggregate,
-        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-        analysis::LogicalPlanAnalysis, cube_scan, projection, projection_expr_empty_tail,
-        projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rewriter::CubeEGraph, rules::split::SplitRules, transforming_rewrite,
-        AggregateSplitPushDownReplacerAliasToCube, CubeScanAliasToCube, ListType,
-        LogicalPlanLanguage, ProjectionAlias, ProjectionSplitPushDownReplacerAliasToCube,
+        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, cube_scan, projection,
+        projection_expr_empty_tail, projection_split_pullup_replacer,
+        projection_split_pushdown_replacer, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::split::SplitRules,
+        transforming_rewrite, AggregateSplitPushDownReplacerAliasToCube, CubeScanAliasToCube,
+        ListType, LogicalPlanLanguage, ProjectionAlias, ProjectionSplitPushDownReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl SplitRules {
-    pub fn top_level_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn top_level_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.push(transforming_rewrite(
             "split-projection-aggregate",
             aggregate(

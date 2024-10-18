@@ -1,12 +1,11 @@
 use crate::compile::rewrite::{
-    aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-    analysis::LogicalPlanAnalysis, column_expr, projection_split_pullup_replacer,
-    projection_split_pushdown_replacer, rewrite, rules::split::SplitRules, LogicalPlanLanguage,
+    aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, column_expr,
+    projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
+    rewriter::CubeRewrite, rules::split::SplitRules,
 };
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn column_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO check for measures?
         rules.push(rewrite(
             "split-column-point-aggregate",

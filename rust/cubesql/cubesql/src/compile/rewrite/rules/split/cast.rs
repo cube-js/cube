@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
         aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer,
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        analysis::OriginalExpr,
         cast_expr, projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::split::SplitRules,
         transforming_rewrite, AliasExprAlias, CastExprDataType, LiteralExprValue,
         LogicalPlanLanguage, ScalarFunctionExprFun,
@@ -16,10 +16,10 @@ use datafusion::{
     physical_plan::functions::BuiltinScalarFunction,
     scalar::ScalarValue,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl SplitRules {
-    pub fn cast_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn cast_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend([
             transforming_rewrite(
                 "split-cast-push-down-aggregate",

@@ -1,23 +1,19 @@
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         binary_expr, cast_expr, cast_expr_explicit, column_expr, literal_expr, literal_float,
         literal_int, literal_string,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::split::SplitRules,
-        udf_expr, LogicalPlanLanguage,
+        udf_expr,
     },
     var,
 };
 use datafusion::{arrow::datatypes::DataType as ArrowDataType, scalar::ScalarValue};
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn granularity_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn granularity_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."LO_COMMITDATE") * 100) + 1) * 100) + 1) AS varchar) AS date)
         self.single_arg_split_point_rules(
             "thoughtspot-year",
