@@ -10,7 +10,7 @@ use crate::{
         limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
         literal_member, measure_expr, member_pushdown_replacer, member_replacer,
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, RewriteRules},
         rules::{
             replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
             replacer_push_down_node_substitute_rules, utils,
@@ -40,7 +40,7 @@ use datafusion::{
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id, Rewrite, Subst, Var};
+use egg::{Id, Rewrite, Subst, Var};
 use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::{HashMap, HashSet},
@@ -1101,7 +1101,7 @@ impl MemberRules {
         left_var: &'static str,
         right_var: &'static str,
         concat_output_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_var = var!(left_var);
         let right_var = var!(right_var);
         let concat_output_var = var!(concat_output_var);
@@ -1141,7 +1141,7 @@ impl MemberRules {
         table_name_var: &'static str,
         alias_to_cube_var: &'static str,
         cube_scan_members_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let source_table_name_var = var!(source_table_name_var);
         let table_name_var = var!(table_name_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -1205,8 +1205,7 @@ impl MemberRules {
         column_expr_var: &'static str,
         alias_expr_var: Option<&'static str>,
         inner_replacer: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
-    {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool + Clone {
         let original_expr_var = var!(original_expr_var);
         let outer_granularity_var = var!(outer_granularity_var);
         let inner_granularity_var = var!(inner_granularity_var);
@@ -1300,8 +1299,7 @@ impl MemberRules {
         column_expr_var: &'static str,
         alias_expr_var: Option<&'static str>,
         inner_replacer: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
-    {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool + Clone {
         Self::transform_original_expr_nested_date_trunc(
             original_expr_var,
             granularity_var,
@@ -1321,7 +1319,7 @@ impl MemberRules {
         alias_to_cube_var: &'static str,
         new_alias_to_cube_var: &'static str,
         member_pushdown_replacer_alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let members_var = var!(members_var);
         let alias_var = var!(alias_var);
@@ -1455,7 +1453,7 @@ impl MemberRules {
         new_pushdown_join_var: &'static str,
         ungrouped_var: &'static str,
         filters_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
         let aggregate_expr_var = var!(aggregate_expr_var);
@@ -1565,7 +1563,7 @@ impl MemberRules {
         fetch_var: &'static str,
         new_skip_var: &'static str,
         new_fetch_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let skip_var = var!(skip_var);
         let fetch_var = var!(fetch_var);
         let new_skip_var = var!(new_skip_var);
@@ -1613,7 +1611,7 @@ impl MemberRules {
         literal_member_value_var: &'static str,
         alias_to_cube_var: &'static str,
         relation_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_value_var = var!(literal_value_var);
         let literal_member_value_var = var!(literal_member_value_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -1666,7 +1664,7 @@ impl MemberRules {
         date_range_var: &'static str,
         original_expr_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = cube_var.parse().unwrap();
         let dimension_var = dimension_var.parse().unwrap();
         let time_dimension_name_var = time_dimension_name_var.parse().unwrap();
@@ -1741,7 +1739,7 @@ impl MemberRules {
     }
 
     pub fn add_alias_column(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         alias: String,
         cube_alias: Option<String>,
     ) -> Id {
@@ -1788,7 +1786,7 @@ impl MemberRules {
         terminal_member: &'static str,
         filtered_member_pushdown_replacer_alias_to_cube_var: &'static str,
         default_count: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = var!(column_var);
@@ -1867,7 +1865,7 @@ impl MemberRules {
         column_var: &'static str,
         member_var: &'static str,
         default_count: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
@@ -1990,7 +1988,7 @@ impl MemberRules {
         original_expr_var: &'static str,
         cast_data_type_var: Option<&'static str>,
         measure_out_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
         let measure_name_var = var!(measure_name_var);
@@ -2106,7 +2104,7 @@ impl MemberRules {
         cast_data_type_var: Option<&'static str>,
         aggr_expr_var: &'static str,
         measure_out_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let distinct_var = distinct_var.map(|var| var.parse().unwrap());
         let fun_var = fun_var.map(|var| var.parse().unwrap());
@@ -2212,7 +2210,7 @@ impl MemberRules {
     }
 
     fn measure_output(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         measure: &V1CubeMetaMeasure,
         call_agg_type: Option<String>,
@@ -2270,7 +2268,7 @@ impl MemberRules {
         column_var: &'static str,
         output_column_var: &'static str,
         relation_var: Option<&'static str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
         let column_var = var!(column_var);
@@ -2314,7 +2312,7 @@ impl MemberRules {
         new_alias_var: &'static str,
         new_relation_var: &'static str,
         is_alias: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = var!(column_var);
         let new_alias_var = var!(new_alias_var);
@@ -2373,7 +2371,7 @@ impl MemberRules {
         alias_var: &'static str,
         output_column_var: &'static str,
         relation_var: Option<&'static str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let member_pushdown_replacer_alias_to_cube_var =
             var!(member_pushdown_replacer_alias_to_cube_var);
         let alias_var = var!(alias_var);
@@ -2415,7 +2413,7 @@ impl MemberRules {
         negated_var: &'static str,
         escape_char_var: &'static str,
         op_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let like_type_var = var!(like_type_var);
         let negated_var = var!(negated_var);
         let escape_char_var = var!(escape_char_var);
@@ -2481,7 +2479,7 @@ impl MemberRules {
         left_alias_to_cube_var: &'static str,
         right_alias_to_cube_var: &'static str,
         joined_alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
         let joined_alias_to_cube_var = var!(joined_alias_to_cube_var);
@@ -2530,7 +2528,7 @@ impl MemberRules {
         left_ungrouped_var: &'static str,
         right_ungrouped_var: &'static str,
         new_ungrouped_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_alias_to_cube_var = var!(left_alias_to_cube_var);
         let right_alias_to_cube_var = var!(right_alias_to_cube_var);
         let joined_alias_to_cube_var = var!(joined_alias_to_cube_var);
@@ -2676,7 +2674,7 @@ impl MemberRules {
         right_on_var: &'static str,
         left_aliases_var: &'static str,
         right_aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_on_var = var!(left_on_var);
         let right_on_var = var!(right_on_var);
         let left_aliases_var = var!(left_aliases_var);
@@ -2829,7 +2827,7 @@ impl MemberRules {
 }
 
 pub fn add_member_error(
-    egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    egraph: &mut CubeEGraph,
     member_error: String,
     priority: usize,
     expr: Id,
