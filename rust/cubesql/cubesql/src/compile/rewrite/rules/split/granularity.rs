@@ -4,6 +4,7 @@ use crate::{
         analysis::{ConstantFolding, LogicalPlanAnalysis},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, literal_expr, literal_float,
         literal_int, literal_string,
+        rewriter::CubeEGraph,
         rules::split::SplitRules,
         udf_expr, LogicalPlanLanguage,
     },
@@ -666,15 +667,8 @@ impl SplitRules {
         &self,
         day_interval_var: &str,
         neg_day_interval_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone
-           + 'static {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
         let day_interval = var!(day_interval_var);
         let neg_day_interval = var!(neg_day_interval_var);
         move |_, egraph, subst| {

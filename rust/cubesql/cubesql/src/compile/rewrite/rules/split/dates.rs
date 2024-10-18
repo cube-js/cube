@@ -2,6 +2,7 @@ use crate::{
     compile::rewrite::{
         analysis::{ConstantFolding, LogicalPlanAnalysis},
         cast_expr, literal_expr,
+        rewriter::CubeEGraph,
         rules::{
             members::min_granularity,
             split::SplitRules,
@@ -149,14 +150,7 @@ impl SplitRules {
         &self,
         date_part_var: &str,
         new_date_part_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let date_part_var = var!(date_part_var);
         let new_date_part_var = var!(new_date_part_var);
         move |_, egraph, subst| {
@@ -193,14 +187,7 @@ impl SplitRules {
         date_part_var: &str,
         new_date_part_var: &str,
         new_trunc_granularity_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let date_part_var = var!(date_part_var);
         let new_date_part_var = var!(new_date_part_var);
         let new_trunc_granularity_var = var!(new_trunc_granularity_var);
@@ -242,14 +229,7 @@ impl SplitRules {
         inner_var: &str,
         new_outer_var: &str,
         new_inner_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone {
         let outer_var = var!(outer_var);
         let inner_var = var!(inner_var);
         let new_outer_var = var!(new_outer_var);
