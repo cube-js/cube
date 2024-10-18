@@ -106,7 +106,7 @@ function layout(
 
     const graph = {
         id: 'root',
-        layoutOptions: layoutOptions,
+        layoutOptions,
         children: Object.keys(groupNodes).map((key) => groupNodes[key]),
         edges: elkEdges,
     };
