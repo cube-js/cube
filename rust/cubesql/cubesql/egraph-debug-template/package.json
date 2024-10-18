@@ -16,8 +16,12 @@
     "eject": "react-scripts eject"
   },
   "devDependencies": {
+    "@types/node": "20.16.12",
+    "@types/react": "18.0.38",
+    "@types/react-dom": "18.0.11",
     "prettier": "3.3.3",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "typescript": "4.9.5"
   },
   "eslintConfig": {
     "extends": [
