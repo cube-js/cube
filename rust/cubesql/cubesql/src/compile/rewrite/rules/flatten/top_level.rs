@@ -1,22 +1,17 @@
 use crate::{
     compile::rewrite::{
-        aggregate,
-        analysis::LogicalPlanAnalysis,
-        cube_scan, flatten_pushdown_replacer, projection,
-        rewriter::CubeEGraph,
+        aggregate, cube_scan, flatten_pushdown_replacer, projection,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
         LogicalPlanLanguage, ProjectionAlias,
     },
     var, var_iter,
 };
-use egg::{Id, Rewrite};
+use egg::Id;
 
 impl FlattenRules {
-    pub fn top_level_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn top_level_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO use root instead for performance
         rules.extend(vec![transforming_chain_rewrite_with_root(
             "flatten-projection-pushdown",
@@ -305,11 +300,7 @@ impl FlattenRules {
         }
     }
 
-    fn list_pushdown_rules(
-        name: &str,
-        list_node: &str,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn list_pushdown_rules(name: &str, list_node: &str, rules: &mut Vec<CubeRewrite>) {
         rules.extend(replacer_push_down_node(
             name,
             list_node,
@@ -318,11 +309,7 @@ impl FlattenRules {
         ));
     }
 
-    fn flat_list_pushdown_rules(
-        name: &str,
-        list_type: ListType,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn flat_list_pushdown_rules(name: &str, list_type: ListType, rules: &mut Vec<CubeRewrite>) {
         rules.extend(replacer_flat_push_down_node(
             name,
             list_type,
