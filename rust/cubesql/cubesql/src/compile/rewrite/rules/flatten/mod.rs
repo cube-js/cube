@@ -3,12 +3,9 @@ mod pass_through;
 mod top_level;
 
 use crate::{
-    compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewriter::RewriteRules, LogicalPlanLanguage,
-    },
+    compile::rewrite::rewriter::{CubeRewrite, RewriteRules},
     config::ConfigObj,
 };
-use egg::Rewrite;
 use std::sync::Arc;
 
 pub struct FlattenRules {
@@ -16,7 +13,7 @@ pub struct FlattenRules {
 }
 
 impl RewriteRules for FlattenRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![];
 
         self.top_level_rules(&mut rules);

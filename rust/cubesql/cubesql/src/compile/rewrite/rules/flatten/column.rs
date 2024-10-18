@@ -1,16 +1,18 @@
 use crate::{
     compile::rewrite::{
-        alias_expr, analysis::LogicalPlanAnalysis, column_expr,
-        converter::LogicalPlanToLanguageConverter, flatten_pushdown_replacer, literal_expr,
-        rewrite, rewriter::CubeEGraph, rules::flatten::FlattenRules, transforming_rewrite,
-        AliasExprAlias, ColumnExprColumn, FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
+        alias_expr, column_expr,
+        converter::LogicalPlanToLanguageConverter,
+        flatten_pushdown_replacer, literal_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::flatten::FlattenRules,
+        transforming_rewrite, AliasExprAlias, ColumnExprColumn, FlattenPushdownReplacerTopLevel,
+        LogicalPlanLanguage,
     },
     var, var_iter, CubeError,
 };
-use egg::Rewrite;
 
 impl FlattenRules {
-    pub fn column_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn column_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "flatten-column-pushdown",
