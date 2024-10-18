@@ -366,7 +366,16 @@ const LayoutFlow = () => {
             navHistory,
             showOnlySelected,
         );
-    }, [preNodes, setNodes, setEdges, stateIdx, showOnlySelected, navHistory]);
+    }, [
+        preNodes,
+        setNodes,
+        setEdges,
+        stateIdx,
+        showOnlySelected,
+        navHistory,
+        fitView,
+        preEdges,
+    ]);
 
     const stateLabel =
         stateIdx === 0
