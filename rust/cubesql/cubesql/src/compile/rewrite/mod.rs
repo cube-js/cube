@@ -9,7 +9,7 @@ use self::analysis::{LogicalPlanData, MemberNameToExpr};
 use crate::{
     compile::rewrite::{
         analysis::{LogicalPlanAnalysis, OriginalExpr},
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
     },
     CubeError,
 };
@@ -37,7 +37,6 @@ use std::{
     str::FromStr,
     sync::Arc,
 };
-
 // trace_macros!(true);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
@@ -658,11 +657,7 @@ fn expr_column_name(expr: &Expr, cube: &Option<String>) -> String {
     }
 }
 
-pub fn rewrite(
-    name: &str,
-    searcher: String,
-    applier: String,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+pub fn rewrite(name: &str, searcher: String, applier: String) -> CubeRewrite {
     Rewrite::new(
         name.to_string(),
         searcher.parse::<Pattern<LogicalPlanLanguage>>().unwrap(),
@@ -676,7 +671,7 @@ pub fn transforming_rewrite<T>(
     searcher: String,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
     T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
@@ -695,7 +690,7 @@ pub fn transforming_rewrite_with_root<T>(
     searcher: String,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
     T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
@@ -713,7 +708,7 @@ pub fn transforming_chain_rewrite<T>(
     chain: Vec<(&str, String)>,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
     T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + 'static,
 {
@@ -739,7 +734,7 @@ pub fn transforming_chain_rewrite_with_root<T>(
     chain: Vec<(&str, String)>,
     applier: String,
     transform_fn: T,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>
+) -> CubeRewrite
 where
     T: Fn(&mut CubeEGraph, Id, &mut Subst) -> bool + Sync + Send + 'static,
 {
@@ -1159,7 +1154,7 @@ pub fn list_rewrite(
     list_type: ListType,
     searcher: ListPattern,
     applier: ListPattern,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1181,7 +1176,7 @@ pub fn list_rewrite_with_lists(
     searcher: ListPattern,
     applier_pattern: &str,
     lists: impl IntoIterator<Item = ListApplierListPattern>,
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1198,7 +1193,7 @@ pub fn list_rewrite_with_vars(
     searcher: ListPattern,
     applier: ListPattern,
     top_level_elem_vars: &[&str],
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,
@@ -1222,7 +1217,7 @@ pub fn list_rewrite_with_lists_and_vars(
     applier_pattern: &str,
     lists: impl IntoIterator<Item = ListApplierListPattern>,
     top_level_elem_vars: &[&str],
-) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+) -> CubeRewrite {
     let searcher = ListNodeSearcher::new(
         list_type.clone(),
         &searcher.list_var,

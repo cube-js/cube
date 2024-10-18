@@ -392,7 +392,7 @@ impl Rewriter {
     fn run_rewrites(
         cube_context: &Arc<CubeContext>,
         egraph: CubeEGraph,
-        rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+        rules: Arc<Vec<CubeRewrite>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
@@ -523,7 +523,7 @@ impl Rewriter {
         meta_context: Arc<MetaContext>,
         config_obj: Arc<dyn ConfigObj>,
         eval_stable_functions: bool,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
             Box::new(MemberRules::new(
@@ -575,7 +575,7 @@ impl Rewriter {
 }
 
 pub trait RewriteRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
+    fn rewrite_rules(&self) -> Vec<CubeRewrite>;
 }
 
 struct IncrementalScheduler {
