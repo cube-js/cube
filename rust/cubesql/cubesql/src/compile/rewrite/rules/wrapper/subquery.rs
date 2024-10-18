@@ -1,21 +1,19 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, empty_relation, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, EmptyRelationDerivedSourceTableName, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        cube_scan_wrapper, empty_relation,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
     },
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
-use egg::{Rewrite, Subst, Var};
+use egg::{Subst, Var};
 use std::sync::Arc;
 
 impl WrapperRules {
-    pub fn subquery_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn subquery_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-subqueries-wrapped-scan-to-pull",

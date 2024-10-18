@@ -1,12 +1,11 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules, sort,
+    cube_scan_wrapper, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules, sort,
     wrapped_select, wrapped_select_order_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer, LogicalPlanLanguage,
+    wrapper_pushdown_replacer,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn order_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn order_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![rewrite(
             "wrapper-push-down-order-to-cube-scan",
             sort(

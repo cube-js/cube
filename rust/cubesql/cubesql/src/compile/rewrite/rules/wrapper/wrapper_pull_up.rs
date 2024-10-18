@@ -1,19 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapped_select,
-        wrapped_select_having_expr_empty_tail, wrapped_select_joins_empty_tail,
-        wrapper_pullup_replacer, LogicalPlanLanguage, WrappedSelectSelectType, WrappedSelectType,
+        cube_scan_wrapper,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
+        wrapped_select_joins_empty_tail, wrapper_pullup_replacer, LogicalPlanLanguage,
+        WrappedSelectSelectType, WrappedSelectType,
     },
     var, var_iter, var_list_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn wrapper_pull_up_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn wrapper_pull_up_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-pull-up-to-cube-scan-non-wrapped-select",

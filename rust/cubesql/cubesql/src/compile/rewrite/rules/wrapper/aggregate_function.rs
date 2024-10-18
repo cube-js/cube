@@ -1,20 +1,19 @@
 use crate::{
     compile::rewrite::{
-        agg_fun_expr, analysis::LogicalPlanAnalysis, rewrite, rewriter::CubeEGraph,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, AggregateFunctionExprDistinct, AggregateFunctionExprFun,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        agg_fun_expr, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
+        AggregateFunctionExprDistinct, AggregateFunctionExprFun, LogicalPlanLanguage,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 use datafusion::physical_plan::aggregates::AggregateFunction;
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn window_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn window_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-aggregate-function",

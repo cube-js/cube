@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
         aggregate,
-        analysis::{LogicalPlanAnalysis, LogicalPlanData},
+        analysis::LogicalPlanData,
         cube_scan_wrapper, grouping_set_expr, original_expr_name, rewrite,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{members::MemberRules, wrapper::WrapperRules},
         subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
         wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
@@ -18,14 +18,11 @@ use crate::{
     var, var_iter,
 };
 use datafusion::logical_plan::Column;
-use egg::{Rewrite, Subst, Var};
+use egg::{Subst, Var};
 use std::ops::IndexMut;
 
 impl WrapperRules {
-    pub fn aggregate_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-push-down-aggregate-to-cube-scan",
@@ -247,10 +244,7 @@ impl WrapperRules {
         }
     }
 
-    pub fn aggregate_rules_subquery(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-aggregate-and-subquery-to-cube-scan",
             aggregate(

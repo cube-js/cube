@@ -1,19 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rewriter::CubeEGraph, rules::wrapper::WrapperRules,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
         WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn udf_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn udf_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-udf",

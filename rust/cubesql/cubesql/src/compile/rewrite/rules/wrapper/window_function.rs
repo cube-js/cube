@@ -1,6 +1,8 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rewriter::CubeEGraph, rules::wrapper::WrapperRules,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LogicalPlanLanguage, WindowFunctionExprFun,
         WrapperPullupReplacerAliasToCube,
@@ -8,13 +10,10 @@ use crate::{
     var, var_iter,
 };
 use datafusion::physical_plan::windows::WindowFunction;
-use egg::{Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-window-function",
