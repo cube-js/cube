@@ -66,8 +66,8 @@ function layout(
 ) {
     const defaultOptions = {
         'elk.algorithm': 'layered',
-        'elk.layered.spacing.nodeNodeBetweenLayers': 100,
-        'elk.spacing.nodeNode': 80,
+        'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+        'elk.spacing.nodeNode': '80',
         'org.eclipse.elk.hierarchyHandling': 'INCLUDE_CHILDREN',
         'elk.direction': 'DOWN',
     };
