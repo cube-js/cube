@@ -250,16 +250,20 @@ const ChildrenNode =
         );
     };
 
+function jsonClone(t) {
+    return JSON.parse(JSON.stringify(t));
+}
+
 const LayoutFlow = () => {
     const [{ preNodes, preEdges }, setPreNodesEdges] = useState({
         preNodes: initialNodes,
         preEdges: initialEdges,
     });
     const [nodes, setNodes, onNodesChange] = useNodesState(
-        JSON.parse(JSON.stringify(initialNodes)),
+        jsonClone(initialNodes),
     );
     const [edges, setEdges, onEdgesChange] = useEdgesState(
-        JSON.parse(JSON.stringify(initialEdges)),
+        jsonClone(initialEdges),
     );
     const [stateIdx, setStateIdx] = useState(0);
     const { fitView } = useReactFlow();
@@ -370,8 +374,8 @@ const LayoutFlow = () => {
     useEffect(() => {
         layout(
             {},
-            JSON.parse(JSON.stringify(preNodes)),
-            JSON.parse(JSON.stringify(preEdges)),
+            jsonClone(preNodes),
+            jsonClone(preEdges),
             setNodes,
             setEdges,
             fitView,
