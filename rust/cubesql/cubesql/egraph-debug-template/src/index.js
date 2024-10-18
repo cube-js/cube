@@ -220,7 +220,7 @@ const ChildrenNode =
                 {splitLabel(label).map((s, i) => {
                     if (s.match(/\d+/)) {
                         return (
-                            <a
+                            <span
                                 style={{ color: 'blue', cursor: 'pointer' }}
                                 onClick={() => navigate(s)}
                                 key={i}
@@ -230,7 +230,7 @@ const ChildrenNode =
                                     .join(', ')}
                             >
                                 {s}
-                            </a>
+                            </span>
                         );
                     } else {
                         return <span key={i}>{s}</span>;
