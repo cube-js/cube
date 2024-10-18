@@ -185,7 +185,11 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     }
 }
 
-fn write_debug_iterations(runner: &CubeRunner, stage: &str) -> Result<(), CubeError> {
+fn write_debug_states(
+    init_debug_data: &DebugData,
+    runner: &CubeRunner,
+    stage: &str,
+) -> Result<(), CubeError> {
     let dir = format!("egraph-debug-{}", stage);
     let _ = fs::create_dir_all(dir.clone());
     let _ = fs::create_dir_all(format!("{}/public", dir));
@@ -203,11 +207,21 @@ fn write_debug_iterations(runner: &CubeRunner, stage: &str) -> Result<(), CubeEr
         format!("{}/src/index.js", dir),
     )?;
 
-    let mut iterations = Vec::new();
+    let mut states = Vec::new();
     let mut last_debug_data: Option<DebugData> = None;
-    for i in &runner.iterations {
-        let debug_data_clone = i.data.debug_info.as_ref().unwrap().debug_data.clone();
-        let mut debug_data = i.data.debug_info.as_ref().unwrap().debug_data.clone();
+
+    let states_data =
+        std::iter::once((init_debug_data, None)).chain(runner.iterations.iter().map(|i| {
+            (
+                &i.data.debug_info.as_ref().unwrap().debug_data,
+                Some(&i.applied),
+            )
+        }));
+
+    for (debug_data, applied) in states_data {
+        let mut debug_data = debug_data.clone();
+        let debug_data_clone = debug_data.clone();
+
         if let Some(last) = last_debug_data {
             debug_data
                 .nodes
@@ -238,15 +252,19 @@ fn write_debug_iterations(runner: &CubeRunner, stage: &str) -> Result<(), CubeEr
                 .removed_combos
                 .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
         }
-        debug_data.applied_rules = Some(i.applied.iter().map(|s| format!("{:?}", s)).collect());
-        iterations.push(debug_data);
+        debug_data.applied_rules = Some(
+            applied
+                .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
+                .unwrap_or(vec![]),
+        );
+        states.push(debug_data);
         last_debug_data = Some(debug_data_clone);
     }
     fs::write(
-        format!("{}/src/iterations.js", dir),
+        format!("{}/src/states.js", dir),
         &format!(
-            "export const iterations = {};",
-            serde_json::to_string_pretty(&iterations)?
+            "export const states = {};",
+            serde_json::to_string_pretty(&states)?
         ),
     )?;
 
@@ -463,6 +481,10 @@ impl Rewriter {
         rules: Arc<Vec<CubeRewrite>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
+        // Capture initial egraph state, before rewrites
+        let init_debug_data =
+            IterInfo::egraph_debug_enabled().then(|| IterDebugInfo::prepare_debug_data(&egraph));
+
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
         let runner = runner.run(rules.iter());
         if !IterInfo::egraph_debug_enabled() {
@@ -482,7 +504,10 @@ impl Rewriter {
             }
         };
         if IterInfo::egraph_debug_enabled() {
-            write_debug_iterations(&runner, stage)?;
+            // `unwrap()` should be ok here
+            // When IterInfo::egraph_debug_enabled() init_debug_data should be filled
+            let init_debug_data = init_debug_data.unwrap();
+            write_debug_states(&init_debug_data, &runner, stage)?;
         }
         if let Some(stop_reason) = stop_reason {
             return Err(CubeError::user(format!(

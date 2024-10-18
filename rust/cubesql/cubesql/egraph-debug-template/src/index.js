@@ -1,4 +1,4 @@
-import { iterations } from './iterations';
+import { states } from './states';
 import { createRoot } from 'react-dom/client';
 import ELK from 'elkjs/lib/elk.bundled.js';
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
@@ -14,7 +14,9 @@ import ReactFlow, {
 
 import 'reactflow/dist/style.css';
 
-const data = { nodes: iterations[0].nodes, edges: iterations[0].edges, combos: iterations[0].combos };
+// First is initial state
+const totalIterations = states.length - 1;
+const data = { nodes: states[0].nodes, edges: states[0].edges, combos: states[0].combos };
 const sizeByNode = (n) => [60 + n.label.length * 5, 30];
 const toGroupNode = (n) => ({ ...n, type: 'group', data: { label: n.label }, position: { x: 0, y: 0 }, width: 200, height: 200  });
 const toRegularNode = (n) => ({
@@ -183,20 +185,20 @@ const LayoutFlow = () => {
     const [{ preNodes, preEdges }, setPreNodesEdges] = useState({ preNodes: initialNodes, preEdges: initialEdges });
     const [nodes, setNodes, onNodesChange] = useNodesState(JSON.parse(JSON.stringify(initialNodes)));
     const [edges, setEdges, onEdgesChange] = useEdgesState(JSON.parse(JSON.stringify(initialEdges)));
-    const [iteration, setIteration] = useState(0);
+    const [stateIdx, setStateIdx] = useState(0);
     const { fitView } = useReactFlow();
 
     const [navigateTo, setNavigateTo] = useState('');
     const [navHistory, setNavHistory] = useState([]);
     const [showOnlySelected, setShowOnlySelected] = useState(false);
 
-    const prevIter = () => {
-        if (iteration === 0) {
+    const prevState = () => {
+        if (stateIdx === 0) {
             return;
         }
         let newNodes = preNodes;
         let newEdges = preEdges;
-        const toRemove = iterations[iteration];
+        const toRemove = states[stateIdx];
         let toRemoveNodeIds = toRemove.nodes.concat(toRemove.combos).map((n) => n.id);
         let toRemoveEdgeIds = toRemove.edges.map((n) => toEdge(n).id);
         newNodes = newNodes.filter((n) => !toRemoveNodeIds.includes(n.id));
@@ -205,21 +207,21 @@ const LayoutFlow = () => {
         newNodes = newNodes.concat((toRemove.removedNodes || []).map(toRegularNode));
         const edgeMap = (toRemove.removedEdges || []).map(toEdge).reduce((acc, val) => ({ ...acc, [val.id]: val }), {});
         newEdges = newEdges.concat(Object.keys(edgeMap).map(key => edgeMap[key]));
-        const toHighlight = iterations[iteration - 1];
+        const toHighlight = states[stateIdx - 1];
         const toHighlightNodeIds = toHighlight.nodes.concat(toHighlight.combos).map((n) => n.id);
         newNodes = newNodes.map(n => ({...n, style: { ...n.style, backgroundColor: toHighlightNodeIds.includes(n.id) ? highlightColor : undefined }}));
-        setIteration(iteration - 1);
+        setStateIdx(stateIdx - 1);
         setPreNodesEdges({ preNodes: newNodes, preEdges: newEdges });
     }
 
-    const nextIter = () => {
-        if (iteration === iterations.length - 1) {
+    const nextState = () => {
+        if (stateIdx === states.length - 1) {
             return;
         }
         let newNodes = preNodes;
         let newEdges = preEdges;
-        setIteration(iteration + 1);
-        const toAdd = iterations[iteration + 1];
+        setStateIdx(stateIdx + 1);
+        const toAdd = states[stateIdx + 1];
         let toRemoveNodeIds = toAdd.removedNodes.concat(toAdd.removedCombos).map((n) => n.id);
         let toRemoveEdgeIds = toAdd.removedEdges.map((n) => toEdge(n).id);
         newNodes = newNodes.filter((n) => !toRemoveNodeIds.includes(n.id));
@@ -248,7 +250,9 @@ const LayoutFlow = () => {
 
     useEffect(() => {
         layout({}, JSON.parse(JSON.stringify(preNodes)), JSON.parse(JSON.stringify(preEdges)), setNodes, setEdges, fitView, navHistory, showOnlySelected);
-    }, [preNodes, setNodes, setEdges, iteration, showOnlySelected, navHistory]);
+    }, [preNodes, setNodes, setEdges, stateIdx, showOnlySelected, navHistory]);
+
+    const stateLabel = stateIdx === 0 ? "Initial state" : `After iteration ${stateIdx} / ${totalIterations}`;
 
     return (
         <ReactFlow
@@ -265,9 +269,9 @@ const LayoutFlow = () => {
                 <div>
                     <input type="checkbox" checked={showOnlySelected} onChange={() => setShowOnlySelected(!showOnlySelected)}/>
                     <span style={{ paddingLeft: 4, paddingRight: 4 }}>Show only selected</span>
-                    <button onClick={() => prevIter()}>Prev Iter</button>
-                    <button onClick={() => nextIter()}>Next Iter</button>
-                    <span style={{ paddingLeft: 4, paddingRight: 4 }}>Iteration #{iteration + 1} / {iterations.length}</span>
+                    <button onClick={() => prevState()}>Prev State</button>
+                    <button onClick={() => nextState()}>Next State</button>
+                    <span style={{ paddingLeft: 4, paddingRight: 4 }}>{stateLabel}</span>
                     <input placeholder="Search Class ID" onChange={(e) => setNavigateTo(e.target.value)} value={navigateTo}></input>
                     <button onClick={() => {
                         navigate(navigateTo);
@@ -284,7 +288,7 @@ const LayoutFlow = () => {
                     }
                 </div>
                 <div>
-                    <span>{iterations[iteration].appliedRules.join(', ')}</span>
+                    <span>{states[stateIdx].appliedRules.join(', ')}</span>
                 </div>
             </Panel>
         </ReactFlow>
