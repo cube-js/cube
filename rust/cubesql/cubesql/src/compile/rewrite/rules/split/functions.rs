@@ -1,14 +1,10 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, is_not_null_expr, is_null_expr, literal_expr, negative_expr,
-    rules::split::SplitRules, udf_expr, ListType, LogicalPlanLanguage,
+    is_not_null_expr, is_null_expr, literal_expr, negative_expr, rewriter::CubeRewrite,
+    rules::split::SplitRules, udf_expr, ListType,
 };
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn functions_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn functions_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // Universal rule to traverse any number of function arguments
         // PushDown(ScalarFunctionExprArgs(..., arg, ...)) => ScalarFunctionExprArgs(..., PushDown(arg), ...)
         // ScalarFunctionExprArgs(..., PullUp(arg), ...) => PullUp(ScalarFunctionExprArgs(..., arg, ...))

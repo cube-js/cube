@@ -1,8 +1,8 @@
 use crate::{
     compile::rewrite::{
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         cast_expr, literal_expr,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{
             members::min_granularity,
             split::SplitRules,
@@ -13,10 +13,9 @@ use crate::{
     var,
 };
 use datafusion::scalar::ScalarValue;
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn date_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn date_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO check for time dimension before push down to optimize performance
         // TODO use pass-through instead point rules for epoch
         self.single_arg_split_point_rules(

@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         case_expr, cast_expr, column_expr, is_null_expr, literal_expr, literal_int,
-        rewriter::CubeEGraph,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
@@ -13,13 +13,9 @@ use crate::{
     var, var_iter,
 };
 use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn aggregate_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function",
             || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
@@ -222,7 +218,7 @@ impl SplitRules {
             + Send
             + Clone
             + 'static,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         self.single_arg_split_point_rules_aggregate(
             name,

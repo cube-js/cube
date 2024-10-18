@@ -11,11 +11,10 @@ pub mod top_level;
 
 use crate::{
     compile::rewrite::{
-        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
-        analysis::LogicalPlanAnalysis,
-        fun_expr, fun_expr_var_arg, list_rewrite_with_lists_and_vars, original_expr_name,
+        aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr, fun_expr,
+        fun_expr_var_arg, list_rewrite_with_lists_and_vars, original_expr_name,
         projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{members::MemberRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite, AliasExprAlias, ListApplierListPattern, ListPattern, ListType,
         LogicalPlanLanguage,
@@ -24,7 +23,6 @@ use crate::{
     transport::MetaContext,
     var,
 };
-use egg::Rewrite;
 use std::{fmt::Display, sync::Arc};
 
 pub struct SplitRules {
@@ -34,7 +32,7 @@ pub struct SplitRules {
 }
 
 impl RewriteRules for SplitRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = Vec::new();
 
         self.top_level_rules(&mut rules);
@@ -69,7 +67,7 @@ impl SplitRules {
         name: &str,
         node: impl Fn(String) -> String,
         projection_rules: bool,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.extend(vec![
             rewrite(
@@ -140,7 +138,7 @@ impl SplitRules {
         &self,
         fun_name: &(impl Display + ?Sized),
         projection_rules: bool,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.extend(vec![
             rewrite(
@@ -223,7 +221,7 @@ impl SplitRules {
             + Clone
             + 'static,
         projection_rules: bool,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         if projection_rules {
             self.single_arg_split_point_rules_projection(
@@ -256,7 +254,7 @@ impl SplitRules {
             + Send
             + Clone
             + 'static,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.push(transforming_chain_rewrite(
             &format!("split-{}-point-aggregate", name),
@@ -292,7 +290,7 @@ impl SplitRules {
             + Send
             + Clone
             + 'static,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.push(transforming_chain_rewrite(
             &format!("split-{}-point-projection", name),
@@ -349,11 +347,7 @@ impl SplitRules {
         }
     }
 
-    fn list_pushdown_pullup_rules(
-        name: &str,
-        list_node: &str,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    fn list_pushdown_pullup_rules(name: &str, list_node: &str, rules: &mut Vec<CubeRewrite>) {
         let possible_inner_list_nodes = Self::possible_inner_list_nodes();
 
         // Aggregate split replacer
@@ -428,7 +422,7 @@ impl SplitRules {
     fn flat_list_pushdown_pullup_rules(
         name: &str,
         list_type: ListType,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         let possible_inner_list_types = Self::possible_inner_flat_list_types();
 
@@ -525,7 +519,7 @@ impl SplitRules {
         substitute_list_node: &str,
         replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_nodes: &Vec<String>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_nodes
             .iter()
             .map(|inner_list_node| {
@@ -562,7 +556,7 @@ impl SplitRules {
         replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_types: &Vec<ListType>,
         top_level_elem_vars: &[&str],
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_types
             .iter()
             .map(|inner_list_type| {
@@ -608,7 +602,7 @@ impl SplitRules {
         push_down_replacer_node: impl Fn(String, String) -> String,
         pull_up_replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_nodes: &Vec<String>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_nodes
             .iter()
             .map(|inner_list_node| {
@@ -632,7 +626,7 @@ impl SplitRules {
         push_down_replacer_node: impl Fn(String, String) -> String,
         pull_up_replacer_node: impl Fn(String, String, String) -> String,
         possible_inner_list_types: &Vec<ListType>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         possible_inner_list_types
             .iter()
             .map(|inner_list_type| {
