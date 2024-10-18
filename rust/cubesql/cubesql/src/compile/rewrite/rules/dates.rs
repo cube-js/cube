@@ -2,10 +2,10 @@ use super::utils;
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, fun_expr, literal_expr,
         literal_int, literal_string, negative_expr, original_expr_name, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::utils::DeltaTimeUnitToken,
         to_day_interval_expr, transform_original_expr_to_alias, transforming_rewrite,
         transforming_rewrite_with_root, udf_expr, AliasExprAlias, CastExprDataType,
@@ -19,7 +19,7 @@ use datafusion::{
     logical_plan::DFSchema,
     scalar::ScalarValue,
 };
-use egg::{Id, Rewrite, Subst};
+use egg::{Id, Subst};
 use std::{convert::TryFrom, fmt::Display, sync::Arc};
 
 pub struct DateRules {
@@ -27,7 +27,7 @@ pub struct DateRules {
 }
 
 impl RewriteRules for DateRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             // TODO ?interval
             rewrite(

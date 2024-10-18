@@ -1,16 +1,14 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, aggregate, alias_expr, all_members,
-        analysis::{
-            ConstantFolding, LogicalPlanAnalysis, LogicalPlanData, MemberNamesToExpr, OriginalExpr,
-        },
+        analysis::{ConstantFolding, LogicalPlanData, MemberNamesToExpr, OriginalExpr},
         binary_expr, cast_expr, change_user_expr, column_expr, cross_join, cube_scan,
         cube_scan_filters_empty_tail, cube_scan_members, cube_scan_members_empty_tail,
         cube_scan_order_empty_tail, dimension_expr, expr_column_name, fun_expr, join, like_expr,
         limit, list_concat_pushdown_replacer, list_concat_pushup_replacer, literal_expr,
         literal_member, measure_expr, member_pushdown_replacer, member_replacer,
         merged_members_replacer, original_expr_name, projection, referenced_columns, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{
             replacer_flat_push_down_node_substitute_rules, replacer_push_down_node,
             replacer_push_down_node_substitute_rules, utils,
@@ -40,7 +38,7 @@ use datafusion::{
     physical_plan::aggregates::AggregateFunction,
     scalar::ScalarValue,
 };
-use egg::{Id, Rewrite, Subst, Var};
+use egg::{Id, Subst, Var};
 use itertools::{EitherOrBoth, Itertools};
 use std::{
     collections::{HashMap, HashSet},
@@ -56,7 +54,7 @@ pub struct MemberRules {
 }
 
 impl RewriteRules for MemberRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
                 "cube-scan",
@@ -442,7 +440,7 @@ impl MemberRules {
         name: &str,
         member_fn: impl Fn(&str) -> String,
         relation: Option<&'static str>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         vec![
             transforming_rewrite(
                 &format!("member-pushdown-replacer-column-{}", name),
@@ -477,7 +475,7 @@ impl MemberRules {
         ]
     }
 
-    fn member_pushdown_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn member_pushdown_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = Vec::new();
         let member_replacer_fn = |members| {
             member_pushdown_replacer(
@@ -931,10 +929,7 @@ impl MemberRules {
             ),
         ));
 
-        fn list_concat_terminal(
-            name: &str,
-            member_fn: String,
-        ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+        fn list_concat_terminal(name: &str, member_fn: String) -> CubeRewrite {
             rewrite(
                 &format!("list-concat-terminal-{}", name),
                 list_concat_pushdown_replacer(member_fn.to_string()),
@@ -1001,7 +996,7 @@ impl MemberRules {
     }
 
     pub fn measure_rewrites(
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
         pushdown_measure_rewrite: impl Fn(
             &'static str,
             String,
@@ -1010,7 +1005,7 @@ impl MemberRules {
             Option<&'static str>,
             Option<&'static str>,
             Option<&'static str>,
-        ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        ) -> CubeRewrite,
     ) {
         rules.push(pushdown_measure_rewrite(
             "member-pushdown-replacer-agg-fun",
@@ -1760,7 +1755,7 @@ impl MemberRules {
         distinct_var: Option<&'static str>,
         fun_var: Option<&'static str>,
         cast_data_type_var: Option<&'static str>,
-    ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    ) -> CubeRewrite {
         transforming_chain_rewrite(
             &format!("measure-{}", name),
             member_replacer("?aggr_expr", "?alias_to_cube", "?aliases"),
@@ -2761,7 +2756,7 @@ impl MemberRules {
         right_members_expr: String,
         left_members: &'static str,
         right_members: &'static str,
-    ) -> Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    ) -> CubeRewrite {
         transforming_rewrite(
             &format!("push-down-cross-join-to-cube-scan-{}", name),
             cross_join(

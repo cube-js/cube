@@ -1,21 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        analysis::OriginalExpr,
         column_name_to_member_vec, cube_scan, cube_scan_order, cube_scan_order_empty_tail,
         expr_column_name, order, order_replacer, referenced_columns, rewrite,
-        rewriter::{CubeEGraph, RewriteRules},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         sort, sort_exp, sort_exp_empty_tail, sort_expr, transforming_rewrite, LogicalPlanLanguage,
         OrderAsc, OrderMember, OrderReplacerColumnNameToMember, SortExprAsc,
     },
     var, var_iter,
 };
-use egg::{Rewrite, Subst};
+use egg::Subst;
 use std::ops::{Index, IndexMut};
 
 pub struct OrderRules {}
 
 impl RewriteRules for OrderRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             transforming_rewrite(
                 "push-down-sort",
