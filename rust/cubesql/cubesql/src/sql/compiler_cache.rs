@@ -2,11 +2,7 @@ use crate::{
     compile::{
         engine::CubeContext,
         qtrace::Qtrace,
-        rewrite::{
-            analysis::LogicalPlanAnalysis,
-            rewriter::{CubeEGraph, Rewriter},
-            LogicalPlanLanguage,
-        },
+        rewrite::rewriter::{CubeEGraph, CubeRewrite, Rewriter},
         DatabaseProtocol,
     },
     config::ConfigObj,
@@ -17,7 +13,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use datafusion::scalar::ScalarValue;
-use egg::Rewrite;
 use lru::LruCache;
 use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use uuid::Uuid;
@@ -29,7 +24,7 @@ pub trait CompilerCache: Send + Sync + Debug {
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
         eval_stable_functions: bool,
-    ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError>;
+    ) -> Result<Arc<Vec<CubeRewrite>>, CubeError>;
 
     async fn meta(
         &self,
@@ -64,8 +59,7 @@ pub struct CompilerCacheImpl {
 
 pub struct CompilerCacheEntry {
     meta_context: Arc<MetaContext>,
-    rewrite_rules:
-        RWLockAsync<HashMap<bool, Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
+    rewrite_rules: RWLockAsync<HashMap<bool, Arc<Vec<CubeRewrite>>>>,
     parameterized_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
     queries_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
 }
@@ -79,7 +73,7 @@ impl CompilerCache for CompilerCacheImpl {
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
         eval_stable_functions: bool,
-    ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError> {
+    ) -> Result<Arc<Vec<CubeRewrite>>, CubeError> {
         let cache_entry = self.get_cache_entry(ctx.clone(), protocol).await?;
 
         let rewrite_rules = {
