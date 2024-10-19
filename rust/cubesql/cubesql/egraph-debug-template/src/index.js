@@ -81,21 +81,31 @@ async function layout(
     });
     nodes = nodes.filter((n) => !isHiddenNode(showOnlySelected, navHistory, n));
     edges = edges.filter((e) => !isHiddenEdge(showOnlySelected, navHistory, e));
-    const groupNodes = nodes
-        .filter((node) => node.type === 'group')
-        .map((node) => ({ [node.id]: node }))
-        .reduce((acc, val) => ({ ...acc, ...val }), {});
-    nodes
-        .filter((node) => node.type !== 'group')
-        .forEach(
-            (node) =>
-                (groupNodes[node.parentNode] = {
-                    ...groupNodes[node.parentNode],
-                    children: (
-                        groupNodes[node.parentNode]?.children || []
-                    ).concat(node),
-                }),
-        );
+
+    const nodesMap = new Map(
+        nodes.map((node) => [
+            node.id,
+            {
+                node,
+                elkNode: {
+                    id: node.id,
+                    width: node.width ?? undefined,
+                    height: node.height ?? undefined,
+                    children: [],
+                },
+            },
+        ]),
+    );
+
+    for (const { node, elkNode } of nodesMap.values()) {
+        if (node.type === 'group') {
+            continue;
+        }
+        if (node.parentNode === undefined) {
+            return;
+        }
+        nodesMap.get(node.parentNode).elkNode.children.push(elkNode);
+    }
 
     // Primitive edges are deprecated in ELK, so we should use ElkExtendedEdge, that use arrays, essentially hyperedges
     const elkEdges = edges.map((edge) => ({
@@ -107,22 +117,27 @@ async function layout(
     const graph = {
         id: 'root',
         layoutOptions,
-        children: Object.keys(groupNodes).map((key) => groupNodes[key]),
+        children: [...nodesMap.values()]
+            .filter(({ node }) => node.type === 'group')
+            .map(({ elkNode }) => elkNode),
         edges: elkEdges,
     };
 
-    function elk2flow(node, flattenChildren) {
-        node.position = { x: node.x, y: node.y };
+    function elk2flow(elkNode, flatChildren) {
+        const node = nodesMap.get(elkNode.id).node;
+
+        node.position = { x: elkNode.x, y: elkNode.y };
         node.style = {
             ...node.style,
-            width: node.width,
-            height: node.height,
+            width: elkNode.width,
+            height: elkNode.height,
         };
-        flattenChildren.push(node);
-        (node.children ?? []).forEach((child) => {
-            elk2flow(child, flattenChildren);
+        node.width = elkNode.width;
+        node.height = elkNode.height;
+        flatChildren.push(node);
+        (elkNode.children ?? []).forEach((child) => {
+            elk2flow(child, flatChildren);
         });
-        delete node.children;
     }
 
     const elk = new ELK();
@@ -130,13 +145,13 @@ async function layout(
 
     // By mutating the children in-place we saves ourselves from creating a
     // needless copy of the nodes array.
-    const flattenChildren = [];
+    const flatChildren = [];
 
-    children.forEach((node) => {
-        elk2flow(node, flattenChildren);
+    children.forEach((elkNode) => {
+        elk2flow(elkNode, flatChildren);
     });
 
-    setNodes(flattenChildren);
+    setNodes(flatChildren);
     setEdges(edges);
     window.requestAnimationFrame(() => {
         if (navHistory?.length) {
@@ -147,7 +162,7 @@ async function layout(
             fitView();
         }
     });
-    return flattenChildren;
+    return flatChildren;
 }
 
 const highlightColor = 'rgba(170,255,170,0.71)';
