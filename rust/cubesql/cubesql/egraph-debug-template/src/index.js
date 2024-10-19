@@ -111,6 +111,23 @@ function layout(
         edges: elkEdges,
     };
 
+    function elk2flow(node, flattenChildren, withStyle) {
+        node.position = { x: node.x, y: node.y };
+        if (withStyle) {
+            node.style = {
+                ...node.style,
+                width: node.width,
+                height: node.height,
+            };
+        }
+        flattenChildren.push(node);
+        (node.children ?? []).forEach((child) => {
+            // only depth 0 get styles
+            elk2flow(child, flattenChildren, false);
+        });
+        delete node.children;
+    }
+
     const elk = new ELK();
     return elk.layout(graph).then(({ children }) => {
         // By mutating the children in-place we saves ourselves from creating a
@@ -118,18 +135,7 @@ function layout(
         const flattenChildren = [];
 
         children.forEach((node) => {
-            node.position = { x: node.x, y: node.y };
-            node.style = {
-                ...node.style,
-                width: node.width,
-                height: node.height,
-            };
-            flattenChildren.push(node);
-            node.children.forEach((child) => {
-                child.position = { x: child.x, y: child.y };
-                flattenChildren.push(child);
-            });
-            delete node.children;
+            elk2flow(node, flattenChildren, true);
         });
 
         setNodes(flattenChildren);
