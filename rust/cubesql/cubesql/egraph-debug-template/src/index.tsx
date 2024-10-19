@@ -1,5 +1,5 @@
 import { createRoot } from 'react-dom/client';
-import ELK from 'elkjs/lib/elk.bundled.js';
+import ELK from 'elkjs';
 import type { ElkNode, LayoutOptions } from 'elkjs';
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import ReactFlow, {
@@ -96,6 +96,18 @@ const initialNodes = data.combos
     .map(toGroupNode)
     .concat(data.nodes.map(toRegularNode));
 const initialEdges = data.edges.map(toEdge);
+
+const elk = new ELK({
+    workerFactory: function (_url) {
+        // TODO something is broken with bundling and web-worker
+        return new Worker(
+            new URL(
+                '../node_modules/elkjs/lib/elk-worker.min.js',
+                import.meta.url,
+            ),
+        );
+    },
+});
 
 async function layout(
     options: LayoutOptions,
@@ -200,7 +212,8 @@ async function layout(
         });
     }
 
-    const elk = new ELK();
+    // TODO add throbber while waiting for layout
+    // TODO add queue to be able to cancel request before sending it to worker
     const { children } = await elk.layout(graph);
 
     if (abortSignal.aborted) {
