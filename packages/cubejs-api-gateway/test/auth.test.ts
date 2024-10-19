@@ -299,6 +299,45 @@ describe('test authorization', () => {
     expectSecurityContext(handlerMock.mock.calls[0][0].context.authInfo);
   });
 
+  test('custom checkAuth with CubejsHandlerError fail in playground', async () => {
+    const loggerMock = jest.fn(() => {
+      //
+    });
+
+    const expectSecurityContext = (securityContext) => {
+      expect(securityContext.uid).toEqual(5);
+      expect(securityContext.iat).toBeDefined();
+      expect(securityContext.exp).toBeDefined();
+    };
+
+    const handlerMock = jest.fn((req, res) => {
+      expectSecurityContext(req.context.securityContext);
+      expectSecurityContext(req.context.authInfo);
+
+      res.status(200).end();
+    });
+
+    const playgroundAuthSecret = 'playgroundSecret';
+
+    const token = generateAuthToken({ uid: 5, }, {});
+
+    const { app } = createApiGateway(handlerMock, loggerMock, {
+      playgroundAuthSecret,
+      checkAuth: async (req: Request, auth?: string) => {
+        throw new CubejsHandlerError(409, 'Error', 'Custom error');
+      }
+    });
+
+    const res = await request(app)
+      .get('/test-auth-fake')
+      .set('Authorization', `Authorization: ${token}`)
+      .expect(409);
+
+    expect(res.body).toMatchObject({
+      error: 'Custom error'
+    });
+  });
+
   test('custom checkAuth with deprecated authInfo', async () => {
     const loggerMock = jest.fn(() => {
       //
