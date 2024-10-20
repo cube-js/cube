@@ -1,11 +1,11 @@
-use super::MultiStageApplyedState;
+use super::MultiStageAppliedState;
 use crate::planner::sql_evaluator::EvaluationNode;
 use std::fmt::Debug;
 use std::rc::Rc;
 
 pub struct MultiStageQueryDescription {
     member_node: Rc<EvaluationNode>,
-    state: Rc<MultiStageApplyedState>,
+    state: Rc<MultiStageAppliedState>,
     input: Vec<Rc<MultiStageQueryDescription>>,
     alias: String,
 }
@@ -27,7 +27,7 @@ impl Debug for MultiStageQueryDescription {
 impl MultiStageQueryDescription {
     pub fn new(
         member_node: Rc<EvaluationNode>,
-        state: Rc<MultiStageApplyedState>,
+        state: Rc<MultiStageAppliedState>,
         input: Vec<Rc<MultiStageQueryDescription>>,
         alias: String,
     ) -> Rc<Self> {
@@ -43,7 +43,7 @@ impl MultiStageQueryDescription {
         &self.member_node
     }
 
-    pub fn state(&self) -> Rc<MultiStageApplyedState> {
+    pub fn state(&self) -> Rc<MultiStageAppliedState> {
         self.state.clone()
     }
 
@@ -66,7 +66,7 @@ impl MultiStageQueryDescription {
     pub fn is_match_member_and_state(
         &self,
         member_node: &Rc<EvaluationNode>,
-        state: &Rc<MultiStageApplyedState>,
+        state: &Rc<MultiStageAppliedState>,
     ) -> bool {
         member_node.full_name() == self.member_name() && state == &self.state
     }

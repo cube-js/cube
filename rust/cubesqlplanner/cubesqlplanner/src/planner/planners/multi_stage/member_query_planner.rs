@@ -72,14 +72,15 @@ impl MultiStageMemberQueryPlanner {
 
         let references = BaseMemberHelper::to_reference_map(&self.all_input_members()?);
 
-        let partition = self.member_partition(query_member.reduce_by(), query_member.group_by());
+        let partition_by =
+            self.member_partition_by(query_member.reduce_by(), query_member.group_by());
 
         let context_factory = SqlNodesFactory::new();
 
         let node_context = if query_member.measure_type() == "rank" {
-            context_factory.multi_stage_rank_node_processor(partition, references)
-        } else if !query_member.is_calculated() && partition != dimensions_aliases {
-            context_factory.multi_stage_window_node_processor(partition, references)
+            context_factory.multi_stage_rank_node_processor(partition_by, references)
+        } else if !query_member.is_calculated() && partition_by != dimensions_aliases {
+            context_factory.multi_stage_window_node_processor(partition_by, references)
         } else {
             context_factory.with_render_references_default_node_processor(references)
         };
@@ -310,7 +311,7 @@ impl MultiStageMemberQueryPlanner {
         )
     }
 
-    fn member_partition(
+    fn member_partition_by(
         &self,
         reduce_by: &Option<Vec<String>>,
         group_by: &Option<Vec<String>>,

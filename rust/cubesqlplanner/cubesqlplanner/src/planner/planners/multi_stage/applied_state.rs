@@ -7,13 +7,13 @@ use std::fmt::Debug;
 use std::rc::Rc;
 
 #[derive(Clone)]
-pub struct MultiStageApplyedState {
+pub struct MultiStageAppliedState {
     dimensions: Vec<Rc<BaseDimension>>,
     allowed_filter_members: HashSet<String>,
     time_shifts: HashMap<String, String>,
 }
 
-impl MultiStageApplyedState {
+impl MultiStageAppliedState {
     pub fn new(
         dimensions: Vec<Rc<BaseDimension>>,
         allowed_filter_members: HashSet<String>,
@@ -71,7 +71,7 @@ impl MultiStageApplyedState {
     }
 }
 
-impl PartialEq for MultiStageApplyedState {
+impl PartialEq for MultiStageAppliedState {
     fn eq(&self, other: &Self) -> bool {
         let dims_eq = if !self.dimensions.len() == other.dimensions.len() {
             false
@@ -87,9 +87,9 @@ impl PartialEq for MultiStageApplyedState {
     }
 }
 
-impl Debug for MultiStageApplyedState {
+impl Debug for MultiStageAppliedState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MultiStageApplyedState")
+        f.debug_struct("MultiStageAppliedState")
             .field(
                 "dimensions",
                 &self

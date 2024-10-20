@@ -72,7 +72,7 @@ impl SqlNodesFactory {
         let measure_filter_processor = MeasureFilterSqlNode::new(auto_prefix_processor.clone());
         let final_measure_processor = FinalMeasureSqlNode::new(measure_filter_processor.clone());
 
-        let rank_processor = MultiStageWindowNode::new(
+        let window_processor = MultiStageWindowNode::new(
             evaluate_sql_processor.clone(),
             final_measure_processor.clone(),
             partition,
@@ -80,7 +80,7 @@ impl SqlNodesFactory {
 
         let root_processor = RootSqlNode::new(
             self.dimension_processor(auto_prefix_processor.clone()),
-            rank_processor.clone(),
+            window_processor.clone(),
             auto_prefix_processor.clone(),
             evaluate_sql_processor.clone(),
         );

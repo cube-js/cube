@@ -1,5 +1,5 @@
 use super::multi_stage::MultiStageMemberQueryPlanner;
-use super::multi_stage::{MultiStageApplyedState, MultiStageQueryDescription};
+use super::multi_stage::{MultiStageAppliedState, MultiStageQueryDescription};
 use crate::plan::{Expr, From, Select, Subquery};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
@@ -41,7 +41,7 @@ impl MultiStageQueryPlanner {
         }
         let mut descriptions = Vec::new();
         let all_filter_members = self.query_properties.all_filtered_members();
-        let state = MultiStageApplyedState::new(
+        let state = MultiStageAppliedState::new(
             self.query_properties.dimensions().clone(),
             all_filter_members,
         );
@@ -93,7 +93,7 @@ impl MultiStageQueryPlanner {
     fn make_queries_descriptions(
         &self,
         member: Rc<EvaluationNode>,
-        state: Rc<MultiStageApplyedState>,
+        state: Rc<MultiStageAppliedState>,
         descriptions: &mut Vec<Rc<MultiStageQueryDescription>>,
     ) -> Result<Rc<MultiStageQueryDescription>, CubeError> {
         let member_name = member.full_name();

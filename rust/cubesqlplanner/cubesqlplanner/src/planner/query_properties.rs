@@ -108,7 +108,7 @@ impl QueryProperties {
         let all_join_hints = evaluator_compiler.join_hints()?;
         let join = query_tools.join_graph().build_join(all_join_hints)?;
         query_tools.cached_data_mut().set_join(join);
-        //FIXME may be this filter should be applyed on other place
+        //FIXME may be this filter should be applied on other place
         let time_dimensions = time_dimensions
             .into_iter()
             .filter(|dim| dim.has_granularity())
