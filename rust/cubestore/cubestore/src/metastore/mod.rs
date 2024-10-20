@@ -6274,8 +6274,8 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(tables.len(), 0);
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
         }
     }
 

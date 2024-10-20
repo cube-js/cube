@@ -1,4 +1,6 @@
-use super::{EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor};
+use crate::planner::sql_evaluator::{
+    EvaluationNode, MemberSymbol, MemberSymbolType, TraversalVisitor,
+};
 use cubenativeutils::CubeError;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -23,11 +25,15 @@ impl TraversalVisitor for JoinHintsCollector {
     fn on_node_traverse(&mut self, node: &Rc<EvaluationNode>) -> Result<bool, CubeError> {
         let res = match node.symbol() {
             MemberSymbolType::Dimension(e) => {
-                self.hints.insert(e.cube_name().clone());
+                if e.owned_by_cube() {
+                    self.hints.insert(e.cube_name().clone());
+                }
                 true
             }
             MemberSymbolType::Measure(e) => {
-                self.hints.insert(e.cube_name().clone());
+                if e.owned_by_cube() {
+                    self.hints.insert(e.cube_name().clone());
+                }
                 true
             }
             MemberSymbolType::CubeName(e) => {

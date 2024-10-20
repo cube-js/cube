@@ -12,6 +12,7 @@ pub mod join_item_definition;
 pub mod measure_definition;
 pub mod measure_filter;
 pub mod member_definition;
+pub mod member_order_by;
 pub mod memeber_sql;
 pub mod security_context;
 pub mod sql_templates_render;
