@@ -74,66 +74,76 @@ pub struct DebugData {
     #[serde(rename = "removedCombos")]
     removed_combos: Vec<DebugCombo>,
     #[serde(rename = "appliedRules")]
-    applied_rules: Option<Vec<String>>,
+    applied_rules: Vec<String>,
 }
 
-impl DebugData {
-    pub fn prepare(graph: &CubeEGraph) -> DebugData {
-        DebugData {
-            applied_rules: None,
-            nodes: graph
-                .classes()
-                .flat_map(|class| {
-                    let mut result = class
-                        .nodes
-                        .iter()
-                        .map(|n| {
-                            let node_id = format!("{}-{:?}", class.id, n);
-                            DebugNode {
-                                id: node_id.to_string(),
-                                label: format!("{:?}", n),
-                                combo_id: format!("c{}", class.id),
-                            }
-                        })
-                        .collect::<Vec<_>>();
-                    result.push(DebugNode {
-                        id: class.id.to_string(),
-                        label: class.id.to_string(),
-                        combo_id: format!("c{}", class.id),
-                    });
-                    result
-                })
-                .collect(),
-            edges: graph
-                .classes()
-                .flat_map(|class| {
-                    class
-                        .nodes
-                        .iter()
-                        .map(|n| DebugEdge {
-                            source: class.id.to_string(),
-                            target: format!("{}-{:?}", class.id, n,),
-                        })
-                        .chain(class.nodes.iter().flat_map(|n| {
-                            n.children().iter().map(move |c| DebugEdge {
-                                source: format!("{}-{:?}", class.id, n),
-                                target: c.to_string(),
-                            })
-                        }))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
-            combos: graph
-                .classes()
-                .map(|class| DebugCombo {
-                    id: format!("c{}", class.id),
-                    label: format!("#{}", class.id),
-                })
-                .collect(),
-            removed_nodes: Vec::new(),
-            removed_edges: Vec::new(),
-            removed_combos: Vec::new(),
-        }
+#[derive(Clone)]
+struct DebugENodeId(String);
+
+impl DebugENodeId {
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
+
+impl From<&LogicalPlanLanguage> for DebugENodeId {
+    fn from(value: &LogicalPlanLanguage) -> Self {
+        Self(format!("{value:?}"))
+    }
+}
+
+#[derive(Clone)]
+pub struct EClassDebugData {
+    id: Id,
+    #[allow(dead_code)]
+    canon: Id,
+}
+
+#[derive(Clone)]
+pub struct ENodeDebugData {
+    enode: DebugENodeId,
+    eclass: Id,
+    children: Vec<Id>,
+}
+
+/// Representation is optimised for storing in JSON, to transfer to UI
+#[derive(Clone)]
+pub struct EGraphDebugState {
+    eclasses: Vec<EClassDebugData>,
+    enodes: Vec<ENodeDebugData>,
+}
+
+impl EGraphDebugState {
+    pub fn new(graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>) -> Self {
+        let current_eclasses = graph.classes().map(|ec| ec.id);
+        let previous_debug_eclasses = graph
+            .analysis
+            .debug_states
+            .iter()
+            .flat_map(|state| state.eclasses.iter().map(|ecd| ecd.id));
+        let all_known_eclasses = current_eclasses.chain(previous_debug_eclasses);
+
+        let all_known_eclasses = all_known_eclasses.collect::<HashSet<_>>();
+
+        let eclasses = all_known_eclasses
+            .into_iter()
+            .map(|ec| EClassDebugData {
+                id: ec,
+                canon: graph.find(ec),
+            })
+            .collect::<Vec<_>>();
+
+        let enodes = graph
+            .classes()
+            .flat_map(|ec| ec.nodes.iter().map(move |node| (ec.id, node)))
+            .map(|(ec, node)| ENodeDebugData {
+                enode: node.into(),
+                eclass: ec,
+                children: node.children().to_vec(),
+            })
+            .collect();
+
+        EGraphDebugState { eclasses, enodes }
     }
 }
 
@@ -191,7 +201,7 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
     )?;
 
     let mut states = Vec::new();
-    let mut last_debug_data: Option<DebugData> = None;
+    let mut previous_debug_data: Option<(Vec<DebugNode>, Vec<DebugEdge>, Vec<DebugCombo>)> = None;
 
     let debug_data = runner.egraph.analysis.debug_states.as_slice();
     debug_assert_eq!(debug_data.len(), runner.iterations.len() + 1);
@@ -204,47 +214,95 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         .zip(runner.iterations.iter().map(|i| Some(&i.applied)));
     let states_data = std::iter::once((&debug_data[0], None)).chain(states_data);
 
+    // TODO move this even later, to UI side
     for (debug_data, applied) in states_data {
-        let mut debug_data = debug_data.clone();
-        let debug_data_clone = debug_data.clone();
+        let mut nodes = debug_data
+            .enodes
+            .iter()
+            .map(|node| {
+                let node_id = format!("{}-{}", node.eclass, node.enode.as_str());
+                DebugNode {
+                    id: node_id,
+                    label: node.enode.0.clone(),
+                    combo_id: format!("c{}", node.eclass),
+                }
+            })
+            .chain(debug_data.eclasses.iter().map(|eclass| DebugNode {
+                id: eclass.id.to_string(),
+                label: eclass.id.to_string(),
+                combo_id: format!("c{}", eclass.id),
+            }))
+            .collect::<Vec<_>>();
 
-        if let Some(last) = last_debug_data {
-            debug_data
-                .nodes
-                .retain(|n| !last.nodes.iter().any(|ln| ln.id == n.id));
-            debug_data.edges.retain(|n| {
-                !last
-                    .edges
+        let mut edges = debug_data
+            .enodes
+            .iter()
+            .flat_map(|node| {
+                std::iter::once(DebugEdge {
+                    source: node.eclass.to_string(),
+                    target: format!("{}-{}", node.eclass, node.enode.as_str()),
+                })
+                .chain(node.children.iter().map(move |child| DebugEdge {
+                    source: format!("{}-{}", node.eclass, node.enode.as_str()),
+                    target: child.to_string(),
+                }))
+            })
+            .collect::<Vec<_>>();
+
+        let mut combos = debug_data
+            .eclasses
+            .iter()
+            .map(|eclass| DebugCombo {
+                id: format!("c{}", eclass.id),
+                label: format!("#{}", eclass.id),
+            })
+            .collect::<Vec<_>>();
+
+        let nodes_clone = nodes.clone();
+        let edges_clone = edges.clone();
+        let combos_clone = combos.clone();
+
+        let mut removed_nodes = vec![];
+        let mut removed_edges = vec![];
+        let mut removed_combos = vec![];
+
+        if let Some((prev_nodes, prev_edges, prev_combos)) = previous_debug_data {
+            nodes.retain(|n| !prev_nodes.iter().any(|ln| ln.id == n.id));
+            edges.retain(|n| {
+                !prev_edges
                     .iter()
                     .any(|ln| ln.source == n.source && ln.target == n.target)
             });
-            debug_data
-                .combos
-                .retain(|n| !last.combos.iter().any(|ln| ln.id == n.id));
+            combos.retain(|n| !prev_combos.iter().any(|ln| ln.id == n.id));
 
-            debug_data.removed_nodes = last.nodes.clone();
-            debug_data
-                .removed_nodes
-                .retain(|n| !debug_data_clone.nodes.iter().any(|ln| ln.id == n.id));
-            debug_data.removed_edges = last.edges.clone();
-            debug_data.removed_edges.retain(|n| {
-                !debug_data_clone
-                    .edges
+            removed_nodes = prev_nodes.clone();
+            removed_nodes.retain(|n| !nodes_clone.iter().any(|ln| ln.id == n.id));
+            removed_edges = prev_edges.clone();
+            removed_edges.retain(|n| {
+                !edges_clone
                     .iter()
                     .any(|ln| ln.source == n.source && ln.target == n.target)
             });
-            debug_data.removed_combos = last.combos.clone();
-            debug_data
-                .removed_combos
-                .retain(|n| !debug_data_clone.combos.iter().any(|ln| ln.id == n.id));
+            removed_combos = prev_combos.clone();
+            removed_combos.retain(|n| !combos_clone.iter().any(|ln| ln.id == n.id));
         }
-        debug_data.applied_rules = Some(
-            applied
-                .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
-                .unwrap_or(vec![]),
-        );
-        states.push(debug_data);
-        last_debug_data = Some(debug_data_clone);
+
+        let applied_rules = applied
+            .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
+            .unwrap_or(vec![]);
+
+        let debug_data = DebugData {
+            nodes,
+            edges,
+            combos,
+            removed_nodes,
+            removed_edges,
+            removed_combos,
+            applied_rules,
+        };
+
+        states.push(debug_data.clone());
+        previous_debug_data = Some((nodes_clone, edges_clone, combos_clone));
     }
     fs::write(
         format!("{}/src/states.json", dir),
