@@ -47,7 +47,7 @@ const toEdge = (n) => ({
     style:
         n.source.indexOf(`${n.target}-`) === 0
             ? { stroke: '#f00', strokeWidth: 10 }
-            : undefined,
+            : {},
 });
 const initialNodes = data.combos
     .map(toGroupNode)
