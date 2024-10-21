@@ -480,17 +480,6 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Flag to disable driver's test connection probes
-   */
-  dbDisableTestConnection: ({
-    dataSource
-  }: {
-    dataSource: string,
-  }) => (
-    !!process.env[keyByDataSource('CUBEJS_DB_DISABLE_TEST_CONNECTION', dataSource)]
-  ),
-
-  /**
    * Database max pool size.
    */
   dbMaxPoolSize: ({
