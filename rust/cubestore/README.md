@@ -132,6 +132,59 @@ CUBEJS_EXT_DB_TYPE=cubestore
 CUBEJS_EXT_DB_HOST=cubestore
 ```
 
+### Configuration
+
+Cubestore can be configured via next (hopefuly self-explanatory) environment variables:
+
+* `CUBESTORE_BIND_ADDR` - bind address, default `0.0.0.0:3306`
+* `CUBESTORE_PORT` - port, default `3306`
+* `CUBESTORE_STATUS_BIND_ADDR` - status probe bind address, default `0.0.0.0:3031`
+* `CUBESTORE_HTTP_BIND_ADDR` - HTTP API bind address, default `0.0.0.0:3030`
+* `CUBESTORE_STALE_STREAM_TIMEOUT` - stale stream timeout, default `600s`
+* `CUBESTORE_WORKERS` - number of workers
+* `CUBESTORE_WORKER_BIND_ADDR` - worker bind address, default `0.0.0.0:<CUBESTORE_WORKER_PORT>`
+* `CUBESTORE_WORKER_PORT` - worker port
+* `CUBESTORE_META_BIND_ADDR` - metastore bind address, default `0.0.0.0:<CUBESTORE_META_PORT>
+* `CUBESTORE_META_ADDR` - remote metastore address
+* `CUBESTORE_META_PORT` - remote metastore port
+* `CUBESTORE_SERVER_NAME` - server name, default `localhost`
+* `CUBESTORE_LONG_TERM_JOB_RUNNERS` - count of job runners, default `32`
+* `CUBESTORE_NO_UPLOAD` - disable uploading, default `false`
+* `CUBESTORE_ENABLE_TOPK` - enable TOP K, default `true`
+* `CUBESTORE_METRICS_FORMAT` - metrics format, can be `statsd` or `dogstatsd`
+* `CUBESTORE_METRICS_ADDRESS` - metrics address, default `127.0.0.1`
+* `CUBESTORE_METRICS_PORT` - metrics port, default `8125`
+* `CUBESTORE_TELEMETRY` - enable telemetry, default `true`
+* `CUBESTORE_LOG_LEVEL` - log level, can be `error`, `warn`, `info`, `debug`, `trace`, default `info`
+* `CUBESTORE_EVENT_LOOP_WORKER_THREADS` - number of event loop worker threads
+* `CUBESTORE_SELECT_WORKER_TITLE` - worker process title, default `--sel-worker`
+* `CUBESTORE_LOG_CONTEXT` - context string to add to all logs, default `<empty>`
+* `CUBESTORE_DATA_DIR` - data directory, default `<current_dir>/.cubestore`
+* `CUBESTORE_DUMP_DIR` - dump directory
+* `CUBESTORE_PARTITION_SPLIT_THRESHOLD` - partition split threshold, default `2 097 152`
+* `CUBESTORE_AGENT_ENDPOINT_URL` - agent endpoint url
+
+* Storage configuration:
+  * `CUBESTORE_REMOTE_DIR` - remote directory local path
+  * `CUBESTORE_S3_BUCKET` - AWS S3 bucket name
+  * `CUBESTORE_S3_REGION` - AWS S3 region
+  * `CUBESTORE_S3_SUB_PATH` - AWS S3 sub path
+  * `CUBESTORE_AWS_ACCESS_KEY_ID` - AWS access key id
+  * `CUBESTORE_AWS_SECRET_ACCESS_KEY` - AWS secret access key
+  * `CUBESTORE_AWS_CREDS_REFRESH_EVERY_MINS` - AWS credentials refresh interval in minutes
+  * `CUBESTORE_MINIO_BUCKET` - MinIO bucket name
+  * `CUBESTORE_MINIO_SUB_PATH` - MinIO sub path
+  * `CUBESTORE_MINIO_ACCESS_KEY_ID` - MinIO access key id
+  * `CUBESTORE_MINIO_SECRET_ACCESS_KEY` - MinIO secret access key
+  * `CUBESTORE_MINIO_SERVER_ENDPOINT` - MinIO server endpoint
+  * `CUBESTORE_MINIO_REGION` - MinIO region
+  * `CUBESTORE_MINIO_CREDS_REFRESH_EVERY_MINS` - MinIO credentials refresh interval in minutes
+  * `CUBESTORE_GCS_BUCKET` - GCS bucket name
+  * `CUBESTORE_GCS_SUB_PATH` - GCS sub path
+  * `CUBESTORE_GCP_CREDENTIALS` - GCP credentials
+  * `CUBESTORE_GCP_KEY_FILE` - GCP key file path
+
+
 ## Build
 
 ```bash
