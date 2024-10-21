@@ -2,8 +2,8 @@ use crate::{
     compile::rewrite::{
         alias_expr, analysis::LogicalPlanAnalysis, column_expr,
         converter::LogicalPlanToLanguageConverter, flatten_pushdown_replacer, literal_expr,
-        rewrite, rules::flatten::FlattenRules, transforming_rewrite, AliasExprAlias,
-        ColumnExprColumn, FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
+        rewrite, rewriter::CubeEGraph, rules::flatten::FlattenRules, transforming_rewrite,
+        AliasExprAlias, ColumnExprColumn, FlattenPushdownReplacerTopLevel, LogicalPlanLanguage,
     },
     var, var_iter, CubeError,
 };
@@ -51,8 +51,7 @@ impl FlattenRules {
         _inner_alias_var: &str,
         column_alias_var: &str,
         out_expr_var: &str,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut egg::Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, &mut egg::Subst) -> bool {
         let column_var = var!(column_var);
         let top_level_var = var!(top_level_var);
         let inner_expr_var = var!(inner_expr_var);
