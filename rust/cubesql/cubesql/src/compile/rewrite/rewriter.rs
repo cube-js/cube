@@ -32,6 +32,8 @@ use std::{
     time::Duration,
 };
 
+pub type CubeEGraph = EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>;
+
 pub struct Rewriter {
     graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
     cube_context: Arc<CubeContext>,
