@@ -192,6 +192,10 @@ export type QueryTablesResult = { schema_name: string, table_name: string };
 // eslint-disable-next-line camelcase
 export type QueryColumnsResult = { schema_name: string, table_name: string } & TableColumnQueryResult;
 
+export type SchemaTableColumn = { name: string, type: string, attributes: string[] };
+
+export type TablesSchema = Record<string, Record<string, SchemaTableColumn[]>>;
+
 export type PrimaryKeysQueryResult = {
   // eslint-disable-next-line camelcase
   table_schema: string

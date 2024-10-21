@@ -50,6 +50,7 @@ import {
   QueryTablesResult,
   QueryColumnsResult,
   TableMemoryData,
+  TablesSchema,
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
 } from './driver.interface';
@@ -409,28 +410,28 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result: any, i: any) {
+  protected informationColumnsSchemaReducer(result: any, i: any): TablesSchema {
     let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+    const columns = (schema[i.table_name] || []);
 
-    tables.push({
+    columns.push({
       name: i.column_name,
       type: i.data_type,
       attributes: i.key_type ? ['primaryKey'] : []
     });
 
-    tables.sort();
-    schema[i.table_name] = tables;
+    columns.sort();
+    schema[i.table_name] = columns;
     schema = sortByKeys(schema);
     result[i.table_schema] = schema;
 
     return sortByKeys(result);
   }
 
-  public tablesSchema(): Promise<any> {
+  public tablesSchema(): Promise<TablesSchema> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query, []).then(data => data.reduce(this.informationColumnsSchemaReducer, {}));
+    return this.query(query, []).then(data => data.reduce<TablesSchema>(this.informationColumnsSchemaReducer, {}));
   }
 
   // Extended version of tablesSchema containing primary and foreign keys
