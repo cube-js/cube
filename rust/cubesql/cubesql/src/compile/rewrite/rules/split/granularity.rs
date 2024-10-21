@@ -1,22 +1,19 @@
 use crate::{
     compile::rewrite::{
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         binary_expr, cast_expr, cast_expr_explicit, column_expr, literal_expr, literal_float,
         literal_int, literal_string,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::split::SplitRules,
-        udf_expr, LogicalPlanLanguage,
+        udf_expr,
     },
     var,
 };
 use datafusion::{arrow::datatypes::DataType as ArrowDataType, scalar::ScalarValue};
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn granularity_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn granularity_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // CAST(CAST(((((EXTRACT(YEAR FROM "ta_1"."LO_COMMITDATE") * 100) + 1) * 100) + 1) AS varchar) AS date)
         self.single_arg_split_point_rules(
             "thoughtspot-year",
@@ -666,15 +663,8 @@ impl SplitRules {
         &self,
         day_interval_var: &str,
         neg_day_interval_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone
-           + 'static {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
         let day_interval = var!(day_interval_var);
         let neg_day_interval = var!(neg_day_interval_var);
         move |_, egraph, subst| {

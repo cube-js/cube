@@ -1,21 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, literal_expr, rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, LiteralExprValue,
-        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 
-use crate::compile::rewrite::rules::utils::{DecomposedDayTime, DecomposedMonthDayNano};
+use crate::compile::rewrite::{
+    rewriter::{CubeEGraph, CubeRewrite},
+    rules::utils::{DecomposedDayTime, DecomposedMonthDayNano},
+};
 use datafusion::scalar::ScalarValue;
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn literal_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn literal_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-push-down-literal",
@@ -60,7 +60,7 @@ impl WrapperRules {
         &self,
         alias_to_cube_var: &str,
         value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let meta = self.meta_context.clone();
@@ -100,7 +100,7 @@ impl WrapperRules {
         alias_to_cube_var: &str,
         value_var: &str,
         new_value_var: &str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);

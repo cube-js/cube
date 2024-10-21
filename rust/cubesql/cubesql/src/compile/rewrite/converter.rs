@@ -1,3 +1,4 @@
+pub use super::rewriter::CubeRunner;
 use crate::{
     compile::{
         engine::df::{
@@ -5,7 +6,9 @@ use crate::{
             wrapper::CubeScanWrapperNode,
         },
         rewrite::{
-            analysis::LogicalPlanAnalysis, extract_exprlist_from_groupping_set, rewriter::Rewriter,
+            analysis::LogicalPlanAnalysis,
+            extract_exprlist_from_groupping_set,
+            rewriter::{CubeEGraph, Rewriter},
             AggregateFunctionExprDistinct, AggregateFunctionExprFun, AggregateSplit,
             AggregateUDFExprFun, AliasExprAlias, AnyExprAll, AnyExprOp, BetweenExprNegated,
             BinaryExprOp, CastExprDataType, ChangeUserMemberValue, ColumnExprColumn,
@@ -52,7 +55,7 @@ use datafusion::{
     scalar::ScalarValue,
     sql::planner::ContextProvider,
 };
-use egg::{EGraph, Id, RecExpr};
+use egg::{Id, RecExpr};
 use itertools::Itertools;
 use serde_json::json;
 use std::{
@@ -61,8 +64,6 @@ use std::{
     ops::Index,
     sync::{Arc, LazyLock},
 };
-
-pub use super::rewriter::CubeRunner;
 
 macro_rules! add_data_node {
     ($converter:expr, $value_expr:expr, $field_variant:ident) => {
@@ -125,10 +126,7 @@ macro_rules! add_binary_expr_list_node {
                 $flat_list
             )
         } else {
-            fn to_binary_tree(
-                graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                list: &[Id],
-            ) -> Id {
+            fn to_binary_tree(graph: &mut CubeEGraph, list: &[Id]) -> Id {
                 if list.len() == 0 {
                     graph.add(LogicalPlanLanguage::$field_variant(Vec::new()))
                 } else if list.len() == 1 {
@@ -186,7 +184,7 @@ static EXCLUDED_PARAM_VALUES: LazyLock<HashSet<ScalarValue>> = LazyLock::new(|| 
 });
 
 pub struct LogicalPlanToLanguageConverter {
-    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    graph: CubeEGraph,
     cube_context: Arc<CubeContext>,
     flat_list: bool,
 }
@@ -199,28 +197,22 @@ pub struct LogicalPlanToLanguageContext {
 impl LogicalPlanToLanguageConverter {
     pub fn new(cube_context: Arc<CubeContext>, flat_list: bool) -> Self {
         Self {
-            graph: EGraph::<LogicalPlanLanguage, LogicalPlanAnalysis>::new(
-                LogicalPlanAnalysis::new(
-                    cube_context.clone(),
-                    Arc::new(DefaultPhysicalPlanner::default()),
-                ),
-            ),
+            graph: CubeEGraph::new(LogicalPlanAnalysis::new(
+                cube_context.clone(),
+                Arc::new(DefaultPhysicalPlanner::default()),
+            )),
             cube_context,
             flat_list,
         }
     }
 
-    pub fn add_expr(
-        graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        expr: &Expr,
-        flat_list: bool,
-    ) -> Result<Id, CubeError> {
+    pub fn add_expr(graph: &mut CubeEGraph, expr: &Expr, flat_list: bool) -> Result<Id, CubeError> {
         // TODO: reference self?
         Self::add_expr_replace_params(graph, expr, &mut None, flat_list)
     }
 
     pub fn add_expr_replace_params(
-        graph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        graph: &mut CubeEGraph,
         expr: &Expr,
         query_params: &mut Option<HashMap<usize, ScalarValue>>,
         flat_list: bool,
@@ -833,7 +825,7 @@ impl LogicalPlanToLanguageConverter {
         })
     }
 
-    pub fn take_egraph(self) -> EGraph<LogicalPlanLanguage, LogicalPlanAnalysis> {
+    pub fn take_egraph(self) -> CubeEGraph {
         self.graph
     }
 

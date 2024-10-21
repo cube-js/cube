@@ -1,4 +1,4 @@
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 use crate::{
     compile::rewrite::{
@@ -7,9 +7,10 @@ use crate::{
         case_expr_replacer, case_expr_var_arg, case_expr_when_then_expr,
         case_expr_when_then_expr_empty_tail, column_expr, group_aggregate_split_replacer,
         group_expr_split_replacer, inner_aggregate_split_replacer, is_not_null_expr, is_null_expr,
-        literal_expr, outer_aggregate_split_replacer, rewrite, rewriter::RewriteRules,
+        literal_expr, outer_aggregate_split_replacer, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         transforming_rewrite, CaseExprReplacerAliasToCube, InnerAggregateSplitReplacerAliasToCube,
-        LogicalPlanAnalysis, LogicalPlanLanguage,
+        LogicalPlanLanguage,
     },
     var, var_iter,
 };
@@ -17,7 +18,7 @@ use crate::{
 pub struct CaseRules {}
 
 impl RewriteRules for CaseRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             // Case replacer takes place of inner replacer
             transforming_rewrite(
@@ -172,7 +173,7 @@ impl CaseRules {
         &self,
         inner_alias_to_cube_var: &'static str,
         case_alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let inner_alias_to_cube_var = var!(inner_alias_to_cube_var);
         let case_alias_to_cube_var = var!(case_alias_to_cube_var);
         move |egraph, subst| {

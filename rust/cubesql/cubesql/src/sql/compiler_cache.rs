@@ -2,7 +2,7 @@ use crate::{
     compile::{
         engine::CubeContext,
         qtrace::Qtrace,
-        rewrite::{analysis::LogicalPlanAnalysis, rewriter::Rewriter, LogicalPlanLanguage},
+        rewrite::rewriter::{CubeEGraph, CubeRewrite, Rewriter},
         DatabaseProtocol,
     },
     config::ConfigObj,
@@ -13,7 +13,6 @@ use crate::{
 };
 use async_trait::async_trait;
 use datafusion::scalar::ScalarValue;
-use egg::{EGraph, Rewrite};
 use lru::LruCache;
 use std::{collections::HashMap, fmt::Debug, num::NonZeroUsize, sync::Arc};
 use uuid::Uuid;
@@ -25,7 +24,7 @@ pub trait CompilerCache: Send + Sync + Debug {
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
         eval_stable_functions: bool,
-    ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError>;
+    ) -> Result<Arc<Vec<CubeRewrite>>, CubeError>;
 
     async fn meta(
         &self,
@@ -37,18 +36,18 @@ pub trait CompilerCache: Send + Sync + Debug {
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        input_plan: CubeEGraph,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError>;
+    ) -> Result<CubeEGraph, CubeError>;
 
     async fn rewrite(
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        input_plan: CubeEGraph,
         param_values: &HashMap<usize, ScalarValue>,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError>;
+    ) -> Result<CubeEGraph, CubeError>;
 }
 
 #[derive(Debug)]
@@ -60,11 +59,9 @@ pub struct CompilerCacheImpl {
 
 pub struct CompilerCacheEntry {
     meta_context: Arc<MetaContext>,
-    rewrite_rules:
-        RWLockAsync<HashMap<bool, Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>>>,
-    parameterized_cache:
-        MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
-    queries_cache: MutexAsync<LruCache<[u8; 32], EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+    rewrite_rules: RWLockAsync<HashMap<bool, Arc<Vec<CubeRewrite>>>>,
+    parameterized_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
+    queries_cache: MutexAsync<LruCache<[u8; 32], CubeEGraph>>,
 }
 
 crate::di_service!(CompilerCacheImpl, [CompilerCache]);
@@ -76,7 +73,7 @@ impl CompilerCache for CompilerCacheImpl {
         ctx: AuthContextRef,
         protocol: DatabaseProtocol,
         eval_stable_functions: bool,
-    ) -> Result<Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>, CubeError> {
+    ) -> Result<Arc<Vec<CubeRewrite>>, CubeError> {
         let cache_entry = self.get_cache_entry(ctx.clone(), protocol).await?;
 
         let rewrite_rules = {
@@ -119,9 +116,9 @@ impl CompilerCache for CompilerCacheImpl {
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        parameterized_graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        parameterized_graph: CubeEGraph,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+    ) -> Result<CubeEGraph, CubeError> {
         let cache_entry = self
             .get_cache_entry(ctx.clone(), cube_context.session_state.protocol.clone())
             .await?;
@@ -145,10 +142,10 @@ impl CompilerCache for CompilerCacheImpl {
         &self,
         ctx: AuthContextRef,
         cube_context: Arc<CubeContext>,
-        input_plan: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        input_plan: CubeEGraph,
         param_values: &HashMap<usize, ScalarValue>,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+    ) -> Result<CubeEGraph, CubeError> {
         if !self.config_obj.enable_rewrite_cache() {
             let mut rewriter = Rewriter::new(input_plan, cube_context);
             rewriter.add_param_values(param_values)?;

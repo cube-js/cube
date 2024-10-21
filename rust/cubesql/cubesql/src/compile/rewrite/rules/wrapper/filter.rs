@@ -1,6 +1,8 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan_wrapper, filter, rules::wrapper::WrapperRules,
+        cube_scan_wrapper, filter,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
         subquery, transforming_rewrite, wrapped_select, wrapped_select_aggr_expr_empty_tail,
         wrapped_select_filter_expr, wrapped_select_filter_expr_empty_tail,
         wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
@@ -12,10 +14,10 @@ use crate::{
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst, Var};
+use egg::{Subst, Var};
 
 impl WrapperRules {
-    pub fn filter_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn filter_rules(&self, rules: &mut Vec<CubeRewrite>) {
         // TODO respect having filter for push down to wrapped select
         // rules.extend(vec![rewrite(
         //     "wrapper-push-down-filter-to-wrapped-select",
@@ -215,10 +217,7 @@ impl WrapperRules {
         );
     }
 
-    pub fn filter_rules_subquery(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn filter_rules_subquery(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-filter-and-subquery-to-cube-scan",
             filter(
@@ -331,7 +330,7 @@ impl WrapperRules {
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let ungrouped_var = var!(ungrouped_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
@@ -352,7 +351,7 @@ impl WrapperRules {
         ungrouped_var: &'static str,
         select_ungrouped_var: &'static str,
         select_ungrouped_scan_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let ungrouped_var = var!(ungrouped_var);
         let select_ungrouped_var = var!(select_ungrouped_var);
@@ -379,7 +378,7 @@ impl WrapperRules {
     }
 
     fn transform_filter_impl(
-        egraph: &mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &mut CubeEGraph,
         subst: &mut Subst,
         ungrouped_var: Var,
         select_ungrouped_var: Var,

@@ -1,14 +1,10 @@
 use std::{env, fs, sync::Arc};
 
-use super::rewrite::{
-    analysis::{LogicalPlanAnalysis, LogicalPlanData},
-    rewriter::IterInfo,
-    LogicalPlanLanguage,
-};
-use crate::compile::test::find_cube_scans_deep_search;
+use super::rewrite::{analysis::LogicalPlanData, rewriter::IterInfo, LogicalPlanLanguage};
+use crate::compile::{rewrite::rewriter::CubeEGraph, test::find_cube_scans_deep_search};
 use cubeclient::models::V1LoadRequestQuery;
 use datafusion::logical_plan::LogicalPlan;
-use egg::{EClass, EGraph, Iteration, Language};
+use egg::{EClass, Iteration, Language};
 use serde::Serialize;
 use sqlparser::ast::Statement;
 use uuid::Uuid;
@@ -82,10 +78,7 @@ impl Qtrace {
         self.statement(|stmt| stmt.set_optimized_plan(plan));
     }
 
-    pub fn set_original_graph(
-        &mut self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) {
+    pub fn set_original_graph(&mut self, egraph: &CubeEGraph) {
         self.statement(|stmt| stmt.set_original_graph(egraph));
     }
 
@@ -189,10 +182,7 @@ impl QtraceStatement {
         self.optimized_plan = Some(format!("{:?}", plan));
     }
 
-    pub fn set_original_graph(
-        &mut self,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) {
+    pub fn set_original_graph(&mut self, egraph: &CubeEGraph) {
         self.original_graph = egraph
             .classes()
             .map(|eclass| QtraceEclass::make(eclass))

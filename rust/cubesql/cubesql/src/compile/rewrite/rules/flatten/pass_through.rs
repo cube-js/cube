@@ -1,15 +1,11 @@
 use crate::compile::rewrite::{
-    agg_fun_expr, alias_expr, analysis::LogicalPlanAnalysis, binary_expr, cast_expr,
-    flatten_pushdown_replacer, fun_expr_var_arg, is_not_null_expr, is_null_expr, rewrite,
-    rules::flatten::FlattenRules, udf_expr_var_arg, LogicalPlanLanguage,
+    agg_fun_expr, alias_expr, binary_expr, cast_expr, flatten_pushdown_replacer, fun_expr_var_arg,
+    is_not_null_expr, is_null_expr, rewrite, rewriter::CubeRewrite, rules::flatten::FlattenRules,
+    udf_expr_var_arg,
 };
-use egg::Rewrite;
 
 impl FlattenRules {
-    pub fn pass_through_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn pass_through_rules(&self, rules: &mut Vec<CubeRewrite>) {
         self.single_arg_pass_through_rules("alias", |expr| alias_expr(expr, "?alias"), rules);
         self.single_arg_pass_through_rules("cast", |expr| cast_expr(expr, "?data_type"), rules);
         self.single_arg_pass_through_rules(
@@ -59,7 +55,7 @@ impl FlattenRules {
         &self,
         name: &str,
         node: impl Fn(String) -> String,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         rules.extend(vec![rewrite(
             &format!("flatten-{}-push-down", name),

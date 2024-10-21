@@ -1,8 +1,9 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis},
+        analysis::ConstantFolding,
         case_expr, cast_expr, column_expr, is_null_expr, literal_expr, literal_int,
+        rewriter::{CubeEGraph, CubeRewrite},
         rules::{members::MemberRules, split::SplitRules},
         AggregateFunctionExprDistinct, AggregateFunctionExprFun,
         AggregateSplitPushDownReplacerAliasToCube, ColumnExprColumn, LogicalPlanLanguage,
@@ -12,13 +13,9 @@ use crate::{
     var, var_iter,
 };
 use datafusion::{logical_plan::Column, physical_plan::aggregates::AggregateFunction};
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn aggregate_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         self.single_arg_split_point_rules_aggregate_function(
             "aggregate-function",
             || agg_fun_expr("?fun_name", vec![column_expr("?column")], "?distinct"),
@@ -211,25 +208,17 @@ impl SplitRules {
         inner_rule: impl Fn() -> String + Clone,
         outer_aggr_rule: impl Fn(String) -> String,
         outer_proj_rule: impl Fn(String) -> String,
-        transform_fn_aggr: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        transform_fn_aggr: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
             + 'static,
-        transform_fn_proj: impl Fn(
-                bool,
-                &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-                &mut egg::Subst,
-            ) -> bool
+        transform_fn_proj: impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool
             + Sync
             + Send
             + Clone
             + 'static,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
+        rules: &mut Vec<CubeRewrite>,
     ) {
         self.single_arg_split_point_rules_aggregate(
             name,
@@ -257,15 +246,8 @@ impl SplitRules {
         output_fun_var: Option<&str>,
         alias_to_cube_var: &str,
         should_match_agg_fun: bool,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone
-           + 'static {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
         let fun_name_var = fun_name_var.map(|fun_name_var| var!(fun_name_var));
         let column_var = column_var.map(|column_var| var!(column_var));
         let distinct_var = distinct_var.map(|distinct_var| var!(distinct_var));
@@ -367,15 +349,8 @@ impl SplitRules {
         fun_name_var: &str,
         distinct_var: &str,
         constant_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone
-           + 'static {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
         let fun_name_var = var!(fun_name_var);
         let distinct_var = var!(distinct_var);
         let constant_var = var!(constant_var);
@@ -407,15 +382,8 @@ impl SplitRules {
         &self,
         column_var: &str,
         alias_to_cube_var: &str,
-    ) -> impl Fn(
-        bool,
-        &mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        &mut egg::Subst,
-    ) -> bool
-           + Sync
-           + Send
-           + Clone
-           + 'static {
+    ) -> impl Fn(bool, &mut CubeEGraph, &mut egg::Subst) -> bool + Sync + Send + Clone + 'static
+    {
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta_context = self.meta_context.clone();
