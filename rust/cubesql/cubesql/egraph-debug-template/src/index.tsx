@@ -22,32 +22,53 @@ import { z } from 'zod';
 
 import statesData from './states.json';
 
-const InputNodeData = z.object({
-    id: z.string(),
-    label: z.string(),
-    comboId: z.string(),
-});
-type InputNodeData = z.infer<typeof InputNodeData>;
+type InputNodeData = {
+    id: string;
+    label: string;
+    comboId: string;
+};
 
-const InputEdgeData = z.object({
-    source: z.string(),
-    target: z.string(),
-});
-type InputEdgeData = z.infer<typeof InputEdgeData>;
+type InputEdgeData = {
+    source: string;
+    target: string;
+};
 
-const InputComboData = z.object({
-    id: z.string(),
-    label: z.string(),
+type InputComboData = {
+    id: string;
+    label: string;
+};
+
+const EClassDebugData = z.object({
+    id: z.number(),
+    canon: z.number(),
 });
-type InputComboData = z.infer<typeof InputComboData>;
+type EClassDebugData = z.infer<typeof EClassDebugData>;
+
+const ENodeDebugData = z.object({
+    enode: z.string(),
+    eclass: z.number(),
+    children: z.array(z.number()),
+});
+type ENodeDebugData = z.infer<typeof ENodeDebugData>;
+
+const EGraphDebugState = z.object({
+    eclasses: z.array(EClassDebugData),
+    enodes: z.array(ENodeDebugData),
+});
+type EGraphDebugState = z.infer<typeof EGraphDebugState>;
+
+type PreparedStateData = {
+    nodes: Array<InputNodeData>;
+    removedNodes: Array<InputNodeData>;
+    edges: Array<InputEdgeData>;
+    removedEdges: Array<InputEdgeData>;
+    combos: Array<InputComboData>;
+    removedCombos: Array<InputComboData>;
+    appliedRules: Array<string>;
+};
 
 const StateData = z.object({
-    nodes: z.array(InputNodeData),
-    removedNodes: z.array(InputNodeData),
-    edges: z.array(InputEdgeData),
-    removedEdges: z.array(InputEdgeData),
-    combos: z.array(InputComboData),
-    removedCombos: z.array(InputComboData),
+    egraph: EGraphDebugState,
     appliedRules: z.array(z.string()),
 });
 type StateData = z.infer<typeof StateData>;
@@ -61,14 +82,139 @@ type NodeData = {
 type Node = ReactFlowNode<NodeData>;
 type Edge = ReactFlowEdge<null>;
 
-const states = InputData.parse(statesData);
+const states: InputData = InputData.parse(statesData);
+
+function prepareStates(states: InputData): Array<PreparedStateData> {
+    const result = [];
+    let previousDebugData:
+        | {
+              nodes: Array<InputNodeData>;
+              edges: Array<InputEdgeData>;
+              combos: Array<InputComboData>;
+          }
+        | undefined;
+
+    for (const { egraph, appliedRules } of states) {
+        let nodes = egraph.enodes
+            .map((node) => {
+                return {
+                    id: `${node.eclass}-${node.enode}`,
+                    label: node.enode,
+                    comboId: `c${node.eclass}`,
+                } as InputNodeData;
+            })
+            .concat(
+                egraph.eclasses.map((eclass) => {
+                    return {
+                        id: eclass.id.toString(),
+                        label: eclass.id.toString(),
+                        comboId: `c${eclass.id}`,
+                    } as InputNodeData;
+                }),
+            );
+
+        let edges = egraph.enodes
+            .map((node) => {
+                return {
+                    source: node.eclass.toString(),
+                    target: `${node.eclass}-${node.enode}`,
+                } as InputEdgeData;
+            })
+            .concat(
+                egraph.enodes.flatMap((node) => {
+                    return node.children.map((child) => {
+                        return {
+                            source: `${node.eclass}-${node.enode}`,
+                            target: child.toString(),
+                        };
+                    });
+                }),
+            );
+
+        let combos = egraph.eclasses.map((eclass) => {
+            return {
+                id: `c${eclass.id}`,
+                label: `#${eclass.id}`,
+            } as InputComboData;
+        });
+
+        const nodesClone = nodes.slice();
+        const edgesClone = edges.slice();
+        const combosClone = combos.slice();
+
+        let removedNodes: Array<InputNodeData> = [];
+        let removedEdges: Array<InputEdgeData> = [];
+        let removedCombos: Array<InputComboData> = [];
+
+        if (previousDebugData !== undefined) {
+            const {
+                nodes: prevNodes,
+                edges: prevEdges,
+                combos: prevCombos,
+            } = previousDebugData;
+            nodes = nodes.filter(
+                (n) => !prevNodes.some((ln) => ln.id === n.id),
+            );
+            edges = edges.filter(
+                (n) =>
+                    !prevEdges.some(
+                        (ln) =>
+                            ln.source === n.source && ln.target === n.target,
+                    ),
+            );
+            combos = combos.filter(
+                (n) => !prevCombos.some((ln) => ln.id === n.id),
+            );
+
+            removedNodes = prevNodes.slice();
+            removedNodes = removedNodes.filter(
+                (n) => !nodesClone.some((ln) => ln.id === n.id),
+            );
+
+            removedEdges = prevEdges.slice();
+            removedEdges = removedEdges.filter(
+                (n) =>
+                    !edgesClone.some(
+                        (ln) =>
+                            ln.source === n.source && ln.target === n.target,
+                    ),
+            );
+
+            removedCombos = prevCombos.slice();
+            removedCombos = removedCombos.filter(
+                (n) => !combosClone.some((ln) => ln.id === n.id),
+            );
+        }
+
+        let debugData = {
+            nodes,
+            edges,
+            combos,
+            removedNodes,
+            removedEdges,
+            removedCombos,
+            appliedRules,
+        } as PreparedStateData;
+
+        result.push(debugData);
+        previousDebugData = {
+            nodes: nodesClone,
+            edges: edgesClone,
+            combos: combosClone,
+        };
+    }
+
+    return result;
+}
+
+let preparedStates = prepareStates(states);
 
 // First is initial state
-const totalIterations = states.length - 1;
+const totalIterations = preparedStates.length - 1;
 const data = {
-    nodes: states[0].nodes,
-    edges: states[0].edges,
-    combos: states[0].combos,
+    nodes: preparedStates[0].nodes,
+    edges: preparedStates[0].edges,
+    combos: preparedStates[0].combos,
 };
 const sizeByNode = (n: InputNodeData): [number, number] => [
     60 + n.label.length * 5,
@@ -409,7 +555,7 @@ const LayoutFlow = () => {
         }
         let newNodes = preNodes;
         let newEdges = preEdges;
-        const toRemove = states[stateIdx];
+        const toRemove = preparedStates[stateIdx];
         let toRemoveNodeIds = (toRemove.nodes as Array<{ id: string }>)
             .concat(toRemove.combos)
             .map((n) => n.id);
@@ -428,7 +574,7 @@ const LayoutFlow = () => {
         newEdges = newEdges.concat(
             Object.keys(edgeMap).map((key) => edgeMap[key]),
         );
-        const toHighlight = states[stateIdx - 1];
+        const toHighlight = preparedStates[stateIdx - 1];
         const toHighlightNodeIds = (toHighlight.nodes as Array<{ id: string }>)
             .concat(toHighlight.combos)
             .map((n) => n.id);
@@ -446,13 +592,13 @@ const LayoutFlow = () => {
     };
 
     const nextState = () => {
-        if (stateIdx === states.length - 1) {
+        if (stateIdx === preparedStates.length - 1) {
             return;
         }
         let newNodes = preNodes;
         let newEdges = preEdges;
         setStateIdx(stateIdx + 1);
-        const toAdd = states[stateIdx + 1];
+        const toAdd = preparedStates[stateIdx + 1];
         let toRemoveNodeIds = (toAdd.removedNodes as Array<{ id: string }>)
             .concat(toAdd.removedCombos)
             .map((n) => n.id);
@@ -590,7 +736,9 @@ const LayoutFlow = () => {
                     ))}
                 </div>
                 <div>
-                    <span>{states[stateIdx].appliedRules.join(', ')}</span>
+                    <span>
+                        {preparedStates[stateIdx].appliedRules.join(', ')}
+                    </span>
                 </div>
             </Panel>
         </ReactFlow>

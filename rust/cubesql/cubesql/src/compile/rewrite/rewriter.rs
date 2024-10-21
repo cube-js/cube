@@ -42,49 +42,8 @@ pub struct Rewriter {
 
 pub type CubeRunner = Runner<LogicalPlanLanguage, LogicalPlanAnalysis, IterInfo>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugNode {
-    id: String,
-    label: String,
-    #[serde(rename = "comboId")]
-    combo_id: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugEdge {
-    source: String,
-    target: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugCombo {
-    id: String,
-    label: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DebugData {
-    nodes: Vec<DebugNode>,
-    #[serde(rename = "removedNodes")]
-    removed_nodes: Vec<DebugNode>,
-    edges: Vec<DebugEdge>,
-    #[serde(rename = "removedEdges")]
-    removed_edges: Vec<DebugEdge>,
-    combos: Vec<DebugCombo>,
-    #[serde(rename = "removedCombos")]
-    removed_combos: Vec<DebugCombo>,
-    #[serde(rename = "appliedRules")]
-    applied_rules: Vec<String>,
-}
-
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct DebugENodeId(String);
-
-impl DebugENodeId {
-    pub fn as_str(&self) -> &str {
-        self.0.as_str()
-    }
-}
 
 impl From<&LogicalPlanLanguage> for DebugENodeId {
     fn from(value: &LogicalPlanLanguage) -> Self {
@@ -92,14 +51,13 @@ impl From<&LogicalPlanLanguage> for DebugENodeId {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EClassDebugData {
     id: Id,
-    #[allow(dead_code)]
     canon: Id,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ENodeDebugData {
     enode: DebugENodeId,
     eclass: Id,
@@ -107,7 +65,7 @@ pub struct ENodeDebugData {
 }
 
 /// Representation is optimised for storing in JSON, to transfer to UI
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct EGraphDebugState {
     eclasses: Vec<EClassDebugData>,
     enodes: Vec<ENodeDebugData>,
@@ -145,6 +103,13 @@ impl EGraphDebugState {
 
         EGraphDebugState { eclasses, enodes }
     }
+}
+
+#[derive(Serialize, Deserialize)]
+struct DebugState {
+    egraph: EGraphDebugState,
+    #[serde(rename = "appliedRules")]
+    applied_rules: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -200,9 +165,6 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         format!("{}/src/index.tsx", dir),
     )?;
 
-    let mut states = Vec::new();
-    let mut previous_debug_data: Option<(Vec<DebugNode>, Vec<DebugEdge>, Vec<DebugCombo>)> = None;
-
     let debug_data = runner.egraph.analysis.debug_states.as_slice();
     debug_assert_eq!(debug_data.len(), runner.iterations.len() + 1);
 
@@ -212,101 +174,19 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         .iter()
         .skip(1)
         .zip(runner.iterations.iter().map(|i| Some(&i.applied)));
-    let states_data = std::iter::once((&debug_data[0], None)).chain(states_data);
+    let debug_data = std::iter::once((&debug_data[0], None))
+        .chain(states_data)
+        .map(|(egraph, applied_rules)| DebugState {
+            egraph: egraph.clone(),
+            applied_rules: applied_rules
+                .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
+                .unwrap_or(vec![]),
+        })
+        .collect::<Vec<_>>();
 
-    // TODO move this even later, to UI side
-    for (debug_data, applied) in states_data {
-        let mut nodes = debug_data
-            .enodes
-            .iter()
-            .map(|node| {
-                let node_id = format!("{}-{}", node.eclass, node.enode.as_str());
-                DebugNode {
-                    id: node_id,
-                    label: node.enode.0.clone(),
-                    combo_id: format!("c{}", node.eclass),
-                }
-            })
-            .chain(debug_data.eclasses.iter().map(|eclass| DebugNode {
-                id: eclass.id.to_string(),
-                label: eclass.id.to_string(),
-                combo_id: format!("c{}", eclass.id),
-            }))
-            .collect::<Vec<_>>();
-
-        let mut edges = debug_data
-            .enodes
-            .iter()
-            .flat_map(|node| {
-                std::iter::once(DebugEdge {
-                    source: node.eclass.to_string(),
-                    target: format!("{}-{}", node.eclass, node.enode.as_str()),
-                })
-                .chain(node.children.iter().map(move |child| DebugEdge {
-                    source: format!("{}-{}", node.eclass, node.enode.as_str()),
-                    target: child.to_string(),
-                }))
-            })
-            .collect::<Vec<_>>();
-
-        let mut combos = debug_data
-            .eclasses
-            .iter()
-            .map(|eclass| DebugCombo {
-                id: format!("c{}", eclass.id),
-                label: format!("#{}", eclass.id),
-            })
-            .collect::<Vec<_>>();
-
-        let nodes_clone = nodes.clone();
-        let edges_clone = edges.clone();
-        let combos_clone = combos.clone();
-
-        let mut removed_nodes = vec![];
-        let mut removed_edges = vec![];
-        let mut removed_combos = vec![];
-
-        if let Some((prev_nodes, prev_edges, prev_combos)) = previous_debug_data {
-            nodes.retain(|n| !prev_nodes.iter().any(|ln| ln.id == n.id));
-            edges.retain(|n| {
-                !prev_edges
-                    .iter()
-                    .any(|ln| ln.source == n.source && ln.target == n.target)
-            });
-            combos.retain(|n| !prev_combos.iter().any(|ln| ln.id == n.id));
-
-            removed_nodes = prev_nodes.clone();
-            removed_nodes.retain(|n| !nodes_clone.iter().any(|ln| ln.id == n.id));
-            removed_edges = prev_edges.clone();
-            removed_edges.retain(|n| {
-                !edges_clone
-                    .iter()
-                    .any(|ln| ln.source == n.source && ln.target == n.target)
-            });
-            removed_combos = prev_combos.clone();
-            removed_combos.retain(|n| !combos_clone.iter().any(|ln| ln.id == n.id));
-        }
-
-        let applied_rules = applied
-            .map(|applied| applied.iter().map(|s| format!("{:?}", s)).collect())
-            .unwrap_or(vec![]);
-
-        let debug_data = DebugData {
-            nodes,
-            edges,
-            combos,
-            removed_nodes,
-            removed_edges,
-            removed_combos,
-            applied_rules,
-        };
-
-        states.push(debug_data.clone());
-        previous_debug_data = Some((nodes_clone, edges_clone, combos_clone));
-    }
     fs::write(
         format!("{}/src/states.json", dir),
-        serde_json::to_string_pretty(&states)?,
+        serde_json::to_string_pretty(&debug_data)?,
     )?;
 
     Ok(())
