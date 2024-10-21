@@ -111,19 +111,16 @@ function layout(
         edges: elkEdges,
     };
 
-    function elk2flow(node, flattenChildren, withStyle) {
+    function elk2flow(node, flattenChildren) {
         node.position = { x: node.x, y: node.y };
-        if (withStyle) {
-            node.style = {
-                ...node.style,
-                width: node.width,
-                height: node.height,
-            };
-        }
+        node.style = {
+            ...node.style,
+            width: node.width,
+            height: node.height,
+        };
         flattenChildren.push(node);
         (node.children ?? []).forEach((child) => {
-            // only depth 0 get styles
-            elk2flow(child, flattenChildren, false);
+            elk2flow(child, flattenChildren);
         });
         delete node.children;
     }
@@ -135,7 +132,7 @@ function layout(
         const flattenChildren = [];
 
         children.forEach((node) => {
-            elk2flow(node, flattenChildren, true);
+            elk2flow(node, flattenChildren);
         });
 
         setNodes(flattenChildren);
