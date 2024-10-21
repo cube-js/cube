@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+
+### Features
+
+* **cubesql:** Top-down extractor for rewrites ([#8694](https://github.com/cube-js/cube/issues/8694)) ([e8fe6db](https://github.com/cube-js/cube/commit/e8fe6db3b382bab91d9b2e2b46886095b5f8b2e6))
+* OpenAPI - declare type field for Cube ([#8837](https://github.com/cube-js/cube/issues/8837)) ([578b90c](https://github.com/cube-js/cube/commit/578b90c9c89926d333498cfe6f2f155579688cb0))
+
+
+
+
+
 ## [1.0.1](https://github.com/cube-js/cube/compare/v1.0.0...v1.0.1) (2024-10-16)
 
 **Note:** Version bump only for package @cubejs-backend/native
