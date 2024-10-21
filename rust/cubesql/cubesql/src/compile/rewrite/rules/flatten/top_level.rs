@@ -3,6 +3,7 @@ use crate::{
         aggregate,
         analysis::LogicalPlanAnalysis,
         cube_scan, flatten_pushdown_replacer, projection,
+        rewriter::CubeEGraph,
         rules::{flatten::FlattenRules, replacer_flat_push_down_node, replacer_push_down_node},
         transforming_chain_rewrite_with_root, FlattenPushdownReplacerInnerAlias, ListType,
         LogicalPlanLanguage, ProjectionAlias,
@@ -193,8 +194,7 @@ impl FlattenRules {
         outer_projection_alias_var: &'static str,
         new_projection_alias_var: &'static str,
         inner_alias_var: &'static str,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut egg::Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut egg::Subst) -> bool {
         let inner_projection_var = var!(inner_projection_var);
         let cube_scan_var = var!(cube_scan_var);
         let members_var = var!(members_var);
@@ -256,8 +256,7 @@ impl FlattenRules {
         outer_aggregate_expr_var: &'static str,
         inner_projection_alias_var: &'static str,
         inner_alias_var: &'static str,
-    ) -> impl Fn(&mut egg::EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut egg::Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut egg::Subst) -> bool {
         let inner_projection_var = var!(inner_projection_var);
         let cube_scan_var = var!(cube_scan_var);
         let members_var = var!(members_var);
