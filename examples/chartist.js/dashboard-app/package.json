@@ -1,0 +1,19 @@
+{
+  "name": "chartistjs-example",
+  "version": "1.0.0",
+  "license": "MIT",
+  "scripts": {
+    "dev": "parcel src/index.html",
+    "without-cube": "parcel src/without-cube/index.html",
+    "build": "parcel build src/index.html"
+  },
+  "devDependencies": {
+    "parcel": "^2.6.2",
+    "process": "^0.11.10"
+  },
+  "dependencies": {
+    "@cube-dev/example-wrapper": "^1.1.10",
+    "@cubejs-client/core": "^0.30.29",
+    "chartist": "^1.3.0"
+  }
+}
