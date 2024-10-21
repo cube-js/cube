@@ -35,7 +35,7 @@ use std::{
 pub type CubeEGraph = EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>;
 
 pub struct Rewriter {
-    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    graph: CubeEGraph,
     cube_context: Arc<CubeContext>,
 }
 
@@ -82,9 +82,7 @@ pub struct IterDebugInfo {
 }
 
 impl IterDebugInfo {
-    pub fn prepare_debug_data(
-        graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> DebugData {
+    pub fn prepare_debug_data(graph: &CubeEGraph) -> DebugData {
         DebugData {
             applied_rules: None,
             nodes: graph
@@ -187,20 +185,14 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
 }
 
 impl Rewriter {
-    pub fn new(
-        graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cube_context: Arc<CubeContext>,
-    ) -> Self {
+    pub fn new(graph: CubeEGraph, cube_context: Arc<CubeContext>) -> Self {
         Self {
             graph,
             cube_context,
         }
     }
 
-    pub fn rewrite_runner(
-        cube_context: Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> CubeRunner {
+    pub fn rewrite_runner(cube_context: Arc<CubeContext>, egraph: CubeEGraph) -> CubeRunner {
         CubeRunner::new(LogicalPlanAnalysis::new(
             cube_context,
             Arc::new(DefaultPhysicalPlanner::default()),
@@ -233,7 +225,7 @@ impl Rewriter {
         &mut self,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+    ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
         if let Some(qtrace) = qtrace {
@@ -398,7 +390,7 @@ impl Rewriter {
 
     fn run_rewrites(
         cube_context: &Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: CubeEGraph,
         rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
@@ -603,7 +595,7 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
     fn search_rewrite<'a>(
         &mut self,
         iteration: usize,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         rewrite: &'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
     ) -> Vec<egg::SearchMatches<'a, LogicalPlanLanguage>> {
         if iteration != self.current_iter {
