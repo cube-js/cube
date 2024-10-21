@@ -4,13 +4,15 @@
  * @fileoverview The `RedshiftDriver` and related types declaration.
  */
 
-import { getEnv } from '@cubejs-backend/shared';
+import { assertDataSource, getEnv } from '@cubejs-backend/shared';
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
 import {
   DownloadTableCSVData,
   DriverCapabilities,
+  QuerySchemasResult,
   StreamOptions,
   StreamTableDataWithTypes,
+  TablesSchema,
   UnloadOptions
 } from '@cubejs-backend/base-driver';
 import crypto from 'crypto';
@@ -40,10 +42,14 @@ export interface RedshiftDriverConfiguration extends PostgresDriverConfiguration
   exportBucket?: RedshiftDriverExportAWS;
 }
 
+const IGNORED_SCHEMAS = ['pg_catalog', 'pg_internal', 'information_schema', 'mysql', 'performance_schema', 'sys', 'INFORMATION_SCHEMA'];
+
 /**
  * Redshift driver class.
  */
 export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> {
+  private readonly dbName: string;
+
   /**
    * Returns default concurrency value.
    */
@@ -55,7 +61,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
    * Class constructor.
    */
   public constructor(
-    options: RedshiftDriverConfiguration & {
+    config: RedshiftDriverConfiguration & {
       /**
        * Data source name.
        */
@@ -73,7 +79,15 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       testConnectionTimeout?: number,
     } = {}
   ) {
-    super(options);
+    super(config);
+
+    const dataSource =
+      config.dataSource ||
+      assertDataSource('default');
+
+    // We need a DB name for querying external tables.
+    // It's not possible to get it later from the pool
+    this.dbName = getEnv('dbName', { dataSource });
   }
 
   protected primaryKeysQuery() {
@@ -82,6 +96,75 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
 
   protected foreignKeysQuery() {
     return null;
+  }
+
+  /**
+   * @override
+   */
+  protected informationSchemaQuery() {
+    return `
+      SELECT columns.column_name as ${this.quoteIdentifier('column_name')},
+             columns.table_name as ${this.quoteIdentifier('table_name')},
+             columns.table_schema as ${this.quoteIdentifier('table_schema')},
+             columns.data_type as ${this.quoteIdentifier('data_type')}
+      FROM information_schema.columns
+      WHERE columns.table_schema NOT IN (${IGNORED_SCHEMAS.map(s => `'${s}'`).join(',')})
+   `;
+  }
+
+  /**
+   * In Redshift external tables are not shown in regular Postgres information_schema,
+   * so it needs to be queried separately.
+   * @override
+   */
+  public async tablesSchema(): Promise<TablesSchema> {
+    const query = this.informationSchemaQuery();
+    const tablesSchema = await this.query(query, []).then(data => data.reduce<TablesSchema>(this.informationColumnsSchemaReducer, {}));
+
+    const allSchemas = await this.getSchemas();
+    const externalSchemas = allSchemas.filter(s => !tablesSchema[s.schema_name]).map(s => s.schema_name);
+
+    for (const externalSchema of externalSchemas) {
+      tablesSchema[externalSchema] = {};
+      // eslint-disable-next-line camelcase
+      const tablesRes: { table_name: string }[] = await this.query(`SHOW TABLES FROM SCHEMA ${this.dbName}.${externalSchema}`, []);
+      const tables = tablesRes.map(t => t.table_name);
+      for (const tableName of tables) {
+        // eslint-disable-next-line camelcase
+        const columnRes: { column_name: string, data_type: string }[] = await this.query(`SHOW COLUMNS FROM TABLE ${this.dbName}.${externalSchema}.${tableName}`, []);
+        tablesSchema[externalSchema][tableName] = columnRes.map(def => ({
+          name: def.column_name,
+          type: def.data_type,
+          attributes: []
+        }));
+      }
+    }
+
+    return tablesSchema;
+  }
+
+  /**
+   * @override
+   */
+  protected getSchemasQuery() {
+    return `
+      SELECT table_schema as ${this.quoteIdentifier('schema_name')}
+      FROM information_schema.tables
+      WHERE table_schema NOT IN (${IGNORED_SCHEMAS.map(s => `'${s}'`).join(',')})
+      GROUP BY table_schema
+    `;
+  }
+
+  /**
+   * From the Redshift docs:
+   * SHOW SCHEMAS FROM DATABASE database_name [LIKE 'filter_pattern'] [LIMIT row_limit ]
+   * It returns regular schemas (queryable from information_schema) and external ones.
+   * @override
+   */
+  public async getSchemas(): Promise<QuerySchemasResult[]> {
+    const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.dbName}`, []);
+
+    return schemas.filter(s => !IGNORED_SCHEMAS.includes(s.schema_name));
   }
 
   /**
