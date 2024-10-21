@@ -29,9 +29,8 @@ async fn test_simple_wrapper() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("COALESCE"));
 
@@ -53,11 +52,7 @@ async fn test_wrapper_group_by_rollup() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -78,11 +73,7 @@ async fn test_wrapper_group_by_rollup_with_aliases() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -103,11 +94,7 @@ async fn test_wrapper_group_by_rollup_nested() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1, 2)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -128,11 +115,7 @@ async fn test_wrapper_group_by_rollup_nested_from_asterisk() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -153,11 +136,7 @@ async fn test_wrapper_group_by_rollup_nested_with_aliases() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1, 2)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -180,11 +159,7 @@ async fn test_wrapper_group_by_rollup_nested_complex() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("ROLLUP(1), ROLLUP(2), 3, CUBE(4)"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -205,11 +180,7 @@ async fn test_wrapper_group_by_rollup_placeholders() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -230,11 +201,7 @@ async fn test_wrapper_group_by_cube() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Cube"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -255,11 +222,7 @@ async fn test_wrapper_group_by_rollup_complex() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("Rollup"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -280,11 +243,7 @@ async fn test_simple_subquery_wrapper_projection_empty_source() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -307,11 +266,7 @@ async fn test_simple_subquery_wrapper_filter_empty_source() {
     .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -334,11 +289,7 @@ async fn test_simple_subquery_wrapper_projection_aggregate_empty_source() {
     .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -360,11 +311,7 @@ async fn test_simple_subquery_wrapper_filter_in_empty_source() {
         .await;
 
     let logical_plan = query_plan.as_logical_plan();
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("IN (SELECT"));
     assert!(sql.contains("utf8__male__"));
 
@@ -387,11 +334,7 @@ async fn test_simple_subquery_wrapper_filter_and_projection_empty_source() {
 
     let logical_plan = query_plan.as_logical_plan();
 
-    let sql = logical_plan
-        .find_cube_scan_wrapper()
-        .wrapped_sql
-        .unwrap()
-        .sql;
+    let sql = logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql;
     assert!(sql.contains("IN (SELECT"));
     assert!(sql.contains("(SELECT"));
     assert!(sql.contains("utf8__male__"));
@@ -416,15 +359,13 @@ async fn test_simple_subquery_wrapper_projection() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("\\\\\\\"limit\\\\\\\":1"));
 
@@ -447,9 +388,8 @@ async fn test_simple_subquery_wrapper_projection_aggregate() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
 
@@ -472,15 +412,13 @@ async fn test_simple_subquery_wrapper_filter_equal() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("(SELECT"));
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("\\\\\\\"limit\\\\\\\":1"));
 
@@ -503,9 +441,8 @@ async fn test_simple_subquery_wrapper_filter_in() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("IN (SELECT"));
 
@@ -529,9 +466,8 @@ async fn test_simple_subquery_wrapper_filter_and_projection() {
     let logical_plan = query_plan.as_logical_plan();
 
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("IN (SELECT"));
 
@@ -554,9 +490,8 @@ async fn test_case_wrapper() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -592,9 +527,8 @@ async fn test_case_wrapper_distinct() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -621,9 +555,8 @@ async fn test_case_wrapper_alias_with_order() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("ORDER BY \"case_when_a_cust\""));
 
@@ -650,9 +583,8 @@ async fn test_case_wrapper_ungrouped() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -684,9 +616,8 @@ async fn test_case_wrapper_non_strict_match() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -719,9 +650,8 @@ async fn test_case_wrapper_ungrouped_sorted() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("ORDER BY"));
 }
@@ -748,9 +678,8 @@ async fn test_case_wrapper_ungrouped_sorted_aliased() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         // TODO test without depend on column name
         .contains("ORDER BY \"case_when"));
@@ -772,25 +701,19 @@ async fn test_case_wrapper_with_internal_limit() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("1123"),
         "SQL contains 1123: {}",
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -818,19 +741,14 @@ async fn test_case_wrapper_with_system_fields() {
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains(
                 "\\\"cube_name\\\":\\\"KibanaSampleDataEcommerce\\\",\\\"alias\\\":\\\"user\\\""
             ),
         r#"SQL contains `\"cube_name\":\"KibanaSampleDataEcommerce\",\"alias\":\"user\"` {}"#,
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -856,25 +774,19 @@ async fn test_case_wrapper_with_limit() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
     assert!(
         logical_plan
-            .find_cube_scan_wrapper()
+            .find_cube_scan_wrapped_sql()
             .wrapped_sql
-            .unwrap()
             .sql
             .contains("1123"),
         "SQL contains 1123: {}",
-        logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
+        logical_plan.find_cube_scan_wrapped_sql().wrapped_sql.sql
     );
 
     let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -900,9 +812,8 @@ async fn test_case_wrapper_with_null() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("CASE WHEN"));
 
@@ -957,9 +868,8 @@ async fn test_case_wrapper_escaping() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
@@ -993,9 +903,8 @@ async fn test_wrapper_limit_zero() {
 
     let logical_plan = query_plan.as_logical_plan();
     assert!(logical_plan
-        .find_cube_scan_wrapper()
+        .find_cube_scan_wrapped_sql()
         .wrapped_sql
-        .unwrap()
         .sql
         .contains("LIMIT 0"));
 
