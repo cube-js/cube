@@ -63,6 +63,7 @@ async function layout(
     fitView,
     navHistory,
     showOnlySelected,
+    abortSignal,
 ) {
     const defaultOptions = {
         'elk.algorithm': 'layered',
@@ -143,6 +144,10 @@ async function layout(
     const elk = new ELK();
     const { children } = await elk.layout(graph);
 
+    if (abortSignal.aborted) {
+        return;
+    }
+
     // By mutating the children in-place we saves ourselves from creating a
     // needless copy of the nodes array.
     const flatChildren = [];
@@ -153,9 +158,21 @@ async function layout(
 
     setNodes(flatChildren);
     setEdges(edges);
+
+    if (abortSignal.aborted) {
+        return;
+    }
     window.requestAnimationFrame(() => {
+        if (abortSignal.aborted) {
+            return;
+        }
+
         if (navHistory?.length) {
             setTimeout(() => {
+                if (abortSignal.aborted) {
+                    return;
+                }
+
                 zoomTo(fitView, navHistory);
             }, 500);
         } else {
@@ -390,6 +407,8 @@ const LayoutFlow = () => {
     );
 
     useEffect(() => {
+        const ac = new AbortController();
+
         layout(
             {},
             jsonClone(preNodes),
@@ -399,7 +418,10 @@ const LayoutFlow = () => {
             fitView,
             navHistory,
             showOnlySelected,
+            ac.signal,
         );
+
+        return () => ac.abort();
     }, [
         preNodes,
         setNodes,
