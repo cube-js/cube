@@ -783,7 +783,7 @@ jobs:
       - name: Detect branch name
         id: detect_branch
         run: |
-          BRANCH_NAME=$(git branch -r --contains $GITHUB_SHA | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
+          BRANCH_NAME=$(git branch -r --contains "$GITHUB_SHA" | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
           echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
       - name: Trigger runtime
         uses: actions/github-script@v6
