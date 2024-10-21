@@ -54,7 +54,7 @@ const initialNodes = data.combos
     .concat(data.nodes.map(toRegularNode));
 const initialEdges = data.edges.map(toEdge);
 
-function layout(
+async function layout(
     options,
     nodes,
     edges,
@@ -126,28 +126,28 @@ function layout(
     }
 
     const elk = new ELK();
-    return elk.layout(graph).then(({ children }) => {
-        // By mutating the children in-place we saves ourselves from creating a
-        // needless copy of the nodes array.
-        const flattenChildren = [];
+    const { children } = await elk.layout(graph);
 
-        children.forEach((node) => {
-            elk2flow(node, flattenChildren);
-        });
+    // By mutating the children in-place we saves ourselves from creating a
+    // needless copy of the nodes array.
+    const flattenChildren = [];
 
-        setNodes(flattenChildren);
-        setEdges(edges);
-        window.requestAnimationFrame(() => {
-            if (navHistory?.length) {
-                setTimeout(() => {
-                    zoomTo(fitView, navHistory);
-                }, 500);
-            } else {
-                fitView();
-            }
-        });
-        return flattenChildren;
+    children.forEach((node) => {
+        elk2flow(node, flattenChildren);
     });
+
+    setNodes(flattenChildren);
+    setEdges(edges);
+    window.requestAnimationFrame(() => {
+        if (navHistory?.length) {
+            setTimeout(() => {
+                zoomTo(fitView, navHistory);
+            }, 500);
+        } else {
+            fitView();
+        }
+    });
+    return flattenChildren;
 }
 
 const highlightColor = 'rgba(170,255,170,0.71)';
