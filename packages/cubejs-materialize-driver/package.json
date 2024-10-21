@@ -32,7 +32,6 @@
     "@cubejs-backend/shared": "1.0.3",
     "@types/pg": "^8.6.0",
     "pg": "^8.6.0",
-    "ramda": "0.27.2",
     "semver": "7.3.7"
   },
   "license": "Apache-2.0",
