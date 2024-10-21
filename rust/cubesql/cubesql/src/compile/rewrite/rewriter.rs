@@ -77,13 +77,8 @@ pub struct DebugData {
     applied_rules: Option<Vec<String>>,
 }
 
-#[derive(Debug)]
-pub struct IterDebugInfo {
-    debug_data: DebugData,
-}
-
-impl IterDebugInfo {
-    pub fn prepare_debug_data(graph: &CubeEGraph) -> DebugData {
+impl DebugData {
+    pub fn prepare(graph: &CubeEGraph) -> DebugData {
         DebugData {
             applied_rules: None,
             nodes: graph
@@ -140,17 +135,10 @@ impl IterDebugInfo {
             removed_combos: Vec::new(),
         }
     }
-
-    fn make(runner: &CubeRunner) -> Self {
-        IterDebugInfo {
-            debug_data: Self::prepare_debug_data(&runner.egraph),
-        }
-    }
 }
 
 #[derive(Debug)]
 pub struct IterInfo {
-    debug_info: Option<IterDebugInfo>,
     debug_qtrace_eclasses: Option<Vec<QtraceEclass>>,
 }
 
@@ -165,11 +153,6 @@ impl IterInfo {
 impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     fn make(runner: &CubeRunner) -> Self {
         IterInfo {
-            debug_info: if Self::egraph_debug_enabled() {
-                Some(IterDebugInfo::make(runner))
-            } else {
-                None
-            },
             debug_qtrace_eclasses: if Qtrace::is_enabled() {
                 Some(
                     runner
@@ -185,11 +168,7 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
     }
 }
 
-fn write_debug_states(
-    init_debug_data: &DebugData,
-    runner: &CubeRunner,
-    stage: &str,
-) -> Result<(), CubeError> {
+fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError> {
     let dir = format!("egraph-debug-{}", stage);
     let _ = fs::create_dir_all(dir.clone());
     let _ = fs::create_dir_all(format!("{}/public", dir));
@@ -210,13 +189,16 @@ fn write_debug_states(
     let mut states = Vec::new();
     let mut last_debug_data: Option<DebugData> = None;
 
-    let states_data =
-        std::iter::once((init_debug_data, None)).chain(runner.iterations.iter().map(|i| {
-            (
-                &i.data.debug_info.as_ref().unwrap().debug_data,
-                Some(&i.applied),
-            )
-        }));
+    let debug_data = runner.egraph.analysis.debug_states.as_slice();
+    debug_assert_eq!(debug_data.len(), runner.iterations.len() + 1);
+
+    // debug_data[0] is initial state
+    // runner.iterations[0] is result of first iteration
+    let states_data = debug_data
+        .iter()
+        .skip(1)
+        .zip(runner.iterations.iter().map(|i| Some(&i.applied)));
+    let states_data = std::iter::once((&debug_data[0], None)).chain(states_data);
 
     for (debug_data, applied) in states_data {
         let mut debug_data = debug_data.clone();
@@ -277,7 +259,7 @@ impl Rewriter {
     }
 
     pub fn rewrite_runner(cube_context: Arc<CubeContext>, egraph: CubeEGraph) -> CubeRunner {
-        CubeRunner::new(LogicalPlanAnalysis::new(
+        let runner = CubeRunner::new(LogicalPlanAnalysis::new(
             cube_context,
             Arc::new(DefaultPhysicalPlanner::default()),
         ))
@@ -297,12 +279,29 @@ impl Rewriter {
                 .map(|v| v.parse::<u64>().unwrap())
                 .unwrap_or(30),
         ))
-        .with_scheduler(IncrementalScheduler::default())
-        .with_hook(|runner| {
-            runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
-            Ok(())
-        })
-        .with_egraph(egraph)
+        .with_scheduler(IncrementalScheduler::default());
+
+        let runner = if IterInfo::egraph_debug_enabled() {
+            // We want more access than Iterations gives us
+            // Specifically, there's no way to store and access egraph state before first iteration
+            // This hook is not really order-dependent with iteration timestamp bump
+            // But just for clarity it should run before, so first captured state would be when iteration is zero, before first iteration started
+            runner.with_hook(|runner| {
+                LogicalPlanAnalysis::store_egraph_debug_state(&mut runner.egraph);
+                Ok(())
+            })
+        } else {
+            runner
+        };
+
+        let runner = runner
+            .with_hook(|runner| {
+                runner.egraph.analysis.iteration_timestamp = runner.iterations.len() + 1;
+                Ok(())
+            })
+            .with_egraph(egraph);
+
+        runner
     }
 
     pub async fn run_rewrite_to_completion(
@@ -478,12 +477,8 @@ impl Rewriter {
         rules: Arc<Vec<CubeRewrite>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
-        // Capture initial egraph state, before rewrites
-        let init_debug_data =
-            IterInfo::egraph_debug_enabled().then(|| IterDebugInfo::prepare_debug_data(&egraph));
-
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
-        let runner = runner.run(rules.iter());
+        let mut runner = runner.run(rules.iter());
         if !IterInfo::egraph_debug_enabled() {
             log::debug!("Iterations: {:?}", runner.iterations);
         }
@@ -501,10 +496,9 @@ impl Rewriter {
             }
         };
         if IterInfo::egraph_debug_enabled() {
-            // `unwrap()` should be ok here
-            // When IterInfo::egraph_debug_enabled() init_debug_data should be filled
-            let init_debug_data = init_debug_data.unwrap();
-            write_debug_states(&init_debug_data, &runner, stage)?;
+            // Store final state after all rewrites
+            LogicalPlanAnalysis::store_egraph_debug_state(&mut runner.egraph);
+            write_debug_states(&runner, stage)?;
         }
         if let Some(stop_reason) = stop_reason {
             return Err(CubeError::user(format!(
