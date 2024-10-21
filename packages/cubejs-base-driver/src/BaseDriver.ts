@@ -14,7 +14,6 @@ import {
   isSslKey,
   isSslCert,
 } from '@cubejs-backend/shared';
-import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
@@ -420,10 +419,10 @@ export abstract class BaseDriver implements DriverInterface {
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public tablesSchema(): Promise<any> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce(this.informationColumnsSchemaReducer, {}));
   }
 
   // Extended version of tablesSchema containing primary and foreign keys
