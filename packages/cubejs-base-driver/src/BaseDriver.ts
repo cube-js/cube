@@ -14,7 +14,6 @@ import {
   isSslKey,
   isSslCert,
 } from '@cubejs-backend/shared';
-import { reduce } from 'ramda';
 import fs from 'fs';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { S3, GetObjectCommand, S3ClientConfig } from '@aws-sdk/client-s3';
@@ -51,6 +50,7 @@ import {
   QueryTablesResult,
   QueryColumnsResult,
   TableMemoryData,
+  TablesSchema,
   PrimaryKeysQueryResult,
   ForeignKeysQueryResult,
 } from './driver.interface';
@@ -410,28 +410,28 @@ export abstract class BaseDriver implements DriverInterface {
     return false;
   }
 
-  protected informationColumnsSchemaReducer(result: any, i: any) {
+  protected informationColumnsSchemaReducer(result: any, i: any): TablesSchema {
     let schema = (result[i.table_schema] || {});
-    const tables = (schema[i.table_name] || []);
+    const columns = (schema[i.table_name] || []);
 
-    tables.push({
+    columns.push({
       name: i.column_name,
       type: i.data_type,
       attributes: i.key_type ? ['primaryKey'] : []
     });
 
-    tables.sort();
-    schema[i.table_name] = tables;
+    columns.sort();
+    schema[i.table_name] = columns;
     schema = sortByKeys(schema);
     result[i.table_schema] = schema;
 
     return sortByKeys(result);
   }
 
-  public tablesSchema() {
+  public tablesSchema(): Promise<TablesSchema> {
     const query = this.informationSchemaQuery();
 
-    return this.query(query).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce<TablesSchema>(this.informationColumnsSchemaReducer, {}));
   }
 
   // Extended version of tablesSchema containing primary and foreign keys
