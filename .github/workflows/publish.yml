@@ -305,7 +305,7 @@ jobs:
           overwrite: true
 
   docker-default:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian docker image
     runs-on: ${{ matrix.os }}
     strategy:
@@ -345,7 +345,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:latest"
           fi
 
           {
@@ -385,7 +389,7 @@ jobs:
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian with jdk docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -420,9 +424,13 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk,${DOCKER_IMAGE}:jdk"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk"
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-jdk"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:latest"
           fi
 
           {
@@ -464,6 +472,7 @@ jobs:
   docker-cubestore:
     name: Cube Store Docker
     runs-on: ${{ matrix.os }}
+    needs: [detect_branch]
     strategy:
       fail-fast: false
       matrix:
@@ -521,7 +530,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${{ matrix.tag }}"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
 
           {
@@ -770,11 +783,11 @@ jobs:
               }
             })
 
-  trigger-repo-sync:
-    name: Trigger runtime repo
+  detect_branch:
     runs-on: ubuntu-20.04
-    needs: [docker-default]
-    timeout-minutes: 15
+    outputs:
+      is_master: ${{ steps.detect_branch.outputs.is_master }}
+      branch: ${{ steps.detect_branch.outputs.branch }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -783,15 +796,30 @@ jobs:
       - name: Detect branch name
         id: detect_branch
         run: |
-          BRANCH_NAME=$(git branch -r --contains "$GITHUB_SHA" | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          BRANCH=$(git branch -r --contains "$GITHUB_SHA" | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+
+          if [ "$BRANCH_NAME" == "master" ]; then
+            echo "is_master=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_master=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  trigger-repo-sync:
+    name: Trigger runtime repo
+    runs-on: ubuntu-20.04
+    needs: [docker-default, detect_branch]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Trigger runtime
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
             const tagName = process.env.GITHUB_REF.replace('refs/tags/', '');
-            const branchName = '${{ steps.detect_branch.outputs.branch_name }}';
+            const branchName = '${{ needs['detect_branch'].outputs.branch }}';
 
             await github.rest.actions.createWorkflowDispatch({
               owner: 'cubedevinc',
@@ -800,6 +828,6 @@ jobs:
               ref: 'master',
               inputs: {
                 'tag': tagName,
-                'branch': branchName,
+                'branch':branchName,
               }
             })
