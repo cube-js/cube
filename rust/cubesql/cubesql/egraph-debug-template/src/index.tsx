@@ -113,7 +113,7 @@ function prepareStates(states: InputData): Array<PreparedStateData> {
                 }),
             );
 
-        let edges = egraph.enodes
+        const allEdges = egraph.enodes
             .map((node) => {
                 return {
                     source: node.eclass.toString(),
@@ -130,6 +130,19 @@ function prepareStates(states: InputData): Array<PreparedStateData> {
                     });
                 }),
             );
+        // Same eclass can be present as child for a single enode multiple times
+        // E.g. CubeScanFilters([CubeScanFilters([]), CubeScanFilters([])])
+        // Both internal nodes are same eclass
+        // This will lead to duplicated edges and non-uniq ids
+        const uniqueEdges = new Map();
+        for (const edge of allEdges) {
+            const key = JSON.stringify(edge);
+            if (uniqueEdges.get(key)) {
+                continue;
+            }
+            uniqueEdges.set(key, edge);
+        }
+        let edges = [...uniqueEdges.values()];
 
         let combos = egraph.eclasses.map((eclass) => {
             return {
