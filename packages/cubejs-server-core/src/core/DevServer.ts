@@ -352,6 +352,8 @@ export class DevServer {
       }
 
       async function installDriver() {
+        driverError = null;
+
         try {
           await executeCommand(
             'npm',
