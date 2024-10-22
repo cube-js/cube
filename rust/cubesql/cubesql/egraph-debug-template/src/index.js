@@ -162,23 +162,14 @@ async function layout(
     if (abortSignal.aborted) {
         return;
     }
-    window.requestAnimationFrame(() => {
+    // TODO investigate why setTimeout is necessary, something related to ReactFlow state and setNodes/setEdges probably
+    setTimeout(() => {
         if (abortSignal.aborted) {
             return;
         }
 
-        if (navHistory?.length) {
-            setTimeout(() => {
-                if (abortSignal.aborted) {
-                    return;
-                }
-
-                zoomTo(fitView, navHistory);
-            }, 500);
-        } else {
-            fitView();
-        }
-    });
+        zoomTo(fitView, navHistory);
+    }, 500);
     return flatChildren;
 }
 
