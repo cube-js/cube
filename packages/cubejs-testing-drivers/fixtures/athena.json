@@ -133,7 +133,7 @@
     "---------------------------------------",
 
     "---------------------------------------",
-    "SKIPPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
