@@ -178,6 +178,23 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       .map(s => ({ schema_name: s.schema_name }));
   }
 
+  public async getTablesForSpecificSchemas(schemas: QuerySchemasResult[]): Promise<QueryTablesResult[]> {
+    const tables = await super.getTablesForSpecificSchemas(schemas);
+
+    // We might request the external schemas and tables, their descriptions won't be returned
+    // by the super.getTablesForSpecificSchemas(). Need to request them separately.
+    const missedSchemas = schemas.filter(s => !tables.some(t => t.schema_name === s.schema_name));
+
+    for (const externalSchema of missedSchemas) {
+      const tablesRes = await this.tablesForExternalSchema(externalSchema.schema_name);
+      tablesRes.forEach(t => {
+        tables.push({ schema_name: externalSchema.schema_name, table_name: t.table_name });
+      });
+    }
+
+    return tables;
+  }
+
   public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
     const columns = await super.getColumnsForSpecificTables(tables);
 
