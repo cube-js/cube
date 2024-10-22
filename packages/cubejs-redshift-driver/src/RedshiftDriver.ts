@@ -107,6 +107,16 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
     }
   }
 
+  /**
+   * AWS Redshift doesn't have any special connection check.
+   * And querying even system tables is billed.
+   * @override
+   */
+  public async testConnection() {
+    const conn = await this.pool.connect();
+    conn.release();
+  }
+
   public override async stream(
     query: string,
     values: unknown[],
@@ -287,8 +297,7 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
       };
     } finally {
       conn.removeAllListeners('notice');
-
-      await conn.release();
+      conn.release();
     }
   }
 
