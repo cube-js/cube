@@ -1,12 +1,11 @@
 use crate::compile::rewrite::{
     aggregate_split_pullup_replacer, aggregate_split_pushdown_replacer, alias_expr,
-    analysis::LogicalPlanAnalysis, projection_split_pullup_replacer,
-    projection_split_pushdown_replacer, rewrite, rules::split::SplitRules, LogicalPlanLanguage,
+    projection_split_pullup_replacer, projection_split_pushdown_replacer, rewrite,
+    rewriter::CubeRewrite, rules::split::SplitRules,
 };
-use egg::Rewrite;
 
 impl SplitRules {
-    pub fn alias_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn alias_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "split-alias-push-down-aggregate",

@@ -1,19 +1,19 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules, transforming_rewrite,
-        window_fun_expr_var_arg, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        LogicalPlanLanguage, WindowFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
+        wrapper_pushdown_replacer, LogicalPlanLanguage, WindowFunctionExprFun,
+        WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
 use datafusion::physical_plan::windows::WindowFunction;
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn aggregate_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn aggregate_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-window-function",
@@ -123,7 +123,7 @@ impl WrapperRules {
         &self,
         fun_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();
