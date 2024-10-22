@@ -173,7 +173,9 @@ export class RedshiftDriver extends PostgresDriver<RedshiftDriverConfiguration> 
   public async getSchemas(): Promise<QuerySchemasResult[]> {
     const schemas = await this.query<QuerySchemasResult>(`SHOW SCHEMAS FROM DATABASE ${this.dbName}`, []);
 
-    return schemas.filter(s => !IGNORED_SCHEMAS.includes(s.schema_name));
+    return schemas
+      .filter(s => !IGNORED_SCHEMAS.includes(s.schema_name))
+      .map(s => ({ schema_name: s.schema_name }));
   }
 
   public async getColumnsForSpecificTables(tables: QueryTablesResult[]): Promise<QueryColumnsResult[]> {
