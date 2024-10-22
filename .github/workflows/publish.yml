@@ -430,7 +430,7 @@ jobs:
           fi
 
           if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
-            TAGS="$TAGS,${DOCKER_IMAGE}:latest"
+            TAGS="$TAGS,${DOCKER_IMAGE}:jdk"
           fi
 
           {
