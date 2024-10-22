@@ -155,11 +155,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.bigquery.query({
-      query: 'SELECT ? AS number',
-      params: ['1'],
-      jobTimeoutMs: this.testConnectionTimeout(),
-    });
+    // From the BigQuery Docs:
+    // You are not charged for list, get, patch, update and delete calls.
+    // Examples include (but are not limited to): listing datasets, updating
+    // a dataset's access control list, updating a table's description, or
+    // listing user-defined functions in a dataset.
+    // @see https://cloud.google.com/bigquery/pricing#free
+    await this.bigquery.getDatasets();
   }
 
   public readOnly() {
