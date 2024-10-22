@@ -791,12 +791,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Ensure full git history is fetched
       - name: Detect branch name
         id: detect_branch
+        env:
+          EVENT_BASE_REF: ${{ github.event.base_ref || 'master' }}
         run: |
-          BRANCH=$(git branch -r --contains "$GITHUB_SHA" | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
+          BRANCH=$EVENT_BASE_REF#refs/heads/
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
 
           if [ "$BRANCH_NAME" == "master" ]; then
