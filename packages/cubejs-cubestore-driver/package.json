@@ -36,7 +36,7 @@
     "moment-timezone": "^0.5.31",
     "node-fetch": "^2.6.1",
     "sqlstring": "^2.3.3",
-    "tempy": "^1.0.1",
+    "tempy": "^3.1.0",
     "uuid": "^8.3.2",
     "ws": "^7.4.3"
   },
