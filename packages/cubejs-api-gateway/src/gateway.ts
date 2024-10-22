@@ -2225,10 +2225,15 @@ class ApiGateway {
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
+        // TODO: separate two auth workflows
         try {
           await mainCheckAuthFn(ctx, authorization);
-        } catch (error) {
-          await systemCheckAuthFn(ctx, authorization);
+        } catch (mainAuthError) {
+          try {
+            await systemCheckAuthFn(ctx, authorization);
+          } catch (playgroundAuthError) {
+            throw mainAuthError;
+          }
         }
       };
     }
