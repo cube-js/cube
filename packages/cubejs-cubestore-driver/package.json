@@ -44,7 +44,7 @@
     "@cubejs-backend/linter": "^1.0.0",
     "@types/csv-write-stream": "^2.0.0",
     "@types/generic-pool": "^3.1.9",
-    "@types/node": "^14",
+    "@types/node": "^18",
     "@types/ws": "^7.4.0",
     "jest": "^27",
     "typescript": "~5.2.2"
