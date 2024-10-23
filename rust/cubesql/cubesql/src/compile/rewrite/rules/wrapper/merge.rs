@@ -11,7 +11,13 @@ use crate::compile::rewrite::{
 impl WrapperRules {
     pub fn merge_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![rewrite(
-            "wrapper-pull-up-inner-wrapper-with-filter",
+            "wrapper-merge-inner-wrapper-with-filter",
+
+            // This does not turn cube_scan_wrapper(wrapped_select(...)) to cube_scan_wrapper(wrapper_pullup_replacer(...)))
+            // Because that would act as a pullup wrapper_pullup_replacer over wrapped_select
+            // And that should follow the rules regarding ungroupedness
+            // So, to avoid repeating it this rules just merges two wrapped_select's, but avoid pulling up further
+
             cube_scan_wrapper(
                 wrapped_select(
                     "?select_type",
@@ -104,40 +110,79 @@ impl WrapperRules {
                 "CubeScanWrapperFinalized:false",
             ),
             cube_scan_wrapper(
-                wrapper_pullup_replacer(
-                    wrapped_select(
-                        "?select_type",
+                wrapped_select(
+                    "?select_type",
+                    wrapper_pullup_replacer(
                         "?projection_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
                         "?subqueries",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
                         "?group_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
                         "?aggr_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
                         "?window_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
                         "?inner_cube_scan_input",
-                        wrapped_select_joins_empty_tail(),
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
                         wrapped_select_filter_expr(
                             "?inner_filter_expr_left",
                             "?inner_filter_expr_right",
                         ),
-                        wrapped_select_having_expr_empty_tail(),
-                        "?limit",
-                        "?offset",
-                        "?order_expr",
-                        "?select_alias",
-                        "?select_distinct",
-                        // this should inherit lower instead of higher
-                        // sematics is that "input of WS in ungrouped", and we use input from lower
-                        // lower WrappedSelect is simple, but if it's ungrouped, then
-                        // "?select_ungrouped",
-                        "WrappedSelectUngrouped:true",
-                        "?select_ungrouped_scan",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
                     ),
-                    "?alias_to_cube",
-                    // TODO why fixed false? is
-                    // "WrapperPullupReplacerUngrouped:false",
-                    // "WrapperPullupReplacerUngrouped:true",
-                    "?ungrouped",
-                    "?in_projection",
-                    "?cube_members",
+                    wrapped_select_having_expr_empty_tail(),
+                    "?limit",
+                    "?offset",
+                    wrapper_pullup_replacer(
+                        "?order_expr",
+                        "?alias_to_cube",
+                        "?ungrouped",
+                        "?in_projection",
+                        "?cube_members",
+                    ),
+                    "?select_alias",
+                    "?select_distinct",
+                    // this should inherit lower instead of higher
+                    // semantics is that "input of WS in ungrouped", and we use input from lower
+                    // lower WrappedSelect is simple, but if it's ungrouped, then
+                    // "?select_ungrouped",
+                    "WrappedSelectUngrouped:true",
+                    "?select_ungrouped_scan",
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
