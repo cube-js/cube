@@ -797,13 +797,16 @@ jobs:
           EVENT_BASE_REF: ${{ github.event.base_ref || 'master' }}
         run: |
           BRANCH=$EVENT_BASE_REF#refs/heads/
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Detected branch: $BRANCH"
 
+          IS_MASTER=false
           if [ "$BRANCH_NAME" == "master" ]; then
-            echo "is_master=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_master=false" >> "$GITHUB_OUTPUT"
+            IS_MASTER=true
           fi
+          echo "Detected is_master: $IS_MASTER"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "is_master=$IS_MASTER" >> "$GITHUB_OUTPUT"
 
   trigger-repo-sync:
     name: Trigger runtime repo
