@@ -800,7 +800,7 @@ jobs:
           echo "Detected branch: $BRANCH"
 
           IS_MASTER=false
-          if [ "$BRANCH_NAME" == "master" ]; then
+          if [ "$BRANCH" == "master" ]; then
             IS_MASTER=true
           fi
           echo "Detected is_master: $IS_MASTER"
