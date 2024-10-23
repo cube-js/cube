@@ -2323,7 +2323,9 @@ from
         assert_eq!(
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
-                measures: Some(vec![]),
+                measures: Some(vec![
+                    "KibanaSampleDataEcommerce.sumPrice".to_string(),
+                ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
