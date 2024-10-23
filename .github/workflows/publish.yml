@@ -828,6 +828,6 @@ jobs:
               ref: 'master',
               inputs: {
                 'tag': tagName,
-                'branch':branchName,
+                'branch': branchName,
               }
             })
