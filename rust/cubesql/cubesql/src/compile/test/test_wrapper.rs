@@ -1043,8 +1043,9 @@ async fn test_wrapper_filter_flatten() {
                 "cube_name": "KibanaSampleDataEcommerce",
                 "alias": "sum_kibanasample",
                 "cube_params": ["KibanaSampleDataEcommerce"],
-                // This SUM(sumPrice) is invalid in grouped query
-                "expr": "SUM(${KibanaSampleDataEcommerce.sumPrice})",
+                // This is grouped query, KibanaSampleDataEcommerce.sumPrice is correct in this context
+                // SUM(sumPrice) will be incrrect here, it would lead to SUM(SUM(sql)) in generated query
+                "expr": "${KibanaSampleDataEcommerce.sumPrice}",
                 "grouping_set": null,
             })
             .to_string(),]),

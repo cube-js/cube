@@ -7265,7 +7265,7 @@ ORDER BY
                         "cube_name": "WideCube",
                         "alias": "max_source_measu",
                         "cube_params": ["WideCube"],
-                        "expr": "MAX(${WideCube.measure1})",
+                        "expr": "${WideCube.measure1}",
                         "grouping_set": null,
                     })
                     .to_string(),
@@ -7273,7 +7273,7 @@ ORDER BY
                         "cube_name": "WideCube",
                         "alias": "max_source_measu_1",
                         "cube_params": ["WideCube"],
-                        "expr": "MAX(${WideCube.measure2})",
+                        "expr": "${WideCube.measure2}",
                         "grouping_set": null,
                     })
                     .to_string(),
@@ -7281,7 +7281,7 @@ ORDER BY
                         "cube_name": "WideCube",
                         "alias": "sum_source_measu",
                         "cube_params": ["WideCube"],
-                        "expr": "SUM(${WideCube.measure3})",
+                        "expr": "${WideCube.measure3}",
                         "grouping_set": null,
                     })
                     .to_string(),
@@ -7289,38 +7289,38 @@ ORDER BY
                         "cube_name": "WideCube",
                         "alias": "max_source_measu_2",
                         "cube_params": ["WideCube"],
-                        "expr": "MAX(${WideCube.measure4})",
+                        "expr": "${WideCube.measure4}",
                         "grouping_set": null,
                     })
                     .to_string(),
                 ]),
                 dimensions: Some(vec![
-                    trivial_member_expr("WideCube", "dim2", "source_dim2"),
-                    trivial_member_expr("WideCube", "dim3", "source_dim3"),
-                    trivial_member_expr("WideCube", "dim4", "source_dim4"),
+                    trivial_member_expr("WideCube", "dim2", "dim2"),
+                    trivial_member_expr("WideCube", "dim3", "dim3"),
+                    trivial_member_expr("WideCube", "dim4", "dim4"),
                     json!({
                         "cube_name": "WideCube",
-                        "alias": "source_pivot_gro",
+                        "alias": "pivot_grouping",
                         "cube_params": ["WideCube"],
                         "expr": "0",
                         "grouping_set": null,
                     })
                     .to_string()
                 ]),
-                segments: Some(vec![json!({
-                    "cube_name": "WideCube",
-                    "alias": "widecube_dim1___",
-                    "cube_params": ["WideCube"],
-                    "expr": "(${WideCube.dim1} = $0$)",
-                    "grouping_set": null,
-                })
-                .to_string()]),
+                segments: Some(vec![]),
                 order: Some(vec![
-                    vec!["source_dim2".to_string(), "asc".to_string(),],
-                    vec!["source_dim3".to_string(), "asc".to_string(),],
-                    vec!["source_dim4".to_string(), "asc".to_string(),],
-                    vec!["source_pivot_gro".to_string(), "asc".to_string(),],
+                    vec!["dim2".to_string(), "asc".to_string(),],
+                    vec!["dim3".to_string(), "asc".to_string(),],
+                    vec!["dim4".to_string(), "asc".to_string(),],
+                    vec!["pivot_grouping".to_string(), "asc".to_string(),],
                 ]),
+                filters: Some(vec![V1LoadRequestQueryFilterItem {
+                    member: Some("WideCube.dim1".to_string()),
+                    operator: Some("equals".to_string()),
+                    values: Some(vec!["foo".to_string()]),
+                    or: None,
+                    and: None,
+                },]),
                 ..Default::default()
             }
         );
@@ -12768,7 +12768,7 @@ ORDER BY "source"."str0" ASC
                         "cube_name": "KibanaSampleDataEcommerce",
                         "alias": "avg_kibanasample",
                         "cube_params": ["KibanaSampleDataEcommerce"],
-                        "expr": "AVG(${KibanaSampleDataEcommerce.avgPrice})",
+                        "expr": "${KibanaSampleDataEcommerce.avgPrice}",
                         "grouping_set": null,
                     }).to_string(),
                 ]),
