@@ -796,7 +796,7 @@ jobs:
         env:
           EVENT_BASE_REF: ${{ github.event.base_ref || 'master' }}
         run: |
-          BRANCH=$EVENT_BASE_REF#refs/heads/
+          BRANCH=${EVENT_BASE_REF#refs/heads/}
           echo "Detected branch: $BRANCH"
 
           IS_MASTER=false
