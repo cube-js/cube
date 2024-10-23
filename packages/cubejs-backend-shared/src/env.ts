@@ -192,7 +192,7 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_NATIVE_SQL_PLANNER').asBool(),
+  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -500,7 +500,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
   dbPollMaxInterval: ({
@@ -514,7 +514,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * Polling timeout. Currently used in BigQuery, Dremio and Athena.
    * TODO: clarify this env.
    */
   dbPollTimeout: ({
@@ -532,7 +532,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *

@@ -1,6 +1,7 @@
 use cubeclient::models::{
     V1LoadRequestQuery, V1LoadRequestQueryFilterItem, V1LoadRequestQueryTimeDimension,
 };
+use pretty_assertions::assert_eq;
 use serde_json::json;
 
 use crate::compile::{
@@ -44,12 +45,8 @@ async fn powerbi_join() {
             measures: Some(vec!["Logs.agentCount".to_string()]),
             dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     );
 }
@@ -118,12 +115,8 @@ async fn powerbi_transitive_join() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
             dimensions: Some(vec!["Logs.content".to_string()]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }
     );
 }
@@ -174,12 +167,9 @@ async fn test_join_three_cubes() {
                 "Logs.content".to_string(),
             ]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }
     )
 }
@@ -218,8 +208,6 @@ async fn test_join_three_cubes_split() {
                 date_range: None
             }]),
             order: Some(vec![]),
-            limit: None,
-            offset: None,
             filters: Some(vec![V1LoadRequestQueryFilterItem {
                 member: Some("Logs.read".to_string()),
                 operator: Some("equals".to_string()),
@@ -227,7 +215,7 @@ async fn test_join_three_cubes_split() {
                 or: None,
                 and: None
             }]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -256,13 +244,10 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![vec![
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "asc".to_string(),
             ]]),
-            limit: None,
-            offset: None,
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -279,7 +264,7 @@ async fn test_join_two_subqueries_with_filter_order_limit() {
                     and: None
                 }
             ]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -318,8 +303,6 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "asc".to_string(),
             ]]),
-            limit: None,
-            offset: None,
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -336,7 +319,7 @@ async fn test_join_three_subqueries_with_filter_order_limit_and_split() {
                     and: None
                 }
             ]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -365,13 +348,10 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
             measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
             dimensions: Some(vec!["Logs.read".to_string(),]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![vec![
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "asc".to_string(),
             ]]),
-            limit: None,
-            offset: None,
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -388,7 +368,7 @@ async fn test_join_subquery_and_table_with_filter_order_limit() {
                     and: None
                 }
             ]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -427,8 +407,6 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                 "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 "asc".to_string(),
             ]]),
-            limit: None,
-            offset: None,
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -445,7 +423,7 @@ async fn test_join_two_subqueries_and_table_with_filter_order_limit_and_split() 
                     and: None
                 }
             ]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -490,8 +468,6 @@ async fn test_join_two_subqueries_filter_push_down() {
                 "KibanaSampleDataEcommerce.count".to_string(),
                 "asc".to_string(),
             ]]),
-            limit: None,
-            offset: None,
             filters: Some(vec![
                 V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -508,7 +484,7 @@ async fn test_join_two_subqueries_filter_push_down() {
                     and: None
                 }
             ]),
-            ungrouped: None,
+            ..Default::default()
         }
     )
 }
@@ -627,10 +603,7 @@ async fn test_join_cubes_with_postprocessing() {
                 date_range: None,
             }]),
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }),
         true
     );
@@ -640,12 +613,9 @@ async fn test_join_cubes_with_postprocessing() {
             measures: Some(vec![]),
             dimensions: Some(vec!["Logs.read".to_string()]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }),
         true
     )
@@ -689,10 +659,7 @@ async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
                 date_range: None,
             }]),
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         }),
         true
     );
@@ -702,12 +669,9 @@ async fn test_join_cubes_with_postprocessing_and_no_cubejoinfield() {
             measures: Some(vec![]),
             dimensions: Some(vec!["Logs.id".to_string(), "Logs.read".to_string(),]),
             segments: Some(vec![]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }),
         true
     )

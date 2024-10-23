@@ -744,7 +744,7 @@ jobs:
     name: Trigger test suites run
     runs-on: ubuntu-20.04
     needs: [docker-default]
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -767,5 +767,39 @@ jobs:
                 'source-pr-url': prUrl,
                 'source-commit-url': commitUrl,
                 'initiator': '${{ github.actor }}'
+              }
+            })
+
+  trigger-repo-sync:
+    name: Trigger runtime repo
+    runs-on: ubuntu-20.04
+    needs: [docker-default]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Ensure full git history is fetched
+      - name: Detect branch name
+        id: detect_branch
+        run: |
+          BRANCH_NAME=$(git branch -r --contains "$GITHUB_SHA" | grep -v 'HEAD' | head -n 1 | sed -e 's/.*origin\///')
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+      - name: Trigger runtime
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            const tagName = process.env.GITHUB_REF.replace('refs/tags/', '');
+            const branchName = '${{ steps.detect_branch.outputs.branch_name }}';
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'cube-runtime',
+              workflow_id: 'sync.yml',
+              ref: 'master',
+              inputs: {
+                'tag': tagName,
+                'branch': branchName,
               }
             })

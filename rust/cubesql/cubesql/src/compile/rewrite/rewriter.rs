@@ -4,7 +4,7 @@ use crate::{
         rewrite::{
             analysis::LogicalPlanAnalysis,
             converter::LanguageToLogicalPlanConverter,
-            cost::BestCubePlan,
+            cost::{BestCubePlan, CubePlanTopDownState, TopDownExtractor},
             rules::{
                 case::CaseRules, common::CommonRules, dates::DateRules, filters::FilterRules,
                 flatten::FlattenRules, members::MemberRules, old_split::OldSplitRules,
@@ -32,8 +32,11 @@ use std::{
     time::Duration,
 };
 
+pub type CubeRewrite = Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>;
+pub type CubeEGraph = EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>;
+
 pub struct Rewriter {
-    graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+    graph: CubeEGraph,
     cube_context: Arc<CubeContext>,
 }
 
@@ -80,9 +83,7 @@ pub struct IterDebugInfo {
 }
 
 impl IterDebugInfo {
-    pub fn prepare_debug_data(
-        graph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> DebugData {
+    pub fn prepare_debug_data(graph: &CubeEGraph) -> DebugData {
         DebugData {
             applied_rules: None,
             nodes: graph
@@ -185,20 +186,14 @@ impl IterationData<LogicalPlanLanguage, LogicalPlanAnalysis> for IterInfo {
 }
 
 impl Rewriter {
-    pub fn new(
-        graph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        cube_context: Arc<CubeContext>,
-    ) -> Self {
+    pub fn new(graph: CubeEGraph, cube_context: Arc<CubeContext>) -> Self {
         Self {
             graph,
             cube_context,
         }
     }
 
-    pub fn rewrite_runner(
-        cube_context: Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    ) -> CubeRunner {
+    pub fn rewrite_runner(cube_context: Arc<CubeContext>, egraph: CubeEGraph) -> CubeRunner {
         CubeRunner::new(LogicalPlanAnalysis::new(
             cube_context,
             Arc::new(DefaultPhysicalPlanner::default()),
@@ -231,7 +226,7 @@ impl Rewriter {
         &mut self,
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
-    ) -> Result<EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, CubeError> {
+    ) -> Result<CubeEGraph, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
         if let Some(qtrace) = qtrace {
@@ -314,6 +309,7 @@ impl Rewriter {
         auth_context: AuthContextRef,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
+        top_down_extractor: bool,
     ) -> Result<LogicalPlan, CubeError> {
         let cube_context = self.cube_context.clone();
         let egraph = self.graph.clone();
@@ -337,9 +333,26 @@ impl Rewriter {
                 let (runner, qtrace_egraph_iterations) =
                     Self::run_rewrites(&cube_context, egraph, rules, "final")?;
 
-                let extractor =
-                    Extractor::new(&runner.egraph, BestCubePlan::new(cube_context.meta.clone()));
-                let (best_cost, best) = extractor.find_best(root);
+                let best = if top_down_extractor {
+                    let mut extractor = TopDownExtractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                        CubePlanTopDownState::new(),
+                    );
+                    let Some((best_cost, best)) = extractor.find_best(root) else {
+                        return Err(CubeError::internal("Unable to find best plan".to_string()));
+                    };
+                    log::debug!("Best cost: {:?}", best_cost);
+                    best
+                } else {
+                    let extractor = Extractor::new(
+                        &runner.egraph,
+                        BestCubePlan::new(cube_context.meta.clone()),
+                    );
+                    let (best_cost, best) = extractor.find_best(root);
+                    log::debug!("Best cost: {:?}", best_cost);
+                    best
+                };
                 let qtrace_best_graph = if Qtrace::is_enabled() {
                     best.as_ref().iter().cloned().collect()
                 } else {
@@ -354,14 +367,13 @@ impl Rewriter {
                         .map(|(i, n)| format!("{}: {:?}", i, n))
                         .join(", ")
                 );
-                log::debug!("Best cost: {:?}", best_cost);
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
                     auth_context,
                     span_id.clone(),
                 );
-                Ok::<_, CubeError>((
+                Ok((
                     converter.to_logical_plan(new_root),
                     qtrace_egraph_iterations,
                     qtrace_best_graph,
@@ -379,8 +391,8 @@ impl Rewriter {
 
     fn run_rewrites(
         cube_context: &Arc<CubeContext>,
-        egraph: EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-        rules: Arc<Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>>,
+        egraph: CubeEGraph,
+        rules: Arc<Vec<CubeRewrite>>,
         stage: &str,
     ) -> Result<(CubeRunner, Vec<QtraceEgraphIteration>), CubeError> {
         let runner = Self::rewrite_runner(cube_context.clone(), egraph);
@@ -501,11 +513,17 @@ impl Rewriter {
             .unwrap_or(true)
     }
 
+    pub fn top_down_extractor_enabled() -> bool {
+        env::var("CUBESQL_TOP_DOWN_EXTRACTOR")
+            .map(|v| v.to_lowercase() != "false")
+            .unwrap_or(true)
+    }
+
     pub fn rewrite_rules(
         meta_context: Arc<MetaContext>,
         config_obj: Arc<dyn ConfigObj>,
         eval_stable_functions: bool,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    ) -> Vec<CubeRewrite> {
         let sql_push_down = Self::sql_push_down_enabled();
         let rules: Vec<Box<dyn RewriteRules>> = vec![
             Box::new(MemberRules::new(
@@ -557,7 +575,7 @@ impl Rewriter {
 }
 
 pub trait RewriteRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>;
+    fn rewrite_rules(&self) -> Vec<CubeRewrite>;
 }
 
 struct IncrementalScheduler {
@@ -578,7 +596,7 @@ impl egg::RewriteScheduler<LogicalPlanLanguage, LogicalPlanAnalysis> for Increme
     fn search_rewrite<'a>(
         &mut self,
         iteration: usize,
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &CubeEGraph,
         rewrite: &'a Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>,
     ) -> Vec<egg::SearchMatches<'a, LogicalPlanLanguage>> {
         if iteration != self.current_iter {

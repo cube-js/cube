@@ -1,7 +1,7 @@
 {
   "name": "@cubejs-client/playground",
   "author": "Cube Dev, Inc.",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "engines": {},
   "repository": {
     "type": "git",
@@ -65,7 +65,7 @@
   "devDependencies": {
     "@ant-design/compatible": "^1.0.1",
     "@ant-design/icons": "^5.3.5",
-    "@cube-dev/ui-kit": "0.37.4",
+    "@cube-dev/ui-kit": "0.38.0",
     "@cubejs-client/core": "^1.0.0",
     "@cubejs-client/react": "^1.0.0",
     "@types/flexsearch": "^0.7.3",

@@ -1150,7 +1150,7 @@ impl LogicalPlanAnalysis {
     }
 
     fn eval_constant_expr(
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
         expr: &Expr,
     ) -> Option<ConstantFolding> {
         let schema = DFSchema::empty();

@@ -77,12 +77,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -121,12 +117,8 @@ mod tests {
                     "MultiTypeCube.dim_num1".to_string(),
                     "MultiTypeCube.dim_num2".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -160,12 +152,8 @@ mod tests {
                     "MultiTypeCube.dim_str0".to_string(),
                     "MultiTypeCube.dim_str1".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -183,12 +171,8 @@ mod tests {
                 measures: Some(vec!["NumberCube.someNumber".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -206,12 +190,8 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -234,12 +214,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -266,12 +242,8 @@ mod tests {
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -305,10 +277,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -316,7 +285,7 @@ mod tests {
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -340,10 +309,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -351,7 +317,7 @@ mod tests {
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -431,15 +397,11 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -461,15 +423,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             (
@@ -481,15 +440,11 @@ mod tests {
                         "KibanaSampleDataEcommerce.customer_gender".to_string(),
                         "KibanaSampleDataEcommerce.order_date".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.order_date".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_default
@@ -501,15 +456,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_compound_identifier_default
@@ -521,15 +473,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_asc
@@ -541,15 +490,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "asc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_indentifier_desc
@@ -561,15 +507,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_identifer_alias_ident_no_escape
@@ -581,15 +524,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
             // test_order_identifer_alias_ident_escape
@@ -601,15 +541,12 @@ mod tests {
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                         "desc".to_string(),
                     ]]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             ),
         ];
@@ -654,10 +591,8 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "desc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -682,10 +617,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "desc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -760,12 +692,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -790,12 +719,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -848,12 +774,10 @@ mod tests {
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(0),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -906,12 +830,9 @@ mod tests {
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -935,12 +856,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -964,12 +882,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -992,10 +907,7 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1003,7 +915,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1027,12 +939,8 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1062,12 +970,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1097,12 +1002,9 @@ mod tests {
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1123,10 +1025,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec!["KibanaSampleDataEcommerce.is_female".to_string()]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -1134,7 +1033,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -1150,10 +1049,7 @@ mod tests {
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.has_subscription".to_string()),
@@ -1170,7 +1066,7 @@ mod tests {
                         and: None,
                     }
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1193,10 +1089,7 @@ mod tests {
                 dimensions: Some(vec![
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
                     operator: Some("set".to_string()),
@@ -1204,7 +1097,7 @@ mod tests {
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1253,10 +1146,7 @@ mod tests {
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1297,10 +1187,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1341,8 +1228,6 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1350,7 +1235,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1392,7 +1277,6 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     "desc".to_string()
                 ]]),
                 limit: Some(10000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.notes".to_string()),
                     operator: Some("equals".to_string()),
@@ -1406,7 +1290,7 @@ ORDER BY \"COUNT(count)\" DESC LIMIT 10000"
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1451,8 +1335,6 @@ ORDER BY \"COUNT(count)\" DESC"
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -1483,7 +1365,7 @@ ORDER BY \"COUNT(count)\" DESC"
                         and: None
                     }
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1504,15 +1386,12 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ],],),
                 limit: Some(1001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1533,10 +1412,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -1578,7 +1454,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     ]),
                     and: None,
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1620,10 +1496,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -1631,7 +1504,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -1674,10 +1547,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1698,12 +1568,8 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1730,10 +1596,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -1755,10 +1618,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1785,10 +1645,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1809,10 +1666,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -1820,7 +1674,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1841,10 +1695,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -1852,7 +1703,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1873,10 +1724,7 @@ ORDER BY \"COUNT(count)\" DESC"
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("gt".to_string()),
@@ -1884,7 +1732,7 @@ ORDER BY \"COUNT(count)\" DESC"
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1919,12 +1767,8 @@ GROUP BY
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -1978,10 +1822,8 @@ GROUP BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -1989,7 +1831,7 @@ GROUP BY
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2040,10 +1882,7 @@ GROUP BY
                     },
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2095,9 +1934,7 @@ GROUP BY
                 }]),
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2203,10 +2040,8 @@ limit
                 ]),
                 dimensions: Some(vec!["WideCube.dim1".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("WideCube.dim1".to_string()),
@@ -2252,7 +2087,7 @@ limit
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2400,10 +2235,7 @@ limit
                     }
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2444,12 +2276,9 @@ from
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -2497,12 +2326,9 @@ from
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -2577,10 +2403,8 @@ from
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("set".to_string()),
@@ -2588,7 +2412,7 @@ from
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2658,7 +2482,6 @@ limit
                 }]),
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
                     operator: Some("set".to_string()),
@@ -2666,7 +2489,7 @@ limit
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2723,12 +2546,9 @@ limit
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000001),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -2819,12 +2639,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2833,12 +2649,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2847,12 +2659,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2861,12 +2669,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2875,12 +2679,8 @@ limit
                     measures: Some(vec!["Logs.agentCount".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2889,12 +2689,8 @@ limit
                     measures: Some(vec!["Logs.agentCountApprox".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
             (
@@ -2903,12 +2699,8 @@ limit
                     measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 },
             ),
         ];
@@ -2943,12 +2735,8 @@ limit
                 measures: Some(vec!["StringCube.someString".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -2981,12 +2769,9 @@ limit
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -3092,10 +2877,7 @@ limit
                         date_range: None,
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             );
 
@@ -3146,10 +2928,7 @@ limit
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -4687,12 +4466,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
         assert_eq!(
@@ -4720,10 +4497,8 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -4732,6 +4507,7 @@ limit
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -4763,12 +4539,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -4794,12 +4568,10 @@ limit
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -4840,12 +4612,9 @@ limit
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -4909,12 +4678,8 @@ ORDER BY "ca_4" ASC
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["Logs.read".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -4975,10 +4740,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5014,10 +4776,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5048,12 +4807,9 @@ ORDER BY
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -5099,10 +4855,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5140,10 +4893,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5185,12 +4935,9 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -5319,26 +5066,6 @@ ORDER BY
         insta::assert_snapshot!(
             "performance_schema_global_variables",
             execute_query("SELECT * FROM performance_schema.global_variables WHERE VARIABLE_NAME = 'max_allowed_packet'".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_processlist() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_processlist",
-            execute_query("SHOW processlist".to_string(), DatabaseProtocol::MySQL).await?
-        );
-
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn test_show_warnings() -> Result<(), CubeError> {
-        insta::assert_snapshot!(
-            "show_warnings",
-            execute_query("SHOW warnings".to_string(), DatabaseProtocol::MySQL).await?
         );
 
         Ok(())
@@ -6504,12 +6231,9 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -6547,10 +6271,8 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -6617,10 +6339,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -6657,12 +6376,9 @@ ORDER BY
                     dimensions: Some(vec![
                         "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                     ]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -6709,10 +6425,7 @@ ORDER BY
                 date_range: None,
             }]),
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         };
 
         context
@@ -6818,10 +6531,7 @@ ORDER BY
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -7051,9 +6761,7 @@ ORDER BY
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -7095,12 +6803,8 @@ ORDER BY
                 ]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -7214,10 +6918,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("equals".to_string()),
@@ -7226,6 +6927,7 @@ ORDER BY
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7310,10 +7012,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
@@ -7331,6 +7030,7 @@ ORDER BY
                     }
                 ]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7365,10 +7065,7 @@ ORDER BY
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
@@ -7376,7 +7073,7 @@ ORDER BY
                     or: None,
                     and: None,
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7426,9 +7123,8 @@ ORDER BY
                     "desc".to_string(),
                 ]]),
                 limit: Some(10000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -7449,10 +7145,8 @@ ORDER BY
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -7460,7 +7154,7 @@ ORDER BY
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7483,12 +7177,10 @@ ORDER BY
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(0),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -7566,10 +7258,7 @@ ORDER BY
                     "WideCube.dim4".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("WideCube.dim1".to_string()),
                     operator: Some("equals".to_string()),
@@ -7578,6 +7267,7 @@ ORDER BY
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
         assert!(!query_plan
@@ -7635,12 +7325,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
         assert!(!query_plan
@@ -7673,10 +7360,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7750,10 +7434,8 @@ ORDER BY "source"."str0" ASC
                         date_range: Some(json!(vec![from, to])),
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -7788,10 +7470,8 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7850,10 +7530,8 @@ ORDER BY "source"."str0" ASC
                         date_range: Some(json!(vec![from, to])),
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -7888,10 +7566,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -7916,12 +7591,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -7950,10 +7621,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -7962,6 +7631,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -7982,10 +7652,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -8009,6 +7677,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -8037,10 +7706,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.taxful_total_price".to_string()),
@@ -8058,6 +7725,7 @@ ORDER BY "source"."str0" ASC
                     }
                 ]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -8078,10 +7746,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -8109,6 +7775,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 },]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -8141,10 +7808,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 },]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -8238,10 +7902,7 @@ ORDER BY "source"."str0" ASC
                         date_range: None,
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             )
         }
@@ -8277,12 +7938,9 @@ ORDER BY "source"."str0" ASC
                     measures: Some(vec![]),
                     dimensions: Some(vec![]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             )
         }
@@ -8325,10 +7983,7 @@ ORDER BY "source"."str0" ASC
                     ])),
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -8365,8 +8020,6 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -8374,7 +8027,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -8420,10 +8073,7 @@ ORDER BY "source"."str0" ASC
                         date_range: None,
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             )
         }
@@ -8447,12 +8097,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -8482,12 +8129,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10000),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -8531,12 +8176,9 @@ ORDER BY "source"."str0" ASC
                     "Logs.content".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -8690,12 +8332,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(50000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -8711,12 +8350,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(200),
                 offset: Some(200),
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -8781,10 +8418,7 @@ ORDER BY "source"."str0" ASC
                         date_range: None
                     }]),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             );
         }
@@ -8825,12 +8459,8 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -8865,10 +8495,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -8897,13 +8524,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notContains".to_string()),
@@ -8911,7 +8536,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -8971,12 +8596,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }),
             true
         );
@@ -8990,12 +8611,8 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }),
             true
         );
@@ -9053,12 +8670,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.maxPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }),
             true
         );
@@ -9077,10 +8690,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }),
             true
         );
@@ -9109,13 +8719,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.count".to_string(),
                     "desc".to_string()
                 ]]),
                 limit: Some(100000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("equals".to_string()),
@@ -9126,7 +8734,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -9189,9 +8797,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9276,9 +8882,7 @@ ORDER BY "source"."str0" ASC
                         "desc".to_string()
                     ]]),
                     limit: Some(2500),
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             )
         }
@@ -9310,10 +8914,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -9321,7 +8922,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9352,10 +8953,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -9363,7 +8961,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9398,10 +8996,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -9409,7 +9004,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9445,10 +9040,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string()]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -9465,7 +9057,7 @@ ORDER BY "source"."str0" ASC
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9499,10 +9091,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("startsWith".to_string()),
@@ -9510,7 +9099,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9544,10 +9133,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("endsWith".to_string()),
@@ -9555,7 +9141,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9593,10 +9179,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
                     operator: Some("contains".to_string()),
@@ -9604,7 +9187,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9643,10 +9226,7 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.maxPrice".to_string()),
@@ -9663,7 +9243,7 @@ ORDER BY "source"."str0" ASC
                         and: None,
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9702,10 +9282,7 @@ ORDER BY "source"."str0" ASC
                     ])),
                 },]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9751,9 +9328,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9809,9 +9384,7 @@ ORDER BY "source"."str0" ASC
                     "desc".to_string()
                 ]]),
                 limit: Some(2500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9842,12 +9415,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -9876,12 +9446,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.sumPrice".to_string()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -9903,10 +9469,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("equals".to_string()),
@@ -9914,7 +9477,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -9943,12 +9506,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec!["KibanaSampleDataEcommerce.count".to_string(),]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -10016,12 +9575,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             },
         );
     }
@@ -10056,12 +9612,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10091,12 +9644,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10211,12 +9761,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10260,10 +9807,8 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10295,10 +9840,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10322,6 +9864,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10355,10 +9898,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10382,6 +9922,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10415,10 +9956,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10442,6 +9980,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10475,10 +10014,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10502,6 +10038,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10535,10 +10072,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10562,6 +10096,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10595,10 +10130,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 segments: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10622,6 +10154,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -10677,10 +10210,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10725,6 +10255,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10759,10 +10290,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -10790,6 +10318,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10848,10 +10377,8 @@ ORDER BY "source"."str0" ASC
                             .collect::<Vec<_>>()
                     ),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             )
         }
@@ -10890,10 +10417,7 @@ ORDER BY "source"."str0" ASC
                             .collect::<Vec<_>>()
                     ),
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
-                    filters: None,
-                    ungrouped: None,
+                    ..Default::default()
                 }
             )
         }
@@ -10928,12 +10452,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -10970,12 +10491,10 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10001),
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11019,15 +10538,12 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11081,8 +10597,6 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("set".to_string()),
@@ -11090,7 +10604,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11137,10 +10651,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("set".to_string()),
@@ -11148,7 +10659,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11184,10 +10695,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(10001),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("equals".to_string()),
@@ -11198,7 +10707,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 },]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11227,12 +10736,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11261,12 +10767,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11308,13 +10811,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("contains".to_string()),
@@ -11322,7 +10823,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -11359,13 +10860,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notStartsWith".to_string()),
@@ -11373,7 +10872,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -11410,13 +10909,11 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
                 limit: Some(1000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
                     operator: Some("notEndsWith".to_string()),
@@ -11424,7 +10921,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11525,12 +11022,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11566,12 +11060,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11606,12 +11097,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11651,12 +11138,9 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11695,12 +11179,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11735,12 +11215,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11776,12 +11252,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11853,10 +11325,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.count".to_string()),
                     operator: Some("lt".to_string()),
@@ -11864,7 +11333,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11900,12 +11369,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -11937,12 +11403,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -11976,10 +11438,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12020,10 +11479,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12064,10 +11520,7 @@ ORDER BY "source"."str0" ASC
                     },
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12098,12 +11551,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -12132,12 +11581,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.notes".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -12200,12 +11645,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12242,10 +11683,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
 
@@ -12277,10 +11715,7 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.order_date".to_string(),
                     "asc".to_string()
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12321,10 +11756,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12362,12 +11794,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
 
@@ -12397,12 +11826,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12450,10 +11876,7 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string(),),
                     operator: Some("beforeDate".to_string(),),
@@ -12462,6 +11885,7 @@ ORDER BY "source"."str0" ASC
                     and: None,
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12495,12 +11919,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12541,10 +11962,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12585,12 +12003,8 @@ ORDER BY "source"."str0" ASC
                     "Logs.id".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12627,12 +12041,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -12669,10 +12080,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12714,10 +12122,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12841,12 +12246,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12882,12 +12283,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -12928,12 +12325,9 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -13013,10 +12407,7 @@ ORDER BY "source"."str0" ASC
                     measures: Some(vec![]),
                     dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                     segments: Some(vec![]),
-                    time_dimensions: None,
                     order: Some(vec![]),
-                    limit: None,
-                    offset: None,
                     filters: Some(vec![V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                         operator: Some(filter_operator.to_string()),
@@ -13025,6 +12416,7 @@ ORDER BY "source"."str0" ASC
                         and: None
                     }]),
                     ungrouped: Some(true),
+                    ..Default::default()
                 }
             );
         }
@@ -13062,10 +12454,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -13101,12 +12490,9 @@ ORDER BY "source"."str0" ASC
                 ]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13144,10 +12530,8 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13182,10 +12566,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -13252,10 +12633,8 @@ ORDER BY "source"."str0" ASC
             // before TableScan is a post-processing projection.
             // Splitting such projections into two may be a good idea.
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
             ungrouped: Some(true),
+            ..Default::default()
         }))
     }
 
@@ -13307,8 +12686,6 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -13339,6 +12716,7 @@ ORDER BY "source"."str0" ASC
                     and: None
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -13376,10 +12754,7 @@ ORDER BY "source"."str0" ASC
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -13447,12 +12822,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         };
 
         context
@@ -13534,10 +12905,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             };
 
             context
@@ -13583,10 +12951,7 @@ ORDER BY "source"."str0" ASC
             dimensions: Some(vec!["MultiTypeCube.dim_date0".to_string()]),
             time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         };
 
         context
@@ -13667,10 +13032,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             };
 
             context
@@ -13715,12 +13077,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         };
 
         context
@@ -13828,12 +13186,8 @@ ORDER BY "source"."str0" ASC
             measures: Some(vec![]),
             segments: Some(vec![]),
             dimensions: Some(vec!["MultiTypeCube.dim_str0".to_string()]),
-            time_dimensions: None,
             order: Some(vec![]),
-            limit: None,
-            offset: None,
-            filters: None,
-            ungrouped: None,
+            ..Default::default()
         };
 
         assert_eq!(
@@ -14159,9 +13513,7 @@ ORDER BY "source"."str0" ASC
                 }]),
                 order: Some(vec![]),
                 limit: Some(1000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14196,10 +13548,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14237,10 +13586,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14308,10 +13654,7 @@ ORDER BY "source"."str0" ASC
                     }
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14349,10 +13692,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14389,7 +13729,11 @@ ORDER BY "source"."str0" ASC
                 .wrapped_sql
                 .unwrap()
                 .sql;
-            assert!(sql.contains("\"limit\":1000"));
+            if Rewriter::top_down_extractor_enabled() {
+                assert!(sql.contains("LIMIT 1000"));
+            } else {
+                assert!(sql.contains("\"limit\":1000"));
+            }
             assert!(sql.contains("% 7"));
 
             let physical_plan = query_plan.as_physical_plan().await.unwrap();
@@ -14409,12 +13753,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14451,10 +13791,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.order_date".to_string()),
                     operator: Some("afterOrOnDate".to_string()),
@@ -14462,7 +13800,7 @@ ORDER BY "source"."str0" ASC
                     or: None,
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14509,9 +13847,7 @@ ORDER BY "source"."str0" ASC
                 }]),
                 order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14548,10 +13884,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(25000),
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -14574,7 +13908,7 @@ ORDER BY "source"."str0" ASC
                     ]),
                     and: None,
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -14627,9 +13961,7 @@ ORDER BY "source"."str0" ASC
                     "asc".to_string(),
                 ]]),
                 limit: Some(25000),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -14693,10 +14025,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -14793,12 +14122,8 @@ ORDER BY "source"."str0" ASC
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -14923,12 +14248,8 @@ ORDER BY "source"."str0" ASC
                     "KibanaSampleDataEcommerce.taxful_total_price".to_string()
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -15386,10 +14707,7 @@ ORDER BY "source"."str0" ASC
                     date_range: None,
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         );
     }
@@ -15584,10 +14902,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.notes".to_string()),
                     operator: Some("equals".to_string()),
@@ -15595,7 +14910,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -15686,10 +15001,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     },
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -15768,15 +15081,11 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measures: Some(vec![]),
                 dimensions: Some(vec!["KibanaSampleDataEcommerce.customer_gender".to_string()]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![vec![
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                     "asc".to_string(),
                 ]]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -15842,10 +15151,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measures: Some(vec!["NumberCube.someNumber".into()]),
                 dimensions: Some(vec![]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("NumberCube.someNumber".into()),
                     operator: Some("equals".into()),
@@ -15854,6 +15160,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     and: None
                 }]),
                 ungrouped: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -15891,8 +15198,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -15921,7 +15226,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]),
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -15969,10 +15274,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ])),
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16017,8 +15319,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     date_range: None
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: None,
                     operator: None,
@@ -16077,7 +15377,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]),
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16221,10 +15521,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     },
                 ]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16275,10 +15572,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ])),
                 },]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16316,12 +15610,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.has_subscription".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
                 limit: Some(500),
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16409,12 +15700,9 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
                 ungrouped: Some(true),
+                ..Default::default()
             }
         )
     }
@@ -16452,12 +15740,8 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     "KibanaSampleDataEcommerce.customer_gender".to_string(),
                 ]),
                 segments: Some(vec![]),
-                time_dimensions: None,
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16505,8 +15789,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![
                     V1LoadRequestQueryFilterItem {
                         member: Some("KibanaSampleDataEcommerce.customer_gender".to_string()),
@@ -16527,7 +15809,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                         and: None
                     },
                 ]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16567,7 +15849,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 measure(count) AS cnt,
                 date_trunc('month', order_date) AS dt
             FROM KibanaSampleDataEcommerce
-            WHERE order_date IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
+            WHERE date_trunc('month', order_date) IN (to_timestamp('2019-01-01 00:00:00.000000', 'YYYY-MM-DD HH24:MI:SS.US'))
             GROUP BY 2
             ;"#
             .to_string(),
@@ -16585,16 +15867,21 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                 time_dimensions: Some(vec![V1LoadRequestQueryTimeDimension {
                     dimension: "KibanaSampleDataEcommerce.order_date".to_string(),
                     granularity: Some("month".to_string()),
-                    date_range: Some(json!(vec![
-                        "2019-01-01T00:00:00.000Z".to_string(),
-                        "2019-01-01T00:00:00.000Z".to_string()
-                    ]))
+                    date_range: if Rewriter::top_down_extractor_enabled() {
+                        Some(json!(vec![
+                            "2019-01-01T00:00:00.000Z".to_string(),
+                            "2019-01-31T23:59:59.999Z".to_string()
+                        ]))
+                    } else {
+                        // Non-optimal variant with top down extractor disabled
+                        Some(json!(vec![
+                            "2019-01-01 00:00:00.000".to_string(),
+                            "2019-01-31 23:59:59.999".to_string()
+                        ]))
+                    }
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16755,8 +16042,6 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     ]))
                 }]),
                 order: Some(vec![]),
-                limit: None,
-                offset: None,
                 filters: Some(vec![V1LoadRequestQueryFilterItem {
                     member: Some("KibanaSampleDataEcommerce.sumPrice".to_string()),
                     operator: Some("gte".to_string()),
@@ -16764,7 +16049,7 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
                     or: None,
                     and: None
                 }]),
-                ungrouped: None,
+                ..Default::default()
             }
         )
     }
@@ -16934,5 +16219,36 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_wrapper_limit_zero() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan(
+            r#"
+            SELECT MAX(order_date) FROM KibanaSampleDataEcommerce LIMIT 0
+            "#
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+        )
+        .await;
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains("LIMIT 0"));
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
     }
 }

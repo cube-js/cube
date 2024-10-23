@@ -171,7 +171,7 @@ const DbTypeValueMatcher: Record<string, ((v: any) => boolean)> = {
  * Base driver class.
  */
 export abstract class BaseDriver implements DriverInterface {
-  private testConnectionTimeoutValue = 10000;
+  private readonly testConnectionTimeoutValue: number = 10000;
 
   protected logger: any;
 

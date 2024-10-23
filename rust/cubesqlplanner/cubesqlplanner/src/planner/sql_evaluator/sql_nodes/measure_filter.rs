@@ -35,7 +35,6 @@ impl SqlNode for MeasureFilterSqlNode {
                         })
                         .collect::<Result<Vec<_>, _>>()?
                         .join(" AND ");
-                    //return `CASE WHEN ${where} THEN ${evaluateSql === '*' ? '1' : evaluateSql} END`;
                     let result = if input.as_str() == "*" {
                         "1".to_string()
                     } else {

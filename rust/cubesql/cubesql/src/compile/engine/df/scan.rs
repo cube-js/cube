@@ -1505,13 +1505,7 @@ mod tests {
                     "KibanaSampleDataEcommerce.orderDate".to_string(),
                     "KibanaSampleDataEcommerce.city".to_string(),
                 ]),
-                segments: None,
-                time_dimensions: None,
-                order: None,
-                limit: None,
-                offset: None,
-                filters: None,
-                ungrouped: None,
+                ..Default::default()
             },
             wrapped_sql: None,
             auth_context: Arc::new(HttpAuthContext {

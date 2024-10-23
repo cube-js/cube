@@ -1,5 +1,4 @@
-use super::Join;
-use super::QueryPlan;
+use super::{Join, QueryPlan, Subquery};
 use crate::planner::{BaseCube, VisitorContext};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -9,7 +8,8 @@ pub enum FromSource {
     Empty,
     Cube(Rc<BaseCube>),
     Join(Rc<Join>),
-    Subquery(Rc<QueryPlan>, String),
+    Subquery(Subquery),
+    TableReference(String, Option<String>),
 }
 
 #[derive(Clone)]
@@ -26,12 +26,16 @@ impl From {
         Self::new(FromSource::Cube(cube))
     }
 
+    pub fn new_from_table_reference(reference: String, alias: Option<String>) -> Self {
+        Self::new(FromSource::TableReference(reference, alias))
+    }
+
     pub fn new_from_join(join: Rc<Join>) -> Self {
         Self::new(FromSource::Join(join))
     }
 
     pub fn new_from_subquery(plan: Rc<QueryPlan>, alias: String) -> Self {
-        Self::new(FromSource::Subquery(plan, alias))
+        Self::new(FromSource::Subquery(Subquery::new(plan, alias)))
     }
 
     pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
@@ -44,8 +48,13 @@ impl From {
             FromSource::Join(j) => {
                 format!("{}", j.to_sql(context.clone())?)
             }
-            FromSource::Subquery(s, alias) => {
-                format!("({}) AS {}", s.to_sql()?, alias)
+            FromSource::Subquery(s) => s.to_sql()?,
+            FromSource::TableReference(r, alias) => {
+                if let Some(alias) = alias {
+                    format!(" {} as {} ", r, alias)
+                } else {
+                    format!(" {} ", r)
+                }
             }
         };
         Ok(sql)
