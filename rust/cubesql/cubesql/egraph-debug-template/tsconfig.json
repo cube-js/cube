@@ -1,0 +1,33 @@
+{
+  // multiple base configs is supported in TS 5.0+
+  // See https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-0.html#supporting-multiple-configuration-files-in-extends
+  // But CRA supports only TS 4
+  // To add insult to injury, is does not fail with proper error, it prints "No issues found." instead
+
+  // @tsconfig/create-react-app is a bit broken, it uses moduleResolution=bundler with resolveJsonModule=true, which is incompatible
+  // TODO make it ["@tsconfig/create-react-app", "@tsconfig/strictest"] after TS bump
+  "extends": "@tsconfig/strictest",
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "skipLibCheck": true,
+
+    // Those are from create-react-app
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "NodeNext",
+    "target": "es2015",
+
+    // Those are from create-react-app
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "resolveJsonModule": true,
+
+    // This adds too much noise when iterating over arrays
+    "noUncheckedIndexedAccess": false,
+  },
+  "include": [
+    "src"
+  ]
+}

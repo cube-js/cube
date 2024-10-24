@@ -182,8 +182,12 @@ fn write_debug_states(runner: &CubeRunner, stage: &str) -> Result<(), CubeError>
         format!("{}/package.json", dir),
     )?;
     fs::copy(
-        "egraph-debug-template/src/index.js",
-        format!("{}/src/index.js", dir),
+        "egraph-debug-template/tsconfig.json",
+        format!("{}/tsconfig.json", dir),
+    )?;
+    fs::copy(
+        "egraph-debug-template/src/index.tsx",
+        format!("{}/src/index.tsx", dir),
     )?;
 
     let mut states = Vec::new();
