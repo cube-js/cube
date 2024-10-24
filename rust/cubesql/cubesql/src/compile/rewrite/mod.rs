@@ -106,6 +106,7 @@ crate::plan_to_language! {
             join_type: JoinType,
             join_constraint: JoinConstraint,
             schema: DFSchemaRef,
+            null_equals_null: bool,
         },
         CrossJoin {
             left: Arc<LogicalPlan>,
@@ -1728,6 +1729,7 @@ fn join(
     right_on: impl Display,
     join_type: impl Display,
     join_constraint: impl Display,
+    null_equals_null: impl Display,
 ) -> String {
     let join_type_prefix = if join_type.to_string().starts_with("?") {
         ""
@@ -1740,7 +1742,7 @@ fn join(
         "JoinJoinConstraint:"
     };
     format!(
-        "(Join {} {} {} {} {}{} {}{})",
+        "(Join {} {} {} {} {}{} {}{} {})",
         left,
         right,
         left_on,
@@ -1749,6 +1751,7 @@ fn join(
         join_type,
         join_constraint_prefix,
         join_constraint,
+        null_equals_null,
     )
 }
 
