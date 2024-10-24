@@ -17,6 +17,29 @@ Visual Modeler is available in Cube Cloud on
   alt="Visual modeler screenshot" 
 />
 
+## Setup and Git Flow
+Contact your Cube account team to enable Cube Visual Modeler.
+
+For existing developers who are comfortable writing code, there is nothing
+additional needed to set up Visual Modeler. They can simply use it alongside
+their existing code-first workflow.
+
+If you would like business users to have self-serve access to Visual Modeler,
+we recommend the following setup:
+1. In your Cube deployment's settings, under the "Build & Deploy" tab, connect
+it to a Git repository.
+2. Disable direct commits to the main branch and disable merging to the main branch.
+
+<Screenshot
+  src="https://ucarecdn.com/5949a9c7-3e28-40bc-b71c-c0564957190e/"
+  alt="Build and deploy tab"
+/>
+
+This way, business users can submit pull requests for an admin to review via
+Cube's git integration. This allows you to keep your Cube data model governed
+while letting users who are less comfortable with code make contributions via
+Visual Modeler.
+
 ## Using Visual Modeler
 
 Cube Visual Modeler lets you see and edit your Cube data model in an easy-to-use,
