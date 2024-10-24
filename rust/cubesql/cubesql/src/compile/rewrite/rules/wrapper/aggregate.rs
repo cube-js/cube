@@ -11,7 +11,7 @@ use crate::{
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
-        ListType, LogicalPlanLanguage, WrappedSelectUngrouped, WrapperPullupReplacerAliasToCube,
+        ListType, LogicalPlanLanguage, WrappedSelectPushToCube, WrapperPullupReplacerAliasToCube,
         WrapperPullupReplacerUngrouped,
     },
     transport::V1CubeMetaMeasureExt,
@@ -106,7 +106,7 @@ impl WrapperRules {
                         ),
                         "WrappedSelectAlias:None",
                         "WrappedSelectDistinct:false",
-                        "?select_ungrouped",
+                        "?select_push_to_cube",
                         "WrappedSelectUngroupedScan:false",
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -115,7 +115,7 @@ impl WrapperRules {
                     "?group_expr",
                     "?aggr_expr",
                     "?ungrouped",
-                    "?select_ungrouped",
+                    "?select_push_to_cube",
                 ),
             ),
             transforming_rewrite(
@@ -331,7 +331,7 @@ impl WrapperRules {
                     ),
                     "WrappedSelectAlias:None",
                     "WrappedSelectDistinct:false",
-                    "?select_ungrouped",
+                    "?select_push_to_cube",
                     "WrappedSelectUngroupedScan:false",
                 ),
                 "CubeScanWrapperFinalized:false",
@@ -341,7 +341,7 @@ impl WrapperRules {
                 "?group_expr",
                 "?aggr_expr",
                 "?ungrouped",
-                "?select_ungrouped",
+                "?select_push_to_cube",
             ),
         )]);
     }
@@ -351,12 +351,12 @@ impl WrapperRules {
         group_expr_var: &'static str,
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
-        select_ungrouped_var: &'static str,
+        select_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
-        let select_ungrouped_var = var!(select_ungrouped_var);
+        let select_push_to_cube_var = var!(select_push_to_cube_var);
         move |egraph, subst| {
             Self::transform_aggregate_impl(
                 egraph,
@@ -364,7 +364,7 @@ impl WrapperRules {
                 group_expr_var,
                 aggr_expr_var,
                 ungrouped_var,
-                select_ungrouped_var,
+                select_push_to_cube_var,
             )
         }
     }
@@ -375,13 +375,13 @@ impl WrapperRules {
         group_expr_var: &'static str,
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
-        select_ungrouped_var: &'static str,
+        select_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
-        let select_ungrouped_var = var!(select_ungrouped_var);
+        let select_push_to_cube_var = var!(select_push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if Self::transform_check_subquery_allowed(
@@ -396,7 +396,7 @@ impl WrapperRules {
                     group_expr_var,
                     aggr_expr_var,
                     ungrouped_var,
-                    select_ungrouped_var,
+                    select_push_to_cube_var,
                 )
             } else {
                 false
@@ -410,7 +410,7 @@ impl WrapperRules {
         group_expr_var: Var,
         aggr_expr_var: Var,
         ungrouped_var: Var,
-        select_ungrouped_var: Var,
+        select_push_to_cube_var: Var,
     ) -> bool {
         if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
             return false;
@@ -422,9 +422,9 @@ impl WrapperRules {
             var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
         {
             subst.insert(
-                select_ungrouped_var,
-                egraph.add(LogicalPlanLanguage::WrappedSelectUngrouped(
-                    WrappedSelectUngrouped(ungrouped),
+                select_push_to_cube_var,
+                egraph.add(LogicalPlanLanguage::WrappedSelectPushToCube(
+                    WrappedSelectPushToCube(ungrouped),
                 )),
             );
             return true;

@@ -28,7 +28,7 @@ use crate::{
             TimeDimensionName, TryCastExprDataType, UnionAlias, WindowFunctionExprFun,
             WindowFunctionExprWindowFrame, WrappedSelectAlias, WrappedSelectDistinct,
             WrappedSelectJoinJoinType, WrappedSelectLimit, WrappedSelectOffset,
-            WrappedSelectSelectType, WrappedSelectType, WrappedSelectUngrouped,
+            WrappedSelectPushToCube, WrappedSelectSelectType, WrappedSelectType,
         },
         CubeContext,
     },
@@ -2141,7 +2141,8 @@ impl LanguageToLogicalPlanConverter {
                     match_expr_list_node!(node_by_id, to_expr, params[12], WrappedSelectOrderExpr);
                 let alias = match_data_node!(node_by_id, params[13], WrappedSelectAlias);
                 let distinct = match_data_node!(node_by_id, params[14], WrappedSelectDistinct);
-                let ungrouped = match_data_node!(node_by_id, params[15], WrappedSelectUngrouped);
+                let push_to_cube =
+                    match_data_node!(node_by_id, params[15], WrappedSelectPushToCube);
 
                 let filter_expr = normalize_cols(
                     replace_qualified_col_with_flat_name_if_missing(
@@ -2307,7 +2308,7 @@ impl LanguageToLogicalPlanConverter {
                         order_expr_rebased,
                         alias,
                         distinct,
-                        ungrouped,
+                        push_to_cube,
                     )),
                 })
             }
