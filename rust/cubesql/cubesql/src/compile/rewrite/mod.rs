@@ -282,7 +282,7 @@ crate::plan_to_language! {
             order_expr: Vec<Expr>,
             alias: Option<String>,
             distinct: bool,
-            ungrouped: bool,
+            push_to_cube: bool,
             ungrouped_scan: bool,
         },
         WrappedSelectJoin {
@@ -1383,7 +1383,7 @@ fn wrapped_select(
     order_expr: impl Display,
     alias: impl Display,
     distinct: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     ungrouped_scan: impl Display,
 ) -> String {
     format!(
@@ -1403,7 +1403,7 @@ fn wrapped_select(
         order_expr,
         alias,
         distinct,
-        ungrouped,
+        push_to_cube,
         ungrouped_scan
     )
 }
