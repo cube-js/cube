@@ -1,0 +1,2 @@
+pub use cubesql::CubeError;
+
