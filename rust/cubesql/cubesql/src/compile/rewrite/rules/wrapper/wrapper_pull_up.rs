@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapper_pullup_replacer, LogicalPlanLanguage,
-        WrappedSelectSelectType, WrappedSelectType,
+        WrappedSelectSelectType, WrappedSelectType, WrapperPullupReplacerUngrouped,
     },
     var, var_iter, var_list_iter,
 };
@@ -109,13 +109,20 @@ impl WrapperRules {
                         ),
                         "?alias_to_cube",
                         // TODO in fact ungrouped flag is being used not only to indicate that underlying query is ungrouped however to indicate that WrappedSelect won't push down Cube members. Do we need separate flags?
-                        "WrapperPullupReplacerUngrouped:false",
+                        // TODO this can be completely incorrect
+                        // "WrapperPullupReplacerUngrouped:false",
+                        "?out_ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
                     "CubeScanWrapperFinalized:false",
                 ),
-                self.transform_pull_up_wrapper_select("?cube_scan_input"),
+                self.transform_pull_up_wrapper_select(
+                    "?cube_scan_input",
+                    "?select_type",
+                    "?ungrouped",
+                    "?out_ungrouped",
+                ),
             ),
             transforming_rewrite(
                 "wrapper-pull-up-to-cube-scan-non-trivial-wrapped-select",
@@ -270,13 +277,45 @@ impl WrapperRules {
     fn transform_pull_up_wrapper_select(
         &self,
         cube_scan_input_var: &'static str,
+        select_type_var: &'static str,
+        ungrouped_var: &'static str,
+        out_ungrouped_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
+        let select_type_var = var!(select_type_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let out_ungrouped_var = var!(out_ungrouped_var);
         move |egraph, subst| {
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return false;
             }
-            true
+
+            for select_type in
+                var_iter!(egraph[subst[select_type_var]], WrappedSelectSelectType).cloned()
+            {
+                for ungrouped in
+                    var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
+                {
+                    if select_type == WrappedSelectType::Aggregate {
+                        subst.insert(
+                            out_ungrouped_var,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerUngrouped(
+                                WrapperPullupReplacerUngrouped(false),
+                            )),
+                        );
+                    } else {
+                        subst.insert(
+                            out_ungrouped_var,
+                            egraph.add(LogicalPlanLanguage::WrapperPullupReplacerUngrouped(
+                                WrapperPullupReplacerUngrouped(ungrouped),
+                            )),
+                        );
+                    }
+                    return true;
+                }
+            }
+
+            false
         }
     }
 
