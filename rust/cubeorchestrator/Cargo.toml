@@ -1,0 +1,12 @@
+[package]
+name = "cubeorchestrator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cubesql = { path = "../cubesql/cubesql" }
+
+[dependencies.neon]
+version = "=1"
+default-features = false
+features = ["napi-1", "napi-4", "napi-6", "futures"]
