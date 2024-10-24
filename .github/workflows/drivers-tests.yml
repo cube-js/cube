@@ -196,6 +196,8 @@ jobs:
         databricks-jdbc
         databricks-jdbc-export-bucket-s3
         databricks-jdbc-export-bucket-azure
+        redshift
+        redshift-export-bucket-s3
         snowflake
         snowflake-export-bucket-s3
         snowflake-export-bucket-azure
@@ -221,6 +223,8 @@ jobs:
           - mssql
           - mysql
           - postgres
+          - redshift
+          - redshift-export-bucket-s3
           - snowflake
           - snowflake-export-bucket-s3
           - snowflake-export-bucket-azure
@@ -312,6 +316,11 @@ jobs:
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
 
+          # Redshift
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST }}
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER }}
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS }}
+
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
@@ -324,3 +333,4 @@ jobs:
             cd ./packages/cubejs-testing-drivers
             export DEBUG=testcontainers
             yarn ${{ matrix.database }}-full
+

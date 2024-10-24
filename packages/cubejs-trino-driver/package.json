@@ -30,7 +30,6 @@
     "@cubejs-backend/schema-compiler": "1.1.0",
     "@cubejs-backend/shared": "1.0.3",
     "presto-client": "^0.12.2",
-    "ramda": "^0.27.0",
     "sqlstring": "^2.3.1"
   },
   "license": "Apache-2.0",

@@ -13,14 +13,16 @@ import {
   buildPreaggs,
 } from '../helpers';
 import { incrementalSchemaLoadingSuite } from './testIncrementalSchemaLoading';
+import { redshiftExternalSchemasSuite } from './testExternalSchemas';
 
 type TestQueriesOptions = {
   includeIncrementalSchemaSuite?: boolean,
   includeHLLSuite?: boolean,
   extendedEnv?: string
+  externalSchemaTests?: boolean,
 };
 
-export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite }: TestQueriesOptions = {}): void {
+export function testQueries(type: string, { includeIncrementalSchemaSuite, extendedEnv, includeHLLSuite, externalSchemaTests }: TestQueriesOptions = {}): void {
   describe(`Queries with the @cubejs-backend/${type}-driver${extendedEnv ? ` ${extendedEnv}` : ''}`, () => {
     jest.setTimeout(60 * 5 * 1000);
 
@@ -1784,7 +1786,15 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
     });
 
     if (includeIncrementalSchemaSuite) {
-      incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      describe(`Incremental schema loading with @cubejs-backend/${type}-driver`, () => {
+        incrementalSchemaLoadingSuite(execute, () => driver, tables);
+      });
+    }
+
+    if (externalSchemaTests) {
+      describe(`External schema retrospection with @cubejs-backend/${type}-driver`, () => {
+        redshiftExternalSchemasSuite(execute, () => driver);
+      });
     }
 
     executePg('SQL API: powerbi min max push down', async (connection) => {
