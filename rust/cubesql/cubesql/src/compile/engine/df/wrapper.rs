@@ -201,14 +201,75 @@ impl SqlQuery {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct CubeScanWrappedSqlNode {
+    // TODO maybe replace wrapped plan with schema + scan_node
+    pub wrapped_plan: Arc<LogicalPlan>,
+    pub wrapped_sql: SqlQuery,
+    pub request: TransportLoadRequestQuery,
+    pub member_fields: Vec<MemberField>,
+}
+
+impl CubeScanWrappedSqlNode {
+    pub fn new(
+        wrapped_plan: Arc<LogicalPlan>,
+        sql: SqlQuery,
+        request: TransportLoadRequestQuery,
+        member_fields: Vec<MemberField>,
+    ) -> Self {
+        Self {
+            wrapped_plan,
+            wrapped_sql: sql,
+            request,
+            member_fields,
+        }
+    }
+}
+
+impl UserDefinedLogicalNode for CubeScanWrappedSqlNode {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn inputs(&self) -> Vec<&LogicalPlan> {
+        vec![]
+    }
+
+    fn schema(&self) -> &DFSchemaRef {
+        self.wrapped_plan.schema()
+    }
+
+    fn expressions(&self) -> Vec<Expr> {
+        vec![]
+    }
+
+    fn fmt_for_explain(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // TODO figure out nice plan for wrapped plan
+        write!(f, "CubeScanWrappedSql")
+    }
+
+    fn from_template(
+        &self,
+        exprs: &[datafusion::logical_plan::Expr],
+        inputs: &[datafusion::logical_plan::LogicalPlan],
+    ) -> std::sync::Arc<dyn UserDefinedLogicalNode + Send + Sync> {
+        assert_eq!(inputs.len(), 0, "input size inconsistent");
+        assert_eq!(exprs.len(), 0, "expression size inconsistent");
+
+        Arc::new(CubeScanWrappedSqlNode {
+            wrapped_plan: self.wrapped_plan.clone(),
+            wrapped_sql: self.wrapped_sql.clone(),
+            request: self.request.clone(),
+            member_fields: self.member_fields.clone(),
+        })
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct CubeScanWrapperNode {
     pub wrapped_plan: Arc<LogicalPlan>,
     pub meta: Arc<MetaContext>,
     pub auth_context: AuthContextRef,
-    pub wrapped_sql: Option<SqlQuery>,
-    pub request: Option<TransportLoadRequestQuery>,
-    pub member_fields: Option<Vec<MemberField>>,
     pub span_id: Option<Arc<SpanId>>,
     pub config_obj: Arc<dyn ConfigObj>,
 }
@@ -225,29 +286,8 @@ impl CubeScanWrapperNode {
             wrapped_plan,
             meta,
             auth_context,
-            wrapped_sql: None,
-            request: None,
-            member_fields: None,
             span_id,
             config_obj,
-        }
-    }
-
-    pub fn with_sql_and_request(
-        &self,
-        sql: SqlQuery,
-        request: TransportLoadRequestQuery,
-        member_fields: Vec<MemberField>,
-    ) -> Self {
-        Self {
-            wrapped_plan: self.wrapped_plan.clone(),
-            meta: self.meta.clone(),
-            auth_context: self.auth_context.clone(),
-            wrapped_sql: Some(sql),
-            request: Some(request),
-            member_fields: Some(member_fields),
-            span_id: self.span_id.clone(),
-            config_obj: self.config_obj.clone(),
         }
     }
 }
@@ -317,7 +357,7 @@ impl CubeScanWrapperNode {
         &self,
         transport: Arc<dyn TransportService>,
         load_request_meta: Arc<LoadRequestMeta>,
-    ) -> result::Result<Self, CubeError> {
+    ) -> result::Result<CubeScanWrappedSqlNode, CubeError> {
         let schema = self.schema();
         let wrapped_plan = self.wrapped_plan.clone();
         let (sql, request, member_fields) = Self::generate_sql_for_node(
@@ -361,7 +401,12 @@ impl CubeScanWrapperNode {
             sql.finalize_query(sql_templates).map_err(|e| CubeError::internal(e.to_string()))?;
             Ok((sql, request, member_fields))
         })?;
-        Ok(self.with_sql_and_request(sql, request, member_fields))
+        Ok(CubeScanWrappedSqlNode::new(
+            self.wrapped_plan.clone(),
+            sql,
+            request,
+            member_fields,
+        ))
     }
 
     pub fn set_max_limit_for_node(self, node: Arc<LogicalPlan>) -> Arc<LogicalPlan> {
@@ -2226,9 +2271,6 @@ impl UserDefinedLogicalNode for CubeScanWrapperNode {
             wrapped_plan: self.wrapped_plan.clone(),
             meta: self.meta.clone(),
             auth_context: self.auth_context.clone(),
-            wrapped_sql: self.wrapped_sql.clone(),
-            request: self.request.clone(),
-            member_fields: self.member_fields.clone(),
             span_id: self.span_id.clone(),
             config_obj: self.config_obj.clone(),
         })

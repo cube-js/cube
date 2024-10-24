@@ -3,14 +3,17 @@ use std::sync::Arc;
 use datafusion::logical_plan::{plan::Extension, Filter, LogicalPlan, PlanVisitor};
 
 use crate::{
-    compile::engine::df::{scan::CubeScanNode, wrapper::CubeScanWrapperNode},
+    compile::engine::df::{
+        scan::CubeScanNode,
+        wrapper::{CubeScanWrappedSqlNode, CubeScanWrapperNode},
+    },
     CubeError,
 };
 
 pub trait LogicalPlanTestUtils {
     fn find_cube_scan(&self) -> CubeScanNode;
 
-    fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode;
+    fn find_cube_scan_wrapped_sql(&self) -> CubeScanWrappedSqlNode;
 
     fn find_cube_scans(&self) -> Vec<CubeScanNode>;
 
@@ -27,13 +30,13 @@ impl LogicalPlanTestUtils for LogicalPlan {
         cube_scans[0].clone()
     }
 
-    fn find_cube_scan_wrapper(&self) -> CubeScanWrapperNode {
+    fn find_cube_scan_wrapped_sql(&self) -> CubeScanWrappedSqlNode {
         match self {
             LogicalPlan::Extension(Extension { node }) => {
-                if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrapperNode>() {
+                if let Some(wrapper_node) = node.as_any().downcast_ref::<CubeScanWrappedSqlNode>() {
                     wrapper_node.clone()
                 } else {
-                    panic!("Root plan node is not cube_scan_wrapper!");
+                    panic!("Root plan node is not cube_scan_wrapped_sql!");
                 }
             }
             _ => panic!("Root plan node is not extension!"),
@@ -64,6 +67,10 @@ pub fn find_cube_scans_deep_search(
                     self.0.push(scan_node.clone());
                 } else if let Some(wrapper_node) =
                     ext.node.as_any().downcast_ref::<CubeScanWrapperNode>()
+                {
+                    wrapper_node.wrapped_plan.accept(self)?;
+                } else if let Some(wrapper_node) =
+                    ext.node.as_any().downcast_ref::<CubeScanWrappedSqlNode>()
                 {
                     wrapper_node.wrapped_plan.accept(self)?;
                 }
