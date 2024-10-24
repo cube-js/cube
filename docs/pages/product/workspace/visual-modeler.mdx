@@ -20,6 +20,13 @@ Visual Modeler is available in Cube Cloud on
 ## Setup and Git Flow
 Contact your Cube account team to enable Cube Visual Modeler.
 
+<InfoBox>
+  Cube Visual Modeler replaces the [Data Graph][ref-data-graph] for accounts 
+  where it is enabled. All functionality of the Data Graph is still present in
+  Visual Modeler plus new features to allow visual editing of your Cube data 
+  model.
+</InfoBox>
+
 For existing developers who are comfortable writing code, there is nothing
 additional needed to set up Visual Modeler. They can simply use it alongside
 their existing code-first workflow.
@@ -36,9 +43,9 @@ it to a Git repository.
 />
 
 This way, business users can submit pull requests for an admin to review via
-Cube's git integration. This allows you to keep your Cube data model governed
-while letting users who are less comfortable with code make contributions via
-Visual Modeler.
+Cube's git integration but do not have the ability to merge their own changes.
+This allows you to govern your Cube data model while letting users who are less
+comfortable with code make contributions via Visual Modeler.
 
 ## Using Visual Modeler
 
@@ -167,6 +174,7 @@ defined in YAML, not JavaScript, and it does not allow editing of [dynamic data
 models][ref-dynamic-data-models] or models which use [Jinja][ref-jinja], although
 they will still be displayed on the canvas.
 
+[ref-data-graph]: /product/workspace/data-model#data-graph
 [ref-data-model]: /product/workspace/data-model
 [ref-meta]: /reference/data-model/cube#meta
 [ref-segments]: /reference/data-model/segments
