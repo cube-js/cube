@@ -2240,6 +2240,14 @@ export class BaseQuery {
         this.safeEvaluateSymbolContext().memberChildren[parentMember].push(memberPath);
       }
     }
+
+    // This is a special recursion guard that might happen sometimes, like
+    // during alias members collection which invokes sql evaluation of all members
+    // when FILTER_PARAMS is proxied for SQL evaluation.
+    if (parentMember === memberPath && this.safeEvaluateSymbolContext().aliasGathering) {
+      return '';
+    }
+
     this.safeEvaluateSymbolContext().currentMember = memberPath;
     try {
       if (type === 'measure') {
@@ -3882,6 +3890,12 @@ export class BaseQuery {
                 // collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
                 // evaluateSql() -> resolveSymbolsCall() -> cubeReferenceProxy->toString() ->
                 // evaluateSymbolSql() -> evaluateSql()... -> and got here again
+                //
+                // When FILTER_PARAMS is used in dimension/measure SQL - we also hit recursive loop:
+                // allBackAliasMembersExceptSegments() -> collectFrom() -> traverseSymbol() -> evaluateSymbolSql() ->
+                // autoPrefixAndEvaluateSql() -> evaluateSql() -> filterProxyFromAllFilters->Proxy->toString()
+                // and so on...
+                // For this case there is a recursion guard added to this.evaluateSymbolSql()
                 const aliases = allFilters ?
                   allFilters
                     .map(v => (v.query ? v.query.allBackAliasMembersExceptSegments() : {}))
@@ -3932,8 +3946,10 @@ export class BaseQuery {
     const query = this;
     return members.map(
       member => {
-        const collectedMembers = query
-          .collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor');
+        const collectedMembers = query.evaluateSymbolSqlWithContext(
+          () => query.collectFrom([member], query.collectMemberNamesFor.bind(query), 'collectMemberNamesFor'),
+          { aliasGathering: true }
+        );
         const memberPath = member.expressionPath();
         let nonAliasSeen = false;
         return collectedMembers
