@@ -6,7 +6,7 @@ use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
-use datafusion::physical_plan::planner::compute_aggregation_strategy;
+use datafusion::physical_plan::planner::input_sortedness_by_group_key;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -29,7 +29,8 @@ pub fn try_switch_to_inplace_aggregates(
     // Try to cheaply rearrange the plan so that it produces sorted inputs.
     let new_input = try_regroup_columns(agg.input().clone())?;
 
-    let (strategy, order) = compute_aggregation_strategy(new_input.as_ref(), agg.group_expr());
+    let input_sortedness = input_sortedness_by_group_key(new_input.as_ref(), agg.group_expr());
+    let (strategy, order) = input_sortedness.compute_aggregate_strategy();
     if strategy != AggregateStrategy::InplaceSorted {
         return Ok(p);
     }

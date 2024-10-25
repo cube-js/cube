@@ -12,7 +12,7 @@ use datafusion::logical_plan::{DFSchema, DFSchemaRef, Expr, LogicalPlan};
 use datafusion::physical_plan::aggregates::AggregateFunction;
 use datafusion::physical_plan::expressions::{Column, PhysicalSortExpr};
 use datafusion::physical_plan::hash_aggregate::{AggregateMode, HashAggregateExec};
-use datafusion::physical_plan::planner::{compute_aggregation_strategy, physical_name};
+use datafusion::physical_plan::planner::{input_sortedness_by_group_key, physical_name};
 use datafusion::physical_plan::sort::{SortExec, SortOptions};
 use datafusion::physical_plan::udf::create_physical_expr;
 use datafusion::physical_plan::{ExecutionPlan, PhysicalExpr, PhysicalPlanner};
@@ -335,7 +335,8 @@ pub fn plan_topk(
             planner.create_aggregate_expr(e, &logical_input_schema, &physical_input_schema, ctx)
         })
         .collect::<Result<Vec<_>, DataFusionError>>()?;
-    let (strategy, order) = compute_aggregation_strategy(input.as_ref(), &group_expr);
+    let input_sortedness = input_sortedness_by_group_key(input.as_ref(), &group_expr);
+    let (strategy, order) = input_sortedness.compute_aggregate_strategy();
     let aggregate = Arc::new(HashAggregateExec::try_new(
         strategy,
         order,
