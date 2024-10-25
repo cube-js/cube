@@ -10,6 +10,7 @@ use datafusion::physical_plan::planner::input_sortedness_by_group_key;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::ExecutionPlan;
+use itertools::Itertools;
 use std::sync::Arc;
 
 /// Attempts to replace hash aggregate with sorted aggregate.
@@ -30,7 +31,31 @@ pub fn try_switch_to_inplace_aggregates(
     let new_input = try_regroup_columns(agg.input().clone())?;
 
     let input_sortedness = input_sortedness_by_group_key(new_input.as_ref(), agg.group_expr());
-    let (strategy, order) = input_sortedness.compute_aggregate_strategy();
+
+
+    let (strategy, order): (AggregateStrategy, Option<Vec<usize>>) =
+    match input_sortedness.sawtooth_levels() {
+        Some(0) => {
+            log::error!("try_switch_to_inplace_aggregates: Perfect match for inplace aggregation");
+            let order = input_sortedness.sort_order[0]
+                .iter()
+                .map(|(_sort_key_offset, group_key_offset)| {
+                    *group_key_offset
+                })
+                .collect_vec();
+            (AggregateStrategy::InplaceSorted, Some(order))
+        }
+        Some(n) => {
+            log::error!("try_switch_to_inplace_aggregates: Non-perfect match for inplace aggregation: {} clumps", n);
+            // TODO: Note that this is very oversimplified
+            (AggregateStrategy::InplaceSorted, None)
+        },
+        _ => {
+            log::error!("try_switch_to_inplace_aggregates: No match for inplace aggregation");
+            (AggregateStrategy::Hash, None)
+        },
+    };
+
     if strategy != AggregateStrategy::InplaceSorted {
         return Ok(p);
     }
@@ -93,3 +118,4 @@ fn try_regroup_columns(
         .collect();
     Ok(Arc::new(MergeSortExec::try_new(input, sort_columns)?))
 }
+
