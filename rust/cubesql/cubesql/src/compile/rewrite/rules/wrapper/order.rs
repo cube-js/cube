@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         sort, transforming_rewrite, wrapped_select, wrapped_select_order_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, WrapperPullupReplacerUngrouped,
-        WrapperPushdownReplacerUngrouped,
+        WrapperPushdownReplacerPushToCube,
     },
     copy_flag, var,
 };
@@ -105,7 +105,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?order_expr",
                         "?alias_to_cube",
-                        "?pushdown_ungrouped",
+                        "?pushdown_push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -116,7 +116,7 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_order("?ungrouped", "?pushdown_ungrouped"),
+            self.transform_order("?ungrouped", "?pushdown_push_to_cube"),
         )]);
 
         Self::list_pushdown_pullup_rules(
@@ -130,18 +130,18 @@ impl WrapperRules {
     fn transform_order(
         &self,
         ungrouped_var: &'static str,
-        pushdown_ungrouped_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let ungrouped_var = var!(ungrouped_var);
-        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
                 ungrouped_var,
                 WrapperPullupReplacerUngrouped,
-                pushdown_ungrouped_var,
-                WrapperPushdownReplacerUngrouped
+                pushdown_push_to_cube_var,
+                WrapperPushdownReplacerPushToCube
             ) {
                 return false;
             }

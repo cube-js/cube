@@ -18,7 +18,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     case_expr_var_arg("?when", "?then", "?else"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -26,21 +26,21 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?when",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?then",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?else",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),

@@ -18,14 +18,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     not_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 not_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),

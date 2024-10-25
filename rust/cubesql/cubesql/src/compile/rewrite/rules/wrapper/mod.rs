@@ -36,7 +36,7 @@ use crate::{
             replacer_push_down_node,
         },
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
-        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerPushToCube,
     },
     config::ConfigObj,
     copy_flag,
@@ -116,7 +116,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -144,7 +144,7 @@ impl WrapperRules {
             wrapper_pushdown_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
@@ -155,22 +155,22 @@ impl WrapperRules {
                 "?in_projection",
                 "?cube_members",
             ),
-            Self::transform_list_tail("?ungrouped", "?pullup_ungrouped"),
+            Self::transform_list_tail("?push_to_cube", "?pullup_ungrouped"),
         )]);
     }
 
     fn transform_list_tail(
-        ungrouped_var: &str,
+        push_to_cube_var: &str,
         pullup_ungrouped_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let ungrouped_var = var!(ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
-                ungrouped_var,
-                WrapperPushdownReplacerUngrouped,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
                 pullup_ungrouped_var,
                 WrapperPullupReplacerUngrouped
             ) {
@@ -193,7 +193,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -227,7 +227,7 @@ impl WrapperRules {
             wrapper_pushdown_replacer(
                 list_type.empty_list(),
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
@@ -238,22 +238,22 @@ impl WrapperRules {
                 "?in_projection",
                 "?cube_members",
             ),
-            Self::transform_flat_list_tail("?ungrouped", "?pullup_ungrouped"),
+            Self::transform_flat_list_tail("?push_to_cube", "?pullup_ungrouped"),
         )]);
     }
 
     fn transform_flat_list_tail(
-        ungrouped_var: &str,
+        push_to_cube_var: &str,
         pullup_ungrouped_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let ungrouped_var = var!(ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
-                ungrouped_var,
-                WrapperPushdownReplacerUngrouped,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
                 pullup_ungrouped_var,
                 WrapperPullupReplacerUngrouped
             ) {
@@ -275,7 +275,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     node,
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )
@@ -303,7 +303,7 @@ impl WrapperRules {
             wrapper_pushdown_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?push_to_cube",
                 "?in_projection",
                 "?cube_members",
             ),
@@ -314,22 +314,22 @@ impl WrapperRules {
                 "?in_projection",
                 "?cube_members",
             ),
-            Self::transform_expr_list_tail("?ungrouped", "?pullup_ungrouped"),
+            Self::transform_expr_list_tail("?push_to_cube", "?pullup_ungrouped"),
         )]);
     }
 
     fn transform_expr_list_tail(
-        ungrouped_var: &str,
+        push_to_cube_var: &str,
         pullup_ungrouped_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let ungrouped_var = var!(ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
-                ungrouped_var,
-                WrapperPushdownReplacerUngrouped,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
                 pullup_ungrouped_var,
                 WrapperPullupReplacerUngrouped
             ) {

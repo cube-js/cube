@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, window, wrapped_select, wrapped_select_window_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
-        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerPushToCube,
     },
     copy_flag, var,
 };
@@ -80,7 +80,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?window_expr",
                         "?alias_to_cube",
-                        "?pushdown_ungrouped",
+                        "?pushdown_push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -116,7 +116,7 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_window_pushdown("?ungrouped", "?pushdown_ungrouped"),
+            self.transform_window_pushdown("?ungrouped", "?pushdown_push_to_cube"),
         )]);
 
         if self.config_obj.push_down_pull_up_split() {
@@ -139,18 +139,18 @@ impl WrapperRules {
     fn transform_window_pushdown(
         &self,
         ungrouped_var: &'static str,
-        pushdown_ungrouped_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let ungrouped_var = var!(ungrouped_var);
-        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
                 ungrouped_var,
                 WrapperPullupReplacerUngrouped,
-                pushdown_ungrouped_var,
-                WrapperPushdownReplacerUngrouped
+                pushdown_push_to_cube_var,
+                WrapperPushdownReplacerPushToCube
             ) {
                 return false;
             }

@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
-        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerPushToCube,
     },
     copy_flag,
     transport::MetaContext,
@@ -31,7 +31,7 @@ impl WrapperRules {
                         "CubeScanWrapperFinalized:false",
                     ),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -44,7 +44,7 @@ impl WrapperRules {
                 ),
                 self.transform_check_subquery_wrapped(
                     "?cube_scan_input",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?pullup_ungrouped",
                 ),
             ),
@@ -144,18 +144,18 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
-        ungrouped_var: &'static str,
+        push_to_cube_var: &'static str,
         pullup_ungrouped_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
-        let ungrouped_var = var!(ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
-                ungrouped_var,
-                WrapperPushdownReplacerUngrouped,
+                push_to_cube_var,
+                WrapperPushdownReplacerPushToCube,
                 pullup_ungrouped_var,
                 WrapperPullupReplacerUngrouped
             ) {

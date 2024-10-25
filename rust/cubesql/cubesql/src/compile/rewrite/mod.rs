@@ -457,7 +457,14 @@ crate::plan_to_language! {
         WrapperPushdownReplacer {
             member: Arc<LogicalPlan>,
             alias_to_cube: Vec<(String, String)>,
-            ungrouped: bool,
+            // This means that result of this replacer would be used as member expression in load query to Cube.
+            // This flag should be passed from top, by the rule that starts wrapping new logical plan node.
+            // Important caveat: it means that result would be used for push to cube *and only there*.
+            // So it's more like "must push to Cube" than "can push to Cube"
+            // This part is important for rewrites like SUM(sumMeasure) => sumMeasure
+            // We can use sumMeasure instead of SUM(sumMeasure) ONLY in with push to Cube
+            // An vice versa, we can't use SUM(sumMeasure) in grouped query to Cube, so it can be allowed ONLY without push to grouped Cube query
+            push_to_cube: bool,
             in_projection: bool,
             cube_members: Vec<LogicalPlan>,
         },
@@ -1929,13 +1936,13 @@ fn case_expr_replacer(members: impl Display, alias_to_cube: impl Display) -> Str
 fn wrapper_pushdown_replacer(
     members: impl Display,
     alias_to_cube: impl Display,
-    ungrouped: impl Display,
+    push_to_cube: impl Display,
     in_projection: impl Display,
     cube_members: impl Display,
 ) -> String {
     format!(
         "(WrapperPushdownReplacer {} {} {} {} {})",
-        members, alias_to_cube, ungrouped, in_projection, cube_members
+        members, alias_to_cube, push_to_cube, in_projection, cube_members
     )
 }
 

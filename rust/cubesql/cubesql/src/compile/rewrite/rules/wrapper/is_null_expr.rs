@@ -18,14 +18,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     is_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 is_null_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),
@@ -53,14 +53,14 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     is_not_null_expr("?expr"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
                 is_not_null_expr(wrapper_pushdown_replacer(
                     "?expr",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 )),

@@ -12,7 +12,7 @@ use crate::{
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         AggregateFunctionExprDistinct, AggregateFunctionExprFun, AliasExprAlias, ColumnExprColumn,
         ListType, LogicalPlanLanguage, WrappedSelectPushToCube, WrapperPullupReplacerAliasToCube,
-        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerPushToCube,
     },
     copy_flag,
     transport::V1CubeMetaMeasureExt,
@@ -62,14 +62,14 @@ impl WrapperRules {
                         wrapper_pushdown_replacer(
                             "?group_expr",
                             "?alias_to_cube",
-                            "?pushdown_ungrouped",
+                            "?pushdown_push_to_cube",
                             "WrapperPullupReplacerInProjection:false",
                             "?cube_members",
                         ),
                         wrapper_pushdown_replacer(
                             "?aggr_expr",
                             "?alias_to_cube",
-                            "?pushdown_ungrouped",
+                            "?pushdown_push_to_cube",
                             "WrapperPullupReplacerInProjection:false",
                             "?cube_members",
                         ),
@@ -116,7 +116,7 @@ impl WrapperRules {
                     "?group_expr",
                     "?aggr_expr",
                     "?ungrouped",
-                    "?pushdown_ungrouped",
+                    "?pushdown_push_to_cube",
                     "?select_push_to_cube",
                 ),
             ),
@@ -125,7 +125,7 @@ impl WrapperRules {
                 wrapper_pushdown_replacer(
                     grouping_set_expr("?rollout_members", "?type"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "WrapperPullupReplacerInProjection:false",
                     "?cube_members",
                 ),
@@ -133,7 +133,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?rollout_members",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "WrapperPullupReplacerInProjection:false",
                         "?cube_members",
                     ),
@@ -178,7 +178,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?aggr_expr",
                         "?alias_to_cube",
-                        "WrapperPushdownReplacerUngrouped:true",
+                        "WrapperPushdownReplacerPushToCube:true",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -281,21 +281,21 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?subqueries",
                         "?alias_to_cube",
-                        "?pushdown_ungrouped",
+                        "?pushdown_push_to_cube",
                         "WrapperPullupReplacerInProjection:false",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?group_expr",
                         "?alias_to_cube",
-                        "?pushdown_ungrouped",
+                        "?pushdown_push_to_cube",
                         "WrapperPullupReplacerInProjection:false",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?aggr_expr",
                         "?alias_to_cube",
-                        "?pushdown_ungrouped",
+                        "?pushdown_push_to_cube",
                         "WrapperPullupReplacerInProjection:false",
                         "?cube_members",
                     ),
@@ -343,7 +343,7 @@ impl WrapperRules {
                 "?group_expr",
                 "?aggr_expr",
                 "?ungrouped",
-                "?pushdown_ungrouped",
+                "?pushdown_push_to_cube",
                 "?select_push_to_cube",
             ),
         )]);
@@ -354,13 +354,13 @@ impl WrapperRules {
         group_expr_var: &'static str,
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
-        pushdown_ungrouped_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
         select_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
-        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         move |egraph, subst| {
             Self::transform_aggregate_impl(
@@ -369,7 +369,7 @@ impl WrapperRules {
                 group_expr_var,
                 aggr_expr_var,
                 ungrouped_var,
-                pushdown_ungrouped_var,
+                pushdown_push_to_cube_var,
                 select_push_to_cube_var,
             )
         }
@@ -381,14 +381,14 @@ impl WrapperRules {
         group_expr_var: &'static str,
         aggr_expr_var: &'static str,
         ungrouped_var: &'static str,
-        pushdown_ungrouped_var: &'static str,
+        pushdown_push_to_cube_var: &'static str,
         select_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let group_expr_var = var!(group_expr_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let ungrouped_var = var!(ungrouped_var);
-        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
+        let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -404,7 +404,7 @@ impl WrapperRules {
                     group_expr_var,
                     aggr_expr_var,
                     ungrouped_var,
-                    pushdown_ungrouped_var,
+                    pushdown_push_to_cube_var,
                     select_push_to_cube_var,
                 )
             } else {
@@ -419,7 +419,7 @@ impl WrapperRules {
         group_expr_var: Var,
         aggr_expr_var: Var,
         ungrouped_var: Var,
-        pushdown_ungrouped_var: Var,
+        pushdown_push_to_cube_var: Var,
         select_push_to_cube_var: Var,
     ) -> bool {
         if egraph[subst[group_expr_var]].data.referenced_expr.is_none() {
@@ -434,8 +434,8 @@ impl WrapperRules {
             subst,
             ungrouped_var,
             WrapperPullupReplacerUngrouped,
-            pushdown_ungrouped_var,
-            WrapperPushdownReplacerUngrouped
+            pushdown_push_to_cube_var,
+            WrapperPushdownReplacerPushToCube
         ) {
             return false;
         }
