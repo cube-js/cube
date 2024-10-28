@@ -1,7 +1,7 @@
 /**
  * @copyright Cube Dev, Inc.
  * @license Apache-2.0
- * @fileoverview The `PrestoDriver` and related types declaration.
+ * @fileoverview The `PinotDriver` and related types declaration.
  */
 
 import {
@@ -146,7 +146,10 @@ export class PinotDriver extends BaseDriver implements DriverInterface {
         'Content-Type': 'application/json',
         ...this.authorizationHeaders()
       }),
-      body: JSON.stringify({ sql: query, queryOptions: `useMultistageEngine=true;timeoutMs=${this.config.queryTimeout}` })
+      body: JSON.stringify({
+        sql: query,
+        queryOptions: `useMultistageEngine=true;timeoutMs=${this.config.queryTimeout}`
+      })
     });
 
     return new Promise((resolve, reject) => {

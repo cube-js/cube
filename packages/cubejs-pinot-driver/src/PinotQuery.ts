@@ -89,7 +89,8 @@ export class PinotQuery extends BaseQuery {
     const values = timeDimension.timeSeries().map(
       ([from, to]) => `select '${from}' f, '${to}' t`
     ).join(' UNION ALL ');
-    return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to FROM (${values}) AS dates`;
+    return `SELECT ${this.timeStampCast('dates.f')} date_from, ${this.timeStampCast('dates.t')} date_to
+            FROM (${values}) AS dates`;
   }
 
   public applyMeasureFilters(evaluateSql: '*' | string, symbol: any, cubeName: string) {
@@ -121,14 +122,6 @@ export class PinotQuery extends BaseQuery {
     return {
       every: '2 minutes'
     };
-  }
-
-  public hllInit(sql: string) {
-    return this.countDistinctApprox(sql); // todo: ensure the correct way to do so in pinot
-  }
-
-  public hllMerge(sql: string) {
-    return this.countDistinctApprox(sql); // todo: ensure the correct way to do so in pinot
   }
 
   public countDistinctApprox(sql: string) {
