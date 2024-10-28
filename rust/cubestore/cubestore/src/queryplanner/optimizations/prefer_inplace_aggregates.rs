@@ -10,7 +10,6 @@ use datafusion::physical_plan::planner::input_sortedness_by_group_key;
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::ExecutionPlan;
-use itertools::Itertools;
 use std::sync::Arc;
 
 /// Attempts to replace hash aggregate with sorted aggregate.
