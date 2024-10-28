@@ -41,7 +41,7 @@ use crate::queryplanner::query_executor::{QueryExecutor, SerializedRecordBatchSt
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::remotefs::RemoteFs;
 use crate::store::ChunkDataStore;
-use crate::telemetry::tracing::TracingHelper;
+use crate::telemetry::tracing::{TraceIdAndSpanId, TracingHelper};
 use crate::CubeError;
 use async_trait::async_trait;
 use datafusion::arrow::datatypes::SchemaRef;
@@ -215,7 +215,7 @@ pub enum WorkerMessage {
         SerializedPlan,
         HashMap<String, String>,
         HashMap<u64, Vec<SerializedRecordBatchStream>>,
-        Option<(u64, u64)>,
+        Option<TraceIdAndSpanId>,
     ),
 }
 
