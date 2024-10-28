@@ -863,10 +863,10 @@ impl ExecutionPlan for CubeTableExec {
             }
         }
 
-        OptimizerHints {
+        OptimizerHints::new_sorted(
             sort_order,
-            single_value_columns: Vec::new(),
-        }
+            Vec::new(),
+        )
     }
 
     #[tracing::instrument(level = "trace", skip(self))]

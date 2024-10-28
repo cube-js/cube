@@ -37,12 +37,7 @@ pub fn try_switch_to_inplace_aggregates(
     match input_sortedness.sawtooth_levels() {
         Some(0) => {
             log::error!("try_switch_to_inplace_aggregates: Perfect match for inplace aggregation");
-            let order = input_sortedness.sort_order[0]
-                .iter()
-                .map(|(_sort_key_offset, group_key_offset)| {
-                    *group_key_offset
-                })
-                .collect_vec();
+            let order = input_sortedness.sort_order[0].clone();  // TODO: No clone?
             (AggregateStrategy::InplaceSorted, Some(order))
         }
         Some(n) => {
