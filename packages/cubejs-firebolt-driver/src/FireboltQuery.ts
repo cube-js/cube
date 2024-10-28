@@ -6,6 +6,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   hour: 'HOUR',
   minute: 'MINUTE',
   second: 'SECOND',
+  millisecond: 'MILLISECOND',
   month: 'MONTH',
   quarter: 'QUARTER',
   year: 'YEAR'

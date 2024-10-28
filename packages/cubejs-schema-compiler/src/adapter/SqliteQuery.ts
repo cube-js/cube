@@ -9,6 +9,7 @@ const GRANULARITY_TO_INTERVAL = {
   hour: (date) => `strftime('%Y-%m-%dT%H:00:00.000', ${date})`,
   minute: (date) => `strftime('%Y-%m-%dT%H:%M:00.000', ${date})`,
   second: (date) => `strftime('%Y-%m-%dT%H:%M:%S.000', ${date})`,
+  millisecond: (date) => `strftime('%Y-%m-%dT%H:%M:%f', ${date})`,
   month: (date) => `strftime('%Y-%m-01T00:00:00.000', ${date})`,
   year: (date) => `strftime('%Y-01-01T00:00:00.000', ${date})`
 };

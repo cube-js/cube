@@ -2,6 +2,7 @@ import { BaseFilter, BaseQuery, ParamAllocator } from '@cubejs-backend/schema-co
 
 const GRANULARITY_TO_INTERVAL: Record<string, string> = {
   second: 's',
+  millisecond: 'T',
   minute: 'm',
   hour: 'h',
   day: 'd',

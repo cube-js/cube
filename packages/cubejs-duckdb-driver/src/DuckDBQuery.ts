@@ -6,6 +6,7 @@ const GRANULARITY_TO_INTERVAL: Record<string, (date: string) => string> = {
   hour: date => `DATE_TRUNC('hour', ${date})`,
   minute: date => `DATE_TRUNC('minute', ${date})`,
   second: date => `DATE_TRUNC('second', ${date})`,
+  millisecond: date => `DATE_TRUNC('millisecond', ${date})`,
   month: date => `DATE_TRUNC('month', ${date})`,
   quarter: date => `DATE_TRUNC('quarter', ${date})`,
   year: date => `DATE_TRUNC('year', ${date})`
