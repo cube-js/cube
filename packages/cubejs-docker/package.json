@@ -35,6 +35,7 @@
     "@cubejs-backend/snowflake-driver": "1.0.3",
     "@cubejs-backend/sqlite-driver": "1.0.3",
     "@cubejs-backend/trino-driver": "1.1.0",
+    "@cubejs-backend/pinot-driver": "1.1.0",
     "cubejs-cli": "1.1.0",
     "typescript": "~5.2.2"
   },
