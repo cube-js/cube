@@ -21,7 +21,7 @@ Visual Modeler is available in Cube Cloud on
   alt="Visual modeler screenshot" 
 />
 
-## Setup and Git Flow
+## Getting started
 Contact your Cube account team to enable Cube Visual Modeler.
 
 <InfoBox>
@@ -41,10 +41,7 @@ we recommend the following setup:
 it to a Git repository.
 2. Disable direct commits to the main branch and disable merging to the main branch.
 
-<Screenshot
-  src="https://ucarecdn.com/5949a9c7-3e28-40bc-b71c-c0564957190e/"
-  alt="Build and deploy tab"
-/>
+See the [Continuous deployment][ref-continuous-deployment] page for more information.
 
 This way, business users can submit pull requests for an admin to review via
 Cube's git integration but do not have the ability to merge their own changes.
@@ -57,14 +54,15 @@ Cube Visual Modeler lets you see and edit your Cube data model in an easy-to-use
 graphical interface. You can also switch seamlessly between Visual Modeler and 
 the original code-based [Data Model editor][ref-data-model] depending on your needs.
 
-To open Visual Modeler, click on the <Btn>Show Canvas</Btn> in the top right of the Data Model
-page. Visual Modeler will stay open until you go back to the code editor by clicking
-the <Btn>View Code</Btn> button or <Btn>Show Code</Btn> on any cube or view node.
-
 <Screenshot
-  src="https://ucarecdn.com/b2b6af54-f17c-4a0c-9963-15a5d0dcc5f6/"
-  alt="View Code button"
+  src="https://ucarecdn.com/08acf61b-faa3-4edb-9673-1d3de44b8a05/"
+  alt="Visual modeler canvas UI"
 />
+
+To open Visual Modeler, click on the <Btn>Show Canvas</Btn> button in the top 
+right of the [Data Model][ref-data-model] page. Visual Modeler will stay open
+until you go back to the code editor by clicking the <Btn>View Code</Btn> 
+button or <Btn>Show Code</Btn> on any cube or view node.
 
 ## Cubes
 
@@ -190,3 +188,4 @@ they will still be displayed on the canvas.
 [ref-rolling-window]: /reference/data-model/measures#rolling_window
 [ref-dynamic-data-models]: /product/data-modeling/dynamic
 [ref-jinja]: /product/data-modeling/dynamic/jinja
+[ref-continuous-deployment]: /product/deployment/cloud/continuous-deployment
