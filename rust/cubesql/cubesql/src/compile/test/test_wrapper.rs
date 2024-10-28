@@ -1261,6 +1261,7 @@ async fn test_wrapper_filter_flatten() {
 }
 
 /// Regular aggregation over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
 #[tokio::test]
 async fn wrapper_agg_over_limit() {
     if !Rewriter::sql_push_down_enabled() {
@@ -1299,7 +1300,9 @@ async fn wrapper_agg_over_limit() {
         logical_plan.find_cube_scan().request,
         V1LoadRequestQuery {
             measures: Some(vec![]),
-            dimensions: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
             segments: Some(vec![]),
             order: Some(vec![]),
             limit: Some(5),
@@ -1324,6 +1327,7 @@ async fn wrapper_agg_over_limit() {
 }
 
 /// Aggregation(dimension) over CubeScan(limit=n, ungrouped=true) is NOT pushed to CubeScan
+/// and inner ungrouped CubeScan should have both proper members and limit
 #[tokio::test]
 async fn wrapper_agg_dimension_over_limit() {
     if !Rewriter::sql_push_down_enabled() {
@@ -1360,7 +1364,9 @@ async fn wrapper_agg_dimension_over_limit() {
         logical_plan.find_cube_scan().request,
         V1LoadRequestQuery {
             measures: Some(vec![]),
-            dimensions: Some(vec![]),
+            dimensions: Some(vec![
+                "KibanaSampleDataEcommerce.customer_gender".to_string(),
+            ]),
             segments: Some(vec![]),
             order: Some(vec![]),
             limit: Some(5),
