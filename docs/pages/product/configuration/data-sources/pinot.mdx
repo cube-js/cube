@@ -5,7 +5,8 @@ redirect_from:
 
 # Pinot
 
-Apache Pinot is a real-time distributed OLAP datastore purpose-built for low-latency, high-throughput analytics, and perfect for user-facing analytical workloads
+Apache Pinot is a real-time distributed OLAP datastore purpose-built for low-latency, high-throughput analytics,
+and perfect for user-facing analytical workloads.
 
 ## Prerequisites
 
@@ -28,12 +29,12 @@ CUBEJS_DB_PASS=**********
 
 ## Environment Variables
 
-| Environment Variable       | Description                                                                         | Possible Values                               | Required |
-| -------------------------- | ----------------------------------------------------------------------------------- | --------------------------------------------- | :------: |
-| `CUBEJS_DB_HOST`           | The host URL for your Pinot broker                                                  | A valid host URL                              |    ✅    |
-| `CUBEJS_DB_PORT`           | The port for the database connection                                                | A valid port number                           |    ✅    |
-| `CUBEJS_DB_USER`           | The username used to connect to the broker                                          | A valid username                              |    ❌    |
-| `CUBEJS_DB_PASS`           | The password used to connect to the broker                                          | A valid password                              |    ❌    |
+| Environment Variable | Description                                | Possible Values     | Required |
+|----------------------|--------------------------------------------|---------------------|:--------:|
+| `CUBEJS_DB_HOST`     | The host URL for your Pinot broker         | A valid host URL    |    ✅    |
+| `CUBEJS_DB_PORT`     | The port for the database connection       | A valid port number |    ✅    |
+| `CUBEJS_DB_USER`     | The username used to connect to the broker | A valid username    |    ❌    |
+| `CUBEJS_DB_PASS`     | The password used to connect to the broker | A valid password    |    ❌    |
 
 ## Pre-Aggregation Feature Support
 
@@ -55,8 +56,8 @@ here][ref-caching-using-preaggs-build-strats].
 </InfoBox>
 
 | Feature       | Works with read-only mode? | Is default? |
-| ------------- | :------------------------: | :---------: |
-| Simple        |             ✅             |     ✅      |
+|---------------|:--------------------------:|:-----------:|
+| Simple        |             ✅             |      ✅     |
 | Batching      |             -              |      -      |
 | Export bucket |             -              |      -      |
 
@@ -77,7 +78,7 @@ Pinot does not support export buckets.
 
 ## SSL
 
-Cube does not require any additional configuration to enable SSL as Elasticsearch connections are made over HTTPS.
+Cube does not require any additional configuration to enable SSL as Pinot connections are made over HTTPS.
 
 [pinot]: https://docs.pinot.apache.org/
 [pinot-docs-approx-agg-fns]:
