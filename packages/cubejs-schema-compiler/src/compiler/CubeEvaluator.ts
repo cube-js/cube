@@ -14,7 +14,7 @@ export type SegmentDefinition = {
   ownedByCube: boolean,
   fieldType?: string,
   // TODO should we have it here?
-  postAggregate?: boolean,
+  multiStage?: boolean,
 };
 
 export type DimensionDefinition = {
@@ -23,7 +23,7 @@ export type DimensionDefinition = {
   primaryKey?: true,
   ownedByCube: boolean,
   fieldType?: string,
-  postAggregate?: boolean,
+  multiStage?: boolean,
   shiftInterval?: string,
 };
 
@@ -47,7 +47,7 @@ export type MeasureDefinition = {
   filters?: any
   primaryKey?: true,
   drillFilters?: any,
-  postAggregate?: boolean,
+  multiStage?: boolean,
   groupBy?: Function,
   reduceBy?: Function,
   addGroupBy?: Function,
@@ -64,6 +64,8 @@ export class CubeEvaluator extends CubeSymbols {
   public primaryKeys: Record<string, any> = {};
 
   public byFileName: Record<string, any> = {};
+
+  private isRbacEnabledCache: boolean | null = null;
 
   public constructor(
     protected readonly cubeValidator: CubeValidator
@@ -107,12 +109,74 @@ export class CubeEvaluator extends CubeSymbols {
     this.prepareMembers(cube.dimensions, cube, errorReporter);
     this.prepareMembers(cube.segments, cube, errorReporter);
 
-    this.evaluatePostAggregateReferences(cube.name, cube.measures);
-    this.evaluatePostAggregateReferences(cube.name, cube.dimensions);
+    this.evaluateMultiStageReferences(cube.name, cube.measures);
+    this.evaluateMultiStageReferences(cube.name, cube.dimensions);
 
     this.prepareHierarchies(cube);
 
+    this.prepareAccessPolicy(cube, errorReporter);
+
     return cube;
+  }
+
+  private allMembersOrList(cube: any, specifier: string | string[]): string[] {
+    const types = ['measures', 'dimensions', 'segments'];
+    if (specifier === '*') {
+      const allMembers = R.unnest(types.map(type => Object.keys(cube[type] || {})));
+      return allMembers;
+    } else {
+      return specifier as string[] || [];
+    }
+  }
+
+  private prepareAccessPolicy(cube: any, errorReporter: ErrorReporter) {
+    if (!cube.accessPolicy) {
+      return;
+    }
+
+    const memberMapper = (memberType: string) => (member: string) => {
+      if (member.indexOf('.') !== -1) {
+        const cubeName = member.split('.')[0];
+        if (cubeName !== cube.name) {
+          errorReporter.error(
+            `Paths aren't allowed in the accessPolicy policy but '${member}' provided as ${memberType} for ${cube.name}`
+          );
+        }
+        return member;
+      }
+      return this.pathFromArray([cube.name, member]);
+    };
+
+    const filterEvaluator = (filter: any) => {
+      if (filter.member) {
+        filter.memberReference = this.evaluateReferences(cube.name, filter.member);
+        filter.memberReference = memberMapper('a filter member reference')(filter.memberReference);
+      } else {
+        if (filter.and) {
+          filter.and.forEach(filterEvaluator);
+        }
+        if (filter.or) {
+          filter.or.forEach(filterEvaluator);
+        }
+      }
+    };
+
+    for (const policy of cube.accessPolicy) {
+      for (const filter of policy?.rowLevel?.filters || []) {
+        filterEvaluator(filter);
+      }
+
+      if (policy.memberLevel) {
+        policy.memberLevel.includesMembers = this.allMembersOrList(
+          cube,
+          policy.memberLevel.includes || '*'
+        ).map(memberMapper('an includes member'));
+        policy.memberLevel.excludesMembers = this.allMembersOrList(
+          cube,
+          policy.memberLevel.excludes || []
+        ).map(memberMapper('an excludes member'));
+      }
+    }
   }
 
   private prepareHierarchies(cube: any) {
@@ -165,14 +229,14 @@ export class CubeEvaluator extends CubeSymbols {
     return [];
   }
 
-  private evaluatePostAggregateReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
+  private evaluateMultiStageReferences(cubeName: string, obj: { [key: string]: MeasureDefinition }) {
     if (!obj) {
       return;
     }
 
     // eslint-disable-next-line no-restricted-syntax
     for (const member of Object.values(obj)) {
-      if (member.postAggregate) {
+      if (member.multiStage) {
         if (member.groupBy) {
           member.groupByReferences = this.evaluateReferences(cubeName, member.groupBy);
         }
@@ -462,9 +526,10 @@ export class CubeEvaluator extends CubeSymbols {
 
   public isInstanceOfType(type: 'measures' | 'dimensions' | 'segments', path: string | string[]): boolean {
     const cubeAndName = Array.isArray(path) ? path : path.split('.');
-    return this.evaluatedCubes[cubeAndName[0]] &&
+    const symbol = this.evaluatedCubes[cubeAndName[0]] &&
       this.evaluatedCubes[cubeAndName[0]][type] &&
       this.evaluatedCubes[cubeAndName[0]][type][cubeAndName[1]];
+    return symbol !== undefined;
   }
 
   public byPathAnyType(path: string[]) {
@@ -512,6 +577,19 @@ export class CubeEvaluator extends CubeSymbols {
     // Should throw UserError in case of parse error
     this.byPath(type, path);
     return path.split('.');
+  }
+
+  public isRbacEnabledForCube(cube: any): boolean {
+    return cube.accessPolicy && cube.accessPolicy.length;
+  }
+
+  public isRbacEnabled(): boolean {
+    if (this.isRbacEnabledCache === null) {
+      this.isRbacEnabledCache = this.cubeNames().some(
+        cubeName => this.isRbacEnabledForCube(this.cubeFromPath(cubeName))
+      );
+    }
+    return this.isRbacEnabledCache;
   }
 
   protected parsePathAnyType(path) {

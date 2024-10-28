@@ -4,6 +4,10 @@ import { PostgresDriver } from '../src';
 
 const streamToArray = require('stream-to-array');
 
+function largeParams(): Array<string> {
+  return new Array(65536).fill('foo');
+}
+
 describe('PostgresDriver', () => {
   let container: StartedTestContainer;
   let driver: PostgresDriver;
@@ -54,6 +58,14 @@ describe('PostgresDriver', () => {
         enum: 'FOO',
       }
     ]);
+  });
+
+  test('too many params', async () => {
+    await expect(
+      driver.query(`SELECT 'foo'::TEXT;`, largeParams())
+    )
+      .rejects
+      .toThrow('PostgreSQL protocol does not support more than 65535 parameters, but 65536 passed');
   });
 
   test('stream', async () => {
@@ -112,6 +124,20 @@ describe('PostgresDriver', () => {
     } catch (e: any) {
       expect(e.message).toEqual(
         'relation "test.random_name_for_table_that_doesnot_exist_sql_must_fail" does not exist'
+      );
+    }
+  });
+
+  test('stream (too many params)', async () => {
+    try {
+      await driver.stream('select * from test.streaming_test', largeParams(), {
+        highWaterMark: 1000,
+      });
+
+      throw new Error('stream must throw an exception');
+    } catch (e: any) {
+      expect(e.message).toEqual(
+        'PostgreSQL protocol does not support more than 65535 parameters, but 65536 passed'
       );
     }
   });

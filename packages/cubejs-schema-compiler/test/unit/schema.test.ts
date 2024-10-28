@@ -1,5 +1,5 @@
 import { prepareCompiler } from './PrepareCompiler';
-import { createCubeSchema, createCubeSchemaWithCustomGranularities } from './utils';
+import { createCubeSchema, createCubeSchemaWithCustomGranularities, createCubeSchemaWithAccessPolicy } from './utils';
 
 describe('Schema Testing', () => {
   const schemaCompile = async () => {
@@ -314,11 +314,20 @@ describe('Schema Testing', () => {
     let gr = dg.granularities.find(g => g.name === 'half_year');
     expect(gr).toBeDefined();
     expect(gr.title).toBe('6 month intervals');
+    expect(gr.interval).toBe('6 months');
+
+    gr = dg.granularities.find(g => g.name === 'half_year_by_1st_april');
+    expect(gr).toBeDefined();
+    expect(gr.title).toBe('Half year from Apr to Oct');
+    expect(gr.interval).toBe('6 months');
+    expect(gr.offset).toBe('3 months');
 
     // // Granularity defined without title -> titlize()
     gr = dg.granularities.find(g => g.name === 'half_year_by_1st_june');
     expect(gr).toBeDefined();
     expect(gr.title).toBe('Half Year By1 St June');
+    expect(gr.interval).toBe('6 months');
+    expect(gr.origin).toBe('2020-06-01 10:00:00');
   });
 
   it('join types', async () => {
@@ -357,5 +366,13 @@ describe('Schema Testing', () => {
       CubeC: { relationship: 'hasMany' },
       CubeD: { relationship: 'belongsTo' }
     });
+  });
+
+  it('valid schema with accessPolicy', async () => {
+    const { compiler } = prepareCompiler([
+      createCubeSchemaWithAccessPolicy('ProtectedCube'),
+    ]);
+    await compiler.compile();
+    compiler.throwIfAnyErrors();
   });
 });

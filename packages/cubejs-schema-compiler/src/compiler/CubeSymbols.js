@@ -10,6 +10,10 @@ import { BaseQuery } from '../adapter';
 const FunctionRegex = /function\s+\w+\(([A-Za-z0-9_,]*)|\(([\s\S]*?)\)\s*=>|\(?(\w+)\)?\s*=>/;
 const CONTEXT_SYMBOLS = {
   SECURITY_CONTEXT: 'securityContext',
+  // SECURITY_CONTEXT has been deprecated, however security_context (lowecase)
+  // is allowed in RBAC policies for query-time attribute matching
+  security_context: 'securityContext',
+  securityContext: 'securityContext',
   FILTER_PARAMS: 'filterParams',
   FILTER_GROUP: 'filterGroup',
   SQL_UTILS: 'sqlUtils'
@@ -139,6 +143,7 @@ export class CubeSymbols {
     this.camelCaseTypes(cube.dimensions);
     this.camelCaseTypes(cube.segments);
     this.camelCaseTypes(cube.preAggregations);
+    this.camelCaseTypes(cube.accessPolicy);
 
     if (cube.preAggregations) {
       this.transformPreAggregations(cube.preAggregations);
@@ -406,6 +411,34 @@ export class CubeSymbols {
     });
   }
 
+  /**
+   * This method is mainly used for evaluating RLS conditions and filters.
+   * It allows referencing security_context (lowecase) in dynamic conditions or filter values.
+   *
+   * It currently does not support async calls because inner resolveSymbol and
+   * resolveSymbolsCall are sync. Async support may be added later with deeper
+   * refactoring.
+   */
+  evaluateContextFunction(cube, contextFn, context = {}) {
+    const cubeEvaluator = this;
+
+    const res = cubeEvaluator.resolveSymbolsCall(contextFn, (name) => {
+      const resolvedSymbol = this.resolveSymbol(cube, name);
+      if (resolvedSymbol) {
+        return resolvedSymbol;
+      }
+      throw new UserError(
+        `Cube references are not allowed when evaluating RLS conditions or filters. Found: ${name} in ${cube.name}`
+      );
+    }, {
+      contextSymbols: {
+        securityContext: context.securityContext,
+      }
+    });
+
+    return res;
+  }
+
   evaluateReferences(cube, referencesFn, options = {}) {
     const cubeEvaluator = this;
 
@@ -493,8 +526,81 @@ export class CubeSymbols {
     return joinHints;
   }
 
+  resolveSymbolsCallDeps(cubeName, sql) {
+    try {
+      return this.resolveSymbolsCallDeps2(cubeName, sql);
+    } catch (e) {
+      console.log(e);
+      return [];
+    }
+  }
+
+  resolveSymbolsCallDeps2(cubeName, sql) {
+    const deps = [];
+    this.resolveSymbolsCall(sql, (name) => {
+      deps.push({ name, undefined });
+      const resolvedSymbol = this.resolveSymbol(
+        cubeName,
+        name
+      );
+      if (resolvedSymbol._objectWithResolvedProperties) {
+        return resolvedSymbol;
+      }
+      return '';
+    }, {
+      depsResolveFn: (name, parent) => {
+        deps.push({ name, parent });
+        return deps.length - 1;
+      },
+      currResolveIndexFn: () => deps.length - 1,
+      contextSymbols: this.depsContextSymbols(),
+
+    });
+    return deps;
+  }
+
+  depsContextSymbols() {
+    return Object.assign({
+      filterParams: this.filtersProxyDep(),
+      filterGroup: this.filterGroupFunctionDep(),
+      securityContext: BaseQuery.contextSymbolsProxyFrom({}, (param) => param)
+    });
+  }
+
+  filtersProxyDep() {
+    return new Proxy({}, {
+      get: (target, name) => {
+        if (name === '_objectWithResolvedProperties') {
+          return true;
+        }
+        // allFilters is null whenever it's used to test if the member is owned by cube so it should always render to `1 = 1`
+        // and do not check cube validity as it's part of compilation step.
+        const cubeName = this.cubeNameFromPath(name);
+        return new Proxy({ cube: cubeName }, {
+          get: (cubeNameObj, propertyName) => ({
+            filter: (column) => ({
+              __column() {
+                return column;
+              },
+              __member() {
+                return this.pathFromArray([cubeNameObj.cube, propertyName]);
+              },
+              toString() {
+                return '';
+              }
+            })
+          })
+        });
+      }
+    });
+  }
+
+  filterGroupFunctionDep() {
+    return (...filterParamArgs) => '';
+  }
+
   resolveSymbol(cubeName, name) {
-    const { sqlResolveFn, contextSymbols, collectJoinHints } = this.resolveSymbolsCallContext || {};
+    const { sqlResolveFn, contextSymbols, collectJoinHints, depsResolveFn, currResolveIndexFn } = this.resolveSymbolsCallContext || {};
 
     if (name === 'USER_CONTEXT') {
       throw new Error('Support for USER_CONTEXT was removed, please migrate to SECURITY_CONTEXT.');
@@ -528,8 +634,14 @@ export class CubeSymbols {
           name
         );
       }
+    } else if (depsResolveFn) {
+      if (cube) {
+        const newCubeName = this.isCurrentCube(name) ? cubeName : name;
+        const parentIndex = currResolveIndexFn();
+        cube = this.cubeDependenciesProxy(parentIndex, newCubeName);
+        return cube;
+      }
     }
-
     return cube || (this.symbols[cubeName] && this.symbols[cubeName][name]);
   }
 
@@ -621,6 +733,44 @@ export class CubeSymbols {
     }
 
     return cube && cube[dimName] && cube[dimName][gr] && cube[dimName][gr][granName];
+  }
+
+  cubeDependenciesProxy(parentIndex, cubeName) {
+    const self = this;
+    const { depsResolveFn } = self.resolveSymbolsCallContext || {};
+    return new Proxy({}, {
+      get: (v, propertyName) => {
+        if (propertyName === '__cubeName') {
+          depsResolveFn('__cubeName', parentIndex);
+          return cubeName;
+        }
+        const cube = self.symbols[cubeName];
+
+        if (propertyName === 'toString') {
+          depsResolveFn('toString', parentIndex);
+          return () => '';
+        }
+        if (propertyName === 'sql') {
+          depsResolveFn('sql', parentIndex);
+          return () => '';
+        }
+        if (propertyName === '_objectWithResolvedProperties') {
+          return true;
+        }
+        if (cube[propertyName]) {
+          depsResolveFn(propertyName, parentIndex);
+          return '';
+        }
+        if (self.symbols[propertyName]) {
+          const index = depsResolveFn(propertyName, parentIndex);
+          return this.cubeDependenciesProxy(index, propertyName);
+        }
+        if (typeof propertyName === 'string') {
+          throw new UserError(`${cubeName}.${propertyName} cannot be resolved. There's no such member or cube.`);
+        }
+        return undefined;
+      }
+    });
   }
 
   isCurrentCube(name) {

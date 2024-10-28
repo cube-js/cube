@@ -24,11 +24,13 @@ import {
   DriverCapabilities,
 } from '@cubejs-backend/base-driver';
 import { formatToTimeZone } from 'date-fns-timezone';
-import { Storage } from '@google-cloud/storage';
+import fs from 'fs/promises';
 import { HydrationMap, HydrationStream } from './HydrationStream';
 
 // eslint-disable-next-line import/order
 const util = require('snowflake-sdk/lib/util');
+
+const SUPPORTED_BUCKET_TYPES = ['s3', 'gcs', 'azure'];
 
 // TODO Remove when https://github.com/snowflakedb/snowflake-connector-nodejs/pull/158 is resolved
 util.construct_hostname = (region: any, account: any) => {
@@ -119,6 +121,7 @@ interface SnowflakeDriverExportAWS {
   keyId: string,
   secretKey: string,
   region: string,
+  integrationName?: string,
 }
 
 interface SnowflakeDriverExportGCS {
@@ -128,7 +131,28 @@ interface SnowflakeDriverExportGCS {
   credentials: any,
 }
 
-export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS;
+interface SnowflakeDriverExportAzure {
+  bucketType: 'azure',
+  bucketName: string,
+  azureKey?: string,
+  sasToken?: string,
+  integrationName?: string,
+  /**
+   * The client ID of a Microsoft Entra app registration.
+   */
+  clientId?: string,
+  /**
+   * ID of the application's Microsoft Entra tenant. Also called its directory ID.
+   */
+  tenantId?: string,
+  /**
+   * The path to a file containing a Kubernetes service account token that authenticates the identity.
+   */
+  tokenFilePath?: string,
+}
+
+export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDriverExportGCS
+  | SnowflakeDriverExportAzure;
 
 interface SnowflakeDriverOptions {
   account: string,
@@ -140,6 +164,8 @@ interface SnowflakeDriverOptions {
   clientSessionKeepAlive?: boolean,
   database?: string,
   authenticator?: string,
+  oauthTokenPath?: string,
+  token?: string,
   privateKeyPath?: string,
   privateKeyPass?: string,
   privateKey?: string,
@@ -184,7 +210,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       'CUBEJS_DB_SNOWFLAKE_CLIENT_SESSION_KEEP_ALIVE',
       'CUBEJS_DB_SNOWFLAKE_AUTHENTICATOR',
       'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PATH',
-      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS'
+      'CUBEJS_DB_SNOWFLAKE_PRIVATE_KEY_PASS',
+      'CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH',
     ];
   }
 
@@ -243,6 +270,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       username: getEnv('dbUser', { dataSource }),
       password: getEnv('dbPass', { dataSource }),
       authenticator: getEnv('snowflakeAuthenticator', { dataSource }),
+      oauthTokenPath: getEnv('snowflakeOAuthTokenPath', { dataSource }),
       privateKeyPath: getEnv('snowflakePrivateKeyPath', { dataSource }),
       privateKeyPass: getEnv('snowflakePrivateKeyPass', { dataSource }),
       privateKey,
@@ -277,16 +305,21 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     bucketType: string,
   ): SnowflakeDriverExportBucket {
     if (bucketType === 's3') {
+      // integrationName is optional for s3
+      const integrationName = getEnv('dbExportIntegration', { dataSource });
+
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
         keyId: getEnv('dbExportBucketAwsKey', { dataSource }),
         secretKey: getEnv('dbExportBucketAwsSecret', { dataSource }),
         region: getEnv('dbExportBucketAwsRegion', { dataSource }),
+        ...(integrationName !== undefined && { integrationName }),
       };
     }
 
     if (bucketType === 'gcs') {
+      // integrationName is required for gcs as the only possible way in snowflake
       return {
         bucketType,
         bucketName: getEnv('dbExportBucket', { dataSource }),
@@ -295,20 +328,50 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
       };
     }
 
+    if (bucketType === 'azure') {
+      // integrationName is optional for azure
+      const integrationName = getEnv('dbExportIntegration', { dataSource });
+      // sasToken is optional for azure if storage integration is used
+      const sasToken = getEnv('dbExportAzureSasToken', { dataSource });
+
+      if (!integrationName && !sasToken) {
+        throw new Error(
+          'Unsupported exportBucket configuration, some keys are empty: integrationName|sasToken'
+        );
+      }
+
+      // azureKey is optional if DefaultAzureCredential() is used
+      const azureKey = getEnv('dbExportBucketAzureKey', { dataSource });
+
+      // These 3 options make sense in case you want to authorize to Azure from
+      // application running in the k8s environment.
+      const clientId = getEnv('dbExportBucketAzureClientId', { dataSource });
+      const tenantId = getEnv('dbExportBucketAzureTenantId', { dataSource });
+      const tokenFilePath = getEnv('dbExportBucketAzureTokenFilePAth', { dataSource });
+
+      return {
+        bucketType,
+        bucketName: getEnv('dbExportBucket', { dataSource }),
+        ...(integrationName !== undefined && { integrationName }),
+        ...(sasToken !== undefined && { sasToken }),
+        ...(azureKey !== undefined && { azureKey }),
+        ...(clientId !== undefined && { clientId }),
+        ...(tenantId !== undefined && { tenantId }),
+        ...(tokenFilePath !== undefined && { tokenFilePath }),
+      };
+    }
+
     throw new Error(
-      `Unsupported EXPORT_BUCKET_TYPE, supported: ${['s3', 'gcs'].join(',')}`
+      `Unsupported EXPORT_BUCKET_TYPE, supported: ${SUPPORTED_BUCKET_TYPES.join(',')}`
     );
   }
 
-  /**
-   * @todo Move to BaseDriver in the future?
-   */
   protected getExportBucket(
     dataSource: string,
   ): SnowflakeDriverExportBucket | undefined {
     const bucketType = getEnv('dbExportBucketType', {
       dataSource,
-      supported: ['s3', 'gcs'],
+      supported: SUPPORTED_BUCKET_TYPES,
     });
     if (bucketType) {
       const exportBucket = this.createExportBucket(
@@ -330,11 +393,35 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     return undefined;
   }
 
+  private async readOAuthToken() {
+    const tokenPath = this.config.oauthTokenPath || '/snowflake/session/token';
+
+    try {
+      await fs.access(tokenPath);
+    } catch (error) {
+      throw new Error(`File ${tokenPath} provided by CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH does not exist.`);
+    }
+
+    const token = await fs.readFile(tokenPath, 'utf8');
+    return token.trim();
+  }
+
+  private async createConnection() {
+    if (this.config.authenticator?.toUpperCase() === 'OAUTH') {
+      this.config.token = await this.readOAuthToken();
+    }
+
+    const connection = snowflake.createConnection(this.config);
+
+    return connection;
+  }
+
   /**
    * Test driver's connection.
    */
   public async testConnection() {
-    const connection = snowflake.createConnection(this.config);
+    const connection = await this.createConnection();
+
     await new Promise(
       (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
     );
@@ -353,7 +440,8 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    */
   protected async initConnection() {
     try {
-      const connection = snowflake.createConnection(this.config);
+      const connection = await this.createConnection();
+
       await new Promise(
         (resolve, reject) => connection.connect((err, conn) => (err ? reject(err) : resolve(conn)))
       );
@@ -397,10 +485,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
    * Determines whether export bucket feature is configured or not.
    */
   public async isUnloadSupported() {
-    if (!this.config.exportBucket) {
-      return false;
-    }
-    return true;
+    return this.config.exportBucket !== undefined;
   }
 
   /**
@@ -414,10 +499,17 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
     if (!this.config.exportBucket) {
       throw new Error('Export bucket is not configured.');
     }
+    if (!SUPPORTED_BUCKET_TYPES.includes(this.config.exportBucket.bucketType as string)) {
+      throw new Error(`Unsupported export bucket type: ${
+        this.config.exportBucket.bucketType
+      }`);
+    }
+
     const types = options.query
       ? await this.unloadWithSql(tableName, options)
       : await this.unloadWithTable(tableName, options);
     const csvFile = await this.getCsvFiles(tableName);
+
     return {
       exportBucketCsvEscapeSymbol: this.config.exportBucketCsvEscapeSymbol,
       csvFile,
@@ -551,25 +643,32 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
         'FIELD_OPTIONALLY_ENCLOSED_BY = \'"\'' +
         ')',
     };
-    switch (bucketType) {
-      case 's3':
-        optionsToExport.CREDENTIALS = `(AWS_KEY_ID = '${
-          (
-            <SnowflakeDriverExportAWS> this.config.exportBucket
-          ).keyId
-        }' AWS_SECRET_KEY = '${
-          (
-            <SnowflakeDriverExportAWS> this.config.exportBucket
-          ).secretKey
-        }')`;
-        break;
-      case 'gcs':
-        optionsToExport.STORAGE_INTEGRATION = (
-          <SnowflakeDriverExportGCS> this.config.exportBucket
-        ).integrationName;
-        break;
-      default:
-        throw new Error('Unsupported export bucket type.');
+    if (bucketType === 's3') {
+      const conf = <SnowflakeDriverExportAWS> this.config.exportBucket;
+
+      // Storage integration export flow takes precedence over direct auth if it is defined
+      if (conf.integrationName) {
+        optionsToExport.STORAGE_INTEGRATION = conf.integrationName;
+      } else {
+        optionsToExport.CREDENTIALS = `(AWS_KEY_ID = '${conf.keyId}' AWS_SECRET_KEY = '${conf.secretKey}')`;
+      }
+    } else if (bucketType === 'gcs') {
+      optionsToExport.STORAGE_INTEGRATION = (
+        <SnowflakeDriverExportGCS> this.config.exportBucket
+      ).integrationName;
+    } else if (bucketType === 'azure') {
+      // @see https://docs.snowflake.com/en/sql-reference/sql/copy-into-location
+      // @see https://docs.snowflake.com/en/user-guide/data-unload-azure
+      const conf = <SnowflakeDriverExportAzure> this.config.exportBucket;
+
+      // Storage integration export flow takes precedence over direct auth if it is defined
+      if (conf.integrationName) {
+        optionsToExport.STORAGE_INTEGRATION = conf.integrationName;
+      } else {
+        optionsToExport.CREDENTIALS = `(AZURE_SAS_TOKEN = '${conf.sasToken}')`;
+      }
+    } else {
+      throw new Error('Unsupported export bucket type.');
     }
     const clause = Object.entries(optionsToExport)
       .map(([key, value]) => `${key} = ${value}`)
@@ -583,63 +682,37 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
   private async getCsvFiles(tableName: string): Promise<string[]> {
     const { bucketType, bucketName } =
       <SnowflakeDriverExportBucket> this.config.exportBucket;
-    const { credentials } = (
-      <SnowflakeDriverExportGCS> this.config.exportBucket
-    );
-    switch (bucketType) {
-      case 's3':
-        return this.extractUnloadedFilesFromS3(
-          {
-            credentials: {
-              accessKeyId: (
-                <SnowflakeDriverExportAWS> this.config.exportBucket
-              ).keyId,
-              secretAccessKey: (
-                <SnowflakeDriverExportAWS> this.config.exportBucket
-              ).secretKey,
-            },
-            region: (
-              <SnowflakeDriverExportAWS> this.config.exportBucket
-            ).region,
-          },
-          bucketName,
-          tableName,
-        );
-      case 'gcs':
-        return this.extractFilesFromGCS(
-          new Storage({
-            credentials,
-            projectId: credentials.project_id
-          }),
-          bucketName,
-          tableName,
-        );
-      default:
-        throw new Error('Unsupported export bucket type.');
-    }
-  }
 
-  /**
-   * Returns an array of signed GCS URLs of the unloaded csv files.
-   */
-  protected async extractFilesFromGCS(
-    storage: Storage,
-    bucketName: string,
-    tableName: string
-  ): Promise<string[]> {
-    const bucket = storage.bucket(bucketName);
-    const [files] = await bucket.getFiles({ prefix: `${tableName}/` });
-    if (files.length) {
-      const csvFile = await Promise.all(files.map(async (file) => {
-        const [url] = await file.getSignedUrl({
-          action: 'read',
-          expires: new Date(new Date().getTime() + 60 * 60 * 1000)
-        });
-        return url;
-      }));
-      return csvFile;
+    if (bucketType === 's3') {
+      const cfg = <SnowflakeDriverExportAWS> this.config.exportBucket;
+
+      return this.extractUnloadedFilesFromS3(
+        {
+          credentials: {
+            accessKeyId: cfg.keyId,
+            secretAccessKey: cfg.secretKey,
+          },
+          region: cfg.region,
+        },
+        bucketName,
+        tableName,
+      );
+    } else if (bucketType === 'gcs') {
+      const { credentials } = (
+        <SnowflakeDriverExportGCS> this.config.exportBucket
+      );
+      return this.extractFilesFromGCS({ credentials }, bucketName, tableName);
+    } else if (bucketType === 'azure') {
+      const { azureKey, sasToken, clientId, tenantId, tokenFilePath } = (
+        <SnowflakeDriverExportAzure> this.config.exportBucket
+      );
+      return this.extractFilesFromAzure(
+        { azureKey, sasToken, clientId, tenantId, tokenFilePath },
+        bucketName,
+        tableName,
+      );
     } else {
-      return [];
+      throw new Error(`Unsupported export bucket type: ${bucketType}`);
     }
   }
 

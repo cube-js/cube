@@ -1303,4 +1303,10 @@ declare module '@cubejs-client/core' {
     stage: string;
     timeElapsed: number;
   };
+
+  export function granularityFor(dateStr: string): string;
+
+  export function minGranularityForIntervals(i1: string, i2: string): string;
+
+  export function isPredefinedGranularity(granularity: TimeDimensionGranularity): boolean;
 }

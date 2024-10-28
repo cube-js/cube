@@ -234,7 +234,7 @@ class ApiGateway {
       const { query, variables } = req.body;
       const compilerApi = await this.getCompilerApi(req.context);
 
-      const metaConfig = await compilerApi.metaConfig({
+      const metaConfig = await compilerApi.metaConfig(req.context, {
         requestId: req.context.requestId,
       });
 
@@ -267,7 +267,7 @@ class ApiGateway {
         const compilerApi = await this.getCompilerApi(req.context);
         let schema = compilerApi.getGraphQLSchema();
         if (!schema) {
-          let metaConfig = await compilerApi.metaConfig({
+          let metaConfig = await compilerApi.metaConfig(req.context, {
             requestId: req.context.requestId,
           });
           metaConfig = this.filterVisibleItemsInMeta(req.context, metaConfig);
@@ -551,7 +551,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      const metaConfig = await compilerApi.metaConfig({
+      const metaConfig = await compilerApi.metaConfig(context, {
         requestId: context.requestId,
         includeCompilerId: includeCompilerId || onlyCompilerId
       });
@@ -587,7 +587,7 @@ class ApiGateway {
     try {
       await this.assertApiScope('meta', context.securityContext);
       const compilerApi = await this.getCompilerApi(context);
-      const metaConfigExtended = await compilerApi.metaConfigExtended({
+      const metaConfigExtended = await compilerApi.metaConfigExtended(context, {
         requestId: context.requestId,
       });
       const { metaConfig, cubeDefinitions } = metaConfigExtended;
@@ -1010,7 +1010,7 @@ class ApiGateway {
           } else {
             const metaCacheKey = JSON.stringify(ctx);
             if (!metaCache.has(metaCacheKey)) {
-              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(ctx));
+              metaCache.set(metaCacheKey, await compiler.metaConfigExtended(context, ctx));
             }
 
             // checking and fetching result status
@@ -1180,6 +1180,7 @@ class ApiGateway {
     }, context);
 
     const startTime = new Date().getTime();
+    const compilerApi = await this.getCompilerApi(context);
 
     let normalizedQueries: NormalizedQuery[] = await Promise.all(
       queries.map(
@@ -1195,8 +1196,14 @@ class ApiGateway {
           }
 
           const normalizedQuery = normalizeQuery(currentQuery, persistent);
-          let rewrittenQuery = await this.queryRewrite(
+          // First apply cube/view level security policies
+          const queryWithRlsFilters = await compilerApi.applyRowLevelSecurity(
             normalizedQuery,
+            context
+          );
+          // Then apply user-supplied queryRewrite
+          let rewrittenQuery = await this.queryRewrite(
+            queryWithRlsFilters,
             context,
           );
 
@@ -1693,7 +1700,7 @@ class ApiGateway {
         await this.getNormalizedQueries(query, context);
 
       let metaConfigResult = await (await this
-        .getCompilerApi(context)).metaConfig({
+        .getCompilerApi(context)).metaConfig(request.context, {
         requestId: context.requestId
       });
 
@@ -1803,7 +1810,7 @@ class ApiGateway {
         await this.getNormalizedQueries(query, context, request.streaming, request.memberExpressions);
 
       const compilerApi = await this.getCompilerApi(context);
-      let metaConfigResult = await compilerApi.metaConfig({
+      let metaConfigResult = await compilerApi.metaConfig(request.context, {
         requestId: context.requestId
       });
 
@@ -2218,10 +2225,15 @@ class ApiGateway {
     if (this.playgroundAuthSecret) {
       const systemCheckAuthFn = this.createCheckAuthSystemFn();
       return async (ctx, authorization) => {
+        // TODO: separate two auth workflows
         try {
           await mainCheckAuthFn(ctx, authorization);
-        } catch (error) {
-          await systemCheckAuthFn(ctx, authorization);
+        } catch (mainAuthError) {
+          try {
+            await systemCheckAuthFn(ctx, authorization);
+          } catch (playgroundAuthError) {
+            throw mainAuthError;
+          }
         }
       };
     }

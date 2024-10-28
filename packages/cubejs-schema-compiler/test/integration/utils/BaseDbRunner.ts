@@ -1,6 +1,6 @@
 import R from 'ramda';
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
-import { BaseQuery } from "../../../src";
+import { BaseQuery } from '../../../src';
 
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
