@@ -2274,7 +2274,7 @@ from
             logical_plan.find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec!["KibanaSampleDataEcommerce.order_date".to_string()]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
@@ -7323,7 +7323,10 @@ ORDER BY "source"."str0" ASC
             query_plan.as_logical_plan().find_cube_scan().request,
             V1LoadRequestQuery {
                 measures: Some(vec![]),
-                dimensions: Some(vec![]),
+                dimensions: Some(vec![
+                    "WideCube.dim1".to_string(),
+                    "WideCube.dim2".to_string(),
+                ]),
                 segments: Some(vec![]),
                 order: Some(vec![]),
                 ungrouped: Some(true),
