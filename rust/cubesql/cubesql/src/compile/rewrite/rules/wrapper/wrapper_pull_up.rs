@@ -4,8 +4,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapped_select, wrapped_select_having_expr_empty_tail,
-        wrapped_select_joins_empty_tail, wrapper_pullup_replacer, LogicalPlanLanguage,
-        WrappedSelectSelectType, WrappedSelectType,
+        wrapped_select_joins_empty_tail, wrapper_pullup_replacer, WrappedSelectSelectType,
+        WrappedSelectType,
     },
     var, var_iter, var_list_iter,
 };

@@ -500,7 +500,9 @@ crate::plan_to_language! {
 macro_rules! var_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant($field_variant(v)) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant($field_variant(v)) => {
+                Some(v)
+            }
             _ => None,
         })
     }};
@@ -510,7 +512,7 @@ macro_rules! var_iter {
 macro_rules! var_list_iter {
     ($eclass:expr, $field_variant:ident) => {{
         $eclass.nodes.iter().filter_map(|node| match node {
-            LogicalPlanLanguage::$field_variant(v) => Some(v),
+            $crate::compile::rewrite::LogicalPlanLanguage::$field_variant(v) => Some(v),
             _ => None,
         })
     }};

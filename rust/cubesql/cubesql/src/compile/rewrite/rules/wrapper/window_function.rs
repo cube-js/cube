@@ -4,8 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, window_fun_expr_var_arg, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, WindowFunctionExprFun,
-        WrapperPullupReplacerAliasToCube,
+        wrapper_pushdown_replacer, WindowFunctionExprFun, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };

@@ -3,8 +3,7 @@ use crate::{
         literal_expr,
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
-        transforming_rewrite, wrapper_pullup_replacer, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube,
+        transforming_rewrite, wrapper_pullup_replacer, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };

@@ -4,7 +4,7 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, ScalarUDFExprFun,
         WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,

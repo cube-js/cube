@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         scalar_fun_expr_args_empty_tail, scalar_fun_expr_args_legacy, transforming_rewrite,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ListPattern, ListType,
-        LogicalPlanLanguage, ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
