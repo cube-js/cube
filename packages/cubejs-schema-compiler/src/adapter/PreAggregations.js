@@ -1192,7 +1192,7 @@ export class PreAggregations {
     const targetMeasuresReferences = this.measureAliasesRenderedReference(preAggregationForQuery);
 
     const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
-      member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.split('.')[1]])]} ${targetReferences[member]}`
+      member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.replace(/^[^.]*\./, '')])]} ${targetReferences[member]}`
     );
 
     const tables = preAggregationForQuery.referencedPreAggregations.map(preAggregation => {
@@ -1346,7 +1346,7 @@ export class PreAggregations {
       R.map((td) => {
         const timeDimension = this.query.newTimeDimension(td);
         return [
-          td.dimension,
+          `${td.dimension}.${td.granularity}`,
           this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity)),
         ];
       }),
