@@ -114,7 +114,7 @@ export class BaseTimeDimension extends BaseFilter {
       return this.convertedToTz();
     }
 
-    return this.query.dimensionTimeGroupedColumn(this.convertedToTz(), <Granularity>granularity);
+    return this.query.convertTz(this.query.dimensionTimeGroupedColumn(this.query.dimensionSql(this), <Granularity>granularity));
   }
 
   public dimensionDefinition(): DimensionDefinition | SegmentDefinition {
