@@ -121,7 +121,7 @@ describe('SQL Generation', () => {
 
       const queryAndParams = query.buildSqlAndParams();
 
-      expect(queryAndParams[0]).toContain('"cards".type "cards__type", date_trunc(\'day\', ("cards".created_at::timestamptz AT TIME ZONE \'America/Los_Angeles\')) "cards__created_at_day"');
+      expect(queryAndParams[0]).toContain('"cards".type "cards__type", (date_trunc(\'day\', "cards".created_at)::timestamptz AT TIME ZONE \'America/Los_Angeles\') "cards__created_at_day"');
       expect(queryAndParams[0]).toContain('GROUP BY 1, 2');
       expect(queryAndParams[0]).toContain('ORDER BY 2');
     });
