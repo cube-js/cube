@@ -62,7 +62,11 @@ jobs:
     #  We use host instead of cross container, because it's much faster
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    name: Unit (Rewrite Engine)
+    name: Unit (Rewrite Engine) (CUBESQL_TOP_DOWN_EXTRACTOR=${{ matrix.top-down-extractor }})
+    strategy:
+      matrix:
+        top-down-extractor: ['true', 'false']
+      fail-fast: false
 
     steps:
       - name: Checkout
@@ -90,6 +94,7 @@ jobs:
           CUBESQL_TESTING_CUBE_TOKEN: ${{ secrets.CUBESQL_TESTING_CUBE_TOKEN }}
           CUBESQL_TESTING_CUBE_URL: ${{ secrets.CUBESQL_TESTING_CUBE_URL }}
           CUBESQL_SQL_PUSH_DOWN: true
+          CUBESQL_TOP_DOWN_EXTRACTOR: ${{ matrix.top-down-extractor }}
           CUBESQL_REWRITE_CACHE: true
           CUBESQL_REWRITE_TIMEOUT: 60
         run: |
