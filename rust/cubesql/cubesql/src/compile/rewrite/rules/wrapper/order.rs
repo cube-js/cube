@@ -1,12 +1,19 @@
-use crate::compile::rewrite::{
-    cube_scan_wrapper, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules, sort,
-    wrapped_select, wrapped_select_order_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer,
+use crate::{
+    compile::rewrite::{
+        cube_scan_wrapper,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        sort, transforming_rewrite, wrapped_select, wrapped_select_order_expr_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, WrapperPullupReplacerUngrouped,
+        WrapperPushdownReplacerUngrouped,
+    },
+    copy_flag, var,
 };
+use egg::Subst;
 
 impl WrapperRules {
     pub fn order_rules(&self, rules: &mut Vec<CubeRewrite>) {
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             "wrapper-push-down-order-to-cube-scan",
             sort(
                 "?order_expr",
@@ -98,7 +105,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?order_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -109,6 +116,7 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
+            self.transform_order("?ungrouped", "?pushdown_ungrouped"),
         )]);
 
         Self::list_pushdown_pullup_rules(
@@ -117,5 +125,27 @@ impl WrapperRules {
             "SortExp",
             "WrappedSelectOrderExpr",
         );
+    }
+
+    fn transform_order(
+        &self,
+        ungrouped_var: &'static str,
+        pushdown_ungrouped_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPullupReplacerUngrouped,
+                pushdown_ungrouped_var,
+                WrapperPushdownReplacerUngrouped
+            ) {
+                return false;
+            }
+            true
+        }
     }
 }

@@ -5,9 +5,10 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ScalarUDFExprFun,
-        WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        WrapperPushdownReplacerUngrouped,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
@@ -107,7 +108,7 @@ impl WrapperRules {
                     "?cube_members",
                 ),
             ),
-            rewrite(
+            transforming_rewrite(
                 "wrapper-push-down-udf-empty-tail",
                 wrapper_pushdown_replacer(
                     udf_fun_expr_args_empty_tail(),
@@ -119,10 +120,11 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_fun_expr_args_empty_tail(),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
+                self.transform_udf_expr_tail("?ungrouped", "?pullup_ungrouped"),
             ),
         ]);
     }
@@ -155,6 +157,28 @@ impl WrapperRules {
                 }
             }
             false
+        }
+    }
+
+    fn transform_udf_expr_tail(
+        &self,
+        ungrouped_var: &'static str,
+        pullup_ungrouped_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+            true
         }
     }
 }

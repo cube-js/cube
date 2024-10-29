@@ -10,9 +10,9 @@ use crate::{
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         LogicalPlanLanguage, WrappedSelectPushToCube, WrappedSelectUngroupedScan,
-        WrapperPullupReplacerUngrouped,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::{Subst, Var};
 
@@ -177,7 +177,7 @@ impl WrapperRules {
                         wrapper_pushdown_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?pushdown_ungrouped",
                             "?in_projection",
                             "?cube_members",
                         ),
@@ -208,6 +208,7 @@ impl WrapperRules {
             ),
             self.transform_filter(
                 "?ungrouped",
+                "?pushdown_ungrouped",
                 "?select_push_to_cube",
                 "?select_ungrouped_scan",
             ),
@@ -254,7 +255,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?subqueries",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -291,7 +292,7 @@ impl WrapperRules {
                         wrapper_pushdown_replacer(
                             "?filter_expr",
                             "?alias_to_cube",
-                            "?ungrouped",
+                            "?pushdown_ungrouped",
                             "?in_projection",
                             "?cube_members",
                         ),
@@ -323,6 +324,7 @@ impl WrapperRules {
             self.transform_filter_subquery(
                 "?alias_to_cube",
                 "?ungrouped",
+                "?pushdown_ungrouped",
                 "?select_push_to_cube",
                 "?select_ungrouped_scan",
             ),
@@ -332,10 +334,12 @@ impl WrapperRules {
     fn transform_filter(
         &self,
         ungrouped_var: &'static str,
+        pushdown_ungrouped_var: &'static str,
         select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let ungrouped_var = var!(ungrouped_var);
+        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         move |egraph, subst| {
@@ -343,6 +347,7 @@ impl WrapperRules {
                 egraph,
                 subst,
                 ungrouped_var,
+                pushdown_ungrouped_var,
                 select_push_to_cube_var,
                 select_ungrouped_scan_var,
             )
@@ -353,11 +358,13 @@ impl WrapperRules {
         &self,
         alias_to_cube_var: &'static str,
         ungrouped_var: &'static str,
+        pushdown_ungrouped_var: &'static str,
         select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let ungrouped_var = var!(ungrouped_var);
+        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
         let meta = self.meta_context.clone();
@@ -372,6 +379,7 @@ impl WrapperRules {
                     egraph,
                     subst,
                     ungrouped_var,
+                    pushdown_ungrouped_var,
                     select_push_to_cube_var,
                     select_ungrouped_scan_var,
                 )
@@ -385,9 +393,21 @@ impl WrapperRules {
         egraph: &mut CubeEGraph,
         subst: &mut Subst,
         ungrouped_var: Var,
+        pushdown_ungrouped_var: Var,
         select_push_to_cube_var: Var,
         select_ungrouped_scan_var: Var,
     ) -> bool {
+        if !copy_flag!(
+            egraph,
+            subst,
+            ungrouped_var,
+            WrapperPullupReplacerUngrouped,
+            pushdown_ungrouped_var,
+            WrapperPushdownReplacerUngrouped
+        ) {
+            return false;
+        }
+
         for ungrouped in
             var_iter!(egraph[subst[ungrouped_var]], WrapperPullupReplacerUngrouped).cloned()
         {

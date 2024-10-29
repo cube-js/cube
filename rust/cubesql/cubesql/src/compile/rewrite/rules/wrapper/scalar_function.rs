@@ -5,9 +5,10 @@ use crate::{
         rules::wrapper::WrapperRules,
         scalar_fun_expr_args_empty_tail, scalar_fun_expr_args_legacy, transforming_rewrite,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ListPattern, ListType,
-        ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube,
+        ScalarFunctionExprFun, WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        WrapperPushdownReplacerUngrouped,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
@@ -55,7 +56,7 @@ impl WrapperRules {
                 ),
                 self.transform_fun_expr("?fun", "?alias_to_cube"),
             ),
-            rewrite(
+            transforming_rewrite(
                 "wrapper-push-down-scalar-function-empty-tail",
                 wrapper_pushdown_replacer(
                     scalar_fun_expr_args_empty_tail(),
@@ -67,10 +68,11 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     scalar_fun_expr_args_empty_tail(),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
+                self.transform_scalar_function_empty_tail("?ungrouped", "?pullup_ungrouped"),
             ),
         ]);
 
@@ -190,6 +192,29 @@ impl WrapperRules {
                     ),
                 ),
             ]);
+        }
+    }
+
+    fn transform_scalar_function_empty_tail(
+        &self,
+        ungrouped_var: &'static str,
+        pullup_ungrouped_var: &'static str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+
+            true
         }
     }
 

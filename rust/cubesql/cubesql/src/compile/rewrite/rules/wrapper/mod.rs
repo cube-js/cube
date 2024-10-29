@@ -29,17 +29,21 @@ mod wrapper_pull_up;
 
 use crate::{
     compile::rewrite::{
-        fun_expr, rewrite,
-        rewriter::{CubeRewrite, RewriteRules},
+        fun_expr,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::{
             replacer_flat_pull_up_node, replacer_flat_push_down_node, replacer_pull_up_node,
             replacer_push_down_node,
         },
-        wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
+        transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
     },
     config::ConfigObj,
+    copy_flag,
     transport::MetaContext,
+    var,
 };
+use egg::Subst;
 use std::{fmt::Display, sync::Arc};
 
 pub struct WrapperRules {
@@ -135,7 +139,7 @@ impl WrapperRules {
             },
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             &format!("{}-tail", rule_name),
             wrapper_pushdown_replacer(
                 list_node,
@@ -147,11 +151,33 @@ impl WrapperRules {
             wrapper_pullup_replacer(
                 substitute_list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_ungrouped",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_list_tail("?ungrouped", "?pullup_ungrouped"),
         )]);
+    }
+
+    fn transform_list_tail(
+        ungrouped_var: &str,
+        pullup_ungrouped_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+            true
+        }
     }
 
     fn flat_list_pushdown_pullup_rules(
@@ -196,7 +222,7 @@ impl WrapperRules {
             ],
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             &format!("{}-tail", rule_name),
             wrapper_pushdown_replacer(
                 list_type.empty_list(),
@@ -208,11 +234,33 @@ impl WrapperRules {
             wrapper_pullup_replacer(
                 substitute_list_type.empty_list(),
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_ungrouped",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_flat_list_tail("?ungrouped", "?pullup_ungrouped"),
         )]);
+    }
+
+    fn transform_flat_list_tail(
+        ungrouped_var: &str,
+        pullup_ungrouped_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+            true
+        }
     }
 
     fn expr_list_pushdown_pullup_rules(
@@ -250,7 +298,7 @@ impl WrapperRules {
             },
         ));
 
-        rules.extend(vec![rewrite(
+        rules.extend(vec![transforming_rewrite(
             rule_name,
             wrapper_pushdown_replacer(
                 list_node,
@@ -262,10 +310,32 @@ impl WrapperRules {
             wrapper_pullup_replacer(
                 list_node,
                 "?alias_to_cube",
-                "?ungrouped",
+                "?pullup_ungrouped",
                 "?in_projection",
                 "?cube_members",
             ),
+            Self::transform_expr_list_tail("?ungrouped", "?pullup_ungrouped"),
         )]);
+    }
+
+    fn transform_expr_list_tail(
+        ungrouped_var: &str,
+        pullup_ungrouped_var: &str,
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+            true
+        }
     }
 }

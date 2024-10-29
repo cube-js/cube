@@ -4,9 +4,10 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
-        WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        WrapperPushdownReplacerUngrouped,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::Subst;
 
@@ -33,13 +34,13 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?list",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pullup_ungrouped",
                         "?in_projection",
                         "?cube_members",
                     ),
                     "?negated",
                 ),
-                self.transform_in_list_only_consts("?list"),
+                self.transform_in_list_only_consts("?list", "?ungrouped", "?pullup_ungrouped"),
             ),
             rewrite(
                 "wrapper-in-list-push-down",
@@ -132,9 +133,23 @@ impl WrapperRules {
     fn transform_in_list_only_consts(
         &self,
         list_var: &'static str,
+        ungrouped_var: &'static str,
+        pullup_ungrouped_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let list_var = var!(list_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph: &mut CubeEGraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
             return egraph[subst[list_var]].data.constant_in_list.is_some();
         }
     }

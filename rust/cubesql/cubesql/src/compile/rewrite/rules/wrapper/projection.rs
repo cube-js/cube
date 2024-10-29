@@ -10,8 +10,9 @@ use crate::{
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         ListType, LogicalPlanLanguage, ProjectionAlias, WrappedSelectAlias,
         WrappedSelectPushToCube, WrappedSelectUngroupedScan, WrapperPullupReplacerUngrouped,
+        WrapperPushdownReplacerUngrouped,
     },
-    var, var_iter,
+    copy_flag, var, var_iter,
 };
 use egg::{Subst, Var};
 
@@ -40,7 +41,7 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_ungrouped",
                         "WrapperPullupReplacerInProjection:true",
                         "?cube_members",
                     ),
@@ -108,6 +109,7 @@ impl WrapperRules {
                 "?expr",
                 "?projection_alias",
                 "?ungrouped",
+                "?pushdown_ungrouped",
                 "?select_alias",
                 "?select_push_to_cube",
                 "?select_ungrouped_scan",
@@ -159,14 +161,14 @@ impl WrapperRules {
                     wrapper_pushdown_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_ungrouped",
                         "WrapperPullupReplacerInProjection:true",
                         "?cube_members",
                     ),
                     wrapper_pushdown_replacer(
                         "?subqueries",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?pushdown_ungrouped",
                         "WrapperPullupReplacerInProjection:true",
                         "?cube_members",
                     ),
@@ -228,6 +230,7 @@ impl WrapperRules {
                 "?expr",
                 "?projection_alias",
                 "?ungrouped",
+                "?pushdown_ungrouped",
                 "?select_alias",
                 "?select_push_to_cube",
                 "?select_ungrouped_scan",
@@ -239,6 +242,7 @@ impl WrapperRules {
         expr_var: &'static str,
         projection_alias_var: &'static str,
         ungrouped_var: &'static str,
+        pushdown_ungrouped_var: &'static str,
         select_alias_var: &'static str,
         select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
@@ -246,6 +250,7 @@ impl WrapperRules {
         let expr_var = var!(expr_var);
         let projection_alias_var = var!(projection_alias_var);
         let ungrouped_var = var!(ungrouped_var);
+        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
         let select_alias_var = var!(select_alias_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
@@ -256,6 +261,7 @@ impl WrapperRules {
                 expr_var,
                 projection_alias_var,
                 ungrouped_var,
+                pushdown_ungrouped_var,
                 select_alias_var,
                 select_push_to_cube_var,
                 select_ungrouped_scan_var,
@@ -269,6 +275,7 @@ impl WrapperRules {
         expr_var: &'static str,
         projection_alias_var: &'static str,
         ungrouped_var: &'static str,
+        pushdown_ungrouped_var: &'static str,
         select_alias_var: &'static str,
         select_push_to_cube_var: &'static str,
         select_ungrouped_scan_var: &'static str,
@@ -277,6 +284,7 @@ impl WrapperRules {
         let expr_var = var!(expr_var);
         let projection_alias_var = var!(projection_alias_var);
         let ungrouped_var = var!(ungrouped_var);
+        let pushdown_ungrouped_var = var!(pushdown_ungrouped_var);
         let select_alias_var = var!(select_alias_var);
         let select_push_to_cube_var = var!(select_push_to_cube_var);
         let select_ungrouped_scan_var = var!(select_ungrouped_scan_var);
@@ -294,6 +302,7 @@ impl WrapperRules {
                     expr_var,
                     projection_alias_var,
                     ungrouped_var,
+                    pushdown_ungrouped_var,
                     select_alias_var,
                     select_push_to_cube_var,
                     select_ungrouped_scan_var,
@@ -310,11 +319,23 @@ impl WrapperRules {
         expr_var: Var,
         projection_alias_var: Var,
         ungrouped_var: Var,
+        pushdown_ungrouped_var: Var,
         select_alias_var: Var,
         select_push_to_cube_var: Var,
         select_ungrouped_scan_var: Var,
     ) -> bool {
         if let Some(_) = &egraph[subst[expr_var]].data.referenced_expr {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPullupReplacerUngrouped,
+                pushdown_ungrouped_var,
+                WrapperPushdownReplacerUngrouped
+            ) {
+                return false;
+            }
+
             for projection_alias in
                 var_iter!(egraph[subst[projection_alias_var]], ProjectionAlias).cloned()
             {

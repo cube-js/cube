@@ -5,7 +5,9 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, wrapper_pullup_replacer, wrapper_pushdown_replacer,
         EmptyRelationDerivedSourceTableName, LogicalPlanLanguage, WrapperPullupReplacerAliasToCube,
+        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerUngrouped,
     },
+    copy_flag,
     transport::MetaContext,
     var, var_iter, var_list_iter,
 };
@@ -36,11 +38,15 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     "?cube_scan_input",
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?pullup_ungrouped",
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.transform_check_subquery_wrapped("?cube_scan_input"),
+                self.transform_check_subquery_wrapped(
+                    "?cube_scan_input",
+                    "?ungrouped",
+                    "?pullup_ungrouped",
+                ),
             ),
             transforming_rewrite(
                 "wrapper-subqueries-wrap-empty-rel",
@@ -138,9 +144,24 @@ impl WrapperRules {
     fn transform_check_subquery_wrapped(
         &self,
         cube_scan_input_var: &'static str,
+        ungrouped_var: &'static str,
+        pullup_ungrouped_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_scan_input_var = var!(cube_scan_input_var);
+        let ungrouped_var = var!(ungrouped_var);
+        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
         move |egraph, subst| {
+            if !copy_flag!(
+                egraph,
+                subst,
+                ungrouped_var,
+                WrapperPushdownReplacerUngrouped,
+                pullup_ungrouped_var,
+                WrapperPullupReplacerUngrouped
+            ) {
+                return false;
+            }
+
             for _ in var_list_iter!(egraph[subst[cube_scan_input_var]], WrappedSelect).cloned() {
                 return true;
             }

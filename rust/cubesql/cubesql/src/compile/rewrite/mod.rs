@@ -525,6 +525,27 @@ macro_rules! var {
     };
 }
 
+#[macro_export]
+macro_rules! copy_flag {
+    ($egraph:expr, $subst:expr, $in_var:expr, $in_kind:ident, $out_var:expr, $out_kind:ident) => {{
+        let mut found = false;
+        for in_value in $crate::var_iter!($egraph[$subst[$in_var]], $in_kind) {
+            // Typechecking for $in_kind, only booleans are supported for now
+            let in_value: bool = *in_value;
+            $subst.insert(
+                $out_var,
+                $egraph.add($crate::compile::rewrite::LogicalPlanLanguage::$out_kind(
+                    $out_kind(in_value),
+                )),
+            );
+            found = true;
+            // This is safe, because we expect only enode with one child, with boolena inside, and expect that they would never unify
+            break;
+        }
+        found
+    }};
+}
+
 pub struct WithColumnRelation(Option<String>);
 
 impl ExprRewriter for WithColumnRelation {
