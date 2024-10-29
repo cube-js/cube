@@ -146,8 +146,8 @@ function getMembers(
       throw new UserError(
         `You requested hidden member: '${
           column
-        }'. Please make it visible using \`shown: true\`. ` +
-        'Please note primaryKey fields are `shown: false` by ' +
+        }'. Please make it visible using \`public: true\`. ` +
+        'Please note primaryKey fields are `public: false` by ' +
         'default: https://cube.dev/docs/schema/reference/joins#' +
         'setting-a-primary-key.'
       );
@@ -236,8 +236,8 @@ function getVanilaRow(
         throw new UserError(
           `You requested hidden member: '${
             p[0]
-          }'. Please make it visible using \`shown: true\`. ` +
-          'Please note primaryKey fields are `shown: false` by ' +
+          }'. Please make it visible using \`public: true\`. ` +
+          'Please note primaryKey fields are `public: false` by ' +
           'default: https://cube.dev/docs/schema/reference/joins#' +
           'setting-a-primary-key.'
         );
