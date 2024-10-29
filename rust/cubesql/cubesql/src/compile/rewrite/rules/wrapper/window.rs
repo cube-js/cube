@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, window, wrapped_select, wrapped_select_window_expr_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ListType,
-        WrapperPullupReplacerUngrouped, WrapperPushdownReplacerPushToCube,
+        WrapperPullupReplacerPushToCube, WrapperPushdownReplacerPushToCube,
     },
     copy_flag, var,
 };
@@ -38,7 +38,7 @@ impl WrapperRules {
                             "?select_ungrouped_scan",
                         ),
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -52,28 +52,28 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?projection_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?subqueries",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?group_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?aggr_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -87,7 +87,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?cube_scan_input",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -95,7 +95,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?filter_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -105,7 +105,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?order_expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -116,7 +116,7 @@ impl WrapperRules {
                 ),
                 "CubeScanWrapperFinalized:false",
             ),
-            self.transform_window_pushdown("?ungrouped", "?pushdown_push_to_cube"),
+            self.transform_window_pushdown("?push_to_cube", "?pushdown_push_to_cube"),
         )]);
 
         if self.config_obj.push_down_pull_up_split() {
@@ -138,17 +138,17 @@ impl WrapperRules {
 
     fn transform_window_pushdown(
         &self,
-        ungrouped_var: &'static str,
+        push_to_cube_var: &'static str,
         pushdown_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
-        let ungrouped_var = var!(ungrouped_var);
+        let push_to_cube_var = var!(push_to_cube_var);
         let pushdown_push_to_cube_var = var!(pushdown_push_to_cube_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
-                ungrouped_var,
-                WrapperPullupReplacerUngrouped,
+                push_to_cube_var,
+                WrapperPullupReplacerPushToCube,
                 pushdown_push_to_cube_var,
                 WrapperPushdownReplacerPushToCube
             ) {

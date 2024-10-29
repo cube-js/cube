@@ -26,7 +26,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:false",
+                    "WrapperPullupReplacerPushToCube:false",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -45,7 +45,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     column_expr("?name"),
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPullupReplacerPushToCube:true",
                     "WrapperPullupReplacerInProjection:true",
                     "?cube_members",
                 ),
@@ -64,7 +64,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     "?dimension",
                     "?alias_to_cube",
-                    "WrapperPullupReplacerUngrouped:true",
+                    "WrapperPullupReplacerPushToCube:true",
                     "?in_projection",
                     "?cube_members",
                 ),

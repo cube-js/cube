@@ -42,7 +42,7 @@ impl WrapperRules {
                     vec![wrapper_pullup_replacer(
                         "?expr",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     )],
@@ -51,7 +51,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     agg_fun_expr("?fun", vec!["?expr"], "?distinct"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),

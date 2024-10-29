@@ -52,21 +52,21 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?when",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?then",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?else",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -74,7 +74,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     case_expr_var_arg("?when", "?then", "?else"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),

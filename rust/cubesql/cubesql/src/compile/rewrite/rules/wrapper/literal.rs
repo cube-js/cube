@@ -2,7 +2,7 @@ use crate::{
     compile::rewrite::{
         literal_expr, rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
         wrapper_pushdown_replacer, LiteralExprValue, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
         WrapperPushdownReplacerPushToCube,
     },
     copy_flag, var, var_iter,
@@ -30,7 +30,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     literal_expr("?value"),
                     "?alias_to_cube",
-                    "?pullup_ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -38,7 +38,7 @@ impl WrapperRules {
                     "?alias_to_cube",
                     "?value",
                     "?push_to_cube",
-                    "?pullup_ungrouped",
+                    "?pullup_push_to_cube",
                 ),
             ),
             transforming_rewrite(
@@ -53,7 +53,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     "?new_value",
                     "?alias_to_cube",
-                    "?pullup_ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -62,7 +62,7 @@ impl WrapperRules {
                     "?value",
                     "?new_value",
                     "?push_to_cube",
-                    "?pullup_ungrouped",
+                    "?pullup_push_to_cube",
                 ),
             ),
         ]);
@@ -73,12 +73,12 @@ impl WrapperRules {
         alias_to_cube_var: &str,
         value_var: &str,
         push_to_cube_var: &str,
-        pullup_ungrouped_var: &str,
+        pullup_push_to_cube_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !copy_flag!(
@@ -86,8 +86,8 @@ impl WrapperRules {
                 subst,
                 push_to_cube_var,
                 WrapperPushdownReplacerPushToCube,
-                pullup_ungrouped_var,
-                WrapperPullupReplacerUngrouped
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
             ) {
                 return false;
             }
@@ -128,13 +128,13 @@ impl WrapperRules {
         value_var: &str,
         new_value_var: &str,
         push_to_cube_var: &str,
-        pullup_ungrouped_var: &str,
+        pullup_push_to_cube_var: &str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let value_var = var!(value_var);
         let new_value_var = var!(new_value_var);
         let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
             if !copy_flag!(
@@ -142,8 +142,8 @@ impl WrapperRules {
                 subst,
                 push_to_cube_var,
                 WrapperPushdownReplacerPushToCube,
-                pullup_ungrouped_var,
-                WrapperPullupReplacerUngrouped
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
             ) {
                 return false;
             }

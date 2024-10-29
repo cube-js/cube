@@ -5,7 +5,7 @@ use crate::{
         rules::wrapper::WrapperRules,
         transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
         wrapper_pullup_replacer, wrapper_pushdown_replacer, ScalarUDFExprFun,
-        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerPushToCube,
         WrapperPushdownReplacerPushToCube,
     },
     copy_flag, var, var_iter,
@@ -42,7 +42,7 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?args",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -50,7 +50,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_expr_var_arg("?fun", "?args"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -88,14 +88,14 @@ impl WrapperRules {
                     wrapper_pullup_replacer(
                         "?left",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
                     wrapper_pullup_replacer(
                         "?right",
                         "?alias_to_cube",
-                        "?ungrouped",
+                        "?push_to_cube",
                         "?in_projection",
                         "?cube_members",
                     ),
@@ -103,7 +103,7 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_fun_expr_args("?left", "?right"),
                     "?alias_to_cube",
-                    "?ungrouped",
+                    "?push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
@@ -120,11 +120,11 @@ impl WrapperRules {
                 wrapper_pullup_replacer(
                     udf_fun_expr_args_empty_tail(),
                     "?alias_to_cube",
-                    "?pullup_ungrouped",
+                    "?pullup_push_to_cube",
                     "?in_projection",
                     "?cube_members",
                 ),
-                self.transform_udf_expr_tail("?push_to_cube", "?pullup_ungrouped"),
+                self.transform_udf_expr_tail("?push_to_cube", "?pullup_push_to_cube"),
             ),
         ]);
     }
@@ -163,18 +163,18 @@ impl WrapperRules {
     fn transform_udf_expr_tail(
         &self,
         push_to_cube_var: &'static str,
-        pullup_ungrouped_var: &'static str,
+        pullup_push_to_cube_var: &'static str,
     ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let push_to_cube_var = var!(push_to_cube_var);
-        let pullup_ungrouped_var = var!(pullup_ungrouped_var);
+        let pullup_push_to_cube_var = var!(pullup_push_to_cube_var);
         move |egraph, subst| {
             if !copy_flag!(
                 egraph,
                 subst,
                 push_to_cube_var,
                 WrapperPushdownReplacerPushToCube,
-                pullup_ungrouped_var,
-                WrapperPullupReplacerUngrouped
+                pullup_push_to_cube_var,
+                WrapperPullupReplacerPushToCube
             ) {
                 return false;
             }
