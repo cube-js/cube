@@ -784,7 +784,7 @@ jobs:
             })
 
   detect_branch:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     outputs:
       is_master: ${{ steps.detect_branch.outputs.is_master }}
       branch: ${{ steps.detect_branch.outputs.branch }}
@@ -794,12 +794,18 @@ jobs:
       - name: Detect branch name
         id: detect_branch
         env:
-          EVENT_BASE_REF: ${{ github.event.base_ref || 'master' }}
+          EVENT_BASE_REF: ${{ github.event.base_ref || 'tag_on_unknown_branch_commit_not_pushed' }}
         run: |
           BRANCH=${EVENT_BASE_REF#refs/heads/}
-          echo "Detected branch: $BRANCH"
 
+          if [ "$BRANCH" == "tag_on_unknown_branch_commit_not_pushed" ]; then
+            echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
+            exit 1
+          fi
+
+          echo "Detected branch: $BRANCH"
           IS_MASTER=false
+
           if [ "$BRANCH" == "master" ]; then
             IS_MASTER=true
           fi
