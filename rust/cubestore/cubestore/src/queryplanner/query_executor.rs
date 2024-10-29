@@ -838,35 +838,57 @@ impl ExecutionPlan for CubeTableExec {
     }
 
     fn output_hints(&self) -> OptimizerHints {
-        let sort_order;
         if let Some(snapshot_sort_on) = self.index_snapshot.sort_on() {
             // Note that this returns `None` if any of the columns were not found.
             // This only happens on programming errors.
-            sort_order = snapshot_sort_on
+            let sort_order = snapshot_sort_on
                 .iter()
                 .map(|c| self.schema.index_of(&c).ok())
-                .collect()
+                .collect();
+            log::error!("CubeTableExec output_hints returning sort_order {:?}", sort_order);
+            OptimizerHints::new_sorted(sort_order, Vec::new())
         } else {
             let index = self.index_snapshot.index().get_row();
+            let mut approximate_sort_order = Vec::<Vec<usize>>::new();
+            let mut chunk = Vec::<usize>::new();
             let sort_cols = index
                 .get_columns()
                 .iter()
                 .take(index.sort_key_size() as usize)
-                .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok())
-                .take_while(|i| i.is_some())
-                .map(|i| i.unwrap())
-                .collect_vec();
-            if !sort_cols.is_empty() {
-                sort_order = Some(sort_cols)
+                .map(|sort_col| self.schema.index_of(&sort_col.get_name()).ok());
+            let mut prefix = true;
+            for sort_col in sort_cols {
+                if let Some(col) = sort_col {
+                    chunk.push(col);
+                } else {
+                    if chunk.is_empty() {
+                        prefix &= !approximate_sort_order.is_empty();
+                    } else {
+                        approximate_sort_order.push(chunk);
+                        chunk = Vec::new();
+                    }
+                }
+            }
+
+            if !chunk.is_empty() {
+                approximate_sort_order.push(chunk);
+            }
+
+            let sort_order = if prefix && !approximate_sort_order.is_empty() {
+                Some(approximate_sort_order[0].clone())
             } else {
-                sort_order = None
+                None
+            };
+            log::error!("CubeTableExec output_hints returning approximate sort order {:?} and sort_order {:?}", approximate_sort_order, sort_order);
+
+            OptimizerHints {
+                sort_order,
+                approximate_sort_order,
+                approximate_sort_order_is_strict: true,
+                approximate_sort_order_is_prefix: prefix,
+                single_value_columns: Vec::new(),
             }
         }
-
-        OptimizerHints::new_sorted(
-            sort_order,
-            Vec::new(),
-        )
     }
 
     #[tracing::instrument(level = "trace", skip(self))]

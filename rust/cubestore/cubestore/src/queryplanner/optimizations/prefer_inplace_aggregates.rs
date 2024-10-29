@@ -6,7 +6,7 @@ use datafusion::physical_plan::filter::FilterExec;
 use datafusion::physical_plan::hash_aggregate::{AggregateStrategy, HashAggregateExec};
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::MergeSortExec;
-use datafusion::physical_plan::planner::input_sortedness_by_group_key;
+use datafusion::physical_plan::planner::{input_sortedness_by_group_key, input_sortedness_by_group_key_using_approximate};
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::union::UnionExec;
 use datafusion::physical_plan::ExecutionPlan;
@@ -29,7 +29,10 @@ pub fn try_switch_to_inplace_aggregates(
     // Try to cheaply rearrange the plan so that it produces sorted inputs.
     let new_input = try_regroup_columns(agg.input().clone())?;
 
-    let input_sortedness = input_sortedness_by_group_key(new_input.as_ref(), agg.group_expr());
+    let input_sortedness = input_sortedness_by_group_key_using_approximate(new_input.as_ref(), agg.group_expr());
+
+    log::error!("try_switch_to_inplace_aggregates: input_sortedness is {:?}\n and... output_hints is {:?}\n and... new_input is {}",
+        input_sortedness, new_input.output_hints(), crate::queryplanner::pretty_printers::pp_phys_plan(new_input.as_ref()));
 
 
     let (strategy, order): (AggregateStrategy, Option<Vec<usize>>) =
