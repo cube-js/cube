@@ -1,5 +1,5 @@
-use arrow::array::ArrayRef;
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::record_batch::RecordBatch;
 
 pub fn record_batch_buffer_size(batch: &RecordBatch) -> usize {
     columns_vec_buffer_size(batch.columns())

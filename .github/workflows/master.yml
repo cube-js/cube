@@ -64,14 +64,14 @@ jobs:
           workspaces: ./rust/cubesql -> target
           key: cubesql-x86_64-unknown-linux-gnu
           shared-key: cubesql-x86_64-unknown-linux-gnu
-      - name: Install Node.js 18
+      - name: Install Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -137,12 +137,19 @@ jobs:
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
+            const prUrl = context.payload.pull_request ? context.payload.pull_request.html_url : '';
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+
             await github.rest.actions.createWorkflowDispatch({
               owner: 'cubedevinc',
               repo: 'sql-api-test-suite',
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:dev'
+                'cube-image': 'cubejs/cube:dev',
+                'source-repo': context.repo.repo,
+                'source-pr-url': prUrl,
+                'source-commit-url': commitUrl,
+                'initiator': '${{ github.actor }}'
               }
             })

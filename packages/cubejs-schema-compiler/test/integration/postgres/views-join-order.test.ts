@@ -34,7 +34,7 @@ cube(\`fact\`, {
 });
 
 cube(\`product\`, {
-  sql: \`SELECT 1 as id_product, 1 as id_sub_category, 1 as id_model, 'Product' as description\`,
+  sql: \`SELECT 1 as id_product, 1 as id_sub_category, 1 as id_model, 'Product'::text as description\`,
   dimensions: {
     id_product: {
       sql: 'id_product',
@@ -59,7 +59,7 @@ cube(\`product\`, {
 });
 
 cube(\`model\`, {
-  sql: \`SELECT 1 as id_model, 1 as id_brand, 'Model' as description\`,
+  sql: \`SELECT 1 as id_model, 1 as id_brand, 'Model'::text as description\`,
   dimensions: {
     id_model: {
       sql: 'id_model',
@@ -80,7 +80,7 @@ cube(\`model\`, {
 });
 
 cube(\`brand\`, {
-  sql: \`SELECT 1 as id_brand, 'Brand' as description\`,
+  sql: \`SELECT 1 as id_brand, 'Brand'::text as description\`,
   dimensions: {
     id_brand: {
       sql: 'id_brand',
@@ -95,7 +95,7 @@ cube(\`brand\`, {
 });
 
 cube(\`sub_category\`, {
-  sql: \`SELECT 1 as id_sub_category, 1 as id_category, 'Sub Category' as description\`,
+  sql: \`SELECT 1 as id_sub_category, 1 as id_category, 'Sub Category'::text as description\`,
   dimensions: {
     id_sub_category: {
       sql: 'id_sub_category',
@@ -116,7 +116,7 @@ cube(\`sub_category\`, {
 });
 
 cube(\`category\`, {
-  sql: \`SELECT 1 as id_category, 'Category' as description\`,
+  sql: \`SELECT 1 as id_category, 'Category'::text as description\`,
   dimensions: {
     id_category: {
       sql: 'id_category',

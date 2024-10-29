@@ -1,3 +1,5 @@
+use pretty_assertions::assert_eq;
+
 use crate::{
     compile::{
         test::{execute_query, init_testing_logger},

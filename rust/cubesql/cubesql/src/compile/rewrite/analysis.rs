@@ -2,12 +2,14 @@ use crate::{
     compile::{
         rewrite::{
             converter::{is_expr_node, node_to_expr, LogicalPlanToLanguageConverter},
-            expr_column_name, AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube,
-            ChangeUserCube, ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp,
-            LiteralExprValue, LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage,
-            MeasureName, ScalarFunctionExprFun, SegmentMemberMember, SegmentName,
-            TableScanSourceTableName, TimeDimensionDateRange, TimeDimensionGranularity,
-            TimeDimensionName, VirtualFieldCube, VirtualFieldName,
+            expr_column_name,
+            rewriter::{CubeEGraph, DebugData},
+            AggregateUDFExprFun, AliasExprAlias, AllMembersAlias, AllMembersCube, ChangeUserCube,
+            ColumnExprColumn, DimensionName, FilterMemberMember, FilterMemberOp, LiteralExprValue,
+            LiteralMemberRelation, LiteralMemberValue, LogicalPlanLanguage, MeasureName,
+            ScalarFunctionExprFun, SegmentMemberMember, SegmentName, TableScanSourceTableName,
+            TimeDimensionDateRange, TimeDimensionGranularity, TimeDimensionName, VirtualFieldCube,
+            VirtualFieldName,
         },
         CubeContext,
     },
@@ -233,11 +235,16 @@ impl Member {
     }
 }
 
+type EgraphDebugState = DebugData;
+
 #[derive(Clone)]
 pub struct LogicalPlanAnalysis {
     /* This is 0, when creating the EGraph.  It's set to 1 before iteration 0,
     2 before the iteration 1, etc. */
     pub iteration_timestamp: usize,
+    /// Debug info, used with egraph-debug
+    /// Will be filled by special hook in Runner
+    pub debug_states: Vec<EgraphDebugState>,
     cube_context: Arc<CubeContext>,
     planner: Arc<DefaultPhysicalPlanner>,
 }
@@ -270,9 +277,23 @@ impl LogicalPlanAnalysis {
     pub fn new(cube_context: Arc<CubeContext>, planner: Arc<DefaultPhysicalPlanner>) -> Self {
         Self {
             iteration_timestamp: 0,
+            debug_states: vec![],
             cube_context,
             planner,
         }
+    }
+
+    fn prepare_egraph_debug_state(egraph: &CubeEGraph) -> EgraphDebugState {
+        DebugData::prepare(egraph)
+    }
+
+    pub fn store_egraph_debug_state(egraph: &mut CubeEGraph) {
+        debug_assert_eq!(
+            egraph.analysis.iteration_timestamp,
+            egraph.analysis.debug_states.len()
+        );
+        let state = Self::prepare_egraph_debug_state(egraph);
+        egraph.analysis.debug_states.push(state);
     }
 
     fn make_original_expr(
@@ -1150,7 +1171,7 @@ impl LogicalPlanAnalysis {
     }
 
     fn eval_constant_expr(
-        egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
+        egraph: &EGraph<LogicalPlanLanguage, Self>,
         expr: &Expr,
     ) -> Option<ConstantFolding> {
         let schema = DFSchema::empty();

@@ -1,11 +1,10 @@
 use crate::compile::rewrite::{
-    alias_expr, analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules,
-    wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage,
+    alias_expr, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules,
+    wrapper_pullup_replacer, wrapper_pushdown_replacer,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn alias_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn alias_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-alias",

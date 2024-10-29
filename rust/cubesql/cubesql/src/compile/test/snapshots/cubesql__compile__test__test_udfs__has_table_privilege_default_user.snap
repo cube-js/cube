@@ -10,4 +10,5 @@ expression: "execute_query(\"SELECT\n                    relname,\n             
 | MultiTypeCube             | true   | false  | false  |
 | NumberCube                | true   | false  | false  |
 | WideCube                  | true   | false  | false  |
+| pg_class                  | true   | false  | false  |
 +---------------------------+--------+--------+--------+

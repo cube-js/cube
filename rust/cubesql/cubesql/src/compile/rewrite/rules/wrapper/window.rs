@@ -1,12 +1,11 @@
 use crate::compile::rewrite::{
-    analysis::LogicalPlanAnalysis, cube_scan_wrapper, rewrite, rules::wrapper::WrapperRules,
-    window, wrapped_select, wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
-    wrapper_pushdown_replacer, ListType, LogicalPlanLanguage,
+    cube_scan_wrapper, rewrite, rewriter::CubeRewrite, rules::wrapper::WrapperRules, window,
+    wrapped_select, wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer,
+    wrapper_pushdown_replacer, ListType,
 };
-use egg::Rewrite;
 
 impl WrapperRules {
-    pub fn window_rules(&self, rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>) {
+    pub fn window_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![rewrite(
             "wrapper-push-down-window-to-cube-scan",
             window(

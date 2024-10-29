@@ -11,11 +11,22 @@
   "scripts": {
     "start": "GENERATE_SOURCEMAP=false && react-scripts start",
     "build": "react-scripts build",
+    "reformat": "prettier --write \"src/**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
   "devDependencies": {
-    "react-scripts": "latest"
+    "prettier": "3.3.3",
+    "react-scripts": "5.0.1"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app"
+    ]
+  },
+  "prettier": {
+    "singleQuote": true,
+    "tabWidth": 4
   },
   "browserslist": {
     "production": [

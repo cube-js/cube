@@ -4,17 +4,14 @@ use datafusion::{
     logical_plan::LogicalPlan,
     sql::{parser::Statement, planner::SqlToRel},
 };
-use egg::Rewrite;
 
 use super::get_test_session;
 use crate::{
     compile::{
         parser::parse_sql_to_statement,
         rewrite::{
-            analysis::LogicalPlanAnalysis,
             converter::{CubeRunner, LogicalPlanToLanguageConverter},
-            rewriter::Rewriter,
-            LogicalPlanLanguage,
+            rewriter::{CubeRewrite, Rewriter},
         },
         rewrite_statement, CompilationError, CubeContext, DatabaseProtocol, QueryEngine,
         SqlQueryEngine,
@@ -38,12 +35,12 @@ pub async fn create_test_postgresql_cube_context(
 
 pub fn query_to_logical_plan(query: String, context: &CubeContext) -> LogicalPlan {
     let stmt = parse_sql_to_statement(&query, DatabaseProtocol::PostgreSQL, &mut None).unwrap();
-    let stmt = rewrite_statement(&stmt);
+    let stmt = rewrite_statement(stmt);
     let df_query_planner = SqlToRel::new_with_options(context, true);
 
-    return df_query_planner
-        .statement_to_plan(Statement::Statement(Box::new(stmt.clone())))
-        .unwrap();
+    df_query_planner
+        .statement_to_plan(Statement::Statement(Box::new(stmt)))
+        .unwrap()
 }
 
 pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunner {
@@ -55,9 +52,7 @@ pub fn rewrite_runner(plan: LogicalPlan, context: Arc<CubeContext>) -> CubeRunne
     converter.take_runner()
 }
 
-pub fn rewrite_rules(
-    cube_context: Arc<CubeContext>,
-) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+pub fn rewrite_rules(cube_context: Arc<CubeContext>) -> Vec<CubeRewrite> {
     Rewriter::rewrite_rules(
         cube_context.meta.clone(),
         cube_context.sessions.server.config_obj.clone(),

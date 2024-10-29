@@ -1,4 +1,4 @@
-FROM node:18.20.3-bullseye-slim AS base
+FROM node:20.17.0-bookworm-slim AS base
 
 ARG IMAGE_VERSION=dev
 
@@ -8,8 +8,8 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python3 libpython3-dev gcc g++ make cmake openjdk-11-jdk-headless \
+    && apt-get install -y --no-install-recommends libssl3 curl \
+       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV RUSTUP_HOME=/usr/local/rustup
@@ -20,8 +20,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- --profile minimal --default-toolchain nightly-2022-03-08 -y
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
-ENV TERM rxvt-unicode
-ENV NODE_ENV development
+ENV NODE_ENV=development
 
 WORKDIR /cubejs
 
@@ -64,6 +63,7 @@ COPY packages/cubejs-questdb-driver/package.json packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/package.json packages/cubejs-materialize-driver/package.json
 COPY packages/cubejs-prestodb-driver/package.json packages/cubejs-prestodb-driver/package.json
 COPY packages/cubejs-trino-driver/package.json packages/cubejs-trino-driver/package.json
+COPY packages/cubejs-pinot-driver/package.json packages/cubejs-pinot-driver/package.json
 COPY packages/cubejs-query-orchestrator/package.json packages/cubejs-query-orchestrator/package.json
 COPY packages/cubejs-schema-compiler/package.json packages/cubejs-schema-compiler/package.json
 COPY packages/cubejs-server/package.json packages/cubejs-server/package.json
@@ -86,7 +86,7 @@ COPY packages/cubejs-client-ngx/package.json packages/cubejs-client-ngx/package.
 COPY packages/cubejs-client-ws-transport/package.json packages/cubejs-client-ws-transport/package.json
 COPY packages/cubejs-playground/package.json packages/cubejs-playground/package.json
 
-RUN yarn policies set-version v1.22.19
+RUN yarn policies set-version v1.22.22
 # Yarn v1 uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
 RUN yarn config set network-timeout 120000 -g
 
@@ -139,6 +139,7 @@ COPY packages/cubejs-questdb-driver/ packages/cubejs-questdb-driver/
 COPY packages/cubejs-materialize-driver/ packages/cubejs-materialize-driver/
 COPY packages/cubejs-prestodb-driver/ packages/cubejs-prestodb-driver/
 COPY packages/cubejs-trino-driver/ packages/cubejs-trino-driver/
+COPY packages/cubejs-pinot-driver/ packages/cubejs-pinot-driver/
 COPY packages/cubejs-query-orchestrator/ packages/cubejs-query-orchestrator/
 COPY packages/cubejs-schema-compiler/ packages/cubejs-schema-compiler/
 COPY packages/cubejs-server/ packages/cubejs-server/
@@ -171,7 +172,7 @@ FROM base AS final
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates python3 libpython3-dev \
+    && apt-get install -y ca-certificates python3.11 libpython3.11-dev \
     && apt-get clean
 
 COPY --from=build /cubejs .

@@ -106,11 +106,11 @@ export class BaseMeasure {
     return BaseMeasure.isCumulative(this.measureDefinition());
   }
 
-  public isPostAggregate() {
+  public isMultiStage() {
     if (this.expression) { // TODO
       return false;
     }
-    return this.definition().postAggregate;
+    return this.definition().multiStage;
   }
 
   public isAdditive() {
@@ -118,7 +118,7 @@ export class BaseMeasure {
       return false;
     }
     const definition = this.measureDefinition();
-    if (definition.postAggregate) {
+    if (definition.multiStage) {
       return false;
     }
     return definition.type === 'sum' || definition.type === 'count' || definition.type === 'countDistinctApprox' ||
@@ -172,11 +172,11 @@ export class BaseMeasure {
     return undefined;
   }
 
-  public minGranularity(granularityA, granularityB) {
+  public minGranularity(granularityA: string | undefined, granularityB: string | undefined) {
     return this.query.minGranularity(granularityA, granularityB);
   }
 
-  public granularityFromInterval(interval) {
+  public granularityFromInterval(interval: string) {
     if (!interval) {
       return undefined;
     }

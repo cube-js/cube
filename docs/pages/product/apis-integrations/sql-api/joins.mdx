@@ -3,10 +3,72 @@ redirect_from:
   - /backend/sql/reference/joins
 ---
 
+## Views
+
+The best practice to query joins using SQL API is to use views. This is the preferred way of
+joining as it provides you control over the joining path for complex use cases.
+While BI tools would see the view as a table, in fact, no materialization is done until Cube is queried.
+Whenever Cube view is queried through SQL API, Cube tries to maximize member pushdown so only required parts of the view are materialized at query time.
+Cube also solves fan and chasm traps based on the dimensions selected in the query, so if measure aggregation types are properly set up, you will see correct results in BI tools even though cubes and views are seen just as tables.
+
+<CodeTabs>
+
+```yaml
+views:
+  - name: orders_users
+    cubes:
+      - join_path: orders
+        includes:
+          - status
+          - count
+
+      - join_path: orders.users
+        prefix: true
+        includes: 
+          - id
+          - city
+          - state
+```
+
+```javascript
+view(`orders_users`, {
+  cubes: [
+    {
+      join_path: orders,
+      includes: ['status', 'count']
+    },
+    {
+      join_path: orders,
+      includes: ['id', 'city', 'state']
+    },
+  ],
+});
+```
+
+</CodeTabs>
+
+Now, it is possible to get orders count by users city with the following query.
+
+```sql
+cube=> SELECT count, city FROM orders_users;
+ count |   user_city
+-------+---------------
+  1416 | Los Angeles
+  1412 | Seattle
+  1365 | Mountain View
+  1263 | New York
+  1220 | Austin
+  1164 | Chicago
+  1101 | San Francisco
+  1059 | Palo Alto
+(8 rows)
+```
+
 # Joins
 
-The SQL API supports joins through `__cubeJoinField` virtual column, which is
-available in every cube table. Join can also be done through `CROSS JOIN`. Usage
+The SQL API supports joins through `__cubeJoinField` virtual column, which allows end users to control how specific cubes are joined.
+This is considered advanced functionality, and views should be used where possible.
+Join can also be done through `CROSS JOIN`. Usage
 of `__cubeJoinField` in a join instructs Cube to perform join as it's defined in
 a data model. Cube generates the correct joining conditions for the underlying
 data source.
@@ -135,48 +197,3 @@ LIMIT 5;
 Please note even if `product_description` is in the inner selection, it isn't
 evaluated in the final query as it isn't used in any way.
 
-## Proxy Dimensions and Views
-
-As an alternative to achieve joins, it is also possible to define proxy
-dimension or measure inside a cube or a view. This is the preferred way of
-joining as it provides you control over the joining path for complex use cases.
-
-<CodeTabs>
-
-```yaml
-views:
-  - name: orders_users
-    includes:
-      - orders
-      # This is a proxy dimension
-      - orders.users.city
-```
-
-```javascript
-view(`orders_users`, {
-  includes: [
-    orders,
-    // This is a proxy dimension
-    orders.users.city,
-  ],
-});
-```
-
-</CodeTabs>
-
-Now, it is possible to get orders count by users city with the following query.
-
-```sql
-cube=> SELECT count, city FROM orders_users;
- count |   user_city
--------+---------------
-  1416 | Los Angeles
-  1412 | Seattle
-  1365 | Mountain View
-  1263 | New York
-  1220 | Austin
-  1164 | Chicago
-  1101 | San Francisco
-  1059 | Palo Alto
-(8 rows)
-```

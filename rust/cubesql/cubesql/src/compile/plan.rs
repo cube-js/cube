@@ -45,15 +45,9 @@ pub enum QueryPlan {
     MetaOk(StatusFlags, CommandCompletion),
     MetaTabular(StatusFlags, Box<dataframe::DataFrame>),
     // Query will be executed via Data Fusion
-    DataFusionSelect(StatusFlags, LogicalPlan, DFSessionContext),
+    DataFusionSelect(LogicalPlan, DFSessionContext),
     // Query will be executed via DataFusion and saved to session
-    CreateTempTable(
-        StatusFlags,
-        LogicalPlan,
-        DFSessionContext,
-        String,
-        Arc<TempTableManager>,
-    ),
+    CreateTempTable(LogicalPlan, DFSessionContext, String, Arc<TempTableManager>),
 }
 
 impl fmt::Debug for QueryPlan {
@@ -70,16 +64,13 @@ impl fmt::Debug for QueryPlan {
                     flags
                 ))
             },
-            QueryPlan::DataFusionSelect(flags, _, _) => {
-                f.write_str(&format!(
-                    "DataFusionSelect(StatusFlags: {:?}, LogicalPlan: hidden, DFSessionContext: hidden)",
-                    flags
-                ))
+            QueryPlan::DataFusionSelect(_, _) => {
+                f.write_str(&"DataFusionSelect(LogicalPlan: hidden, DFSessionContext: hidden)")
             },
-            QueryPlan::CreateTempTable(flags, _, _, name, _) => {
+            QueryPlan::CreateTempTable(_, _, name, _) => {
                 f.write_str(&format!(
-                    "CreateTempTable(StatusFlags: {:?}, LogicalPlan: hidden, DFSessionContext: hidden, Name: {:?}, SessionState: hidden",
-                    flags, name
+                    "CreateTempTable(LogicalPlan: hidden, DFSessionContext: hidden, Name: {}, SessionState: hidden",
+                    name
                 ))
             },
         }
@@ -89,8 +80,9 @@ impl fmt::Debug for QueryPlan {
 impl QueryPlan {
     pub fn as_logical_plan(&self) -> LogicalPlan {
         match self {
-            QueryPlan::DataFusionSelect(_, plan, _)
-            | QueryPlan::CreateTempTable(_, plan, _, _, _) => plan.clone(),
+            QueryPlan::DataFusionSelect(plan, _) | QueryPlan::CreateTempTable(plan, _, _, _) => {
+                plan.clone()
+            }
             QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => {
                 panic!("This query doesnt have a plan, because it already has values for response")
             }
@@ -99,8 +91,8 @@ impl QueryPlan {
 
     pub async fn as_physical_plan(&self) -> Result<Arc<dyn ExecutionPlan>, CubeError> {
         match self {
-            QueryPlan::DataFusionSelect(_, plan, ctx)
-            | QueryPlan::CreateTempTable(_, plan, ctx, _, _) => {
+            QueryPlan::DataFusionSelect(plan, ctx)
+            | QueryPlan::CreateTempTable(plan, ctx, _, _) => {
                 DataFrame::new(ctx.state.clone(), plan)
                     .create_physical_plan()
                     .await
@@ -114,8 +106,7 @@ impl QueryPlan {
 
     pub fn print(&self, pretty: bool) -> Result<String, CubeError> {
         match self {
-            QueryPlan::DataFusionSelect(_, plan, _)
-            | QueryPlan::CreateTempTable(_, plan, _, _, _) => {
+            QueryPlan::DataFusionSelect(plan, _) | QueryPlan::CreateTempTable(plan, _, _, _) => {
                 if pretty {
                     Ok(plan.display_indent().to_string())
                 } else {
@@ -134,7 +125,7 @@ pub async fn get_df_batches(
     plan: &QueryPlan,
 ) -> Result<Pin<Box<dyn RecordBatchStream + Send>>, CubeError> {
     match plan {
-        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+        QueryPlan::DataFusionSelect(plan, ctx) => {
             let df = DataFrame::new(ctx.state.clone(), &plan);
             let safe_stream = async move {
                 std::panic::AssertUnwindSafe(df.execute_stream())

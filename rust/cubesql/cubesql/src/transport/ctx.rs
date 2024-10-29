@@ -22,6 +22,7 @@ pub struct CubeMetaTable {
     pub record_oid: u32,
     pub array_handler_oid: u32,
     pub name: String,
+    pub description: Option<String>,
     pub columns: Vec<CubeMetaColumn>,
 }
 
@@ -29,6 +30,7 @@ pub struct CubeMetaTable {
 pub struct CubeMetaColumn {
     pub oid: u32,
     pub name: String,
+    pub description: Option<String>,
     pub column_type: ColumnType,
     pub can_be_null: bool,
 }
@@ -49,12 +51,14 @@ impl MetaContext {
                 record_oid: oid_iter.next().unwrap_or(0),
                 array_handler_oid: oid_iter.next().unwrap_or(0),
                 name: cube.name.clone(),
+                description: cube.description.clone(),
                 columns: cube
                     .get_columns()
                     .iter()
                     .map(|column| CubeMetaColumn {
                         oid: oid_iter.next().unwrap_or(0),
                         name: column.get_name().clone(),
+                        description: column.get_description().clone(),
                         column_type: column.get_column_type().clone(),
                         can_be_null: column.sql_can_be_null(),
                     })
@@ -216,25 +220,32 @@ impl MetaContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::CubeMetaType;
 
     #[test]
     fn test_find_tables() {
         let test_cubes = vec![
             CubeMeta {
                 name: "test1".to_string(),
+                description: None,
                 title: None,
+                r#type: CubeMetaType::Cube,
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
                 joins: None,
+                meta: None,
             },
             CubeMeta {
                 name: "test2".to_string(),
+                description: None,
                 title: None,
+                r#type: CubeMetaType::Cube,
                 dimensions: vec![],
                 measures: vec![],
                 segments: vec![],
                 joins: None,
+                meta: None,
             },
         ];
 

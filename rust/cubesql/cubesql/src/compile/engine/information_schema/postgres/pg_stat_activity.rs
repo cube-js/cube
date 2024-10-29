@@ -72,8 +72,8 @@ impl PgStatActivityBuilder {
         self.oid.append_value(session.oid).unwrap();
         self.datname.append_option(session.datname).unwrap();
         self.pid.append_value(session.pid).unwrap();
-        self.leader_pid.append_null().unwrap();
-        self.usesysid.append_null().unwrap();
+        self.leader_pid.append_option(session.leader_pid).unwrap();
+        self.usesysid.append_option(session.usesysid).unwrap();
         self.usename.append_option(session.usename).unwrap();
         self.application_name
             .append_option(session.application_name)
@@ -205,7 +205,7 @@ impl TableProvider for PgCatalogStatActivityProvider {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>, DataFusionError> {
-        let sessions = self.sessions.stat_activity().await;
+        let sessions = self.sessions.map_sessions::<SessionStatActivity>().await;
         let mut builder = PgStatActivityBuilder::new(sessions.len());
 
         for session in sessions {
