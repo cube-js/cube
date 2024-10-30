@@ -1190,8 +1190,6 @@ export class PreAggregations {
     const targetDimensionsReferences = this.dimensionsRenderedReference(preAggregationForQuery);
     const targetTimeDimensionsReferences = this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery);
     const targetMeasuresReferences = this.measureAliasesRenderedReference(preAggregationForQuery);
-    // Removing duplicated dimension from targetTimeDimensionsReferences
-    Object.keys(targetDimensionsReferences).forEach(key => { delete targetTimeDimensionsReferences[key]; });
 
     const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
       member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.replace(/^[^.]*\./, '')])]} ${targetReferences[member]}`
@@ -1211,6 +1209,12 @@ export class PreAggregations {
         columns: columnsFor(targetDimensionsReferences, dimensionsReferences, preAggregation)
           .concat(columnsFor(targetTimeDimensionsReferences, timeDimensionsReferences, preAggregation))
           .concat(columnsFor(targetMeasuresReferences, measuresReferences, preAggregation))
+          .reduce((acc, v) => {
+            if (!acc.includes(v)) {
+              acc.push(v);
+            }
+            return acc;
+          }, []),
       };
     });
     if (tables.length === 1) {
