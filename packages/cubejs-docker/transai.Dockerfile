@@ -8,9 +8,9 @@ ENV CI=0
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 curl \
-       cmake python3 libpython3-dev gcc g++ make cmake openjdk-11-jdk-headless \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get install -y --no-install-recommends libssl3 curl \
+       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
+    && rm -rf /var/lib/apt/lists/* \
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
 ENV TERM rxvt-unicode
