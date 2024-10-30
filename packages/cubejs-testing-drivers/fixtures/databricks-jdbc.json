@@ -160,7 +160,7 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "SKIPPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
@@ -173,6 +173,7 @@
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + dimension",
 
+    "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
     "SQL API: Nested Rollup",

@@ -5,9 +5,16 @@
  */
 
 import { PostgresDriver, PostgresDriverConfiguration } from '@cubejs-backend/postgres-driver';
-import { BaseDriver, DownloadTableMemoryData, IndexesSQL, StreamOptions, StreamTableDataWithTypes, TableStructure } from '@cubejs-backend/base-driver';
+import {
+  BaseDriver,
+  DatabaseStructure,
+  DownloadTableMemoryData,
+  IndexesSQL,
+  StreamOptions,
+  StreamTableDataWithTypes,
+  TableStructure
+} from '@cubejs-backend/base-driver';
 import { PoolClient, QueryResult } from 'pg';
-import { reduce } from 'ramda';
 import { Readable } from 'stream';
 import semver from 'semver';
 
@@ -16,16 +23,6 @@ export type ReadableStreamTableDataWithTypes = StreamTableDataWithTypes & {
    * Compatibility with streamToArray method from '@cubejs-backend/shared'
    */
   rowStream: Readable;
-};
-
-export type SchemaResponse = {
-  [schema: string]: {
-    [schemaObject: string]: {
-      name: string;
-      type: string;
-      attributes: any[];
-  }[];
-  }
 };
 
 /**
@@ -73,6 +70,7 @@ export class MaterializeDriver extends PostgresDriver {
       /**
        * Application name to set for the connection.
        */
+      // eslint-disable-next-line camelcase
       application_name?: string,
     } = {},
   ) {
@@ -130,7 +128,7 @@ export class MaterializeDriver extends PostgresDriver {
   }
 
   /**
-   * Materialize quereable schema
+   * Materialize queryable schema
    * Returns materialized sources, materialized views, and tables
    * @returns {string} schemaQuery
    */
@@ -171,15 +169,15 @@ export class MaterializeDriver extends PostgresDriver {
   public async getMaterializeVersion(): Promise<string> {
     const [{ version }] = await this.query<{version: string}>('SELECT mz_version() as version;', []);
 
-    // Materialzie returns the version as follows: 'v0.24.3-alpha.5 (65778f520)'
+    // Materialize returns the version as follows: 'v0.24.3-alpha.5 (65778f520)'
     return version.split(' ')[0];
   }
 
-  public async tablesSchema(): Promise<SchemaResponse> {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const version = await this.getMaterializeVersion();
     const query = this.informationSchemaQueryWithFilter(version);
 
-    return this.query(query, []).then(data => reduce(this.informationColumnsSchemaReducer, {}, data));
+    return this.query(query, []).then(data => data.reduce<DatabaseStructure>(this.informationColumnsSchemaReducer, {}));
   }
 
   protected async* asyncFetcher<R extends unknown>(conn: PoolClient, cursorId: string): AsyncGenerator<R> {

@@ -527,6 +527,11 @@ impl CubeScanWrapperNode {
                                 if let Some(cube_scan_node) =
                                     node.as_any().downcast_ref::<CubeScanNode>()
                                 {
+                                    if cube_scan_node.request.ungrouped != Some(true) {
+                                        return Err(CubeError::internal(format!(
+                                            "Expected ungrouped CubeScan node but found: {cube_scan_node:?}"
+                                        )));
+                                    }
                                     Some(Arc::new(cube_scan_node.clone()))
                                 } else {
                                     return Err(CubeError::internal(format!(

@@ -14,6 +14,7 @@ module.exports = {
   "access-control": "Access Control",
   "sso": "Single Sign-on",
   "audit-log": "Audit Log",
+  "encryption-keys": "Encryption keys",
   "budgets": "Budgets",
   "preferences": "Preferences",
   "cli": "CLI",

@@ -15,15 +15,21 @@ pub struct V1CubeMetaDimension {
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
+    #[serde(rename = "granularities", skip_serializing_if = "Option::is_none")]
+    pub granularities: Option<Vec<crate::models::V1CubeMetaDimensionGranularity>>,
+    #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
 }
 
 impl V1CubeMetaDimension {
-    pub fn new(name: String, _type: String) -> V1CubeMetaDimension {
+    pub fn new(name: String, r#type: String) -> V1CubeMetaDimension {
         V1CubeMetaDimension {
             name,
             description: None,
-            _type,
+            r#type,
+            granularities: None,
+            meta: None,
         }
     }
 }

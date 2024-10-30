@@ -112,10 +112,13 @@
     ]
   },
   "skip": [
+    "---------------------------------------",
     "MySQL doesn't support offset wo limit",
     "---------------------------------------",
     "querying ECommerce: dimensions + order + total + offset",
     "querying Customers: dimensions + order + total + offset",
+
+    "---------------------------------------",
     "SKIPPED FOR ALL",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
@@ -134,6 +137,7 @@
     "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
     "querying custom granularities ECommerce: count by three_months_by_march + dimension",
 
+    "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
     "SQL API: reuse params",

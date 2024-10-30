@@ -72,7 +72,7 @@ impl QueryPlanExt for QueryPlan {
         required_format: protocol::Format,
     ) -> Result<Option<protocol::RowDescription>, ConnectionError> {
         match &self {
-            QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _, _) => Ok(None),
+            QueryPlan::MetaOk(_, _) | QueryPlan::CreateTempTable(_, _, _, _) => Ok(None),
             QueryPlan::MetaTabular(_, frame) => {
                 let mut result = vec![];
 
@@ -86,7 +86,7 @@ impl QueryPlanExt for QueryPlan {
 
                 Ok(Some(protocol::RowDescription::new(result)))
             }
-            QueryPlan::DataFusionSelect(_, logical_plan, _) => {
+            QueryPlan::DataFusionSelect(logical_plan, _) => {
                 let mut result = vec![];
 
                 for field in logical_plan.schema().fields() {

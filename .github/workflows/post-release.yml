@@ -205,22 +205,3 @@ jobs:
           color: danger
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
-  trigger-repo-sync:
-    runs-on: ubuntu-20.04
-    name: 'Sync runtime repo'
-    timeout-minutes: 60
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Trigger runtime
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: 'cubedevinc',
-              repo: 'cube-runtime',
-              workflow_id: 'sync.yml',
-              ref: 'master'
-            })

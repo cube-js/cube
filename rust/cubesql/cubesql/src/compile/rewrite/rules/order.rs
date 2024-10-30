@@ -1,21 +1,21 @@
 use crate::{
     compile::rewrite::{
-        analysis::{LogicalPlanAnalysis, OriginalExpr},
+        analysis::OriginalExpr,
         column_name_to_member_vec, cube_scan, cube_scan_order, cube_scan_order_empty_tail,
         expr_column_name, order, order_replacer, referenced_columns, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         sort, sort_exp, sort_exp_empty_tail, sort_expr, transforming_rewrite, LogicalPlanLanguage,
         OrderAsc, OrderMember, OrderReplacerColumnNameToMember, SortExprAsc,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 use std::ops::{Index, IndexMut};
 
 pub struct OrderRules {}
 
 impl RewriteRules for OrderRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         vec![
             transforming_rewrite(
                 "push-down-sort",
@@ -82,7 +82,7 @@ impl OrderRules {
         sort_exp_var: &'static str,
         members_var: &'static str,
         aliases_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let sort_exp_var = var!(sort_exp_var);
         let members_var = var!(members_var);
         let aliases_var = var!(aliases_var);
@@ -129,7 +129,7 @@ impl OrderRules {
         column_name_to_member_var: &'static str,
         order_member_var: &'static str,
         order_asc_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = expr_var.parse().unwrap();
         let asc_var = asc_var.parse().unwrap();
         let column_name_to_member_var = column_name_to_member_var.parse().unwrap();

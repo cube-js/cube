@@ -1,9 +1,9 @@
 use crate::{
     compile::rewrite::{
         agg_fun_expr, alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, column_expr, fun_expr,
-        rewriter::{RewriteRules, Rewriter},
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules, Rewriter},
         transform_original_expr_to_alias, transforming_rewrite_with_root, udf_expr, AliasExprAlias,
         LogicalPlanLanguage,
     },
@@ -11,7 +11,7 @@ use crate::{
     var,
 };
 use datafusion::{logical_plan::DFSchema, scalar::ScalarValue};
-use egg::{EGraph, Id, Rewrite, Subst};
+use egg::{Id, Subst};
 use std::{fmt::Display, sync::Arc};
 
 pub struct CommonRules {
@@ -19,7 +19,7 @@ pub struct CommonRules {
 }
 
 impl RewriteRules for CommonRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![];
 
         if Rewriter::sql_push_down_enabled() {
@@ -89,8 +89,7 @@ impl CommonRules {
         &self,
         literal_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, Id, &mut Subst) -> bool
-    {
+    ) -> impl Fn(&mut CubeEGraph, Id, &mut Subst) -> bool {
         let literal_var = var!(literal_var);
         let alias_var = var!(alias_var);
 

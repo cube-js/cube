@@ -516,7 +516,7 @@ mod tests {
                 bools.push(false);
             }
         }
-        check_bools(bools);
+        check_bools(bools).await;
     }
 
     #[tokio::test]

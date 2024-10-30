@@ -21,6 +21,7 @@ import {
 import { Bucket, Storage } from '@google-cloud/storage';
 import {
   BaseDriver,
+  DatabaseStructure,
   DriverCapabilities,
   DriverInterface,
   QueryColumnsResult,
@@ -155,11 +156,13 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
   }
 
   public async testConnection() {
-    await this.bigquery.query({
-      query: 'SELECT ? AS number',
-      params: ['1'],
-      jobTimeoutMs: this.testConnectionTimeout(),
-    });
+    // From the BigQuery Docs:
+    // You are not charged for list, get, patch, update and delete calls.
+    // Examples include (but are not limited to): listing datasets, updating
+    // a dataset's access control list, updating a table's description, or
+    // listing user-defined functions in a dataset.
+    // @see https://cloud.google.com/bigquery/pricing#free
+    await this.bigquery.getDatasets();
   }
 
   public readOnly() {
@@ -200,7 +203,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
         );
       }
 
-      return [];
+      return {};
     } catch (e) {
       if ((<any>e).message.includes('Permission bigquery.tables.get denied on table')) {
         return {};
@@ -210,7 +213,7 @@ export class BigQueryDriver extends BaseDriver implements DriverInterface {
     }
   }
 
-  public async tablesSchema() {
+  public async tablesSchema(): Promise<DatabaseStructure> {
     const dataSets = await this.bigquery.getDatasets();
     const dataSetsColumns = await Promise.all(
       dataSets[0].map((dataSet) => this.loadTablesForDataset(dataSet))

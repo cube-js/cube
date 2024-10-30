@@ -136,7 +136,7 @@ dependencies = [
  "flatbuffers",
  "half",
  "hex",
- "indexmap 1.8.1",
+ "indexmap 1.9.3",
  "lazy_static",
  "lexical-core",
  "multiversion",
@@ -473,7 +473,7 @@ checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
  "bitflags 1.3.2",
  "clap_lex",
- "indexmap 1.8.1",
+ "indexmap 1.9.3",
  "textwrap",
 ]
 
@@ -773,6 +773,7 @@ dependencies = [
  "futures-core",
  "futures-util",
  "hashbrown 0.14.3",
+ "indexmap 1.9.3",
  "insta",
  "itertools",
  "log",
@@ -995,7 +996,7 @@ dependencies = [
  "env_logger",
  "fxhash",
  "hashbrown 0.12.1",
- "indexmap 1.8.1",
+ "indexmap 1.9.3",
  "instant",
  "log",
  "num-bigint",
@@ -1278,12 +1279,6 @@ checksum = "eabb4a44450da02c90444cf74558da904edde8fb4e9035a9a6a4e15445af0bd7"
 
 [[package]]
 name = "hashbrown"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab5ef0d4909ef3724cc8cce6ccc8572c5c817592e9285f5464f8e86f8bd3726e"
-
-[[package]]
-name = "hashbrown"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "db0d4cf898abf0081f964436dc980e96670a0f36863e4b83aaacdb65c9d7ccc3"
@@ -1499,12 +1494,12 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.1"
+version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
+checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
- "hashbrown 0.11.2",
+ "hashbrown 0.12.1",
 ]
 
 [[package]]
@@ -2762,7 +2757,7 @@ version = "0.8.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4a521f2940385c165a24ee286aa8599633d162077a54bdcae2a6fd5a7bfa7a0"
 dependencies = [
- "indexmap 1.8.1",
+ "indexmap 1.9.3",
  "ryu",
  "serde",
  "yaml-rust",

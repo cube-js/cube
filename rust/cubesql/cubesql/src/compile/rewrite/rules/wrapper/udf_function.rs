@@ -1,19 +1,18 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, rewrite, rules::wrapper::WrapperRules, transforming_rewrite,
-        udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail, wrapper_pullup_replacer,
-        wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
+        rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, udf_expr_var_arg, udf_fun_expr_args, udf_fun_expr_args_empty_tail,
+        wrapper_pullup_replacer, wrapper_pushdown_replacer, LogicalPlanLanguage, ScalarUDFExprFun,
         WrapperPullupReplacerAliasToCube,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn udf_function_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn udf_function_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             rewrite(
                 "wrapper-push-down-udf",
@@ -132,7 +131,7 @@ impl WrapperRules {
         &self,
         fun_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_var = var!(fun_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let meta = self.meta_context.clone();

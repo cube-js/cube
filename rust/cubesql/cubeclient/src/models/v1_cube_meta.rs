@@ -14,6 +14,10 @@ pub struct V1CubeMeta {
     pub name: String,
     #[serde(rename = "title", skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+    #[serde(rename = "type")]
+    pub r#type: crate::models::V1CubeMetaType,
+    #[serde(rename = "meta", skip_serializing_if = "Option::is_none")]
+    pub meta: Option<serde_json::Value>,
     #[serde(rename = "description", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(rename = "measures")]
@@ -29,6 +33,7 @@ pub struct V1CubeMeta {
 impl V1CubeMeta {
     pub fn new(
         name: String,
+        r#type: crate::models::V1CubeMetaType,
         measures: Vec<crate::models::V1CubeMetaMeasure>,
         dimensions: Vec<crate::models::V1CubeMetaDimension>,
         segments: Vec<crate::models::V1CubeMetaSegment>,
@@ -36,6 +41,8 @@ impl V1CubeMeta {
         V1CubeMeta {
             name,
             title: None,
+            r#type,
+            meta: None,
             description: None,
             measures,
             dimensions,
