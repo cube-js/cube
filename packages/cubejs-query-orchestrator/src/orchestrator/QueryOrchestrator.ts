@@ -10,7 +10,7 @@ import { DriverFactory, DriverFactoryByDataSource } from './DriverFactory';
 import { LocalQueueEventsBus } from './LocalQueueEventsBus';
 import { QueryStream } from './QueryStream';
 
-export type CacheAndQueryDriverType = 'redis' | 'memory' | 'cubestore';
+export type CacheAndQueryDriverType = 'memory' | 'cubestore' | /** removed, used for exception */ 'redis';
 
 export enum DriverType {
   External = 'external',
@@ -27,8 +27,6 @@ export interface QueryOrchestratorOptions {
   continueWaitTimeout?: number;
   skipExternalCacheAndQueue?: boolean;
 }
-
-let redisDeprecationShowed = false;
 
 function detectQueueAndCacheDriver(options: QueryOrchestratorOptions): CacheAndQueryDriverType {
   if (options.cacheAndQueueDriver) {
@@ -68,20 +66,10 @@ export class QueryOrchestrator {
     this.rollupOnlyMode = options.rollupOnlyMode;
     const cacheAndQueueDriver = detectQueueAndCacheDriver(options);
 
-    if (!['redis', 'memory', 'cubestore'].includes(cacheAndQueueDriver)) {
+    if (!['memory', 'cubestore'].includes(cacheAndQueueDriver)) {
       throw new Error(
-        `Only 'cubestore', 'redis' or 'memory' are supported for cacheAndQueueDriver option, passed: ${cacheAndQueueDriver}`
+        `Only 'cubestore' or 'memory' are supported for cacheAndQueueDriver option, passed: ${cacheAndQueueDriver}`
       );
-    }
-
-    if (cacheAndQueueDriver === 'redis' && !redisDeprecationShowed) {
-      this.logger('Redis Deprecation', {
-        warning: (
-          'Redis queue and cache driver is deprecated and no longer supported. Please consider switching to cubestore option.'
-        )
-      });
-
-      redisDeprecationShowed = true;
     }
 
     const { externalDriverFactory, continueWaitTimeout, skipExternalCacheAndQueue } = options;
@@ -138,6 +126,7 @@ export class QueryOrchestrator {
     if (!this.queueEventsBus) {
       this.queueEventsBus = new LocalQueueEventsBus();
     }
+
     return this.queueEventsBus;
   }
 

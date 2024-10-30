@@ -13,7 +13,7 @@ const storage = new (class Storage {
 
         try {
           value = JSON.parse(event.newValue || '');
-        } catch (error) {
+        } catch (error: any) {
           value = event.newValue;
         }
         this.emit(event.key, value);
@@ -54,7 +54,7 @@ const storage = new (class Storage {
       }
 
       return parsed !== undefined ? parsed : defaultValue;
-    } catch (error) {
+    } catch (error: any) {
       return typeof defaultValue === 'function'
         ? defaultValue(null)
         : defaultValue;

@@ -2,7 +2,7 @@
   "name": "@cubejs-backend/redshift-driver",
   "description": "Cube.js Redshift database driver",
   "author": "Cube Dev, Inc.",
-  "version": "0.35.76",
+  "version": "1.1.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/cube-js/cube.git",
@@ -25,15 +25,13 @@
     "lint:fix": "eslint --fix src/* --ext .ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.17.0",
-    "@aws-sdk/s3-request-presigner": "^3.17.0",
-    "@cubejs-backend/base-driver": "^0.35.67",
-    "@cubejs-backend/postgres-driver": "^0.35.76",
-    "@cubejs-backend/shared": "^0.35.67"
+    "@cubejs-backend/base-driver": "1.0.3",
+    "@cubejs-backend/postgres-driver": "1.1.0",
+    "@cubejs-backend/shared": "1.0.3"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cubejs-backend/linter": "^0.35.0",
+    "@cubejs-backend/linter": "^1.0.0",
     "typescript": "~5.2.2"
   },
   "publishConfig": {

@@ -39,7 +39,8 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
         } else if let Ok(val) = self.input.to_string() {
             visitor.visit_string(val.value().unwrap())
         } else if let Ok(val) = self.input.to_number() {
-            visitor.visit_f64(val.value().unwrap())
+            visitor.visit_i64(val.value().unwrap() as i64) //We deserialize float value in
+                                                           //different methods
         } else if let Ok(val) = self.input.to_array() {
             let deserializer = NativeSeqDeserializer::<IT>::new(val);
             visitor.visit_seq(deserializer)
@@ -98,9 +99,35 @@ impl<'de, IT: InnerTypes> Deserializer<'de> for NativeSerdeDeserializer<IT> {
 
     forward_to_deserialize_any! {
        <V: Visitor<'de>>
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 char str string
         unit unit_struct seq tuple tuple_struct map struct identifier
         newtype_struct
+    }
+
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if let Ok(val) = self.input.to_number() {
+            visitor.visit_f32(val.value().unwrap() as f32)
+        } else {
+            Err(NativeObjSerializerError::Message(
+                "JS Number expected for f32 field".to_string(),
+            ))
+        }
+    }
+
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        if let Ok(val) = self.input.to_number() {
+            visitor.visit_f64(val.value().unwrap() as f64)
+        } else {
+            Err(NativeObjSerializerError::Message(
+                "JS Number expected for f64 field".to_string(),
+            ))
+        }
     }
 }
 

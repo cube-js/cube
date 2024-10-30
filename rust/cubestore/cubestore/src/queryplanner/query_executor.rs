@@ -18,7 +18,9 @@ use crate::table::{Row, TableValue, TimestampValue};
 use crate::telemetry::suboptimal_query_plan_event;
 use crate::util::memory::MemoryHandler;
 use crate::{app_metrics, CubeError};
-use arrow::array::{
+use async_trait::async_trait;
+use core::fmt;
+use datafusion::arrow::array::{
     make_array, Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int16Array, Int32Array,
     Int64Array, Int64Decimal0Array, Int64Decimal10Array, Int64Decimal1Array, Int64Decimal2Array,
     Int64Decimal3Array, Int64Decimal4Array, Int64Decimal5Array, Int96Array, Int96Decimal0Array,
@@ -26,12 +28,10 @@ use arrow::array::{
     Int96Decimal4Array, Int96Decimal5Array, MutableArrayData, StringArray,
     TimestampMicrosecondArray, TimestampNanosecondArray, UInt16Array, UInt32Array, UInt64Array,
 };
-use arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
-use arrow::ipc::reader::StreamReader;
-use arrow::ipc::writer::MemStreamWriter;
-use arrow::record_batch::RecordBatch;
-use async_trait::async_trait;
-use core::fmt;
+use datafusion::arrow::datatypes::{DataType, Schema, SchemaRef, TimeUnit};
+use datafusion::arrow::ipc::reader::StreamReader;
+use datafusion::arrow::ipc::writer::MemStreamWriter;
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::datasource::TableProvider;
 use datafusion::error::DataFusionError;
@@ -44,7 +44,7 @@ use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::merge::MergeExec;
 use datafusion::physical_plan::merge_sort::{LastRowByUniqueKeyExec, MergeSortExec};
 use datafusion::physical_plan::parquet::{
-    NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
+    MetadataCacheFactory, NoopParquetMetadataCache, ParquetExec, ParquetMetadataCache,
 };
 use datafusion::physical_plan::projection::ProjectionExec;
 use datafusion::physical_plan::{
@@ -105,6 +105,8 @@ pub trait QueryExecutor: DIService + Send + Sync {
 crate::di_service!(MockQueryExecutor, [QueryExecutor]);
 
 pub struct QueryExecutorImpl {
+    // TODO: Why do we need a MetadataCacheFactory when we have a ParquetMetadataCache?
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
     memory_handler: Arc<dyn MemoryHandler>,
 }
@@ -312,10 +314,12 @@ impl QueryExecutor for QueryExecutorImpl {
 
 impl QueryExecutorImpl {
     pub fn new(
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
         parquet_metadata_cache: Arc<dyn CubestoreParquetMetadataCache>,
         memory_handler: Arc<dyn MemoryHandler>,
     ) -> Arc<Self> {
         Arc::new(QueryExecutorImpl {
+            metadata_cache_factory,
             parquet_metadata_cache,
             memory_handler,
         })
@@ -328,6 +332,7 @@ impl QueryExecutorImpl {
     ) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
+                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
                 .with_batch_size(4096)
                 .with_concurrency(1)
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_router(
@@ -345,6 +350,7 @@ impl QueryExecutorImpl {
     ) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
+                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
                 .with_batch_size(4096)
                 .with_concurrency(1)
                 .with_query_planner(Arc::new(CubeQueryPlanner::new_on_worker(
@@ -1761,7 +1767,7 @@ fn slice_copy(a: &dyn Array, start: usize, len: usize) -> ArrayRef {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::datatypes::Field;
+    use datafusion::arrow::datatypes::Field;
 
     #[test]
     fn test_batch_to_dataframe() -> Result<(), CubeError> {

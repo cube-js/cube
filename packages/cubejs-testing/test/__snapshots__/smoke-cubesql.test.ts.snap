@@ -92,7 +92,7 @@ Array [
 ]
 `;
 
-exports[`SQL API Postgres (Data) power bi post aggregate measure wrap: power bi post aggregate measure wrap 1`] = `
+exports[`SQL API Postgres (Data) power bi multi stage measure wrap: power bi post aggregate measure wrap 1`] = `
 Array [
   Object {
     "a0": 1,

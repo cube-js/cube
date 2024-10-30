@@ -1,9 +1,9 @@
-use super::base_cube::BaseCube;
-use super::base_dimension::BaseDimension;
-use super::base_measure::BaseMeasure;
+use super::planners::FullKeyAggregateQueryPlanner;
+use super::query_tools::QueryTools;
+use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::plan::{Expr, From, GenerationPlan, Select};
+use crate::plan::Select;
+use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -14,10 +14,8 @@ use std::rc::Rc;
 
 pub struct BaseQuery<IT: InnerTypes> {
     context: NativeContextHolder<IT>,
-    cube_evaluator: Rc<dyn CubeEvaluator>,
-    measures: Vec<Rc<BaseMeasure>>,
-    dimensions: Vec<Rc<BaseDimension>>,
-    join_root: String, //TODO temporary
+    query_tools: Rc<QueryTools>,
+    request: Rc<QueryProperties>,
 }
 
 impl<IT: InnerTypes> BaseQuery<IT> {
@@ -25,75 +23,41 @@ impl<IT: InnerTypes> BaseQuery<IT> {
         context: NativeContextHolder<IT>,
         options: Rc<dyn BaseQueryOptions>,
     ) -> Result<Self, CubeError> {
-        let cube_evaluator = options.cube_evaluator()?;
+        let query_tools = QueryTools::try_new(
+            options.cube_evaluator()?,
+            options.base_tools()?,
+            options.join_graph()?,
+            options.static_data().timezone.clone(),
+        )?;
 
-        let measures = if let Some(measures) = &options.static_data().measures {
-            measures
-                .iter()
-                .map(|m| BaseMeasure::new(m.clone(), cube_evaluator.clone()))
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
-        let dimensions = if let Some(dimensions) = &options.static_data().dimensions {
-            dimensions
-                .iter()
-                .map(|m| BaseDimension::new(m.clone()))
-                .collect::<Vec<_>>()
-        } else {
-            Vec::new()
-        };
+        let request = QueryProperties::try_new(query_tools.clone(), options)?;
 
         Ok(Self {
             context,
-            cube_evaluator,
-            measures,
-            dimensions,
-            join_root: options.static_data().join_root.clone().unwrap(),
+            query_tools,
+            request,
         })
     }
+
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
-        let sql = plan.to_string();
-        let params = self.get_params()?;
+        let sql = plan.to_sql()?;
+        let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
+
         let res = self.context.empty_array();
-        res.set(0, sql.to_native(self.context.clone())?)?;
+        res.set(0, result_sql.to_native(self.context.clone())?)?;
         res.set(1, params.to_native(self.context.clone())?)?;
         let result = NativeObjectHandle::new(res.into_object());
 
         Ok(result)
     }
 
-    fn build_sql_and_params_impl(&self) -> Result<GenerationPlan, CubeError> {
-        self.simple_query()
-    }
-
-    //TODO temporary realization
-    fn get_params(&self) -> Result<Vec<String>, CubeError> {
-        Ok(Vec::new())
-    }
-
-    fn simple_query(&self) -> Result<GenerationPlan, CubeError> {
-        //let cube =
-        let select = Select {
-            projection: self.simple_projection()?,
-            from: From::Cube(self.cube_from_path(self.join_root.clone())?),
-        };
-        Ok(GenerationPlan::Select(select))
-    }
-
-    fn simple_projection(&self) -> Result<Vec<Expr>, CubeError> {
-        let res = self
-            .measures
-            .iter()
-            .map(|m| Expr::Measure(m.clone()))
-            .collect();
-        Ok(res)
-    }
-
-    fn cube_from_path(&self, cube_path: String) -> Result<Rc<BaseCube>, CubeError> {
-        let eval = self.cube_evaluator.clone();
-        let def = self.cube_evaluator.cube_from_path(cube_path)?;
-        Ok(BaseCube::new(eval, def))
+    fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
+        let full_key_aggregate_query_builder = FullKeyAggregateQueryPlanner::new(
+            self.query_tools.clone(),
+            self.request.clone(),
+            SqlNodesFactory::new(),
+        );
+        full_key_aggregate_query_builder.plan()
     }
 }

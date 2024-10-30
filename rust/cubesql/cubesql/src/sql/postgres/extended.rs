@@ -492,7 +492,7 @@ impl Portal {
 
                             return;
                         }
-                        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                        QueryPlan::DataFusionSelect(plan, ctx) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let safe_stream = async move {
                                 std::panic::AssertUnwindSafe(df.execute_stream())
@@ -511,7 +511,7 @@ impl Portal {
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
                         }
-                        QueryPlan::CreateTempTable(_, plan, ctx, name, temp_tables) => {
+                        QueryPlan::CreateTempTable(plan, ctx, name, temp_tables) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let record_batch = df.collect();
                             let row_count = match record_batch.await {

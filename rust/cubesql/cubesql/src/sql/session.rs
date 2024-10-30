@@ -3,7 +3,7 @@ use log::trace;
 use rand::Rng;
 use std::{
     collections::HashMap,
-    sync::{Arc, RwLock as RwLockSync, Weak},
+    sync::{Arc, LazyLock, RwLock as RwLockSync, Weak},
     time::{Duration, SystemTime},
 };
 use tokio_util::sync::CancellationToken;
@@ -23,8 +23,6 @@ use crate::{
     RWLockAsync,
 };
 
-extern crate lazy_static;
-
 #[derive(Debug, Clone)]
 pub struct SessionProperties {
     user: Option<String>,
@@ -37,10 +35,10 @@ impl SessionProperties {
     }
 }
 
-lazy_static! {
-    static ref POSTGRES_DEFAULT_VARIABLES: DatabaseVariables = postgres_default_session_variables();
-    static ref MYSQL_DEFAULT_VARIABLES: DatabaseVariables = mysql_default_session_variables();
-}
+static POSTGRES_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
+    LazyLock::new(postgres_default_session_variables);
+static MYSQL_DEFAULT_VARIABLES: LazyLock<DatabaseVariables> =
+    LazyLock::new(mysql_default_session_variables);
 
 #[derive(Debug)]
 pub enum TransactionState {
@@ -63,7 +61,7 @@ pub struct SessionState {
     // connection id, immutable
     pub connection_id: u32,
     // Can be UUID or anything else. MDX uses UUID
-    pub extra_id: Option<String>,
+    pub extra_id: Option<SessionExtraId>,
     // secret for this session
     pub secret: u32,
     // client ip, immutable
@@ -97,7 +95,7 @@ pub struct SessionState {
 impl SessionState {
     pub fn new(
         connection_id: u32,
-        extra_id: Option<String>,
+        extra_id: Option<SessionExtraId>,
         client_ip: String,
         client_port: u16,
         protocol: DatabaseProtocol,
@@ -394,6 +392,8 @@ impl SessionState {
     }
 }
 
+pub type SessionExtraId = [u8; 16];
+
 #[derive(Debug)]
 pub struct Session {
     // Backref
@@ -412,8 +412,8 @@ pub struct SessionProcessList {
     pub database: Option<String>,
 }
 
-impl From<&Arc<Session>> for SessionProcessList {
-    fn from(session: &Arc<Session>) -> Self {
+impl From<&Session> for SessionProcessList {
+    fn from(session: &Session) -> Self {
         Self {
             id: session.state.connection_id,
             host: session.state.client_ip.clone(),
@@ -439,8 +439,8 @@ pub struct SessionStatActivity {
     pub query: Option<String>,
 }
 
-impl From<&Arc<Session>> for SessionStatActivity {
-    fn from(session: &Arc<Session>) -> Self {
+impl From<&Session> for SessionStatActivity {
+    fn from(session: &Session) -> Self {
         let query = session.state.current_query();
 
         let application_name = if let Some(v) = session.state.get_variable("application_name") {

@@ -2,16 +2,17 @@ use crate::metastore::Column;
 use crate::sql::MySqlDialectWithBackTicks;
 use crate::streaming::topic_table_provider::TopicTableProvider;
 use crate::CubeError;
-use arrow::array::ArrayRef;
-use arrow::datatypes::{Schema, SchemaRef};
-use arrow::record_batch::RecordBatch;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::{Schema, SchemaRef};
+use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::logical_plan::{
     Column as DFColumn, DFField, DFSchema, DFSchemaRef, Expr, LogicalPlan,
 };
 use datafusion::physical_plan::empty::EmptyExec;
 use datafusion::physical_plan::memory::MemoryExec;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 use datafusion::physical_plan::{collect, ExecutionPlan};
-use datafusion::prelude::ExecutionContext;
+use datafusion::prelude::{ExecutionConfig, ExecutionContext};
 use datafusion::sql::parser::Statement as DFStatement;
 use datafusion::sql::planner::SqlToRel;
 use sqlparser::ast::Expr as SQExpr;
@@ -126,7 +127,11 @@ impl KafkaPostProcessPlanner {
         }
     }
 
-    pub fn build(&self, select_statement: String) -> Result<KafkaPostProcessPlan, CubeError> {
+    pub fn build(
+        &self,
+        select_statement: String,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
+    ) -> Result<KafkaPostProcessPlan, CubeError> {
         let target_schema = Arc::new(Schema::new(
             self.columns
                 .iter()
@@ -137,7 +142,7 @@ impl KafkaPostProcessPlanner {
         let source_unique_columns = self.extract_source_unique_columns(&logical_plan)?;
 
         let (projection_plan, filter_plan) =
-            self.make_projection_and_filter_physical_plans(&logical_plan)?;
+            self.make_projection_and_filter_physical_plans(&logical_plan, metadata_cache_factory)?;
         if target_schema != projection_plan.schema() {
             return Err(CubeError::user(format!(
                 "Table schema: {:?} don't match select_statement result schema: {:?}",
@@ -352,6 +357,7 @@ impl KafkaPostProcessPlanner {
     fn make_projection_and_filter_physical_plans(
         &self,
         plan: &LogicalPlan,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Result<(Arc<dyn ExecutionPlan>, Option<Arc<dyn ExecutionPlan>>), CubeError> {
         let source_schema = Arc::new(Schema::new(
             self.source_columns
@@ -373,7 +379,10 @@ impl KafkaPostProcessPlanner {
                             schema.clone(),
                             projection_input.clone(),
                         )?;
-                        let plan_ctx = Arc::new(ExecutionContext::new());
+                        let plan_ctx = Arc::new(ExecutionContext::with_config(
+                            ExecutionConfig::new()
+                                .with_metadata_cache_factory(metadata_cache_factory),
+                        ));
 
                         let projection_phys_plan = plan_ctx
                             .create_physical_plan(&projection_plan)?
@@ -393,7 +402,9 @@ impl KafkaPostProcessPlanner {
                 LogicalPlan::TableScan { .. } => {
                     let projection_plan =
                         self.make_projection_plan(expr, schema.clone(), projection_input.clone())?;
-                    let plan_ctx = Arc::new(ExecutionContext::new());
+                    let plan_ctx = Arc::new(ExecutionContext::with_config(
+                        ExecutionConfig::new().with_metadata_cache_factory(metadata_cache_factory),
+                    ));
                     let projection_phys_plan = plan_ctx
                         .create_physical_plan(&projection_plan)?
                         .with_new_children(vec![empty_exec.clone()])?;
@@ -434,7 +445,7 @@ impl KafkaPostProcessPlanner {
             Arc::new(schema.join(&DFSchema::new(vec![DFField::new(
                 None,
                 self.seq_column.get_name(),
-                arrow::datatypes::DataType::Int64,
+                datafusion::arrow::datatypes::DataType::Int64,
                 true,
             )])?)?)
         } else {

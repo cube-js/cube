@@ -1,7 +1,6 @@
 import { Required, SchemaFileRepository } from '@cubejs-backend/shared';
 import {
   CheckAuthFn,
-  CheckAuthMiddlewareFn,
   ExtendContextFn,
   JWTOptions,
   UserBackgroundContext,
@@ -122,9 +121,11 @@ export type DatabaseType =
   | 'snowflake'
   | 'sqlite'
   | 'questdb'
-  | 'materialize';
+  | 'materialize'
+  | 'pinot';
 
 export type ContextToAppIdFn = (context: RequestContext) => string | Promise<string>;
+export type ContextToRolesFn = (context: RequestContext) => string[] | Promise<string[]>;
 export type ContextToOrchestratorIdFn = (context: RequestContext) => string | Promise<string>;
 
 export type OrchestratorOptionsFn = (context: RequestContext) => OrchestratorOptions | Promise<OrchestratorOptions>;
@@ -182,10 +183,10 @@ export interface CreateOptions {
   externalDialectFactory?: ExternalDialectFactoryFn;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
   contextToAppId?: ContextToAppIdFn;
+  contextToRoles?: ContextToRolesFn;
   contextToOrchestratorId?: ContextToOrchestratorIdFn;
   contextToApiScopes?: ContextToApiScopesFn;
   repositoryFactory?: (context: RequestContext) => SchemaFileRepository;
-  checkAuthMiddleware?: CheckAuthMiddlewareFn;
   checkAuth?: CheckAuthFn;
   checkSqlAuth?: CheckSQLAuthFn;
   canSwitchSqlUser?: CanSwitchSQLUserFn;

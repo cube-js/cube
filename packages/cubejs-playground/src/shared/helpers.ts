@@ -16,7 +16,7 @@ export function playgroundFetch(url, options: any = {}) {
         try {
           const json = JSON.parse(errorText);
           errorText = json.error;
-        } catch (e) {
+        } catch (e: any) {
           // Nothing
         }
         throw errorText;
@@ -70,9 +70,9 @@ export function openWindow({
     title,
     `
       scrollbars=yes,
-      width=${width / systemZoom}, 
-      height=${height / systemZoom}, 
-      top=${top}, 
+      width=${width / systemZoom},
+      height=${height / systemZoom},
+      top=${top},
       left=${left}
     `
   );

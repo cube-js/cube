@@ -1,26 +1,20 @@
-//pub mod aggregation;
 pub mod builder;
 pub mod expression;
-//pub mod filter;
+pub mod filter;
 pub mod from;
+pub mod join;
+pub mod order;
+pub mod query_plan;
 pub mod select;
+pub mod subquery;
+pub mod union;
 
 pub use expression::Expr;
-pub use from::From;
+pub use filter::{Filter, FilterGroup, FilterItem};
+pub use from::{From, FromSource};
+pub use join::{Join, JoinItem, JoinSource};
+pub use order::OrderBy;
+pub use query_plan::QueryPlan;
 pub use select::Select;
-
-use std::fmt::{self, write};
-
-pub enum GenerationPlan {
-    Select(Select),
-}
-
-impl fmt::Display for GenerationPlan {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            GenerationPlan::Select(select) => {
-                write!(f, "{}", select)
-            }
-        }
-    }
-}
+pub use subquery::Subquery;
+pub use union::Union;

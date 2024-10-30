@@ -3,6 +3,7 @@ mod optimizations;
 pub mod panic;
 mod partition_filter;
 mod planning;
+use datafusion::physical_plan::parquet::MetadataCacheFactory;
 pub use planning::PlanningMeta;
 mod check_memory;
 pub mod physical_plan_flags;
@@ -51,12 +52,12 @@ use crate::sql::cache::SqlResultCache;
 use crate::sql::InlineTables;
 use crate::store::DataFrame;
 use crate::{app_metrics, metastore, CubeError};
-use arrow::array::ArrayRef;
-use arrow::datatypes::Field;
-use arrow::record_batch::RecordBatch;
-use arrow::{datatypes::Schema, datatypes::SchemaRef};
 use async_trait::async_trait;
 use core::fmt;
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::Field;
+use datafusion::arrow::record_batch::RecordBatch;
+use datafusion::arrow::{datatypes::Schema, datatypes::SchemaRef};
 use datafusion::catalog::TableReference;
 use datafusion::datasource::datasource::{Statistics, TableProviderFilterPushDown};
 use datafusion::error::DataFusionError;
@@ -98,6 +99,7 @@ pub struct QueryPlannerImpl {
     cache_store: Arc<dyn CacheStore>,
     config: Arc<dyn ConfigObj>,
     cache: Arc<SqlResultCache>,
+    metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
 }
 
 crate::di_service!(QueryPlannerImpl, [QueryPlanner]);
@@ -179,12 +181,14 @@ impl QueryPlannerImpl {
         cache_store: Arc<dyn CacheStore>,
         config: Arc<dyn ConfigObj>,
         cache: Arc<SqlResultCache>,
+        metadata_cache_factory: Arc<dyn MetadataCacheFactory>,
     ) -> Arc<QueryPlannerImpl> {
         Arc::new(QueryPlannerImpl {
             meta_store,
             cache_store,
             config,
             cache,
+            metadata_cache_factory,
         })
     }
 }
@@ -193,6 +197,7 @@ impl QueryPlannerImpl {
     async fn execution_context(&self) -> Result<Arc<ExecutionContext>, CubeError> {
         Ok(Arc::new(ExecutionContext::with_config(
             ExecutionConfig::new()
+                .with_metadata_cache_factory(self.metadata_cache_factory.clone())
                 .add_optimizer_rule(Arc::new(MaterializeNow {}))
                 .add_optimizer_rule(Arc::new(FlattenUnion {})),
         )))
@@ -292,6 +297,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
                     None,
                     None,
                     Vec::new(),
+                    None,
                     None,
                     None,
                 ),
@@ -409,6 +415,7 @@ impl ContextProvider for MetaStoreSchemaProvider {
             "unix_timestamp" | "UNIX_TIMESTAMP" => CubeScalarUDFKind::UnixTimestamp,
             "date_add" | "DATE_ADD" => CubeScalarUDFKind::DateAdd,
             "date_sub" | "DATE_SUB" => CubeScalarUDFKind::DateSub,
+            "date_bin" | "DATE_BIN" => CubeScalarUDFKind::DateBin,
             _ => return None,
         };
         return Some(Arc::new(scalar_udf_by_kind(kind).descriptor()));
@@ -480,15 +487,15 @@ macro_rules! base_info_schema_table_def {
     ($table: ty) => {
         #[async_trait]
         impl crate::queryplanner::BaseInfoSchemaTableDef for $table {
-            fn schema_ref(&self) -> arrow::datatypes::SchemaRef {
-                Arc::new(arrow::datatypes::Schema::new(self.schema()))
+            fn schema_ref(&self) -> datafusion::arrow::datatypes::SchemaRef {
+                Arc::new(datafusion::arrow::datatypes::Schema::new(self.schema()))
             }
 
             async fn scan(
                 &self,
                 ctx: crate::queryplanner::InfoSchemaTableDefContext,
                 limit: Option<usize>,
-            ) -> Result<arrow::record_batch::RecordBatch, crate::CubeError> {
+            ) -> Result<datafusion::arrow::record_batch::RecordBatch, crate::CubeError> {
                 let rows = self.rows(ctx, limit).await?;
                 let schema = self.schema_ref();
                 let columns = self.columns();
@@ -496,7 +503,9 @@ macro_rules! base_info_schema_table_def {
                     .into_iter()
                     .map(|c| c(rows.clone()))
                     .collect::<Vec<_>>();
-                Ok(arrow::record_batch::RecordBatch::try_new(schema, columns)?)
+                Ok(datafusion::arrow::record_batch::RecordBatch::try_new(
+                    schema, columns,
+                )?)
             }
         }
     };

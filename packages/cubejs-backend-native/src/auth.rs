@@ -7,8 +7,7 @@ use cubesql::{
 };
 use log::trace;
 use neon::prelude::*;
-use serde::Deserialize;
-use serde_derive::Serialize;
+use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::sync::Arc;
 use uuid::Uuid;

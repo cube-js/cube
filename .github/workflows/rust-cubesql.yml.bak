@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
     branches:
       - 'master'
@@ -12,6 +14,8 @@ on:
     paths:
       - '.github/workflows/rust-cubesql.yml'
       - 'packages/cubejs-backend-native/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesqlplanner/**'
       - 'rust/cubesql/**'
 
 jobs:
@@ -43,16 +47,16 @@ jobs:
         run: cd rust/cubesql && cargo fmt --all -- --check
       - name: Lint Native
         run: cd packages/cubejs-backend-native && cargo fmt --all -- --check
-      # TODO replace with clippy once cubesql is ready
-      - name: Check CubeSQL
-        run: cd rust/cubesql && cargo check --locked --workspace --all-targets --keep-going
+      - name: Lint cubenativeutils
+        run: cd rust/cubenativeutils && cargo fmt --all -- --check
+      - name: Lint cubesqlplanner
+        run: cd rust/cubesqlplanner && cargo fmt --all -- --check
+      - name: Clippy CubeSQL
+        run: cd rust/cubesql && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going -- -D warnings
       - name: Clippy Native (with Python)
         run: cd packages/cubejs-backend-native && cargo clippy --locked --workspace --all-targets --keep-going --features python -- -D warnings
-      # CubeSQL is not ready for Clippy
-      #- name: Clippy CubeSQL
-      #  run: cd rust/cubesql && cargo clippy -- -D warnings
 
   unit:
     #  We use host instead of cross container, because it's much faster
@@ -108,12 +112,12 @@ jobs:
     strategy:
       matrix:
         # Current used version + 1 LTS
-        node-version: [18, 20]
+        node-version: [20, 22]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         # minimize number of jobs
         exclude:
-          - node-version: 18
+          - node-version: 20
             target: "aarch64-unknown-linux-gnu"
           - python-version: 3.10
             target: "aarch64-unknown-linux-gnu"
@@ -147,7 +151,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -211,7 +215,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: ["macos-13"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         include:
@@ -250,7 +254,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -304,7 +308,7 @@ jobs:
     strategy:
       matrix:
         # We do not need to test under all versions, we do it under linux
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: [windows-2019]
         python-version: ["fallback"]
       fail-fast: false
@@ -332,7 +336,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"

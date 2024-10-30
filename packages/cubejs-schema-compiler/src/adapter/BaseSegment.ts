@@ -41,11 +41,11 @@ export class BaseSegment {
     return this.query.cubeEvaluator.segmentByPath(this.segment);
   }
 
-  public isPostAggregate() {
+  public isMultiStage() {
     if (this.expression) { // TODO
       return false;
     }
-    return this.definition().postAggregate;
+    return this.definition().multiStage;
   }
 
   public definition(): any {

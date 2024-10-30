@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use log::{error, trace};
+use pg_srv::{buffer, protocol};
 use std::sync::Arc;
 use tokio::{
     net::TcpListener,
@@ -42,7 +43,7 @@ impl ProcessingLoop for PostgresServer {
 
         loop {
             let mut stop_receiver = self.close_socket_rx.write().await;
-            let (socket, _) = tokio::select! {
+            let (mut socket, _) = tokio::select! {
                 _ = stop_receiver.changed() => {
                     let mode = *stop_receiver.borrow();
                     if mode > active_shutdown_mode {
@@ -105,6 +106,22 @@ impl ProcessingLoop for PostgresServer {
                 Ok(r) => r,
                 Err(err) => {
                     error!("Session creation error: {}", err);
+
+                    let error_response = protocol::ErrorResponse::error(
+                        protocol::ErrorCode::TooManyConnections,
+                        err.to_string(),
+                    );
+
+                    if let Err(err) = buffer::write_message(
+                        &mut bytes::BytesMut::new(),
+                        &mut socket,
+                        error_response,
+                    )
+                    .await
+                    {
+                        error!("Session creation, failed to write error response: {}", err);
+                    };
+
                     continue;
                 }
             };

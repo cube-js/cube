@@ -11,8 +11,10 @@ interface CreateCubeSchemaOptions {
 }
 
 export function createCubeSchema({ name, refreshKey = '', preAggregations = '', sqlTable, publicly, shown, joins }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cube('${name}', {
+        description: 'test cube from createCubeSchema',
+
         ${sqlTable ? `sqlTable: \`${sqlTable}\`` : 'sql: `select * from cards`'},
 
         ${publicly !== undefined ? `public: ${publicly},` : ''}
@@ -22,6 +24,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         measures: {
           count: {
+            description: 'count measure from createCubeSchema',
             type: 'count'
           },
           sum: {
@@ -35,18 +38,39 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
           min: {
             sql: \`amount\`,
             type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
           }
         },
 
         dimensions: {
           id: {
             type: 'number',
+            description: 'id dimension from createCubeSchema',
             sql: 'id',
             primaryKey: true
+          },
+          id_cube: {
+            type: 'number',
+            sql: \`\${CUBE}.id\`,
+          },
+          other_id: {
+            type: 'number',
+            sql: 'other_id',
           },
           type: {
             type: 'string',
             sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE.type}\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
           },
           createdAt: {
             type: 'time',
@@ -60,6 +84,7 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
 
         segments: {
           sfUsers: {
+            description: 'SF users segment from createCubeSchema',
             sql: \`\${CUBE}.location = 'San Francisco'\`
           }
         },
@@ -67,8 +92,277 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
         preAggregations: {
             ${preAggregations}
         }
-      }) 
+      })
   `;
+}
+
+export function createCubeSchemaWithAccessPolicy(name: string, extraPolicies: string = ''): string {
+  return `cube('${name}', {
+        description: 'test cube from createCubeSchemaWithAccessPolicy',
+        sql: 'select * from cards',
+
+        measures: {
+          count: {
+            description: 'count measure from createCubeSchemaWithAccessPolicy',
+            type: 'count'
+          },
+          sum: {
+            sql: \`amount\`,
+            type: \`sum\`
+          },
+          max: {
+            sql: \`amount\`,
+            type: \`max\`
+          },
+          min: {
+            sql: \`amount\`,
+            type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
+          }
+        },
+
+        dimensions: {
+          id: {
+            type: 'number',
+            description: 'id dimension from createCubeSchemaWithAccessPolicy',
+            sql: 'id',
+            primaryKey: true
+          },
+          id_cube: {
+            type: 'number',
+            sql: \`\${CUBE}.id\`,
+          },
+          other_id: {
+            type: 'number',
+            sql: 'other_id',
+          },
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE.type}\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
+          },
+          createdAt: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          location: {
+            type: 'string',
+            sql: 'location'
+          }
+        },
+        accessPolicy: [
+          {
+            role: "*",
+            rowLevel: {
+              allowAll: true
+            }
+          },
+          {
+            role: 'admin',
+            conditions: [
+              {
+                if: \`true\`,
+              }
+            ],
+            rowLevel: {
+              filters: [
+                {
+                  member: \`$\{CUBE}.id\`,
+                  operator: 'equals',
+                  values: [\`1\`, \`2\`, \`3\`]
+                }
+              ]
+            },
+            memberLevel: {
+              includes: \`*\`,
+              excludes: [\`location\`, \`diff\`]
+            },
+          },
+          {
+            role: 'manager',
+            conditions: [
+              {
+                if: security_context.userId === 1,
+              }
+            ],
+            rowLevel: {
+              filters: [
+                {
+                  or: [
+                    {
+                      member: \`location\`,
+                      operator: 'startsWith',
+                      values: [\`San\`]
+                    },
+                    {
+                      member: \`location\`,
+                      operator: 'startsWith',
+                      values: [\`Lon\`]
+                    }
+                  ]
+                }
+              ]
+            },
+            memberLevel: {
+              includes: \`*\`,
+              excludes: [\`min\`, \`max\`]
+            },
+          },
+          ${extraPolicies}
+        ]
+      })
+  `;
+}
+
+export function createCubeSchemaWithCustomGranularities(name: string): string {
+  return `cube('${name}', {
+        sql: 'select * from orders',
+        public: true,
+        dimensions: {
+          createdAt: {
+            public: true,
+            sql: 'created_at',
+            type: 'time',
+            granularities: {
+              half_year: {
+                interval: '6 months',
+                title: '6 month intervals'
+              },
+              half_year_by_1st_april: {
+                title: 'Half year from Apr to Oct',
+                interval: '6 months',
+                offset: '3 months'
+              },
+              half_year_by_1st_march: {
+                interval: '6 months',
+                origin: '2020-03-01'
+              },
+              half_year_by_1st_june: {
+                interval: '6 months',
+                origin: '2020-06-01 10:00:00'
+              }
+            }
+          },
+          createdAtPredefinedYear: {
+            public: true,
+            sql: \`\${createdAt.year}\`,
+            type: 'string',
+          },
+          createdAtPredefinedQuarter: {
+            public: true,
+            sql: \`\${createdAt.quarter}\`,
+            type: 'string',
+          },
+          createdAtHalfYear: {
+            public: true,
+            sql: \`\${createdAt.half_year}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stJune: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_june}\`,
+            type: 'string',
+          },
+          createdAtHalfYearBy1stMarch: {
+            public: true,
+            sql: \`\${createdAt.half_year_by_1st_march}\`,
+            type: 'string',
+          },
+          status: {
+            type: 'string',
+            sql: 'status',
+          },
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
+          }
+        },
+        measures: {
+          count: {
+            type: 'count'
+          },
+          rollingCountByTrailing2Day: {
+            type: 'count',
+            rollingWindow: {
+              trailing: '2 day'
+            }
+          },
+          rollingCountByLeading2Day: {
+            type: 'count',
+            rollingWindow: {
+              leading: '3 day'
+            }
+          },
+          rollingCountByUnbounded: {
+            type: 'count',
+            rollingWindow: {
+              trailing: 'unbounded'
+            }
+          }
+        },
+
+        joins: {
+          ${name}_users: {
+            sql: \`\${${name}_users}.id = \${${name}}.user_id\`,
+            relationship: \`one_to_many\`
+          }
+        }
+
+      })
+
+      cube(\`${name}_users\`, {
+        sql: \`SELECT * FROM users\`,
+
+        dimensions: {
+          id: {
+            type: 'number',
+            sql: 'id',
+            primaryKey: true,
+            public: true,
+          },
+          name: {
+            sql: 'name',
+            type: 'string',
+            public: true,
+          },
+          proxyCreatedAtPredefinedYear: {
+            sql: \`\${${name}.createdAt.year}\`,
+            type: \`string\`,
+            public: true,
+          },
+          proxyCreatedAtHalfYear: {
+            sql: \`\${${name}.createdAt.half_year}\`,
+            type: 'string',
+            public: true,
+          }
+        },
+
+        measures: {
+          count: {
+            sql: 'user_id',
+            type: 'count_distinct'
+          }
+        }
+      })
+
+      view(\`orders_view\`, {
+        cubes: [{
+          join_path: orders,
+          includes: '*'
+        }]
+      })`;
 }
 
 export type CreateSchemaOptions = {
@@ -80,12 +374,51 @@ export function createSchemaYaml(schema: CreateSchemaOptions): string {
   return YAML.dump(schema);
 }
 
+export function createSchemaYamlForGroupFilterParamsTests(cubeDefSql: string): string {
+  return createSchemaYaml({
+    cubes: [
+      {
+        name: 'Order',
+        sql: cubeDefSql,
+        measures: [{
+          name: 'count',
+          type: 'count',
+        }],
+        dimensions: [
+          {
+            name: 'dim0',
+            sql: 'dim0',
+            type: 'string'
+          },
+          {
+            name: 'dim1',
+            sql: 'dim1',
+            type: 'string'
+          }
+        ]
+      },
+    ],
+    views: [{
+      name: 'orders_view',
+      cubes: [{
+        join_path: 'Order',
+        prefix: true,
+        includes: [
+          'count',
+          'dim0',
+          'dim1',
+        ]
+      }]
+    }]
+  });
+}
+
 export function createCubeSchemaYaml({ name, sqlTable }: CreateCubeSchemaOptions): string {
-  return ` 
+  return `
     cubes:
       - name: ${name}
         sql_table: ${sqlTable}
-    
+
         measures:
           - name: count
             type: count
