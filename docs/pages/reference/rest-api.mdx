@@ -213,45 +213,6 @@ Example response:
 }
 ```
 
-## `/v1/run-scheduled-refresh`
-
-Trigger a scheduled refresh run to refresh pre-aggregations.
-
-<WarningBox>
-
-This API endpoint is deprecated and will be removed from Cube in the future.
-Use the [`/v1/pre-aggregations/jobs`](#v1pre-aggregationsjobs) endpoint instead.
-
-</WarningBox>
-
-<WarningBox>
-
-Single call to this API may be not enough to refresh everything is pending. This
-call just populates queue with refresh workload and should be continuously
-called until refresh jobs have completed; otherwise refresh jobs will be marked
-as orphaned, and they will be removed from the queue.
-
-</WarningBox>
-
-Learn more about
-[scheduled refresh here](/product/caching/getting-started-pre-aggregations#keeping-pre-aggregations-up-to-date).
-
-| Parameter       | Description                                                                                                  |
-| --------------- | ------------------------------------------------------------------------------------------------------------ |
-| queryingOptions | Optional URL encoded Cube [Query](/product/apis-integrations/rest-api/query-format) options such as timezone |
-
-Empty object response if scheduled successfully.
-
-Example request:
-
-```bash{outputLines: 2-5}
-curl \
-  -H "Authorization: EXAMPLE-API-TOKEN" \
-  -G \
-  --data-urlencode 'queryingOptions={"timezone":"UTC"}' \
-  http://localhost:4000/cubejs-api/v1/run-scheduled-refresh
-```
-
 ## `/v1/pre-aggregations/jobs`
 
 Trigger pre-aggregation build jobs or retrieve statuses of such jobs.

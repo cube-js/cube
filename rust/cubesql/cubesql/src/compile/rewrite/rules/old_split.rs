@@ -4,14 +4,14 @@ use crate::{
         agg_fun_expr, aggr_aggr_expr_empty_tail, aggr_aggr_expr_legacy as aggr_aggr_expr,
         aggr_group_expr_empty_tail, aggr_group_expr_legacy as aggr_group_expr, aggregate,
         alias_expr,
-        analysis::{ConstantFolding, LogicalPlanAnalysis, OriginalExpr},
+        analysis::{ConstantFolding, OriginalExpr},
         binary_expr, cast_expr, cast_expr_explicit, column_expr, cube_scan, event_notification,
         fun_expr, group_aggregate_split_replacer, group_expr_split_replacer,
         inner_aggregate_split_replacer, is_not_null_expr, is_null_expr, literal_expr,
         literal_float, literal_int, literal_string, original_expr_name,
         outer_aggregate_split_replacer, outer_projection_split_replacer, projection,
         projection_expr_empty_tail, projection_expr_legacy as projection_expr, rewrite,
-        rewriter::RewriteRules,
+        rewriter::{CubeEGraph, CubeRewrite, RewriteRules},
         rules::members::MemberRules,
         transforming_chain_rewrite, transforming_rewrite, udf_expr, AggregateFunctionExprDistinct,
         AggregateFunctionExprFun, AliasExprAlias, BinaryExprOp, CastExprDataType, ColumnExprColumn,
@@ -30,7 +30,7 @@ use datafusion::{
     physical_plan::{aggregates::AggregateFunction, functions::BuiltinScalarFunction},
     scalar::ScalarValue,
 };
-use egg::{EGraph, Id, Rewrite, Subst, Var};
+use egg::{Id, Subst, Var};
 use std::{fmt::Display, ops::Index, sync::Arc};
 
 pub struct OldSplitRules {
@@ -39,7 +39,7 @@ pub struct OldSplitRules {
 }
 
 impl RewriteRules for OldSplitRules {
-    fn rewrite_rules(&self) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>> {
+    fn rewrite_rules(&self) -> Vec<CubeRewrite> {
         let mut rules = vec![
             transforming_rewrite(
                 "split-projection-aggregate",
@@ -4667,16 +4667,12 @@ impl OldSplitRules {
         is_measure: bool,
         is_dimension: bool,
         unwrap_agg_chain: Option<Vec<(&'a str, String)>>,
-    ) -> Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>
+    ) -> Vec<CubeRewrite>
     where
         M: Fn(fn(D, DD) -> String) -> String,
         C: Fn(fn(D, DD) -> String) -> Vec<(&'a str, String)>,
         A: Fn(fn(D, DD) -> String) -> String,
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
-            + Sync
-            + Send
-            + Clone
-            + 'static,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool + Sync + Send + Clone + 'static,
     {
         let mut rules = vec![transforming_chain_rewrite(
             &format!("{}-outer-aggr", base_name),
@@ -4827,7 +4823,7 @@ impl OldSplitRules {
         original_expr_var: &'static str,
         out_alias_expr_var: &'static str,
         out_column_expr_var: Option<&'static str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         self.transform_original_expr_to_alias_and_column_with_chain_transform(
             original_expr_var,
             out_alias_expr_var,
@@ -4842,9 +4838,9 @@ impl OldSplitRules {
         out_alias_expr_var: &'static str,
         out_column_expr_var: Option<&'static str>,
         chain_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
     where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
     {
         let original_expr_var = var!(original_expr_var);
         let out_alias_expr_var = var!(out_alias_expr_var);
@@ -4895,16 +4891,12 @@ impl OldSplitRules {
 
     pub fn transform_original_expr_alias(
         &self,
-        alias_to_cube_fn: fn(
-            &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-            Id,
-        ) -> Vec<Vec<(String, String)>>,
+        alias_to_cube_fn: fn(&CubeEGraph, Id) -> Vec<Vec<(String, String)>>,
         original_expr_var: &'static str,
         column_var: &'static str,
         alias_to_cube_var: &'static str,
         alias_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool + Clone
-    {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool + Clone {
         let original_expr_var = var!(original_expr_var);
         let column_var = var!(column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -4959,7 +4951,7 @@ impl OldSplitRules {
         left_column_var: &'static str,
         right_column_var: &'static str,
         alias_to_cube_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_column_var = var!(left_column_var);
         let right_column_var = var!(right_column_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
@@ -5005,7 +4997,7 @@ impl OldSplitRules {
         right_granularity_var: &'static str,
         out_granularity_var: &'static str,
         is_max: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let left_granularity_var = var!(left_granularity_var);
         let right_granularity_var = var!(right_granularity_var);
         let out_granularity_var = var!(out_granularity_var);
@@ -5043,7 +5035,7 @@ impl OldSplitRules {
         column_var: &'static str,
         alias_var: &'static str,
         is_time_dimension: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
         let fun_expr_var = var!(fun_expr_var);
         let arg_expr_var = var!(arg_expr_var);
@@ -5065,8 +5057,8 @@ impl OldSplitRules {
                                 meta.find_cube_by_column(&alias_to_cube, &column)
                             {
                                 if let Some(dimension) = cube.lookup_dimension(&column.name) {
-                                    if is_time_dimension && dimension._type == "time"
-                                        || !is_time_dimension && dimension._type != "time"
+                                    if is_time_dimension && dimension.r#type == "time"
+                                        || !is_time_dimension && dimension.r#type != "time"
                                     {
                                         if let Some(expr_name) =
                                             original_expr_name(egraph, subst[arg_expr_var])
@@ -5099,7 +5091,7 @@ impl OldSplitRules {
         fun_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         out_expr_var: Option<&'static str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
         let column_var = column_var.map(|column_var| var!(column_var));
         let aggr_expr_var = aggr_expr_var.map(|v| var!(v));
@@ -5235,7 +5227,7 @@ impl OldSplitRules {
         &self,
         alias_to_cube_var: &'static str,
         column_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = var!(column_var);
         let meta = self.meta_context.clone();
@@ -5259,7 +5251,7 @@ impl OldSplitRules {
     fn transform_inner_measure_missing_count(
         &self,
         cube_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_expr_var = var!(cube_expr_var);
         let meta = self.meta_context.clone();
         move |egraph, subst| {
@@ -5290,9 +5282,9 @@ impl OldSplitRules {
         alias_to_cube_var: &'static str,
         column_var: Option<&'static str>,
         original_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
     where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
@@ -5326,9 +5318,9 @@ impl OldSplitRules {
         alias_to_cube_var: &'static str,
         column_var: Option<&'static str>,
         original_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
     where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
@@ -5372,9 +5364,9 @@ impl OldSplitRules {
         output_fun_var: Option<&'static str>,
         distinct_var: Option<&'static str>,
         original_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
     where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
@@ -5436,9 +5428,9 @@ impl OldSplitRules {
         alias_to_cube_var: &'static str,
         column_var: Option<&'static str>,
         original_transform_fn: T,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool
     where
-        T: Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool,
+        T: Fn(&mut CubeEGraph, &mut Subst) -> bool,
     {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = column_var.map(|column_var| var!(column_var));
@@ -5480,7 +5472,7 @@ impl OldSplitRules {
         group_aggregate_cube_var: &'static str,
         new_expr_var: &'static str,
         inner_projection_alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_expr_var = var!(projection_expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_aggregate_cube_var = var!(inner_aggregate_cube_var);
@@ -5615,7 +5607,7 @@ impl OldSplitRules {
         inner_aggregate_cube_expr_var: &'static str,
         outer_projection_cube_expr_var: &'static str,
         projection_alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let projection_expr_var = projection_expr_var.map(|v| var!(v));
         let aggr_expr_var = aggr_expr_var.map(|v| var!(v));
         let group_expr_var = group_expr_var.map(|v| var!(v));
@@ -5672,7 +5664,7 @@ impl OldSplitRules {
         &self,
         granularity_var: &'static str,
         out_granularity_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let granularity_var = var!(granularity_var);
         let out_granularity_var = var!(out_granularity_var);
 
@@ -5702,7 +5694,7 @@ impl OldSplitRules {
         binary_op_var: &'static str,
         literal_expr_var: &'static str,
         is_outer_projection: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let binary_op_var = var!(binary_op_var);
         let literal_expr_var = var!(literal_expr_var);
 
@@ -5800,7 +5792,7 @@ impl OldSplitRules {
         alias_to_cube_var: &'static str,
         inner_aggregate_cube_expr_var: &'static str,
         outer_aggregate_cube_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let aggr_expr_var = var!(aggr_expr_var);
         let group_expr_var = var!(group_expr_var);
@@ -5844,7 +5836,7 @@ impl OldSplitRules {
         &self,
         alias_to_cube_var: &'static str,
         column_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_to_cube_var = var!(alias_to_cube_var);
         let column_var = var!(column_var);
         let meta = self.meta_context.clone();
@@ -5878,7 +5870,7 @@ impl OldSplitRules {
         distinct_var: &'static str,
         allow_count_distinct: bool,
         output_distinct_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
         let fun_expr_var = var!(fun_expr_var);
@@ -5985,7 +5977,7 @@ impl OldSplitRules {
         &self,
         expr_var: &'static str,
         alias_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let alias_var = var!(alias_var);
         move |egraph, subst| {
@@ -6010,7 +6002,7 @@ impl OldSplitRules {
         alias_expr_var: &'static str,
         outer_alias_expr_var: &'static str,
         meta_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
         let arg_var = var!(arg_var);
@@ -6089,7 +6081,7 @@ impl OldSplitRules {
         &self,
         cube_var: &'static str,
         fun_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let fun_expr_var = var!(fun_expr_var);
         let meta = self.meta_context.clone();
@@ -6126,7 +6118,7 @@ impl OldSplitRules {
         original_expr_var: &'static str,
         column_var: Option<&'static str>,
         alias_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let cube_var = var!(cube_var);
         let original_expr_var = var!(original_expr_var);
         let column_var = column_var.map(|v| var!(v));
@@ -6173,7 +6165,7 @@ impl OldSplitRules {
         &self,
         fun_expr_var: &'static str,
         expr_val: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let fun_expr_var = var!(fun_expr_var);
         let expr_val = var!(expr_val);
         move |egraph, subst| {
@@ -6199,7 +6191,7 @@ impl OldSplitRules {
         &self,
         expr_val: &'static str,
         alias_val: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let alias_val = var!(alias_val);
         let expr_val = var!(expr_val);
         move |egraph, subst| {
@@ -6232,7 +6224,7 @@ impl OldSplitRules {
         literal_strings: Vec<&'static str>,
         metas: Vec<&'static str>,
         keys: Vec<&'static str>,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let literal_strings = literal_strings
             .into_iter()
             .map(|l| var!(l))
@@ -6307,7 +6299,7 @@ impl OldSplitRules {
         &self,
         column_var: &'static str,
         meta_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let column_var = var!(column_var);
         let meta_var = var!(meta_var);
         move |egraph, subst| {
@@ -6336,7 +6328,7 @@ impl OldSplitRules {
         inner_expr_var: &'static str,
         data_type_var: &'static str,
         new_expr_var: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_expr_var = var!(inner_expr_var);
@@ -6443,7 +6435,7 @@ impl OldSplitRules {
         data_type_var: &'static str,
         new_expr_var: &'static str,
         is_outer_projection: bool,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let expr_var = var!(expr_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let inner_expr_var = var!(inner_expr_var);
@@ -6539,7 +6531,7 @@ impl OldSplitRules {
         &self,
         interval_var: &'static str,
         granularity: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let interval_var = var!(interval_var);
         move |egraph, subst| {
             if let Some(expected_interval) = utils::granularity_str_to_interval(granularity) {

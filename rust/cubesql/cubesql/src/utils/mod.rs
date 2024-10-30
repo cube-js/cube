@@ -1,6 +1,5 @@
-use crate::compile::rewrite::{analysis::LogicalPlanAnalysis, LogicalPlanLanguage};
+use crate::compile::rewrite::rewriter::CubeEGraph;
 use datafusion::scalar::ScalarValue;
-use egg::EGraph;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,
@@ -38,10 +37,7 @@ impl ShaHasher {
     }
 }
 
-pub fn egraph_hash(
-    egraph: &EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>,
-    params: Option<&HashMap<usize, ScalarValue>>,
-) -> [u8; 32] {
+pub fn egraph_hash(egraph: &CubeEGraph, params: Option<&HashMap<usize, ScalarValue>>) -> [u8; 32] {
     let mut hasher = ShaHasher::new();
     for class in egraph.classes() {
         class.id.hash(&mut hasher);

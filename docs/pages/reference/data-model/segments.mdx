@@ -102,7 +102,7 @@ After defining a segment, you can pass it in [query object][ref-backend-query]:
 
 ## Parameters
 
-### name
+### `name`
 
 The `name` parameter serves as the identifier of a segment. It must be unique
 among all segments, dimensions, and measures within a cube and follow the
@@ -134,7 +134,41 @@ cubes:
 
 </CodeTabs>
 
-### public
+### `description`
+
+This parameter provides a human-readable description of a segment.
+When applicable, it will be displayed in [Playground][ref-playground] and exposed
+to data consumers via [APIs and integrations][ref-apis].
+
+<CodeTabs>
+
+```javascript
+cube(`users`, {
+  // ...
+
+  segments: {
+    sf_users: {
+      sql: `${CUBE}.location = 'San Francisco'`,
+      description: `Users from San Francisco`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: users
+    # ...
+
+    segments:
+      - name: sf_users
+        sql: "{CUBE}.location = 'San Francisco'"
+        description: Users from San Francisco
+```
+
+</CodeTabs>
+
+### `public`
 
 The `public` property is used to manage the visibility of a segment. Valid
 values for `public` are `true` and `false`. When set to `false`, this segment
@@ -164,7 +198,7 @@ cubes:
 
 </CodeTabs>
 
-### sql
+### `sql`
 
 The `sql` parameter defines how a segment would filter out a subset of data. It
 takes any SQL expression that would be valid within a `WHERE` statement.
@@ -301,6 +335,9 @@ cubes:
 
 </CodeTabs>
 
+
 [ref-backend-query]: /product/apis-integrations/rest-api/query-format
 [ref-schema-gen]: /guides/recipes/code-reusability/schema-generation
 [ref-naming]: /product/data-modeling/syntax#naming
+[ref-playground]: /product/workspace/playground
+[ref-apis]: /product/apis-integrations

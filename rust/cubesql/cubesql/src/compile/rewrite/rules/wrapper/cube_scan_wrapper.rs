@@ -1,19 +1,17 @@
 use crate::{
     compile::rewrite::{
-        analysis::LogicalPlanAnalysis, cube_scan, cube_scan_wrapper, rewrite,
-        rules::wrapper::WrapperRules, transforming_rewrite, wrapper_pullup_replacer,
-        CubeScanAliasToCube, CubeScanUngrouped, LogicalPlanLanguage,
-        WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
+        cube_scan, cube_scan_wrapper, rewrite,
+        rewriter::{CubeEGraph, CubeRewrite},
+        rules::wrapper::WrapperRules,
+        transforming_rewrite, wrapper_pullup_replacer, CubeScanAliasToCube, CubeScanUngrouped,
+        LogicalPlanLanguage, WrapperPullupReplacerAliasToCube, WrapperPullupReplacerUngrouped,
     },
     var, var_iter,
 };
-use egg::{EGraph, Rewrite, Subst};
+use egg::Subst;
 
 impl WrapperRules {
-    pub fn cube_scan_wrapper_rules(
-        &self,
-        rules: &mut Vec<Rewrite<LogicalPlanLanguage, LogicalPlanAnalysis>>,
-    ) {
+    pub fn cube_scan_wrapper_rules(&self, rules: &mut Vec<CubeRewrite>) {
         rules.extend(vec![
             transforming_rewrite(
                 "wrapper-cube-scan-wrap",
@@ -82,7 +80,7 @@ impl WrapperRules {
         ungrouped_cube_var: &'static str,
         alias_to_cube_var_out: &'static str,
         ungrouped_cube_var_out: &'static str,
-    ) -> impl Fn(&mut EGraph<LogicalPlanLanguage, LogicalPlanAnalysis>, &mut Subst) -> bool {
+    ) -> impl Fn(&mut CubeEGraph, &mut Subst) -> bool {
         let members_var = var!(members_var);
         let alias_to_cube_var = var!(alias_to_cube_var);
         let ungrouped_cube_var = var!(ungrouped_cube_var);

@@ -26,10 +26,10 @@ jobs:
           # override: true # this is by default on
           rustflags: ""
           components: rustfmt
-      - name: Install Node.js 18.x
+      - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
@@ -42,7 +42,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Yarn install
         uses: nick-fields/retry@v3
         env:
@@ -72,7 +72,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [18]
+        node-version: [20]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
         target: ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
         include:
@@ -107,7 +107,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -151,7 +151,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.target }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
         os-version: ["macos-12"]
         target: ["x86_64-apple-darwin", "aarch64-apple-darwin"]
         python-version: ["3.9", "3.10", "3.11", "3.12", "fallback"]
@@ -200,7 +200,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -239,7 +239,7 @@ jobs:
     name: Build ${{ matrix.os-version }} ${{ matrix.node-version }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [18.x]
+        node-version: [20.x]
         python-version: ["fallback"]
         os-version: [windows-2019]
         include:
@@ -274,7 +274,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
         # We don't need to install all yarn deps to build native
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
@@ -305,7 +305,7 @@ jobs:
           overwrite: true
 
   docker-default:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian docker image
     runs-on: ${{ matrix.os }}
     strategy:
@@ -345,7 +345,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR},${DOCKER_IMAGE}:latest"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR},${DOCKER_IMAGE}:${MAJOR}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:latest"
           fi
 
           {
@@ -381,15 +385,11 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ fromJson(steps.repo.outputs.result).license.spdx_id }}
-          # Workaround for yarn v1, it uses aggressive timeouts with summing time spending on fs, https://github.com/yarnpkg/yarn/issues/4890
-          config-inline: |
-            [worker.oci]
-              max-parallelism = 1
           build-args: |
             IMAGE_VERSION=${{ steps.prep.outputs.version }}
 
   docker-debian-jdk:
-    needs: [npm, cubestore_linux, native_linux]
+    needs: [npm, cubestore_linux, native_linux, detect_branch]
     name: Debian with jdk docker image
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -424,9 +424,13 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk,${DOCKER_IMAGE}:jdk"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}-jdk,${DOCKER_IMAGE}:${MAJOR}-jdk"
           elif [ "${{ github.event_name }}" = "push" ]; then
             TAGS="$TAGS,${DOCKER_IMAGE}:sha-${GITHUB_SHA::8}-jdk"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:jdk"
           fi
 
           {
@@ -468,6 +472,7 @@ jobs:
   docker-cubestore:
     name: Cube Store Docker
     runs-on: ${{ matrix.os }}
+    needs: [detect_branch]
     strategy:
       fail-fast: false
       matrix:
@@ -525,7 +530,11 @@ jobs:
           if [[ $VERSION =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
             MINOR=${VERSION%.*}
             MAJOR=${MINOR%.*}
-            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${{ matrix.tag }}"
+            TAGS="$TAGS,${DOCKER_IMAGE}:${MINOR}${{ matrix.postfix }},${DOCKER_IMAGE}:${MAJOR}${{ matrix.postfix }}"
+          fi
+
+          if [ "${{ needs['detect_branch'].outputs.is_master }}" = "true" ]; then
+            TAGS="$TAGS,${DOCKER_IMAGE}:${{ matrix.tag }}"
           fi
 
           {
@@ -669,6 +678,7 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-12
             executable_name: cubestored
+            # upx has been disabled because it is crashing for macOS Ventura or above! It was disabled on 2024-09-05.
             strip: false
             compress: false
             # bsd tar has a different format with Sparse files which breaks download script
@@ -747,7 +757,7 @@ jobs:
     name: Trigger test suites run
     runs-on: ubuntu-20.04
     needs: [docker-default]
-    timeout-minutes: 60
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -756,12 +766,77 @@ jobs:
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
+            const prUrl = context.payload.pull_request ? context.payload.pull_request.html_url : '';
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+
             await github.rest.actions.createWorkflowDispatch({
               owner: 'cubedevinc',
               repo: 'sql-api-test-suite',
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:latest'
+                'cube-image': 'cubejs/cube:latest',
+                'source-repo': context.repo.repo,
+                'source-pr-url': prUrl,
+                'source-commit-url': commitUrl,
+                'initiator': '${{ github.actor }}'
+              }
+            })
+
+  detect_branch:
+    runs-on: ubuntu-24.04
+    outputs:
+      is_master: ${{ steps.detect_branch.outputs.is_master }}
+      branch: ${{ steps.detect_branch.outputs.branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Detect branch name
+        id: detect_branch
+        env:
+          EVENT_BASE_REF: ${{ github.event.base_ref || 'tag_on_unknown_branch_commit_not_pushed' }}
+        run: |
+          BRANCH=${EVENT_BASE_REF#refs/heads/}
+
+          if [ "$BRANCH" == "tag_on_unknown_branch_commit_not_pushed" ]; then
+            echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
+            exit 1
+          fi
+
+          echo "Detected branch: $BRANCH"
+          IS_MASTER=false
+
+          if [ "$BRANCH" == "master" ]; then
+            IS_MASTER=true
+          fi
+          echo "Detected is_master: $IS_MASTER"
+
+          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+          echo "is_master=$IS_MASTER" >> "$GITHUB_OUTPUT"
+
+  trigger-repo-sync:
+    name: Trigger runtime repo
+    runs-on: ubuntu-20.04
+    needs: [docker-default, detect_branch]
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Trigger runtime
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
+          script: |
+            const tagName = process.env.GITHUB_REF.replace('refs/tags/', '');
+            const branchName = '${{ needs['detect_branch'].outputs.branch }}';
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner: 'cubedevinc',
+              repo: 'cube-runtime',
+              workflow_id: 'sync.yml',
+              ref: 'master',
+              inputs: {
+                'tag': tagName,
+                'branch': branchName,
               }
             })

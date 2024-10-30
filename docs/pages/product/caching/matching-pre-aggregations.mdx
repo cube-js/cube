@@ -28,7 +28,7 @@ Pre-aggregations are tested in the order they are defined in the data model
 file. However, `rollup` pre-aggregations are tested before `original_sql`
 pre-aggregations.
 
-The first pre-aggregation that matches a query is be used.
+The first pre-aggregation that matches a query is used.  
 
 ## Matching algorithm
 
@@ -81,6 +81,11 @@ You can configure a list of time zones that pre-aggregations will be built for
 using the [`scheduled_refresh_time_zones`][ref-conf-scheduled-refresh-time-zones]
 configuration option.
 
+If a query specifies a [custom granularity][ref-custom-granularity] for its time
+dimension, then a matching pre-aggregation with the same custom granularity will
+be used even if there is also an matching pre-aggregation with a default
+granularity (e.g., `day` or `month`).
+
 ### Matching ungrouped queries
 
 There are extra considerations that apply to matching [ungrouped
@@ -124,3 +129,4 @@ configuration option.
 [ref-conf-scheduled-refresh-time-zones]: /reference/configuration/config#scheduled_refresh_time_zones
 [ref-ungrouped-queries]: /product/apis-integrations/queries#ungrouped-query
 [ref-primary-key]: /reference/data-model/dimensions#primary_key
+[ref-custom-granularity]: /reference/data-model/dimensions#granularities

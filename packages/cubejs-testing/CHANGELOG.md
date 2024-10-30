@@ -3,6 +3,218 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+# [1.1.0](https://github.com/cube-js/cube/compare/v1.0.4...v1.1.0) (2024-10-24)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [1.0.4](https://github.com/cube-js/cube/compare/v1.0.3...v1.0.4) (2024-10-23)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [1.0.3](https://github.com/cube-js/cube/compare/v1.0.2...v1.0.3) (2024-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [1.0.1](https://github.com/cube-js/cube/compare/v1.0.0...v1.0.1) (2024-10-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+# [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.11](https://github.com/cube-js/cube/compare/v0.36.10...v0.36.11) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.10](https://github.com/cube-js/cube/compare/v0.36.9...v0.36.10) (2024-10-14)
+
+
+### Features
+
+* New style RBAC framework ([#8766](https://github.com/cube-js/cube/issues/8766)) ([ad81453](https://github.com/cube-js/cube/commit/ad81453757788784c785c7a75202f94a74ab4c26))
+
+
+
+
+
+## [0.36.9](https://github.com/cube-js/cube/compare/v0.36.8...v0.36.9) (2024-10-14)
+
+
+### Bug Fixes
+
+* **cubejs-testing:** Fix TZ env var for snapshots update script ([#8811](https://github.com/cube-js/cube/issues/8811)) ([51d85d3](https://github.com/cube-js/cube/commit/51d85d3bd8d8f1d910ff830f81651c69f15c2b49))
+* Error after renaming post aggregate ([#8805](https://github.com/cube-js/cube/issues/8805)) ([d2773a7](https://github.com/cube-js/cube/commit/d2773a746829458139adf5baad87958baa43b331))
+
+
+
+
+
+## [0.36.8](https://github.com/cube-js/cube/compare/v0.36.7...v0.36.8) (2024-10-11)
+
+
+### Bug Fixes
+
+* Render LIMIT 0 and OFFSET 0 properly in SQL templates ([#8781](https://github.com/cube-js/cube/issues/8781)) ([6b17731](https://github.com/cube-js/cube/commit/6b17731f84aa494de820dce791e3120e4282bc37))
+
+
+### Features
+
+* Renaming of Post Aggregate into Multi Stage ([#8798](https://github.com/cube-js/cube/issues/8798)) ([bd42c44](https://github.com/cube-js/cube/commit/bd42c44c48f571bdf6a5f097854f3a022e85278a))
+
+
+
+
+
+## [0.36.7](https://github.com/cube-js/cube/compare/v0.36.6...v0.36.7) (2024-10-08)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.6](https://github.com/cube-js/cube/compare/v0.36.5...v0.36.6) (2024-10-03)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.5](https://github.com/cube-js/cube/compare/v0.36.4...v0.36.5) (2024-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.4](https://github.com/cube-js/cube/compare/v0.36.3...v0.36.4) (2024-09-27)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.3](https://github.com/cube-js/cube/compare/v0.36.2...v0.36.3) (2024-09-26)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.36.2](https://github.com/cube-js/cube/compare/v0.36.1...v0.36.2) (2024-09-18)
+
+
+### Bug Fixes
+
+* **cubejs-testing:** cypress - fix rollup tests ([#8725](https://github.com/cube-js/cube/issues/8725)) ([23c9cda](https://github.com/cube-js/cube/commit/23c9cda10f7fe8fe642a6f4a28283b31c92e6240))
+
+
+### Features
+
+* **cubejs-playground:** add support for ungrouped and offset options ([#8719](https://github.com/cube-js/cube/issues/8719)) ([7d77b4a](https://github.com/cube-js/cube/commit/7d77b4ad6ce76e0e6d06f23f0cbb74b265b7c299))
+
+
+
+
+
+## [0.36.1](https://github.com/cube-js/cube/compare/v0.36.0...v0.36.1) (2024-09-16)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+# [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+
+* chore!: /v1/run-scheduled-refresh - was removed ([7213ae7](https://github.com/cube-js/cube/commit/7213ae743e026116ac73c4407acba30f318bd050))
+* chore!: Support for Node.js 16 was removed ([8b83021](https://github.com/cube-js/cube/commit/8b830214ab3d16ebfadc65cb9587a08b0496fb93))
+
+
+### Features
+
+* **cubejs-client/playground:** new query builder & new chart prototyping ([#8678](https://github.com/cube-js/cube/issues/8678)) ([6099144](https://github.com/cube-js/cube/commit/609914492d6ca6c4b2be507a2af0eb5e70fdf6de))
+
+
+### BREAKING CHANGES
+
+* Removing this method since Cube is designed and supposed to be run as a cluster, rather than a serverless application, in a production setting. Use the Orchestration API instead
+* Node.js is EOL, it was deprecated in v0.35.0
+
+
+
+
+
+## [0.35.81](https://github.com/cube-js/cube/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+
+### Bug Fixes
+
+* Updated jsonwebtoken in all packages ([#8282](https://github.com/cube-js/cube/issues/8282)) Thanks  [@jlloyd-widen](https://github.com/jlloyd-widen) ! ([ca7c292](https://github.com/cube-js/cube/commit/ca7c292e0122be50ac7adc9b9d4910623d19f840))
+
+
+### Features
+
+* ksql and rollup pre-aggregations ([#8619](https://github.com/cube-js/cube/issues/8619)) ([cdfbd1e](https://github.com/cube-js/cube/commit/cdfbd1e21ffcf111e40c525f8a391cc0dcee3c11))
+
+
+
+
+
+## [0.35.80](https://github.com/cube-js/cube/compare/v0.35.79...v0.35.80) (2024-09-09)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
+## [0.35.79](https://github.com/cube-js/cube/compare/v0.35.78...v0.35.79) (2024-09-04)
+
+**Note:** Version bump only for package @cubejs-backend/testing
+
+
+
+
+
 ## [0.35.78](https://github.com/cube-js/cube/compare/v0.35.77...v0.35.78) (2024-08-27)
 
 **Note:** Version bump only for package @cubejs-backend/testing

@@ -164,7 +164,7 @@ describe('prepareAnnotation helpers', () => {
         type: undefined,
       }
     });
-    
+
     // query timeDimensions
     expect(
       prepareAnnotation([{
@@ -197,6 +197,11 @@ describe('prepareAnnotation helpers', () => {
         shortTitle: undefined,
         title: undefined,
         type: undefined,
+        granularity: {
+          name: 'day',
+          title: 'day',
+          interval: '1 day',
+        }
       },
     });
 

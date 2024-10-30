@@ -84,7 +84,7 @@ jobs:
     name: Build native Linux ${{ matrix.node-version }} ${{ matrix.target }} Python ${{ matrix.python-version }}
     strategy:
       matrix:
-        node-version: [ 18 ]
+        node-version: [ 20 ]
         python-version: [ "fallback" ]
         target: [ "x86_64-unknown-linux-gnu" ]
       fail-fast: false
@@ -109,7 +109,7 @@ jobs:
       - name: Install Yarn
         run: npm install -g yarn
       - name: Set Yarn version
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
       - name: Install cargo-cp-artifact
         run: npm install -g cargo-cp-artifact@0.1
       - uses: Swatinem/rust-cache@v2
@@ -144,6 +144,8 @@ jobs:
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
     runs-on: ubuntu-20.04
     timeout-minutes: 30
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -154,6 +156,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+        if: (env.DOCKERHUB_USERNAME != '')
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
       - name: Download native build
@@ -167,40 +170,79 @@ jobs:
           context: .
           file: ./packages/cubejs-docker/testing-drivers.Dockerfile
           tags: cubejs/cube:testing-drivers
-          push: true
+          push: ${{ (env.DOCKERHUB_USERNAME != '') }}
+      - name: Save Docker image as artifact
+        run: |
+          IMAGE_TAG=cubejs/cube:testing-drivers
+          docker save -o image.tar $IMAGE_TAG
+          gzip image.tar
+        continue-on-error: true
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: image.tar.gz
 
   tests:
     runs-on: ubuntu-20.04
     timeout-minutes: 30
     needs: [latest-tag-sha, build]
     if: (needs['latest-tag-sha'].outputs.sha != github.sha)
+    env:
+      CLOUD_DATABASES: >
+        athena-export-bucket-s3
+        bigquery-export-bucket-gcs
+        clickhouse-export-bucket-s3
+        databricks-jdbc
+        databricks-jdbc-export-bucket-s3
+        databricks-jdbc-export-bucket-azure
+        redshift
+        redshift-export-bucket-s3
+        snowflake
+        snowflake-export-bucket-s3
+        snowflake-export-bucket-azure
+        snowflake-export-bucket-azure-via-storage-integration
+        snowflake-export-bucket-gcs
+      # As per docs:
+      # Secrets cannot be directly referenced in if: conditionals. Instead, consider setting
+      # secrets as job-level environment variables, then referencing the environment variables
+      # to conditionally run steps in the job.
+      DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
     strategy:
       matrix:
         node:
-          - 18.x
+          - 20.x
         database:
-          - athena
-          - bigquery
+          - athena-export-bucket-s3
+          - bigquery-export-bucket-gcs
           - clickhouse
+          - clickhouse-export-bucket-s3
           - databricks-jdbc
-          - databricks-jdbc-export-bucket
+          - databricks-jdbc-export-bucket-s3
+          - databricks-jdbc-export-bucket-azure
           - mssql
           - mysql
           - postgres
+          - redshift
+          - redshift-export-bucket-s3
           - snowflake
+          - snowflake-export-bucket-s3
+          - snowflake-export-bucket-azure
+          - snowflake-export-bucket-azure-via-storage-integration
+          - snowflake-export-bucket-gcs
       fail-fast: false
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Node.js 18.x
+      - name: Install Node.js 20.x
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
+          node-version: 20.x
 
       - name: Configure `yarn`
-        run: yarn policies set-version v1.22.19
+        run: yarn policies set-version v1.22.22
 
       - name: Get yarn cache directory path
         id: yarn-cache-dir-path
@@ -237,7 +279,22 @@ jobs:
           cd packages/cubejs-testing-drivers
           yarn tsc
 
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+
+      - name: Load Docker image into Docker Daemon
+        run: |
+          gunzip image.tar.gz
+          docker load -i image.tar
+
       - name: Run tests
+        uses: nick-fields/retry@v3
+        # It's enough to test for any one secret because they are set all at once or not set all
+        if: |
+          (contains(env.CLOUD_DATABASES, matrix.database) && env.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY != '') ||
+          (!contains(env.CLOUD_DATABASES, matrix.database))
         env:
           # Athena
           DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY: ${{ secrets.DRIVERS_TESTS_ATHENA_CUBEJS_AWS_KEY }}
@@ -246,16 +303,34 @@ jobs:
           # BigQuery
           DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_BQ_CREDENTIALS }}
 
+          #GCS
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_GCS_CREDENTIALS }}
+
+          # Azure
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY }}
+          DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN }}
+
           # Databricks
           DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_URL }}
           DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN }}
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY }}
           DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET }}
 
+          # Redshift
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_HOST }}
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_USER }}
+          DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_REDSHIFT_PASS }}
+
           # Snowflake
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_USER }}
           DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS: ${{ secrets.DRIVERS_TESTS_CUBEJS_DB_SNOWFLAKE_PASS }}
-        run: |
-          cd ./packages/cubejs-testing-drivers
-          export DEBUG=testcontainers
-          yarn ${{ matrix.database }}-full
+        with:
+          max_attempts: 3
+          retry_on: error
+          retry_wait_seconds: 15
+          timeout_minutes: 20
+          command: |
+            cd ./packages/cubejs-testing-drivers
+            export DEBUG=testcontainers
+            yarn ${{ matrix.database }}-full
+

@@ -203,6 +203,7 @@ pub fn sql_tests() -> Vec<(&'static str, TestFn)> {
         t("float_index", float_index),
         t("float_order", float_order),
         t("date_add", date_add),
+        t("date_bin", date_bin),
         t("now", now),
         t("dump", dump),
         t("unsorted_merge_assertion", unsorted_merge_assertion),
@@ -2515,7 +2516,7 @@ async fn create_table_with_location_and_hyperloglog(service: Box<dyn SqlClient>)
         .await
         .unwrap();
     let _ = service
-        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}", 
+        .exec_query(&format!("CREATE TABLE hll.locations (id int, hll hyperloglog, hll_base hyperloglog) LOCATION {}",
             paths
                 .into_iter()
                 .map(|p| format!("'{}'", p.to_string_lossy()))
@@ -2567,7 +2568,7 @@ async fn create_table_with_location_and_hyperloglog_postgress(service: Box<dyn S
         .await
         .unwrap();
     let _ = service
-        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}", 
+        .exec_query(&format!("CREATE TABLE hll.locations_pg (id int, hll HLL_POSTGRES, hll_base HLL_POSTGRES) LOCATION {}",
             paths
                 .into_iter()
                 .map(|p| format!("'{}'", p.to_string_lossy()))
@@ -2622,7 +2623,7 @@ async fn create_table_with_location_and_hyperloglog_space_separated(service: Box
         .await
         .unwrap();
     let _ = service
-        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}", 
+        .exec_query(&format!("CREATE TABLE hll.locations_ssep (id int, hll varbinary, hll_base varbinary) LOCATION {}",
             paths
                 .into_iter()
                 .map(|p| format!("'{}'", p.to_string_lossy()))
@@ -2867,23 +2868,27 @@ async fn physical_plan_flags(service: Box<dyn SqlClient>) {
     // (query, is_optimal)
     let cases = vec![
         ("SELECT SUM(hits) FROM s.Data", true),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", true),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test'", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day > 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE day = 'test'", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND day = 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' AND category = 'test'", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR url = 'test_2'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url = 'test' OR category = 'test'", false),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test' AND category = 'test')", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR url = 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day = 'test_2')", false),
-        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test') OR (url = 'test_1' OR day > 'test_2')", false),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test') OR (url = 'test_2' AND day = 'test_2' AND category = 'test_2')", true),
+        ("SELECT SUM(hits) FROM s.Data WHERE (url = 'test' AND day = 'test' AND category = 'test') OR (url = 'test_2' AND day = 'test_2' AND category > 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url IN ('test_1', 'test_2')", false),
         ("SELECT SUM(hits) FROM s.Data WHERE url IS NOT NULL", false),
         ("SELECT SUM(hits), url FROM s.Data GROUP BY url", true),
         ("SELECT SUM(hits), url, day FROM s.Data GROUP BY url, day", true),
         ("SELECT SUM(hits), day FROM s.Data GROUP BY day", false),
         ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false),
+        ("SELECT SUM(hits), day, category FROM s.Data GROUP BY day, category", false)
     ];
 
     for (query, expected_optimal) in cases {
@@ -5751,6 +5756,180 @@ async fn date_add(service: Box<dyn SqlClient>) {
     );
 }
 
+async fn date_bin(service: Box<dyn SqlClient>) {
+    let check_fn = |interval, source, origin, expected| {
+        let expected = timestamp_from_string(expected).unwrap();
+        let service = &service;
+        async move {
+            let actual = service
+                .exec_query(&format!(
+                    "SELECT DATE_BIN(INTERVAL '{}', CAST('{}' as TIMESTAMP), CAST('{}' as TIMESTAMP))",
+                    interval, source, origin
+                ))
+                .await
+                .unwrap();
+            assert_eq!(to_rows(&actual), rows(&[expected]));
+        }
+    };
+
+    // Common dates
+    check_fn(
+        "1 month",
+        "2024-01-21T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "1 month",
+        "2023-11-21T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2023-11-01T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "1 month",
+        "2024-02-21T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2024-02-01T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2024-04-25T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2024-03-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2024-04-15T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2024-03-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2024-05-25T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2024-05-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2024-05-15T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2024-03-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2023-11-25T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2023-11-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "2 month",
+        "2023-11-15T01:00:00Z",
+        "2024-01-20T01:00:00Z",
+        "2023-09-20T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "10 day",
+        "2024-01-25T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2024-01-21T01:00:00Z",
+    )
+    .await;
+    check_fn(
+        "10 day 2 hour 5 minute 10 second",
+        "2024-01-15T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2024-01-11T03:05:10.000Z",
+    )
+    .await;
+    check_fn(
+        "10 day 2 hour 5 minute 10 second",
+        "2024-01-30T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2024-01-21T05:10:20.000Z",
+    )
+    .await;
+    check_fn(
+        "10 day 2 hour 5 minute 10 second",
+        "2023-12-30T01:00:00Z",
+        "2024-01-01T01:00:00Z",
+        "2023-12-21T22:54:50.000Z",
+    )
+    .await;
+
+    // Nulls
+    let r = service
+        .exec_query(
+            "SELECT DATE_BIN(INTERVAL '1 month', CAST(NULL as timestamp), CAST('2023-12-30T01:00:00Z' AS timestamp))",
+        )
+        .await
+        .unwrap();
+    assert_eq!(to_rows(&r), rows(&[(NULL)]));
+
+    // Invalid number of args
+    service.exec_query("SELECT DATE_BIN(1)").await.unwrap_err();
+    service
+        .exec_query("SELECT DATE_BIN(1, 2)")
+        .await
+        .unwrap_err();
+    service
+        .exec_query("SELECT DATE_BIN(1, 2, 3, 4, 5)")
+        .await
+        .unwrap_err();
+
+    // Invalid types
+    service
+        .exec_query("SELECT DATE_BIN(NULL, CAST('2023-12-30T01:00:00Z' AS timestamp), CAST('2023-12-30T01:00:00Z' AS timestamp))")
+        .await
+        .unwrap_err();
+    service
+        .exec_query(
+            "SELECT DATE_BIN(INTERVAL '1 month', 1, CAST('2023-12-30T01:00:00Z' AS timestamp))",
+        )
+        .await
+        .unwrap_err();
+    service
+        .exec_query(
+            "SELECT DATE_BIN(INTERVAL '1 month', CAST('2023-12-30T01:00:00Z' AS timestamp), true)",
+        )
+        .await
+        .unwrap_err();
+
+    // Columnar data
+    service.exec_query("CREATE SCHEMA s").await.unwrap();
+    service
+        .exec_query("CREATE TABLE s.data(t timestamp)")
+        .await
+        .unwrap();
+    service
+        .exec_query(
+            "INSERT INTO s.data(t) VALUES ('2024-01-21T01:00:00Z'), ('2023-11-21T01:00:00Z'), ('2024-02-21T01:00:00Z'), (NULL)",
+        )
+        .await
+        .unwrap();
+    let r = service
+        .exec_query("SELECT DATE_BIN(INTERVAL '1 month', t, CAST('2024-01-01T01:00:00Z' AS timestamp)) FROM s.data ORDER BY 1")
+        .await
+        .unwrap();
+    assert_eq!(
+        to_rows(&r),
+        rows(&[
+            Some(timestamp_from_string("2023-11-01T01:00:00Z").unwrap()),
+            Some(timestamp_from_string("2024-01-01T01:00:00Z").unwrap()),
+            Some(timestamp_from_string("2024-02-01T01:00:00Z").unwrap()),
+            None,
+        ]),
+    );
+}
+
 async fn unsorted_merge_assertion(service: Box<dyn SqlClient>) {
     service.exec_query("CREATE SCHEMA s").await.unwrap();
     service
@@ -6014,7 +6193,7 @@ async fn unique_key_and_multi_partitions(service: Box<dyn SqlClient>) {
         .exec_query(
             "SELECT a, b FROM (
                     SELECT * FROM test.unique_parts1
-                    UNION ALL 
+                    UNION ALL
                     SELECT * FROM test.unique_parts2
                 ) `tt` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 100",
         )
@@ -6074,7 +6253,7 @@ async fn unique_key_and_multi_partitions_hash_aggregate(service: Box<dyn SqlClie
         .exec_query(
             "SELECT c, sum(val) FROM (
                     SELECT * FROM test.unique_parts1
-                    UNION ALL 
+                    UNION ALL
                     SELECT * FROM test.unique_parts2
                 ) `tt` GROUP BY 1 ORDER BY 1 LIMIT 100",
         )
@@ -6132,7 +6311,7 @@ async fn planning_aggregate_index(service: Box<dyn SqlClient>) {
     service
         .exec_query("CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int, a_merge HYPERLOGLOG)
                      AGGREGATIONS(sum(a_sum), max(a_max), min(a_min), merge(a_merge))
-                     INDEX reg_index (a, b) 
+                     INDEX reg_index (a, b)
                      AGGREGATE INDEX aggr_index (a, b)
                      ")
         .await
@@ -6239,7 +6418,7 @@ async fn aggregate_index(service: Box<dyn SqlClient>) {
         .exec_query(
             "CREATE TABLE s.Orders(a int, b int, c int, a_sum int, a_max int, a_min int)
                      AGGREGATIONS(sum(a_sum), max(a_max), min(a_min))
-                     INDEX reg_index (a, b) 
+                     INDEX reg_index (a, b)
                      AGGREGATE INDEX aggr_index (a, b)
                      ",
         )
@@ -6335,7 +6514,7 @@ async fn aggregate_index_with_hll_bytes(service: Box<dyn SqlClient>) {
         .exec_query(
             "CREATE TABLE s.Orders(a int, b int, hll bytes)
                      AGGREGATIONS(merge(hll))
-                     AGGREGATE INDEX agg_index (a, b) 
+                     AGGREGATE INDEX agg_index (a, b)
                      ",
         )
         .await
@@ -7098,9 +7277,9 @@ async fn limit_pushdown_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT id, SUM(n) FROM (
-                SELECT * FROM foo.pushdown1 
+                SELECT * FROM foo.pushdown1
                 union all
-                SELECT * FROM foo.pushdown2 
+                SELECT * FROM foo.pushdown2
                 ) as `tb` GROUP BY 1 LIMIT 3",
         None,
         false,
@@ -7162,9 +7341,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a `aa`, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
         Some("ind1"),
         true,
@@ -7198,9 +7377,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 LIMIT 3",
         Some("ind1"),
         true,
@@ -7235,9 +7414,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
         Some("ind1"),
         false,
@@ -7270,9 +7449,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1, 2 DESC LIMIT 3",
         Some("ind1"),
         false,
@@ -7305,9 +7484,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC, 2 DESC LIMIT 3",
         Some("ind1"),
         true,
@@ -7340,9 +7519,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2 ORDER BY 1 DESC LIMIT 3",
         Some("ind1"),
         true,
@@ -7376,9 +7555,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, n FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2,3 ORDER BY 1 DESC, 2 DESC, 3 DESC LIMIT 3",
         Some("default"),
         true,
@@ -7412,9 +7591,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT b, SUM(n) FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1 ORDER BY 1 LIMIT 3",
         Some("ind2"),
         true,
@@ -7436,9 +7615,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, n FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 1, 2, 3 ORDER BY 1, 2 LIMIT 3",
         Some("default"),
         true,
@@ -7470,9 +7649,9 @@ async fn limit_pushdown_group_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, n FROM (
-                SELECT * FROM foo.pushdown_group1 
+                SELECT * FROM foo.pushdown_group1
                 union all
-                SELECT * FROM foo.pushdown_group2 
+                SELECT * FROM foo.pushdown_group2
                 ) as `tb` GROUP BY 3, 1, 2 ORDER BY 1, 2 LIMIT 3",
         Some("default"),
         true,
@@ -7546,10 +7725,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(c) FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
         Some("ind1"),
@@ -7583,10 +7762,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(c) FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 GROUP BY 1, 2 ORDER BY 2 DESC LIMIT 3",
         Some("ind1"),
@@ -7620,10 +7799,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE b = 18
                 GROUP BY a, b, c ORDER BY a, c LIMIT 3",
         Some("ind1"),
@@ -7645,10 +7824,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE b = 18
                 GROUP BY a, b, c ORDER BY a DESC, c LIMIT 3",
         Some("ind1"),
@@ -7670,10 +7849,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE b = 18
                 GROUP BY a, b, c ORDER BY a DESC, c DESC LIMIT 3",
         Some("ind1"),
@@ -7696,10 +7875,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 11 and b = 18
                 GROUP BY a, b, c ORDER BY c LIMIT 3",
         Some("ind1"),
@@ -7720,10 +7899,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 11 and b = 18
                 GROUP BY a, b, c ORDER BY c DESC LIMIT 3",
         Some("ind1"),
@@ -7744,10 +7923,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 11 and b = 18
                 GROUP BY b, a, c ORDER BY c LIMIT 3",
         Some("ind1"),
@@ -7769,10 +7948,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a >= 11 and a < 12 and b = 18
                 GROUP BY a, b, c ORDER BY c LIMIT 3",
         Some("ind1"),
@@ -7794,10 +7973,10 @@ async fn limit_pushdown_group_where_order(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT b FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE c = 11
                 GROUP BY b, c ORDER BY b LIMIT 3",
         Some("ind2"),
@@ -7855,10 +8034,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 ORDER BY 2 LIMIT 4",
         Some("ind1"),
@@ -7898,10 +8077,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 3 LIMIT 3",
         Some("ind2"),
         true,
@@ -7935,10 +8114,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 3 DESC LIMIT 3",
         Some("ind2"),
         true,
@@ -7972,10 +8151,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 1, 2 LIMIT 3",
         Some("ind1"),
         true,
@@ -8008,10 +8187,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 1, 2 LIMIT 2 OFFSET 1",
         Some("ind1"),
         true,
@@ -8039,10 +8218,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE b = 20
                 ORDER BY 1 LIMIT 3",
         Some("ind1"),
@@ -8071,10 +8250,10 @@ async fn limit_pushdown_without_group(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE b = 20
                 ORDER BY 1, 3 LIMIT 3",
         Some("ind1"),
@@ -8145,10 +8324,10 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 ORDER BY 2 desc LIMIT 4",
         Some("ind1"),
@@ -8188,10 +8367,10 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a aaa, b bbbb, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 1 desc, 2 desc LIMIT 3",
         Some("ind1"),
         true,
@@ -8225,10 +8404,10 @@ async fn limit_pushdown_without_group_resort(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 2 LIMIT 2",
         Some("ind1"),
         false,
@@ -8298,10 +8477,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 ORDER BY 2 LIMIT 4",
         Some("ind1"),
@@ -8336,10 +8515,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 ORDER BY 3 LIMIT 3",
         Some("ind1"),
         false,
@@ -8372,10 +8551,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT c FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 11 and b = 18
                 GROUP BY b, a, c ORDER BY c LIMIT 3",
         Some("ind1"),
@@ -8390,10 +8569,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(c) FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 WHERE a = 12
                 GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
         Some("ind1"),
@@ -8428,10 +8607,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(c) FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 GROUP BY 1, 2 ORDER BY 2 LIMIT 3",
         Some("ind1"),
         false,
@@ -8464,10 +8643,10 @@ async fn limit_pushdown_unique_key(service: Box<dyn SqlClient>) {
     let res = assert_limit_pushdown(
         &service,
         "SELECT a, b, SUM(c) FROM (
-                SELECT * FROM foo.pushdown_where_group1 
+                SELECT * FROM foo.pushdown_where_group1
                 union all
-                SELECT * FROM foo.pushdown_where_group2 
-                ) as `tb` 
+                SELECT * FROM foo.pushdown_where_group2
+                ) as `tb`
                 GROUP BY 1, 2 ORDER BY 1 LIMIT 3",
         Some("ind1"),
         true,

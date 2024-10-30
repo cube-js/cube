@@ -3,6 +3,81 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.3](https://github.com/cube-js/cube/compare/v1.0.2...v1.0.3) (2024-10-22)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [1.0.2](https://github.com/cube-js/cube/compare/v1.0.1...v1.0.2) (2024-10-21)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+# [1.0.0](https://github.com/cube-js/cube/compare/v0.36.11...v1.0.0) (2024-10-15)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.36.11](https://github.com/cube-js/cube/compare/v0.36.10...v0.36.11) (2024-10-14)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.36.8](https://github.com/cube-js/cube/compare/v0.36.7...v0.36.8) (2024-10-11)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+## [0.36.5](https://github.com/cube-js/cube/compare/v0.36.4...v0.36.5) (2024-10-02)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
+# [0.36.0](https://github.com/cube-js/cube/compare/v0.35.81...v0.36.0) (2024-09-13)
+
+
+* chore!: Support for Node.js 16 was removed ([8b83021](https://github.com/cube-js/cube/commit/8b830214ab3d16ebfadc65cb9587a08b0496fb93))
+
+
+### Features
+
+* **databricks-jdbc-driver:** Support Java higher then 11 ([03c278d](https://github.com/cube-js/cube/commit/03c278db81a1bbf3363192aeec50993f2fcf8a5b))
+
+
+### BREAKING CHANGES
+
+* Node.js is EOL, it was deprecated in v0.35.0
+
+
+
+
+
+## [0.35.81](https://github.com/cube-js/cube/compare/v0.35.80...v0.35.81) (2024-09-12)
+
+**Note:** Version bump only for package @cubejs-backend/jdbc-driver
+
+
+
+
+
 ## [0.35.67](https://github.com/cube-js/cube/compare/v0.35.66...v0.35.67) (2024-08-07)
 
 **Note:** Version bump only for package @cubejs-backend/jdbc-driver

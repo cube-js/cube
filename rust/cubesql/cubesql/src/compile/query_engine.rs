@@ -17,7 +17,7 @@ use crate::{
             analysis::LogicalPlanAnalysis,
             converter::{LogicalPlanToLanguageContext, LogicalPlanToLanguageConverter},
         },
-        CompilationError, CompilationResult, DatabaseProtocol, QueryPlan, Rewriter, StatusFlags,
+        CompilationError, CompilationResult, DatabaseProtocol, QueryPlan, Rewriter,
     },
     config::ConfigObj,
     sql::{
@@ -46,7 +46,11 @@ use datafusion::{
 
 #[async_trait::async_trait]
 pub trait QueryEngine {
+    /// Custom type for AST statement type, It allows to use any parsers for SQL
     type AstStatementType: std::fmt::Display + Send;
+
+    /// Additional metadata for results of plan method instead of extending query plan
+    type PlanMetadataType: std::fmt::Debug + Send;
 
     fn compiler_cache_ref(&self) -> &Arc<dyn CompilerCache>;
 
@@ -70,7 +74,7 @@ pub trait QueryEngine {
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
-    ) -> Result<LogicalPlan, DataFusionError>;
+    ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError>;
 
     fn sanitize_statement(&self, stmt: &Self::AstStatementType) -> Self::AstStatementType;
 
@@ -81,11 +85,11 @@ pub trait QueryEngine {
         span_id: Option<Arc<SpanId>>,
         meta: Arc<MetaContext>,
         state: Arc<SessionState>,
-    ) -> CompilationResult<QueryPlan> {
+    ) -> CompilationResult<(QueryPlan, Self::PlanMetadataType)> {
         let ctx = self.create_session_ctx(state.clone())?;
         let cube_ctx = self.create_cube_ctx(state.clone(), meta.clone(), ctx.clone())?;
 
-        let plan = self.create_logical_plan(&cube_ctx, &stmt).map_err(|err| {
+        let (plan, metadata) = self.create_logical_plan(&cube_ctx, &stmt).map_err(|err| {
             let message = format!("Initial planning error: {}", err,);
             let meta = Some(HashMap::from([
                 ("query".to_string(), stmt.to_string()),
@@ -186,7 +190,13 @@ pub trait QueryEngine {
         let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
 
         let result = rewriter
-            .find_best_plan(root, state.auth_context().unwrap(), qtrace, span_id.clone())
+            .find_best_plan(
+                root,
+                state.auth_context().unwrap(),
+                qtrace,
+                span_id.clone(),
+                self.config_ref().top_down_extractor(),
+            )
             .await
             .map_err(|e| match e.cause {
                 CubeErrorCauseType::Internal(_) => CompilationError::Internal(
@@ -249,11 +259,7 @@ pub trait QueryEngine {
             qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
         }
 
-        Ok(QueryPlan::DataFusionSelect(
-            StatusFlags::empty(),
-            rewrite_plan,
-            ctx,
-        ))
+        Ok((QueryPlan::DataFusionSelect(rewrite_plan, ctx), metadata))
     }
 
     fn evaluate_wrapped_sql(
@@ -307,6 +313,8 @@ impl SqlQueryEngine {
 #[async_trait::async_trait]
 impl QueryEngine for SqlQueryEngine {
     type AstStatementType = sqlparser::ast::Statement;
+
+    type PlanMetadataType = ();
 
     fn create_cube_ctx(
         &self,
@@ -366,7 +374,7 @@ impl QueryEngine for SqlQueryEngine {
             ctx.register_udf(create_user_udf(state.clone()));
         } else if state.protocol == DatabaseProtocol::PostgreSQL {
             ctx.register_udf(create_version_udf(
-                "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
+                "PostgreSQL 14.2 on x86_64-cubesql".to_string(),
             ));
             ctx.register_udf(create_db_udf("current_database".to_string(), state.clone()));
             ctx.register_udf(create_db_udf("current_schema".to_string(), state.clone()));
@@ -432,6 +440,7 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_pg_get_serial_sequence_udf());
         ctx.register_udf(create_json_build_object_udf());
         ctx.register_udf(create_regexp_substr_udf());
+        ctx.register_udf(create_regexp_instr_udf());
         ctx.register_udf(create_ends_with_udf());
         ctx.register_udf(create_position_udf());
         ctx.register_udf(create_date_to_timestamp_udf());
@@ -469,12 +478,12 @@ impl QueryEngine for SqlQueryEngine {
         &self,
         cube_ctx: &CubeContext,
         stmt: &Self::AstStatementType,
-    ) -> Result<LogicalPlan, DataFusionError> {
+    ) -> Result<(LogicalPlan, Self::PlanMetadataType), DataFusionError> {
         let df_query_planner = SqlToRel::new_with_options(cube_ctx, true);
         let plan =
-            df_query_planner.statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())));
+            df_query_planner.statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))?;
 
-        plan
+        Ok((plan, ()))
     }
 
     fn compiler_cache_ref(&self) -> &Arc<dyn CompilerCache> {

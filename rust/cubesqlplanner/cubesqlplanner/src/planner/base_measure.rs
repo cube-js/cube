@@ -1,58 +1,214 @@
-use crate::cube_bridge::evaluator::CubeEvaluator;
-use crate::planner::utils::escape_column_name;
+use super::query_tools::QueryTools;
+use super::sql_evaluator::{EvaluationNode, MemberSymbol, MemberSymbolType};
+use super::{evaluate_with_context, BaseMember, VisitorContext};
+use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use cubenativeutils::CubeError;
+use lazy_static::lazy_static;
+use regex::Regex;
 use std::rc::Rc;
+
+#[derive(Clone, Debug)]
+pub struct MeasureTimeShift {
+    pub interval: String,
+    pub time_dimension: String,
+}
+
+lazy_static! {
+    static ref INTERVAL_MATCH_RE: Regex =
+        Regex::new(r"^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$").unwrap();
+}
+impl MeasureTimeShift {
+    pub fn try_from_reference(reference: &TimeShiftReference) -> Result<Self, CubeError> {
+        let parsed_interval =
+            if let Some(captures) = INTERVAL_MATCH_RE.captures(&reference.interval) {
+                let duration = if let Some(duration) = captures.get(1) {
+                    duration.as_str().parse::<i64>().ok()
+                } else {
+                    None
+                };
+                let granularity = if let Some(granularity) = captures.get(2) {
+                    Some(granularity.as_str().to_owned())
+                } else {
+                    None
+                };
+                if let Some((duration, granularity)) = duration.zip(granularity) {
+                    Some((duration, granularity))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+        if let Some((duration, granularity)) = parsed_interval {
+            let duration = if reference.shift_type.as_ref().unwrap_or(&format!("prior")) == "next" {
+                duration * (-1)
+            } else {
+                duration
+            };
+
+            Ok(Self {
+                interval: format!("{duration} {granularity}"),
+                time_dimension: reference.time_dimension.clone(),
+            })
+        } else {
+            Err(CubeError::user(format!(
+                "Invalid interval: {}",
+                reference.interval
+            )))
+        }
+    }
+}
 
 pub struct BaseMeasure {
     measure: String,
-    cube_evaluator: Rc<dyn CubeEvaluator>,
+    query_tools: Rc<QueryTools>,
+    member_evaluator: Rc<EvaluationNode>,
+    definition: Rc<dyn MeasureDefinition>,
+    time_shifts: Vec<MeasureTimeShift>,
+    cube_name: String,
+}
+
+impl BaseMember for BaseMeasure {
+    fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+        let sql = evaluate_with_context(&self.member_evaluator, self.query_tools.clone(), context)?;
+        let alias_name = self.alias_name();
+
+        Ok(format!("{} {}", sql, alias_name))
+    }
+
+    fn alias_name(&self) -> String {
+        self.query_tools
+            .escape_column_name(&self.unescaped_alias_name())
+    }
+
+    fn member_evaluator(&self) -> Rc<EvaluationNode> {
+        self.member_evaluator.clone()
+    }
+
+    fn as_base_member(self: Rc<Self>) -> Rc<dyn BaseMember> {
+        self.clone()
+    }
 }
 
 impl BaseMeasure {
-    pub fn new(measure: String, cube_evaluator: Rc<dyn CubeEvaluator>) -> Rc<Self> {
-        Rc::new(Self {
-            measure,
-            cube_evaluator,
-        })
-    }
-
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        self.sql()
-    }
-
-    fn sql(&self) -> Result<String, CubeError> {
-        /* let primary_keys = self.cube_evaluator.static_data().primary_keys.get()
-        self.measure.clone() */
-        let path = self.path()?;
-        let cube_name = &path[0];
-        let primary_keys = self
-            .cube_evaluator
+    pub fn try_new(
+        measure: String,
+        query_tools: Rc<QueryTools>,
+        member_evaluator: Rc<EvaluationNode>,
+    ) -> Result<Rc<Self>, CubeError> {
+        let cube_name = query_tools
+            .cube_evaluator()
+            .cube_from_path(measure.clone())?
             .static_data()
-            .primary_keys
-            .get(cube_name)
-            .unwrap();
-        let primary_key = primary_keys.first().unwrap();
-        let pk_sql = self.primary_key_sql(primary_key, cube_name)?;
+            .name
+            .clone();
+        let definition = match member_evaluator.symbol() {
+            MemberSymbolType::Measure(m) => Ok(m.definition().clone()),
+            _ => Err(CubeError::internal(format!(
+                "wrong type of member_evaluator for measure: {}",
+                measure
+            ))),
+        }?;
 
-        let measure_definition = self.cube_evaluator.measure_by_path(self.measure.clone())?;
-
-        let measure_type = &measure_definition.static_data().measure_type;
-        let alias_name = escape_column_name(&self.alias_name()?);
-
-        Ok(format!("{}({}) {}", measure_type, pk_sql, alias_name))
+        let time_shifts = Self::parse_time_shifts(&definition)?;
+        Ok(Rc::new(Self {
+            measure,
+            query_tools,
+            definition,
+            member_evaluator,
+            cube_name,
+            time_shifts,
+        }))
     }
 
-    fn path(&self) -> Result<Vec<String>, CubeError> {
-        self.cube_evaluator
-            .parse_path("measures".to_string(), self.measure.clone())
+    pub fn try_new_from_precompiled(
+        evaluation_node: Rc<EvaluationNode>,
+        query_tools: Rc<QueryTools>,
+    ) -> Result<Option<Rc<Self>>, CubeError> {
+        let res = match evaluation_node.symbol() {
+            MemberSymbolType::Measure(s) => {
+                let time_shifts = Self::parse_time_shifts(&s.definition())?;
+                Some(Rc::new(Self {
+                    measure: s.full_name(),
+                    query_tools: query_tools.clone(),
+                    member_evaluator: evaluation_node.clone(),
+                    definition: s.definition().clone(),
+                    cube_name: s.cube_name().clone(),
+                    time_shifts,
+                }))
+            }
+            _ => None,
+        };
+        Ok(res)
     }
 
-    //FIXME should be moved out from here
-    fn primary_key_sql(&self, key_name: &String, cube_name: &String) -> Result<String, CubeError> {
-        Ok(format!("{}.{}", escape_column_name(&cube_name), key_name))
+    fn parse_time_shifts(
+        definition: &Rc<dyn MeasureDefinition>,
+    ) -> Result<Vec<MeasureTimeShift>, CubeError> {
+        if let Some(time_shifts) = &definition.static_data().time_shift_references {
+            time_shifts
+                .iter()
+                .map(|t| MeasureTimeShift::try_from_reference(t))
+                .collect::<Result<Vec<_>, _>>()
+        } else {
+            Ok(vec![])
+        }
     }
 
-    fn alias_name(&self) -> Result<String, CubeError> {
-        Ok(self.measure.replace(".", "__"))
+    pub fn member_evaluator(&self) -> &Rc<EvaluationNode> {
+        &self.member_evaluator
+    }
+
+    pub fn measure(&self) -> &String {
+        &self.measure
+    }
+
+    pub fn cube_name(&self) -> &String {
+        &self.cube_name
+    }
+
+    pub fn reduce_by(&self) -> &Option<Vec<String>> {
+        &self.definition.static_data().reduce_by_references
+    }
+
+    pub fn add_group_by(&self) -> &Option<Vec<String>> {
+        &self.definition.static_data().add_group_by_references
+    }
+
+    pub fn group_by(&self) -> &Option<Vec<String>> {
+        &self.definition.static_data().group_by_references
+    }
+
+    //FIXME dublicate with symbol
+    pub fn is_calculated(&self) -> bool {
+        match self.definition.static_data().measure_type.as_str() {
+            "number" | "string" | "time" | "boolean" => true,
+            _ => false,
+        }
+    }
+
+    pub fn time_shift_references(&self) -> &Option<Vec<TimeShiftReference>> {
+        &self.definition.static_data().time_shift_references
+    }
+
+    pub fn time_shifts(&self) -> &Vec<MeasureTimeShift> {
+        &self.time_shifts
+    }
+
+    pub fn is_multi_stage(&self) -> bool {
+        self.definition.static_data().multi_stage.unwrap_or(false)
+    }
+
+    //FIXME dublicate with symbol
+    pub fn measure_type(&self) -> &String {
+        &self.definition.static_data().measure_type
+    }
+
+    pub fn is_multi_stage_ungroupped(&self) -> bool {
+        self.is_calculated() || self.definition.static_data().measure_type == "rank"
+    }
+
+    fn unescaped_alias_name(&self) -> String {
+        self.query_tools.alias_name(&self.measure)
     }
 }

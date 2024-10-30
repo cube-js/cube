@@ -17,17 +17,17 @@ import { CubejsServerCore } from '../../src/core/server';
 import { CreateOptions, SystemOptions } from '../../src/core/types';
 
 class CubejsServerCoreExposed extends CubejsServerCore {
-  public options: ServerCoreInitializedOptions;
+  public declare options: ServerCoreInitializedOptions;
 
-  public optsHandler: OptsHandler;
+  public declare optsHandler: OptsHandler;
 
-  public contextToDbType: DbTypeAsyncFn;
+  public declare contextToDbType: DbTypeAsyncFn;
 
-  public contextToExternalDbType: ExternalDbTypeFn;
+  public declare contextToExternalDbType: ExternalDbTypeFn;
 
-  public apiGateway = super.apiGateway;
+  public declare apiGateway;
 
-  public reloadEnvVariables = super.reloadEnvVariables;
+  public declare reloadEnvVariables;
 
   public constructor(
     opts: CreateOptions = {},
@@ -46,6 +46,7 @@ class CubejsServerCoreExposed extends CubejsServerCore {
 let message: string;
 
 const conf = {
+  apiSecret: 'testApiSecretToSuppressWarning',
   logger: (msg: string) => {
     message = msg;
   },
@@ -53,11 +54,7 @@ const conf = {
   externalDriverFactory: async () => <OriginalBaseDriver>({
     testConnection: async () => undefined,
   }),
-  orchestratorOptions: () => ({
-    redisPoolOptions: {
-      createClient: async () => undefined
-    },
-  }),
+  orchestratorOptions: () => ({}),
 };
 
 describe('OptsHandler class', () => {
@@ -82,85 +79,91 @@ describe('OptsHandler class', () => {
   test('must handle vanila CreateOptions', async () => {
     process.env.CUBEJS_DB_TYPE = 'postgres';
 
-    let core;
-
     // Case 1
-    core = new CubejsServerCoreExposed({
-      ...conf,
-      dbType: undefined,
-      driverFactory: undefined,
-    });
+    {
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: undefined,
+        driverFactory: undefined,
+      });
 
-    expect(core.options.dbType).toBeDefined();
-    expect(typeof core.options.dbType).toEqual('function');
-    expect(await core.options.dbType({} as DriverContext))
-      .toEqual(process.env.CUBEJS_DB_TYPE);
+      expect(core.options.dbType).toBeDefined();
+      expect(typeof core.options.dbType).toEqual('function');
+      expect(await core.options.dbType({} as DriverContext))
+        .toEqual(process.env.CUBEJS_DB_TYPE);
 
-    expect(core.options.driverFactory).toBeDefined();
-    expect(typeof core.options.driverFactory).toEqual('function');
-    expect(await core.options.driverFactory({} as DriverContext)).toEqual({
-      type: process.env.CUBEJS_DB_TYPE,
-    });
+      expect(core.options.driverFactory).toBeDefined();
+      expect(typeof core.options.driverFactory).toEqual('function');
+      expect(await core.options.driverFactory({} as DriverContext)).toEqual({
+        type: process.env.CUBEJS_DB_TYPE,
+      });
+    }
 
     // Case 2
-    core = new CubejsServerCoreExposed({
-      ...conf,
-      dbType: 'postgres',
-      driverFactory: () => CubejsServerCore.createDriver('postgres'),
-    });
+    {
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: 'postgres',
+        driverFactory: () => CubejsServerCore.createDriver('postgres'),
+      });
 
-    expect(core.options.dbType).toBeDefined();
-    expect(typeof core.options.dbType).toEqual('function');
-    expect(await core.options.dbType({} as DriverContext))
-      .toEqual(process.env.CUBEJS_DB_TYPE);
+      expect(core.options.dbType).toBeDefined();
+      expect(typeof core.options.dbType).toEqual('function');
+      expect(await core.options.dbType({} as DriverContext))
+        .toEqual(process.env.CUBEJS_DB_TYPE);
 
-    expect(core.options.driverFactory).toBeDefined();
-    expect(typeof core.options.driverFactory).toEqual('function');
-    expect(
-      JSON.stringify(await core.options.driverFactory({} as DriverContext)),
-    ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
-    );
+      expect(core.options.driverFactory).toBeDefined();
+      expect(typeof core.options.driverFactory).toEqual('function');
+      expect(
+        JSON.stringify(await core.options.driverFactory({} as DriverContext)),
+      ).toEqual(
+        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      );
+    }
 
     // Case 3
-    core = new CubejsServerCoreExposed({
-      ...conf,
-      dbType: () => 'postgres',
-      driverFactory: () => CubejsServerCore.createDriver('postgres'),
-    });
+    {
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: () => 'postgres',
+        driverFactory: () => CubejsServerCore.createDriver('postgres'),
+      });
 
-    expect(core.options.dbType).toBeDefined();
-    expect(typeof core.options.dbType).toEqual('function');
-    expect(await core.options.dbType({} as DriverContext))
-      .toEqual(process.env.CUBEJS_DB_TYPE);
+      expect(core.options.dbType).toBeDefined();
+      expect(typeof core.options.dbType).toEqual('function');
+      expect(await core.options.dbType({} as DriverContext))
+        .toEqual(process.env.CUBEJS_DB_TYPE);
 
-    expect(core.options.driverFactory).toBeDefined();
-    expect(typeof core.options.driverFactory).toEqual('function');
-    expect(
-      JSON.stringify(await core.options.driverFactory({} as DriverContext)),
-    ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
-    );
+      expect(core.options.driverFactory).toBeDefined();
+      expect(typeof core.options.driverFactory).toEqual('function');
+      expect(
+        JSON.stringify(await core.options.driverFactory({} as DriverContext)),
+      ).toEqual(
+        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      );
+    }
 
     // Case 4
-    core = new CubejsServerCoreExposed({
-      ...conf,
-      dbType: () => 'postgres',
-      driverFactory: async () => CubejsServerCore.createDriver('postgres'),
-    });
+    {
+      const core = new CubejsServerCoreExposed({
+        ...conf,
+        dbType: () => 'postgres',
+        driverFactory: async () => CubejsServerCore.createDriver('postgres'),
+      });
 
-    expect(core.options.dbType).toBeDefined();
-    expect(typeof core.options.dbType).toEqual('function');
-    expect(await core.options.dbType({} as DriverContext))
-      .toEqual(process.env.CUBEJS_DB_TYPE);
+      expect(core.options.dbType).toBeDefined();
+      expect(typeof core.options.dbType).toEqual('function');
+      expect(await core.options.dbType({} as DriverContext))
+        .toEqual(process.env.CUBEJS_DB_TYPE);
 
-    expect(core.options.driverFactory).toBeDefined();
-    expect(typeof core.options.driverFactory).toEqual('function');
-    expect(
-      JSON.stringify(await core.options.driverFactory({} as DriverContext)),
-    ).toEqual(
-      JSON.stringify(CubejsServerCore.createDriver('postgres')),
-    );
+      expect(core.options.driverFactory).toBeDefined();
+      expect(typeof core.options.driverFactory).toEqual('function');
+      expect(
+        JSON.stringify(await core.options.driverFactory({} as DriverContext)),
+      ).toEqual(
+        JSON.stringify(CubejsServerCore.createDriver('postgres')),
+      );
+    }
   });
 
   test('must handle valid CreateOptions', async () => {
@@ -328,6 +331,7 @@ describe('OptsHandler class', () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       core = new CubejsServerCoreExposed({
         ...conf,
+        apiSecret: undefined,
         dbType: undefined,
         driverFactory: undefined,
       });
@@ -789,7 +793,7 @@ describe('OptsHandler class', () => {
     });
     opts = (<any> await core.getOrchestratorApi(<RequestContext>{})).options;
     driver = <any>(await core.resolveDriver(<DriverContext>{}));
-    
+
     expect(driver.pool.options.max).toEqual(8);
     expect(driver.testConnectionTimeout()).toEqual(testConnectionTimeout);
 
@@ -1020,9 +1024,6 @@ describe('OptsHandler class', () => {
           database: 'database',
         }),
         orchestratorOptions: () => ({
-          redisPoolOptions: {
-            createClient: async () => undefined
-          },
           preAggregationsOptions: {
             externalRefresh: true,
           },

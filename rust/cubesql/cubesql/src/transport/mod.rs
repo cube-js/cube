@@ -4,6 +4,7 @@ pub(crate) mod service;
 
 // Re-export types to minimise version maintenance for crate users such as cloud
 pub type CubeMeta = cubeclient::models::V1CubeMeta;
+pub type CubeMetaType = cubeclient::models::V1CubeMetaType;
 pub type CubeMetaDimension = cubeclient::models::V1CubeMetaDimension;
 pub type CubeMetaMeasure = cubeclient::models::V1CubeMetaMeasure;
 pub type CubeMetaSegment = cubeclient::models::V1CubeMetaSegment;
