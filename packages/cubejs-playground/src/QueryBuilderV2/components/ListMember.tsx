@@ -11,7 +11,7 @@ import {
 import { TCubeMeasure, TCubeDimension, TCubeSegment, Cube, MemberType } from '@cubejs-client/core';
 import { PlusOutlined } from '@ant-design/icons';
 
-import { getTypeIcon } from '../utils';
+import { getTypeIcon, titleize } from '../utils';
 import { PrimaryKeyIcon } from '../icons/PrimaryKeyIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
@@ -60,6 +60,8 @@ export function ListMember(props: ListMemberProps) {
   const description = member.description;
 
   const hasOverflow = useHasOverflow(textRef);
+  const isAutoTitle = titleize(member.name) === title;
+
   const button = (
     <ListMemberWrapper>
       <ListMemberButton
@@ -122,11 +124,15 @@ export function ListMember(props: ListMemberProps) {
     </ListMemberWrapper>
   );
 
-  return hasOverflow ? (
+  return hasOverflow || !isAutoTitle ? (
     <TooltipProvider
       title={
         <>
-          <b>{name}</b>
+          <Text preset="t4">
+            <b>{name}</b>
+          </Text>
+          <br />
+          <Text preset="t4">{title}</Text>
         </>
       }
       delay={1000}

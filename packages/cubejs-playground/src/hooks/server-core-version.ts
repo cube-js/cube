@@ -4,18 +4,25 @@ export function useServerCoreVersionGte(version: string): boolean {
   const { serverCoreVersion = '', coreServerVersion = '' } =
     usePlaygroundContext();
 
-  let gt = false;
+  const coreVersion = serverCoreVersion || coreServerVersion;
 
-  try {
-    const [, m, p] = (serverCoreVersion || coreServerVersion)
-      .split('.')
-      .map(Number);
-    const [, m1, p1] = version.split('.').map(Number);
+  if (coreVersion) {
+    let gt = false;
 
-    gt = m > m1 || (m === m1 && p >= p1);
-  } catch (_) {
-    //
+    try {
+      const [major, minor, patch] = coreVersion.split('.').map(Number);
+      const [major1, minor1, patch1] = version.split('.').map(Number);
+
+      gt =
+        major > major1 ||
+        (major === major1 && minor > minor1) ||
+        (major === major1 && minor === minor1 && patch >= patch1);
+    } catch (_) {
+      //
+    }
+
+    return gt;
   }
 
-  return gt;
+  return true;
 }

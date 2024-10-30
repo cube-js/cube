@@ -16,6 +16,7 @@ import { ArrowIcon } from '../icons/ArrowIcon';
 import { NonPublicIcon } from '../icons/NonPublicIcon';
 import { ItemInfoIcon } from '../icons/ItemInfoIcon';
 import { useHasOverflow, useFilteredMembers } from '../hooks';
+import { titleize } from '../utils/index';
 
 import { ListMember } from './ListMember';
 import { TimeListMember } from './TimeListMember';
@@ -366,6 +367,7 @@ export function SidePanelCubeItem({
   }, [segments.join(','), query?.segments?.join(','), showMembers, mode, meta]);
 
   const hasOverflow = useHasOverflow(textRef);
+  const isAutoTitle = titleize(name) === title;
 
   const noVisibleMembers = !dimensions.length && !measures.length && !segments.length;
 
@@ -468,12 +470,16 @@ export function SidePanelCubeItem({
   return (
     <Space flow="column" gap="0">
       <CubeWrapper>
-        {hasOverflow ? (
+        {hasOverflow || !isAutoTitle ? (
           <TooltipProvider
             delay={1000}
             title={
               <>
-                <b>{name}</b>
+                <Text preset="t4">
+                  <b>{name}</b>
+                </Text>
+                <br />
+                <Text preset="t4">{title}</Text>
               </>
             }
             placement="right"

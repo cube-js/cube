@@ -1,6 +1,4 @@
 import Icon, { ThunderboltFilled } from '@ant-design/icons';
-import { Query } from '@cubejs-client/core';
-import { AvailableMembers } from '@cubejs-client/react';
 import { Alert, Button, Space, Typography } from 'antd';
 import styled from 'styled-components';
 

@@ -2134,7 +2134,7 @@ impl MetaStore for RocksMetaStore {
             } else {
                 None
             };
-            let aggregate_column_indices = if let Some(aggrs) = aggregates {
+            let aggregate_column_indices = if let Some(ref aggrs) = aggregates {
                 let res = aggrs.iter()
                     .map(|aggr| {
                         let aggr_column = &aggr.1;
@@ -2232,6 +2232,14 @@ impl MetaStore for RocksMetaStore {
                     index_def,
                 )?;
             }
+
+            let aggr_column_names = if let Some(ref aggrs) = aggregates {
+                aggrs.iter()
+                    .map(|aggr| aggr.1.clone())
+                    .collect::<Vec<String>>()
+            } else {
+                vec![]
+            };
             let def_index_columns = table_id
                 .get_row()
                 .unique_key_columns()
@@ -2242,9 +2250,10 @@ impl MetaStore for RocksMetaStore {
                     ColumnType::Bytes => None,
                     ColumnType::HyperLogLog(_) => None,
                     _ => {
-                        if seq_column_index.is_none()
-                            || seq_column_index.is_some()
-                                && c.get_index() as u64 != seq_column_index.unwrap()
+                        if !aggr_column_names.contains(&c.get_name())
+                            && seq_column_index.is_none()
+                            || (seq_column_index.is_some()
+                                && c.get_index() as u64 != seq_column_index.unwrap())
                         {
                             Some(c.get_name().clone())
                         } else {
@@ -5641,6 +5650,104 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn table_with_default_index_no_measures_test() {
+        init_test_logger().await;
+
+        let config = Config::test("table_with_default_index_no_measures_test");
+        let store_path = env::current_dir()
+            .unwrap()
+            .join("test-table-default-index-no-measure-local");
+        let remote_store_path = env::current_dir()
+            .unwrap()
+            .join("test-table-default-index-no-measure-remote");
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+        let remote_fs = LocalDirRemoteFs::new(Some(remote_store_path.clone()), store_path.clone());
+        {
+            let meta_store = RocksMetaStore::new(
+                store_path.clone().join("metastore").as_path(),
+                BaseRocksStoreFs::new_for_metastore(remote_fs.clone(), config.config_obj()),
+                config.config_obj(),
+            )
+            .unwrap();
+
+            meta_store
+                .create_schema("foo".to_string(), false)
+                .await
+                .unwrap();
+            let mut columns = Vec::new();
+            columns.push(Column::new("col1".to_string(), ColumnType::Int, 0));
+            columns.push(Column::new("col2".to_string(), ColumnType::String, 1));
+            columns.push(Column::new("col3".to_string(), ColumnType::Int, 2));
+            columns.push(Column::new("aggr_col1".to_string(), ColumnType::Int, 3));
+            columns.push(Column::new("aggr_col2".to_string(), ColumnType::String, 4));
+            columns.push(Column::new("aggr_col3".to_string(), ColumnType::Int, 5));
+
+            let table1 = meta_store
+                .create_table(
+                    "foo".to_string(),
+                    "boo".to_string(),
+                    columns.clone(),
+                    None,
+                    None,
+                    vec![],
+                    true,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    Some(vec![
+                        ("sum".to_string(), "aggr_col1".to_string()),
+                        ("max".to_string(), "aggr_col2".to_string()),
+                        ("min".to_string(), "aggr_col3".to_string()),
+                    ]),
+                    None,
+                    None,
+                    false,
+                    None,
+                )
+                .await
+                .unwrap();
+
+            let table_id = table1.get_id();
+
+            assert_eq!(
+                meta_store
+                    .get_table("foo".to_string(), "boo".to_string())
+                    .await
+                    .unwrap(),
+                table1
+            );
+
+            let indexes = meta_store.get_table_indexes(table_id).await.unwrap();
+            assert_eq!(indexes.len(), 1);
+            let ind = &indexes[0];
+
+            let index = ind.get_row();
+            assert_eq!(index.get_name(), &"default".to_string());
+            assert!(match index.get_type() {
+                IndexType::Regular => true,
+                _ => false,
+            });
+            assert_eq!(index.sort_key_size(), 3); // The main test point is here, sort key should exclude all measures
+
+            let expected_columns = vec![
+                Column::new("col1".to_string(), ColumnType::Int, 0),
+                Column::new("col2".to_string(), ColumnType::String, 1),
+                Column::new("col3".to_string(), ColumnType::Int, 2),
+                Column::new("aggr_col1".to_string(), ColumnType::Int, 3),
+                Column::new("aggr_col2".to_string(), ColumnType::String, 4),
+                Column::new("aggr_col3".to_string(), ColumnType::Int, 5),
+            ];
+            assert_eq!(index.get_columns(), &expected_columns);
+        }
+        let _ = fs::remove_dir_all(store_path.clone());
+        let _ = fs::remove_dir_all(remote_store_path.clone());
+    }
+
+    #[tokio::test]
     async fn cold_start_test() {
         init_test_logger().await;
 
@@ -6167,8 +6274,8 @@ mod tests {
                 .await
                 .unwrap();
             assert_eq!(tables.len(), 0);
-            fs::remove_dir_all(config.local_dir()).unwrap();
-            fs::remove_dir_all(config.remote_dir()).unwrap();
+            let _ = fs::remove_dir_all(config.local_dir());
+            let _ = fs::remove_dir_all(config.remote_dir());
         }
     }
 

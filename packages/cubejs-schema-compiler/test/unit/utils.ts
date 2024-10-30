@@ -96,6 +96,134 @@ export function createCubeSchema({ name, refreshKey = '', preAggregations = '', 
   `;
 }
 
+export function createCubeSchemaWithAccessPolicy(name: string, extraPolicies: string = ''): string {
+  return `cube('${name}', {
+        description: 'test cube from createCubeSchemaWithAccessPolicy',
+        sql: 'select * from cards',
+
+        measures: {
+          count: {
+            description: 'count measure from createCubeSchemaWithAccessPolicy',
+            type: 'count'
+          },
+          sum: {
+            sql: \`amount\`,
+            type: \`sum\`
+          },
+          max: {
+            sql: \`amount\`,
+            type: \`max\`
+          },
+          min: {
+            sql: \`amount\`,
+            type: \`min\`
+          },
+          diff: {
+            sql: \`\${max} - \${min}\`,
+            type: \`number\`
+          }
+        },
+
+        dimensions: {
+          id: {
+            type: 'number',
+            description: 'id dimension from createCubeSchemaWithAccessPolicy',
+            sql: 'id',
+            primaryKey: true
+          },
+          id_cube: {
+            type: 'number',
+            sql: \`\${CUBE}.id\`,
+          },
+          other_id: {
+            type: 'number',
+            sql: 'other_id',
+          },
+          type: {
+            type: 'string',
+            sql: 'type'
+          },
+          type_with_cube: {
+            type: 'string',
+            sql: \`\${CUBE.type}\`,
+          },
+          type_complex: {
+            type: 'string',
+            sql: \`CONCAT(\${type}, ' ', \${location})\`,
+          },
+          createdAt: {
+            type: 'time',
+            sql: 'created_at'
+          },
+          location: {
+            type: 'string',
+            sql: 'location'
+          }
+        },
+        accessPolicy: [
+          {
+            role: "*",
+            rowLevel: {
+              allowAll: true
+            }
+          },
+          {
+            role: 'admin',
+            conditions: [
+              {
+                if: \`true\`,
+              }
+            ],
+            rowLevel: {
+              filters: [
+                {
+                  member: \`$\{CUBE}.id\`,
+                  operator: 'equals',
+                  values: [\`1\`, \`2\`, \`3\`]
+                }
+              ]
+            },
+            memberLevel: {
+              includes: \`*\`,
+              excludes: [\`location\`, \`diff\`]
+            },
+          },
+          {
+            role: 'manager',
+            conditions: [
+              {
+                if: security_context.userId === 1,
+              }
+            ],
+            rowLevel: {
+              filters: [
+                {
+                  or: [
+                    {
+                      member: \`location\`,
+                      operator: 'startsWith',
+                      values: [\`San\`]
+                    },
+                    {
+                      member: \`location\`,
+                      operator: 'startsWith',
+                      values: [\`Lon\`]
+                    }
+                  ]
+                }
+              ]
+            },
+            memberLevel: {
+              includes: \`*\`,
+              excludes: [\`min\`, \`max\`]
+            },
+          },
+          ${extraPolicies}
+        ]
+      })
+  `;
+}
+
 export function createCubeSchemaWithCustomGranularities(name: string): string {
   return `cube('${name}', {
         sql: 'select * from orders',

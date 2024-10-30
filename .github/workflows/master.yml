@@ -137,12 +137,19 @@ jobs:
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
+            const prUrl = context.payload.pull_request ? context.payload.pull_request.html_url : '';
+            const commitUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/commit/${context.sha}`;
+
             await github.rest.actions.createWorkflowDispatch({
               owner: 'cubedevinc',
               repo: 'sql-api-test-suite',
               workflow_id: 'test_and_run_test_suites.yml',
               ref: 'main',
               inputs: {
-                'cube-image': 'cubejs/cube:dev'
+                'cube-image': 'cubejs/cube:dev',
+                'source-repo': context.repo.repo,
+                'source-pr-url': prUrl,
+                'source-commit-url': commitUrl,
+                'initiator': '${{ github.actor }}'
               }
             })

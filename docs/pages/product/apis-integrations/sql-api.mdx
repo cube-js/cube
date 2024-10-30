@@ -211,7 +211,7 @@ error: `Error during rewrite: Can't find rewrite due to 10002 AST node limit rea
 Use the following environment variables to allocate more resources for query planning:
 `CUBESQL_REWRITE_MAX_NODES`, `CUBESQL_REWRITE_MAX_ITERATIONS`, `CUBESQL_REWRITE_TIMEOUT`.
 
-## Streaming
+### Streaming
 
 By default, query results are loaded in a single batch. However, a more effective
 *streaming mode* can be used for large result sets. To enable it, set the
@@ -223,6 +223,14 @@ When the streaming mode is enabled, the maximum [row limit][ref-queries-row-limi
 does not apply to SQL API queries. They can return an unlimited number of rows.
 
 </InfoBox>
+
+### Session limit
+
+Each concurrent connection to the SQL API consumes some resources and attempting
+to establish too many connections at once can lead to an out-of-memory crash.
+You can use the `CUBEJS_MAX_SESSIONS` environment variable to adjust the session
+limit.
+
 
 [ref-sql-api-auth]: /product/apis-integrations/sql-api/security
 [ref-config-checksqlauth]: /reference/configuration/config#checksqlauth

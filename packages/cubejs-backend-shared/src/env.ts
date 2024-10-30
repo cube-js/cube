@@ -192,7 +192,7 @@ const variables: Record<string, (...args: any) => any> = {
   scheduledRefreshBatchSize: () => get('CUBEJS_SCHEDULED_REFRESH_BATCH_SIZE')
     .default('1')
     .asInt(),
-  nativeSqlPlanner: () => get('CUBEJS_NATIVE_SQL_PLANNER').asBool(),
+  nativeSqlPlanner: () => get('CUBEJS_TESSERACT_SQL_PLANNER').asBool(),
 
   /** ****************************************************************
    * Common db options                                               *
@@ -500,7 +500,7 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
-   * Max polling interval. Currenly used in BigQuery and Databricks.
+   * Max polling interval. Currently used in BigQuery and Databricks.
    * TODO: clarify this env.
    */
   dbPollMaxInterval: ({
@@ -514,7 +514,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Polling timeout. Currenly used in BigQuery, Dremio and Athena.
+   * Polling timeout. Currently used in BigQuery, Dremio and Athena.
    * TODO: clarify this env.
    */
   dbPollTimeout: ({
@@ -532,7 +532,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Query timeout. Currenly used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *
@@ -779,6 +779,45 @@ const variables: Record<string, (...args: any) => any> = {
   }) => (
     process.env[
       keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_SAS_TOKEN', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Client ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureClientId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_CLIENT_ID', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Federated Token File Path for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTokenFilePAth: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_FEDERATED_TOKEN_FILE', dataSource)
+    ]
+  ),
+
+  /**
+   * Azure Tenant ID for the Azure based export bucket storage.
+   */
+  dbExportBucketAzureTenantId: ({
+    dataSource,
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_EXPORT_BUCKET_AZURE_TENANT_ID', dataSource)
     ]
   ),
 
@@ -1375,6 +1414,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake OAuth token path.
+   */
+  snowflakeOAuthTokenPath: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_OAUTH_TOKEN_PATH', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
@@ -1581,7 +1633,7 @@ const variables: Record<string, (...args: any) => any> = {
     .asInt(),
 
   allowUngroupedWithoutPrimaryKey: () => get('CUBEJS_ALLOW_UNGROUPED_WITHOUT_PRIMARY_KEY')
-    .default(get('CUBESQL_SQL_PUSH_DOWN').default('false').asString())
+    .default(get('CUBESQL_SQL_PUSH_DOWN').default('true').asString())
     .asBoolStrict(),
   nodeEnv: () => get('NODE_ENV')
     .asString(),
