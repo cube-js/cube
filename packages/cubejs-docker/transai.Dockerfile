@@ -10,10 +10,9 @@ RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
     && apt-get install -y --no-install-recommends libssl3 curl \
        cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
-    && rm -rf /var/lib/apt/lists/* \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV CUBESTORE_SKIP_POST_INSTALL=true
-ENV TERM rxvt-unicode
 ENV NODE_ENV development
 
 RUN yarn policies set-version v1.22.19
