@@ -1210,7 +1210,7 @@ export class PreAggregations {
           .concat(columnsFor(targetTimeDimensionsReferences, timeDimensionsReferences, preAggregation))
           .concat(columnsFor(targetMeasuresReferences, measuresReferences, preAggregation))
           // Deduplicate columns, for case when targetTimeDimensionsReferences has the same column as targetDimensionsReferences
-          // Concat order is important, targetDimensionsReferences should override targetTimeDimensionsReferences
+          // Concat order is important, targetDimensionsReferences must override targetTimeDimensionsReferences
           .reduce((acc, v) => {
             if (!acc.includes(v)) {
               acc.push(v);
