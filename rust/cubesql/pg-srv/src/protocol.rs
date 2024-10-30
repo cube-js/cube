@@ -122,8 +122,8 @@ impl Serialize for StartupMessage {
         buffer.put_u16(self.minor);
 
         for (name, value) in &self.parameters {
-            buffer::write_string(&mut buffer, &name);
-            buffer::write_string(&mut buffer, &value);
+            buffer::write_string(&mut buffer, name);
+            buffer::write_string(&mut buffer, value);
         }
 
         buffer.push(0);
@@ -471,7 +471,7 @@ impl Serialize for CommandComplete {
             CommandComplete::Fetch(rows) => {
                 buffer::write_string(&mut buffer, &format!("FETCH {}", rows))
             }
-            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, &tag),
+            CommandComplete::Plain(tag) => buffer::write_string(&mut buffer, tag),
         }
 
         Some(buffer)

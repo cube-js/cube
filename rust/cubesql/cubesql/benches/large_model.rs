@@ -5,7 +5,10 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
 use cubesql::{
     compile::test::{
-        rewrite_engine::{cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner},
+        rewrite_engine::{
+            create_test_postgresql_cube_context, query_to_logical_plan, rewrite_rules,
+            rewrite_runner,
+        },
         sql_generator,
     },
     transport::MetaContext,
@@ -16,9 +19,13 @@ use uuid::Uuid;
 
 macro_rules! bench_large_model {
     ($DIMS:expr, $NAME:expr, $QUERY_FN:expr, $CRITERION:expr) => {{
-        let context = Arc::new(futures::executor::block_on(cube_context(
-            get_large_model_test_tenant_ctx($DIMS),
-        )));
+        let context = Arc::new(
+            futures::executor::block_on(create_test_postgresql_cube_context(
+                get_large_model_test_tenant_ctx($DIMS),
+            ))
+            .unwrap(),
+        );
+
         let plan = query_to_logical_plan($QUERY_FN($DIMS), &context);
         let rules = rewrite_rules(context.clone());
 

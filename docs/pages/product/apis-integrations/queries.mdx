@@ -33,13 +33,17 @@ from default ordering by passing an empty array (`[]`) object as `order`.
 
 ### Row limit
 
-By default, [any query](#query-types) will return no more than 10,000 rows
-in the result set. It serves as a safeguard against data scraping and
-denial-of-service (DoS) attacks if Cube is exposed to untrusted environments.
+By default, [any query](#query-types) that does not explicitly specify the row
+limit, will return no more than 10,000 rows in the result set. You can use the
+`CUBEJS_DB_QUERY_DEFAULT_LIMIT` environment variable to override it. This serves
+as a safeguard against data scraping and denial-of-service (DoS) attacks if Cube
+is exposed to untrusted environments.
 
 The maximum allowed limit is 50,000 rows. You can use the `CUBEJS_DB_QUERY_LIMIT`
 environment variable to override it. You can also implement
 [pagination][ref-pagination-recipe] to fetch more rows than the maximum limit.
+Finally, if you're using the [SQL API][ref-sql-api], you can enable the
+[streaming mode][ref-sql-api-streaming] to ignore the maximum row limit.
 
 ### Time zone
 
@@ -394,3 +398,4 @@ Additionally, note that ungrouped queries have additional requirements for
 [ref-query-rewrite]: /reference/configuration/config#query_rewrite
 [ref-ref-sql-api]: /reference/sql-api
 [blog-compare-date-range]: https://cube.dev/blog/comparing-data-over-different-time-periods
+[ref-sql-api-streaming]: /product/apis-integrations/sql-api#streaming

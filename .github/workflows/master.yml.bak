@@ -11,6 +11,9 @@ on:
       - 'package.json'
       - 'rollup.config.js'
       - 'yarn.lock'
+      - 'rust/cubesqlplanner/**'
+      - 'rust/cubenativeutils/**'
+      - 'rust/cubesql/**'
     branches:
       - master
 jobs:

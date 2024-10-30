@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [0.35.73](https://github.com/cube-js/cube/compare/v0.35.72...v0.35.73) (2024-08-21)
+
+
+### Bug Fixes
+
+* **cubestore:** Reduce memory usage while converting to DataFrame ([#8599](https://github.com/cube-js/cube/issues/8599)) ([15f9a0f](https://github.com/cube-js/cube/commit/15f9a0f6791a5128c426c452ea180ffa757f8bc3))
+
+
+
+
+
 ## [0.35.68](https://github.com/cube-js/cube/compare/v0.35.67...v0.35.68) (2024-08-12)
 
 

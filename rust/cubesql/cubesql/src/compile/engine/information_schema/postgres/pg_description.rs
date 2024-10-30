@@ -34,12 +34,12 @@ impl PgCatalogDescriptionBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.objoid.finish()));
-        columns.push(Arc::new(self.classoid.finish()));
-        columns.push(Arc::new(self.objsubid.finish()));
-        columns.push(Arc::new(self.description.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.objoid.finish()),
+            Arc::new(self.classoid.finish()),
+            Arc::new(self.objsubid.finish()),
+            Arc::new(self.description.finish()),
+        ];
 
         columns
     }

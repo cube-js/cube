@@ -589,6 +589,9 @@ export class DatabricksDriver extends JDBCDriver {
    * Returns quoted string.
    */
   protected quoteIdentifier(identifier: string): string {
+    if (identifier.startsWith('`') && identifier.endsWith('`')) {
+      return identifier;
+    }
     return `\`${identifier}\``;
   }
 

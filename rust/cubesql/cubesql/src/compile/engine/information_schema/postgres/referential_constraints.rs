@@ -43,16 +43,17 @@ impl InfoSchemaReferentialConstraintsBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.constraint_catalog.finish()));
-        columns.push(Arc::new(self.constraint_schema.finish()));
-        columns.push(Arc::new(self.constraint_name.finish()));
-        columns.push(Arc::new(self.unique_constraint_catalog.finish()));
-        columns.push(Arc::new(self.unique_constraint_schema.finish()));
-        columns.push(Arc::new(self.unique_constraint_name.finish()));
-        columns.push(Arc::new(self.match_option.finish()));
-        columns.push(Arc::new(self.update_rule.finish()));
-        columns.push(Arc::new(self.delete_rule.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.constraint_catalog.finish()),
+            Arc::new(self.constraint_schema.finish()),
+            Arc::new(self.constraint_name.finish()),
+            Arc::new(self.unique_constraint_catalog.finish()),
+            Arc::new(self.unique_constraint_schema.finish()),
+            Arc::new(self.unique_constraint_name.finish()),
+            Arc::new(self.match_option.finish()),
+            Arc::new(self.update_rule.finish()),
+            Arc::new(self.delete_rule.finish()),
+        ];
 
         columns
     }

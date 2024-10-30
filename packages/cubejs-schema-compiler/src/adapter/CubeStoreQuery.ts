@@ -229,7 +229,7 @@ export class CubeStoreQuery extends BaseQuery {
           const preceding = rollingWindow.trailing ? `${this.toInterval(rollingWindow.trailing)} PRECEDING` : '';
           const following = rollingWindow.leading ? `${this.toInterval(rollingWindow.leading)} FOLLOWING` : '';
           const offset = ` OFFSET ${rollingWindow.offset || 'end'}`;
-          const rollingMeasure = `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' ' : ''}${following}${offset})`;
+          const rollingMeasure = `ROLLING(${measureSql} ${preceding && following ? 'RANGE BETWEEN ' : 'RANGE '}${preceding}${preceding && following ? ' AND ' : ''}${following}${offset})`;
           return this.topAggregateWrap(m.measureDefinition(), rollingMeasure);
         } else {
           const conditionFn = m.isCumulative() ? this.dateFromStartToEndConditionSql(m.dateJoinCondition(), true, true)[0] : timeDimension;

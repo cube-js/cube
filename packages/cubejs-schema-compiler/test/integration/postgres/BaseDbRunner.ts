@@ -1,5 +1,6 @@
 import R from 'ramda';
 import { PreAggregationPartitionRangeLoader } from '@cubejs-backend/query-orchestrator';
+import { BaseQuery } from "../../../src";
 
 export class BaseDbRunner {
   protected containerLazyInitPromise: any = null;
@@ -14,6 +15,24 @@ export class BaseDbRunner {
 
   public testQuery(query, fixture: any = null) {
     return this.testQueries([query], fixture);
+  }
+
+  protected newTestQuery(_compilers: any, _query: any): BaseQuery {
+    throw new Error('newTestQuery not implemented');
+  }
+
+  public async runQueryTest(q, expectedResult, { compiler, joinGraph, cubeEvaluator }) {
+    await compiler.compile();
+    const query = this.newTestQuery({ joinGraph, cubeEvaluator, compiler }, q);
+
+    console.log(query.buildSqlAndParams());
+
+    const res = await this.testQuery(query.buildSqlAndParams());
+    console.log(JSON.stringify(res));
+
+    expect(res).toEqual(
+      expectedResult
+    );
   }
 
   public async testQueries(queries, fixture: any = null) {

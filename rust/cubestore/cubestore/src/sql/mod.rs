@@ -49,7 +49,7 @@ use crate::metastore::{
 };
 use crate::queryplanner::panic::PanicWorkerNode;
 use crate::queryplanner::pretty_printers::{pp_phys_plan, pp_plan};
-use crate::queryplanner::query_executor::{batch_to_dataframe, ClusterSendExec, QueryExecutor};
+use crate::queryplanner::query_executor::{batches_to_dataframe, ClusterSendExec, QueryExecutor};
 use crate::queryplanner::serialized_plan::{RowFilter, SerializedPlan};
 use crate::queryplanner::{PlanningMeta, QueryPlan, QueryPlanner};
 use crate::remotefs::RemoteFs;
@@ -1072,7 +1072,7 @@ impl SqlService for SqlServiceImpl {
                                     }
                                     Ok(cube_ext::spawn_blocking(
                                         move || -> Result<DataFrame, CubeError> {
-                                            let df = batch_to_dataframe(&records)?;
+                                            let df = batches_to_dataframe(records)?;
                                             Ok(df)
                                         },
                                     )

@@ -3246,15 +3246,12 @@ export class BaseQuery {
    * @return {[number, string]}
    */
   parseInterval(interval) {
-    const intervalMatch = interval.match(/^(\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
+    const intervalMatch = interval.match(/^(-?\d+) (second|minute|hour|day|week|month|quarter|year)s?$/);
     if (!intervalMatch) {
       throw new UserError(`Invalid interval: ${interval}`);
     }
 
     const duration = parseInt(intervalMatch[1], 10);
-    if (duration < 1) {
-      throw new UserError(`Duration should be positive: ${interval}`);
-    }
 
     return [duration, intervalMatch[2]];
   }

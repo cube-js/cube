@@ -1,5 +1,9 @@
-use crate::{compile::CubeContext, CubeError};
+use crate::{
+    compile::{CubeContext, DatabaseVariable, DatabaseVariables},
+    CubeError,
+};
 use datafusion::datasource;
+use log::error;
 use std::{
     fmt::Debug,
     hash::{Hash, Hasher},
@@ -13,11 +17,17 @@ pub trait DatabaseProtocolDetails: Debug + Send + Sync {
 
     fn support_transactions(&self) -> bool;
 
+    /// Get default state for session variables
+    fn get_session_default_variables(&self) -> DatabaseVariables;
+
+    /// Get default value for specific session variable
+    fn get_session_variable_default(&self, name: &str) -> Option<DatabaseVariable>;
+
     fn get_provider(
         &self,
         context: &CubeContext,
         tr: datafusion::catalog::TableReference,
-    ) -> Option<std::sync::Arc<dyn datasource::TableProvider>>;
+    ) -> Option<Arc<dyn datasource::TableProvider>>;
 
     fn table_name_by_table_provider(
         &self,
@@ -68,6 +78,28 @@ impl DatabaseProtocolDetails for DatabaseProtocol {
             DatabaseProtocol::PostgreSQL => true,
             DatabaseProtocol::Extension(ext) => ext.support_transactions(),
         }
+    }
+
+    fn get_session_default_variables(&self) -> DatabaseVariables {
+        match &self {
+            DatabaseProtocol::MySQL => {
+                // TODO(ovr): Should we move it from session?
+                error!("get_session_default_variables was called on MySQL protocol");
+
+                DatabaseVariables::default()
+            }
+            DatabaseProtocol::PostgreSQL => {
+                // TODO(ovr): Should we move it from session?
+                error!("get_session_default_variables was called on PostgreSQL protocol");
+
+                DatabaseVariables::default()
+            }
+            DatabaseProtocol::Extension(ext) => ext.get_session_default_variables(),
+        }
+    }
+
+    fn get_session_variable_default(&self, name: &str) -> Option<DatabaseVariable> {
+        self.get_session_default_variables().get(name).cloned()
     }
 
     fn get_provider(

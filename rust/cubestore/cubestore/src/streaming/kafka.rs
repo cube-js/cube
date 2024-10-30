@@ -402,7 +402,7 @@ impl StreamingSource for KafkaStreamingSource {
 mod tests {
     use super::*;
     use crate::metastore::{Column, ColumnType};
-    use crate::queryplanner::query_executor::batch_to_dataframe;
+    use crate::queryplanner::query_executor::batches_to_dataframe;
     use crate::sql::MySqlDialectWithBackTicks;
     use crate::streaming::topic_table_provider::TopicTableProvider;
     use arrow::array::StringArray;
@@ -432,7 +432,7 @@ mod tests {
         let phys_plan = plan_ctx.create_physical_plan(&logical_plan).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batches_to_dataframe(batches).unwrap();
         res.get_rows()[0].values()[0].clone()
     }
 
@@ -462,7 +462,7 @@ mod tests {
         let phys_plan = phys_plan.with_new_children(vec![inp]).unwrap();
 
         let batches = collect(phys_plan).await.unwrap();
-        let res = batch_to_dataframe(&batches).unwrap();
+        let res = batches_to_dataframe(batches).unwrap();
         res.get_rows().to_vec()
     }
 

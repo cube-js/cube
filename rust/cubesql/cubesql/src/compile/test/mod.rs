@@ -16,7 +16,7 @@ use crate::{
     },
     config::{ConfigObj, ConfigObjImpl},
     sql::{
-        compiler_cache::CompilerCacheImpl, dataframe::batch_to_dataframe, AuthContextRef,
+        compiler_cache::CompilerCacheImpl, dataframe::batches_to_dataframe, AuthContextRef,
         AuthenticateResponse, HttpAuthContext, ServerManager, Session, SessionManager,
         SqlAuthService,
     },
@@ -565,8 +565,9 @@ async fn get_test_session_with_config_and_transport(
     };
     let session_manager = Arc::new(SessionManager::new(server.clone()));
     let session = session_manager
-        .create_session(protocol, "127.0.0.1".to_string(), 1234)
-        .await;
+        .create_session(protocol, "127.0.0.1".to_string(), 1234, None)
+        .await
+        .unwrap();
 
     // Populate like shims
     session.state.set_database(Some(db_name.to_string()));
@@ -839,7 +840,7 @@ impl TestContext {
                 QueryPlan::DataFusionSelect(flags, plan, ctx) => {
                     let df = DFDataFrame::new(ctx.state, &plan);
                     let batches = df.collect().await?;
-                    let frame = batch_to_dataframe(&df.schema().into(), &batches)?;
+                    let frame = batches_to_dataframe(&df.schema().into(), batches)?;
 
                     output.push(frame.print());
                     output_flags = flags;

@@ -40,7 +40,7 @@ use crate::queryplanner::info_schema::{
 use crate::queryplanner::now::MaterializeNow;
 use crate::queryplanner::planning::{choose_index_ext, ClusterSendNode};
 use crate::queryplanner::query_executor::{
-    batch_to_dataframe, ClusterSendExec, InlineTableProvider,
+    batches_to_dataframe, ClusterSendExec, InlineTableProvider,
 };
 use crate::queryplanner::serialized_plan::SerializedPlan;
 use crate::queryplanner::topk::ClusterAggregateTopK;
@@ -168,7 +168,7 @@ impl QueryPlanner for QueryPlannerImpl {
         let execution_time = execution_time.elapsed()?;
         app_metrics::META_QUERY_TIME_MS.report(execution_time.as_millis() as i64);
         debug!("Meta query data processing time: {:?}", execution_time,);
-        let data_frame = cube_ext::spawn_blocking(move || batch_to_dataframe(&results)).await??;
+        let data_frame = cube_ext::spawn_blocking(move || batches_to_dataframe(results)).await??;
         Ok(data_frame)
     }
 }

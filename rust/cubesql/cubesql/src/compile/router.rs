@@ -1,32 +1,17 @@
-use crate::compile::{qtrace::Qtrace, CommandCompletion, DatabaseProtocol, QueryPlan, StatusFlags};
-use sqlparser::ast;
-use std::{
-    backtrace::Backtrace, collections::HashMap, future::Future, pin::Pin, sync::Arc,
-    time::SystemTime,
+use crate::compile::{
+    qtrace::Qtrace, CommandCompletion, DatabaseProtocol, QueryEngine, QueryPlan, SqlQueryEngine,
+    StatusFlags,
 };
+use sqlparser::ast;
+use std::{collections::HashMap, future::Future, pin::Pin, sync::Arc, time::SystemTime};
 
 use crate::{
     compile::{
-        engine::{
-            df::{
-                optimizers::{FilterPushDown, LimitPushDown, SortPushDown},
-                planner::CubeQueryPlanner,
-                scan::CubeScanNode,
-                wrapper::CubeScanWrapperNode,
-            },
-            udf::*,
-            CubeContext, VariablesProvider,
-        },
         error::{CompilationError, CompilationResult},
         parser::parse_sql_to_statement,
-        rewrite::{
-            analysis::LogicalPlanAnalysis,
-            converter::{LogicalPlanToLanguageContext, LogicalPlanToLanguageConverter},
-            rewriter::Rewriter,
-        },
+        DatabaseVariable, DatabaseVariablesToUpdate,
     },
     sql::{
-        database_variables::{DatabaseVariable, DatabaseVariablesToUpdate},
         dataframe,
         statement::{
             ApproximateCountDistinctVisitor, CastReplacer, RedshiftDatePartReplacer,
@@ -34,39 +19,26 @@ use crate::{
         },
         ColumnFlags, ColumnType, Session, SessionManager, SessionState,
     },
-    transport::{LoadRequestMeta, MetaContext, SpanId, TransportService},
-    CubeErrorCauseType,
+    transport::{MetaContext, SpanId},
 };
 use datafusion::{
-    execution::context::{
-        default_session_builder, SessionConfig as DFSessionConfig,
-        SessionContext as DFSessionContext,
-    },
     logical_plan::{
-        plan::{Analyze, Explain, Extension, ToStringifiedPlan},
-        LogicalPlan, PlanType, PlanVisitor, ToDFSchema,
+        plan::{Analyze, Explain, ToStringifiedPlan},
+        LogicalPlan, PlanType, ToDFSchema,
     },
-    optimizer::{
-        optimizer::{OptimizerConfig, OptimizerRule},
-        projection_drop_out::ProjectionDropOut,
-        utils::from_plan,
-    },
-    physical_plan::planner::DefaultPhysicalPlanner,
     scalar::ScalarValue,
-    sql::{parser::Statement as DFStatement, planner::SqlToRel},
-    variable::VarType,
 };
 use itertools::Itertools;
 use sqlparser::ast::{escape_single_quote_string, ObjectName};
 
 #[derive(Clone)]
-pub struct QueryPlanner {
+pub struct QueryRouter {
     state: Arc<SessionState>,
     meta: Arc<MetaContext>,
     session_manager: Arc<SessionManager>,
 }
 
-impl QueryPlanner {
+impl QueryRouter {
     pub fn new(
         state: Arc<SessionState>,
         meta: Arc<MetaContext>,
@@ -87,7 +59,6 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> CompilationResult<QueryPlan> {
         let planning_start = SystemTime::now();
         if let Some(span_id) = span_id.as_ref() {
@@ -109,7 +80,7 @@ impl QueryPlanner {
             }
         }
         let result = self
-            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone(), flat_list)
+            .create_df_logical_plan(stmt.clone(), qtrace, span_id.clone())
             .await?;
 
         if let Some(span_id) = span_id.as_ref() {
@@ -140,20 +111,16 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> CompilationResult<QueryPlan> {
         let plan = match (stmt, &self.state.protocol) {
             (ast::Statement::Query(q), _) => {
                 if let ast::SetExpr::Select(select) = &q.body {
                     if let Some(into) = &select.into {
-                        return self
-                            .select_into_to_plan(into, q, qtrace, span_id, flat_list)
-                            .await;
+                        return self.select_into_to_plan(into, q, qtrace, span_id).await;
                     }
                 }
 
-                self.select_to_plan(stmt, qtrace, span_id.clone(), flat_list)
-                    .await
+                self.select_to_plan(stmt, qtrace, span_id.clone()).await
             }
             (ast::Statement::SetTransaction { .. }, _) => Ok(QueryPlan::MetaTabular(
                 StatusFlags::empty(),
@@ -164,8 +131,7 @@ impl QueryPlanner {
                 self.set_variable_to_plan(&key_values).await
             }
             (ast::Statement::ShowVariable { variable }, _) => {
-                self.show_variable_to_plan(variable, span_id.clone(), flat_list)
-                    .await
+                self.show_variable_to_plan(variable, span_id.clone()).await
             }
             (
                 ast::Statement::Explain {
@@ -175,10 +141,7 @@ impl QueryPlanner {
                     ..
                 },
                 _,
-            ) => {
-                self.explain_to_plan(&statement, *verbose, *analyze, flat_list)
-                    .await
-            }
+            ) => self.explain_to_plan(&statement, *verbose, *analyze).await,
             (ast::Statement::StartTransaction { .. }, DatabaseProtocol::PostgreSQL) => {
                 // TODO: Real support
                 Ok(QueryPlan::MetaOk(
@@ -228,7 +191,7 @@ impl QueryPlanner {
                 && *temporary =>
             {
                 let stmt = ast::Statement::Query(query.clone());
-                self.create_table_to_plan(name, &stmt, qtrace, span_id.clone(), flat_list)
+                self.create_table_to_plan(name, &stmt, qtrace, span_id.clone())
                     .await
             }
             (
@@ -263,7 +226,6 @@ impl QueryPlanner {
         &self,
         variable: &Vec<ast::Ident>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> CompilationResult<QueryPlan> {
         let name = variable.to_vec()[0].value.clone();
         if self.state.protocol == DatabaseProtocol::PostgreSQL {
@@ -291,7 +253,7 @@ impl QueryPlanner {
                 )?
             };
 
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
+            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
                 .await
         } else if name.eq_ignore_ascii_case("databases") || name.eq_ignore_ascii_case("schemas") {
             Ok(QueryPlan::MetaTabular(
@@ -324,7 +286,7 @@ impl QueryPlanner {
                 &mut None,
             )?;
 
-            self.create_df_logical_plan(stmt, &mut None, span_id.clone(), flat_list)
+            self.create_df_logical_plan(stmt, &mut None, span_id.clone())
                 .await
         } else if name.eq_ignore_ascii_case("warnings") {
             Ok(QueryPlan::MetaTabular(
@@ -357,7 +319,6 @@ impl QueryPlanner {
                 },
                 &mut None,
                 span_id.clone(),
-                flat_list,
             )
             .await
         }
@@ -368,7 +329,6 @@ impl QueryPlanner {
         statement: &Box<ast::Statement>,
         verbose: bool,
         analyze: bool,
-        flat_list: bool,
     ) -> Pin<Box<dyn Future<Output = Result<QueryPlan, CompilationError>> + Send>> {
         let self_cloned = self.clone();
 
@@ -376,9 +336,7 @@ impl QueryPlanner {
         // This Boxing construct here because of recursive call to self.plan()
         Box::pin(async move {
             // TODO span_id ?
-            let plan = self_cloned
-                .plan(&statement, &mut None, None, flat_list)
-                .await?;
+            let plan = self_cloned.plan(&statement, &mut None, None).await?;
 
             match plan {
                 QueryPlan::MetaOk(_, _) | QueryPlan::MetaTabular(_, _) => Ok(QueryPlan::MetaTabular(
@@ -633,11 +591,8 @@ impl QueryPlanner {
         stmt: &ast::Statement,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> Result<QueryPlan, CompilationError> {
-        let plan = self
-            .select_to_plan(stmt, qtrace, span_id, flat_list)
-            .await?;
+        let plan = self.select_to_plan(stmt, qtrace, span_id).await?;
         let QueryPlan::DataFusionSelect(flags, plan, ctx) = plan else {
             return Err(CompilationError::internal(
                 "unable to build DataFusion plan from Query".to_string(),
@@ -665,7 +620,6 @@ impl QueryPlanner {
         query: &Box<ast::Query>,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> Result<QueryPlan, CompilationError> {
         if !into.temporary || !into.table {
             return Err(CompilationError::unsupported(
@@ -682,7 +636,7 @@ impl QueryPlanner {
             ));
         }
         let new_stmt = ast::Statement::Query(new_query);
-        self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id, flat_list)
+        self.create_table_to_plan(&into.name, &new_stmt, qtrace, span_id)
             .await
     }
 
@@ -711,153 +665,6 @@ impl QueryPlanner {
         Ok(QueryPlan::MetaOk(flags, CommandCompletion::DropTable))
     }
 
-    pub fn create_execution_ctx(&self) -> DFSessionContext {
-        let query_planner = Arc::new(CubeQueryPlanner::new(
-            self.session_manager.server.transport.clone(),
-            self.state.get_load_request_meta(),
-            self.session_manager.server.config_obj.clone(),
-        ));
-        let mut ctx = DFSessionContext::with_state(
-            default_session_builder(
-                DFSessionConfig::new()
-                    .create_default_catalog_and_schema(false)
-                    .with_information_schema(false)
-                    .with_default_catalog_and_schema("db", "public"),
-            )
-            .with_query_planner(query_planner),
-        );
-
-        if self.state.protocol == DatabaseProtocol::MySQL {
-            let system_variable_provider =
-                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
-            let user_defined_variable_provider =
-                VariablesProvider::new(self.state.clone(), self.session_manager.server.clone());
-
-            ctx.register_variable(VarType::System, Arc::new(system_variable_provider));
-            ctx.register_variable(
-                VarType::UserDefined,
-                Arc::new(user_defined_variable_provider),
-            );
-        }
-
-        // udf
-        if self.state.protocol == DatabaseProtocol::MySQL {
-            ctx.register_udf(create_version_udf("8.0.25".to_string()));
-            ctx.register_udf(create_db_udf("database".to_string(), self.state.clone()));
-            ctx.register_udf(create_db_udf("schema".to_string(), self.state.clone()));
-            ctx.register_udf(create_current_user_udf(
-                self.state.clone(),
-                "current_user",
-                true,
-            ));
-            ctx.register_udf(create_user_udf(self.state.clone()));
-        } else if self.state.protocol == DatabaseProtocol::PostgreSQL {
-            ctx.register_udf(create_version_udf(
-                "PostgreSQL 14.1 on x86_64-cubesql".to_string(),
-            ));
-            ctx.register_udf(create_db_udf(
-                "current_database".to_string(),
-                self.state.clone(),
-            ));
-            ctx.register_udf(create_db_udf(
-                "current_schema".to_string(),
-                self.state.clone(),
-            ));
-            ctx.register_udf(create_current_user_udf(
-                self.state.clone(),
-                "current_user",
-                false,
-            ));
-            ctx.register_udf(create_current_user_udf(self.state.clone(), "user", false));
-            ctx.register_udf(create_session_user_udf(self.state.clone()));
-        }
-
-        ctx.register_udf(create_connection_id_udf(self.state.clone()));
-        ctx.register_udf(create_pg_backend_pid_udf(self.state.clone()));
-        ctx.register_udf(create_instr_udf());
-        ctx.register_udf(create_ucase_udf());
-        ctx.register_udf(create_isnull_udf());
-        ctx.register_udf(create_if_udf());
-        ctx.register_udf(create_least_udf());
-        ctx.register_udf(create_greatest_udf());
-        ctx.register_udf(create_convert_tz_udf());
-        ctx.register_udf(create_timediff_udf());
-        ctx.register_udf(create_time_format_udf());
-        ctx.register_udf(create_locate_udf());
-        ctx.register_udf(create_date_udf());
-        ctx.register_udf(create_makedate_udf());
-        ctx.register_udf(create_year_udf());
-        ctx.register_udf(create_quarter_udf());
-        ctx.register_udf(create_hour_udf());
-        ctx.register_udf(create_minute_udf());
-        ctx.register_udf(create_second_udf());
-        ctx.register_udf(create_dayofweek_udf());
-        ctx.register_udf(create_dayofmonth_udf());
-        ctx.register_udf(create_dayofyear_udf());
-        ctx.register_udf(create_date_sub_udf());
-        ctx.register_udf(create_date_add_udf());
-        ctx.register_udf(create_str_to_date_udf());
-        ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
-        ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
-        ctx.register_udf(create_current_schema_udf());
-        ctx.register_udf(create_current_schemas_udf());
-        ctx.register_udf(create_format_type_udf());
-        ctx.register_udf(create_pg_datetime_precision_udf());
-        ctx.register_udf(create_pg_numeric_precision_udf());
-        ctx.register_udf(create_pg_numeric_scale_udf());
-        ctx.register_udf(create_pg_get_userbyid_udf(self.state.clone()));
-        ctx.register_udf(create_pg_get_expr_udf());
-        ctx.register_udf(create_pg_table_is_visible_udf());
-        ctx.register_udf(create_pg_type_is_visible_udf());
-        ctx.register_udf(create_pg_get_constraintdef_udf());
-        ctx.register_udf(create_pg_truetypid_udf());
-        ctx.register_udf(create_pg_truetypmod_udf());
-        ctx.register_udf(create_to_char_udf());
-        ctx.register_udf(create_array_lower_udf());
-        ctx.register_udf(create_array_upper_udf());
-        ctx.register_udf(create_pg_my_temp_schema());
-        ctx.register_udf(create_pg_is_other_temp_schema());
-        ctx.register_udf(create_has_schema_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_has_table_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_has_any_column_privilege_udf(self.state.clone()));
-        ctx.register_udf(create_pg_total_relation_size_udf());
-        ctx.register_udf(create_cube_regclass_cast_udf());
-        ctx.register_udf(create_pg_get_serial_sequence_udf());
-        ctx.register_udf(create_json_build_object_udf());
-        ctx.register_udf(create_regexp_substr_udf());
-        ctx.register_udf(create_ends_with_udf());
-        ctx.register_udf(create_position_udf());
-        ctx.register_udf(create_date_to_timestamp_udf());
-        ctx.register_udf(create_to_date_udf());
-        ctx.register_udf(create_sha1_udf());
-        ctx.register_udf(create_current_setting_udf());
-        ctx.register_udf(create_quote_ident_udf());
-        ctx.register_udf(create_pg_encoding_to_char_udf());
-        ctx.register_udf(create_array_to_string_udf());
-        ctx.register_udf(create_charindex_udf());
-        ctx.register_udf(create_to_regtype_udf());
-        ctx.register_udf(create_pg_get_indexdef_udf());
-        ctx.register_udf(create_inet_server_addr_udf());
-
-        // udaf
-        ctx.register_udaf(create_measure_udaf());
-
-        // udtf
-        ctx.register_udtf(create_generate_series_udtf());
-        ctx.register_udtf(create_unnest_udtf());
-        ctx.register_udtf(create_generate_subscripts_udtf());
-        ctx.register_udtf(create_pg_expandarray_udtf());
-
-        // redshift
-        ctx.register_udf(create_datediff_udf());
-        ctx.register_udf(create_dateadd_udf());
-
-        // fn stubs
-        ctx = register_fun_stubs(ctx);
-
-        ctx
-    }
-
     async fn reauthenticate_if_needed(&self) -> CompilationResult<()> {
         if self.state.is_auth_context_expired() {
             let authenticate_response = self
@@ -883,7 +690,6 @@ impl QueryPlanner {
         stmt: ast::Statement,
         qtrace: &mut Option<Qtrace>,
         span_id: Option<Arc<SpanId>>,
-        flat_list: bool,
     ) -> CompilationResult<QueryPlan> {
         self.reauthenticate_if_needed().await?;
         match &stmt {
@@ -898,258 +704,11 @@ impl QueryPlanner {
             _ => (),
         }
 
-        let ctx = self.create_execution_ctx();
-
-        let df_state = Arc::new(ctx.state.write().clone());
-        let cube_ctx = CubeContext::new(
-            df_state,
-            self.meta.clone(),
-            self.session_manager.clone(),
-            self.state.clone(),
-        );
-        let df_query_planner = SqlToRel::new_with_options(&cube_ctx, true);
-
-        let plan = df_query_planner
-            .statement_to_plan(DFStatement::Statement(Box::new(stmt.clone())))
-            .map_err(|err| {
-                let message = format!("Initial planning error: {}", err,);
-                let meta = Some(HashMap::from([
-                    ("query".to_string(), stmt.to_string()),
-                    (
-                        "sanitizedQuery".to_string(),
-                        SensitiveDataSanitizer::new().replace(&stmt).to_string(),
-                    ),
-                ]));
-
-                CompilationError::internal(message).with_meta(meta)
-            })?;
-        if let Some(qtrace) = qtrace {
-            qtrace.set_df_plan(&plan);
-        }
-
-        let mut optimized_plan = plan;
-        // ctx.optimize(&plan).map_err(|err| {
-        //    CompilationError::Internal(format!("Planning optimization error: {}", err))
-        // })?;
-
-        let optimizer_config = OptimizerConfig::new();
-        let optimizers: Vec<Arc<dyn OptimizerRule + Sync + Send>> = vec![
-            Arc::new(ProjectionDropOut::new()),
-            Arc::new(FilterPushDown::new()),
-            Arc::new(SortPushDown::new()),
-            Arc::new(LimitPushDown::new()),
-        ];
-        for optimizer in optimizers {
-            // TODO: report an error when the plan can't be optimized
-            optimized_plan = optimizer
-                .optimize(&optimized_plan, &optimizer_config)
-                .unwrap_or(optimized_plan);
-        }
-
-        if let Some(qtrace) = qtrace {
-            qtrace.set_optimized_plan(&optimized_plan);
-        }
-
-        log::debug!("Initial Plan: {:#?}", optimized_plan);
-
-        let cube_ctx = Arc::new(cube_ctx);
-        let mut converter = LogicalPlanToLanguageConverter::new(cube_ctx.clone(), flat_list);
-        let mut query_params = Some(HashMap::new());
-        let root = converter
-            .add_logical_plan_replace_params(
-                &optimized_plan,
-                &mut query_params,
-                &mut LogicalPlanToLanguageContext::default(),
-            )
-            .map_err(|e| CompilationError::internal(e.to_string()))?;
-
-        let mut finalized_graph = self
-            .session_manager
-            .server
-            .compiler_cache
-            .rewrite(
-                self.state.auth_context().unwrap(),
-                cube_ctx.clone(),
-                converter.take_egraph(),
-                &query_params.unwrap(),
-                qtrace,
-            )
+        let sql_query_engine = SqlQueryEngine::new(self.session_manager.clone());
+        sql_query_engine
+            .plan(stmt, qtrace, span_id, self.meta.clone(), self.state.clone())
             .await
-            .map_err(|e| match e.cause {
-                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-            })?;
-
-        // Replace Analysis as at least time has changed but it might be also context may affect rewriting in some other ways
-        finalized_graph.analysis = LogicalPlanAnalysis::new(
-            cube_ctx.clone(),
-            Arc::new(DefaultPhysicalPlanner::default()),
-        );
-
-        let mut rewriter = Rewriter::new(finalized_graph, cube_ctx.clone());
-
-        let result = rewriter
-            .find_best_plan(
-                root,
-                self.state.auth_context().unwrap(),
-                qtrace,
-                span_id.clone(),
-            )
-            .await
-            .map_err(|e| match e.cause {
-                CubeErrorCauseType::Internal(_) => CompilationError::Internal(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    e.to_backtrace().unwrap_or_else(|| Backtrace::capture()),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-                CubeErrorCauseType::User(_) => CompilationError::User(
-                    format!(
-                        "Error during rewrite: {}. Please check logs for additional information.",
-                        e.message
-                    ),
-                    Some(HashMap::from([
-                        ("query".to_string(), stmt.to_string()),
-                        (
-                            "sanitizedQuery".to_string(),
-                            SensitiveDataSanitizer::new().replace(&stmt).to_string(),
-                        ),
-                    ])),
-                ),
-            });
-
-        if let Err(_) = &result {
-            log::error!("It may be this query is not supported yet. Please post an issue on GitHub https://github.com/cube-js/cube.js/issues/new?template=sql_api_query_issue.md or ask about it in Slack https://slack.cube.dev.");
-        }
-
-        let rewrite_plan = result?;
-
-        // DF optimizes logical plan (second time) on physical plan creation
-        // It's not safety to use all optimizers from DF for OLAP queries, because it will lead to errors
-        // From another side, 99% optimizers cannot optimize anything
-        if is_olap_query(&rewrite_plan)? {
-            {
-                let mut guard = ctx.state.write();
-                // TODO: We should find what optimizers will be safety to use for OLAP queries
-                guard.optimizer.rules = vec![];
-            }
-            if let Some(span_id) = span_id {
-                span_id.set_is_data_query(true).await;
-            }
-        };
-
-        log::debug!("Rewrite: {:#?}", rewrite_plan);
-        let rewrite_plan = Self::evaluate_wrapped_sql(
-            self.session_manager.server.transport.clone(),
-            Arc::new(self.state.get_load_request_meta()),
-            rewrite_plan,
-        )
-        .await?;
-        if let Some(qtrace) = qtrace {
-            qtrace.set_best_plan_and_cube_scans(&rewrite_plan);
-        }
-
-        Ok(QueryPlan::DataFusionSelect(
-            StatusFlags::empty(),
-            rewrite_plan,
-            ctx,
-        ))
     }
-
-    fn evaluate_wrapped_sql(
-        transport_service: Arc<dyn TransportService>,
-        load_request_meta: Arc<LoadRequestMeta>,
-        plan: LogicalPlan,
-    ) -> Pin<Box<dyn Future<Output = CompilationResult<LogicalPlan>> + Send>> {
-        Box::pin(async move {
-            if let LogicalPlan::Extension(Extension { node }) = &plan {
-                // .cloned() is to avoid borrowing Any to comply with Send + Sync
-                let wrapper_option = node.as_any().downcast_ref::<CubeScanWrapperNode>().cloned();
-                if let Some(wrapper) = wrapper_option {
-                    // TODO evaluate sql
-                    return Ok(LogicalPlan::Extension(Extension {
-                        node: Arc::new(
-                            wrapper
-                                .generate_sql(transport_service.clone(), load_request_meta.clone())
-                                .await
-                                .map_err(|e| CompilationError::internal(e.to_string()))?,
-                        ),
-                    }));
-                }
-            }
-            let mut children = Vec::new();
-            for input in plan.inputs() {
-                children.push(
-                    Self::evaluate_wrapped_sql(
-                        transport_service.clone(),
-                        load_request_meta.clone(),
-                        input.clone(),
-                    )
-                    .await?,
-                );
-            }
-            from_plan(&plan, plan.expressions().as_slice(), children.as_slice())
-                .map_err(|e| CompilationError::internal(e.to_string()))
-        })
-    }
-}
-
-fn is_olap_query(parent: &LogicalPlan) -> Result<bool, CompilationError> {
-    pub struct FindCubeScanNodeVisitor(bool);
-
-    impl PlanVisitor for FindCubeScanNodeVisitor {
-        type Error = CompilationError;
-
-        fn pre_visit(&mut self, plan: &LogicalPlan) -> Result<bool, Self::Error> {
-            if let LogicalPlan::Extension(ext) = plan {
-                if let Some(_) = ext.node.as_any().downcast_ref::<CubeScanNode>() {
-                    self.0 = true;
-
-                    return Ok(false);
-                }
-            }
-
-            Ok(true)
-        }
-    }
-
-    let mut visitor = FindCubeScanNodeVisitor(false);
-    parent.accept(&mut visitor)?;
-
-    Ok(visitor.0)
 }
 
 pub fn rewrite_statement(stmt: &ast::Statement) -> ast::Statement {
@@ -1174,9 +733,8 @@ pub async fn convert_statement_to_cube_query(
         qtrace.set_visitor_replaced_statement(&stmt);
     }
 
-    let planner = QueryPlanner::new(session.state.clone(), meta, session.session_manager.clone());
-    let flat_list = session.server.config_obj.push_down_pull_up_split();
-    planner.plan(&stmt, qtrace, span_id, flat_list).await
+    let planner = QueryRouter::new(session.state.clone(), meta, session.session_manager.clone());
+    planner.plan(&stmt, qtrace, span_id).await
 }
 
 pub async fn convert_sql_to_cube_query(

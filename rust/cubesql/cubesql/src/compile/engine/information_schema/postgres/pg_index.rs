@@ -68,27 +68,28 @@ impl PgCatalogIndexBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.indexrelid.finish()));
-        columns.push(Arc::new(self.indrelid.finish()));
-        columns.push(Arc::new(self.indnatts.finish()));
-        columns.push(Arc::new(self.indnkeyatts.finish()));
-        columns.push(Arc::new(self.indisunique.finish()));
-        columns.push(Arc::new(self.indisprimary.finish()));
-        columns.push(Arc::new(self.indisexclusion.finish()));
-        columns.push(Arc::new(self.indimmediate.finish()));
-        columns.push(Arc::new(self.indisclustered.finish()));
-        columns.push(Arc::new(self.indisvalid.finish()));
-        columns.push(Arc::new(self.indcheckxmin.finish()));
-        columns.push(Arc::new(self.indisready.finish()));
-        columns.push(Arc::new(self.indislive.finish()));
-        columns.push(Arc::new(self.indisreplident.finish()));
-        columns.push(Arc::new(self.indkey.finish()));
-        columns.push(Arc::new(self.indcollation.finish()));
-        columns.push(Arc::new(self.indclass.finish()));
-        columns.push(Arc::new(self.indoption.finish()));
-        columns.push(Arc::new(self.indexprs.finish()));
-        columns.push(Arc::new(self.indpred.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.indexrelid.finish()),
+            Arc::new(self.indrelid.finish()),
+            Arc::new(self.indnatts.finish()),
+            Arc::new(self.indnkeyatts.finish()),
+            Arc::new(self.indisunique.finish()),
+            Arc::new(self.indisprimary.finish()),
+            Arc::new(self.indisexclusion.finish()),
+            Arc::new(self.indimmediate.finish()),
+            Arc::new(self.indisclustered.finish()),
+            Arc::new(self.indisvalid.finish()),
+            Arc::new(self.indcheckxmin.finish()),
+            Arc::new(self.indisready.finish()),
+            Arc::new(self.indislive.finish()),
+            Arc::new(self.indisreplident.finish()),
+            Arc::new(self.indkey.finish()),
+            Arc::new(self.indcollation.finish()),
+            Arc::new(self.indclass.finish()),
+            Arc::new(self.indoption.finish()),
+            Arc::new(self.indexprs.finish()),
+            Arc::new(self.indpred.finish()),
+        ];
 
         columns
     }
