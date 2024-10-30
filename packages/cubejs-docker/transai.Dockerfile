@@ -96,7 +96,8 @@ ENV CUBEJS_DOCKER_IMAGE_TAG=latest
 
 RUN DEBIAN_FRONTEND=noninteractive \
     && apt-get update \
-    && apt-get install -y --no-install-recommends rxvt-unicode libssl1.1 python3 libpython3-dev \
+    && apt-get install -y --no-install-recommends libssl3 curl \
+       cmake python3.11 libpython3.11-dev gcc g++ make cmake openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
 ENV TERM rxvt-unicode
