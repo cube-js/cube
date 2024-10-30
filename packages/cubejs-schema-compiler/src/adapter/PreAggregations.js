@@ -1190,6 +1190,8 @@ export class PreAggregations {
     const targetDimensionsReferences = this.dimensionsRenderedReference(preAggregationForQuery);
     const targetTimeDimensionsReferences = this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery);
     const targetMeasuresReferences = this.measureAliasesRenderedReference(preAggregationForQuery);
+    // Removing duplicated dimension from targetTimeDimensionsReferences
+    Object.keys(targetDimensionsReferences).forEach(key => { delete targetTimeDimensionsReferences[key]; });
 
     const columnsFor = (targetReferences, references, preAggregation) => Object.keys(targetReferences).map(
       member => `${references[this.query.cubeEvaluator.pathFromArray([preAggregation.cube, member.replace(/^[^.]*\./, '')])]} ${targetReferences[member]}`
@@ -1275,8 +1277,8 @@ export class PreAggregations {
 
     const renderedReference = {
       ...(this.measuresRenderedReference(preAggregationForQuery)),
-      ...(this.dimensionsRenderedReference(preAggregationForQuery)),
       ...(this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery)),
+      ...(this.dimensionsRenderedReference(preAggregationForQuery)),
     };
 
     return this.query.evaluateSymbolSqlWithContext(
@@ -1342,16 +1344,28 @@ export class PreAggregations {
   }
 
   timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery) {
+    const rollupTimeDimensions = this.rollupTimeDimensions(preAggregationForQuery).flatMap(td => {
+      const timeDimension = this.query.newTimeDimension(td);
+      return [
+        { td, timeDimension },
+        { td, timeDimension, withPostfix: true }
+      ];
+    });
+
     return R.pipe(
-      R.map((td) => {
-        const timeDimension = this.query.newTimeDimension(td);
+      R.map(({ td, timeDimension, withPostfix }) => {
+        const dimension = [
+          td.dimension,
+          ...(withPostfix ? [td.granularity] : [])
+        ].join('.');
+
         return [
-          `${td.dimension}.${td.granularity}`,
+          dimension,
           this.query.escapeColumnName(timeDimension.unescapedAliasName(rollupGranularity)),
         ];
       }),
       R.fromPairs,
-    )(this.rollupTimeDimensions(preAggregationForQuery));
+    )(rollupTimeDimensions);
   }
 
   rollupMembers(preAggregationForQuery, type) {
