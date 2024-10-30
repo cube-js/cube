@@ -6,7 +6,8 @@ use crate::{
         rewriter::{CubeEGraph, CubeRewrite},
         rules::{members::MemberRules, wrapper::WrapperRules},
         subquery, transforming_chain_rewrite, transforming_rewrite, wrapped_select,
-        wrapped_select_filter_expr_empty_tail, wrapped_select_having_expr_empty_tail,
+        wrapped_select_aggr_expr_empty_tail, wrapped_select_filter_expr_empty_tail,
+        wrapped_select_group_expr_empty_tail, wrapped_select_having_expr_empty_tail,
         wrapped_select_joins_empty_tail, wrapped_select_order_expr_empty_tail,
         wrapped_select_projection_expr_empty_tail, wrapped_select_subqueries_empty_tail,
         wrapped_select_window_expr_empty_tail, wrapper_pullup_replacer, wrapper_pushdown_replacer,
@@ -345,6 +346,162 @@ impl WrapperRules {
                 "?push_to_cube",
                 "?pushdown_push_to_cube",
                 "?select_push_to_cube",
+            ),
+        )]);
+    }
+
+    pub fn aggregate_merge_rules(&self, rules: &mut Vec<CubeRewrite>) {
+        rules.extend(vec![rewrite(
+            "wrapper-merge-aggregation-with-inner-wrapped-select",
+            // Input is not a finished wrapper_pullup_replacer, but WrappedSelect just before pullup
+            // After pullup replacer would disable push to cube, because any node on top would have WrappedSelect in `from`
+            // So there would be no CubeScan to push to
+            // Instead, this rule tries to catch `from` before pulling up, and merge outer Aggregate into inner WrappedSelect
+            aggregate(
+                cube_scan_wrapper(
+                    wrapped_select(
+                        "WrappedSelectSelectType:Projection",
+                        wrapper_pullup_replacer(
+                            wrapped_select_projection_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_subqueries_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_group_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_aggr_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            wrapped_select_window_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapper_pullup_replacer(
+                            "?inner_from",
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapped_select_joins_empty_tail(),
+                        wrapper_pullup_replacer(
+                            "?inner_filters",
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        wrapped_select_having_expr_empty_tail(),
+                        // Inner must not have limit and offset, because they are not commutative with aggregation
+                        "WrappedSelectLimit:None",
+                        "WrappedSelectOffset:None",
+                        wrapper_pullup_replacer(
+                            wrapped_select_order_expr_empty_tail(),
+                            "?alias_to_cube",
+                            "WrapperPullupReplacerPushToCube:true",
+                            "WrapperPullupReplacerInProjection:false",
+                            "?cube_members",
+                        ),
+                        "WrappedSelectAlias:None",
+                        "WrappedSelectDistinct:false",
+                        "WrappedSelectPushToCube:true",
+                        "WrappedSelectUngroupedScan:true",
+                    ),
+                    "CubeScanWrapperFinalized:false",
+                ),
+                "?group_expr",
+                "?aggr_expr",
+                "AggregateSplit:false",
+            ),
+            cube_scan_wrapper(
+                wrapped_select(
+                    "WrappedSelectSelectType:Aggregate",
+                    wrapper_pullup_replacer(
+                        wrapped_select_projection_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_subqueries_empty_tail(),
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?group_expr",
+                        "?alias_to_cube",
+                        "WrapperPushdownReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pushdown_replacer(
+                        "?aggr_expr",
+                        "?alias_to_cube",
+                        "WrapperPushdownReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        wrapped_select_window_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapper_pullup_replacer(
+                        "?inner_from",
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapped_select_joins_empty_tail(),
+                    wrapper_pullup_replacer(
+                        "?inner_filters",
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    wrapped_select_having_expr_empty_tail(),
+                    "WrappedSelectLimit:None",
+                    "WrappedSelectOffset:None",
+                    wrapper_pullup_replacer(
+                        wrapped_select_order_expr_empty_tail(),
+                        "?alias_to_cube",
+                        "WrapperPullupReplacerPushToCube:true",
+                        "WrapperPullupReplacerInProjection:false",
+                        "?cube_members",
+                    ),
+                    "WrappedSelectAlias:None",
+                    "WrappedSelectDistinct:false",
+                    "WrappedSelectPushToCube:true",
+                    "WrappedSelectUngroupedScan:false",
+                ),
+                "CubeScanWrapperFinalized:false",
             ),
         )]);
     }
