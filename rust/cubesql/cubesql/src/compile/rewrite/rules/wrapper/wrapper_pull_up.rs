@@ -204,7 +204,8 @@ impl WrapperRules {
                         ),
                         "?select_alias",
                         "?select_distinct",
-                        "?select_push_to_cube",
+                        // This node has a WrappedSelect in from, so it's not allowed to use push to Cube
+                        "WrappedSelectPushToCube:false",
                         "?select_ungrouped_scan",
                     ),
                     "CubeScanWrapperFinalized:false",
@@ -245,7 +246,7 @@ impl WrapperRules {
                             "?order_expr",
                             "?select_alias",
                             "?select_distinct",
-                            "?select_push_to_cube",
+                            "WrappedSelectPushToCube:false",
                             "?select_ungrouped_scan",
                         ),
                         "?alias_to_cube",
