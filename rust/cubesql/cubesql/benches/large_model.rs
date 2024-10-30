@@ -2,10 +2,13 @@ use std::{env::set_var, sync::Arc, time::Duration};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure};
+use cubeclient::models::{V1CubeMeta, V1CubeMetaDimension, V1CubeMetaMeasure, V1CubeMetaType};
 use cubesql::{
     compile::test::{
-        rewrite_engine::{cube_context, query_to_logical_plan, rewrite_rules, rewrite_runner},
+        rewrite_engine::{
+            create_test_postgresql_cube_context, query_to_logical_plan, rewrite_rules,
+            rewrite_runner,
+        },
         sql_generator,
     },
     transport::MetaContext,
@@ -16,9 +19,13 @@ use uuid::Uuid;
 
 macro_rules! bench_large_model {
     ($DIMS:expr, $NAME:expr, $QUERY_FN:expr, $CRITERION:expr) => {{
-        let context = Arc::new(futures::executor::block_on(cube_context(
-            get_large_model_test_tenant_ctx($DIMS),
-        )));
+        let context = Arc::new(
+            futures::executor::block_on(create_test_postgresql_cube_context(
+                get_large_model_test_tenant_ctx($DIMS),
+            ))
+            .unwrap(),
+        );
+
         let plan = query_to_logical_plan($QUERY_FN($DIMS), &context);
         let rules = rewrite_rules(context.clone());
 
@@ -63,29 +70,39 @@ pub fn get_large_model_test_meta(dims: usize) -> Vec<V1CubeMeta> {
     let cube_name = format!("LargeCube_{}", dims);
     vec![V1CubeMeta {
         name: cube_name.clone(),
+        description: None,
         title: None,
+        r#type: V1CubeMetaType::Cube,
         measures: vec![
             V1CubeMetaMeasure {
                 name: format!("{}.count", cube_name),
                 title: None,
-                _type: "number".to_string(),
+                description: None,
+                r#type: "number".to_string(),
                 agg_type: Some("count".to_string()),
+                meta: None,
             },
             V1CubeMetaMeasure {
                 name: format!("{}.sum", cube_name),
                 title: None,
-                _type: "number".to_string(),
+                description: None,
+                r#type: "number".to_string(),
                 agg_type: Some("sum".to_string()),
+                meta: None,
             },
         ],
         dimensions: (1..=dims)
             .map(|n| V1CubeMetaDimension {
                 name: format!("{}.n{}", cube_name, n),
-                _type: "number".to_string(),
+                description: None,
+                r#type: "number".to_string(),
+                granularities: None,
+                meta: None,
             })
             .collect(),
         segments: vec![],
         joins: None,
+        meta: None,
     }]
 }
 

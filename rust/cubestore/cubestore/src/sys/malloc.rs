@@ -6,7 +6,7 @@ pub const HAS_TRIM_ALLOC: bool = false;
 /// Ask the memory allocator to return the freed memory to the system.
 /// This only has effect when compiled for glibc, this is a no-op on other systems.
 ///
-/// Cubestore produces allocation patterns that hit the limitations of glibc`s malloc, which results
+/// Cubestore produces allocation patterns that hit the limitations of glibc's malloc, which results
 /// in too many physical memory pages being retained in the allocator's arena. This leads to the
 /// resident set size growing over the acceptable limits.
 /// Probably related to https://sourceware.org/bugzilla/show_bug.cgi?id=11261.

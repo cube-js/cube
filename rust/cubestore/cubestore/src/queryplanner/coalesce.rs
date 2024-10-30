@@ -1,5 +1,5 @@
-use arrow::array::ArrayRef;
-use arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
+use datafusion::arrow::array::ArrayRef;
+use datafusion::arrow::datatypes::{DataType, IntervalUnit, TimeUnit};
 use datafusion::cube_match_array;
 use datafusion::error::DataFusionError;
 use datafusion::physical_plan::ColumnarValue;

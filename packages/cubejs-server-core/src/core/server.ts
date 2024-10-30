@@ -177,7 +177,7 @@ export class CubejsServerCore {
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
     if (opts.eventEmitterOptions?.type || getEnv('eventEmitterSetting') === 'redis') {
-      console.log('Redis Event Emitter');
+      console.log('🔗 TransAI Redis Event Emitter');
       const options = opts.eventEmitterOptions as RedisEventEmitterOptions | undefined;
       const url = options?.url || getEnv('eventEmitterRedisUrl');
       this.eventEmitter = new RedisEventEmitter(url);
@@ -459,7 +459,6 @@ export class CubejsServerCore {
         standalone: this.standalone,
         dataSourceStorage: this.orchestratorStorage,
         basePath: this.options.basePath,
-        checkAuthMiddleware: this.options.checkAuthMiddleware,
         contextRejectionMiddleware: this.contextRejectionMiddleware.bind(this),
         wsContextAcceptor: this.contextAcceptor.shouldAcceptWs.bind(this.contextAcceptor),
         checkAuth: this.options.checkAuth,
@@ -523,6 +522,7 @@ export class CubejsServerCore {
           ),
           externalDialectClass: this.options.externalDialectFactory && this.options.externalDialectFactory(context),
           schemaVersion: currentSchemaVersion,
+          contextToRoles: this.options.contextToRoles,
           preAggregationsSchema: await this.preAggregationsSchema(context),
           context,
           allowJsDuplicatePropsInSchema: this.options.allowJsDuplicatePropsInSchema,
@@ -684,6 +684,7 @@ export class CubejsServerCore {
       options.dbType || this.options.dbType,
       {
         schemaVersion: options.schemaVersion || this.options.schemaVersion,
+        contextToRoles: this.options.contextToRoles,
         devServer: this.options.devServer,
         logger: this.logger,
         externalDbType: options.externalDbType,

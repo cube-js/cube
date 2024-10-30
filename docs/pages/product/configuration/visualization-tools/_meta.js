@@ -5,6 +5,7 @@ module.exports = {
   "deepnote": "Deepnote",
   "excel": "Excel",
   "explo": "Explo",
+  "google-sheets": "Google Sheets",
   "hashboard": "Hashboard",
   "hex": "Hex",
   "hightouch": "Hightouch",

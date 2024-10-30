@@ -1,6 +1,7 @@
 use cubesql::compile::engine::df::scan::{
     transform_response, FieldValue, MemberField, RecordBatch, SchemaRef, ValueObject,
 };
+use std::borrow::Cow;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -211,7 +212,7 @@ impl ValueObject for JsValueObject<'_> {
                 CubeError::user(format!("Can't get '{}' field value: {}", field_name, e))
             })?;
         if let Ok(s) = value.downcast::<JsString, _>(&mut self.cx) {
-            Ok(FieldValue::String(s.value(&mut self.cx)))
+            Ok(FieldValue::String(Cow::Owned(s.value(&mut self.cx))))
         } else if let Ok(n) = value.downcast::<JsNumber, _>(&mut self.cx) {
             Ok(FieldValue::Number(n.value(&mut self.cx)))
         } else if let Ok(b) = value.downcast::<JsBoolean, _>(&mut self.cx) {

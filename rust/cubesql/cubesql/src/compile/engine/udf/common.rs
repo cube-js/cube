@@ -1,4 +1,8 @@
-use std::{any::type_name, sync::Arc, thread};
+use std::{
+    any::type_name,
+    sync::{Arc, LazyLock},
+    thread,
+};
 
 use chrono::{Datelike, Days, Duration, Months, NaiveDate, NaiveDateTime, NaiveTime};
 use datafusion::{
@@ -41,6 +45,7 @@ use sha1_smol::Sha1;
 use crate::{
     compile::engine::{
         df::{coerce::common_type_coercion, columar::if_then_else},
+        information_schema::postgres::{PG_NAMESPACE_CATALOG_OID, PG_NAMESPACE_PUBLIC_OID},
         udf::utils::*,
     },
     sql::SessionState,
@@ -2206,7 +2211,7 @@ pub fn create_pg_type_is_visible_udf() -> ScalarUDF {
                     }
 
                     match PgTypeId::from_oid(oid)?.to_type().typnamespace {
-                        11 | 2200 => Some(true),
+                        PG_NAMESPACE_CATALOG_OID | PG_NAMESPACE_PUBLIC_OID => Some(true),
                         _ => Some(false),
                     }
                 }
@@ -3328,17 +3333,18 @@ pub fn create_current_setting_udf() -> ScalarUDF {
 }
 
 pub fn create_quote_ident_udf() -> ScalarUDF {
+    static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap());
+
     let fun = make_scalar_function(move |args: &[ArrayRef]| {
         assert!(args.len() == 1);
 
         let idents = downcast_string_arg!(args[0], "str", i32);
 
-        let re = Regex::new(r"^[a-z_][a-z0-9_]*$").unwrap();
         let result = idents
             .iter()
             .map(|ident| {
                 ident.map(|ident| {
-                    if re.is_match(ident) {
+                    if RE.is_match(ident) {
                         return ident.to_string();
                     }
                     format!("\"{}\"", ident.replace("\"", "\"\""))
@@ -4694,19 +4700,6 @@ pub fn register_fun_stubs(mut ctx: SessionContext) -> SessionContext {
         udf,
         "regexp_count",
         tsigs = [[Utf8, Utf8], [Utf8, Utf8, Int32], [Utf8, Utf8, Int32, Utf8],],
-        rettyp = Int32
-    );
-    register_fun_stub!(
-        udf,
-        "regexp_instr",
-        tsigs = [
-            [Utf8, Utf8],
-            [Utf8, Utf8, Int32],
-            [Utf8, Utf8, Int32, Int32],
-            [Utf8, Utf8, Int32, Int32, Int32],
-            [Utf8, Utf8, Int32, Int32, Int32, Utf8],
-            [Utf8, Utf8, Int32, Int32, Int32, Utf8, Int32],
-        ],
         rettyp = Int32
     );
     register_fun_stub!(

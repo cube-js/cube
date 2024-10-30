@@ -772,7 +772,7 @@ impl RocksStoreConfig {
             // Default: 1 (i.e. no subcompactions)
             max_subcompactions: 1,
             // Default: 1
-            parallelism: 1,
+            parallelism: 2,
         }
     }
 

@@ -26,3 +26,14 @@ chrono = { version = "0.4", package = "chrono", default-features = false, featur
 [dev-dependencies]
 hex = "0.4.3"
 
+# Code in cubesql workspace is not ready for full-blown clippy
+# So we disable some rules to enable per-rule latch in CI, not for a whole clippy run
+# Feel free to remove any rule from here and fix all warnings with it
+# Or to write a comment why rule should stay disabled
+[lints.clippy]
+len_without_is_empty = "allow"
+new_without_default = "allow"
+redundant_slicing = "allow"
+single_char_add_str = "allow"
+single_match = "allow"
+to_string_trait_impl = "allow"

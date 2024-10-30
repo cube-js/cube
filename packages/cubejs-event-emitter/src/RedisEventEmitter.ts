@@ -22,7 +22,9 @@ export class RedisEventEmitter implements EventEmitterInterface {
     public constructor(url: string) {
       this.#url = url;
       this.init().then(() => {
-        console.log('Redis client is initialized');
+        console.log('🔗 TransAI Redis Client is initialized');
+      }).catch((error) => {
+        console.error('🔗 TransAI Redis Client initialization failed', error);
       });
     }
 

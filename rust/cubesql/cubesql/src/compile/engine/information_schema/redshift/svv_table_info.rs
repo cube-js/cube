@@ -103,28 +103,29 @@ impl RedshiftSvvTableInfoBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-        columns.push(Arc::new(self.databases.finish()));
-        columns.push(Arc::new(self.schemas.finish()));
-        columns.push(Arc::new(self.table_ids.finish()));
-        columns.push(Arc::new(self.tables.finish()));
-        columns.push(Arc::new(self.encoded.finish()));
-        columns.push(Arc::new(self.diststyles.finish()));
-        columns.push(Arc::new(self.sortkey1s.finish()));
-        columns.push(Arc::new(self.max_varchars.finish()));
-        columns.push(Arc::new(self.sortkey1_encs.finish()));
-        columns.push(Arc::new(self.sortkey_nums.finish()));
-        columns.push(Arc::new(self.sizes.finish()));
-        columns.push(Arc::new(self.pct_used.finish()));
-        columns.push(Arc::new(self.empty.finish()));
-        columns.push(Arc::new(self.unsorted.finish()));
-        columns.push(Arc::new(self.stats_off.finish()));
-        columns.push(Arc::new(self.tbl_rows.finish()));
-        columns.push(Arc::new(self.skew_sortkey1s.finish()));
-        columns.push(Arc::new(self.skew_rows.finish()));
-        columns.push(Arc::new(self.estimated_visible_rows.finish()));
-        columns.push(Arc::new(self.risk_events.finish()));
-        columns.push(Arc::new(self.vacuum_sort_benefits.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.databases.finish()),
+            Arc::new(self.schemas.finish()),
+            Arc::new(self.table_ids.finish()),
+            Arc::new(self.tables.finish()),
+            Arc::new(self.encoded.finish()),
+            Arc::new(self.diststyles.finish()),
+            Arc::new(self.sortkey1s.finish()),
+            Arc::new(self.max_varchars.finish()),
+            Arc::new(self.sortkey1_encs.finish()),
+            Arc::new(self.sortkey_nums.finish()),
+            Arc::new(self.sizes.finish()),
+            Arc::new(self.pct_used.finish()),
+            Arc::new(self.empty.finish()),
+            Arc::new(self.unsorted.finish()),
+            Arc::new(self.stats_off.finish()),
+            Arc::new(self.tbl_rows.finish()),
+            Arc::new(self.skew_sortkey1s.finish()),
+            Arc::new(self.skew_rows.finish()),
+            Arc::new(self.estimated_visible_rows.finish()),
+            Arc::new(self.risk_events.finish()),
+            Arc::new(self.vacuum_sort_benefits.finish()),
+        ];
 
         columns
     }

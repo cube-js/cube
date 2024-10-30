@@ -79,33 +79,33 @@ impl PgCatalogConstraintBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.oid.finish()));
-        columns.push(Arc::new(self.conname.finish()));
-        columns.push(Arc::new(self.connamespace.finish()));
-        columns.push(Arc::new(self.contype.finish()));
-        columns.push(Arc::new(self.condeferrable.finish()));
-        columns.push(Arc::new(self.condeferred.finish()));
-        columns.push(Arc::new(self.convalidated.finish()));
-        columns.push(Arc::new(self.conrelid.finish()));
-        columns.push(Arc::new(self.contypid.finish()));
-        columns.push(Arc::new(self.conindid.finish()));
-        columns.push(Arc::new(self.conparentid.finish()));
-        columns.push(Arc::new(self.confrelid.finish()));
-        columns.push(Arc::new(self.confupdtype.finish()));
-        columns.push(Arc::new(self.confdeltype.finish()));
-        columns.push(Arc::new(self.confmatchtype.finish()));
-        columns.push(Arc::new(self.conislocal.finish()));
-        columns.push(Arc::new(self.coninhcount.finish()));
-        columns.push(Arc::new(self.connoinherit.finish()));
-        columns.push(Arc::new(self.conkey.finish()));
-        columns.push(Arc::new(self.confkey.finish()));
-        columns.push(Arc::new(self.conpfeqop.finish()));
-        columns.push(Arc::new(self.conppeqop.finish()));
-        columns.push(Arc::new(self.conffeqop.finish()));
-        columns.push(Arc::new(self.conexclop.finish()));
-        columns.push(Arc::new(self.conbin.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.oid.finish()),
+            Arc::new(self.conname.finish()),
+            Arc::new(self.connamespace.finish()),
+            Arc::new(self.contype.finish()),
+            Arc::new(self.condeferrable.finish()),
+            Arc::new(self.condeferred.finish()),
+            Arc::new(self.convalidated.finish()),
+            Arc::new(self.conrelid.finish()),
+            Arc::new(self.contypid.finish()),
+            Arc::new(self.conindid.finish()),
+            Arc::new(self.conparentid.finish()),
+            Arc::new(self.confrelid.finish()),
+            Arc::new(self.confupdtype.finish()),
+            Arc::new(self.confdeltype.finish()),
+            Arc::new(self.confmatchtype.finish()),
+            Arc::new(self.conislocal.finish()),
+            Arc::new(self.coninhcount.finish()),
+            Arc::new(self.connoinherit.finish()),
+            Arc::new(self.conkey.finish()),
+            Arc::new(self.confkey.finish()),
+            Arc::new(self.conpfeqop.finish()),
+            Arc::new(self.conppeqop.finish()),
+            Arc::new(self.conffeqop.finish()),
+            Arc::new(self.conexclop.finish()),
+            Arc::new(self.conbin.finish()),
+        ];
 
         columns
     }

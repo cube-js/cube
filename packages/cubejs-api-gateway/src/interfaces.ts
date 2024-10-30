@@ -71,17 +71,6 @@ export {
 };
 
 /**
- * Auth middleware.
- * @deprecated
- */
-export type CheckAuthMiddlewareFn =
- (
-   req: Request,
-   res: ExpressResponse,
-   next: ExpressNextFunction,
- ) => void;
-
-/**
  * Context rejection middleware.
  */
 export type ContextRejectionMiddlewareFn =

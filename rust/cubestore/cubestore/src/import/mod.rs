@@ -5,12 +5,12 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use arrow::array::{ArrayBuilder, ArrayRef};
 use async_compression::tokio::bufread::GzipDecoder;
 use async_std::io::SeekFrom;
 use async_std::task::{Context, Poll};
 use async_trait::async_trait;
 use bigdecimal::{BigDecimal, Num};
+use datafusion::arrow::array::{ArrayBuilder, ArrayRef};
 use datafusion::cube_ext;
 use futures::future::join_all;
 use futures::{Stream, StreamExt};

@@ -1,7 +1,7 @@
 use crate::{
     compile::QueryPlan,
     sql::{
-        dataframe::{batch_to_dataframe, DataFrame, TableValue},
+        dataframe::{batches_to_dataframe, DataFrame, TableValue},
         statement::PostgresStatementParamsBinder,
         temp_tables::TempTable,
         writer::BatchWriter,
@@ -390,7 +390,7 @@ impl Portal {
             }
         };
 
-        let frame = batch_to_dataframe(batch_for_write.schema().as_ref(), &vec![batch_for_write])?;
+        let frame = batches_to_dataframe(batch_for_write.schema().as_ref(), vec![batch_for_write])?;
 
         Ok((unused, self.dataframe_to_writer(frame)?))
     }
@@ -492,7 +492,7 @@ impl Portal {
 
                             return;
                         }
-                        QueryPlan::DataFusionSelect(_, plan, ctx) => {
+                        QueryPlan::DataFusionSelect(plan, ctx) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let safe_stream = async move {
                                 std::panic::AssertUnwindSafe(df.execute_stream())
@@ -511,7 +511,7 @@ impl Portal {
                                 Err(err) => return yield Err(CubeError::panic(err).into()),
                             }
                         }
-                        QueryPlan::CreateTempTable(_, plan, ctx, name, temp_tables) => {
+                        QueryPlan::CreateTempTable(plan, ctx, name, temp_tables) => {
                             let df = DFDataFrame::new(ctx.state.clone(), &plan);
                             let record_batch = df.collect();
                             let row_count = match record_batch.await {

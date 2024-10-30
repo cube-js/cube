@@ -5,6 +5,7 @@ module.exports = {
     {
       name: 'KibanaSampleDataEcommerce',
       title: 'Ecommerce',
+      type: 'cube',
       measures: [
         {
           name: 'KibanaSampleDataEcommerce.count',
@@ -126,6 +127,7 @@ module.exports = {
     {
       name: 'Logs',
       title: 'Logs',
+      type: 'cube',
       measures: [
         {
           name: 'Logs.count',

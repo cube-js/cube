@@ -132,7 +132,6 @@ export interface QueryCacheOptions {
     orphanedTimeout?: number;
     heartBeatInterval?: number;
   }>;
-  redisPool?: any;
   cubeStoreDriverFactory?: () => Promise<CubeStoreDriver>,
   continueWaitTimeout?: number;
   cacheAndQueueDriver?: CacheAndQueryDriverType;
@@ -505,7 +504,6 @@ export class QueryCache {
           {
             logger: this.logger,
             cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-            redisPool: this.options.redisPool,
             cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
             // Centralized continueWaitTimeout that can be overridden in queueOptions
             continueWaitTimeout: this.options.continueWaitTimeout,
@@ -572,7 +570,6 @@ export class QueryCache {
         {
           logger: this.logger,
           cacheAndQueueDriver: this.options.cacheAndQueueDriver,
-          redisPool: this.options.redisPool,
           cubeStoreDriverFactory: this.options.cubeStoreDriverFactory,
           // Centralized continueWaitTimeout that can be overridden in queueOptions
           continueWaitTimeout: this.options.continueWaitTimeout,

@@ -2,7 +2,7 @@ use crate::gateway::ApiGatewayState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use serde_derive::Serialize;
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct HandlerResponse {

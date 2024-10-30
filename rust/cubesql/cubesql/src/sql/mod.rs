@@ -1,5 +1,5 @@
 pub(crate) mod auth_service;
-pub(crate) mod compiler_cache;
+pub mod compiler_cache;
 pub(crate) mod database_variables;
 pub mod dataframe;
 pub(crate) mod postgres;

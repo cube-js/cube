@@ -16,15 +16,15 @@ describe('MSSqlUngrouped', () => {
       type: 'number',
       sql: new Function('visitor_revenue', 'visitor_count', 'return visitor_revenue + "/" + visitor_count')
     }
-  
+
     cube(\`visitors\`, {
       sql: \`
-      select * from ##visitors WHERE \${USER_CONTEXT.source.filter('source')} AND
-      \${USER_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
+      select * from ##visitors WHERE \${SECURITY_CONTEXT.source.filter('source')} AND
+      \${SECURITY_CONTEXT.sourceArray.filter(sourceArray => \`source in (\${sourceArray.join(',')})\`)}
       \`,
-      
+
       rewriteQueries: true,
-      
+
       refreshKey: {
         sql: 'SELECT 1',
       },
@@ -122,37 +122,37 @@ describe('MSSqlUngrouped', () => {
           type: 'time',
           sql: 'created_at'
         },
-        
+
         createdAtSqlUtils: {
           type: 'time',
           sql: SQL_UTILS.convertTz('created_at')
         },
-        
+
         checkins: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         checkinsRolling: {
           sql: \`\${visitor_checkins.visitorCheckinsRolling}\`,
           type: \`number\`,
           subQuery: true
         },
-        
+
         checkinsWithPropagation: {
           sql: \`\${visitor_checkins.visitor_checkins_count}\`,
           type: \`number\`,
           subQuery: true,
           propagateFiltersToSubQuery: true
         },
-        
+
         subQueryFail: {
           sql: '2',
           type: \`number\`,
           subQuery: true
         },
-        
+
         doubledCheckings: {
           sql: \`\${checkins} * 2\`,
           type: 'number'
@@ -181,11 +181,11 @@ describe('MSSqlUngrouped', () => {
 
     cube('visitor_checkins', {
       sql: \`
-      select * from ##visitor_checkins WHERE 
+      select * from ##visitor_checkins WHERE
       \${FILTER_PARAMS.visitor_checkins.created_at.filter('created_at')} AND
       \${FILTER_GROUP(FILTER_PARAMS.visitor_checkins.created_at.filter("dateadd(day, -3, created_at)"), FILTER_PARAMS.visitor_checkins.source.filter('source'))}
       \`,
-      
+
       rewriteQueries: true,
 
       joins: {
@@ -199,14 +199,14 @@ describe('MSSqlUngrouped', () => {
         visitor_checkins_count: {
           type: 'count'
         },
-        
+
         visitorCheckinsRolling: {
           type: 'count',
           rollingWindow: {
             trailing: 'unbounded'
           }
         },
-        
+
         revenue_per_checkin: {
           type: 'number',
           sql: \`\${visitors.visitor_revenue} / \${visitor_checkins_count}\`
@@ -259,7 +259,7 @@ describe('MSSqlUngrouped', () => {
           subQuery: true
         },
       },
-      
+
       preAggregations: {
         checkinSource: {
           type: 'rollup',
@@ -331,9 +331,9 @@ describe('MSSqlUngrouped', () => {
         }
       }
     })
-    
-    
-    
+
+
+
     `);
 
   async function runQueryTest(q, expectedResult) {

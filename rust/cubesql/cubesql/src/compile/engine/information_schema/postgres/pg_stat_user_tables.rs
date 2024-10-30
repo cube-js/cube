@@ -99,31 +99,31 @@ impl PgCatalogStatUserTablesBuilder {
     }
 
     fn finish(mut self) -> Vec<Arc<dyn Array>> {
-        let mut columns: Vec<Arc<dyn Array>> = vec![];
-
-        columns.push(Arc::new(self.relid.finish()));
-        columns.push(Arc::new(self.schemaname.finish()));
-        columns.push(Arc::new(self.relname.finish()));
-        columns.push(Arc::new(self.seq_scan.finish()));
-        columns.push(Arc::new(self.seq_tup_read.finish()));
-        columns.push(Arc::new(self.idx_scan.finish()));
-        columns.push(Arc::new(self.idx_tup_fetch.finish()));
-        columns.push(Arc::new(self.n_tup_ins.finish()));
-        columns.push(Arc::new(self.n_tup_upd.finish()));
-        columns.push(Arc::new(self.n_tup_del.finish()));
-        columns.push(Arc::new(self.n_tup_hot_upd.finish()));
-        columns.push(Arc::new(self.n_live_tup.finish()));
-        columns.push(Arc::new(self.n_dead_tup.finish()));
-        columns.push(Arc::new(self.n_mod_since_analyze.finish()));
-        columns.push(Arc::new(self.n_ins_since_vacuum.finish()));
-        columns.push(Arc::new(self.last_vacuum.finish()));
-        columns.push(Arc::new(self.last_autovacuum.finish()));
-        columns.push(Arc::new(self.last_analyze.finish()));
-        columns.push(Arc::new(self.last_autoanalyze.finish()));
-        columns.push(Arc::new(self.vacuum_count.finish()));
-        columns.push(Arc::new(self.autovacuum_count.finish()));
-        columns.push(Arc::new(self.analyze_count.finish()));
-        columns.push(Arc::new(self.autoanalyze_count.finish()));
+        let columns: Vec<Arc<dyn Array>> = vec![
+            Arc::new(self.relid.finish()),
+            Arc::new(self.schemaname.finish()),
+            Arc::new(self.relname.finish()),
+            Arc::new(self.seq_scan.finish()),
+            Arc::new(self.seq_tup_read.finish()),
+            Arc::new(self.idx_scan.finish()),
+            Arc::new(self.idx_tup_fetch.finish()),
+            Arc::new(self.n_tup_ins.finish()),
+            Arc::new(self.n_tup_upd.finish()),
+            Arc::new(self.n_tup_del.finish()),
+            Arc::new(self.n_tup_hot_upd.finish()),
+            Arc::new(self.n_live_tup.finish()),
+            Arc::new(self.n_dead_tup.finish()),
+            Arc::new(self.n_mod_since_analyze.finish()),
+            Arc::new(self.n_ins_since_vacuum.finish()),
+            Arc::new(self.last_vacuum.finish()),
+            Arc::new(self.last_autovacuum.finish()),
+            Arc::new(self.last_analyze.finish()),
+            Arc::new(self.last_autoanalyze.finish()),
+            Arc::new(self.vacuum_count.finish()),
+            Arc::new(self.autovacuum_count.finish()),
+            Arc::new(self.analyze_count.finish()),
+            Arc::new(self.autoanalyze_count.finish()),
+        ];
 
         columns
     }
@@ -135,7 +135,7 @@ pub struct PgCatalogStatUserTablesProvider {
 
 // https://www.postgresql.org/docs/14/monitoring-stats.html#MONITORING-PG-STAT-ALL-TABLES-VIEW
 impl PgCatalogStatUserTablesProvider {
-    pub fn new(cube_tables: &Vec<CubeMetaTable>) -> Self {
+    pub fn new(cube_tables: &[CubeMetaTable]) -> Self {
         let mut builder = PgCatalogStatUserTablesBuilder::new(cube_tables.len());
 
         for table in cube_tables.iter() {

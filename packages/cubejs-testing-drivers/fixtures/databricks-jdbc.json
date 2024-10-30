@@ -1,6 +1,6 @@
 {
   "extendedEnvs": {
-    "export-bucket": {
+    "export-bucket-s3": {
       "cube": {
         "environment": {
           "CUBEJS_DB_EXPORT_BUCKET_TYPE": "s3",
@@ -8,6 +8,15 @@
           "CUBEJS_DB_EXPORT_BUCKET_AWS_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_KEY}",
           "CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AWS_SECRET}",
           "CUBEJS_DB_EXPORT_BUCKET_AWS_REGION": "us-east-1"
+        }
+      }
+    },
+    "export-bucket-azure": {
+      "cube": {
+        "environment": {
+          "CUBEJS_DB_EXPORT_BUCKET_TYPE": "azure",
+          "CUBEJS_DB_EXPORT_BUCKET": "wasbs://databricks-drivers-tests-preaggs@coreteamdevtest.blob.core.windows.net",
+          "CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY": "${DRIVERS_TESTS_CUBEJS_DB_EXPORT_BUCKET_AZURE_KEY}"
         }
       }
     }
@@ -151,13 +160,20 @@
     "for the ECommerce.TimeAnalysisExternal",
 
     "---------------------------------------",
-    "SKIPED FOR ALL                         ",
+    "SKIPPED FOR ALL                        ",
     "---------------------------------------",
     "querying Products: dimensions -- doesn't work wo ordering",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- rounding in athena",
     "querying ECommerce: total sales, total profit by month + order (date) + total -- doesn't work with the BigQuery",
     "querying ECommerce: total quantity, avg discount, total sales, total profit by product + order + total -- noisy test",
 
+    "---------------------------------------",
+    "Custom Granularities                   ",
+    "---------------------------------------",
+    "querying custom granularities ECommerce: count by three_months_by_march + no dimension",
+    "querying custom granularities ECommerce: count by three_months_by_march + dimension",
+
+    "---------------------------------------",
     "SKIPPED SQL API (Need work)",
     "---------------------------------------",
     "SQL API: Nested Rollup",

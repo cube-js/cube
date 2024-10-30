@@ -103,7 +103,7 @@ const querySchema = Joi.object().keys({
   filters: Joi.array().items(oneFilter, oneCondition),
   timeDimensions: Joi.array().items(Joi.object().keys({
     dimension: id.required(),
-    granularity: Joi.valid('quarter', 'day', 'month', 'year', 'week', 'hour', 'minute', 'second', null),
+    granularity: Joi.string().max(128, 'utf8'), // Custom granularities may have arbitrary names
     dateRange: [
       Joi.array().items(Joi.string()).min(1).max(2),
       Joi.string()
