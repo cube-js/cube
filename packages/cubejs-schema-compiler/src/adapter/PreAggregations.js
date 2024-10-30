@@ -1209,6 +1209,8 @@ export class PreAggregations {
         columns: columnsFor(targetDimensionsReferences, dimensionsReferences, preAggregation)
           .concat(columnsFor(targetTimeDimensionsReferences, timeDimensionsReferences, preAggregation))
           .concat(columnsFor(targetMeasuresReferences, measuresReferences, preAggregation))
+          // Deduplicate columns, for case when targetTimeDimensionsReferences has the same column as targetDimensionsReferences
+          // Concat order is important, targetDimensionsReferences should override targetTimeDimensionsReferences
           .reduce((acc, v) => {
             if (!acc.includes(v)) {
               acc.push(v);
@@ -1281,6 +1283,7 @@ export class PreAggregations {
 
     const renderedReference = {
       ...(this.measuresRenderedReference(preAggregationForQuery)),
+      // Merge order is important, dimensionsRenderedReference must override timeDimensionsRenderedReference
       ...(this.timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery)),
       ...(this.dimensionsRenderedReference(preAggregationForQuery)),
     };
@@ -1348,6 +1351,9 @@ export class PreAggregations {
   }
 
   timeDimensionsRenderedReference(rollupGranularity, preAggregationForQuery) {
+    // We have to support 2 time dimensions references
+    // In the case where the original time column was added as a dimension in the rollup - the engine will use the original value overridden using dimension references
+    // Otherwise, the cube will use a truncated time representation, but with the original column name
     const rollupTimeDimensions = this.rollupTimeDimensions(preAggregationForQuery).flatMap(td => {
       const timeDimension = this.query.newTimeDimension(td);
       return [
