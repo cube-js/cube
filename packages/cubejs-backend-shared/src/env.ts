@@ -1777,10 +1777,6 @@ const variables: Record<string, (...args: any) => any> = {
   // Support for Redis as queue & cache driver was removed in 0.36
   // This code is used to detect Redis and throw an error
   // TODO(ovr): Remove in after 1.0 + LTS
-  redisUseIORedis: () => get('CUBEJS_REDIS_USE_IOREDIS')
-    .default('false')
-    .asBoolStrict(),
-  // TODO(ovr): Remove in after 1.0 + LTS
   redisUrl: () => {
     const redisUrl = get('CUBEJS_REDIS_URL')
       .asString();

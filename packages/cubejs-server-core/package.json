@@ -26,7 +26,8 @@
     "lint": "eslint src/* test/* --ext .ts,.js",
     "lint:fix": "eslint --fix src/* test/* --ext .ts,.js",
     "test": "npm run unit",
-    "unit": "jest --runInBand --forceExit --coverage dist/test"
+    "unit": "jest --runInBand --forceExit --coverage dist/test",
+    "use:transai": "yarn link @cubejs-backend/shared && yarn link @cubejs-backend/cloud && yarn link @cubejs-backend/native && yarn link @cubejs-backend/server && yarn link @cubejs-backend/api-gateway && yarn link @cubejs-backend/schema-compiler && yarn link @cubejs-backend/query-orchestrator && yarn link @cubejs-backend/postgres-driver && yarn link @cubejs-backend/cubestore-driver && yarn link @cubejs-backend/event-emitter && yarn link"
   },
   "dependencies": {
     "@cubejs-backend/api-gateway": "1.1.0",

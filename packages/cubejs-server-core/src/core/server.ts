@@ -177,7 +177,7 @@ export class CubejsServerCore {
     this.repositoryFactory = this.options.repositoryFactory || (() => this.repository);
 
     if (opts.eventEmitterOptions?.type || getEnv('eventEmitterSetting') === 'redis') {
-      console.log('Redis Event Emitter');
+      console.log('🔗 TransAI Redis Event Emitter');
       const options = opts.eventEmitterOptions as RedisEventEmitterOptions | undefined;
       const url = options?.url || getEnv('eventEmitterRedisUrl');
       this.eventEmitter = new RedisEventEmitter(url);
