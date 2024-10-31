@@ -23,5 +23,5 @@ pub use base_member::{BaseMember, BaseMemberHelper};
 pub use base_query::BaseQuery;
 pub use base_time_dimension::BaseTimeDimension;
 pub use params_allocator::ParamsAllocator;
-pub use query_properties::{OrderByItem, QueryProperties};
+pub use query_properties::{FullKeyAggregateMeasures, OrderByItem, QueryProperties};
 pub use visitor_context::{evaluate_with_context, VisitorContext};

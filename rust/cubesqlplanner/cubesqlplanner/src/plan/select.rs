@@ -1,30 +1,31 @@
 use itertools::Itertools;
 
 use super::{Expr, Filter, From, OrderBy, Subquery};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct Select {
-    pub projection: Vec<Expr>,
-    pub from: From,
-    pub filter: Option<Filter>,
-    pub group_by: Vec<Expr>,
-    pub having: Option<Filter>,
-    pub order_by: Vec<OrderBy>,
-    pub context: Rc<VisitorContext>,
-    pub ctes: Vec<Rc<Subquery>>,
-    pub is_distinct: bool,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub(super) projection: Vec<Expr>,
+    pub(super) from: From,
+    pub(super) filter: Option<Filter>,
+    pub(super) group_by: Vec<Expr>,
+    pub(super) having: Option<Filter>,
+    pub(super) order_by: Vec<OrderBy>,
+    pub(super) context: Rc<VisitorContext>,
+    pub(super) ctes: Vec<Rc<Subquery>>,
+    pub(super) is_distinct: bool,
+    pub(super) limit: Option<usize>,
+    pub(super) offset: Option<usize>,
 }
 
 impl Select {
-    pub fn to_sql(&self) -> Result<String, CubeError> {
+    pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
         let projection = self
             .projection
             .iter()
-            .map(|p| p.to_sql(self.context.clone()))
+            .map(|p| p.to_sql(templates, self.context.clone()))
             .collect::<Result<Vec<_>, _>>()?
             .join(", ");
         let where_condition = if let Some(filter) = &self.filter {
@@ -56,7 +57,11 @@ impl Select {
                 .ctes
                 .iter()
                 .map(|cte| -> Result<_, CubeError> {
-                    Ok(format!(" {} as ({})", cte.alias(), cte.query().to_sql()?))
+                    Ok(format!(
+                        " {} as ({})",
+                        cte.alias(),
+                        cte.query().to_sql(templates)?
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .join(",\n");
@@ -78,7 +83,7 @@ impl Select {
         };
 
         let distinct = if self.is_distinct { "DISTINCT " } else { "" };
-        let from = self.from.to_sql(self.context.clone())?;
+        let from = self.from.to_sql(templates, self.context.clone())?;
         let limit = if let Some(limit) = self.limit {
             format!(" LIMIT {limit}")
         } else {

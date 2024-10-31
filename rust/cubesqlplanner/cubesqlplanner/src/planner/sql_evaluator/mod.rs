@@ -13,8 +13,7 @@ pub use evaluation_node::EvaluationNode;
 pub use sql_visitor::SqlEvaluatorVisitor;
 pub use symbols::{
     CubeNameSymbol, CubeNameSymbolFactory, CubeTableSymbol, CubeTableSymbolFactory,
-    DimensionSymbol, DimensionSymbolFactory, JoinConditionSymbol, JoinConditionSymbolFactory,
-    MeasureSymbol, MeasureSymbolFactory, MemberSymbol, MemberSymbolFactory, MemberSymbolType,
-    SimpleSqlSymbol, SimpleSqlSymbolFactory,
+    DimensionSymbol, DimensionSymbolFactory, MeasureSymbol, MeasureSymbolFactory, MemberSymbol,
+    MemberSymbolType, SimpleSqlSymbol, SimpleSqlSymbolFactory, SymbolFactory,
 };
 pub use visitor::{EvaluatorVisitor, TraversalVisitor};

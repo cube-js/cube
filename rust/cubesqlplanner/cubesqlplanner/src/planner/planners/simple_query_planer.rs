@@ -1,5 +1,5 @@
 use super::{JoinPlanner, OrderPlanner};
-use crate::plan::{Filter, Select};
+use crate::plan::{Filter, Select, SelectBuilder};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
@@ -36,21 +36,20 @@ impl SimpleQueryPlanner {
                 items: self.query_properties.measures_filters().clone(),
             })
         };
-        let select = Select {
-            projection: self
-                .query_properties
+        let mut select_builder = SelectBuilder::new(
+            self.join_planner.make_join_node()?,
+            VisitorContext::default(self.context_factory.clone()),
+        );
+        select_builder.set_projection(
+            self.query_properties
                 .select_all_dimensions_and_measures(self.query_properties.measures())?,
-            from: self.join_planner.make_join_node()?,
-            filter,
-            group_by: self.query_properties.group_by(),
-            having,
-            order_by: self.order_planner.default_order(),
-            context: VisitorContext::default(self.context_factory.clone()),
-            ctes: vec![],
-            is_distinct: false,
-            limit: self.query_properties.row_limit(),
-            offset: self.query_properties.offset(),
-        };
-        Ok(select)
+        );
+        select_builder.set_filter(filter);
+        select_builder.set_group_by(self.query_properties.group_by());
+        select_builder.set_order_by(self.order_planner.default_order());
+        select_builder.set_having(having);
+        select_builder.set_limit(self.query_properties.row_limit());
+        select_builder.set_offset(self.query_properties.offset());
+        Ok(select_builder.build())
     }
 }

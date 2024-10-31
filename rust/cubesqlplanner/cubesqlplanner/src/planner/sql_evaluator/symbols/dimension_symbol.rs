@@ -1,4 +1,4 @@
-use super::{MemberSymbol, MemberSymbolFactory};
+use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
@@ -93,7 +93,7 @@ impl DimensionSymbolFactory {
     }
 }
 
-impl MemberSymbolFactory for DimensionSymbolFactory {
+impl SymbolFactory for DimensionSymbolFactory {
     fn symbol_name() -> String {
         "dimension".to_string()
     }

@@ -1,13 +1,11 @@
 use super::{
-    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, JoinConditionSymbol, MeasureSymbol,
-    MemberSymbol, SimpleSqlSymbol,
+    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberSymbol, SimpleSqlSymbol,
 };
 pub enum MemberSymbolType {
     Dimension(DimensionSymbol),
     Measure(MeasureSymbol),
     CubeName(CubeNameSymbol),
     CubeTable(CubeTableSymbol),
-    JoinCondition(JoinConditionSymbol),
     SimpleSql(SimpleSqlSymbol),
 }
 
@@ -18,7 +16,6 @@ impl MemberSymbolType {
             MemberSymbolType::Measure(m) => m.full_name(),
             MemberSymbolType::CubeName(c) => c.cube_name().clone(),
             MemberSymbolType::CubeTable(c) => c.cube_name().clone(),
-            MemberSymbolType::JoinCondition(_) => "".to_string(),
             MemberSymbolType::SimpleSql(_) => "".to_string(),
         }
     }

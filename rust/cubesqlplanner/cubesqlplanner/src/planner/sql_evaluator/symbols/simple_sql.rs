@@ -1,4 +1,4 @@
-use super::{MemberSymbol, MemberSymbolFactory};
+use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
@@ -47,7 +47,7 @@ impl SimpleSqlSymbolFactory {
     }
 }
 
-impl MemberSymbolFactory for SimpleSqlSymbolFactory {
+impl SymbolFactory for SimpleSqlSymbolFactory {
     fn is_cachable() -> bool {
         false
     }

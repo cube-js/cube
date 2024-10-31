@@ -1,10 +1,12 @@
 use super::MultiStageQueryDescription;
 use crate::plan::{
-    Expr, FilterGroup, FilterItem, From, FromSource, Join, JoinItem, JoinSource, OrderBy,
-    QueryPlan, Select, Subquery,
+    select_builder, Expr, FilterGroup, FilterItem, From, FromSource, Join, JoinItem, JoinSource,
+    OrderBy, QueryPlan, Select, SelectBuilder, Subquery,
 };
 use crate::planner::base_join_condition::DimensionJoinCondition;
-use crate::planner::planners::{FullKeyAggregateQueryPlanner, OrderPlanner};
+use crate::planner::planners::{
+    FullKeyAggregateQueryPlanner, MultipliedMeasuresQueryPlanner, OrderPlanner, SimpleQueryPlanner,
+};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
 use crate::planner::QueryProperties;
@@ -85,19 +87,11 @@ impl MultiStageMemberQueryPlanner {
             context_factory.with_render_references_default_node_processor(references)
         };
 
-        let select = Select {
-            projection,
-            from,
-            filter: None,
-            group_by,
-            having: None,
-            order_by,
-            context: VisitorContext::new(None, node_context),
-            ctes: vec![],
-            is_distinct: false,
-            limit: None,
-            offset: None,
-        };
+        let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
+        select_builder.set_projection(projection);
+        select_builder.set_group_by(group_by);
+        select_builder.set_order_by(order_by);
+        let select = select_builder.build();
 
         Ok(Rc::new(Subquery::new_from_select(
             Rc::new(select),
@@ -143,23 +137,16 @@ impl MultiStageMemberQueryPlanner {
             )
             .collect_vec();
 
-        let select = Select {
-            projection,
-            from: From::new(FromSource::Join(Rc::new(Join {
-                root,
-                joins: join_items,
-            }))),
-            filter: None,
-            group_by: vec![],
-            having: None,
-            order_by: self.subquery_order()?,
-            context: VisitorContext::default(SqlNodesFactory::new()),
-            ctes: vec![],
-            is_distinct: false,
-            limit: None,
-            offset: None,
-        };
-        Ok(QueryPlan::Select(Rc::new(select)))
+        let from = From::new(FromSource::Join(Rc::new(Join {
+            root,
+            joins: join_items,
+        })));
+        let mut select_builder =
+            SelectBuilder::new(from, VisitorContext::default(SqlNodesFactory::new()));
+        select_builder.set_projection(projection);
+        select_builder.set_order_by(self.subquery_order()?);
+
+        Ok(QueryPlan::Select(Rc::new(select_builder.build())))
     }
 
     fn plan_for_leaf_cte_query(&self) -> Result<Rc<Subquery>, CubeError> {
@@ -175,7 +162,8 @@ impl MultiStageMemberQueryPlanner {
 
         let allowed_filter_members = self.description.state().allowed_filter_members().clone();
 
-        let cte_query_properties = QueryProperties::new_from_precompiled(
+        let cte_query_properties = QueryProperties::try_new_from_precompiled(
+            self.query_tools.clone(),
             measures,
             self.description.state().dimensions().clone(),
             self.query_properties.time_dimensions().clone(),
@@ -194,7 +182,7 @@ impl MultiStageMemberQueryPlanner {
             vec![],
             None,
             None,
-        );
+        )?;
 
         let node_factory = if self.description.state().time_shifts().is_empty() {
             SqlNodesFactory::new()
@@ -202,12 +190,37 @@ impl MultiStageMemberQueryPlanner {
             SqlNodesFactory::new_with_time_shifts(self.description.state().time_shifts().clone())
         };
 
-        let full_key_aggregate_query_builder = FullKeyAggregateQueryPlanner::new(
-            self.query_tools.clone(),
-            cte_query_properties.clone(),
-            node_factory,
-        );
-        let cte_select = full_key_aggregate_query_builder.plan()?;
+        if cte_query_properties
+            .full_key_aggregate_measures()?
+            .has_multi_stage_measures()
+        {
+            return Err(CubeError::internal(format!(
+                "Leaf multi stage query cannot contain multi stage member"
+            )));
+        }
+
+        let cte_select = if cte_query_properties.is_simple_query()? {
+            let planner = SimpleQueryPlanner::new(
+                self.query_tools.clone(),
+                cte_query_properties.clone(),
+                node_factory.clone(),
+            );
+            planner.plan()?
+        } else {
+            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
+                self.query_tools.clone(),
+                cte_query_properties.clone(),
+                node_factory.clone(),
+            );
+            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
+                self.query_tools.clone(),
+                cte_query_properties.clone(),
+                node_factory.clone(),
+            );
+            let subqueries = multiplied_measures_query_planner.plan_queries()?;
+            let result = full_key_aggregate_planner.plan(subqueries, vec![])?;
+            result
+        };
         let result =
             Subquery::new_from_select(Rc::new(cte_select), self.description.alias().clone());
         Ok(Rc::new(result))

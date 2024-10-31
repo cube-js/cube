@@ -1,4 +1,4 @@
-use super::{MemberSymbol, MemberSymbolFactory};
+use super::SymbolFactory;
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
@@ -23,19 +23,7 @@ impl CubeNameSymbol {
     pub fn evaluate_sql(&self, _args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
         Ok(self.cube_name.clone())
     }
-    pub fn default_evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        Ok(tools.escape_column_name(
-            &tools.cube_alias_name(&self.cube_name, visitor.cube_alias_prefix()),
-        ))
-    }
-}
-
-impl MemberSymbol for CubeNameSymbol {
-    fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
@@ -56,7 +44,7 @@ impl CubeNameSymbolFactory {
     }
 }
 
-impl MemberSymbolFactory for CubeNameSymbolFactory {
+impl SymbolFactory for CubeNameSymbolFactory {
     fn symbol_name() -> String {
         "cube_name".to_string()
     }
@@ -128,10 +116,7 @@ impl CubeTableSymbol {
         };
         Ok(res)
     }
-}
-
-impl MemberSymbol for CubeTableSymbol {
-    fn cube_name(&self) -> &String {
+    pub fn cube_name(&self) -> &String {
         &self.cube_name
     }
 }
@@ -170,7 +155,7 @@ impl CubeTableSymbolFactory {
     }
 }
 
-impl MemberSymbolFactory for CubeTableSymbolFactory {
+impl SymbolFactory for CubeTableSymbolFactory {
     fn symbol_name() -> String {
         "cube_table".to_string()
     }

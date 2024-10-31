@@ -1,4 +1,5 @@
 use super::{QueryPlan, Select};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::CubeError;
 
 use std::rc::Rc;
@@ -29,8 +30,8 @@ impl Subquery {
         &self.alias
     }
 
-    pub fn to_sql(&self) -> Result<String, CubeError> {
-        let sql = format!("({}) AS {}", self.query.to_sql()?, self.alias);
+    pub fn to_sql(&self, templates: &PlanSqlTemplates) -> Result<String, CubeError> {
+        let sql = format!("({}) AS {}", self.query.to_sql(templates)?, self.alias);
         Ok(sql)
     }
 }

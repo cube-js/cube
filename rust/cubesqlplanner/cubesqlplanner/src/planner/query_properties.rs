@@ -3,6 +3,10 @@ use super::query_tools::QueryTools;
 use super::{BaseDimension, BaseMeasure, BaseMember, BaseTimeDimension};
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::{Expr, Filter, FilterItem};
+use crate::planner::sql_evaluator::collectors::{
+    collect_multiplied_measures, has_multi_stage_members,
+};
+use crate::planner::sql_evaluator::EvaluationNode;
 use cubenativeutils::CubeError;
 use itertools::Itertools;
 use std::collections::HashSet;
@@ -28,6 +32,29 @@ impl OrderByItem {
     }
 }
 
+enum SymbolAggregateType {
+    Regular,
+    Multiplied,
+    MultiStage,
+}
+
+#[derive(Default, Clone)]
+pub struct FullKeyAggregateMeasures {
+    pub multiplied_measures: Vec<Rc<BaseMeasure>>,
+    pub regular_measures: Vec<Rc<BaseMeasure>>,
+    pub multi_stage_measures: Vec<Rc<BaseMeasure>>,
+}
+
+impl FullKeyAggregateMeasures {
+    pub fn has_multiplied_measures(&self) -> bool {
+        !self.multiplied_measures.is_empty()
+    }
+
+    pub fn has_multi_stage_measures(&self) -> bool {
+        !self.multi_stage_measures.is_empty()
+    }
+}
+
 #[derive(Clone)]
 pub struct QueryProperties {
     measures: Vec<Rc<BaseMeasure>>,
@@ -39,6 +66,7 @@ pub struct QueryProperties {
     order_by: Vec<OrderByItem>,
     row_limit: Option<usize>,
     offset: Option<usize>,
+    query_tools: Rc<QueryTools>,
 }
 
 impl QueryProperties {
@@ -144,10 +172,12 @@ impl QueryProperties {
             order_by,
             row_limit,
             offset,
+            query_tools,
         }))
     }
 
-    pub fn new_from_precompiled(
+    pub fn try_new_from_precompiled(
+        query_tools: Rc<QueryTools>,
         measures: Vec<Rc<BaseMeasure>>,
         dimensions: Vec<Rc<BaseDimension>>,
         time_dimensions: Vec<Rc<BaseTimeDimension>>,
@@ -157,14 +187,14 @@ impl QueryProperties {
         order_by: Vec<OrderByItem>,
         row_limit: Option<usize>,
         offset: Option<usize>,
-    ) -> Rc<Self> {
+    ) -> Result<Rc<Self>, CubeError> {
         let order_by = if order_by.is_empty() {
             Self::default_order(&dimensions, &time_dimensions, &measures)
         } else {
             order_by
         };
 
-        Rc::new(Self {
+        Ok(Rc::new(Self {
             measures,
             dimensions,
             time_dimensions,
@@ -174,7 +204,8 @@ impl QueryProperties {
             order_by,
             row_limit,
             offset,
-        })
+            query_tools,
+        }))
     }
 
     pub fn measures(&self) -> &Vec<Rc<BaseMeasure>> {
@@ -209,36 +240,8 @@ impl QueryProperties {
         self.offset
     }
 
-    pub fn set_measures(&mut self, measures: Vec<Rc<BaseMeasure>>) {
-        self.measures = measures;
-    }
-
-    pub fn set_dimensions(&mut self, dimensions: Vec<Rc<BaseDimension>>) {
-        self.dimensions = dimensions;
-    }
-
-    pub fn set_time_dimensions(&mut self, time_dimensions: Vec<Rc<BaseTimeDimension>>) {
-        self.time_dimensions = time_dimensions;
-    }
-
-    pub fn set_time_dimensions_filters(&mut self, time_dimensions_filters: Vec<FilterItem>) {
-        self.time_dimensions_filters = time_dimensions_filters
-    }
-
-    pub fn set_dimensions_filters(&mut self, dimenstions_filters: Vec<FilterItem>) {
-        self.dimensions_filters = dimenstions_filters
-    }
-
-    pub fn set_measures_filters(&mut self, measures_filters: Vec<FilterItem>) {
-        self.measures_filters = measures_filters
-    }
-
     pub fn order_by(&self) -> &Vec<OrderByItem> {
         &self.order_by
-    }
-
-    pub fn set_order_by(&mut self, order_by: Vec<OrderByItem>) {
-        self.order_by = order_by;
     }
 
     pub fn set_order_by_to_default(&mut self) {
@@ -366,6 +369,7 @@ impl QueryProperties {
         }
         result
     }
+
     pub fn all_filtered_members(&self) -> HashSet<String> {
         let mut result = HashSet::new();
         for item in self.dimensions_filters().iter() {
@@ -391,5 +395,49 @@ impl QueryProperties {
                 members.insert(item.member_name());
             }
         }
+    }
+
+    pub fn is_simple_query(&self) -> Result<bool, CubeError> {
+        for member in self.all_members(false) {
+            match self.get_symbol_aggregate_type(&member.member_evaluator())? {
+                SymbolAggregateType::Regular => {}
+                _ => return Ok(false),
+            }
+        }
+        Ok(true)
+    }
+
+    pub fn full_key_aggregate_measures(&self) -> Result<FullKeyAggregateMeasures, CubeError> {
+        let mut result = FullKeyAggregateMeasures::default();
+        let measures = self.measures();
+        for m in measures.iter() {
+            match self.get_symbol_aggregate_type(m.member_evaluator())? {
+                SymbolAggregateType::Regular => result.regular_measures.push(m.clone()),
+                SymbolAggregateType::Multiplied => result.multiplied_measures.push(m.clone()),
+                SymbolAggregateType::MultiStage => result.multi_stage_measures.push(m.clone()),
+            }
+        }
+
+        Ok(result)
+    }
+
+    fn get_symbol_aggregate_type(
+        &self,
+        symbol: &Rc<EvaluationNode>,
+    ) -> Result<SymbolAggregateType, CubeError> {
+        let symbol_type = if has_multi_stage_members(symbol)? {
+            SymbolAggregateType::MultiStage
+        } else if let Some(multiple) =
+            collect_multiplied_measures(self.query_tools.clone(), symbol)?
+        {
+            if multiple.multiplied {
+                SymbolAggregateType::Multiplied
+            } else {
+                SymbolAggregateType::Regular
+            }
+        } else {
+            SymbolAggregateType::Regular
+        };
+        Ok(symbol_type)
     }
 }

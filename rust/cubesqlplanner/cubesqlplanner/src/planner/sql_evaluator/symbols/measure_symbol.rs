@@ -1,4 +1,4 @@
-use super::{MemberSymbol, MemberSymbolFactory};
+use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
@@ -170,7 +170,7 @@ impl MeasureSymbolFactory {
     }
 }
 
-impl MemberSymbolFactory for MeasureSymbolFactory {
+impl SymbolFactory for MeasureSymbolFactory {
     fn symbol_name() -> String {
         "measure".to_string()
     }

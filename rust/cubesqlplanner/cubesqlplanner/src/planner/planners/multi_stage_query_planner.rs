@@ -1,6 +1,6 @@
 use super::multi_stage::MultiStageMemberQueryPlanner;
 use super::multi_stage::{MultiStageAppliedState, MultiStageQueryDescription};
-use crate::plan::{Expr, From, Select, Subquery};
+use crate::plan::{Expr, From, Select, SelectBuilder, Subquery};
 use crate::planner::query_tools::QueryTools;
 use crate::planner::sql_evaluator::collectors::has_multi_stage_members;
 use crate::planner::sql_evaluator::collectors::member_childs;
@@ -9,6 +9,7 @@ use crate::planner::sql_evaluator::EvaluationNode;
 use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, VisitorContext};
 use cubenativeutils::CubeError;
+use itertools::Itertools;
 use std::rc::Rc;
 
 pub struct MultiStageQueryPlanner {
@@ -23,7 +24,7 @@ impl MultiStageQueryPlanner {
             query_properties,
         }
     }
-    pub fn get_cte_queries(&self) -> Result<(Vec<Rc<Subquery>>, Vec<String>), CubeError> {
+    pub fn plan_queries(&self) -> Result<(Vec<Rc<Subquery>>, Vec<Rc<Select>>), CubeError> {
         let multi_stage_members = self
             .query_properties
             .all_members(false)
@@ -71,23 +72,23 @@ impl MultiStageQueryPlanner {
                 .plan_query()
             })
             .collect::<Result<Vec<_>, _>>()?;
-        Ok((all_queries, top_level_ctes))
+
+        let cte_joins = top_level_ctes
+            .iter()
+            .map(|alias| self.cte_select(alias))
+            .collect_vec();
+
+        Ok((all_queries, cte_joins))
     }
 
     pub fn cte_select(&self, alias: &String) -> Rc<Select> {
-        Rc::new(Select {
-            projection: vec![Expr::Asterix],
-            from: From::new_from_table_reference(alias.clone(), None),
-            filter: None,
-            group_by: vec![],
-            having: None,
-            order_by: vec![],
-            context: VisitorContext::default(SqlNodesFactory::new()),
-            ctes: vec![],
-            is_distinct: false,
-            limit: None,
-            offset: None,
-        })
+        let mut select_builder = SelectBuilder::new(
+            From::new_from_table_reference(alias.clone(), None),
+            VisitorContext::default(SqlNodesFactory::new()),
+        );
+        select_builder.set_projection(vec![Expr::Asterix]);
+
+        Rc::new(select_builder.build())
     }
 
     fn make_queries_descriptions(

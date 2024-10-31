@@ -1,9 +1,13 @@
-use super::planners::FullKeyAggregateQueryPlanner;
+use super::planners::{
+    multiplied_measures_query_planner, FullKeyAggregateQueryPlanner, MultiStageQueryPlanner,
+    MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
+};
 use super::query_tools::QueryTools;
 use super::QueryProperties;
 use crate::cube_bridge::base_query_options::BaseQueryOptions;
 use crate::plan::Select;
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
+use crate::planner::sql_templates::PlanSqlTemplates;
 use cubenativeutils::wrappers::inner_types::InnerTypes;
 use cubenativeutils::wrappers::object::NativeArray;
 use cubenativeutils::wrappers::serializer::NativeSerialize;
@@ -41,7 +45,9 @@ impl<IT: InnerTypes> BaseQuery<IT> {
 
     pub fn build_sql_and_params(&self) -> Result<NativeObjectHandle<IT>, CubeError> {
         let plan = self.build_sql_and_params_impl()?;
-        let sql = plan.to_sql()?;
+        let templates = PlanSqlTemplates::new(self.query_tools.templates_render());
+
+        let sql = plan.to_sql(&templates)?;
         let (result_sql, params) = self.query_tools.build_sql_and_params(&sql, true)?;
 
         let res = self.context.empty_array();
@@ -53,11 +59,32 @@ impl<IT: InnerTypes> BaseQuery<IT> {
     }
 
     fn build_sql_and_params_impl(&self) -> Result<Select, CubeError> {
-        let full_key_aggregate_query_builder = FullKeyAggregateQueryPlanner::new(
-            self.query_tools.clone(),
-            self.request.clone(),
-            SqlNodesFactory::new(),
-        );
-        full_key_aggregate_query_builder.plan()
+        if self.request.is_simple_query()? {
+            let planner = SimpleQueryPlanner::new(
+                self.query_tools.clone(),
+                self.request.clone(),
+                SqlNodesFactory::new(),
+            );
+            planner.plan()
+        } else {
+            let multiplied_measures_query_planner = MultipliedMeasuresQueryPlanner::new(
+                self.query_tools.clone(),
+                self.request.clone(),
+                SqlNodesFactory::new(),
+            );
+            let multi_stage_query_planner =
+                MultiStageQueryPlanner::new(self.query_tools.clone(), self.request.clone());
+            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
+                self.query_tools.clone(),
+                self.request.clone(),
+                SqlNodesFactory::new(),
+            );
+            let mut subqueries = multiplied_measures_query_planner.plan_queries()?;
+            let (multi_stage_ctes, multi_stage_subqueries) =
+                multi_stage_query_planner.plan_queries()?;
+            subqueries.extend(multi_stage_subqueries.into_iter());
+            let mut result = full_key_aggregate_planner.plan(subqueries, multi_stage_ctes)?;
+            Ok(result)
+        }
     }
 }

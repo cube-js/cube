@@ -27,7 +27,6 @@ impl SqlNode for EvaluateSqlNode {
             MemberSymbolType::Measure(ev) => ev.evaluate_sql(args),
             MemberSymbolType::CubeTable(ev) => ev.evaluate_sql(args),
             MemberSymbolType::CubeName(ev) => ev.evaluate_sql(args),
-            MemberSymbolType::JoinCondition(ev) => ev.evaluate_sql(args),
             MemberSymbolType::SimpleSql(ev) => ev.evaluate_sql(args),
         }
     }

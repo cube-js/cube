@@ -1,4 +1,5 @@
-use super::{QueryPlan, Select, Subquery};
+use super::{QueryPlan, Select, SingleAliasedSource, Subquery};
+use crate::planner::sql_templates::PlanSqlTemplates;
 use crate::planner::{BaseCube, BaseJoinCondition, VisitorContext};
 use cubenativeutils::CubeError;
 
@@ -27,13 +28,17 @@ impl JoinSource {
         Self::TableReference(reference, alias)
     }
 
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
         let sql = match &self {
             JoinSource::Cube(cube) => {
                 let cubesql = cube.to_sql(context.clone())?;
                 format!(" {} ", cubesql)
             }
-            JoinSource::Subquery(s) => s.to_sql()?,
+            JoinSource::Subquery(s) => s.to_sql(templates)?,
             JoinSource::TableReference(r, alias) => format!(" {} as {} ", r, alias),
         };
         Ok(sql)
@@ -41,39 +46,47 @@ impl JoinSource {
 }
 
 pub struct JoinItem {
-    pub from: JoinSource,
+    pub from: SingleAliasedSource,
     pub on: Rc<dyn BaseJoinCondition>,
     pub is_inner: bool,
 }
 
 pub struct Join {
-    pub root: JoinSource,
+    pub root: SingleAliasedSource,
     pub joins: Vec<JoinItem>,
 }
 
 impl JoinItem {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
         let operator = if self.is_inner { "INNER" } else { "LEFT" };
         let on_sql = self.on.to_sql(context.clone())?;
         Ok(format!(
             "{} JOIN {} ON {}",
             operator,
-            self.from.to_sql(context)?,
+            self.from.to_sql(templates, context)?,
             on_sql
         ))
     }
 }
 
 impl Join {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        templates: &PlanSqlTemplates,
+        context: Rc<VisitorContext>,
+    ) -> Result<String, CubeError> {
         let joins_sql = self
             .joins
             .iter()
-            .map(|j| j.to_sql(context.clone()))
+            .map(|j| j.to_sql(templates, context.clone()))
             .collect::<Result<Vec<_>, _>>()?;
         let res = format!(
             "{}\n{}",
-            self.root.to_sql(context.clone())?,
+            self.root.to_sql(templates, context.clone())?,
             joins_sql.join("\n")
         );
         Ok(res)
