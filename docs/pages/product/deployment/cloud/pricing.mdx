@@ -35,7 +35,7 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 | [Development Instance][ref-development-instance] | Depends on a [chosen tier](#compute-tiers)           |
 | Cube API Instance         | Depends on a [chosen tier](#compute-tiers)           |
 | Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) |
-| [Semantic Catalog][ref-semantic-catalog] Worker | 4 |
+| [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 |
 | [Query History][ref-query-history] | Depends on a [chosen tier](#query-history-tiers)     |
 | [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
@@ -44,14 +44,13 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 ### Compute tiers
 
 [Production clusters][ref-production-cluster] (including individual API instances)
-and [development instances][ref-development-instance] are involved in enforcing
-Data Access Policies and serving requests through [APIs & integrations][ref-apis]
-under the following tiers:
+and [development instances][ref-development-instance] are involved in serving
+requests through [APIs & integrations][ref-apis] under the following tiers:
 
 | Tier | <nobr>CCUs per hour</nobr> | <nobr>CPU and memory</nobr> | Dependent features |
 | ---- | :--- | --- | --- |
-| S    | <nobr>4 — _for Production Cluster_</nobr><br/><nobr>1 — _for Development Instance_</nobr><br/><nobr>1 — _for Cube API Instance_</nobr> | 100% | <nobr>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]</nobr> |
-| M    | <nobr>8 — _for Production Cluster_</nobr><br/><nobr>2 — _for Development Instance_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | <nobr>[Cube Cloud for Sheets][ref-cube-cloud-for-sheets]</nobr><br/><nobr>[MDX API][ref-mdx-api]</nobr><br/><nobr>Data Access Policies</nobr> |
+| S    | <nobr>4 — _for Production Cluster_</nobr><br/><nobr>1 — _for Development Instance_</nobr><br/><nobr>1 — _for Cube API Instance_</nobr> | 100% | — |
+| M    | <nobr>8 — _for Production Cluster_</nobr><br/><nobr>2 — _for Development Instance_</nobr><br/><nobr>2 — _for Cube API Instance_</nobr> | 200% | <nobr>[MDX API][ref-mdx-api]</nobr> |
 
 You can upgrade to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
@@ -66,6 +65,19 @@ pre-aggregations and executing queries against them under the following tiers:
 | ---- | :-----------: | ---------- | ------------------ |
 | S    | 1             | 100%       | —                  |
 | M    | 2             | 200%       | [Data-at-rest encryption][ref-data-at-rest-encryption] with [customer-managed keys][ref-customer-managed-keys] in Cube Store |
+
+You can upgrade to a chosen tier in the
+<Btn>Settings</Btn> of your deployment.
+
+### Semantic Catalog tiers
+
+[Semantic Catalog][ref-semantic-catalog] provides observability into other data
+tools interoperating with your data model under the following tiers:
+
+| Tier | <nobr>CCUs per hour</nobr> | Data assets |
+| ---- | :-----------: | ---------- |
+| S    | 2             | Up to 30,000 |
+| M    | 4             | Up to 100,000 |
 
 You can upgrade to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
@@ -310,7 +322,6 @@ subscription plan level. Payments are non-refundable.
 [ref-production-cluster]: /product/deployment/cloud/deployment-types#production-cluster
 [ref-development-instance]: /product/deployment/cloud/deployment-types#development-instance
 [ref-apis]: /product/apis-integrations
-[ref-cube-cloud-for-sheets]: /product/apis-integrations/google-sheets
 [ref-mdx-api]: /product/apis-integrations/mdx-api
 [ref-cube-store-architecture]: /product/caching/running-in-production#architecture
 [ref-data-at-rest-encryption]: /product/caching/running-in-production#data-at-rest-encryption
