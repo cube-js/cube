@@ -2375,6 +2375,16 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"camel_case_cube__id"');
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"camel_case_cube__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"camel_case_cube__grant_total"');
+
+    // aliasName + memberToAlias
+    const memberAliasQuery = new BaseQuery(set, {
+      memberToAlias: {
+        'CamelCaseCube.id': 'alias("id")'
+      }
+    });
+    expect(memberAliasQuery.aliasName('CamelCaseCube.id', false)).toEqual('alias("id")');
+    // Should escape quotes
+    expect(memberAliasQuery.newDimension('CamelCaseCube.id').aliasName()).toEqual('"alias(""id"")"');
   });
 
   it('Test BaseQuery with aliased cube', async () => {
@@ -2424,6 +2434,17 @@ describe('Class unit tests', () => {
     expect(baseQuery.cubeAlias('CamelCaseCube.id')).toEqual('"t1__id"');
     expect(baseQuery.cubeAlias('CamelCaseCube.description')).toEqual('"t1__description"');
     expect(baseQuery.cubeAlias('CamelCaseCube.grant_total')).toEqual('"t1__grant_total"');
+
+    // aliasName + memberToAlias
+    // Should ignore cube alias
+    const memberAliasQuery = new BaseQuery(set, {
+      memberToAlias: {
+        'CamelCaseCube.id': 'alias("id")'
+      }
+    });
+    expect(memberAliasQuery.aliasName('CamelCaseCube.id', false)).toEqual('alias("id")');
+    // Should escape quotes
+    expect(memberAliasQuery.newDimension('CamelCaseCube.id').aliasName()).toEqual('"alias(""id"")"');
   });
 
   it('Test BaseQuery columns order for the query with the sub-query', async () => {

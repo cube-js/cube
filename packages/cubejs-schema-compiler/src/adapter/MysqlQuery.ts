@@ -133,7 +133,9 @@ export class MysqlQuery extends BaseQuery {
   }
 
   public escapeColumnName(name) {
-    return `\`${name}\``;
+    // If the character to be included within the identifier is the same as that used to quote the identifier itself, then you need to double the character
+    // https://dev.mysql.com/doc/refman/8.0/en/identifiers.html
+    return `\`${name.replaceAll('`', '``')}\``;
   }
 
   public seriesSql(timeDimension) {
