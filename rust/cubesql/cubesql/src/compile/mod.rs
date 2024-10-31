@@ -7278,13 +7278,15 @@ ORDER BY
             .sql
             .contains("ungrouped"));
 
-        assert!(query_plan
-            .as_logical_plan()
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql
-            .contains("[\"dim2\",\"asc\"]"));
+        let re = Regex::new(r#"\[[[:space:]]*"dim2",[[:space:]]*"asc"[[:space:]]*\]"#).unwrap();
+        assert!(re.is_match(
+            &query_plan
+                .as_logical_plan()
+                .find_cube_scan_wrapper()
+                .wrapped_sql
+                .unwrap()
+                .sql
+        ));
     }
 
     #[tokio::test]
@@ -13732,7 +13734,7 @@ ORDER BY "source"."str0" ASC
             if Rewriter::top_down_extractor_enabled() {
                 assert!(sql.contains("LIMIT 1000"));
             } else {
-                assert!(sql.contains("\"limit\":1000"));
+                assert!(sql.contains("\"limit\": 1000"));
             }
             assert!(sql.contains("% 7"));
 

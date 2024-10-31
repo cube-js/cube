@@ -795,7 +795,10 @@ impl TransportService for TestConnectionTransport {
         });
         Ok(SqlResponse {
             sql: SqlQuery::new(
-                format!("SELECT * FROM {}", serde_json::to_string(&inputs).unwrap()),
+                format!(
+                    "SELECT * FROM {}",
+                    serde_json::to_string_pretty(&inputs).unwrap()
+                ),
                 expression_params.unwrap_or(Vec::new()),
             ),
         })

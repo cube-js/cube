@@ -426,7 +426,7 @@ async fn test_simple_subquery_wrapper_projection() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("\\\\\\\"limit\\\\\\\":1"));
+        .contains("\\\\\\\"limit\\\\\\\": 1"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
@@ -482,7 +482,7 @@ async fn test_simple_subquery_wrapper_filter_equal() {
         .wrapped_sql
         .unwrap()
         .sql
-        .contains("\\\\\\\"limit\\\\\\\":1"));
+        .contains("\\\\\\\"limit\\\\\\\": 1"));
 
     let _physical_plan = query_plan.as_physical_plan().await.unwrap();
 }
