@@ -7,33 +7,107 @@ redirect_from:
 
 Cube Cloud pricing is based on resource consumption which we measure
 using [Cube Consumption Units](#cube-consumption-unit) in 5 minute intervals.
-Each [pricing plan](#pricing-plans) has different features and functionality
+Each [product tier](#product-tiers) has different features and functionality
 that you should review as you think about what is right for your business.
 
 ## Cube Consumption Unit
 
-A **Cube Consumption Unit** (CCU) is a way to measure resource consumption
+_Cube Consumption Unit_ (CCU) is a way to measure resource consumption
 used to run Cube Cloud infrastructure and [resources](#resources) within it. 
 
-The price of a CCU is determined by the pricing plan you're subscribed to.
+The price of a CCU is determined by the [product tier](#product-tiers) you're subscribed to.
+Each product tier determines the features, scalability, availability, as well as
+the [speed and scope of support][ref-support] you may receive for your deployment.
 
-Each plan determines the features, scalability, availability, as well as the [speed and
-scope of support][ref-support] you may receive for your deployment.
-
-During your deployment, Premium, Enterprise, and Enterprise Premier customers can set
-[Budgets][ref-cloud-budgets] to make sure you know your usage is on track and as expected.
+You can also set [Budgets][ref-cloud-budgets] to make sure you know your usage
+is on track and as expected.
 
 [ref-cloud-budgets]: /product/workspace/budgets
 
-### Resources
+## Payment plans
+
+Payment plans determine whether you have a fixed-term contract or a recurring
+subscription:
+
+* _On-demand payment plan_ allows you to subscribe at any time, add your credit
+card, and start using Cube Cloud right away. [Starter](#starter) and [Premium](#premium)
+product tiers are available on the on-demand payment plan.
+* _Commit payment plan_ allows you to have a contract with a CCU amount specified
+in an order form. [Premium](#premium), [Enterprise](#enterprise), and
+[Enterprise Premier](#enterprise-premier) product tiers are available on the
+commit payment plan. [Contact us][link-contact-us] to learn more.
+
+## Product tiers
+
+### Free
+
+**Free product tier is designed for development and testing purposes.** It is not
+intended for production use.
+
+It offers up to two [Development Instances][ref-cloud-deployment-dev-instance].
+
+You can review its [support terms][ref-free-tier-support] and [limits][ref-cloud-limits].
+
+### Starter
+
+**Starter product tier targets low-scale production that is not business-critical.**
+
+It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
+to use third-party packages from the npm registry, AWS and GCP support in select
+regions, pre-aggregations of up to 150GB in size, auto-suspend controls, and
+[Semantic Layer Sync][ref-sls] with a single BI tool (such as Preset or Metabase).
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-starter-tier-support], and [limits][ref-cloud-limits].
+
+### Premium
+
+**Premium product tier is designed for basic small-scale production deployments.**
+
+It offers everything in the [Starter product tier](#starter) as well as enabling
+the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
+support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
+in all regions. Cube Cloud provides a 99.95% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-premium-tier-support], and [limits][ref-cloud-limits].
+
+### Enterprise
+
+**Enterprise product tier is suitable for high-scale or mission-critical production
+deployments with more significant security and compliance needs.**
+
+It offers everything in the [Premium product tier](#premium) as well as [Semantic Layer
+Sync][ref-sls] with unlimited supported BI tools, SAML 2.0
+support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
+infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
+[monitoring integrations][ref-monitoring-integrations], and [role-based access
+control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-enterprise-tier-support], and [limits][ref-cloud-limits].
+
+### Enterprise Premier
+
+**Enterprise Premier product tier caters to high-scale, high-availability
+mission-critical production deployments with security and compliance needs.**
+
+It offers everything in the [Enterprise product tier](#enterprise) as well as
+unlimited pre-aggregation sizes, and support for kSQL and Elasticsearch. Cube
+Cloud provides a 99.995% uptime SLA for this product tier.
+
+You can review its [pricing][cube-pricing], [support
+terms][ref-enterprise-premier-tier-support], and [limits][ref-cloud-limits].
+
+## Resources
 
 The following resource types incur CCU consumption (measured in 5-minute intervals):
 
 | Resource type             | CCUs per hour                                        |
 | ------------------------- | :--------------------------------------------------: |
-| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#compute-tiers)           |
-| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#compute-tiers)           |
-| Cube API Instance         | Depends on a [chosen tier](#compute-tiers)           |
+| [Production Cluster][ref-production-cluster] | Depends on a [chosen tier](#deployment-tiers)           |
+| [Development Instance][ref-development-instance] | Depends on a [chosen tier](#deployment-tiers)           |
+| Cube API Instance         | Depends on a [chosen tier](#deployment-tiers)           |
 | Cube Store Worker         | Depends on a [chosen tier](#cube-store-worker-tiers) |
 | [Semantic Catalog][ref-semantic-catalog] | Depends on a [chosen tier](#semantic-catalog-tiers) |
 | [Dedicated infrastructure][ref-dedicated-infra] | 3 |
@@ -41,7 +115,7 @@ The following resource types incur CCU consumption (measured in 5-minute interva
 | [Monitoring Integrations][ref-monitoring-integrations] | Depends on a [chosen tier](#monitoring-integrations-tiers) |
 | [Audit Log][ref-audit-log] | Depends on a [chosen tier](#audit-log-tiers) |
 
-### Compute tiers
+### Deployment tiers
 
 [Production clusters][ref-production-cluster] (including individual API instances)
 and [development instances][ref-development-instance] are involved in serving
@@ -54,7 +128,7 @@ requests through [APIs & integrations][ref-apis] under the following tiers:
 
 You can upgrade to a chosen tier in the
 <Btn>Settings</Btn> of your deployment.
-Upgrading to the M tier is only available on [Enterprise and above][cube-pricing] plans.
+Upgrading to the M tier is only available on [Enterprise and above][cube-pricing] product tiers.
 
 ### Cube Store Worker tiers
 
@@ -121,75 +195,13 @@ under the following tiers:
 | S    | 4                          | —                  |
 | M    | 6                          | Audit Log data export |
 
-## Pricing plans
-
-### Free
-
-**Free plan is designed for development and testing purposes.** It is not
-intended for production use.
-
-It offers up to two [Development Instances][ref-cloud-deployment-dev-instance].
-
-You can review its [support terms][ref-free-plan-support] and [limits][ref-cloud-limits].
-
-### Starter
-
-**Starter plan targets low-scale production that is not business-critical.**
-
-It offers a [Production Cluster][ref-cloud-deployment-prod-cluster], the ability
-to use third-party packages from the npm registry, AWS and GCP support in select
-regions, pre-aggregations of up to 150GB in size, auto-suspend controls, and
-[semantic layer sync][ref-sls] with a single BI tool (such as Preset or Metabase).
-
-You can review its [pricing][cube-pricing], [support
-terms][ref-starter-plan-support], and [limits][ref-cloud-limits].
-
-### Premium
-
-**Premium plan is designed for basic small-scale production deployments.**
-
-It offers everything in the [Starter plan](#starter) as well as enabling
-the use of [Production Multi-Clusters][ref-cloud-deployment-prod-multicluster],
-support for [custom domains][ref-cloud-custom-domains], AWS and GCP support
-in all regions. Cube Cloud provides a 99.95% uptime SLA for this plan.
-
-You can review its [pricing][cube-pricing], [support
-terms][ref-premium-plan-support], and [limits][ref-cloud-limits].
-
-### Enterprise
-
-**Enterprise plan is suitable for high-scale or mission-critical production
-deployments with more significant security and compliance needs.**
-
-It offers everything in the [Premium plan](#premium) as well as [Semantic Layer
-Sync][ref-sls] with unlimited supported BI tools, SAML 2.0
-support for [single sign-on][ref-sso], Azure support for all regions, [dedicated
-infrastructure][ref-dedicated-infra], [VPC peering][ref-cloud-vpc-peering],
-[monitoring integrations][ref-monitoring-integrations], and [role-based access
-control][ref-cloud-acl]. Cube Cloud provides a 99.99% uptime SLA for this plan.
-
-You can review its [pricing][cube-pricing], [support
-terms][ref-enterprise-plan-support], and [limits][ref-cloud-limits].
-
-### Enterprise Premier
-
-**Enterprise Premier plan caters to high-scale, high-availability
-mission-critical production deployments with security and compliance needs.**
-
-It offers everything in the [Enterprise plan](#enterprise) as well as
-unlimited pre-aggregation sizes, and support for kSQL and Elasticsearch. Cube
-Cloud provides a 99.995% uptime SLA for this plan.
-
-You can review its [pricing][cube-pricing], [support
-terms][ref-enterprise-premier-plan-support], and [limits][ref-cloud-limits].
-
 ## Total cost examples
 
 The following examples provide insight into the total cost to use Cube Cloud:
-- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium plan).
-- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise plan).
+- [Small-scale deployment](#small-scale-deployment) (production cluster, Premium product tier).
+- [Medium-scale deployment](#medium-scale-deployment) (production cluster with auto-scaling, Enterprise product tier).
 - [Large-scale deployment](#large-scale-deployment) (production multi-cluster
-with dedicated infrastructure, Enterprise plan).
+with dedicated infrastructure, Enterprise product tier).
 
 ### Small-scale deployment
 
@@ -197,7 +209,7 @@ Suppose a company uses Cube Cloud to power self-serve business intelligence for
 a couple of teams in Eastern and Pacific time zones.
 
 This organization:
-* Uses the Premium plan of Cube Cloud.
+* Uses the Premium product tier of Cube Cloud.
 * Runs a single Production Cluster that is active 24/7 but never has to auto-scale
 its API instances because the usage is spread evenly with no bursts.
 * Operates on a small volume of data that requires the usage of just 2 Cube Store
@@ -223,7 +235,7 @@ exploration in multiple BI tools and AI agents; it also uses Cube Cloud to power
 analytics in its SaaS platform that caters to a vast worldwide customer base. 
 
 This organization:
-* Uses the Enterprise plan of Cube Cloud.
+* Uses the Enterprise product tier of Cube Cloud.
 * Runs two Production Clusters that are active 24/7 and auto-scale up to 8 API instances
 during a peak hour every day.
 * Operates on a moderate volume of data that requires the usage of 4 Cube Store
@@ -248,7 +260,7 @@ Suppose a company uses Cube Cloud as a mission-critical part of their infrastruc
 its globally distributed workforce, customer base, and (or) partners to operate at scale.
 
 This organization:
-* Uses the Enterprise plan of Cube Cloud.
+* Uses the Enterprise product tier of Cube Cloud.
 * Uses [dedicated infrastructure][ref-dedicated-infra].
 * Runs a Production Multi-Cluster that is active 24/7, includes 3 Production Clusters, with each
 Production Cluster auto-scaling up to 10 API instances during a few peak hours every day.
@@ -275,11 +287,11 @@ of data engineers.
 
 ### Upgrades
 
-You may upgrade your CCUs to a higher-level subscription plan at any time by
+You may upgrade your CCUs to a higher-level product tier at any time by
 paying the difference in per-Cube Consumption Unit pricing, or by asking to convert
-the price paid for the remaining CCUs into CCUs for the higher subscription plan
-at the CCU pricing for that plan (resulting in a lower number of available CCUs
-but upgraded to the higher subscription plan).
+the price paid for the remaining CCUs into CCUs for the higher product tier
+at the CCU pricing for that product tier (resulting in a lower number of available CCUs
+but upgraded to the higher product tier).
 
 ### Terms
 
@@ -289,12 +301,13 @@ account, services may degrade or be suspended until new CCUs are purchased.
 
 Future purchases and upgrades are subject to the pricing that is in effect at
 the time of the order. No credit is allowed for downgrading CCUs to a lower
-subscription plan level. Payments are non-refundable.
+product tier level. Payments are non-refundable.
 
 [ref-docs-intro]: /product/introduction
 [cube-webinars]: https://cube.dev/events
 [cube-slack]: https://slack.cube.dev
 [cube-pricing]: https://cube.dev/pricing
+[link-contact-us]: https://cube.dev/contact
 [ref-cloud-deployment-dev-instance]:
   /product/deployment/cloud/deployment-types#development-instance
 [ref-cloud-deployment-prod-cluster]:
@@ -309,11 +322,11 @@ subscription plan level. Payments are non-refundable.
 [ref-cloud-vpc-peering]: /product/deployment/cloud/vpc
 [ref-sls]: /product/apis-integrations/semantic-layer-sync
 [ref-support]: /product/deployment/cloud/support
-[ref-free-plan-support]: /product/deployment/cloud/support#free
-[ref-starter-plan-support]: /product/deployment/cloud/support#starter
-[ref-premium-plan-support]: /product/deployment/cloud/support#premium
-[ref-enterprise-plan-support]: /product/deployment/cloud/support#enterprise
-[ref-enterprise-premier-plan-support]: /product/deployment/cloud/support#enterprise-premier
+[ref-free-tier-support]: /product/deployment/cloud/support#free
+[ref-starter-tier-support]: /product/deployment/cloud/support#starter
+[ref-premium-tier-support]: /product/deployment/cloud/support#premium
+[ref-enterprise-tier-support]: /product/deployment/cloud/support#enterprise
+[ref-enterprise-premier-tier-support]: /product/deployment/cloud/support#enterprise-premier
 [ref-query-history]: /product/workspace/query-history
 [ref-performance-insights]: /product/workspace/performance
 [ref-audit-log]: /product/workspace/audit-log
