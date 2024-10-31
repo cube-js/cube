@@ -121,7 +121,7 @@ export function testQueries(type: string, { includeIncrementalSchemaSuite, exten
         }
         console.log(`Creating ${queries.length} fixture tables completed`);
       } catch (e: any) {
-        console.log('Error creating fixtures', e.stack);
+        console.log('Error creating TEST fixtures', e.stack);
         throw e;
       }
     });
