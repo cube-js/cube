@@ -324,6 +324,88 @@ impl Remapper {
         }
     }
 
+    fn generate_new_alias(&self, start_from: String) -> String {
+        static NON_ID_REGEX: LazyLock<Regex> =
+            LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
+
+        let alias = start_from;
+        let mut truncated_alias = NON_ID_REGEX
+            .replace_all(&alias, "_")
+            .trim_start_matches("_")
+            .to_lowercase();
+        truncated_alias.truncate(16);
+        let mut alias = truncated_alias.clone();
+        for i in 1..10000 {
+            if !self.used_targets.contains(&alias) {
+                break;
+            }
+            alias = format!("{}_{}", truncated_alias, i);
+        }
+        alias
+    }
+
+    fn new_alias(
+        &self,
+        original_alias: &String,
+        start_from: Option<String>,
+    ) -> result::Result<String, CubeError> {
+        let alias = if self.can_rename_columns {
+            self.generate_new_alias(start_from.unwrap_or_else(|| original_alias.clone()))
+        } else {
+            original_alias.clone()
+        };
+
+        if self.used_targets.contains(&alias) {
+            return Err(CubeError::internal(format!(
+                "Can't generate SQL for column expr: duplicate alias {alias}"
+            )));
+        }
+
+        Ok(alias)
+    }
+
+    fn insert_new_alias(&mut self, original_column: &Column, new_alias: &String) {
+        self.used_targets.insert(new_alias.clone());
+        self.remapping.insert(
+            Column::from_name(&original_column.name),
+            Column::from_name(new_alias),
+        );
+        if let Some(from_alias) = &self.from_alias {
+            self.remapping.insert(
+                Column {
+                    name: original_column.name.clone(),
+                    relation: Some(from_alias.clone()),
+                },
+                Column {
+                    name: new_alias.clone(),
+                    relation: Some(from_alias.clone()),
+                },
+            );
+            if let Some(original_relation) = &original_column.relation {
+                if original_relation != from_alias {
+                    self.remapping.insert(
+                        original_column.clone(),
+                        Column {
+                            name: new_alias.clone(),
+                            relation: Some(from_alias.clone()),
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn add_column(&mut self, column: &Column) -> result::Result<String, CubeError> {
+        if let Some(alias_column) = self.remapping.get(column) {
+            return Ok(alias_column.name.clone());
+        }
+
+        let new_alias = self.new_alias(&column.name, None)?;
+        self.insert_new_alias(column, &new_alias);
+
+        Ok(new_alias)
+    }
+
     /// Generate new alias for expression
     /// `original_expr` is the one we are generating alias for
     /// `expr` can be same or modified, i.e. when previous column remapping is applied.
@@ -335,71 +417,21 @@ impl Remapper {
         original_expr: &Expr,
         expr: &Expr,
     ) -> result::Result<String, CubeError> {
-        static NON_ID_REGEX: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"[^a-zA-Z0-9_]").unwrap());
-
         let original_alias = expr_name(original_expr, schema)?;
         let original_alias_key = Column::from_name(&original_alias);
         if let Some(alias_column) = self.remapping.get(&original_alias_key) {
             return Ok(alias_column.name.clone());
         }
 
-        let alias = if self.can_rename_columns {
-            let alias = expr_name(&expr, &schema)?;
-            let mut truncated_alias = NON_ID_REGEX
-                .replace_all(&alias, "_")
-                .trim_start_matches("_")
-                .to_lowercase();
-            truncated_alias.truncate(16);
-            let mut alias = truncated_alias.clone();
-            for i in 1..10000 {
-                if !self.used_targets.contains(&alias) {
-                    break;
-                }
-                alias = format!("{}_{}", truncated_alias, i);
-            }
-            alias
+        let start_from = expr_name(&expr, &schema)?;
+        let alias = self.new_alias(&original_alias, Some(start_from))?;
+
+        let original_column = if let Expr::Column(column) = &original_expr {
+            column
         } else {
-            original_alias.clone()
+            &Column::from_name(original_alias)
         };
-
-        if self.used_targets.contains(&alias) {
-            return Err(CubeError::internal(format!(
-                "Can't generate SQL for column expr: duplicate alias {alias}"
-            )));
-        }
-
-        self.used_targets.insert(alias.clone());
-        self.remapping
-            .insert(original_alias_key, Column::from_name(&alias));
-        if let Some(from_alias) = &self.from_alias {
-            self.remapping.insert(
-                Column {
-                    name: original_alias.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-                Column {
-                    name: alias.clone(),
-                    relation: Some(from_alias.clone()),
-                },
-            );
-            if let Expr::Column(column) = &original_expr {
-                if let Some(original_relation) = &column.relation {
-                    if original_relation != from_alias {
-                        self.remapping.insert(
-                            Column {
-                                name: original_alias.clone(),
-                                relation: Some(original_relation.clone()),
-                            },
-                            Column {
-                                name: alias.clone(),
-                                relation: Some(from_alias.clone()),
-                            },
-                        );
-                    }
-                }
-            }
-        }
+        self.insert_new_alias(original_column, &alias);
 
         Ok(alias)
     }
@@ -618,38 +650,52 @@ impl CubeScanWrapperNode {
                         }
                         let mut meta_with_user = load_request_meta.as_ref().clone();
                         meta_with_user.set_change_user(node.options.change_user.clone());
+
+                        // Single CubeScan can represent join of multiple table scans
+                        // Multiple table scans can have multiple different aliases
+                        // It means that column expressions on top of this node can have multiple different qualifiers
+                        // CubeScan can have only one alias, so we remap every column to use that alias
+
+                        // Columns in node.schema can have arbitrary names, assigned by DF
+                        // Stuff like `datetrunc(Utf8("month"), col)`
+                        // They can be very long, and contain unwanted character
+                        // So we rename them
+
+                        let from_alias = node
+                            .schema
+                            .fields()
+                            .iter()
+                            .next()
+                            .and_then(|f| f.qualifier().cloned());
+                        let mut remapper = Remapper::new(from_alias.clone(), true);
+                        let mut member_to_alias = HashMap::new();
+                        for (member, field) in
+                            node.member_fields.iter().zip(node.schema.fields().iter())
+                        {
+                            let alias = remapper.add_column(&field.qualified_column())?;
+                            if let MemberField::Member(f) = member {
+                                member_to_alias.insert(f.to_string(), alias);
+                            }
+                        }
+                        let column_remapping = remapper.into_remapping();
+
                         let sql = transport
                             .sql(
                                 node.span_id.clone(),
                                 node.request.clone(),
                                 node.auth_context,
                                 meta_with_user,
-                                Some(
-                                    node.member_fields
-                                        .iter()
-                                        .zip(node.schema.fields().iter())
-                                        .filter_map(|(m, field)| match m {
-                                            MemberField::Member(f) => {
-                                                Some((f.to_string(), field.name().to_string()))
-                                            }
-                                            _ => None,
-                                        })
-                                        .collect(),
-                                ),
+                                Some(member_to_alias),
                                 None,
                             )
                             .await?;
+
                         // TODO Add wrapper for reprojection and literal members handling
                         return Ok(SqlGenerationResult {
                             data_source: Some(data_sources[0].clone()),
-                            from_alias: node
-                                .schema
-                                .fields()
-                                .iter()
-                                .next()
-                                .and_then(|f| f.qualifier().cloned()),
+                            from_alias,
                             sql: sql.sql,
-                            column_remapping: None,
+                            column_remapping,
                             request: node.request.clone(),
                         });
                     } else if let Some(WrappedSelectNode {
