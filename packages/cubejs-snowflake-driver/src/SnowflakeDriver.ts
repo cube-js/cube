@@ -450,6 +450,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
       await this.execute(connection, 'ALTER SESSION SET TIMEZONE = \'UTC\'', [], false);
       await this.execute(connection, `ALTER SESSION SET STATEMENT_TIMEOUT_IN_SECONDS = ${this.config.executionTimeout}`, [], false);
+      await this.execute(connection, 'ALTER SESSION SET QUOTED_IDENTIFIRS_IGNORE_CASE = FALSE', [], false);
 
       return connection;
     } catch (e) {
