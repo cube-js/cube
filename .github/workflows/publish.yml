@@ -791,16 +791,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Detect branch name
         id: detect_branch
-        env:
-          EVENT_BASE_REF: ${{ github.event.base_ref || 'tag_on_unknown_branch_commit_not_pushed' }}
         run: |
-          BRANCH=${EVENT_BASE_REF#refs/heads/}
+          GIT_BRANCHES=$(git branch -r --contains ${{ github.ref_name }})
+          echo "Git contains: $GIT_BRANCHES"
 
-          if [ "$BRANCH" == "tag_on_unknown_branch_commit_not_pushed" ]; then
-            echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
-            exit 1
+          BRANCH="$(echo ${GIT_BRANCHES//origin\//} | tr -d '\n')"
+
+          if [[ -z $BRANCH ]]; then
+              echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
+              exit 1
           fi
 
           echo "Detected branch: $BRANCH"
