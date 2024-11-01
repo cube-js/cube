@@ -793,26 +793,10 @@ jobs:
         uses: actions/checkout@v4
       - name: Detect branch name
         id: detect_branch
-        env:
-          EVENT_BASE_REF: ${{ github.event.base_ref || 'tag_on_unknown_branch_commit_not_pushed' }}
         run: |
-          BRANCH=${EVENT_BASE_REF#refs/heads/}
-
-          if [ "$BRANCH" == "tag_on_unknown_branch_commit_not_pushed" ]; then
-            echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
-            exit 1
-          fi
-
-          echo "Detected branch: $BRANCH"
-          IS_MASTER=false
-
-          if [ "$BRANCH" == "master" ]; then
-            IS_MASTER=true
-          fi
-          echo "Detected is_master: $IS_MASTER"
-
-          echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
-          echo "is_master=$IS_MASTER" >> "$GITHUB_OUTPUT"
+          # Git & GitHub (for now) doesn't provide an easy/stable way to detect branch name from tag.
+          echo "branch=lts/v1.0" >> "$GITHUB_OUTPUT"
+          echo "is_master=false" >> "$GITHUB_OUTPUT"
 
   trigger-repo-sync:
     name: Trigger runtime repo
