@@ -799,7 +799,7 @@ jobs:
           GIT_BRANCHES=$(git branch -r --contains ${{ github.ref_name }})
           echo "Git contains: $GIT_BRANCHES"
 
-          BRANCH="$(echo ${GIT_BRANCHES//origin\//} | tr -d '\n')"
+          BRANCH="$(echo "${GIT_BRANCHES//origin\//}" | tr -d '\n')"
 
           if [[ -z "$BRANCH" ]]; then
               echo "Error: Could not detect branch name. Most likely this is that commit for tag is not pushed yet."
