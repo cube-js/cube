@@ -331,7 +331,8 @@ jobs:
           timeout_minutes: 20
           command: |
             dig ohio.cloud.databricks.com.
-            curl -v https://ohio.cloud.databricks.com.
+            curl -v https://ohio.cloud.databricks.com
+            curl -v https://ohio.cloud.databricks.com/sql/1.0/warehouses/
             cd ./packages/cubejs-testing-drivers
             export DEBUG=testcontainers
             yarn ${{ matrix.database }}-full
