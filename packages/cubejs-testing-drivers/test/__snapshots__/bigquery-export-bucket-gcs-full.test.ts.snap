@@ -1,25 +1,21 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: NULLS FIRST/LAST SQL push down: nulls_first_last_sql_push_down 1`] = `
 Array [
   Object {
-    "SUM(a.cnt)": "44",
-    "date": null,
-    "order": null,
-    "row": null,
+    "category": null,
   },
   Object {
-    "SUM(a.cnt)": "1",
-    "date": null,
-    "order": null,
-    "row": 523,
+    "category": "Office Supplies",
   },
   Object {
-    "SUM(a.cnt)": "1",
-    "date": null,
-    "order": "CA-2017-145142",
-    "row": 523,
+    "category": "Technology",
   },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup with aliases: nested_rollup_with_aliases 1`] = `
+Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": 2020-01-23T00:00:00.000Z,
@@ -29,14 +25,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 849,
+    "order": "CA-2017-145142",
+    "row": 523,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-107503",
-    "row": 849,
+    "order": null,
+    "row": 523,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -47,14 +43,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 1013,
+    "order": "CA-2017-107503",
+    "row": 849,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-118437",
-    "row": 1013,
+    "order": null,
+    "row": 849,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -65,14 +61,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 1494,
+    "order": "CA-2017-118437",
+    "row": 1013,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-139661",
-    "row": 1494,
+    "order": null,
+    "row": 1013,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -83,14 +79,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 1995,
+    "order": "CA-2017-139661",
+    "row": 1494,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-133648",
-    "row": 1995,
+    "order": null,
+    "row": 1494,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -101,14 +97,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2329,
+    "order": "CA-2017-133648",
+    "row": 1995,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-138422",
-    "row": 2329,
+    "order": null,
+    "row": 1995,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -119,14 +115,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2455,
+    "order": "CA-2017-138422",
+    "row": 2329,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-140949",
-    "row": 2455,
+    "order": null,
+    "row": 2329,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -137,14 +133,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2595,
+    "order": "CA-2017-140949",
+    "row": 2455,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-149048",
-    "row": 2595,
+    "order": null,
+    "row": 2455,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -155,14 +151,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2655,
+    "order": "CA-2017-149048",
+    "row": 2595,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-112515",
-    "row": 2655,
+    "order": null,
+    "row": 2595,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -173,14 +169,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2661,
+    "order": "CA-2017-112515",
+    "row": 2655,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-123372",
-    "row": 2661,
+    "order": null,
+    "row": 2655,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -191,14 +187,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 2952,
+    "order": "CA-2017-123372",
+    "row": 2661,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-134915",
-    "row": 2952,
+    "order": null,
+    "row": 2661,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -209,14 +205,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3059,
+    "order": "CA-2017-134915",
+    "row": 2952,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-131492",
-    "row": 3059,
+    "order": null,
+    "row": 2952,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -227,14 +223,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3060,
+    "order": "CA-2017-131492",
+    "row": 3059,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-131492",
-    "row": 3060,
+    "order": null,
+    "row": 3059,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -245,14 +241,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3083,
+    "order": "CA-2017-131492",
+    "row": 3060,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "US-2017-132297",
-    "row": 3083,
+    "order": null,
+    "row": 3060,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -263,14 +259,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3448,
+    "order": "US-2017-132297",
+    "row": 3083,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-102554",
-    "row": 3448,
+    "order": null,
+    "row": 3083,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -281,14 +277,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3717,
+    "order": "CA-2017-102554",
+    "row": 3448,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-144568",
-    "row": 3717,
+    "order": null,
+    "row": 3448,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -299,14 +295,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 3934,
+    "order": "CA-2017-144568",
+    "row": 3717,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-123001",
-    "row": 3934,
+    "order": null,
+    "row": 3717,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -317,14 +313,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 4012,
+    "order": "CA-2017-123001",
+    "row": 3934,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-100811",
-    "row": 4012,
+    "order": null,
+    "row": 3934,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -335,14 +331,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 4031,
+    "order": "CA-2017-100811",
+    "row": 4012,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-124296",
-    "row": 4031,
+    "order": null,
+    "row": 4012,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -353,14 +349,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 4161,
+    "order": "CA-2017-124296",
+    "row": 4031,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-115546",
-    "row": 4161,
+    "order": null,
+    "row": 4031,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -371,14 +367,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 4227,
+    "order": "CA-2017-115546",
+    "row": 4161,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-120327",
-    "row": 4227,
+    "order": null,
+    "row": 4161,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -389,14 +385,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 4882,
+    "order": "CA-2017-120327",
+    "row": 4227,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-143567",
-    "row": 4882,
+    "order": null,
+    "row": 4227,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -407,14 +403,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 5220,
+    "order": "CA-2017-143567",
+    "row": 4882,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-145653",
-    "row": 5220,
+    "order": null,
+    "row": 4882,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -425,14 +421,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 5277,
+    "order": "CA-2017-145653",
+    "row": 5220,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-147333",
-    "row": 5277,
+    "order": null,
+    "row": 5220,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -443,14 +439,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 6125,
+    "order": "CA-2017-147333",
+    "row": 5277,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-145772",
-    "row": 6125,
+    "order": null,
+    "row": 5277,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -461,14 +457,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 6205,
+    "order": "CA-2017-145772",
+    "row": 6125,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-145660",
-    "row": 6205,
+    "order": null,
+    "row": 6125,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -479,14 +475,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 6272,
+    "order": "CA-2017-145660",
+    "row": 6205,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-102379",
-    "row": 6272,
+    "order": null,
+    "row": 6205,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -497,14 +493,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 6459,
+    "order": "CA-2017-102379",
+    "row": 6272,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "US-2017-133361",
-    "row": 6459,
+    "order": null,
+    "row": 6272,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -515,14 +511,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 6651,
+    "order": "US-2017-133361",
+    "row": 6459,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "US-2017-124779",
-    "row": 6651,
+    "order": null,
+    "row": 6459,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -533,14 +529,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 7174,
+    "order": "US-2017-124779",
+    "row": 6651,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "US-2017-141677",
-    "row": 7174,
+    "order": null,
+    "row": 6651,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -551,14 +547,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 7293,
+    "order": "US-2017-141677",
+    "row": 7174,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-109183",
-    "row": 7293,
+    "order": null,
+    "row": 7174,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -569,14 +565,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 7310,
+    "order": "CA-2017-109183",
+    "row": 7293,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-112172",
-    "row": 7310,
+    "order": null,
+    "row": 7293,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -587,14 +583,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 7425,
+    "order": "CA-2017-112172",
+    "row": 7310,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-135069",
-    "row": 7425,
+    "order": null,
+    "row": 7310,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -605,14 +601,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 7698,
+    "order": "CA-2017-135069",
+    "row": 7425,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-151799",
-    "row": 7698,
+    "order": null,
+    "row": 7425,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -623,14 +619,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8425,
+    "order": "CA-2017-151799",
+    "row": 7698,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-150091",
-    "row": 8425,
+    "order": null,
+    "row": 7698,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -641,14 +637,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8621,
+    "order": "CA-2017-150091",
+    "row": 8425,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "US-2017-119319",
-    "row": 8621,
+    "order": null,
+    "row": 8425,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -659,14 +655,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8673,
+    "order": "US-2017-119319",
+    "row": 8621,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-163265",
-    "row": 8673,
+    "order": null,
+    "row": 8621,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -677,14 +673,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8697,
+    "order": "CA-2017-163265",
+    "row": 8673,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-119284",
-    "row": 8697,
+    "order": null,
+    "row": 8673,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -695,14 +691,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8878,
+    "order": "CA-2017-119284",
+    "row": 8697,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-126928",
-    "row": 8878,
+    "order": null,
+    "row": 8697,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -713,14 +709,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 8958,
+    "order": "CA-2017-126928",
+    "row": 8878,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-105620",
-    "row": 8958,
+    "order": null,
+    "row": 8878,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -731,14 +727,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 9473,
+    "order": "CA-2017-105620",
+    "row": 8958,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-102925",
-    "row": 9473,
+    "order": null,
+    "row": 8958,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -749,14 +745,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 9584,
+    "order": "CA-2017-102925",
+    "row": 9473,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-116127",
-    "row": 9584,
+    "order": null,
+    "row": 9473,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -767,14 +763,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": null,
-    "row": 9618,
+    "order": "CA-2017-116127",
+    "row": 9584,
   },
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
-    "order": "CA-2017-160633",
-    "row": 9618,
+    "order": null,
+    "row": 9584,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -785,7 +781,19 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "date": null,
+    "order": "CA-2017-160633",
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.cnt)": "1",
+    "date": null,
     "order": null,
+    "row": 9618,
+  },
+  Object {
+    "SUM(a.cnt)": "1",
+    "date": 2020-11-16T00:00:00.000Z,
+    "order": "CA-2017-160633",
     "row": 9619,
   },
   Object {
@@ -796,33 +804,21 @@ Array [
   },
   Object {
     "SUM(a.cnt)": "1",
-    "date": 2020-11-16T00:00:00.000Z,
-    "order": "CA-2017-160633",
+    "date": null,
+    "order": null,
     "row": 9619,
+  },
+  Object {
+    "SUM(a.cnt)": "44",
+    "date": null,
+    "order": null,
+    "row": null,
   },
 ]
 `;
 
 exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Nested Rollup: nested_rollup 1`] = `
 Array [
-  Object {
-    "SUM(a.cnt)": "44",
-    "orderDate": null,
-    "orderId": null,
-    "rowId": null,
-  },
-  Object {
-    "SUM(a.cnt)": "1",
-    "orderDate": null,
-    "orderId": null,
-    "rowId": 523,
-  },
-  Object {
-    "SUM(a.cnt)": "1",
-    "orderDate": null,
-    "orderId": "CA-2017-145142",
-    "rowId": 523,
-  },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": 2020-01-23T00:00:00.000Z,
@@ -832,14 +828,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 849,
+    "orderId": "CA-2017-145142",
+    "rowId": 523,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-107503",
-    "rowId": 849,
+    "orderId": null,
+    "rowId": 523,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -850,14 +846,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1013,
+    "orderId": "CA-2017-107503",
+    "rowId": 849,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-118437",
-    "rowId": 1013,
+    "orderId": null,
+    "rowId": 849,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -868,14 +864,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1494,
+    "orderId": "CA-2017-118437",
+    "rowId": 1013,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-139661",
-    "rowId": 1494,
+    "orderId": null,
+    "rowId": 1013,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -886,14 +882,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1995,
+    "orderId": "CA-2017-139661",
+    "rowId": 1494,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-133648",
-    "rowId": 1995,
+    "orderId": null,
+    "rowId": 1494,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -904,14 +900,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2329,
+    "orderId": "CA-2017-133648",
+    "rowId": 1995,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-138422",
-    "rowId": 2329,
+    "orderId": null,
+    "rowId": 1995,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -922,14 +918,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2455,
+    "orderId": "CA-2017-138422",
+    "rowId": 2329,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-140949",
-    "rowId": 2455,
+    "orderId": null,
+    "rowId": 2329,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -940,14 +936,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2595,
+    "orderId": "CA-2017-140949",
+    "rowId": 2455,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-149048",
-    "rowId": 2595,
+    "orderId": null,
+    "rowId": 2455,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -958,14 +954,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2655,
+    "orderId": "CA-2017-149048",
+    "rowId": 2595,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-112515",
-    "rowId": 2655,
+    "orderId": null,
+    "rowId": 2595,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -976,14 +972,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2661,
+    "orderId": "CA-2017-112515",
+    "rowId": 2655,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-123372",
-    "rowId": 2661,
+    "orderId": null,
+    "rowId": 2655,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -994,14 +990,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2952,
+    "orderId": "CA-2017-123372",
+    "rowId": 2661,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-134915",
-    "rowId": 2952,
+    "orderId": null,
+    "rowId": 2661,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1012,14 +1008,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3059,
+    "orderId": "CA-2017-134915",
+    "rowId": 2952,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-131492",
-    "rowId": 3059,
+    "orderId": null,
+    "rowId": 2952,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1030,14 +1026,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3060,
+    "orderId": "CA-2017-131492",
+    "rowId": 3059,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-131492",
-    "rowId": 3060,
+    "orderId": null,
+    "rowId": 3059,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1048,14 +1044,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3083,
+    "orderId": "CA-2017-131492",
+    "rowId": 3060,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "US-2017-132297",
-    "rowId": 3083,
+    "orderId": null,
+    "rowId": 3060,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1066,14 +1062,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3448,
+    "orderId": "US-2017-132297",
+    "rowId": 3083,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102554",
-    "rowId": 3448,
+    "orderId": null,
+    "rowId": 3083,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1084,14 +1080,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3717,
+    "orderId": "CA-2017-102554",
+    "rowId": 3448,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-144568",
-    "rowId": 3717,
+    "orderId": null,
+    "rowId": 3448,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1102,14 +1098,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3934,
+    "orderId": "CA-2017-144568",
+    "rowId": 3717,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-123001",
-    "rowId": 3934,
+    "orderId": null,
+    "rowId": 3717,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1120,14 +1116,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4012,
+    "orderId": "CA-2017-123001",
+    "rowId": 3934,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-100811",
-    "rowId": 4012,
+    "orderId": null,
+    "rowId": 3934,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1138,14 +1134,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4031,
+    "orderId": "CA-2017-100811",
+    "rowId": 4012,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-124296",
-    "rowId": 4031,
+    "orderId": null,
+    "rowId": 4012,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1156,14 +1152,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4161,
+    "orderId": "CA-2017-124296",
+    "rowId": 4031,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-115546",
-    "rowId": 4161,
+    "orderId": null,
+    "rowId": 4031,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1174,14 +1170,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4227,
+    "orderId": "CA-2017-115546",
+    "rowId": 4161,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-120327",
-    "rowId": 4227,
+    "orderId": null,
+    "rowId": 4161,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1192,14 +1188,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4882,
+    "orderId": "CA-2017-120327",
+    "rowId": 4227,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-143567",
-    "rowId": 4882,
+    "orderId": null,
+    "rowId": 4227,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1210,14 +1206,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 5220,
+    "orderId": "CA-2017-143567",
+    "rowId": 4882,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145653",
-    "rowId": 5220,
+    "orderId": null,
+    "rowId": 4882,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1228,14 +1224,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 5277,
+    "orderId": "CA-2017-145653",
+    "rowId": 5220,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-147333",
-    "rowId": 5277,
+    "orderId": null,
+    "rowId": 5220,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1246,14 +1242,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6125,
+    "orderId": "CA-2017-147333",
+    "rowId": 5277,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145772",
-    "rowId": 6125,
+    "orderId": null,
+    "rowId": 5277,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1264,14 +1260,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6205,
+    "orderId": "CA-2017-145772",
+    "rowId": 6125,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145660",
-    "rowId": 6205,
+    "orderId": null,
+    "rowId": 6125,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1282,14 +1278,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6272,
+    "orderId": "CA-2017-145660",
+    "rowId": 6205,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102379",
-    "rowId": 6272,
+    "orderId": null,
+    "rowId": 6205,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1300,14 +1296,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6459,
+    "orderId": "CA-2017-102379",
+    "rowId": 6272,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "US-2017-133361",
-    "rowId": 6459,
+    "orderId": null,
+    "rowId": 6272,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1318,14 +1314,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6651,
+    "orderId": "US-2017-133361",
+    "rowId": 6459,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "US-2017-124779",
-    "rowId": 6651,
+    "orderId": null,
+    "rowId": 6459,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1336,14 +1332,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7174,
+    "orderId": "US-2017-124779",
+    "rowId": 6651,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "US-2017-141677",
-    "rowId": 7174,
+    "orderId": null,
+    "rowId": 6651,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1354,14 +1350,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7293,
+    "orderId": "US-2017-141677",
+    "rowId": 7174,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-109183",
-    "rowId": 7293,
+    "orderId": null,
+    "rowId": 7174,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1372,14 +1368,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7310,
+    "orderId": "CA-2017-109183",
+    "rowId": 7293,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-112172",
-    "rowId": 7310,
+    "orderId": null,
+    "rowId": 7293,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1390,14 +1386,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7425,
+    "orderId": "CA-2017-112172",
+    "rowId": 7310,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-135069",
-    "rowId": 7425,
+    "orderId": null,
+    "rowId": 7310,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1408,14 +1404,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7698,
+    "orderId": "CA-2017-135069",
+    "rowId": 7425,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-151799",
-    "rowId": 7698,
+    "orderId": null,
+    "rowId": 7425,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1426,14 +1422,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8425,
+    "orderId": "CA-2017-151799",
+    "rowId": 7698,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-150091",
-    "rowId": 8425,
+    "orderId": null,
+    "rowId": 7698,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1444,14 +1440,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8621,
+    "orderId": "CA-2017-150091",
+    "rowId": 8425,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "US-2017-119319",
-    "rowId": 8621,
+    "orderId": null,
+    "rowId": 8425,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1462,14 +1458,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8673,
+    "orderId": "US-2017-119319",
+    "rowId": 8621,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-163265",
-    "rowId": 8673,
+    "orderId": null,
+    "rowId": 8621,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1480,14 +1476,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8697,
+    "orderId": "CA-2017-163265",
+    "rowId": 8673,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-119284",
-    "rowId": 8697,
+    "orderId": null,
+    "rowId": 8673,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1498,14 +1494,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8878,
+    "orderId": "CA-2017-119284",
+    "rowId": 8697,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-126928",
-    "rowId": 8878,
+    "orderId": null,
+    "rowId": 8697,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1516,14 +1512,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8958,
+    "orderId": "CA-2017-126928",
+    "rowId": 8878,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-105620",
-    "rowId": 8958,
+    "orderId": null,
+    "rowId": 8878,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1534,14 +1530,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9473,
+    "orderId": "CA-2017-105620",
+    "rowId": 8958,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102925",
-    "rowId": 9473,
+    "orderId": null,
+    "rowId": 8958,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1552,14 +1548,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9584,
+    "orderId": "CA-2017-102925",
+    "rowId": 9473,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-116127",
-    "rowId": 9584,
+    "orderId": null,
+    "rowId": 9473,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1570,14 +1566,14 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9618,
+    "orderId": "CA-2017-116127",
+    "rowId": 9584,
   },
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-160633",
-    "rowId": 9618,
+    "orderId": null,
+    "rowId": 9584,
   },
   Object {
     "SUM(a.cnt)": "1",
@@ -1588,7 +1584,19 @@ Array [
   Object {
     "SUM(a.cnt)": "1",
     "orderDate": null,
+    "orderId": "CA-2017-160633",
+    "rowId": 9618,
+  },
+  Object {
+    "SUM(a.cnt)": "1",
+    "orderDate": null,
     "orderId": null,
+    "rowId": 9618,
+  },
+  Object {
+    "SUM(a.cnt)": "1",
+    "orderDate": 2020-11-16T00:00:00.000Z,
+    "orderId": "CA-2017-160633",
     "rowId": 9619,
   },
   Object {
@@ -1599,33 +1607,21 @@ Array [
   },
   Object {
     "SUM(a.cnt)": "1",
-    "orderDate": 2020-11-16T00:00:00.000Z,
-    "orderId": "CA-2017-160633",
+    "orderDate": null,
+    "orderId": null,
     "rowId": 9619,
+  },
+  Object {
+    "SUM(a.cnt)": "44",
+    "orderDate": null,
+    "orderId": null,
+    "rowId": null,
   },
 ]
 `;
 
 exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Rollup over exprs: rollup_over_exprs 1`] = `
 Array [
-  Object {
-    "SUM(ECommerce.count)": "44",
-    "city": null,
-    "order": null,
-    "orderData": null,
-  },
-  Object {
-    "SUM(ECommerce.count)": "1",
-    "city": null,
-    "order": 944.96,
-    "orderData": null,
-  },
-  Object {
-    "SUM(ECommerce.count)": "1",
-    "city": null,
-    "order": 944.96,
-    "orderData": 2020-01-23T00:00:00.000Z,
-  },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": "Detroit",
@@ -1635,14 +1631,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 946.792,
-    "orderData": null,
+    "order": 944.96,
+    "orderData": 2020-01-23T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 946.792,
-    "orderData": 2020-01-01T00:00:00.000Z,
+    "order": 944.96,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1653,14 +1649,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 1041.06,
-    "orderData": null,
+    "order": 946.792,
+    "orderData": 2020-01-01T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 1041.06,
-    "orderData": 2020-06-17T00:00:00.000Z,
+    "order": 946.792,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1671,14 +1667,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 1513.28,
-    "orderData": null,
+    "order": 1041.06,
+    "orderData": 2020-06-17T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 1513.28,
-    "orderData": 2020-10-30T00:00:00.000Z,
+    "order": 1041.06,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1689,14 +1685,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2017.608,
-    "orderData": null,
+    "order": 1513.28,
+    "orderData": 2020-10-30T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2017.608,
-    "orderData": 2020-06-25T00:00:00.000Z,
+    "order": 1513.28,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1707,14 +1703,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2357.704,
-    "orderData": null,
+    "order": 2017.608,
+    "orderData": 2020-06-25T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2357.704,
-    "orderData": 2020-09-23T00:00:00.000Z,
+    "order": 2017.608,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1725,14 +1721,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2598.2,
-    "orderData": null,
+    "order": 2357.704,
+    "orderData": 2020-09-23T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2598.2,
-    "orderData": 2020-03-17T00:00:00.000Z,
+    "order": 2357.704,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1743,14 +1739,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2956.92,
-    "orderData": null,
+    "order": 2598.2,
+    "orderData": 2020-03-17T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 2956.92,
-    "orderData": 2020-05-13T00:00:00.000Z,
+    "order": 2598.2,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1761,14 +1757,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3108.736,
-    "orderData": null,
+    "order": 2956.92,
+    "orderData": 2020-05-13T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3108.736,
-    "orderData": 2020-10-19T00:00:00.000Z,
+    "order": 2956.92,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1779,14 +1775,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3120.12,
-    "orderData": null,
+    "order": 3108.736,
+    "orderData": 2020-10-19T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3120.12,
-    "orderData": 2020-10-19T00:00:00.000Z,
+    "order": 3108.736,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1797,14 +1793,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3179.776,
-    "orderData": null,
+    "order": 3120.12,
+    "orderData": 2020-10-19T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3179.776,
-    "orderData": 2020-11-12T00:00:00.000Z,
+    "order": 3120.12,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1815,14 +1811,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3455.52,
-    "orderData": null,
+    "order": 3179.776,
+    "orderData": 2020-11-12T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3455.52,
-    "orderData": 2020-06-11T00:00:00.000Z,
+    "order": 3179.776,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1833,14 +1829,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3764.1,
-    "orderData": null,
+    "order": 3455.52,
+    "orderData": 2020-06-11T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3764.1,
-    "orderData": 2020-05-29T00:00:00.000Z,
+    "order": 3455.52,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1851,14 +1847,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3952.8,
-    "orderData": null,
+    "order": 3764.1,
+    "orderData": 2020-05-29T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 3952.8,
-    "orderData": 2020-09-02T00:00:00.000Z,
+    "order": 3764.1,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1869,14 +1865,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4090.592,
-    "orderData": null,
+    "order": 3952.8,
+    "orderData": 2020-09-02T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4090.592,
-    "orderData": 2020-11-21T00:00:00.000Z,
+    "order": 3952.8,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1887,14 +1883,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4162.9400000000005,
-    "orderData": null,
+    "order": 4090.592,
+    "orderData": 2020-11-21T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4162.9400000000005,
-    "orderData": 2020-05-27T00:00:00.000Z,
+    "order": 4090.592,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1905,14 +1901,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4318.84,
-    "orderData": null,
+    "order": 4162.9400000000005,
+    "orderData": 2020-05-27T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4318.84,
-    "orderData": 2020-11-11T00:00:00.000Z,
+    "order": 4162.9400000000005,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1923,14 +1919,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4496.76,
-    "orderData": null,
+    "order": 4318.84,
+    "orderData": 2020-11-11T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 4496.76,
-    "orderData": 2020-12-24T00:00:00.000Z,
+    "order": 4318.84,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1941,14 +1937,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5240.88,
-    "orderData": null,
+    "order": 4496.76,
+    "orderData": 2020-12-24T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5240.88,
-    "orderData": 2020-09-17T00:00:00.000Z,
+    "order": 4496.76,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1959,14 +1955,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5240.9400000000005,
-    "orderData": null,
+    "order": 5240.88,
+    "orderData": 2020-09-17T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5240.9400000000005,
-    "orderData": 2020-05-14T00:00:00.000Z,
+    "order": 5240.88,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1977,14 +1973,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5366.5,
-    "orderData": null,
+    "order": 5240.9400000000005,
+    "orderData": 2020-05-14T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 5366.5,
-    "orderData": 2020-12-14T00:00:00.000Z,
+    "order": 5240.9400000000005,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -1995,14 +1991,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6214.5,
-    "orderData": null,
+    "order": 5366.5,
+    "orderData": 2020-12-14T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6214.5,
-    "orderData": 2020-06-03T00:00:00.000Z,
+    "order": 5366.5,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2013,14 +2009,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6216.52,
-    "orderData": null,
+    "order": 6214.5,
+    "orderData": 2020-06-03T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6216.52,
-    "orderData": 2020-09-01T00:00:00.000Z,
+    "order": 6214.5,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2031,14 +2027,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6220.424,
-    "orderData": null,
+    "order": 6216.52,
+    "orderData": 2020-09-01T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6220.424,
-    "orderData": 2020-12-01T00:00:00.000Z,
+    "order": 6216.52,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2049,14 +2045,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6466.52,
-    "orderData": null,
+    "order": 6220.424,
+    "orderData": 2020-12-01T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6466.52,
-    "orderData": 2020-05-14T00:00:00.000Z,
+    "order": 6220.424,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2067,14 +2063,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6620.780000000001,
-    "orderData": null,
+    "order": 6466.52,
+    "orderData": 2020-05-14T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6620.780000000001,
-    "orderData": 2020-11-28T00:00:00.000Z,
+    "order": 6466.52,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2085,14 +2081,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6631.8,
-    "orderData": null,
+    "order": 6620.780000000001,
+    "orderData": 2020-11-28T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6631.8,
-    "orderData": 2020-12-02T00:00:00.000Z,
+    "order": 6620.780000000001,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2103,14 +2099,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6742.84,
-    "orderData": null,
+    "order": 6631.8,
+    "orderData": 2020-12-02T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 6742.84,
-    "orderData": 2020-09-08T00:00:00.000Z,
+    "order": 6631.8,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2121,14 +2117,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 7338.26,
-    "orderData": null,
+    "order": 6742.84,
+    "orderData": 2020-09-08T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 7338.26,
-    "orderData": 2020-06-10T00:00:00.000Z,
+    "order": 6742.84,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2139,14 +2135,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 7498.344,
-    "orderData": null,
+    "order": 7338.26,
+    "orderData": 2020-06-10T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 7498.344,
-    "orderData": 2020-04-10T00:00:00.000Z,
+    "order": 7338.26,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2157,14 +2153,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8591,
-    "orderData": null,
+    "order": 7498.344,
+    "orderData": 2020-04-10T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8591,
-    "orderData": 2020-12-04T00:00:00.000Z,
+    "order": 7498.344,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2175,14 +2171,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8682.12,
-    "orderData": null,
+    "order": 8591,
+    "orderData": 2020-12-04T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8682.12,
-    "orderData": 2020-11-06T00:00:00.000Z,
+    "order": 8591,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2193,14 +2189,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8709.736,
-    "orderData": null,
+    "order": 8682.12,
+    "orderData": 2020-11-06T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 8709.736,
-    "orderData": 2020-02-16T00:00:00.000Z,
+    "order": 8682.12,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2211,14 +2207,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9176.952,
-    "orderData": null,
+    "order": 8709.736,
+    "orderData": 2020-02-16T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9176.952,
-    "orderData": 2020-06-15T00:00:00.000Z,
+    "order": 8709.736,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2229,14 +2225,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9198,
-    "orderData": null,
+    "order": 9176.952,
+    "orderData": 2020-06-15T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9198,
-    "orderData": 2020-12-25T00:00:00.000Z,
+    "order": 9176.952,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2247,14 +2243,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9381.82,
-    "orderData": null,
+    "order": 9198,
+    "orderData": 2020-12-25T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9381.82,
-    "orderData": 2020-11-02T00:00:00.000Z,
+    "order": 9198,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2265,14 +2261,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9729.248,
-    "orderData": null,
+    "order": 9381.82,
+    "orderData": 2020-11-02T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9729.248,
-    "orderData": 2020-11-05T00:00:00.000Z,
+    "order": 9381.82,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2283,14 +2279,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9791.704,
-    "orderData": null,
+    "order": 9729.248,
+    "orderData": 2020-11-05T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9791.704,
-    "orderData": 2020-11-16T00:00:00.000Z,
+    "order": 9729.248,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2301,14 +2297,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9838,
-    "orderData": null,
+    "order": 9791.704,
+    "orderData": 2020-11-16T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 9838,
-    "orderData": 2020-09-17T00:00:00.000Z,
+    "order": 9791.704,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2319,14 +2315,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 10097.96,
-    "orderData": null,
+    "order": 9838,
+    "orderData": 2020-09-17T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 10097.96,
-    "orderData": 2020-12-14T00:00:00.000Z,
+    "order": 9838,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2337,14 +2333,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 10385.568,
-    "orderData": null,
+    "order": 10097.96,
+    "orderData": 2020-12-14T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 10385.568,
-    "orderData": 2020-06-25T00:00:00.000Z,
+    "order": 10097.96,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2355,14 +2351,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 11417.964,
-    "orderData": null,
+    "order": 10385.568,
+    "orderData": 2020-06-25T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 11417.964,
-    "orderData": 2020-11-16T00:00:00.000Z,
+    "order": 10385.568,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2373,14 +2369,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 11973.92,
-    "orderData": null,
+    "order": 11417.964,
+    "orderData": 2020-11-16T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 11973.92,
-    "orderData": 2020-03-26T00:00:00.000Z,
+    "order": 11417.964,
+    "orderData": null,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2391,8 +2387,20 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "city": null,
-    "order": 12734.8,
+    "order": 11973.92,
+    "orderData": 2020-03-26T00:00:00.000Z,
+  },
+  Object {
+    "SUM(ECommerce.count)": "1",
+    "city": null,
+    "order": 11973.92,
     "orderData": null,
+  },
+  Object {
+    "SUM(ECommerce.count)": "1",
+    "city": "Lakewood",
+    "order": 12734.8,
+    "orderData": 2020-10-12T00:00:00.000Z,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2402,33 +2410,21 @@ Array [
   },
   Object {
     "SUM(ECommerce.count)": "1",
-    "city": "Lakewood",
+    "city": null,
     "order": 12734.8,
-    "orderData": 2020-10-12T00:00:00.000Z,
+    "orderData": null,
+  },
+  Object {
+    "SUM(ECommerce.count)": "44",
+    "city": null,
+    "order": null,
+    "orderData": null,
   },
 ]
 `;
 
 exports[`Queries with the @cubejs-backend/bigquery-driver SQL API: Simple Rollup: simple_rollup 1`] = `
 Array [
-  Object {
-    "SUM(ECommerce.count)": "44",
-    "orderDate": null,
-    "orderId": null,
-    "rowId": null,
-  },
-  Object {
-    "SUM(ECommerce.count)": "1",
-    "orderDate": null,
-    "orderId": null,
-    "rowId": 523,
-  },
-  Object {
-    "SUM(ECommerce.count)": "1",
-    "orderDate": null,
-    "orderId": "CA-2017-145142",
-    "rowId": 523,
-  },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": 2020-01-23T00:00:00.000Z,
@@ -2438,14 +2434,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 849,
+    "orderId": "CA-2017-145142",
+    "rowId": 523,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-107503",
-    "rowId": 849,
+    "orderId": null,
+    "rowId": 523,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2456,14 +2452,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1013,
+    "orderId": "CA-2017-107503",
+    "rowId": 849,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-118437",
-    "rowId": 1013,
+    "orderId": null,
+    "rowId": 849,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2474,14 +2470,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1494,
+    "orderId": "CA-2017-118437",
+    "rowId": 1013,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-139661",
-    "rowId": 1494,
+    "orderId": null,
+    "rowId": 1013,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2492,14 +2488,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 1995,
+    "orderId": "CA-2017-139661",
+    "rowId": 1494,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-133648",
-    "rowId": 1995,
+    "orderId": null,
+    "rowId": 1494,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2510,14 +2506,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2329,
+    "orderId": "CA-2017-133648",
+    "rowId": 1995,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-138422",
-    "rowId": 2329,
+    "orderId": null,
+    "rowId": 1995,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2528,14 +2524,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2455,
+    "orderId": "CA-2017-138422",
+    "rowId": 2329,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-140949",
-    "rowId": 2455,
+    "orderId": null,
+    "rowId": 2329,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2546,14 +2542,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2595,
+    "orderId": "CA-2017-140949",
+    "rowId": 2455,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-149048",
-    "rowId": 2595,
+    "orderId": null,
+    "rowId": 2455,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2564,14 +2560,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2655,
+    "orderId": "CA-2017-149048",
+    "rowId": 2595,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-112515",
-    "rowId": 2655,
+    "orderId": null,
+    "rowId": 2595,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2582,14 +2578,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2661,
+    "orderId": "CA-2017-112515",
+    "rowId": 2655,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-123372",
-    "rowId": 2661,
+    "orderId": null,
+    "rowId": 2655,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2600,14 +2596,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 2952,
+    "orderId": "CA-2017-123372",
+    "rowId": 2661,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-134915",
-    "rowId": 2952,
+    "orderId": null,
+    "rowId": 2661,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2618,14 +2614,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3059,
+    "orderId": "CA-2017-134915",
+    "rowId": 2952,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-131492",
-    "rowId": 3059,
+    "orderId": null,
+    "rowId": 2952,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2636,14 +2632,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3060,
+    "orderId": "CA-2017-131492",
+    "rowId": 3059,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-131492",
-    "rowId": 3060,
+    "orderId": null,
+    "rowId": 3059,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2654,14 +2650,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3083,
+    "orderId": "CA-2017-131492",
+    "rowId": 3060,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "US-2017-132297",
-    "rowId": 3083,
+    "orderId": null,
+    "rowId": 3060,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2672,14 +2668,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3448,
+    "orderId": "US-2017-132297",
+    "rowId": 3083,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102554",
-    "rowId": 3448,
+    "orderId": null,
+    "rowId": 3083,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2690,14 +2686,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3717,
+    "orderId": "CA-2017-102554",
+    "rowId": 3448,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-144568",
-    "rowId": 3717,
+    "orderId": null,
+    "rowId": 3448,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2708,14 +2704,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 3934,
+    "orderId": "CA-2017-144568",
+    "rowId": 3717,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-123001",
-    "rowId": 3934,
+    "orderId": null,
+    "rowId": 3717,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2726,14 +2722,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4012,
+    "orderId": "CA-2017-123001",
+    "rowId": 3934,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-100811",
-    "rowId": 4012,
+    "orderId": null,
+    "rowId": 3934,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2744,14 +2740,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4031,
+    "orderId": "CA-2017-100811",
+    "rowId": 4012,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-124296",
-    "rowId": 4031,
+    "orderId": null,
+    "rowId": 4012,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2762,14 +2758,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4161,
+    "orderId": "CA-2017-124296",
+    "rowId": 4031,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-115546",
-    "rowId": 4161,
+    "orderId": null,
+    "rowId": 4031,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2780,14 +2776,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4227,
+    "orderId": "CA-2017-115546",
+    "rowId": 4161,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-120327",
-    "rowId": 4227,
+    "orderId": null,
+    "rowId": 4161,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2798,14 +2794,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 4882,
+    "orderId": "CA-2017-120327",
+    "rowId": 4227,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-143567",
-    "rowId": 4882,
+    "orderId": null,
+    "rowId": 4227,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2816,14 +2812,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 5220,
+    "orderId": "CA-2017-143567",
+    "rowId": 4882,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145653",
-    "rowId": 5220,
+    "orderId": null,
+    "rowId": 4882,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2834,14 +2830,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 5277,
+    "orderId": "CA-2017-145653",
+    "rowId": 5220,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-147333",
-    "rowId": 5277,
+    "orderId": null,
+    "rowId": 5220,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2852,14 +2848,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6125,
+    "orderId": "CA-2017-147333",
+    "rowId": 5277,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145772",
-    "rowId": 6125,
+    "orderId": null,
+    "rowId": 5277,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2870,14 +2866,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6205,
+    "orderId": "CA-2017-145772",
+    "rowId": 6125,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-145660",
-    "rowId": 6205,
+    "orderId": null,
+    "rowId": 6125,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2888,14 +2884,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6272,
+    "orderId": "CA-2017-145660",
+    "rowId": 6205,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102379",
-    "rowId": 6272,
+    "orderId": null,
+    "rowId": 6205,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2906,14 +2902,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6459,
+    "orderId": "CA-2017-102379",
+    "rowId": 6272,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "US-2017-133361",
-    "rowId": 6459,
+    "orderId": null,
+    "rowId": 6272,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2924,14 +2920,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 6651,
+    "orderId": "US-2017-133361",
+    "rowId": 6459,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "US-2017-124779",
-    "rowId": 6651,
+    "orderId": null,
+    "rowId": 6459,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2942,14 +2938,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7174,
+    "orderId": "US-2017-124779",
+    "rowId": 6651,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "US-2017-141677",
-    "rowId": 7174,
+    "orderId": null,
+    "rowId": 6651,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2960,14 +2956,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7293,
+    "orderId": "US-2017-141677",
+    "rowId": 7174,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-109183",
-    "rowId": 7293,
+    "orderId": null,
+    "rowId": 7174,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2978,14 +2974,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7310,
+    "orderId": "CA-2017-109183",
+    "rowId": 7293,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-112172",
-    "rowId": 7310,
+    "orderId": null,
+    "rowId": 7293,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -2996,14 +2992,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7425,
+    "orderId": "CA-2017-112172",
+    "rowId": 7310,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-135069",
-    "rowId": 7425,
+    "orderId": null,
+    "rowId": 7310,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3014,14 +3010,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 7698,
+    "orderId": "CA-2017-135069",
+    "rowId": 7425,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-151799",
-    "rowId": 7698,
+    "orderId": null,
+    "rowId": 7425,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3032,14 +3028,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8425,
+    "orderId": "CA-2017-151799",
+    "rowId": 7698,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-150091",
-    "rowId": 8425,
+    "orderId": null,
+    "rowId": 7698,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3050,14 +3046,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8621,
+    "orderId": "CA-2017-150091",
+    "rowId": 8425,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "US-2017-119319",
-    "rowId": 8621,
+    "orderId": null,
+    "rowId": 8425,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3068,14 +3064,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8673,
+    "orderId": "US-2017-119319",
+    "rowId": 8621,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-163265",
-    "rowId": 8673,
+    "orderId": null,
+    "rowId": 8621,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3086,14 +3082,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8697,
+    "orderId": "CA-2017-163265",
+    "rowId": 8673,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-119284",
-    "rowId": 8697,
+    "orderId": null,
+    "rowId": 8673,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3104,14 +3100,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8878,
+    "orderId": "CA-2017-119284",
+    "rowId": 8697,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-126928",
-    "rowId": 8878,
+    "orderId": null,
+    "rowId": 8697,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3122,14 +3118,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 8958,
+    "orderId": "CA-2017-126928",
+    "rowId": 8878,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-105620",
-    "rowId": 8958,
+    "orderId": null,
+    "rowId": 8878,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3140,14 +3136,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9473,
+    "orderId": "CA-2017-105620",
+    "rowId": 8958,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-102925",
-    "rowId": 9473,
+    "orderId": null,
+    "rowId": 8958,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3158,14 +3154,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9584,
+    "orderId": "CA-2017-102925",
+    "rowId": 9473,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-116127",
-    "rowId": 9584,
+    "orderId": null,
+    "rowId": 9473,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3176,14 +3172,14 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": null,
-    "rowId": 9618,
+    "orderId": "CA-2017-116127",
+    "rowId": 9584,
   },
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
-    "orderId": "CA-2017-160633",
-    "rowId": 9618,
+    "orderId": null,
+    "rowId": 9584,
   },
   Object {
     "SUM(ECommerce.count)": "1",
@@ -3194,7 +3190,19 @@ Array [
   Object {
     "SUM(ECommerce.count)": "1",
     "orderDate": null,
+    "orderId": "CA-2017-160633",
+    "rowId": 9618,
+  },
+  Object {
+    "SUM(ECommerce.count)": "1",
+    "orderDate": null,
     "orderId": null,
+    "rowId": 9618,
+  },
+  Object {
+    "SUM(ECommerce.count)": "1",
+    "orderDate": 2020-11-16T00:00:00.000Z,
+    "orderId": "CA-2017-160633",
     "rowId": 9619,
   },
   Object {
@@ -3205,9 +3213,15 @@ Array [
   },
   Object {
     "SUM(ECommerce.count)": "1",
-    "orderDate": 2020-11-16T00:00:00.000Z,
-    "orderId": "CA-2017-160633",
+    "orderDate": null,
+    "orderId": null,
     "rowId": 9619,
+  },
+  Object {
+    "SUM(ECommerce.count)": "44",
+    "orderDate": null,
+    "orderId": null,
+    "rowId": null,
   },
 ]
 `;

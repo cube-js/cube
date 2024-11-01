@@ -3230,7 +3230,7 @@ export class BaseQuery {
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',
         binary: '({{ left }} {{ op }} {{ right }})',
-        sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}{% if nulls_first %} NULLS FIRST{% endif %}',
+        sort: '{{ expr }} {% if asc %}ASC{% else %}DESC{% endif %} NULLS {% if nulls_first %}FIRST{% else %}LAST{% endif %}',
         cast: 'CAST({{ expr }} AS {{ data_type }})',
         window_function: '{{ fun_call }} OVER ({% if partition_by_concat %}PARTITION BY {{ partition_by_concat }}{% if order_by_concat or window_frame %} {% endif %}{% endif %}{% if order_by_concat %}ORDER BY {{ order_by_concat }}{% if window_frame %} {% endif %}{% endif %}{% if window_frame %}{{ window_frame }}{% endif %})',
         window_frame_bounds: '{{ frame_type }} BETWEEN {{ frame_start }} AND {{ frame_end }}',

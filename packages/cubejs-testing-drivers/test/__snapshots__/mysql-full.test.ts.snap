@@ -1,5 +1,19 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Queries with the @cubejs-backend/mysql-driver SQL API: NULLS FIRST/LAST SQL push down: nulls_first_last_sql_push_down 1`] = `
+Array [
+  Object {
+    "category": null,
+  },
+  Object {
+    "category": "Office Supplies",
+  },
+  Object {
+    "category": "Technology",
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/mysql-driver SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
 Array [
   Object {
