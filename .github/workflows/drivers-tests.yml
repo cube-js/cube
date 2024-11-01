@@ -330,6 +330,8 @@ jobs:
           retry_wait_seconds: 15
           timeout_minutes: 20
           command: |
+            dig https://ohio.cloud.databricks.com.
+            curl -v https://ohio.cloud.databricks.com.
             cd ./packages/cubejs-testing-drivers
             export DEBUG=testcontainers
             yarn ${{ matrix.database }}-full
