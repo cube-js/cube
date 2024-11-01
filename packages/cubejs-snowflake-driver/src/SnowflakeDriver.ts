@@ -155,6 +155,7 @@ export type SnowflakeDriverExportBucket = SnowflakeDriverExportAWS | SnowflakeDr
   | SnowflakeDriverExportAzure;
 
 interface SnowflakeDriverOptions {
+  host?: string,
   account: string,
   username: string,
   password: string,
@@ -261,6 +262,7 @@ export class SnowflakeDriver extends BaseDriver implements DriverInterface {
 
     this.config = {
       readOnly: false,
+      host: getEnv('snowflakeHost', { dataSource }),
       account: getEnv('snowflakeAccount', { dataSource }),
       region: getEnv('snowflakeRegion', { dataSource }),
       warehouse: getEnv('snowflakeWarehouse', { dataSource }),

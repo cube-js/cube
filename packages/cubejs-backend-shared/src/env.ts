@@ -1427,6 +1427,19 @@ const variables: Record<string, (...args: any) => any> = {
   ),
 
   /**
+   * Snowflake host.
+   */
+  snowflakeHost: ({
+    dataSource
+  }: {
+    dataSource: string,
+  }) => (
+    process.env[
+      keyByDataSource('CUBEJS_DB_SNOWFLAKE_HOST', dataSource)
+    ]
+  ),
+
+  /**
    * Snowflake private key.
    */
   snowflakePrivateKey: ({
