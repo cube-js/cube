@@ -333,7 +333,7 @@ jobs:
             dig ohio.cloud.databricks.com.
             curl -v https://ohio.cloud.databricks.com
             curl -v https://ohio.cloud.databricks.com/sql/1.0/warehouses/
-            node --eval='require("https").get("https://ohio.cloud.databricks.com/sql/1.0/warehouses/", (res) => {console.log("res status and headers", res.statusCode, res.statusMessage, res.headers); res.on("data", (chunk) => console.log("res data", chunk.toString()))})'
+            CUBEJS_DB_DATABRICKS_ACCEPT_POLICY=true node --eval='require("https").get("https://ohio.cloud.databricks.com/sql/1.0/warehouses/", (res) => {console.log("res status and headers", res.statusCode, res.statusMessage, res.headers); res.on("data", (chunk) => console.log("res data", chunk.toString()))})'
             cd ./packages/cubejs-testing-drivers
             export DEBUG=testcontainers
             yarn ${{ matrix.database }}-full
