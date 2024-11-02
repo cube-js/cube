@@ -44,6 +44,9 @@ const initMvn = (customClassPath: any) => {
       };
       console.log('mvnPromise options', options);
       mvn(options, (err: any, mvnResults: any) => {
+        console.log('mvnPromise callback err', err);
+        console.log('mvnPromise callback mvnResults', mvnResults);
+
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
         } else {
