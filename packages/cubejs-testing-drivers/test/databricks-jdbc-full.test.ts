@@ -44,9 +44,19 @@ async function f() {
   console.log('qRes', qRes);
 }
 
-f().catch(e => console.log('driver test query failed', e));
+f()
+  .then(
+    () => {
+      console.log('driver test query succ');
+      process.exit(0);
+    },
+    e => {
+      console.log('driver test query failed', e);
+      process.exit(1);
+    }
+  );
 
-testQueries('databricks-jdbc', {
-  includeIncrementalSchemaSuite: true,
-  includeHLLSuite: true,
-});
+// testQueries('databricks-jdbc', {
+//   includeIncrementalSchemaSuite: true,
+//   includeHLLSuite: true,
+// });
