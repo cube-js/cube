@@ -37,9 +37,12 @@ let mvnPromise: Promise<void> | null = null;
 const initMvn = (customClassPath: any) => {
   if (!mvnPromise) {
     mvnPromise = new Promise((resolve, reject) => {
+      console.log('new mvnPromise');
+
       const options = {
         packageJsonPath: `${path.join(__dirname, '../..')}/package.json`,
       };
+      console.log('mvnPromise options', options);
       mvn(options, (err: any, mvnResults: any) => {
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
