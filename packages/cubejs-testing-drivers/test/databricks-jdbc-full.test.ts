@@ -19,7 +19,7 @@ https.get(
   'https://ohio.cloud.databricks.com/sql/1.0/warehouses/',
   {
     headers: {
-      authorization: process.env.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN,
+      authorization: `Bearer ${process.env.DRIVERS_TESTS_CUBEJS_DB_DATABRICKS_TOKEN}`,
     }
   },
   (res) => {
