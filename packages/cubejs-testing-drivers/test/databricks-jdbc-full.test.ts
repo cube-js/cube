@@ -1,4 +1,6 @@
-import * as https from "node:https";
+import * as https from 'node:https';
+
+import D from '@cubejs-backend/databricks-jdbc-driver';
 
 import { testQueries } from '../src/tests/testQueries';
 
@@ -32,6 +34,15 @@ https.get(
     res.on('data', (chunk) => console.log('res with token data', chunk.toString()));
   }
 );
+
+async function f() {
+  const source = new D();
+  console.log('test driver constructed');
+  const qRes = await source.query('SELECT 1 as foo;', []);
+  console.log('qRes', qRes);
+}
+
+f().catch(e => console.log('driver test query failed', e));
 
 testQueries('databricks-jdbc', {
   includeIncrementalSchemaSuite: true,
