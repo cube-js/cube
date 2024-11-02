@@ -47,10 +47,16 @@ const initMvn = (customClassPath: any) => {
         console.log('mvnPromise callback err', err);
         console.log('mvnPromise callback mvnResults', mvnResults);
 
+        console.log('mvnPromise callback err.message.includes', err.message.includes('Could not find java property'));
+
         if (err && !err.message.includes('Could not find java property')) {
           reject(err);
         } else {
+          console.log('jinst.isJvmCreated()', jinst.isJvmCreated());
+
           if (!jinst.isJvmCreated()) {
+            console.log('before jinst.addOption');
+
             jinst.addOption('-Xrs');
             jinst.addOption('-Dfile.encoding=UTF8');
 
@@ -59,6 +65,8 @@ const initMvn = (customClassPath: any) => {
             jinst.addOption('--add-opens=java.base/java.nio=ALL-UNNAMED');
 
             const classPath = (mvnResults && mvnResults.classpath || []).concat(customClassPath || []);
+
+            console.log('before jinst.setupClasspath');
             jinst.setupClasspath(classPath);
           }
           resolve();
