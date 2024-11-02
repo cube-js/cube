@@ -137,7 +137,10 @@ export class JDBCDriver extends BaseDriver {
 
     this.pool = genericPool.createPool({
       create: async () => {
-        await initMvn(await this.getCustomClassPath());
+        console.log("before await this.getCustomClassPath()");
+        const ccp = await this.getCustomClassPath();
+        console.log("before await initMvn(ccp)");
+        await initMvn(ccp);
 
         if (!this.jdbcProps) {
           /** @protected */
@@ -145,6 +148,7 @@ export class JDBCDriver extends BaseDriver {
         }
 
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
+        console.log("new Connection this.config.url", this.config.url);
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
       // @ts-expect-error Promise<Function> vs Promise<void>
