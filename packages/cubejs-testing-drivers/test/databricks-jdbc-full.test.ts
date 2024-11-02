@@ -38,6 +38,7 @@ https.get(
 async function f() {
   const source = new D({
     url: 'https://ohio.cloud.databricks.com',
+    maxPoolSize: 1,
   });
   console.log('test driver constructed');
   const qRes = await source.query('SELECT 1 as foo;', []);
