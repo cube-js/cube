@@ -37,7 +37,7 @@ https.get(
 
 async function f() {
   const source = new D({
-    url: 'ohio.cloud.databricks.com',
+    url: 'https://ohio.cloud.databricks.com',
   });
   console.log('test driver constructed');
   const qRes = await source.query('SELECT 1 as foo;', []);
