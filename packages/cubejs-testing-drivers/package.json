@@ -27,7 +27,7 @@
     "clickhouse-export-bucket-s3-full": "yarn test-driver -i dist/test/clickhouse-export-bucket-s3-full.test.js",
     "databricks-jdbc-driver": "yarn test-driver -i dist/test/databricks-jdbc-driver.test.js",
     "databricks-jdbc-core": "yarn test-driver -i dist/test/databricks-jdbc-core.test.js",
-    "databricks-jdbc-full": "yarn test-driver -i dist/test/databricks-jdbc-full.test.js",
+    "databricks-jdbc-full": "node dist/test/databricks-jdbc-full.test.js",
     "databricks-jdbc-export-bucket-s3-full": "yarn test-driver -i dist/test/databricks-jdbc-export-bucket-s3-full.test.js",
     "databricks-jdbc-export-bucket-azure-full": "yarn test-driver -i dist/test/databricks-jdbc-export-bucket-azure-full.test.js",
     "mssql-driver": "yarn test-driver -i dist/test/mssql-driver.test.js",
