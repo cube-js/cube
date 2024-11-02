@@ -151,9 +151,9 @@ export class JDBCDriver extends BaseDriver {
 
     this.pool = genericPool.createPool({
       create: async () => {
-        console.log("before await this.getCustomClassPath()", new Error().stack);
+        console.log('before await this.getCustomClassPath()', new Error().stack);
         const ccp = await this.getCustomClassPath();
-        console.log("before await initMvn(ccp)");
+        console.log('before await initMvn(ccp)');
         await initMvn(ccp);
 
         if (!this.jdbcProps) {
@@ -162,7 +162,7 @@ export class JDBCDriver extends BaseDriver {
         }
 
         const getConnection = promisify(DriverManager.getConnection.bind(DriverManager));
-        console.log("new Connection this.config.url", this.config.url);
+        console.log('new Connection this.config.url', this.config.url);
         return new Connection(await getConnection(this.config.url, this.jdbcProps));
       },
       // @ts-expect-error Promise<Function> vs Promise<void>
@@ -201,6 +201,10 @@ export class JDBCDriver extends BaseDriver {
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
+
+    this.pool.on('factoryCreateError', (err) => {
+      console.log('pool factoryCreateError', err);
+    });
   }
 
   protected async getCustomClassPath() {
