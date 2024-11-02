@@ -2,7 +2,10 @@ import path from 'path';
 import { downloadAndExtractFile, getEnv } from '@cubejs-backend/shared';
 
 function acceptedByEnv() {
+  console.log('acceptedByEnv call');
+
   const acceptStatus = getEnv('databrickAcceptPolicy');
+  console.log('acceptedByEnv call acceptStatus', acceptStatus);
   if (acceptStatus) {
     console.log('You accepted Terms & Conditions for JDBC driver from DataBricks by CUBEJS_DB_DATABRICKS_ACCEPT_POLICY');
   }
@@ -16,7 +19,10 @@ function acceptedByEnv() {
 }
 
 export async function downloadJDBCDriver(): Promise<string | null> {
+  console.log('downloadJDBCDriver call');
   const driverAccepted = acceptedByEnv();
+
+  console.log('downloadJDBCDriver call driverAccepted', driverAccepted);
 
   if (driverAccepted) {
     console.log('Downloading DatabricksJDBC42-2.6.40.1071');
