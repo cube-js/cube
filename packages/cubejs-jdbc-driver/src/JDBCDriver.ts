@@ -151,7 +151,7 @@ export class JDBCDriver extends BaseDriver {
 
     this.pool = genericPool.createPool({
       create: async () => {
-        console.log("before await this.getCustomClassPath()");
+        console.log("before await this.getCustomClassPath()", new Error().stack);
         const ccp = await this.getCustomClassPath();
         console.log("before await initMvn(ccp)");
         await initMvn(ccp);
