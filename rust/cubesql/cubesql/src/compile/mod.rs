@@ -16251,4 +16251,20 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
             displayable(physical_plan.as_ref()).indent()
         );
     }
+
+    #[tokio::test]
+    async fn test_to_timestamp() -> Result<(), CubeError> {
+        let query = r#"
+            SELECT to_timestamp(1618449331) AS result
+            UNION ALL
+            SELECT to_timestamp('2021-08-31 11:05:10.400000', '%Y-%m-%d %H:%i:%s.%f') AS result
+        "#;
+
+        insta::assert_snapshot!(
+            "to_timestamp",
+            execute_query(query.to_string(), DatabaseProtocol::PostgreSQL).await?
+        );
+
+        Ok(())
+    }
 }

@@ -411,6 +411,7 @@ impl QueryEngine for SqlQueryEngine {
         ctx.register_udf(create_dayofyear_udf());
         ctx.register_udf(create_date_sub_udf());
         ctx.register_udf(create_date_add_udf());
+        ctx.register_udf(create_epoch_to_timestamp_udf());
         ctx.register_udf(create_str_to_date_udf());
         ctx.register_udf(create_current_timestamp_udf("current_timestamp"));
         ctx.register_udf(create_current_timestamp_udf("localtimestamp"));
