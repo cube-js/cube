@@ -37,7 +37,7 @@ https.get(
 
 async function f() {
   const source = new D({
-    url: 'jdbc:databricks://ohio.cloud.databricks.com',
+    url: 'jdbc:databricks://ohio.cloud.databricks.com/default;httpPath=/sql/1.0/warehouses/;',
     maxPoolSize: 1,
   });
   console.log('test driver constructed');
