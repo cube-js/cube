@@ -940,11 +940,36 @@ impl ToTimestampReplacer {
 }
 
 impl<'ast> Visitor<'ast, ConnectionError> for ToTimestampReplacer {
-    fn visit_identifier(&mut self, identifier: &mut Ident) -> Result<(), ConnectionError> {
-        if identifier.value.to_lowercase() == "to_timestamp" {
-            identifier.value = "str_to_date".to_string()
-        };
+    fn visit_function(&mut self, fun: &mut Function) -> Result<(), ConnectionError> {
+        if fun.name.to_string().to_lowercase() == "to_timestamp" {
+            if fun.args.len() == 1
+                && matches!(
+                    &fun.args[0],
+                    FunctionArg::Unnamed(FunctionArgExpr::Expr(Expr::Value(Value::Number(_, _))))
+                )
+            {
+                fun.name = ObjectName(vec![Ident {
+                    value: "to_timestamp_seconds".to_string(),
+                    quote_style: None,
+                }]);
+            } else {
+                fun.name = ObjectName(vec![Ident {
+                    value: "str_to_date".to_string(),
+                    quote_style: None,
+                }]);
+            }
+        }
 
+        // Continue visiting function arguments
+        self.visit_function_args(&mut fun.args)?;
+        if let Some(over) = &mut fun.over {
+            for res in over.partition_by.iter_mut() {
+                self.visit_expr(res)?;
+            }
+            for order_expr in over.order_by.iter_mut() {
+                self.visit_expr(&mut order_expr.expr)?;
+            }
+        }
         Ok(())
     }
 }

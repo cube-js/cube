@@ -39,7 +39,7 @@ use chrono::{
 use cubeclient::models::V1CubeMeta;
 use datafusion::{
     arrow::{
-        array::{Date32Array, Date64Array, TimestampNanosecondArray},
+        array::{Date32Array, Date64Array, TimestampNanosecondArray, TimestampSecondArray},
         datatypes::{DataType, IntervalDayTimeType},
     },
     logical_plan::{Column, Expr, Operator},
@@ -2804,6 +2804,7 @@ impl FilterRules {
                                             vec![Decimal::new(*value).to_string(*scale)]
                                         }
                                         ScalarValue::TimestampNanosecond(_, _)
+                                        | ScalarValue::TimestampSecond(_, _)
                                         | ScalarValue::Date32(_)
                                         | ScalarValue::Date64(_) => {
                                             if let Some(timestamp) =
@@ -3561,6 +3562,7 @@ impl FilterRules {
                 Decimal::new(*value).to_string(*scale)
             }
             ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::TimestampSecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
                 if let Some(timestamp) = Self::scalar_to_native_datetime(literal) {
@@ -3576,12 +3578,15 @@ impl FilterRules {
     fn scalar_to_native_datetime(literal: &ScalarValue) -> Option<NaiveDateTime> {
         match literal {
             ScalarValue::TimestampNanosecond(_, _)
+            | ScalarValue::TimestampSecond(_, _)
             | ScalarValue::Date32(_)
             | ScalarValue::Date64(_) => {
                 let array = literal.to_array();
                 let timestamp = if let Some(array) =
                     array.as_any().downcast_ref::<TimestampNanosecondArray>()
                 {
+                    array.value_as_datetime(0)
+                } else if let Some(array) = array.as_any().downcast_ref::<TimestampSecondArray>() {
                     array.value_as_datetime(0)
                 } else if let Some(array) = array.as_any().downcast_ref::<Date32Array>() {
                     array.value_as_datetime(0)
