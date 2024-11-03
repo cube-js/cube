@@ -183,6 +183,14 @@ export class JDBCDriver extends BaseDriver {
       acquireTimeoutMillis: 120000,
       ...(poolOptions || {})
     }) as ExtendedPool;
+
+    // https://github.com/coopernurse/node-pool/blob/ee5db9ddb54ce3a142fde3500116b393d4f2f755/README.md#L220-L226
+    this.pool.on('factoryCreateError', (err) => {
+      this.databasePoolError(err);
+    });
+    this.pool.on('factoryDestroyError', (err) => {
+      this.databasePoolError(err);
+    });
   }
 
   protected async getCustomClassPath() {
