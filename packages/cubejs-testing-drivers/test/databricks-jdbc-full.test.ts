@@ -37,7 +37,7 @@ https.get(
 
 async function f() {
   const source = new D({
-    url: 'https://ohio.cloud.databricks.com',
+    url: 'jdbc:databricks://ohio.cloud.databricks.com',
     maxPoolSize: 1,
   });
   console.log('test driver constructed');
