@@ -57,6 +57,11 @@ f()
     }
   );
 
+setTimeout(() => {
+  console.log('TIMING OUT');
+  process.exit(1);
+}, 3 * 60 * 1000);
+
 // testQueries('databricks-jdbc', {
 //   includeIncrementalSchemaSuite: true,
 //   includeHLLSuite: true,
