@@ -264,17 +264,18 @@ cubes:
 
 ### `primary_key`
 
-Specify which dimension is a primary key for a cube. The default value is
+Specify if a dimension is a primary key for a cube. The default value is
 `false`.
 
 A primary key is used to make [joins][ref-schema-ref-joins] work properly.
 
-<WarningBox>
+<InfoBox>
 
-Setting `primary_key` to `true` will change the default value of `public`
-parameter to `false`. If you still want `public` to be `true`, set it manually.
+Setting `primary_key` to `true` will change the default value of the [`public`
+parameter](#public) to `false`. If you still want `public` to be `true`, set it
+explicitly.
 
-</WarningBox>
+</InfoBox>
 
 <CodeTabs>
 
@@ -305,6 +306,85 @@ cubes:
 ```
 
 </CodeTabs>
+
+It is possible to have more than one primary key dimension in a cube if you'd
+like them all to be parts of a composite key:
+
+<CodeTabs>
+
+```javascript
+cube(`products`, {
+  sql: `
+    SELECT 1 AS column_a, 1 AS column_b UNION ALL
+    SELECT 2 AS column_a, 1 AS column_b UNION ALL
+    SELECT 1 AS column_a, 2 AS column_b UNION ALL
+    SELECT 2 AS column_a, 2 AS column_b
+  `,
+
+  dimensions: {
+    composite_key_a: {
+      sql: `column_a`,
+      type: `number`,
+      primary_key: true
+    },
+
+    composite_key_b: {
+      sql: `column_b`,
+      type: `number`,
+      primary_key: true
+    }
+  },
+
+  measures: {
+    count: {
+      type: `count`
+    }
+  }
+})
+```
+
+```yaml
+cubes:
+  - name: products
+    sql: >
+      SELECT 1 AS column_a, 1 AS column_b UNION ALL
+      SELECT 2 AS column_a, 1 AS column_b UNION ALL
+      SELECT 1 AS column_a, 2 AS column_b UNION ALL
+      SELECT 2 AS column_a, 2 AS column_b
+
+    dimensions:
+      - name: composite_key_a
+        sql: column_a
+        type: number
+        primary_key: true
+
+      - name: composite_key_b
+        sql: column_b
+        type: number
+        primary_key: true
+
+    measures:
+      - name: count
+        type: count
+```
+
+</CodeTabs>
+
+Querying the `count` measure of the cube shown above will generate the following
+SQL to the upstream data source:
+
+```sql
+SELECT
+  count(
+    CAST("product".column_a as TEXT) || CAST("product".column_b as TEXT)
+  ) "product__count"
+FROM (
+  SELECT 1 AS column_a, 1 AS column_b UNION ALL
+  SELECT 2 AS column_a, 1 AS column_b UNION ALL
+  SELECT 1 AS column_a, 2 AS column_b UNION ALL
+  SELECT 2 AS column_a, 2 AS column_b
+) AS "product"
+```
 
 ### `propagate_filters_to_sub_query`
 
