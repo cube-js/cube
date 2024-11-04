@@ -5,7 +5,19 @@ redirect_from:
 
 # MongoDB
 
+[MongoDB](https://www.mongodb.com) is a popular document database. It can be
+accessed using SQL via the [MongoDB Connector for BI][link-bi-connector], also
+known as _BI Connector_.
+
 <CommunitySupportedDriver dataSource="MongoDB" />
+
+<WarningBox>
+
+BI Connector for MongoDB Atlas, cloud-based MongoDB service, is approaching
+[end-of-life](https://www.mongodb.com/docs/atlas/bi-connection/#std-label-bi-connection).
+It will be deprecated and no longer supported in June 2025.
+
+</WarningBox>
 
 ## Prerequisites
 
@@ -113,3 +125,4 @@ Database][ref-recipe-enable-ssl].
   /guides/recipes/data-sources/using-ssl-connections-to-data-source
 [ref-schema-ref-types-formats-countdistinctapprox]: /reference/data-model/types-and-formats#count_distinct_approx
 [self-preaggs-batching]: #batching
+[link-bi-connector]: https://www.mongodb.com/docs/bi-connector/current/
