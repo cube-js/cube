@@ -70,9 +70,13 @@ export class BaseTimeDimension extends BaseFilter {
     return super.aliasName();
   }
 
-  // @ts-ignore
-  public unescapedAliasName(granularity: string) {
+  public unescapedAliasName(granularity?: string) {
     const actualGranularity = granularity || this.granularityObj?.granularity || 'day';
+
+    const fullName = `${this.dimension}.${actualGranularity}`;
+    if (this.query.options.memberToAlias && this.query.options.memberToAlias[fullName]) {
+      return this.query.options.memberToAlias[fullName];
+    }
 
     return `${this.query.aliasName(this.dimension)}_${actualGranularity}`; // TODO date here for rollups
   }
