@@ -260,6 +260,45 @@ fn expr_name(e: &Expr, schema: &DFSchema) -> Result<String> {
     }
 }
 
+/// Holds column remapping for generated SQL
+/// Can be used to remap expression in logical plans on top,
+/// and to generate mapping between schema and Cube load query in wrapper
+#[derive(Debug)]
+pub struct ColumnRemapping {
+    column_remapping: HashMap<Column, Column>,
+}
+
+impl ColumnRemapping {
+    /// Generate member_fields for CubeScanExecutionPlan, which contains SQL with this remapping.
+    /// Cube will respond with aliases after remapping, which we must use to read response.
+    /// Schema in DF will stay the same as before remapping.
+    /// So result would have all aliases after remapping in order derived from `schema`.
+    pub fn member_fields(&self, schema: &DFSchema) -> Vec<MemberField> {
+        schema
+            .fields()
+            .iter()
+            .map(|f| {
+                MemberField::Member(
+                    self.column_remapping
+                        .get(&Column::from_name(f.name().to_string()))
+                        .map(|x| x.name.to_string())
+                        .unwrap_or(f.name().to_string()),
+                )
+            })
+            .collect()
+    }
+
+    /// Replace every column expression in `expr` according to this remapping. Column expressions
+    /// not present in `self` will stay the same.
+    pub fn remap(&self, expr: &Expr) -> result::Result<Expr, CubeError> {
+        replace_col(
+            expr.clone(),
+            &self.column_remapping.iter().map(|(k, v)| (k, v)).collect(),
+        )
+        .map_err(|_| CubeError::internal(format!("Can't rename columns for expr: {expr:?}",)))
+    }
+}
+
 /// Builds new column mapping
 /// One remapper for one context: all unqualified columns with same name are assumed the same column
 struct Remapper {
@@ -365,9 +404,11 @@ impl Remapper {
         Ok(alias)
     }
 
-    pub fn into_remapping(self) -> Option<HashMap<Column, Column>> {
+    pub fn into_remapping(self) -> Option<ColumnRemapping> {
         if self.remapping.len() > 0 {
-            Some(self.remapping)
+            Some(ColumnRemapping {
+                column_remapping: self.remapping,
+            })
         } else {
             None
         }
@@ -377,7 +418,7 @@ impl Remapper {
 pub struct SqlGenerationResult {
     pub data_source: Option<String>,
     pub from_alias: Option<String>,
-    pub column_remapping: Option<HashMap<Column, Column>>,
+    pub column_remapping: Option<ColumnRemapping>,
     pub sql: SqlQuery,
     pub request: TransportLoadRequestQuery,
 }
@@ -446,11 +487,7 @@ impl CubeScanWrapperNode {
         .await
         .and_then(|SqlGenerationResult { data_source, mut sql, request, column_remapping, .. }| -> result::Result<_, CubeError> {
             let member_fields = if let Some(column_remapping) = column_remapping {
-                schema
-                    .fields()
-                    .iter()
-                    .map(|f| MemberField::Member(column_remapping.get(&Column::from_name(f.name().to_string())).map(|x| x.name.to_string()).unwrap_or(f.name().to_string())))
-                    .collect()
+                column_remapping.member_fields(schema)
             } else {
                 schema
                     .fields()
@@ -714,6 +751,8 @@ impl CubeScanWrapperNode {
                             .await?
                         };
 
+                        let column_remapping = column_remapping.as_ref();
+
                         let mut subqueries_sql = HashMap::new();
                         for subquery in subqueries.iter() {
                             let SqlGenerationResult {
@@ -759,7 +798,7 @@ impl CubeScanWrapperNode {
                                 projection_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -773,7 +812,7 @@ impl CubeScanWrapperNode {
                                 flat_group_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -787,7 +826,7 @@ impl CubeScanWrapperNode {
                                 aggr_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -801,7 +840,7 @@ impl CubeScanWrapperNode {
                                 filter_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -815,7 +854,7 @@ impl CubeScanWrapperNode {
                                 window_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -829,7 +868,7 @@ impl CubeScanWrapperNode {
                                 order_expr.clone(),
                                 sql,
                                 generator.clone(),
-                                &column_remapping,
+                                column_remapping,
                                 &mut next_remapper,
                                 can_rename_columns,
                                 ungrouped_scan_node.clone(),
@@ -1060,7 +1099,7 @@ impl CubeScanWrapperNode {
         exprs: Vec<Expr>,
         mut sql: SqlQuery,
         generator: Arc<dyn SqlGenerator>,
-        column_remapping: &Option<HashMap<Column, Column>>,
+        column_remapping: Option<&ColumnRemapping>,
         next_remapper: &mut Remapper,
         can_rename_columns: bool,
         ungrouped_scan_node: Option<Arc<CubeScanNode>>,
@@ -1068,17 +1107,8 @@ impl CubeScanWrapperNode {
     ) -> result::Result<(Vec<AliasedColumn>, SqlQuery), CubeError> {
         let mut aliased_columns = Vec::new();
         for original_expr in exprs {
-            let expr = if let Some(column_remapping) = column_remapping.as_ref() {
-                let mut expr = replace_col(
-                    original_expr.clone(),
-                    &column_remapping.iter().map(|(k, v)| (k, v)).collect(),
-                )
-                .map_err(|_| {
-                    CubeError::internal(format!(
-                        "Can't rename columns for expr: {:?}",
-                        original_expr
-                    ))
-                })?;
+            let expr = if let Some(column_remapping) = column_remapping {
+                let mut expr = column_remapping.remap(&original_expr)?;
                 if !can_rename_columns {
                     let original_alias = expr_name(&original_expr, &schema)?;
                     if original_alias != expr_name(&expr, &schema)? {
