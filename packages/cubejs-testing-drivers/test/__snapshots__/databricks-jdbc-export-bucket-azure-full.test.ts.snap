@@ -6003,10 +6003,27 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: metabase count cast to float32 from push down: metabase_count_cast_to_float32_from_push_down 1`] = `
+Array [
+  Object {
+    "a0": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: post-aggregate percentage of total: post_aggregate_percentage_of_total 1`] = `
 Array [
   Object {
     "SUM(BigECommerce.percentageOfTotalForStatus)": 100,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: powerbi min max push down: powerbi_min_max_push_down 1`] = `
+Array [
+  Object {
+    "a0": 2020-12-25T00:00:00.000Z,
+    "a1": 2020-01-01T00:00:00.000Z,
   },
 ]
 `;
@@ -6020,6 +6037,10 @@ Array [
   },
 ]
 `;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: reuse params: reuse_params 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure SQL API: ungrouped pre-agg: ungrouped_pre_agg 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure filtering Customers: contains + dimensions, first 1`] = `
 Array [
@@ -8296,6 +8317,14 @@ Array [
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure filtering Products: startsWith filter + dimensions + order, third 1`] = `Array []`;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure pre-aggregations Customers: running total without time dimension 1`] = `
+Array [
+  Object {
+    "Customers.runningTotal": null,
+  },
+]
+`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: null boolean 1`] = `
 Array [
   Object {
@@ -8303,6 +8332,18 @@ Array [
   },
 ]
 `;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: null sum 1`] = `
+Array [
+  Object {
+    "BigECommerce.totalSales": null,
+  },
+]
+`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: partitioned pre-agg with multi time dimension 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying BigECommerce: rolling count_distinct_approx window by 2 day 1`] = `
 Array [
@@ -11936,6 +11977,10 @@ Array [
 ]
 `;
 
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying ECommerce: partitioned pre-agg higher granularity 1`] = `Array []`;
+
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying Products: dimensions + order + limit + total 1`] = `
 Array [
   Object {
@@ -12335,6 +12380,10 @@ Array [
   },
 ]
 `;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + dimension 1`] = `Array []`;
+
+exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities (with preaggregation) ECommerce: totalQuantity by half_year + no dimension 1`] = `Array []`;
 
 exports[`Queries with the @cubejs-backend/databricks-jdbc-driver export-bucket-azure querying custom granularities ECommerce: count by half_year + dimension 1`] = `
 Array [
