@@ -1,3 +1,4 @@
+use super::Schema;
 use crate::planner::filter::BaseFilter;
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
@@ -42,14 +43,18 @@ impl fmt::Display for FilterGroupOperator {
 }
 
 impl FilterItem {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
         let res = match self {
             FilterItem::Group(group) => {
                 let operator = format!(" {} ", group.operator.to_string());
                 let items_sql = group
                     .items
                     .iter()
-                    .map(|itm| itm.to_sql(context.clone()))
+                    .map(|itm| itm.to_sql(context.clone(), schema.clone()))
                     .collect::<Result<Vec<_>, _>>()?;
                 if items_sql.is_empty() {
                     format!("( 1 = 1 )")
@@ -58,7 +63,7 @@ impl FilterItem {
                 }
             }
             FilterItem::Item(item) => {
-                let sql = item.to_sql(context.clone())?;
+                let sql = item.to_sql(context.clone(), schema)?;
                 format!("({})", sql)
             }
         };
@@ -67,11 +72,15 @@ impl FilterItem {
 }
 
 impl Filter {
-    pub fn to_sql(&self, context: Rc<VisitorContext>) -> Result<String, CubeError> {
+    pub fn to_sql(
+        &self,
+        context: Rc<VisitorContext>,
+        schema: Rc<Schema>,
+    ) -> Result<String, CubeError> {
         let res = self
             .items
             .iter()
-            .map(|itm| itm.to_sql(context.clone()))
+            .map(|itm| itm.to_sql(context.clone(), schema.clone()))
             .collect::<Result<Vec<_>, _>>()?
             .join(" AND ");
         Ok(res)

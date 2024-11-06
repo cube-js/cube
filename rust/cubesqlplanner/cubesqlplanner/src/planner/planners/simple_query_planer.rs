@@ -40,16 +40,20 @@ impl SimpleQueryPlanner {
             self.join_planner.make_join_node()?,
             VisitorContext::default(self.context_factory.clone()),
         );
-        select_builder.set_projection(
-            self.query_properties
-                .select_all_dimensions_and_measures(self.query_properties.measures())?,
-        );
+        for member in self
+            .query_properties
+            .all_dimensions_and_measures(self.query_properties.measures())?
+            .iter()
+        {
+            select_builder.add_projection_member(member, None, None);
+        }
         select_builder.set_filter(filter);
         select_builder.set_group_by(self.query_properties.group_by());
         select_builder.set_order_by(self.order_planner.default_order());
         select_builder.set_having(having);
         select_builder.set_limit(self.query_properties.row_limit());
         select_builder.set_offset(self.query_properties.offset());
-        Ok(select_builder.build())
+        let res = select_builder.build();
+        Ok(res)
     }
 }

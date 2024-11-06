@@ -1,6 +1,6 @@
 use super::planners::{
-    multiplied_measures_query_planner, FullKeyAggregateQueryPlanner, MultiStageQueryPlanner,
-    MultipliedMeasuresQueryPlanner, SimpleQueryPlanner,
+    FullKeyAggregateQueryPlanner, MultiStageQueryPlanner, MultipliedMeasuresQueryPlanner,
+    SimpleQueryPlanner,
 };
 use super::query_tools::QueryTools;
 use super::QueryProperties;
@@ -74,16 +74,13 @@ impl<IT: InnerTypes> BaseQuery<IT> {
             );
             let multi_stage_query_planner =
                 MultiStageQueryPlanner::new(self.query_tools.clone(), self.request.clone());
-            let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
-                self.query_tools.clone(),
-                self.request.clone(),
-                SqlNodesFactory::new(),
-            );
+            let full_key_aggregate_planner =
+                FullKeyAggregateQueryPlanner::new(self.request.clone(), SqlNodesFactory::new());
             let mut subqueries = multiplied_measures_query_planner.plan_queries()?;
             let (multi_stage_ctes, multi_stage_subqueries) =
                 multi_stage_query_planner.plan_queries()?;
             subqueries.extend(multi_stage_subqueries.into_iter());
-            let mut result = full_key_aggregate_planner.plan(subqueries, multi_stage_ctes)?;
+            let result = full_key_aggregate_planner.plan(subqueries, multi_stage_ctes)?;
             Ok(result)
         }
     }

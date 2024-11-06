@@ -22,17 +22,20 @@ impl SqlNode for AutoPrefixSqlNode {
         node: &Rc<EvaluationNode>,
         query_tools: Rc<QueryTools>,
     ) -> Result<String, CubeError> {
-        let prefix = visitor.cube_alias_prefix().clone();
+        let source_schema = visitor.source_schema().clone();
         let input = self.input.to_sql(visitor, node, query_tools.clone())?;
         let res = match node.symbol() {
             MemberSymbolType::Dimension(ev) => {
-                query_tools.auto_prefix_with_cube_name(&ev.cube_name(), &input, &prefix)
+                let cube_alias = source_schema.resolve_cube_alias(&ev.cube_name());
+                query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
             }
             MemberSymbolType::Measure(ev) => {
-                query_tools.auto_prefix_with_cube_name(&ev.cube_name(), &input, &prefix)
+                let cube_alias = source_schema.resolve_cube_alias(&ev.cube_name());
+                query_tools.auto_prefix_with_cube_name(&cube_alias, &input)
             }
             MemberSymbolType::CubeName(_) => {
-                query_tools.escape_column_name(&query_tools.cube_alias_name(&input, &prefix))
+                let cube_alias = source_schema.resolve_cube_alias(&input);
+                query_tools.escape_column_name(&cube_alias)
             }
             _ => input,
         };

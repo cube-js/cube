@@ -538,7 +538,7 @@ describe('SQL Generation', () => {
     });
     `);
 
-  it('simple join', async () => {
+  it('simple join 1', async () => {
     await compiler.compile();
 
     console.log(joinGraph.buildJoin(['visitor_checkins', 'visitors']));
@@ -2372,7 +2372,7 @@ describe('SQL Generation', () => {
     }]
   ));
 
-  it('multi stage measure with multiple dependencies', async () => runQueryTest(
+  it('multi stage measure with multiple dependencies 1', async () => runQueryTest(
     {
       measures: ['visitors.second_rank_sum', 'visitors.visitor_revenue', 'visitors.revenue_rank'],
       dimensions: ['visitors.source'],

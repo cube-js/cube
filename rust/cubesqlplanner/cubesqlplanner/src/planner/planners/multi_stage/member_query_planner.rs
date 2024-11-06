@@ -1,9 +1,8 @@
 use super::MultiStageQueryDescription;
 use crate::plan::{
-    select_builder, Expr, FilterGroup, FilterItem, From, FromSource, Join, JoinItem, JoinSource,
-    OrderBy, QueryPlan, Select, SelectBuilder, Subquery,
+    Cte, Expr, FilterGroup, FilterItem, From, JoinBuilder, JoinCondition, MemberExpression,
+    OrderBy, QueryPlan, Schema, SelectBuilder,
 };
-use crate::planner::base_join_condition::DimensionJoinCondition;
 use crate::planner::planners::{
     FullKeyAggregateQueryPlanner, MultipliedMeasuresQueryPlanner, OrderPlanner, SimpleQueryPlanner,
 };
@@ -13,7 +12,7 @@ use crate::planner::QueryProperties;
 use crate::planner::{BaseDimension, BaseMeasure, BaseMember, BaseMemberHelper, VisitorContext};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 pub struct MultiStageMemberQueryPlanner {
     query_tools: Rc<QueryTools>,
@@ -34,34 +33,38 @@ impl MultiStageMemberQueryPlanner {
         }
     }
 
-    pub fn plan_query(&self) -> Result<Rc<Subquery>, CubeError> {
+    pub fn plan_query(
+        &self,
+        cte_schemas: &HashMap<String, Rc<Schema>>,
+    ) -> Result<Rc<Cte>, CubeError> {
         if self.description.is_leaf() {
             self.plan_for_leaf_cte_query()
         } else {
-            self.plan_for_cte_query()
+            self.plan_for_cte_query(cte_schemas)
         }
     }
 
-    fn plan_for_cte_query(&self) -> Result<Rc<Subquery>, CubeError> {
+    fn plan_for_cte_query(
+        &self,
+        cte_schemas: &HashMap<String, Rc<Schema>>,
+    ) -> Result<Rc<Cte>, CubeError> {
         let query_member = self.query_member_as_measure()?.unwrap();
 
         let dimensions = self.all_dimensions();
         let dimensions_aliases = BaseMemberHelper::to_alias_vec(&dimensions);
 
         let from = From::new_from_subquery(
-            Rc::new(self.make_input_join()?),
+            Rc::new(self.make_input_join(cte_schemas)?),
             format!("{}_join", self.description.alias()),
         );
-
-        let mut projection = dimensions_aliases
-            .iter()
-            .map(|d| Expr::Reference(None, d.clone()))
-            .collect_vec();
 
         let group_by = if query_member.is_multi_stage_ungroupped() {
             vec![]
         } else {
-            projection.clone()
+            dimensions
+                .iter()
+                .map(|dim| Expr::Member(MemberExpression::new(dim.clone(), None)))
+                .collect_vec()
         };
 
         let order_by = if query_member.is_multi_stage_ungroupped() {
@@ -70,90 +73,86 @@ impl MultiStageMemberQueryPlanner {
             self.query_order()?
         };
 
-        projection.push(Expr::Field(query_member.clone()));
-
-        let references = BaseMemberHelper::to_reference_map(&self.all_input_members()?);
-
         let partition_by =
             self.member_partition_by(query_member.reduce_by(), query_member.group_by());
 
         let context_factory = SqlNodesFactory::new();
 
         let node_context = if query_member.measure_type() == "rank" {
-            context_factory.multi_stage_rank_node_processor(partition_by, references)
+            context_factory.multi_stage_rank_node_processor(partition_by)
         } else if !query_member.is_calculated() && partition_by != dimensions_aliases {
-            context_factory.multi_stage_window_node_processor(partition_by, references)
+            context_factory.multi_stage_window_node_processor(partition_by)
         } else {
-            context_factory.with_render_references_default_node_processor(references)
+            context_factory.default_node_processor()
         };
 
         let mut select_builder = SelectBuilder::new(from, VisitorContext::new(None, node_context));
-        select_builder.set_projection(projection);
+        for dim in dimensions.iter() {
+            select_builder.add_projection_member(&dim, None, None);
+        }
+        select_builder.add_projection_member(&query_member.as_base_member(), None, None);
         select_builder.set_group_by(group_by);
         select_builder.set_order_by(order_by);
         let select = select_builder.build();
 
-        Ok(Rc::new(Subquery::new_from_select(
+        Ok(Rc::new(Cte::new_from_select(
             Rc::new(select),
             self.description.alias().clone(),
         )))
     }
 
-    fn make_input_join(&self) -> Result<QueryPlan, CubeError> {
+    fn make_input_join(
+        &self,
+        cte_schemas: &HashMap<String, Rc<Schema>>,
+    ) -> Result<QueryPlan, CubeError> {
         let inputs = self.input_cte_aliases();
-        let dimensions_aliases = BaseMemberHelper::to_alias_vec(&self.all_input_dimensions());
-        let measures_aliases = BaseMemberHelper::to_alias_vec(&self.input_measures()?);
+        let dimensions = self.all_input_dimensions();
 
         let root_alias = format!("q_0");
-        let root = JoinSource::new_from_reference(inputs[0].clone(), root_alias.clone());
-        let mut join_items = vec![];
-        let dimensions_aliases = Rc::new(dimensions_aliases.clone());
+        let cte_schema = cte_schemas.get(&inputs[0]).unwrap().clone();
+        let mut join_builder = JoinBuilder::new_from_table_reference(
+            inputs[0].clone(),
+            cte_schema,
+            Some(root_alias.clone()),
+        );
         for (i, input) in inputs.iter().skip(1).enumerate() {
             let left_alias = format!("q_{}", i);
             let right_alias = format!("q_{}", i + 1);
-            let from = JoinSource::new_from_reference(
-                input.clone(),
-                self.query_tools.escape_column_name(&format!("q_{}", i + 1)),
+            let on = JoinCondition::new_dimension_join(
+                left_alias,
+                right_alias,
+                dimensions.clone(),
+                true,
             );
-            let join_item = JoinItem {
-                from,
-                on: DimensionJoinCondition::try_new(
-                    left_alias,
-                    right_alias,
-                    dimensions_aliases.clone(),
-                )?,
-                is_inner: true,
-            };
-            join_items.push(join_item);
+            let cte_schema = cte_schemas.get(input).unwrap().clone();
+            join_builder.inner_join_table_reference(
+                input.clone(),
+                cte_schema,
+                Some(format!("q_{}", i + 1)),
+                on,
+            );
         }
 
-        let projection = dimensions_aliases
-            .iter()
-            .map(|d| Expr::Reference(Some(root_alias.clone()), d.clone()))
-            .chain(
-                measures_aliases
-                    .iter()
-                    .map(|m| Expr::Reference(None, m.clone())),
-            )
-            .collect_vec();
-
-        let from = From::new(FromSource::Join(Rc::new(Join {
-            root,
-            joins: join_items,
-        })));
+        let from = From::new_from_join(join_builder.build());
         let mut select_builder =
             SelectBuilder::new(from, VisitorContext::default(SqlNodesFactory::new()));
-        select_builder.set_projection(projection);
+
+        for dim in dimensions.iter() {
+            select_builder.add_projection_member(dim, None, None)
+        }
+        for meas in self.input_measures()?.iter() {
+            select_builder.add_projection_member(meas, None, None)
+        }
         select_builder.set_order_by(self.subquery_order()?);
 
         Ok(QueryPlan::Select(Rc::new(select_builder.build())))
     }
 
-    fn plan_for_leaf_cte_query(&self) -> Result<Rc<Subquery>, CubeError> {
+    fn plan_for_leaf_cte_query(&self) -> Result<Rc<Cte>, CubeError> {
         let member_node = self.description.member_node();
 
         let measures = if let Some(measure) =
-            BaseMeasure::try_new_from_precompiled(member_node.clone(), self.query_tools.clone())?
+            BaseMeasure::try_new(member_node.clone(), self.query_tools.clone())?
         {
             vec![measure]
         } else {
@@ -213,7 +212,6 @@ impl MultiStageMemberQueryPlanner {
                 node_factory.clone(),
             );
             let full_key_aggregate_planner = FullKeyAggregateQueryPlanner::new(
-                self.query_tools.clone(),
                 cte_query_properties.clone(),
                 node_factory.clone(),
             );
@@ -221,8 +219,7 @@ impl MultiStageMemberQueryPlanner {
             let result = full_key_aggregate_planner.plan(subqueries, vec![])?;
             result
         };
-        let result =
-            Subquery::new_from_select(Rc::new(cte_select), self.description.alias().clone());
+        let result = Cte::new_from_select(Rc::new(cte_select), self.description.alias().clone());
         Ok(Rc::new(result))
     }
 
@@ -281,12 +278,7 @@ impl MultiStageMemberQueryPlanner {
             .description
             .input()
             .iter()
-            .map(|m| {
-                BaseMeasure::try_new_from_precompiled(
-                    m.member_node().clone(),
-                    self.query_tools.clone(),
-                )
-            })
+            .map(|m| BaseMeasure::try_new(m.member_node().clone(), self.query_tools.clone()))
             .collect::<Result<Vec<_>, _>>()?
             .into_iter()
             .filter_map(|m| m)
@@ -318,7 +310,7 @@ impl MultiStageMemberQueryPlanner {
     }
 
     fn query_member_as_measure(&self) -> Result<Option<Rc<BaseMeasure>>, CubeError> {
-        BaseMeasure::try_new_from_precompiled(
+        BaseMeasure::try_new(
             self.description.member_node().clone(),
             self.query_tools.clone(),
         )

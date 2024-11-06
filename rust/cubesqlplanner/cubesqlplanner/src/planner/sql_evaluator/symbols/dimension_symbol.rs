@@ -2,8 +2,7 @@ use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::dimension_definition::DimensionDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -29,21 +28,9 @@ impl DimensionSymbol {
             definition,
         }
     }
+
     pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
         let sql = self.member_sql.call(args)?;
-        Ok(sql)
-    }
-    pub fn default_evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        args: Vec<MemberSqlArg>,
-        tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        let sql = tools.auto_prefix_with_cube_name(
-            &self.cube_name,
-            &self.member_sql.call(args)?,
-            visitor.cube_alias_prefix(),
-        );
         Ok(sql)
     }
 
@@ -63,6 +50,10 @@ impl DimensionSymbol {
 impl MemberSymbol for DimensionSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
+    }
+
+    fn name(&self) -> &String {
+        &self.name
     }
 }
 

@@ -2,10 +2,7 @@ use super::SymbolFactory;
 use crate::cube_bridge::cube_definition::CubeDefinition;
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{
-    dependecy::Dependency, Compiler, EvaluationNode, SqlEvaluatorVisitor,
-};
+use crate::planner::sql_evaluator::{dependecy::Dependency, Compiler, EvaluationNode};
 use cubenativeutils::CubeError;
 use lazy_static::lazy_static;
 use regex::Regex;

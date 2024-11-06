@@ -3,6 +3,7 @@ use super::sql_nodes::SqlNode;
 use super::visitor::EvaluatorVisitor;
 use super::EvaluationNode;
 use crate::cube_bridge::memeber_sql::{ContextSymbolArg, MemberSqlArg};
+use crate::plan::Schema;
 use crate::planner::query_tools::QueryTools;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -12,6 +13,7 @@ pub struct SqlEvaluatorVisitor {
     query_tools: Rc<QueryTools>,
     cube_alias_prefix: Option<String>,
     node_processor: Rc<dyn SqlNode>,
+    source_schema: Rc<Schema>,
 }
 
 impl SqlEvaluatorVisitor {
@@ -19,16 +21,22 @@ impl SqlEvaluatorVisitor {
         query_tools: Rc<QueryTools>,
         cube_alias_prefix: Option<String>,
         node_processor: Rc<dyn SqlNode>,
+        source_schema: Rc<Schema>,
     ) -> Self {
         Self {
             query_tools,
             cube_alias_prefix,
             node_processor,
+            source_schema,
         }
     }
 
     pub fn cube_alias_prefix(&self) -> &Option<String> {
         &self.cube_alias_prefix
+    }
+
+    pub fn source_schema(&self) -> &Rc<Schema> {
+        &self.source_schema
     }
 }
 

@@ -2,8 +2,7 @@ use super::{MemberSymbol, SymbolFactory};
 use crate::cube_bridge::evaluator::CubeEvaluator;
 use crate::cube_bridge::measure_definition::{MeasureDefinition, TimeShiftReference};
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode, SqlEvaluatorVisitor};
+use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
 use std::rc::Rc;
 
@@ -100,25 +99,6 @@ impl MeasureSymbol {
         &self.definition.static_data().time_shift_references
     }
 
-    pub fn default_evaluate_sql(
-        &self,
-        visitor: &SqlEvaluatorVisitor,
-        args: Vec<MemberSqlArg>,
-        tools: Rc<QueryTools>,
-    ) -> Result<String, CubeError> {
-        let sql = tools.auto_prefix_with_cube_name(
-            &self.cube_name,
-            &self.member_sql.call(args)?,
-            visitor.cube_alias_prefix(),
-        );
-        if self.is_calculated() {
-            Ok(sql)
-        } else {
-            let measure_type = &self.definition.static_data().measure_type;
-            Ok(format!("{}({})", measure_type, sql))
-        }
-    }
-
     pub fn is_multi_stage(&self) -> bool {
         self.definition.static_data().multi_stage.unwrap_or(false)
     }
@@ -127,6 +107,9 @@ impl MeasureSymbol {
 impl MemberSymbol for MeasureSymbol {
     fn cube_name(&self) -> &String {
         &self.cube_name
+    }
+    fn name(&self) -> &String {
+        &self.name
     }
 }
 

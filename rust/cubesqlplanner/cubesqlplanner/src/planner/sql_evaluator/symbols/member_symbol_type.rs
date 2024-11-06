@@ -1,6 +1,4 @@
-use super::{
-    CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, MemberSymbol, SimpleSqlSymbol,
-};
+use super::{CubeNameSymbol, CubeTableSymbol, DimensionSymbol, MeasureSymbol, SimpleSqlSymbol};
 pub enum MemberSymbolType {
     Dimension(DimensionSymbol),
     Measure(MeasureSymbol),

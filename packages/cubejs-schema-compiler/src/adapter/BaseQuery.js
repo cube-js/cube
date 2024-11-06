@@ -3251,6 +3251,7 @@ export class BaseQuery {
         group_by_exprs: '{{ group_by | map(attribute=\'index\') | join(\', \') }}',
       },
       expressions: {
+        column_reference: '{% if table_name %}{{ table_name }}.{% endif %}{{ name }}',
         column_aliased: '{{expr}} {{quoted_alias}}',
         case: 'CASE{% if expr %} {{ expr }}{% endif %}{% for when, then in when_then %} WHEN {{ when }} THEN {{ then }}{% endfor %}{% if else_expr %} ELSE {{ else_expr }}{% endif %} END',
         is_null: '{{ expr }} IS {% if negate %}NOT {% endif %}NULL',

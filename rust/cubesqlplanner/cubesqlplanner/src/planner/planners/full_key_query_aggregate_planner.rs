@@ -1,56 +1,32 @@
-use super::{CommonUtils, JoinPlanner, MultiStageQueryPlanner, OrderPlanner, SimpleQueryPlanner};
-use crate::plan::{
-    Filter, From, FromSource, Join, JoinItem, JoinSource, Select, SelectBuilder, Subquery,
-};
-use crate::planner::base_join_condition::DimensionJoinCondition;
-use crate::planner::query_tools::QueryTools;
-use crate::planner::sql_evaluator::collectors::{
-    collect_multiplied_measures, has_multi_stage_members,
-};
+use super::OrderPlanner;
+use crate::plan::{Cte, Filter, From, JoinBuilder, JoinCondition, Select, SelectBuilder};
 use crate::planner::sql_evaluator::sql_nodes::SqlNodesFactory;
-use crate::planner::BaseMember;
+use crate::planner::BaseMemberHelper;
 use crate::planner::QueryProperties;
-use crate::planner::{BaseDimension, BaseMeasure, PrimaryJoinCondition, VisitorContext};
+use crate::planner::{BaseMeasure, VisitorContext};
 use cubenativeutils::CubeError;
 use itertools::Itertools;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub struct FullKeyAggregateQueryPlanner {
-    query_tools: Rc<QueryTools>,
     query_properties: Rc<QueryProperties>,
-    join_planner: JoinPlanner,
     order_planner: OrderPlanner,
-    multi_stage_planner: MultiStageQueryPlanner,
-    common_utils: CommonUtils,
     context_factory: Rc<SqlNodesFactory>,
 }
 
 impl FullKeyAggregateQueryPlanner {
     pub fn new(
-        query_tools: Rc<QueryTools>,
         query_properties: Rc<QueryProperties>,
         context_factory: Rc<SqlNodesFactory>,
     ) -> Self {
         Self {
-            join_planner: JoinPlanner::new(query_tools.clone()),
             order_planner: OrderPlanner::new(query_properties.clone()),
-            common_utils: CommonUtils::new(query_tools.clone()),
-            multi_stage_planner: MultiStageQueryPlanner::new(
-                query_tools.clone(),
-                query_properties.clone(),
-            ),
-            query_tools,
             query_properties,
             context_factory,
         }
     }
 
-    pub fn plan(
-        self,
-        joins: Vec<Rc<Select>>,
-        ctes: Vec<Rc<Subquery>>,
-    ) -> Result<Select, CubeError> {
+    pub fn plan(self, joins: Vec<Rc<Select>>, ctes: Vec<Rc<Cte>>) -> Result<Select, CubeError> {
         if self.query_properties.is_simple_query()? {
             return Err(CubeError::internal(format!(
                 "FullKeyAggregateQueryPlanner should not be used for simple query"
@@ -81,48 +57,25 @@ impl FullKeyAggregateQueryPlanner {
 
     fn outer_measures_join_full_key_aggregate(
         &self,
-        inner_measures: &Vec<Rc<BaseMeasure>>,
+        _inner_measures: &Vec<Rc<BaseMeasure>>,
         outer_measures: &Vec<Rc<BaseMeasure>>,
         joins: Vec<Rc<Select>>,
     ) -> Result<SelectBuilder, CubeError> {
-        let root = JoinSource::new_from_select(joins[0].clone(), format!("q_0"));
-        let mut join_items = vec![];
-        let dimensions_to_select = self
-            .query_properties
-            .dimensions_for_select()
-            .iter()
-            .map(|d| d.alias_name())
-            .collect_vec();
-        let dimensions_to_select = Rc::new(dimensions_to_select);
+        let mut join_builder = JoinBuilder::new_from_subselect(joins[0].clone(), format!("q_0"));
+        let dimensions_to_select = self.query_properties.dimensions_for_select();
         for (i, join) in joins.iter().skip(1).enumerate() {
             let left_alias = format!("q_{}", i);
             let right_alias = format!("q_{}", i + 1);
-            let from = JoinSource::new_from_select(
-                join.clone(),
-                self.query_tools.escape_column_name(&format!("q_{}", i + 1)),
+            let on = JoinCondition::new_dimension_join(
+                left_alias,
+                right_alias,
+                dimensions_to_select.clone(),
+                true,
             );
-            let join_item = JoinItem {
-                from,
-                on: DimensionJoinCondition::try_new(
-                    left_alias,
-                    right_alias,
-                    dimensions_to_select.clone(),
-                )?,
-                is_inner: true,
-            };
-            join_items.push(join_item);
+            join_builder.inner_join_subselect(join.clone(), format!("q_{}", i + 1), on);
         }
 
-        let references = inner_measures
-            .iter()
-            .map(|m| Ok((m.measure().clone(), m.alias_name())))
-            .collect::<Result<HashMap<_, _>, CubeError>>()?;
-
-        let context = VisitorContext::new(
-            None,
-            self.context_factory
-                .with_render_references_default_node_processor(references),
-        );
+        let context = VisitorContext::new(None, self.context_factory.default_node_processor());
 
         let having = if self.query_properties.measures_filters().is_empty() {
             None
@@ -132,16 +85,23 @@ impl FullKeyAggregateQueryPlanner {
             })
         };
 
-        let from = From::new(FromSource::Join(Rc::new(Join {
-            root,
-            joins: join_items,
-        })));
+        let from = From::new_from_join(join_builder.build());
         let mut select_builder = SelectBuilder::new(from, context);
-        select_builder.set_projection(
-            self.query_properties
-                .dimensions_references_and_measures("q_0", outer_measures)?,
-        );
+
+        for member in self
+            .query_properties
+            .all_dimensions_and_measures(&vec![])?
+            .iter()
+        {
+            select_builder.add_projection_member(member, Some(format!("q_0")), None);
+        }
+
+        for member in BaseMemberHelper::iter_as_base_member(&outer_measures) {
+            select_builder.add_projection_member(&member, None, None);
+        }
+
         select_builder.set_order_by(self.order_planner.default_order());
+        select_builder.set_having(having);
         select_builder.set_limit(self.query_properties.row_limit());
         select_builder.set_offset(self.query_properties.offset());
         Ok(select_builder)

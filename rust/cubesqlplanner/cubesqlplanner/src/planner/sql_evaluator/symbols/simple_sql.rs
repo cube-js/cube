@@ -1,4 +1,4 @@
-use super::{MemberSymbol, SymbolFactory};
+use super::SymbolFactory;
 use crate::cube_bridge::memeber_sql::{MemberSql, MemberSqlArg};
 use crate::planner::sql_evaluator::{Compiler, Dependency, EvaluationNode};
 use cubenativeutils::CubeError;
@@ -24,12 +24,6 @@ impl SimpleSqlSymbol {
     pub fn evaluate_sql(&self, args: Vec<MemberSqlArg>) -> Result<String, CubeError> {
         let sql = self.member_sql.call(args)?;
         Ok(sql)
-    }
-}
-
-impl MemberSymbol for SimpleSqlSymbol {
-    fn cube_name(&self) -> &String {
-        &self.cube_name
     }
 }
 
