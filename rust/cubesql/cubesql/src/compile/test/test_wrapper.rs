@@ -1,6 +1,7 @@
 use cubeclient::models::V1LoadRequestQuery;
 use datafusion::physical_plan::displayable;
 use pretty_assertions::assert_eq;
+use regex::Regex;
 use serde_json::json;
 use std::sync::Arc;
 
@@ -1145,6 +1146,88 @@ async fn test_case_wrapper_escaping() {
         .sql
         // Expect 6 backslashes as output is JSON and it's escaped one more time
         .contains("\\\\\\\\\\\\`"));
+}
+
+/// Test aliases for grouped CubeScan in wrapper
+/// qualifiers from join should get remapped to single from alias
+/// long generated aliases from Datafusion should get shortened
+#[tokio::test]
+async fn test_join_wrapper_cubescan_aliasing() {
+    if !Rewriter::sql_push_down_enabled() {
+        return;
+    }
+    init_testing_logger();
+
+    let query_plan = convert_select_to_query_plan(
+        // language=PostgreSQL
+        r#"
+WITH
+-- This subquery should be represented as CubeScan(ungrouped=false) inside CubeScanWrapper
+cube_scan_subq AS (
+    SELECT
+        logs_alias.content logs_content,
+        DATE_TRUNC('month', kibana_alias.last_mod) last_mod_month,
+        CASE
+            WHEN sum(kibana_alias."sumPrice") IS NOT NULL
+                THEN sum(kibana_alias."sumPrice")
+            ELSE 0
+            END sum_price
+    FROM KibanaSampleDataEcommerce kibana_alias
+    JOIN Logs logs_alias
+    ON kibana_alias.__cubeJoinField = logs_alias.__cubeJoinField
+    GROUP BY
+        logs_content,
+        last_mod_month
+),
+filter_subq AS (
+    SELECT
+        Logs.content logs_content_filter
+    FROM Logs
+    GROUP BY
+        logs_content_filter
+)
+SELECT
+    logs_content
+FROM cube_scan_subq
+WHERE
+    -- This subquery filter should trigger wrapping of whole query
+    logs_content IN (
+        SELECT
+            logs_content_filter
+        FROM filter_subq
+    )
+;
+"#
+        .to_string(),
+        DatabaseProtocol::PostgreSQL,
+    )
+    .await;
+
+    let physical_plan = query_plan.as_physical_plan().await.unwrap();
+    println!(
+        "Physical plan: {}",
+        displayable(physical_plan.as_ref()).indent()
+    );
+
+    let logical_plan = query_plan.as_logical_plan();
+    let sql = logical_plan
+        .find_cube_scan_wrapper()
+        .wrapped_sql
+        .unwrap()
+        .sql;
+
+    // Check that all aliases from different tables have same qualifier, and that names are simple and short
+    // logs_content => logs_alias.content
+    // last_mod_month => DATE_TRUNC('month', kibana_alias.last_mod),
+    // sum_price => CASE WHEN sum(kibana_alias."sumPrice") ... END
+    let content_re = Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "logs_content""#).unwrap();
+    assert!(content_re.is_match(&sql));
+    let last_mod_month_re =
+        Regex::new(r#""logs_alias"."[a-zA-Z0-9_]{1,16}" "last_mod_month""#).unwrap();
+    assert!(last_mod_month_re.is_match(&sql));
+    let sum_price_re = Regex::new(r#"CASE WHEN "logs_alias"."[a-zA-Z0-9_]{1,16}" IS NOT NULL THEN "logs_alias"."[a-zA-Z0-9_]{1,16}" ELSE 0 END "sum_price""#)
+        .unwrap();
+    assert!(sum_price_re.is_match(&sql));
 }
 
 /// Test that WrappedSelect(... limit=Some(0) ...) will render it correctly
