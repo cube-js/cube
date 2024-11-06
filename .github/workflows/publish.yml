@@ -807,7 +807,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Trigger runtime
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GH_TRIGGER_TOKEN }}
           script: |
