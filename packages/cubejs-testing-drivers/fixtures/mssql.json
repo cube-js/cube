@@ -149,6 +149,7 @@
     "SQL API: Rollup over exprs",
     "SQL API: Nested Rollup with aliases",
     "SQL API: Nested Rollup over asterisk",
-    "SQL API: Extended nested Rollup over asterisk"
+    "SQL API: Extended nested Rollup over asterisk",
+    "SQL API: ungrouped pre-agg"
   ]
 }
