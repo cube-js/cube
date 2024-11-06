@@ -21,9 +21,8 @@ impl MemberExpression {
         context: Rc<VisitorContext>,
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
-        if let Some(reference_column) = context
-            .source_schema()
-            .find_column_for_member(&self.member.full_name(), &self.source)
+        if let Some(reference_column) =
+            schema.find_column_for_member(&self.member.full_name(), &self.source)
         {
             templates.column_reference(&reference_column.table_name, &reference_column.alias)
         } else {

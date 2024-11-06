@@ -8,7 +8,6 @@ use cubenativeutils::CubeError;
 use std::rc::Rc;
 
 pub struct VisitorContext {
-    source_schema: Rc<Schema>,
     cube_alias_prefix: Option<String>,
     node_processor: Rc<dyn SqlNode>,
 }
@@ -18,7 +17,6 @@ impl VisitorContext {
         Self {
             cube_alias_prefix,
             node_processor,
-            source_schema: Rc::new(Schema::empty()),
         }
     }
 
@@ -51,14 +49,6 @@ impl VisitorContext {
 
     pub fn cube_alias_prefix(&self) -> &Option<String> {
         &self.cube_alias_prefix
-    }
-
-    pub fn source_schema(&self) -> &Rc<Schema> {
-        &self.source_schema
-    }
-
-    pub fn set_source_schema(&mut self, schema: Rc<Schema>) {
-        self.source_schema = schema
     }
 }
 

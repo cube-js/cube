@@ -628,30 +628,6 @@ export class BaseQuery {
     return res;
   }
 
-  buildSqlAndParamsTest(exportAnnotatedSql) {
-    if (!this.options.preAggregationQuery && !this.options.disableExternalPreAggregations && this.externalQueryClass) {
-      if (this.externalPreAggregationQuery()) { // TODO performance
-        return this.externalQuery().buildSqlAndParams(exportAnnotatedSql);
-      }
-    }
-    const js_res = this.compilers.compiler.withQuery(
-      this,
-      () => this.cacheValue(
-        ['buildSqlAndParams', exportAnnotatedSql],
-        () => this.paramAllocator.buildSqlAndParams(
-          this.buildParamAnnotatedSql(),
-          exportAnnotatedSql,
-          this.shouldReuseParams
-        ),
-        { cache: this.queryCache }
-      )
-    );
-    const rust = this.buildSqlAndParamsRust(exportAnnotatedSql);
-    console.log('js result: ', js_res[0]);
-    console.log('rust result: ', rust[0]);
-    return js_res;
-  }
-
   get shouldReuseParams() {
     return false;
   }

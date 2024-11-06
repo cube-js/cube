@@ -78,7 +78,10 @@ impl DimensionJoinCondition {
             format!("")
         };
 
-        Ok(format!("{} = {}{}", left_column, right_column, null_check))
+        Ok(format!(
+            "({} = {}{})",
+            left_column, right_column, null_check
+        ))
     }
 
     fn resolve_member_alias(
