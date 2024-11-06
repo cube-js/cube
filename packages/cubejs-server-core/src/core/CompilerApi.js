@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import R from 'ramda';
+import { getEnv } from '@cubejs-backend/shared';
 import { createQuery, compile, queryClass, PreAggregations, QueryFactory } from '@cubejs-backend/schema-compiler';
 import { v4 as uuidv4 } from 'uuid';
 import { NativeInstance } from '@cubejs-backend/native';
@@ -468,11 +469,14 @@ export class CompilerApi {
     }
 
     const visibilityFilterForCube = (cube) => {
+      const isDevMode = getEnv('devMode');
       const evaluatedCube = cubeEvaluator.cubeFromPath(cube.config.name);
       if (!cubeEvaluator.isRbacEnabledForCube(evaluatedCube)) {
-        return (item) => item.isVisible;
+        return (item) => isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible;
       }
-      return (item) => (item.isVisible && isMemberVisibleInContext[item.name] || false);
+      return (item) => (
+        (isDevMode || context.signedWithPlaygroundAuthSecret || item.isVisible) &&
+          isMemberVisibleInContext[item.name] || false);
     };
 
     return cubes
