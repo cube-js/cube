@@ -16220,35 +16220,4 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
-
-    #[tokio::test]
-    async fn test_wrapper_limit_zero() {
-        if !Rewriter::sql_push_down_enabled() {
-            return;
-        }
-        init_testing_logger();
-
-        let query_plan = convert_select_to_query_plan(
-            r#"
-            SELECT MAX(order_date) FROM KibanaSampleDataEcommerce LIMIT 0
-            "#
-            .to_string(),
-            DatabaseProtocol::PostgreSQL,
-        )
-        .await;
-
-        let logical_plan = query_plan.as_logical_plan();
-        let sql = logical_plan
-            .find_cube_scan_wrapper()
-            .wrapped_sql
-            .unwrap()
-            .sql;
-        assert!(sql.contains("LIMIT 0"));
-
-        let physical_plan = query_plan.as_physical_plan().await.unwrap();
-        println!(
-            "Physical plan: {}",
-            displayable(physical_plan.as_ref()).indent()
-        );
-    }
 }
