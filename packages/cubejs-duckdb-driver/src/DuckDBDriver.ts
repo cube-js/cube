@@ -20,6 +20,7 @@ export type DuckDBDriverConfiguration = {
   dataSource?: string,
   initSql?: string,
   schema?: string,
+  duckdbS3UseCredentialChain?: boolean,
 };
 
 type InitPromise = {
@@ -145,7 +146,7 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
         value: getEnv('duckdbS3SessionToken', this.config),
       }
     ];
-    
+
     for (const { key, value } of configuration) {
       if (value) {
         try {
@@ -157,6 +158,17 @@ export class DuckDBDriver extends BaseDriver implements DriverInterface {
             });
           }
         }
+      }
+    }
+    const useCredentialChain = getEnv('duckdbS3UseCredentialChain', this.config);
+    if (useCredentialChain === 'true' || useCredentialChain === true) {
+      try {
+        await execAsync('CREATE SECRET (TYPE S3, PROVIDER \'CREDENTIAL_CHAIN\')');
+      } catch (e) {
+        if (this.logger) {
+          console.error('DuckDB - error on creating S3 credential chain secret', { e });
+        }
+        throw e;
       }
     }
 

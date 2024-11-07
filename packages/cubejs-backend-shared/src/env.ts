@@ -1613,6 +1613,16 @@ const variables: Record<string, (...args: any) => any> = {
     ]
   ),
 
+   duckdbS3UseCredentialChain: ({
+      dataSource
+    }: {
+      dataSource: string,
+    }) => (
+      process.env[
+        keyByDataSource('CUBEJS_DB_DUCKDB_S3_USE_CREDENTIAL_CHAIN', dataSource)
+      ]
+    ),
+
   /**
    * Presto catalog.
    */
