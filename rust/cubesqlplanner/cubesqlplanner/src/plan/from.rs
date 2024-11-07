@@ -70,10 +70,7 @@ impl SingleAliasedSource {
     ) -> Result<String, CubeError> {
         let sql = self.source.to_sql(templates, context)?;
 
-        Ok(format!(
-            "{sql} AS {}",
-            templates.quote_identifier(&self.alias)?
-        ))
+        templates.query_aliased(&sql, &self.alias)
     }
 
     pub fn make_schema(&self) -> Schema {

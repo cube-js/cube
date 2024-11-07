@@ -68,20 +68,7 @@ impl DimensionJoinCondition {
             dimension,
             schema.clone(),
         )?;
-        let null_check = if self.null_check {
-            format!(
-                " OR ({} AND {})",
-                templates.is_null_expr(&left_column, false)?,
-                templates.is_null_expr(&right_column, false)?
-            )
-        } else {
-            format!("")
-        };
-
-        Ok(format!(
-            "({} = {}{})",
-            left_column, right_column, null_check
-        ))
+        templates.join_by_dimension_conditions(&left_column, &right_column, self.null_check)
     }
 
     fn resolve_member_alias(
@@ -157,14 +144,13 @@ impl JoinItem {
         context: Rc<VisitorContext>,
         schema: Rc<Schema>,
     ) -> Result<String, CubeError> {
-        let operator = if self.is_inner { "INNER" } else { "LEFT" };
         let on_sql = self.on.to_sql(templates, context.clone(), schema)?;
-        Ok(format!(
-            "{} JOIN {} ON {}",
-            operator,
-            self.from.to_sql(templates, context)?,
-            on_sql
-        ))
+        let result = templates.join(
+            &self.from.to_sql(templates, context)?,
+            &on_sql,
+            self.is_inner,
+        )?;
+        Ok(result)
     }
 }
 

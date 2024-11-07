@@ -2,6 +2,9 @@ use itertools::Itertools;
 
 use super::{Cte, Expr, Filter, From, OrderBy, Schema, SchemaColumn};
 use crate::planner::sql_templates::PlanSqlTemplates;
+use crate::planner::sql_templates::{
+    TemplateGroupByColumn, TemplateOrderByColumn, TemplateProjectionColumn,
+};
 use crate::planner::VisitorContext;
 use cubenativeutils::CubeError;
 use std::rc::Rc;
@@ -21,12 +24,14 @@ impl AliasedExpr {
         templates: &PlanSqlTemplates,
         context: Rc<VisitorContext>,
         schema: Rc<Schema>,
-    ) -> Result<String, CubeError> {
-        Ok(format!(
-            "{}  {}",
-            self.expr.to_sql(templates, context, schema)?,
-            templates.quote_identifier(&self.alias)?
-        ))
+    ) -> Result<TemplateProjectionColumn, CubeError> {
+        let expr = self.expr.to_sql(templates, context, schema)?;
+        let aliased = templates.column_aliased(&expr, &self.alias)?;
+        Ok(TemplateProjectionColumn {
+            expr,
+            alias: self.alias.clone(),
+            aliased,
+        })
     }
 }
 
@@ -76,90 +81,79 @@ impl Select {
                 .iter()
                 .map(|p| p.to_sql(templates, self.context.clone(), schema.clone()))
                 .collect::<Result<Vec<_>, _>>()?
-                .join(", ")
         } else {
-            format!(" * ")
+            vec![TemplateProjectionColumn {
+                expr: format!("*"),
+                alias: format!(""),
+                aliased: format!("*"),
+            }]
         };
 
         let where_condition = if let Some(filter) = &self.filter {
-            format!(
-                " WHERE {}",
-                filter.to_sql(self.context.clone(), schema.clone())?
-            )
+            Some(filter.to_sql(templates, self.context.clone(), schema.clone())?)
         } else {
-            format!("")
+            None
         };
 
-        let group_by = if !self.group_by.is_empty() {
-            let str = self
-                .group_by
-                .iter()
-                .enumerate()
-                .map(|(i, _)| format!("{}", i + 1))
-                .join(", ");
-            format!(" GROUP BY {}", str)
-        } else {
-            format!("")
-        };
+        let group_by = self
+            .group_by
+            .iter()
+            .enumerate()
+            .map(|(i, expr)| -> Result<_, CubeError> {
+                let expr = expr.to_sql(templates, self.context.clone(), schema.clone())?;
+                Ok(TemplateGroupByColumn { expr, index: i + 1 })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
         let having = if let Some(having) = &self.having {
-            format!(
-                " HAVING {}",
-                having.to_sql(self.context.clone(), schema.clone())?
-            )
+            Some(having.to_sql(templates, self.context.clone(), schema.clone())?)
         } else {
-            format!("")
+            None
         };
 
-        let ctes = if !self.ctes.is_empty() {
-            let ctes_sql = self
-                .ctes
-                .iter()
-                .map(|cte| -> Result<_, CubeError> {
-                    Ok(format!(
-                        " {} as ({})",
-                        cte.name(),
-                        cte.query().to_sql(templates)?
-                    ))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .join(",\n");
-            format!("WITH\n{ctes_sql}\n")
-        } else {
-            "".to_string()
-        };
+        let ctes = self
+            .ctes
+            .iter()
+            .map(|cte| -> Result<_, CubeError> {
+                templates.cte(&cte.query().to_sql(templates)?, &cte.name().clone())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let order_by = if !self.order_by.is_empty() {
-            let order_sql = self
-                .order_by
-                .iter()
-                .map(|itm| format!("{} {}", itm.pos, itm.asc_str()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!(" ORDER BY {}", order_sql)
-        } else {
-            format!("")
-        };
+        let order_by = self
+            .order_by
+            .iter()
+            .map(|itm| -> Result<_, CubeError> {
+                let expr = templates.order_by(
+                    &itm.expr
+                        .to_sql(templates, self.context.clone(), schema.clone())?,
+                    Some(itm.pos),
+                    !itm.desc,
+                )?;
+                Ok(TemplateOrderByColumn { expr })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let distinct = if self.is_distinct { "DISTINCT " } else { "" };
         let from = self.from.to_sql(templates, self.context.clone())?;
-        let limit = if let Some(limit) = self.limit {
-            format!(" LIMIT {limit}")
-        } else {
-            format!("")
-        };
-        let offset = if let Some(offset) = self.offset {
-            format!(" OFFSET {offset}")
-        } else {
-            format!("")
-        };
 
-        let res = format!(
+        let result = templates.select(
+            ctes,
+            &from,
+            projection,
+            where_condition,
+            group_by,
+            having,
+            order_by,
+            self.limit,
+            self.offset,
+            self.is_distinct,
+        )?;
+
+        /* let res = format!(
             "{ctes}SELECT\
             \n      {distinct}{projection}\
             \n    FROM\
             \n{from}{where_condition}{group_by}{having}{order_by}{limit}{offset}",
-        );
-        Ok(res)
+        ); */
+        Ok(result)
     }
 }
