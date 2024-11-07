@@ -532,7 +532,7 @@ const variables: Record<string, (...args: any) => any> = {
   },
 
   /**
-   * Query timeout. Currently used in BigQuery, Dremio, Postgres, Snowflake
+   * Query timeout. Currently used in BigQuery, ClickHouse, Dremio, Postgres, Snowflake
    * and Athena drivers and the orchestrator (queues, pre-aggs). For the
    * orchestrator this variable did not split by the datasource.
    *

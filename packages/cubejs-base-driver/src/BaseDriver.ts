@@ -614,9 +614,14 @@ export abstract class BaseDriver implements DriverInterface {
     return [];
   }
 
-  public createTable(quotedTableName: string, columns: TableColumn[]) {
+  // This is only for use in tests
+  public async createTableRaw(query: string): Promise<void> {
+    await this.query(query);
+  }
+
+  public async createTable(quotedTableName: string, columns: TableColumn[]): Promise<void> {
     const createTableSql = this.createTableSql(quotedTableName, columns);
-    return this.query(createTableSql, []).catch(e => {
+    await this.query(createTableSql, []).catch(e => {
       e.message = `Error during create table: ${createTableSql}: ${e.message}`;
       throw e;
     });
