@@ -58,13 +58,23 @@ describe('ClickHouseDriver', () => {
         []
       );
 
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      function mkPlaceholdersTuple(len: number): string {
+        const parts = new Array(len).fill('').map((_, idx) => driver.param(idx));
+        return `(${parts.join(',')})`;
+      }
+
+      async function insert(table: string, values: Array<unknown>): Promise<void> {
+        const placeholders = mkPlaceholdersTuple(values.length);
+        await driver.query(`INSERT INTO ${table} VALUES ${placeholders}`, values);
+      }
+
+      await insert('test.types_test', [
         '2020-01-01', '2020-01-01 00:00:00', '2020-01-01 00:00:00.000', '2020-01-01 00:00:00.000000', '2020-01-01 00:00:00.000000000', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.01, 1.01, 1.01, 'hello', 'world'
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      await insert('test.types_test', [
         '2020-01-02', '2020-01-02 00:00:00', '2020-01-02 00:00:00.123', '2020-01-02 00:00:00.123456', '2020-01-02 00:00:00.123456789', 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2.02, 2.02, 2.02, 'hello', 'world'
       ]);
-      await driver.query('INSERT INTO test.types_test VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+      await insert('test.types_test', [
         '2020-01-03', '2020-01-03 00:00:00', '2020-01-03 00:00:00.234', '2020-01-03 00:00:00.234567', '2020-01-03 00:00:00.234567890', 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3.03, 3.03, 3.03, 'hello', 'world'
       ]);
     });
@@ -205,8 +215,8 @@ describe('ClickHouseDriver', () => {
       try {
         await driver.createSchemaIfNotExists(name);
         await driver.query(`CREATE TABLE ${name}.test (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.test VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
-        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = ?`, [2]);
+        await driver.query(`INSERT INTO ${name}.test VALUES ({p0:Int32}, {p1:String}), ({p2:Int32}, {p3:String}), ({p4:Int32}, {p5:String})`, [1, 'str1', 2, 'str2', 3, 'str3']);
+        const values = await driver.query(`SELECT * FROM ${name}.test WHERE x = {p0:Int32}`, [2]);
         expect(values).toEqual([{ x: '2', s: 'str2' }]);
       } finally {
         await driver.query(`DROP DATABASE ${name}`, []);
@@ -220,10 +230,10 @@ describe('ClickHouseDriver', () => {
       try {
         await driver.createSchemaIfNotExists(name);
         await driver.query(`CREATE TABLE ${name}.a (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.a VALUES (?, ?), (?, ?), (?, ?)`, [1, 'str1', 2, 'str2', 3, 'str3']);
+        await driver.query(`INSERT INTO ${name}.a VALUES ({p0:Int32}, {p1:String}), ({p2:Int32}, {p3:String}), ({p4:Int32}, {p5:String})`, [1, 'str1', 2, 'str2', 3, 'str3']);
 
         await driver.query(`CREATE TABLE ${name}.b (x Int32, s String) ENGINE Log`, []);
-        await driver.query(`INSERT INTO ${name}.b VALUES (?, ?), (?, ?), (?, ?)`, [2, 'str2', 3, 'str3', 4, 'str4']);
+        await driver.query(`INSERT INTO ${name}.b VALUES ({p0:Int32}, {p1:String}), ({p2:Int32}, {p3:String}), ({p4:Int32}, {p5:String})`, [2, 'str2', 3, 'str3', 4, 'str4']);
 
         const values = await driver.query(`SELECT * FROM ${name}.a LEFT OUTER JOIN ${name}.b ON a.x = b.x`, []);
         expect(values).toEqual([
@@ -245,7 +255,7 @@ describe('ClickHouseDriver', () => {
 
   it('datetime with specific timezone', async () => {
     await doWithDriver(async (driver) => {
-      const rows = await driver.query('SELECT toDateTime(?, \'Asia/Istanbul\') as dt', [
+      const rows = await driver.query('SELECT toDateTime({p0:String}, \'Asia/Istanbul\') as dt', [
         '2020-01-01 00:00:00'
       ]);
       expect(rows).toEqual([{

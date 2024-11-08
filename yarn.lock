@@ -4222,6 +4222,11 @@
   resolved "https://registry.yarnpkg.com/@bcoe/v8-coverage/-/v8-coverage-0.2.3.tgz#75a2e8b51cb758a7553d6804a5932d7aace75c39"
   integrity sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==
 
+"@clickhouse/client-common@^1.8.0":
+  version "1.8.0"
+  resolved "https://registry.yarnpkg.com/@clickhouse/client-common/-/client-common-1.8.0.tgz#6775c4f1f4b56f393cbacec0a1b544dafcf8d5ed"
+  integrity sha512-aQgH0UODGuFHfL8rgeLSrGCoh3NCoNUs0tFGl0o79iyfASfvWtT/K/X3RM0QJpXXOgXpB//T2nD5XvCFtdk32w==
+
 "@codemirror/highlight@^0.19.0":
   version "0.19.6"
   resolved "https://registry.yarnpkg.com/@codemirror/highlight/-/highlight-0.19.6.tgz#7f2e066f83f5649e8e0748a3abe0aaeaf64b8ac2"

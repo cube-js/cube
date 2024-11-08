@@ -1,7 +1,8 @@
+import { formatQueryParams } from '@clickhouse/client-common';
+// TODO migrate to `@clickhouse/client`, upstream clickhouse client
 /* eslint-disable */
 import ClickHouse from '@cubejs-backend/apla-clickhouse';
 import { GenericContainer } from 'testcontainers';
-import { format as formatSql } from 'sqlstring';
 import { v4 as uuidv4 } from 'uuid';
 import { ClickHouseQuery } from '../../../src/adapter/ClickHouseQuery';
 import { BaseDbRunner } from "../utils/BaseDbRunner";
@@ -136,13 +137,29 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     } : {};
 
     for (const [query, params] of queries) {
-      requests.push(clickHouse.querying(formatSql(query, params), {
+      // ClickHouse have named and typed parameters
+      // But our interface for parameters between query builder and driver is Array<unknown>
+      // We don't have access to driver here, so instead this replicates logic from driver
+      const preparedValues = Object.fromEntries(params.map((value, idx) => {
+        const paramName = `p${idx}`;
+        const paramKey = `param_${paramName}`;
+        const preparedValue = formatQueryParams(value);
+        return [paramKey, preparedValue];
+      }));
+      // TODO drop this
+      console.log("ClickHOuse testQueries prepared", query, preparedValues);
+      requests.push(clickHouse.querying(query, {
         dataObjects: true,
         queryOptions: {
           session_id: clickHouse.sessionId,
           join_use_nulls: '1',
-          ...extendedDateTimeResultsOptions
+          ...extendedDateTimeResultsOptions,
+          // Add parameter values to query string
+          ...preparedValues,
         }
+      }).catch((err) => {
+        // TODO remove message, or make it shorter. ort not, it's just tests
+        throw new Error(`Failed during query; query: ${query}; params: ${params}`, { cause: err });
       }));
     }
 
