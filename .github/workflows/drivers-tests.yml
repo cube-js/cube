@@ -331,6 +331,6 @@ jobs:
           timeout_minutes: 20
           command: |
             cd ./packages/cubejs-testing-drivers
-            export DEBUG=testcontainers
+            export DEBUG=testcontainers,testcontainers:containers
             yarn ${{ matrix.database }}-full
 

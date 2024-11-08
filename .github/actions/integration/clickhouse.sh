@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # Debug log for test containers
-export DEBUG=testcontainers
+export DEBUG=testcontainers,testcontainers:containers
 
 export TEST_CLICKHOUSE_VERSION=23.11
 
