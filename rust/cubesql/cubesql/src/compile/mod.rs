@@ -16220,4 +16220,42 @@ LIMIT {{ limit }}{% endif %}"#.to_string(),
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn test_mysql_nulls_last() {
+        if !Rewriter::sql_push_down_enabled() {
+            return;
+        }
+        init_testing_logger();
+
+        let query_plan = convert_select_to_query_plan_customized(
+            "
+            SELECT customer_gender AS s
+            FROM KibanaSampleDataEcommerce AS k
+            WHERE LOWER(customer_gender) = 'test'
+            GROUP BY 1
+            ORDER BY 1 DESC
+            "
+            .to_string(),
+            DatabaseProtocol::PostgreSQL,
+            vec![
+                ("expressions/sort".to_string(), "{{ expr }} IS NULL {% if nulls_first %}DESC{% else %}ASC{% endif %}, {{ expr }} {% if asc %}ASC{% else %}DESC{% endif %}".to_string()),
+            ]
+        )
+        .await;
+
+        let physical_plan = query_plan.as_physical_plan().await.unwrap();
+        println!(
+            "Physical plan: {}",
+            displayable(physical_plan.as_ref()).indent()
+        );
+
+        let logical_plan = query_plan.as_logical_plan();
+        let sql = logical_plan
+            .find_cube_scan_wrapper()
+            .wrapped_sql
+            .unwrap()
+            .sql;
+        assert!(sql.contains(" IS NULL DESC, "));
+    }
 }
