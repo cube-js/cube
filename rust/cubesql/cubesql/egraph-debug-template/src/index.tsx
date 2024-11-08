@@ -104,13 +104,16 @@ function prepareStates(states: InputData): Array<PreparedStateData> {
                 } as InputNodeData;
             })
             .concat(
-                egraph.eclasses.map((eclass) => {
-                    return {
-                        id: eclass.id.toString(),
-                        label: eclass.id.toString(),
-                        comboId: `c${eclass.id}`,
-                    } as InputNodeData;
-                }),
+                egraph.eclasses
+                    // render only canonical eclasses to avoid rendering empty nodes and combos for merged ones
+                    .filter((eclass) => eclass.id === eclass.canon)
+                    .map((eclass) => {
+                        return {
+                            id: eclass.id.toString(),
+                            label: eclass.id.toString(),
+                            comboId: `c${eclass.id}`,
+                        } as InputNodeData;
+                    }),
             );
 
         const allEdges = egraph.enodes
@@ -144,12 +147,15 @@ function prepareStates(states: InputData): Array<PreparedStateData> {
         }
         let edges = [...uniqueEdges.values()];
 
-        let combos = egraph.eclasses.map((eclass) => {
-            return {
-                id: `c${eclass.id}`,
-                label: `#${eclass.id}`,
-            } as InputComboData;
-        });
+        let combos = egraph.eclasses
+            // render only canonical eclasses to avoid rendering empty nodes and combos for merged ones
+            .filter((eclass) => eclass.id === eclass.canon)
+            .map((eclass) => {
+                return {
+                    id: `c${eclass.id}`,
+                    label: `#${eclass.id}`,
+                } as InputComboData;
+            });
 
         const nodesClone = nodes.slice();
         const edgesClone = edges.slice();
