@@ -2780,7 +2780,7 @@ export class BaseQuery {
    * intervals relative to origin timestamp point
    * @param {string} interval (a value expression of type interval)
    * @param {string} source (a value expression of type timestamp/date)
-   * @param {string} origin (a value expression of type timestamp/date)
+   * @param {string} origin (a value expression of type timestamp/date without timezone)
    * @returns {string}
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -2838,7 +2838,7 @@ export class BaseQuery {
       return this.timeGroupedColumn(granularity.granularityFromInterval(), dimension);
     }
 
-    return this.dateBin(granularity.granularityInterval, dimension, granularity.originFormatted());
+    return this.dateBin(granularity.granularityInterval, dimension, granularity.originLocalFormatted());
   }
 
   /**
