@@ -3809,21 +3809,20 @@ export class BaseQuery {
     if (!filterParamArg) {
       throw new Error(`FILTER_PARAMS arg not found for ${filter.measure || filter.dimension}`);
     }
-    if (
-      filterParams && filterParams.length
-    ) {
-      if (typeof filterParamArg.__column() === 'function') {
-        // eslint-disable-next-line prefer-spread
-        return filterParamArg.__column().apply(
-          null,
-          filterParams.map(allocateParam),
-        );
-      } else {
-        return filter.conditionSql(filterParamArg.__column());
-      }
-    } else {
+
+    if (typeof filterParamArg.__column() !== 'function') {
+      return filter.conditionSql(filterParamArg.__column());
+    }
+
+    if (!filterParams || !filterParams.length) {
       return '1 = 1';
     }
+
+    // eslint-disable-next-line prefer-spread
+    return filterParamArg.__column().apply(
+      null,
+      filterParams.map(allocateParam),
+    );
   }
 
   filterGroupFunction() {
