@@ -136,6 +136,8 @@ export class ClickHouseDbRunner extends BaseDbRunner {
     } : {};
 
     for (const [query, params] of queries) {
+      console.log("ClickHOuse testQueries", query, params);
+      console.log("ClickHOuse prepared", formatSql(query, params));
       requests.push(clickHouse.querying(formatSql(query, params), {
         dataObjects: true,
         queryOptions: {

@@ -506,4 +506,84 @@ describe('ClickHouse DataSchemaCompiler', () => {
       ]);
     }
   );
+
+  it('question mark filter', () => {
+    const { compiler, cubeEvaluator, joinGraph } = testPrepareCompiler(`
+    cube('visitors', {
+      sql: \`
+      select * from visitors
+      \`,
+
+      measures: {
+        visitor_count: {
+          type: 'count',
+          sql: 'id'
+        },
+        visitor_revenue: {
+          type: 'sum',
+          sql: 'amount'
+        },
+        per_visitor_revenue: {
+          type: 'number',
+          sql: visitor_revenue + "/" + visitor_count
+        }
+      },
+
+      dimensions: {
+        source: {
+          type: 'string',
+          sql: 'source'
+        },
+        created_at: {
+          type: 'time',
+          sql: 'created_at'
+        },
+        updated_at: {
+          type: 'time',
+          sql: 'updated_at'
+        },
+        questionMark: {
+          sql: \`replace('some string question string ? ? ? ???', 'string', 'with some ? ? ? ???')\`,
+          type: 'string'
+        }
+      }
+    })
+    `);
+    const result = compiler.compile().then(() => {
+      const query = new ClickHouseQuery({ joinGraph, cubeEvaluator, compiler }, {
+        measures: ['visitors.visitor_count'],
+        dimensions: [],
+        timeDimensions: [],
+        timezone: 'America/Los_Angeles',
+        filters: [{
+          or: [{
+            member: 'visitors.questionMark',
+            operator: 'contains',
+            values: ['with some']
+          }, {
+            member: 'visitors.questionMark',
+            operator: 'equals',
+            values: [null]
+          }, {
+            member: 'visitors.questionMark',
+            operator: 'equals',
+            values: [null, 'with some']
+          }]
+        }],
+        order: []
+      });
+
+      logSqlAndParams(query);
+
+      return dbRunner.testQuery(query.buildSqlAndParams()).then((res: any) => {
+        expect(res).toEqual(
+          [
+            { visitors__visitor_count_foo_bar: '6' }
+          ]
+        );
+      });
+    });
+
+    return result;
+  });
 });
