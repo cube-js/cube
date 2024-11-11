@@ -19,6 +19,7 @@ use crate::{
     CubeError,
 };
 use chrono::{Days, NaiveDate, SecondsFormat, TimeZone, Utc};
+use cubeclient::models::V1LoadRequestQuery;
 use datafusion::{
     error::{DataFusionError, Result},
     logical_plan::{
@@ -1065,74 +1066,76 @@ impl CubeScanWrapperNode {
                             .await?;
                             if let Some(push_to_cube_context) = push_to_cube_context {
                                 let ungrouped_scan_node = push_to_cube_context.ungrouped_scan_node;
-                                let mut load_request = ungrouped_scan_node.request.clone();
-                                load_request.measures = Some(
-                                    aggregate
-                                        .iter()
-                                        .map(|m| {
-                                            Self::ungrouped_member_def(
-                                                m,
-                                                &ungrouped_scan_node.used_cubes,
-                                            )
-                                        })
-                                        .chain(
-                                            // TODO understand type of projections
-                                            projection.iter().map(|m| {
+                                let load_request = &ungrouped_scan_node.request;
+
+                                let load_request = V1LoadRequestQuery {
+                                    measures: Some(
+                                        aggregate
+                                            .iter()
+                                            .map(|m| {
                                                 Self::ungrouped_member_def(
                                                     m,
                                                     &ungrouped_scan_node.used_cubes,
                                                 )
-                                            }),
-                                        )
-                                        .chain(window.iter().map(|m| {
-                                            Self::ungrouped_member_def(
-                                                m,
-                                                &ungrouped_scan_node.used_cubes,
+                                            })
+                                            .chain(
+                                                // TODO understand type of projections
+                                                projection.iter().map(|m| {
+                                                    Self::ungrouped_member_def(
+                                                        m,
+                                                        &ungrouped_scan_node.used_cubes,
+                                                    )
+                                                }),
                                             )
-                                        }))
-                                        .collect::<Result<_>>()?,
-                                );
-                                load_request.dimensions = Some(
-                                    group_by
-                                        .iter()
-                                        .zip(group_descs.iter())
-                                        .map(|(m, t)| {
-                                            Self::dimension_member_def(
-                                                m,
-                                                &ungrouped_scan_node.used_cubes,
-                                                t,
-                                            )
-                                        })
-                                        .collect::<Result<_>>()?,
-                                );
-                                load_request.segments = Some(
-                                    filter
-                                        .iter()
-                                        .map(|m| {
-                                            Self::ungrouped_member_def(
-                                                m,
-                                                &ungrouped_scan_node.used_cubes,
-                                            )
-                                        })
-                                        .collect::<Result<_>>()?,
-                                );
-                                if !order_expr.is_empty() {
-                                    load_request.order = Some(
-                                        order_expr
+                                            .chain(window.iter().map(|m| {
+                                                Self::ungrouped_member_def(
+                                                    m,
+                                                    &ungrouped_scan_node.used_cubes,
+                                                )
+                                            }))
+                                            .collect::<Result<_>>()?,
+                                    ),
+                                    dimensions: Some(
+                                        group_by
                                             .iter()
-                                            .map(|o| -> Result<_> { match o {
-                                                Expr::Sort {
-                                                    expr,
-                                                    asc,
-                                                    ..
-                                                } => {
-                                                    let col_name = expr_name(&expr, &schema)?;
-                                                    let aliased_column = aggr_expr
-                                                        .iter()
-                                                        .find_position(|e| {
-                                                            expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
-                                                        })
-                                                        .map(|(i, _)| aggregate[i].clone()).or_else(|| {
+                                            .zip(group_descs.iter())
+                                            .map(|(m, t)| {
+                                                Self::dimension_member_def(
+                                                    m,
+                                                    &ungrouped_scan_node.used_cubes,
+                                                    t,
+                                                )
+                                            })
+                                            .collect::<Result<_>>()?,
+                                    ),
+                                    segments: Some(
+                                        filter
+                                            .iter()
+                                            .map(|m| {
+                                                Self::ungrouped_member_def(
+                                                    m,
+                                                    &ungrouped_scan_node.used_cubes,
+                                                )
+                                            })
+                                            .collect::<Result<_>>()?,
+                                    ),
+                                    order: if !order_expr.is_empty() {
+                                        Some(
+                                            order_expr
+                                                .iter()
+                                                .map(|o| -> Result<_> { match o {
+                                                    Expr::Sort {
+                                                        expr,
+                                                        asc,
+                                                        ..
+                                                    } => {
+                                                        let col_name = expr_name(&expr, &schema)?;
+                                                        let aliased_column = aggr_expr
+                                                            .iter()
+                                                            .find_position(|e| {
+                                                                expr_name(e, &schema).map(|n| &n == &col_name).unwrap_or(false)
+                                                            })
+                                                            .map(|(i, _)| aggregate[i].clone()).or_else(|| {
                                                             projection_expr
                                                                 .iter()
                                                                 .find_position(|e| {
@@ -1157,33 +1160,46 @@ impl CubeScanWrapperNode {
                                                                 flat_group_expr
                                                             ))
                                                         })?;
-                                                    Ok(vec![
-                                                        aliased_column.alias.clone(),
-                                                        if *asc { "asc".to_string() } else { "desc".to_string() },
-                                                    ])
-                                                }
-                                                _ => Err(DataFusionError::Execution(format!(
-                                                    "Expected sort expression, found {:?}",
-                                                    o
-                                                ))),
-                                            }})
-                                            .collect::<Result<Vec<_>>>()?,
-                                    );
-                                }
-                                load_request.ungrouped =
-                                    if let WrappedSelectType::Projection = select_type {
+                                                        Ok(vec![
+                                                            aliased_column.alias.clone(),
+                                                            if *asc { "asc".to_string() } else { "desc".to_string() },
+                                                        ])
+                                                    }
+                                                    _ => Err(DataFusionError::Execution(format!(
+                                                        "Expected sort expression, found {:?}",
+                                                        o
+                                                    ))),
+                                                }})
+                                                .collect::<Result<Vec<_>>>()?,
+                                        )
+                                    } else {
+                                        load_request.order.clone()
+                                    },
+                                    ungrouped: if let WrappedSelectType::Projection = select_type {
                                         load_request.ungrouped.clone()
                                     } else {
                                         None
-                                    };
+                                    },
+                                    // TODO is it okay to just override limit?
+                                    limit: if let Some(limit) = limit {
+                                        Some(limit as i32)
+                                    } else {
+                                        load_request.limit.clone()
+                                    },
+                                    // TODO is it okay to just override offset?
+                                    offset: if let Some(offset) = offset {
+                                        Some(offset as i32)
+                                    } else {
+                                        load_request.offset.clone()
+                                    },
 
-                                if let Some(limit) = limit {
-                                    load_request.limit = Some(limit as i32);
-                                }
+                                    // Original scan node can already have consumed filters from Logical plan
+                                    // It's incorrect to just throw them away
+                                    filters: ungrouped_scan_node.request.filters.clone(),
 
-                                if let Some(offset) = offset {
-                                    load_request.offset = Some(offset as i32);
-                                }
+                                    time_dimensions: load_request.time_dimensions.clone(),
+                                };
+
                                 // TODO time dimensions, filters, segments
 
                                 let mut meta_with_user = load_request_meta.as_ref().clone();
