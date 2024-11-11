@@ -3784,7 +3784,7 @@ export class BaseQuery {
 
   static renderFilterParams(filter, filterParamArgs, allocateParam, newGroupFilter, aliases) {
     if (!filter) {
-      return '1 = 1';
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     if (filter.operator === 'and' || filter.operator === 'or') {
@@ -3815,7 +3815,7 @@ export class BaseQuery {
     }
 
     if (!filterParams || !filterParams.length) {
-      return '1 = 1';
+      return BaseFilter.ALWAYS_TRUE;
     }
 
     // eslint-disable-next-line prefer-spread
