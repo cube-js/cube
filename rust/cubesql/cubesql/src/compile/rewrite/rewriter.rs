@@ -384,6 +384,7 @@ impl Rewriter {
                         .map(|(i, n)| format!("{}: {:?}", i, n))
                         .join(", ")
                 );
+                log::debug!("Best pretty: {}", best.pretty(80));
                 let converter = LanguageToLogicalPlanConverter::new(
                     best,
                     cube_context.clone(),
