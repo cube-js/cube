@@ -251,6 +251,13 @@ impl Configurator for WorkerConfigurator {
         };
         Ok(config)
     }
+
+    fn teardown() {
+        let teardown = SELECT_WORKER_SHUTDOWN.read().unwrap();
+        if teardown.is_some() {
+            teardown.as_ref().unwrap()();
+        }
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -369,9 +376,20 @@ lazy_static! {
         std::sync::RwLock::new(None);
 }
 
+lazy_static! {
+    static ref SELECT_WORKER_SHUTDOWN: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>> =
+        std::sync::RwLock::new(None);
+}
+
 pub fn register_select_worker_setup(f: fn(&Runtime)) {
     let mut setup = SELECT_WORKER_SETUP.write().unwrap();
     assert!(setup.is_none(), "select worker setup already registered");
+    *setup = Some(Box::new(f));
+}
+
+pub fn register_select_worker_teardown(f: fn()) {
+    let mut setup = SELECT_WORKER_SHUTDOWN.write().unwrap();
+    assert!(setup.is_none(), "select worker teardown already registered");
     *setup = Some(Box::new(f));
 }
 
